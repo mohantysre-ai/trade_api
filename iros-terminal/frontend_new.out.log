@@ -1,0 +1,29 @@
+
+> iros-terminal@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.200.1:3000
+✓ Ready in 1873ms
+Creating turbopack project { dir: 'D:\\trade_api\\iros-terminal', testMode: true }
+
+ GET / 200 in 2.2s (next.js: 1265ms, application-code: 982ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 288ms (next.js: 199ms, application-code: 89ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 38ms (next.js: 16ms, application-code: 22ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 41ms (next.js: 10ms, application-code: 31ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 38ms (next.js: 15ms, application-code: 23ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 36ms (next.js: 10ms, application-code: 26ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 23ms (next.js: 6ms, application-code: 17ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 58ms (next.js: 13ms, application-code: 45ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 37ms (next.js: 15ms, application-code: 22ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 68ms (next.js: 15ms, application-code: 53ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 58ms (next.js: 14ms, application-code: 43ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 25ms (next.js: 6ms, application-code: 20ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 40ms (next.js: 14ms, application-code: 26ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 42ms (next.js: 11ms, application-code: 31ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 50ms (next.js: 14ms, application-code: 36ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 37ms (next.js: 16ms, application-code: 21ms)
+ GET / 200 in 144ms (next.js: 4ms, application-code: 140ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 29ms (next.js: 7ms, application-code: 22ms)
+ GET /api/market-data?pool=Nifty%20100 503 in 32ms (next.js: 17ms, application-code: 14ms)
