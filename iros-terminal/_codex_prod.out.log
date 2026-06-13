@@ -1,0 +1,8 @@
+
+> iros-terminal@0.1.0 start
+> next start --port 3001
+
+▲ Next.js 16.2.6
+- Local:         http://localhost:3001
+- Network:       http://192.168.200.1:3001
+✓ Ready in 824ms
