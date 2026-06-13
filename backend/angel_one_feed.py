@@ -49,6 +49,12 @@ EVENING_REFRESH_END = (16, 30)
 REFRESH_TASK_TTL_SECONDS = 600
 _REFRESH_TASKS: dict[str, dict[str, Any]] = {}
 _REFRESH_TASK_LOCK = threading.Lock()
+LLM_UNIVERSE_LIMIT = int(os.getenv("LLM_UNIVERSE_LIMIT", "30"))
+NIFTY_100_LABEL = "Nifty 100"
+NIFTY_100_CACHE_PATH = BASE_DIR / "nifty100_instruments.json"
+ANGEL_API_TIMEOUT_SECONDS = int(os.getenv("ANGEL_API_TIMEOUT_SECONDS", "12"))
+QUOTE_CHUNK_SIZE = int(os.getenv("QUOTE_CHUNK_SIZE", "10"))
+INTRADAY_CHUNK_SIZE = int(os.getenv("INTRADAY_CHUNK_SIZE", "10"))
 
 
 def _refresh_task_key(pool_name: str | None, custom_prompt: str | None) -> str:
@@ -129,7 +135,7 @@ def _filter_prompt(custom_prompt: str | None = None) -> str:
         parts.append(custom_prompt.strip())
     parts.append(
         "Use the live Angel One universe below to select the top "
-        f"{TOP_SELECTION_COUNT} stocks. Prefer the Nifty 500 universe; do not restrict selection to Nifty 50 only. "
+        f"{TOP_SELECTION_COUNT} stocks. Prefer the Nifty 100 universe; do not restrict selection to Nifty 50 only. "
         "Do not invent tickers. Return valid JSON only."
     )
     return " ".join(parts)
@@ -185,19 +191,19 @@ def _within_refresh_window(now: datetime | None = None) -> bool:
 def _normalize_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
     payload["rawSources"] = _news_feed_sources()
     available_pools = [pool for pool in payload.get("availablePools", []) if pool != "Nifty 50"]
-    if NIFTY_500_LABEL not in available_pools:
-        available_pools.insert(0, NIFTY_500_LABEL)
+    if NIFTY_100_LABEL not in available_pools:
+        available_pools.insert(0, NIFTY_100_LABEL)
     if LIVE_UNIVERSE_LABEL not in available_pools:
         available_pools.append(LIVE_UNIVERSE_LABEL)
     payload["availablePools"] = available_pools
-    payload.setdefault("activePool", NIFTY_500_LABEL)
-    payload.setdefault("poolDescription", "Nifty 500 Angel One live universe ranked by your filter prompt.")
+    payload.setdefault("activePool", NIFTY_100_LABEL)
+    payload.setdefault("poolDescription", "Nifty 100 Angel One live universe ranked by your filter prompt.")
     return payload
 
 
-def _load_nifty500_watchlist() -> list[Instrument]:
+def _load_watchlist_from_cache(path: Path) -> list[Instrument]:
     try:
-        raw = json.loads(NIFTY_500_CACHE_PATH.read_text(encoding="utf-8"))
+        raw = json.loads(path.read_text(encoding="utf-8"))
         instruments = raw.get("instruments", []) if isinstance(raw, dict) else []
         return [
             Instrument(
@@ -215,14 +221,20 @@ def _load_nifty500_watchlist() -> list[Instrument]:
 
 
 def _pool_watchlist(pool_name: str | None) -> tuple[list[Instrument], str]:
-    resolved_pool_name = pool_name or NIFTY_500_LABEL
-    if resolved_pool_name == "Nifty 50":
-        resolved_pool_name = NIFTY_500_LABEL
-    if resolved_pool_name == NIFTY_500_LABEL:
-        nifty500 = _load_nifty500_watchlist()
+    resolved = pool_name or NIFTY_100_LABEL
+
+    if resolved in ("Nifty 50", NIFTY_500_LABEL):
+        resolved = NIFTY_100_LABEL
+
+    if resolved == NIFTY_100_LABEL:
+        nifty100 = _load_watchlist_from_cache(NIFTY_100_CACHE_PATH)
+        if nifty100:
+            return nifty100, NIFTY_100_LABEL
+        nifty500 = _load_watchlist_from_cache(NIFTY_500_CACHE_PATH)
         if nifty500:
-            return nifty500, resolved_pool_name
-    return WATCHLIST, NIFTY_500_LABEL if not pool_name else resolved_pool_name
+            return nifty500[:100], NIFTY_100_LABEL
+
+    return WATCHLIST, resolved
 
 
 def _payload_data_date(payload: dict[str, Any] | None = None) -> str:
@@ -398,7 +410,7 @@ class AngelOneClient:
     def connect(self) -> SmartConnect:
         if self._smart is not None:
             return self._smart
-        smart = SmartConnect(api_key=self.api_key)
+        smart = SmartConnect(api_key=self.api_key, timeout=ANGEL_API_TIMEOUT_SECONDS)
         totp = pyotp.TOTP(self.totp_secret).now()
         session = smart.generateSession(self.client_id, self.mpin, totp)
         if not session.get("status"):
@@ -478,6 +490,56 @@ class AngelOneClient:
                 continue
 
         return fetched
+
+
+def _fetch_quote_chunk(
+    smart: SmartConnect,
+    chunk: list[Instrument],
+    token_to_key: dict[str, str],
+) -> dict[str, dict[str, Any]]:
+    tokens_by_exchange: dict[str, list[str]] = {}
+    for inst in chunk:
+        tokens_by_exchange.setdefault(inst.exchange, []).append(inst.token)
+
+    fetched: dict[str, dict[str, Any]] = {}
+    try:
+        response = smart.getMarketData("FULL", tokens_by_exchange)
+        if response.get("status"):
+            for item in response.get("data", {}).get("fetched", []):
+                token = str(item.get("symbolToken", ""))
+                key = token_to_key.get(token)
+                if key:
+                    fetched[key] = item
+            return fetched
+    except Exception:
+        pass
+
+    for inst in chunk:
+        try:
+            response = smart.ltpData(inst.exchange, inst.tradingsymbol, inst.token)
+            if response.get("status"):
+                fetched[inst.key] = response["data"]
+        except Exception:
+            continue
+    return fetched
+
+
+def _fetch_batch_quotes_chunked(
+    self: AngelOneClient,
+    instruments: list[Instrument],
+) -> dict[str, dict[str, Any]]:
+    smart = self.connect()
+    token_to_key = {inst.token: inst.key for inst in instruments}
+    chunks = [instruments[i : i + QUOTE_CHUNK_SIZE] for i in range(0, len(instruments), QUOTE_CHUNK_SIZE)]
+    all_fetched: dict[str, dict[str, Any]] = {}
+
+    for chunk in chunks:
+        all_fetched.update(_fetch_quote_chunk(smart, chunk, token_to_key))
+
+    return all_fetched
+
+
+AngelOneClient.fetch_batch_quotes = _fetch_batch_quotes_chunked
 
 
 def _build_stock_row(
@@ -594,6 +656,28 @@ def _ema_angle_deg(ema_values: list[float]) -> float:
     return math.degrees(math.atan(slope_pct))
 
 
+def _empty_intraday_metrics(reason: str) -> dict[str, Any]:
+    return {
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": False,
+        "price_above_ema9": False,
+        "trigger_point": "VWAP Bounce",
+        "passes_hard_filters": False,
+        "hard_filter_reasons": [reason],
+    }
+
+
 def _intraday_metrics(
     client: AngelOneClient,
     inst: Instrument,
@@ -615,24 +699,7 @@ def _intraday_metrics(
         intraday_candles = []
 
     if not daily_candles or not intraday_candles:
-        return {
-            "atr_pct": 0.0,
-            "volume_multiplier": 0.0,
-            "today_volume": 0.0,
-            "avg_daily_volume_20": 0.0,
-            "vwap": 0.0,
-            "ema9": 0.0,
-            "ema_angle_deg": 0.0,
-            "orb_high": 0.0,
-            "orb_low": 0.0,
-            "orb_velocity_pct": 0.0,
-            "wick_noise_ratio": 1.0,
-            "turnover_cr": 0.0,
-            "price_above_vwap": False,
-            "price_above_ema9": False,
-            "passes_hard_filters": False,
-            "hard_filter_reasons": ["insufficient candle data"],
-        }
+        return _empty_intraday_metrics("insufficient candle data")
 
     daily_close = daily_candles[-1]["close"] or ltp or 1.0
     daily_volumes = [row["volume"] for row in daily_candles[-20:]]
@@ -697,6 +764,43 @@ def _intraday_metrics(
         "passes_hard_filters": passes_hard_filters,
         "hard_filter_reasons": hard_filter_reasons,
     }
+
+
+def _fetch_intraday_chunk(
+    client: AngelOneClient,
+    rows: list[dict[str, Any]],
+    stock_universe_by_key: dict[str, Instrument],
+    now: datetime,
+) -> dict[str, dict[str, Any]]:
+    results: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        inst = stock_universe_by_key.get(str(row["ticker"]))
+        if not inst:
+            continue
+        try:
+            metrics = _intraday_metrics(client, inst, float(row.get("ltpRaw", 0) or 0), now)
+        except Exception:
+            metrics = _empty_intraday_metrics("fetch error")
+        results[str(row["ticker"])] = metrics
+    return results
+
+
+def _fetch_all_intraday_chunked(
+    client: AngelOneClient,
+    candidate_rows: list[dict[str, Any]],
+    stock_universe_by_key: dict[str, Instrument],
+    now: datetime,
+) -> dict[str, dict[str, Any]]:
+    chunks = [
+        candidate_rows[i : i + INTRADAY_CHUNK_SIZE]
+        for i in range(0, len(candidate_rows), INTRADAY_CHUNK_SIZE)
+    ]
+    all_metrics: dict[str, dict[str, Any]] = {}
+
+    for chunk in chunks:
+        all_metrics.update(_fetch_intraday_chunk(client, chunk, stock_universe_by_key, now))
+
+    return all_metrics
 
 
 def _heuristic_rank(stocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -804,8 +908,9 @@ def _select_dynamic_top_stocks(
     try:
         screened = [row for row in all_stocks if _hard_screen(row)]
         selection_universe = screened if len(screened) >= TOP_SELECTION_COUNT else all_stocks
+        llm_universe = selection_universe[:LLM_UNIVERSE_LIMIT]
         compiled = _compile_selection_stream(
-            selection_universe,
+            llm_universe,
             pool_name=pool_name,
             news_items=news_items,
             macro_morning=macro_morning,
@@ -847,7 +952,6 @@ def _select_dynamic_top_stocks(
         if not selected_rows:
             selected_rows = _heuristic_rank(selection_universe)
         else:
-            # Keep the list exactly at TOP_SELECTION_COUNT when possible.
             if len(selected_rows) < TOP_SELECTION_COUNT:
                 remaining = [row for row in _heuristic_rank(selection_universe) if row["ticker"] not in {r["ticker"] for r in selected_rows}]
                 selected_rows.extend(remaining[: TOP_SELECTION_COUNT - len(selected_rows)])
@@ -909,7 +1013,7 @@ def _build_terminal_payload(
     news_items: list[dict[str, str]],
     macro_morning: list[dict[str, str]],
     macro_evening: list[dict[str, str]],
-    pool_name: str = NIFTY_500_LABEL,
+    pool_name: str = NIFTY_100_LABEL,
     custom_prompt: str | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, str | None]:
     return _select_dynamic_top_stocks(
@@ -929,8 +1033,7 @@ def _build_payload_from_live_data(
 ) -> dict[str, Any]:
     llm_config = _llm_config()
     now = _ist_now()
-    candle_limit = int(os.getenv("INTRADAY_CANDIDATE_LIMIT", "30"))
-    resolved_pool_name = pool_name or NIFTY_500_LABEL
+    resolved_pool_name = pool_name or NIFTY_100_LABEL
     stock_universe, active_pool_label = _pool_watchlist(resolved_pool_name)
 
     stock_quotes_raw = client.fetch_batch_quotes(stock_universe)
@@ -947,6 +1050,7 @@ def _build_payload_from_live_data(
         all_stocks.append(row)
         stock_quotes[inst.key] = row
 
+    candle_limit = int(os.getenv("INTRADAY_CANDIDATE_LIMIT", "20"))
     candidate_rows = _coarse_pre_rank(all_stocks)[:candle_limit]
     candidate_keys = {row["ticker"] for row in candidate_rows}
     row_by_ticker = {row["ticker"]: row for row in all_stocks}
@@ -973,15 +1077,12 @@ def _build_payload_from_live_data(
                 "hard_filter_reasons": ["not in intraday candidate set"],
             }
 
-    for row in candidate_rows:
-        inst = stock_universe_by_key.get(row["ticker"])
-        if not inst:
-            continue
-        intraday = _intraday_metrics(client, inst, float(row.get("ltpRaw", 0) or 0), now)
-        original = row_by_ticker.get(row["ticker"])
+    all_metrics = _fetch_all_intraday_chunked(client, candidate_rows, stock_universe_by_key, now)
+    for ticker, metrics in all_metrics.items():
+        original = row_by_ticker.get(ticker)
         if original is not None:
-            original["intraday"] = intraday
-            stock_quotes[row["ticker"]] = original
+            original["intraday"] = metrics
+            stock_quotes[ticker] = original
 
     macro_morning, macro_evening = _build_macro_strips(macro_raw)
     global_macro = fetch_global_macro()
@@ -1002,11 +1103,11 @@ def _build_payload_from_live_data(
         "rawSources": _news_feed_sources(),
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "mockTickers": sorted(MOCK_TICKERS),
-        "availablePools": [NIFTY_500_LABEL, LIVE_UNIVERSE_LABEL],
+        "availablePools": [NIFTY_100_LABEL, LIVE_UNIVERSE_LABEL],
         "activePool": resolved_pool_name,
         "poolDescription": (
-            "Nifty 500 Angel One live universe ranked by your filter prompt."
-            if resolved_pool_name == NIFTY_500_LABEL
+            "Nifty 100 Angel One live universe ranked by your filter prompt."
+            if resolved_pool_name == NIFTY_100_LABEL
             else f"Dynamic live universe label applied for {resolved_pool_name}."
         ),
         "stocks": top_rows,
@@ -1061,9 +1162,9 @@ def build_market_payload(
                 "success": False,
                 "error": "Live refresh was requested but the scheduled refresh window is not active and fallback is disabled.",
                 "rawSources": _news_feed_sources(),
-                "availablePools": [NIFTY_500_LABEL, LIVE_UNIVERSE_LABEL],
-                "activePool": pool_name or NIFTY_500_LABEL,
-                "poolDescription": "Nifty 500 Angel One live universe ranked by your filter prompt.",
+                "availablePools": [NIFTY_100_LABEL, LIVE_UNIVERSE_LABEL],
+                "activePool": pool_name or NIFTY_100_LABEL,
+                "poolDescription": "Nifty 100 Angel One live universe ranked by your filter prompt.",
                 "stocks": [],
                 "stockQuotes": {},
                 "macroDataStrip": {"morning": [], "evening": []},
@@ -1083,9 +1184,9 @@ def build_market_payload(
             "success": False,
             "error": "No cached snapshot available. Live refresh runs only during the morning or evening IST windows.",
             "rawSources": _news_feed_sources(),
-            "availablePools": [NIFTY_500_LABEL, LIVE_UNIVERSE_LABEL],
-            "activePool": pool_name or NIFTY_500_LABEL,
-            "poolDescription": "Nifty 500 Angel One live universe ranked by your filter prompt.",
+            "availablePools": [NIFTY_100_LABEL, LIVE_UNIVERSE_LABEL],
+            "activePool": pool_name or NIFTY_100_LABEL,
+            "poolDescription": "Nifty 100 Angel One live universe ranked by your filter prompt.",
             "stocks": [],
             "stockQuotes": {},
             "macroDataStrip": {"morning": [], "evening": []},
@@ -1355,7 +1456,7 @@ def main() -> int:
     parser.add_argument("--serve", action="store_true", help="Start FastAPI server")
     parser.add_argument("--once", action="store_true", help="Fetch once and print/save JSON")
     parser.add_argument("--output", help="Write JSON snapshot to this file")
-    parser.add_argument("--pool", default=None, help="Pool label. Defaults to Nifty 500; Live Universe is also supported.")
+    parser.add_argument("--pool", default=None, help="Pool label. Defaults to Nifty 100; Live Universe is also supported.")
     parser.add_argument("--prompt", default=None, help="Custom filter prompt override")
     parser.add_argument("--refresh-on-demand", action="store_true", help="Force a non-fallback live refresh and write snapshot")
     args = parser.parse_args()
