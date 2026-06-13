@@ -884,7 +884,7 @@ def _normalize_analysis_payload(
     fallback = _build_fallback_payload(snapshot, focus_ticker)
     data = payload.model_dump()
 
-    data["ledger_stocks"] = _canonicalize_ledger_rows(data.get("ledger_stocks") or [], focus_ticker)
+    data["ledger_stocks"] = _canonicalize_ledger_rows(data.get("ledger_stocks") or [], focus_ticker, (data.get("active_factor_hub") or {}).get("selection_reason"), data.get("stocks") or [])
 
     for key in (
         "news_catalysts_card",
