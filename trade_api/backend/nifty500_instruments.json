@@ -1,0 +1,2423 @@
+{
+  "exportedAtUtc": "2026-06-12T10:10:17Z",
+  "source": "nse_nifty500list+angel_one_searchScrip",
+  "count": 213,
+  "resolved": 213,
+  "unresolved": [
+    "BATAINDIA",
+    "BAYERCROP",
+    "BELRISE",
+    "BERGEPAINT",
+    "BDL",
+    "BEL",
+    "BHARATFORG",
+    "BHEL",
+    "BPCL",
+    "BHARTIARTL",
+    "BHARTIHEXA",
+    "BIKAJI",
+    "GROWW",
+    "BIOCON",
+    "BSOFT",
+    "BLUEDART",
+    "BLUEJET",
+    "BLUESTARCO",
+    "BBTC",
+    "BOSCHLTD",
+    "FIRSTCRY",
+    "BRIGADE",
+    "BRITANNIA",
+    "MAPMYINDIA",
+    "CCL",
+    "CESC",
+    "CGPOWER",
+    "CIEINDIA",
+    "CRISIL",
+    "DUMMYVEDL1",
+    "DUMMYVEDL2",
+    "DUMMYVEDL3",
+    "DUMMYVEDL4",
+    "GRAVITA",
+    "GESHIP",
+    "FLUOROCHEM",
+    "GMDCLTD",
+    "HEG",
+    "HBLENGINE",
+    "HCLTECH",
+    "HDBFS",
+    "HDFCAMC",
+    "HDFCBANK",
+    "HDFCLIFE",
+    "HFCL",
+    "HAVELLS",
+    "HEROMOTOCO",
+    "HEXT",
+    "HSCL",
+    "HINDALCO",
+    "HAL",
+    "HINDCOPPER",
+    "HINDPETRO",
+    "HINDUNILVR",
+    "HINDZINC",
+    "POWERINDIA",
+    "HOMEFIRST",
+    "HONASA",
+    "HONAUT",
+    "HUDCO",
+    "HYUNDAI",
+    "ICICIBANK",
+    "ICICIGI",
+    "ICICIAMC",
+    "ICICIPRULI",
+    "IDBI",
+    "IDFCFIRSTB",
+    "IFCI",
+    "IIFL",
+    "IRB",
+    "IRCON",
+    "ITCHOTELS",
+    "ITC",
+    "ITI",
+    "INDGN",
+    "INDIACEM",
+    "INDIAMART",
+    "INDIANB",
+    "IEX",
+    "INDHOTEL",
+    "IOC",
+    "IOB",
+    "IRCTC",
+    "IRFC",
+    "IREDA",
+    "IGL",
+    "INDUSTOWER",
+    "INDUSINDBK",
+    "NAUKRI",
+    "INFY",
+    "INOXWIND",
+    "INTELLECT",
+    "INDIGO",
+    "IGIL",
+    "IKS",
+    "IPCALAB",
+    "JBCHEPHARM",
+    "JKCEMENT",
+    "JBMA",
+    "JKTYRE",
+    "JMFINANCIL",
+    "JSWCEMENT",
+    "JSWDULUX",
+    "JSWENERGY",
+    "JSWINFRA",
+    "JSWSTEEL",
+    "JAINREC",
+    "JPPOWER",
+    "J&KBANK",
+    "JINDALSAW",
+    "JSL",
+    "JINDALSTEL",
+    "JIOFIN",
+    "JUBLFOOD",
+    "JUBLINGREA",
+    "JUBLPHARMA",
+    "JWL",
+    "JYOTICNC",
+    "KPRMILL",
+    "KEI",
+    "KPITTECH",
+    "KAJARIACER",
+    "KPIL",
+    "KALYANKJIL",
+    "KARURVYSYA",
+    "KAYNES",
+    "KEC",
+    "KFINTECH",
+    "KIRLOSENG",
+    "KOTAKBANK",
+    "KIMS",
+    "LTF",
+    "LTTS",
+    "LGEINDIA",
+    "LICHSGFIN",
+    "LTFOODS",
+    "LTM",
+    "LT",
+    "LATENTVIEW",
+    "LAURUSLABS",
+    "THELEELA",
+    "LEMONTREE",
+    "LENSKART",
+    "LICI",
+    "LINDEINDIA",
+    "LLOYDSME",
+    "LODHA",
+    "LUPIN",
+    "MMTC",
+    "MRF",
+    "MGL",
+    "M&MFIN",
+    "M&M",
+    "MANAPPURAM",
+    "MRPL",
+    "MANKIND",
+    "MARICO",
+    "MARUTI",
+    "MFSL",
+    "MAXHEALTH",
+    "MAZDOCK",
+    "MEESHO",
+    "MINDACORP",
+    "MSUMI",
+    "MOTILALOFS",
+    "MPHASIS",
+    "MCX",
+    "MUTHOOTFIN",
+    "NATCOPHARM",
+    "NBCC",
+    "NCC",
+    "NHPC",
+    "NLCINDIA",
+    "NMDC",
+    "NSLNISP",
+    "NTPCGREEN",
+    "NTPC",
+    "NH",
+    "NATIONALUM",
+    "NAVA",
+    "NAVINFLUOR",
+    "NESTLEIND",
+    "NETWEB",
+    "NEULANDLAB",
+    "NEWGEN",
+    "NAM-INDIA",
+    "NIVABUPA"
+  ],
+  "failures": [
+    [
+      "BATAINDIA",
+      "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    ],
+    [
+      "BAYERCROP",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FB690>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BELRISE",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FDB50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BERGEPAINT",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FE750>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BDL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA310210>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BEL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA311D10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BHARATFORG",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA313750>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BHEL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA3211D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BPCL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA322C10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BHARTIARTL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA313750>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BHARTIHEXA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA310F50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BIKAJI",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA3116D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "GROWW",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FFD50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BIOCON",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FDDD0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BSOFT",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2DB410>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BLUEDART",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA323490>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BLUEJET",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA3211D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BLUESTARCO",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32C850>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BBTC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32E2D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BOSCHLTD",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32FD50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "FIRSTCRY",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32E910>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BRIGADE",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32E210>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "BRITANNIA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32C550>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MAPMYINDIA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FA090>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "CCL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FD210>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "CESC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FECD0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "CGPOWER",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA320B10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "CIEINDIA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA322690>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "CRISIL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA310110>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "GRAVITA",
+      "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    ],
+    [
+      "GESHIP",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32D5D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "FLUOROCHEM",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32D7D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "GMDCLTD",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32E690>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HEG",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA336E90>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HBLENGINE",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA310310>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HCLTECH",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA313C90>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HDBFS",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FF650>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HDFCAMC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA318190>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HDFCBANK",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FD950>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HDFCLIFE",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA313210>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HFCL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA313450>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HAVELLS",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA3116D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HEROMOTOCO",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32F890>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HEXT",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32DCD0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HSCL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA334D90>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HINDALCO",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2F9110>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HAL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA222D10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HINDCOPPER",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA319050>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HINDPETRO",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA31A3D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HINDUNILVR",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA31BE10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HINDZINC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2DB410>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "POWERINDIA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32CB90>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HOMEFIRST",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32E650>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HONASA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA335810>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HONAUT",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA336D10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HUDCO",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA310B50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "HYUNDAI",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA313450>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "ICICIBANK",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2D7850>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "ICICIGI",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA318250>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "ICICIAMC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FC650>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "ICICIPRULI",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA3441D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IDBI",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA313F50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IDFCFIRSTB",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA310210>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IFCI",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA311590>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IIFL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FA510>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IRB",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA3376D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IRCON",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32EED0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "ITCHOTELS",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32FED0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "ITC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA318710>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "ITI",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA31A590>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "INDGN",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA323A10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "INDIACEM",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FDED0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "INDIAMART",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA345F50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "INDIANB",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2F3050>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IEX",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32FA50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "INDHOTEL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32F810>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IOC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA335810>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IOB",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA337150>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IRCTC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA319510>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IRFC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA31A5D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IREDA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FC850>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IGL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA310F50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "INDUSTOWER",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA313550>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "INDUSINDBK",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA347310>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NAUKRI",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA3187D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "INFY",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA319690>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "INOXWIND",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FBF90>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "INTELLECT",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA335890>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "INDIGO",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA334090>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IGIL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2DA6D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IKS",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA344E10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "IPCALAB",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32C690>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JBCHEPHARM",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32FED0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JKCEMENT",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA311090>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JBMA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA34C110>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JKTYRE",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2F3910>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JMFINANCIL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FB510>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JSWCEMENT",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA311790>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JSWDULUX",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA313510>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JSWENERGY",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA337C50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JSWINFRA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32E2D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JSWSTEEL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32CA10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JAINREC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FC3D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JPPOWER",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA287350>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "J&KBANK",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA3472D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JINDALSAW",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA345950>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JSL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA318AD0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JINDALSTEL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA3446D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JIOFIN",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA347BD0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JUBLFOOD",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA347C90>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JUBLINGREA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FDDD0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JUBLPHARMA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32FF10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JWL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32DB50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "JYOTICNC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA3376D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "KPRMILL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA335FD0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "KEI",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2D7C10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "KPITTECH",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA313A50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "KAJARIACER",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA322790>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "KPIL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA31A710>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "KALYANKJIL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2F3D10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "KARURVYSYA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2F9510>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "KAYNES",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA337350>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "KEC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA336210>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "KFINTECH",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA313C90>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "KIRLOSENG",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32F5D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "KOTAKBANK",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32E0D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "KIMS",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FE690>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LTF",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA287350>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LTTS",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA345F90>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LGEINDIA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA347D50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LICHSGFIN",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA31A5D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LTFOODS",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FE490>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LTM",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32CC90>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LT",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA345810>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LATENTVIEW",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA344790>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LAURUSLABS",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32D5D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "THELEELA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32C1D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LEMONTREE",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA312510>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LENSKART",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA310890>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LICI",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA334510>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LINDEINDIA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2F9650>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LLOYDSME",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA321AD0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LODHA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FA510>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "LUPIN",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA334190>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MMTC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA334690>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MRF",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA311BD0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MGL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA311090>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "M&MFIN",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32E850>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "M&M",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32E750>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MANAPPURAM",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA3476D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MRPL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA347F50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MANKIND",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FC0D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MARICO",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2DB550>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MARUTI",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA31A910>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MFSL",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA345D10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MAXHEALTH",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA344E10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MAZDOCK",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA347850>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MEESHO",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32DB90>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MINDACORP",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32E290>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MSUMI",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2DAC50>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MOTILALOFS",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FDB90>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MPHASIS",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA313190>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MCX",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA337310>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "MUTHOOTFIN",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA335FD0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NATCOPHARM",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2F8050>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NBCC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA31A190>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NCC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA337D90>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NHPC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA337AD0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NLCINDIA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FB410>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NMDC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA312490>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NSLNISP",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA310750>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NTPCGREEN",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32E910>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NTPC",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32C410>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NH",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2D8AD0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NATIONALUM",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FF350>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NAVA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA347750>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NAVINFLUOR",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA344E90>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NESTLEIND",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA31AC10>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NETWEB",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32DCD0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NEULANDLAB",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32D090>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NEWGEN",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA32F610>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NAM-INDIA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA2FF010>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ],
+    [
+      "NIVABUPA",
+      "HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/secure/angelbroking/order/v1/searchScrip (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x00000108BA3463D0>: Failed to resolve 'apiconnect.angelone.in' ([Errno 11001] getaddrinfo failed)\"))"
+    ]
+  ],
+  "partial": true,
+  "instruments": [
+    {
+      "key": "360ONE",
+      "exchange": "NSE",
+      "tradingsymbol": "360ONE-EQ",
+      "token": "13061",
+      "label": "360ONE"
+    },
+    {
+      "key": "3MINDIA",
+      "exchange": "NSE",
+      "tradingsymbol": "3MINDIA-EQ",
+      "token": "474",
+      "label": "3MINDIA"
+    },
+    {
+      "key": "AADHARHFC",
+      "exchange": "NSE",
+      "tradingsymbol": "AADHARHFC-EQ",
+      "token": "23729",
+      "label": "AADHARHFC"
+    },
+    {
+      "key": "AARTIIND",
+      "exchange": "NSE",
+      "tradingsymbol": "AARTIIND-EQ",
+      "token": "7",
+      "label": "AARTIIND"
+    },
+    {
+      "key": "AAVAS",
+      "exchange": "NSE",
+      "tradingsymbol": "AAVAS-EQ",
+      "token": "5385",
+      "label": "AAVAS"
+    },
+    {
+      "key": "ABB",
+      "exchange": "NSE",
+      "tradingsymbol": "ABB-EQ",
+      "token": "13",
+      "label": "ABB"
+    },
+    {
+      "key": "ABBOTINDIA",
+      "exchange": "NSE",
+      "tradingsymbol": "ABBOTINDIA-EQ",
+      "token": "17903",
+      "label": "ABBOTINDIA"
+    },
+    {
+      "key": "ABCAPITAL",
+      "exchange": "NSE",
+      "tradingsymbol": "ABCAPITAL-EQ",
+      "token": "21614",
+      "label": "ABCAPITAL"
+    },
+    {
+      "key": "ABDL",
+      "exchange": "NSE",
+      "tradingsymbol": "ABDL-EQ",
+      "token": "24308",
+      "label": "ABDL"
+    },
+    {
+      "key": "ABFRL",
+      "exchange": "NSE",
+      "tradingsymbol": "ABFRL-EQ",
+      "token": "30108",
+      "label": "ABFRL"
+    },
+    {
+      "key": "ABLBL",
+      "exchange": "NSE",
+      "tradingsymbol": "ABLBL-EQ",
+      "token": "756843",
+      "label": "ABLBL"
+    },
+    {
+      "key": "ABREL",
+      "exchange": "NSE",
+      "tradingsymbol": "ABREL-EQ",
+      "token": "625",
+      "label": "ABREL"
+    },
+    {
+      "key": "ABSLAMC",
+      "exchange": "NSE",
+      "tradingsymbol": "ABSLAMC-EQ",
+      "token": "6018",
+      "label": "ABSLAMC"
+    },
+    {
+      "key": "ACC",
+      "exchange": "NSE",
+      "tradingsymbol": "ACC-EQ",
+      "token": "22",
+      "label": "ACC"
+    },
+    {
+      "key": "ACE",
+      "exchange": "NSE",
+      "tradingsymbol": "ACE-EQ",
+      "token": "13587",
+      "label": "ACE"
+    },
+    {
+      "key": "ACMESOLAR",
+      "exchange": "NSE",
+      "tradingsymbol": "ACMESOLAR-EQ",
+      "token": "27061",
+      "label": "ACMESOLAR"
+    },
+    {
+      "key": "ACUTAAS",
+      "exchange": "NSE",
+      "tradingsymbol": "ACUTAAS-EQ",
+      "token": "5578",
+      "label": "ACUTAAS"
+    },
+    {
+      "key": "ADANIENSOL",
+      "exchange": "NSE",
+      "tradingsymbol": "ADANIENSOL-EQ",
+      "token": "10217",
+      "label": "ADANIENSOL"
+    },
+    {
+      "key": "ADANIENT",
+      "exchange": "NSE",
+      "tradingsymbol": "ADANIENT-EQ",
+      "token": "25",
+      "label": "ADANIENT"
+    },
+    {
+      "key": "ADANIGREEN",
+      "exchange": "NSE",
+      "tradingsymbol": "ADANIGREEN-EQ",
+      "token": "3563",
+      "label": "ADANIGREEN"
+    },
+    {
+      "key": "ADANIPORTS",
+      "exchange": "NSE",
+      "tradingsymbol": "ADANIPORTS-EQ",
+      "token": "15083",
+      "label": "ADANIPORTS"
+    },
+    {
+      "key": "ADANIPOWER",
+      "exchange": "NSE",
+      "tradingsymbol": "ADANIPOWER-EQ",
+      "token": "17388",
+      "label": "ADANIPOWER"
+    },
+    {
+      "key": "AEGISLOG",
+      "exchange": "NSE",
+      "tradingsymbol": "AEGISLOG-EQ",
+      "token": "40",
+      "label": "AEGISLOG"
+    },
+    {
+      "key": "AEGISVOPAK",
+      "exchange": "NSE",
+      "tradingsymbol": "AEGISVOPAK-EQ",
+      "token": "757336",
+      "label": "AEGISVOPAK"
+    },
+    {
+      "key": "AFCONS",
+      "exchange": "NSE",
+      "tradingsymbol": "AFCONS-EQ",
+      "token": "25977",
+      "label": "AFCONS"
+    },
+    {
+      "key": "AFFLE",
+      "exchange": "NSE",
+      "tradingsymbol": "AFFLE-EQ",
+      "token": "11343",
+      "label": "AFFLE"
+    },
+    {
+      "key": "AIAENG",
+      "exchange": "NSE",
+      "tradingsymbol": "AIAENG-EQ",
+      "token": "13086",
+      "label": "AIAENG"
+    },
+    {
+      "key": "AIIL",
+      "exchange": "NSE",
+      "tradingsymbol": "AIIL-EQ",
+      "token": "23553",
+      "label": "AIIL"
+    },
+    {
+      "key": "AJANTPHARM",
+      "exchange": "NSE",
+      "tradingsymbol": "AJANTPHARM-EQ",
+      "token": "8124",
+      "label": "AJANTPHARM"
+    },
+    {
+      "key": "ALKEM",
+      "exchange": "NSE",
+      "tradingsymbol": "ALKEM-EQ",
+      "token": "11703",
+      "label": "ALKEM"
+    },
+    {
+      "key": "AMBER",
+      "exchange": "NSE",
+      "tradingsymbol": "AMBER-EQ",
+      "token": "1185",
+      "label": "AMBER"
+    },
+    {
+      "key": "AMBUJACEM",
+      "exchange": "NSE",
+      "tradingsymbol": "AMBUJACEM-EQ",
+      "token": "1270",
+      "label": "AMBUJACEM"
+    },
+    {
+      "key": "ANANDRATHI",
+      "exchange": "NSE",
+      "tradingsymbol": "ANANDRATHI-EQ",
+      "token": "7145",
+      "label": "ANANDRATHI"
+    },
+    {
+      "key": "ANANTRAJ",
+      "exchange": "NSE",
+      "tradingsymbol": "ANANTRAJ-EQ",
+      "token": "13620",
+      "label": "ANANTRAJ"
+    },
+    {
+      "key": "ANGELONE",
+      "exchange": "NSE",
+      "tradingsymbol": "ANGELONE-EQ",
+      "token": "324",
+      "label": "ANGELONE"
+    },
+    {
+      "key": "ANTHEM",
+      "exchange": "NSE",
+      "tradingsymbol": "ANTHEM-EQ",
+      "token": "757885",
+      "label": "ANTHEM"
+    },
+    {
+      "key": "ANURAS",
+      "exchange": "NSE",
+      "tradingsymbol": "ANURAS-EQ",
+      "token": "2829",
+      "label": "ANURAS"
+    },
+    {
+      "key": "APARINDS",
+      "exchange": "NSE",
+      "tradingsymbol": "APARINDS-EQ",
+      "token": "11491",
+      "label": "APARINDS"
+    },
+    {
+      "key": "APLAPOLLO",
+      "exchange": "NSE",
+      "tradingsymbol": "APLAPOLLO-EQ",
+      "token": "25780",
+      "label": "APLAPOLLO"
+    },
+    {
+      "key": "APOLLOHOSP",
+      "exchange": "NSE",
+      "tradingsymbol": "APOLLOHOSP-EQ",
+      "token": "157",
+      "label": "APOLLOHOSP"
+    },
+    {
+      "key": "APOLLOTYRE",
+      "exchange": "NSE",
+      "tradingsymbol": "APOLLOTYRE-EQ",
+      "token": "163",
+      "label": "APOLLOTYRE"
+    },
+    {
+      "key": "APTUS",
+      "exchange": "NSE",
+      "tradingsymbol": "APTUS-EQ",
+      "token": "5435",
+      "label": "APTUS"
+    },
+    {
+      "key": "ARE&M",
+      "exchange": "NSE",
+      "tradingsymbol": "ARE&M-EQ",
+      "token": "100",
+      "label": "ARE&M"
+    },
+    {
+      "key": "ASAHIINDIA",
+      "exchange": "NSE",
+      "tradingsymbol": "ASAHIINDIA-EQ",
+      "token": "5378",
+      "label": "ASAHIINDIA"
+    },
+    {
+      "key": "ASHOKLEY",
+      "exchange": "NSE",
+      "tradingsymbol": "ASHOKLEY-EQ",
+      "token": "212",
+      "label": "ASHOKLEY"
+    },
+    {
+      "key": "ASIANPAINT",
+      "exchange": "NSE",
+      "tradingsymbol": "ASIANPAINT-EQ",
+      "token": "236",
+      "label": "ASIANPAINT"
+    },
+    {
+      "key": "ASTERDM",
+      "exchange": "NSE",
+      "tradingsymbol": "ASTERDM-EQ",
+      "token": "1508",
+      "label": "ASTERDM"
+    },
+    {
+      "key": "ASTRAL",
+      "exchange": "NSE",
+      "tradingsymbol": "ASTRAL-EQ",
+      "token": "14418",
+      "label": "ASTRAL"
+    },
+    {
+      "key": "ATGL",
+      "exchange": "NSE",
+      "tradingsymbol": "ATGL-EQ",
+      "token": "6066",
+      "label": "ATGL"
+    },
+    {
+      "key": "ATHERENERG",
+      "exchange": "NSE",
+      "tradingsymbol": "ATHERENERG-EQ",
+      "token": "757645",
+      "label": "ATHERENERG"
+    },
+    {
+      "key": "ATUL",
+      "exchange": "NSE",
+      "tradingsymbol": "ATUL-EQ",
+      "token": "263",
+      "label": "ATUL"
+    },
+    {
+      "key": "AUBANK",
+      "exchange": "NSE",
+      "tradingsymbol": "AUBANK-EQ",
+      "token": "21238",
+      "label": "AUBANK"
+    },
+    {
+      "key": "AUROPHARMA",
+      "exchange": "NSE",
+      "tradingsymbol": "AUROPHARMA-EQ",
+      "token": "275",
+      "label": "AUROPHARMA"
+    },
+    {
+      "key": "AWL",
+      "exchange": "NSE",
+      "tradingsymbol": "AWL-EQ",
+      "token": "8110",
+      "label": "AWL"
+    },
+    {
+      "key": "AXISBANK",
+      "exchange": "NSE",
+      "tradingsymbol": "AXISBANK-EQ",
+      "token": "5900",
+      "label": "AXISBANK"
+    },
+    {
+      "key": "BAJAJ-AUTO",
+      "exchange": "NSE",
+      "tradingsymbol": "BAJAJ-AUTO-EQ",
+      "token": "16669",
+      "label": "BAJAJ-AUTO"
+    },
+    {
+      "key": "BAJAJFINSV",
+      "exchange": "NSE",
+      "tradingsymbol": "BAJAJFINSV-EQ",
+      "token": "16675",
+      "label": "BAJAJFINSV"
+    },
+    {
+      "key": "BAJAJHFL",
+      "exchange": "NSE",
+      "tradingsymbol": "BAJAJHFL-EQ",
+      "token": "25270",
+      "label": "BAJAJHFL"
+    },
+    {
+      "key": "BAJAJHLDNG",
+      "exchange": "NSE",
+      "tradingsymbol": "BAJAJHLDNG-EQ",
+      "token": "305",
+      "label": "BAJAJHLDNG"
+    },
+    {
+      "key": "BAJFINANCE",
+      "exchange": "NSE",
+      "tradingsymbol": "BAJFINANCE-EQ",
+      "token": "317",
+      "label": "BAJFINANCE"
+    },
+    {
+      "key": "BALKRISIND",
+      "exchange": "NSE",
+      "tradingsymbol": "BALKRISIND-EQ",
+      "token": "335",
+      "label": "BALKRISIND"
+    },
+    {
+      "key": "BALRAMCHIN",
+      "exchange": "NSE",
+      "tradingsymbol": "BALRAMCHIN-EQ",
+      "token": "341",
+      "label": "BALRAMCHIN"
+    },
+    {
+      "key": "BANDHANBNK",
+      "exchange": "NSE",
+      "tradingsymbol": "BANDHANBNK-EQ",
+      "token": "2263",
+      "label": "BANDHANBNK"
+    },
+    {
+      "key": "BANKBARODA",
+      "exchange": "NSE",
+      "tradingsymbol": "BANKBARODA-EQ",
+      "token": "4668",
+      "label": "BANKBARODA"
+    },
+    {
+      "key": "BANKINDIA",
+      "exchange": "NSE",
+      "tradingsymbol": "BANKINDIA-EQ",
+      "token": "4745",
+      "label": "BANKINDIA"
+    },
+    {
+      "key": "BEML",
+      "exchange": "NSE",
+      "tradingsymbol": "BEML-EQ",
+      "token": "395",
+      "label": "BEML"
+    },
+    {
+      "key": "BLS",
+      "exchange": "NSE",
+      "tradingsymbol": "BLS-EQ",
+      "token": "17279",
+      "label": "BLS"
+    },
+    {
+      "key": "BSE",
+      "exchange": "NSE",
+      "tradingsymbol": "BSE-EQ",
+      "token": "19585",
+      "label": "BSE"
+    },
+    {
+      "key": "CAMS",
+      "exchange": "NSE",
+      "tradingsymbol": "CAMS-EQ",
+      "token": "342",
+      "label": "CAMS"
+    },
+    {
+      "key": "CANBK",
+      "exchange": "NSE",
+      "tradingsymbol": "CANBK-EQ",
+      "token": "10794",
+      "label": "CANBK"
+    },
+    {
+      "key": "CANFINHOME",
+      "exchange": "NSE",
+      "tradingsymbol": "CANFINHOME-EQ",
+      "token": "583",
+      "label": "CANFINHOME"
+    },
+    {
+      "key": "CANHLIFE",
+      "exchange": "NSE",
+      "tradingsymbol": "CANHLIFE-EQ",
+      "token": "759477",
+      "label": "CANHLIFE"
+    },
+    {
+      "key": "CAPLIPOINT",
+      "exchange": "NSE",
+      "tradingsymbol": "CAPLIPOINT-EQ",
+      "token": "3906",
+      "label": "CAPLIPOINT"
+    },
+    {
+      "key": "CARBORUNIV",
+      "exchange": "NSE",
+      "tradingsymbol": "CARBORUNIV-EQ",
+      "token": "595",
+      "label": "CARBORUNIV"
+    },
+    {
+      "key": "CARTRADE",
+      "exchange": "NSE",
+      "tradingsymbol": "CARTRADE-EQ",
+      "token": "5407",
+      "label": "CARTRADE"
+    },
+    {
+      "key": "CASTROLIND",
+      "exchange": "NSE",
+      "tradingsymbol": "CASTROLIND-EQ",
+      "token": "1250",
+      "label": "CASTROLIND"
+    },
+    {
+      "key": "CDSL",
+      "exchange": "NSE",
+      "tradingsymbol": "CDSL-EQ",
+      "token": "21174",
+      "label": "CDSL"
+    },
+    {
+      "key": "CEATLTD",
+      "exchange": "NSE",
+      "tradingsymbol": "CEATLTD-EQ",
+      "token": "15254",
+      "label": "CEATLTD"
+    },
+    {
+      "key": "CEMPRO",
+      "exchange": "NSE",
+      "tradingsymbol": "CEMPRO-EQ",
+      "token": "5622",
+      "label": "CEMPRO"
+    },
+    {
+      "key": "CENTRALBK",
+      "exchange": "NSE",
+      "tradingsymbol": "CENTRALBK-EQ",
+      "token": "14894",
+      "label": "CENTRALBK"
+    },
+    {
+      "key": "CGCL",
+      "exchange": "NSE",
+      "tradingsymbol": "CGCL-EQ",
+      "token": "20329",
+      "label": "CGCL"
+    },
+    {
+      "key": "CHALET",
+      "exchange": "NSE",
+      "tradingsymbol": "CHALET-EQ",
+      "token": "8546",
+      "label": "CHALET"
+    },
+    {
+      "key": "CHAMBLFERT",
+      "exchange": "NSE",
+      "tradingsymbol": "CHAMBLFERT-EQ",
+      "token": "637",
+      "label": "CHAMBLFERT"
+    },
+    {
+      "key": "CHENNPETRO",
+      "exchange": "NSE",
+      "tradingsymbol": "CHENNPETRO-EQ",
+      "token": "2049",
+      "label": "CHENNPETRO"
+    },
+    {
+      "key": "CHOICEIN",
+      "exchange": "NSE",
+      "tradingsymbol": "CHOICEIN-EQ",
+      "token": "8866",
+      "label": "CHOICEIN"
+    },
+    {
+      "key": "CHOLAFIN",
+      "exchange": "NSE",
+      "tradingsymbol": "CHOLAFIN-EQ",
+      "token": "685",
+      "label": "CHOLAFIN"
+    },
+    {
+      "key": "CHOLAHLDNG",
+      "exchange": "NSE",
+      "tradingsymbol": "CHOLAHLDNG-EQ",
+      "token": "21740",
+      "label": "CHOLAHLDNG"
+    },
+    {
+      "key": "CIPLA",
+      "exchange": "NSE",
+      "tradingsymbol": "CIPLA-EQ",
+      "token": "694",
+      "label": "CIPLA"
+    },
+    {
+      "key": "CLEAN",
+      "exchange": "NSE",
+      "tradingsymbol": "CLEAN-EQ",
+      "token": "5049",
+      "label": "CLEAN"
+    },
+    {
+      "key": "COALINDIA",
+      "exchange": "NSE",
+      "tradingsymbol": "COALINDIA-EQ",
+      "token": "20374",
+      "label": "COALINDIA"
+    },
+    {
+      "key": "COCHINSHIP",
+      "exchange": "NSE",
+      "tradingsymbol": "COCHINSHIP-EQ",
+      "token": "21508",
+      "label": "COCHINSHIP"
+    },
+    {
+      "key": "COFORGE",
+      "exchange": "NSE",
+      "tradingsymbol": "COFORGE-EQ",
+      "token": "11543",
+      "label": "COFORGE"
+    },
+    {
+      "key": "COHANCE",
+      "exchange": "NSE",
+      "tradingsymbol": "COHANCE-EQ",
+      "token": "17945",
+      "label": "COHANCE"
+    },
+    {
+      "key": "COLPAL",
+      "exchange": "NSE",
+      "tradingsymbol": "COLPAL-EQ",
+      "token": "15141",
+      "label": "COLPAL"
+    },
+    {
+      "key": "CONCOR",
+      "exchange": "NSE",
+      "tradingsymbol": "CONCOR-EQ",
+      "token": "4749",
+      "label": "CONCOR"
+    },
+    {
+      "key": "CONCORDBIO",
+      "exchange": "NSE",
+      "tradingsymbol": "CONCORDBIO-EQ",
+      "token": "18060",
+      "label": "CONCORDBIO"
+    },
+    {
+      "key": "COROMANDEL",
+      "exchange": "NSE",
+      "tradingsymbol": "COROMANDEL-EQ",
+      "token": "739",
+      "label": "COROMANDEL"
+    },
+    {
+      "key": "CPPLUS",
+      "exchange": "NSE",
+      "tradingsymbol": "CPPLUS-EQ",
+      "token": "758858",
+      "label": "CPPLUS"
+    },
+    {
+      "key": "CRAFTSMAN",
+      "exchange": "NSE",
+      "tradingsymbol": "CRAFTSMAN-EQ",
+      "token": "2854",
+      "label": "CRAFTSMAN"
+    },
+    {
+      "key": "CREDITACC",
+      "exchange": "NSE",
+      "tradingsymbol": "CREDITACC-EQ",
+      "token": "4421",
+      "label": "CREDITACC"
+    },
+    {
+      "key": "CROMPTON",
+      "exchange": "NSE",
+      "tradingsymbol": "CROMPTON-EQ",
+      "token": "17094",
+      "label": "CROMPTON"
+    },
+    {
+      "key": "CUB",
+      "exchange": "NSE",
+      "tradingsymbol": "CUB-EQ",
+      "token": "5701",
+      "label": "CUB"
+    },
+    {
+      "key": "CUMMINSIND",
+      "exchange": "NSE",
+      "tradingsymbol": "CUMMINSIND-EQ",
+      "token": "1901",
+      "label": "CUMMINSIND"
+    },
+    {
+      "key": "CYIENT",
+      "exchange": "NSE",
+      "tradingsymbol": "CYIENT-EQ",
+      "token": "5748",
+      "label": "CYIENT"
+    },
+    {
+      "key": "DABUR",
+      "exchange": "NSE",
+      "tradingsymbol": "DABUR-EQ",
+      "token": "772",
+      "label": "DABUR"
+    },
+    {
+      "key": "DALBHARAT",
+      "exchange": "NSE",
+      "tradingsymbol": "DALBHARAT-EQ",
+      "token": "8075",
+      "label": "DALBHARAT"
+    },
+    {
+      "key": "DATAPATTNS",
+      "exchange": "NSE",
+      "tradingsymbol": "DATAPATTNS-EQ",
+      "token": "7358",
+      "label": "DATAPATTNS"
+    },
+    {
+      "key": "DCMSHRIRAM",
+      "exchange": "NSE",
+      "tradingsymbol": "DCMSHRIRAM-EQ",
+      "token": "811",
+      "label": "DCMSHRIRAM"
+    },
+    {
+      "key": "DEEPAKFERT",
+      "exchange": "NSE",
+      "tradingsymbol": "DEEPAKFERT-EQ",
+      "token": "827",
+      "label": "DEEPAKFERT"
+    },
+    {
+      "key": "DEEPAKNTR",
+      "exchange": "NSE",
+      "tradingsymbol": "DEEPAKNTR-EQ",
+      "token": "19943",
+      "label": "DEEPAKNTR"
+    },
+    {
+      "key": "DELHIVERY",
+      "exchange": "NSE",
+      "tradingsymbol": "DELHIVERY-EQ",
+      "token": "9599",
+      "label": "DELHIVERY"
+    },
+    {
+      "key": "DEVYANI",
+      "exchange": "NSE",
+      "tradingsymbol": "DEVYANI-EQ",
+      "token": "5373",
+      "label": "DEVYANI"
+    },
+    {
+      "key": "DIVISLAB",
+      "exchange": "NSE",
+      "tradingsymbol": "DIVISLAB-EQ",
+      "token": "10940",
+      "label": "DIVISLAB"
+    },
+    {
+      "key": "DIXON",
+      "exchange": "NSE",
+      "tradingsymbol": "DIXON-EQ",
+      "token": "21690",
+      "label": "DIXON"
+    },
+    {
+      "key": "DLF",
+      "exchange": "NSE",
+      "tradingsymbol": "DLF-EQ",
+      "token": "14732",
+      "label": "DLF"
+    },
+    {
+      "key": "DMART",
+      "exchange": "NSE",
+      "tradingsymbol": "DMART-EQ",
+      "token": "19913",
+      "label": "DMART"
+    },
+    {
+      "key": "DOMS",
+      "exchange": "NSE",
+      "tradingsymbol": "DOMS-EQ",
+      "token": "20551",
+      "label": "DOMS"
+    },
+    {
+      "key": "DRREDDY",
+      "exchange": "NSE",
+      "tradingsymbol": "DRREDDY-EQ",
+      "token": "881",
+      "label": "DRREDDY"
+    },
+    {
+      "key": "EICHERMOT",
+      "exchange": "NSE",
+      "tradingsymbol": "EICHERMOT-EQ",
+      "token": "910",
+      "label": "EICHERMOT"
+    },
+    {
+      "key": "EIDPARRY",
+      "exchange": "NSE",
+      "tradingsymbol": "EIDPARRY-EQ",
+      "token": "916",
+      "label": "EIDPARRY"
+    },
+    {
+      "key": "EIHOTEL",
+      "exchange": "NSE",
+      "tradingsymbol": "EIHOTEL-EQ",
+      "token": "919",
+      "label": "EIHOTEL"
+    },
+    {
+      "key": "ELECON",
+      "exchange": "NSE",
+      "tradingsymbol": "ELECON-EQ",
+      "token": "13643",
+      "label": "ELECON"
+    },
+    {
+      "key": "ELGIEQUIP",
+      "exchange": "NSE",
+      "tradingsymbol": "ELGIEQUIP-EQ",
+      "token": "937",
+      "label": "ELGIEQUIP"
+    },
+    {
+      "key": "EMAMILTD",
+      "exchange": "NSE",
+      "tradingsymbol": "EMAMILTD-EQ",
+      "token": "13517",
+      "label": "EMAMILTD"
+    },
+    {
+      "key": "EMCURE",
+      "exchange": "NSE",
+      "tradingsymbol": "EMCURE-EQ",
+      "token": "24398",
+      "label": "EMCURE"
+    },
+    {
+      "key": "EMMVEE",
+      "exchange": "NSE",
+      "tradingsymbol": "EMMVEE-EQ",
+      "token": "759728",
+      "label": "EMMVEE"
+    },
+    {
+      "key": "ENDURANCE",
+      "exchange": "NSE",
+      "tradingsymbol": "ENDURANCE-EQ",
+      "token": "18822",
+      "label": "ENDURANCE"
+    },
+    {
+      "key": "ENGINERSIN",
+      "exchange": "NSE",
+      "tradingsymbol": "ENGINERSIN-EQ",
+      "token": "4907",
+      "label": "ENGINERSIN"
+    },
+    {
+      "key": "ERIS",
+      "exchange": "NSE",
+      "tradingsymbol": "ERIS-EQ",
+      "token": "21154",
+      "label": "ERIS"
+    },
+    {
+      "key": "ESCORTS",
+      "exchange": "NSE",
+      "tradingsymbol": "ESCORTS-EQ",
+      "token": "958",
+      "label": "ESCORTS"
+    },
+    {
+      "key": "ETERNAL",
+      "exchange": "NSE",
+      "tradingsymbol": "ETERNAL-EQ",
+      "token": "5097",
+      "label": "ETERNAL"
+    },
+    {
+      "key": "EXIDEIND",
+      "exchange": "NSE",
+      "tradingsymbol": "EXIDEIND-EQ",
+      "token": "676",
+      "label": "EXIDEIND"
+    },
+    {
+      "key": "FACT",
+      "exchange": "NSE",
+      "tradingsymbol": "FACT-EQ",
+      "token": "1008",
+      "label": "FACT"
+    },
+    {
+      "key": "FEDERALBNK",
+      "exchange": "NSE",
+      "tradingsymbol": "FEDERALBNK-EQ",
+      "token": "1023",
+      "label": "FEDERALBNK"
+    },
+    {
+      "key": "FINCABLES",
+      "exchange": "NSE",
+      "tradingsymbol": "FINCABLES-EQ",
+      "token": "1038",
+      "label": "FINCABLES"
+    },
+    {
+      "key": "FIVESTAR",
+      "exchange": "NSE",
+      "tradingsymbol": "FIVESTAR-EQ",
+      "token": "12032",
+      "label": "FIVESTAR"
+    },
+    {
+      "key": "FORCEMOT",
+      "exchange": "NSE",
+      "tradingsymbol": "FORCEMOT-EQ",
+      "token": "11573",
+      "label": "FORCEMOT"
+    },
+    {
+      "key": "FORTIS",
+      "exchange": "NSE",
+      "tradingsymbol": "FORTIS-EQ",
+      "token": "14592",
+      "label": "FORTIS"
+    },
+    {
+      "key": "FSL",
+      "exchange": "NSE",
+      "tradingsymbol": "FSL-EQ",
+      "token": "14304",
+      "label": "FSL"
+    },
+    {
+      "key": "GABRIEL",
+      "exchange": "NSE",
+      "tradingsymbol": "GABRIEL-EQ",
+      "token": "1085",
+      "label": "GABRIEL"
+    },
+    {
+      "key": "GAIL",
+      "exchange": "NSE",
+      "tradingsymbol": "GAIL-EQ",
+      "token": "4717",
+      "label": "GAIL"
+    },
+    {
+      "key": "GALLANTT",
+      "exchange": "NSE",
+      "tradingsymbol": "GALLANTT-EQ",
+      "token": "13337",
+      "label": "GALLANTT"
+    },
+    {
+      "key": "GICRE",
+      "exchange": "NSE",
+      "tradingsymbol": "GICRE-EQ",
+      "token": "277",
+      "label": "GICRE"
+    },
+    {
+      "key": "GILLETTE",
+      "exchange": "NSE",
+      "tradingsymbol": "GILLETTE-EQ",
+      "token": "1576",
+      "label": "GILLETTE"
+    },
+    {
+      "key": "GLAND",
+      "exchange": "NSE",
+      "tradingsymbol": "GLAND-EQ",
+      "token": "1186",
+      "label": "GLAND"
+    },
+    {
+      "key": "GLAXO",
+      "exchange": "NSE",
+      "tradingsymbol": "GLAXO-EQ",
+      "token": "1153",
+      "label": "GLAXO"
+    },
+    {
+      "key": "GLENMARK",
+      "exchange": "NSE",
+      "tradingsymbol": "GLENMARK-EQ",
+      "token": "7406",
+      "label": "GLENMARK"
+    },
+    {
+      "key": "GMRAIRPORT",
+      "exchange": "NSE",
+      "tradingsymbol": "GMRAIRPORT-EQ",
+      "token": "13528",
+      "label": "GMRAIRPORT"
+    },
+    {
+      "key": "GODFRYPHLP",
+      "exchange": "NSE",
+      "tradingsymbol": "GODFRYPHLP-EQ",
+      "token": "1181",
+      "label": "GODFRYPHLP"
+    },
+    {
+      "key": "GODIGIT",
+      "exchange": "NSE",
+      "tradingsymbol": "GODIGIT-EQ",
+      "token": "23799",
+      "label": "GODIGIT"
+    },
+    {
+      "key": "GODREJCP",
+      "exchange": "NSE",
+      "tradingsymbol": "GODREJCP-EQ",
+      "token": "10099",
+      "label": "GODREJCP"
+    },
+    {
+      "key": "GODREJIND",
+      "exchange": "NSE",
+      "tradingsymbol": "GODREJIND-EQ",
+      "token": "10925",
+      "label": "GODREJIND"
+    },
+    {
+      "key": "GODREJPROP",
+      "exchange": "NSE",
+      "tradingsymbol": "GODREJPROP-EQ",
+      "token": "17875",
+      "label": "GODREJPROP"
+    },
+    {
+      "key": "GPIL",
+      "exchange": "NSE",
+      "tradingsymbol": "GPIL-EQ",
+      "token": "13409",
+      "label": "GPIL"
+    },
+    {
+      "key": "GRANULES",
+      "exchange": "NSE",
+      "tradingsymbol": "GRANULES-EQ",
+      "token": "11872",
+      "label": "GRANULES"
+    },
+    {
+      "key": "GRAPHITE",
+      "exchange": "NSE",
+      "tradingsymbol": "GRAPHITE-EQ",
+      "token": "592",
+      "label": "GRAPHITE"
+    },
+    {
+      "key": "GRASIM",
+      "exchange": "NSE",
+      "tradingsymbol": "GRASIM-EQ",
+      "token": "1232",
+      "label": "GRASIM"
+    },
+    {
+      "key": "GRSE",
+      "exchange": "NSE",
+      "tradingsymbol": "GRSE-EQ",
+      "token": "5475",
+      "label": "GRSE"
+    },
+    {
+      "key": "GVT&D",
+      "exchange": "NSE",
+      "tradingsymbol": "GVT&D-EQ",
+      "token": "16783",
+      "label": "GVT&D"
+    },
+    {
+      "key": "LALPATHLAB",
+      "exchange": "NSE",
+      "tradingsymbol": "LALPATHLAB-EQ",
+      "token": "11654",
+      "label": "LALPATHLAB"
+    },
+    {
+      "key": "MAHABANK",
+      "exchange": "NSE",
+      "tradingsymbol": "MAHABANK-EQ",
+      "token": "11377",
+      "label": "MAHABANK"
+    },
+    {
+      "key": "MEDANTA",
+      "exchange": "NSE",
+      "tradingsymbol": "MEDANTA-EQ",
+      "token": "11956",
+      "label": "MEDANTA"
+    },
+    {
+      "key": "NUVAMA",
+      "exchange": "NSE",
+      "tradingsymbol": "NUVAMA-EQ",
+      "token": "18721",
+      "label": "NUVAMA"
+    },
+    {
+      "key": "NUVOCO",
+      "exchange": "NSE",
+      "tradingsymbol": "NUVOCO-EQ",
+      "token": "5426",
+      "label": "NUVOCO"
+    },
+    {
+      "key": "NYKAA",
+      "exchange": "NSE",
+      "tradingsymbol": "NYKAA-EQ",
+      "token": "6545",
+      "label": "NYKAA"
+    },
+    {
+      "key": "OBEROIRLTY",
+      "exchange": "NSE",
+      "tradingsymbol": "OBEROIRLTY-EQ",
+      "token": "20242",
+      "label": "OBEROIRLTY"
+    },
+    {
+      "key": "OFSS",
+      "exchange": "NSE",
+      "tradingsymbol": "OFSS-EQ",
+      "token": "10738",
+      "label": "OFSS"
+    },
+    {
+      "key": "OIL",
+      "exchange": "NSE",
+      "tradingsymbol": "OIL-EQ",
+      "token": "17438",
+      "label": "OIL"
+    },
+    {
+      "key": "OLAELEC",
+      "exchange": "NSE",
+      "tradingsymbol": "OLAELEC-EQ",
+      "token": "24777",
+      "label": "OLAELEC"
+    },
+    {
+      "key": "OLECTRA",
+      "exchange": "NSE",
+      "tradingsymbol": "OLECTRA-EQ",
+      "token": "10637",
+      "label": "OLECTRA"
+    },
+    {
+      "key": "ONESOURCE",
+      "exchange": "NSE",
+      "tradingsymbol": "ONESOURCE-EQ",
+      "token": "29224",
+      "label": "ONESOURCE"
+    },
+    {
+      "key": "ONGC",
+      "exchange": "NSE",
+      "tradingsymbol": "ONGC-EQ",
+      "token": "2475",
+      "label": "ONGC"
+    },
+    {
+      "key": "PAGEIND",
+      "exchange": "NSE",
+      "tradingsymbol": "PAGEIND-EQ",
+      "token": "14413",
+      "label": "PAGEIND"
+    },
+    {
+      "key": "PARADEEP",
+      "exchange": "NSE",
+      "tradingsymbol": "PARADEEP-EQ",
+      "token": "9741",
+      "label": "PARADEEP"
+    },
+    {
+      "key": "PATANJALI",
+      "exchange": "NSE",
+      "tradingsymbol": "PATANJALI-EQ",
+      "token": "17029",
+      "label": "PATANJALI"
+    },
+    {
+      "key": "PAYTM",
+      "exchange": "NSE",
+      "tradingsymbol": "PAYTM-EQ",
+      "token": "6705",
+      "label": "PAYTM"
+    },
+    {
+      "key": "PCBL",
+      "exchange": "NSE",
+      "tradingsymbol": "PCBL-EQ",
+      "token": "2649",
+      "label": "PCBL"
+    },
+    {
+      "key": "PERSISTENT",
+      "exchange": "NSE",
+      "tradingsymbol": "PERSISTENT-EQ",
+      "token": "18365",
+      "label": "PERSISTENT"
+    },
+    {
+      "key": "PETRONET",
+      "exchange": "NSE",
+      "tradingsymbol": "PETRONET-EQ",
+      "token": "11351",
+      "label": "PETRONET"
+    },
+    {
+      "key": "PFC",
+      "exchange": "NSE",
+      "tradingsymbol": "PFC-EQ",
+      "token": "14299",
+      "label": "PFC"
+    },
+    {
+      "key": "PFIZER",
+      "exchange": "NSE",
+      "tradingsymbol": "PFIZER-EQ",
+      "token": "2643",
+      "label": "PFIZER"
+    },
+    {
+      "key": "PGEL",
+      "exchange": "NSE",
+      "tradingsymbol": "PGEL-EQ",
+      "token": "25358",
+      "label": "PGEL"
+    },
+    {
+      "key": "PHOENIXLTD",
+      "exchange": "NSE",
+      "tradingsymbol": "PHOENIXLTD-EQ",
+      "token": "14552",
+      "label": "PHOENIXLTD"
+    },
+    {
+      "key": "PIDILITIND",
+      "exchange": "NSE",
+      "tradingsymbol": "PIDILITIND-EQ",
+      "token": "2664",
+      "label": "PIDILITIND"
+    },
+    {
+      "key": "PIIND",
+      "exchange": "NSE",
+      "tradingsymbol": "PIIND-EQ",
+      "token": "24184",
+      "label": "PIIND"
+    },
+    {
+      "key": "PINELABS",
+      "exchange": "NSE",
+      "tradingsymbol": "PINELABS-EQ",
+      "token": "759820",
+      "label": "PINELABS"
+    },
+    {
+      "key": "PIRAMALFIN",
+      "exchange": "NSE",
+      "tradingsymbol": "PIRAMALFIN-EQ",
+      "token": "759551",
+      "label": "PIRAMALFIN"
+    },
+    {
+      "key": "PNB",
+      "exchange": "NSE",
+      "tradingsymbol": "PNB-EQ",
+      "token": "10666",
+      "label": "PNB"
+    },
+    {
+      "key": "PNBHOUSING",
+      "exchange": "NSE",
+      "tradingsymbol": "PNBHOUSING-EQ",
+      "token": "18908",
+      "label": "PNBHOUSING"
+    },
+    {
+      "key": "POLICYBZR",
+      "exchange": "NSE",
+      "tradingsymbol": "POLICYBZR-EQ",
+      "token": "6656",
+      "label": "POLICYBZR"
+    },
+    {
+      "key": "POLYCAB",
+      "exchange": "NSE",
+      "tradingsymbol": "POLYCAB-EQ",
+      "token": "9590",
+      "label": "POLYCAB"
+    },
+    {
+      "key": "POLYMED",
+      "exchange": "NSE",
+      "tradingsymbol": "POLYMED-EQ",
+      "token": "25718",
+      "label": "POLYMED"
+    },
+    {
+      "key": "POONAWALLA",
+      "exchange": "NSE",
+      "tradingsymbol": "POONAWALLA-EQ",
+      "token": "11403",
+      "label": "POONAWALLA"
+    },
+    {
+      "key": "POWERGRID",
+      "exchange": "NSE",
+      "tradingsymbol": "POWERGRID-EQ",
+      "token": "14977",
+      "label": "POWERGRID"
+    },
+    {
+      "key": "PPLPHARMA",
+      "exchange": "NSE",
+      "tradingsymbol": "PPLPHARMA-EQ",
+      "token": "11571",
+      "label": "PPLPHARMA"
+    },
+    {
+      "key": "PREMIERENE",
+      "exchange": "NSE",
+      "tradingsymbol": "PREMIERENE-EQ",
+      "token": "25049",
+      "label": "PREMIERENE"
+    },
+    {
+      "key": "PRESTIGE",
+      "exchange": "NSE",
+      "tradingsymbol": "PRESTIGE-EQ",
+      "token": "20302",
+      "label": "PRESTIGE"
+    },
+    {
+      "key": "PTCIL",
+      "exchange": "NSE",
+      "tradingsymbol": "PTCIL-EQ",
+      "token": "16682",
+      "label": "PTCIL"
+    },
+    {
+      "key": "PVRINOX",
+      "exchange": "NSE",
+      "tradingsymbol": "PVRINOX-EQ",
+      "token": "13147",
+      "label": "PVRINOX"
+    },
+    {
+      "key": "PWL",
+      "exchange": "NSE",
+      "tradingsymbol": "PWL-EQ",
+      "token": "759723",
+      "label": "PWL"
+    },
+    {
+      "key": "RADICO",
+      "exchange": "NSE",
+      "tradingsymbol": "RADICO-EQ",
+      "token": "10990",
+      "label": "RADICO"
+    },
+    {
+      "key": "RAILTEL",
+      "exchange": "NSE",
+      "tradingsymbol": "RAILTEL-EQ",
+      "token": "2431",
+      "label": "RAILTEL"
+    },
+    {
+      "key": "RAINBOW",
+      "exchange": "NSE",
+      "tradingsymbol": "RAINBOW-EQ",
+      "token": "9408",
+      "label": "RAINBOW"
+    },
+    {
+      "key": "RBLBANK",
+      "exchange": "NSE",
+      "tradingsymbol": "RBLBANK-EQ",
+      "token": "18391",
+      "label": "RBLBANK"
+    },
+    {
+      "key": "RECLTD",
+      "exchange": "NSE",
+      "tradingsymbol": "RECLTD-EQ",
+      "token": "15355",
+      "label": "RECLTD"
+    },
+    {
+      "key": "REDINGTON",
+      "exchange": "NSE",
+      "tradingsymbol": "REDINGTON-EQ",
+      "token": "14255",
+      "label": "REDINGTON"
+    },
+    {
+      "key": "RELIANCE",
+      "exchange": "NSE",
+      "tradingsymbol": "RELIANCE-EQ",
+      "token": "2885",
+      "label": "RELIANCE"
+    },
+    {
+      "key": "RHIM",
+      "exchange": "NSE",
+      "tradingsymbol": "RHIM-EQ",
+      "token": "31163",
+      "label": "RHIM"
+    },
+    {
+      "key": "RITES",
+      "exchange": "NSE",
+      "tradingsymbol": "RITES-EQ",
+      "token": "3761",
+      "label": "RITES"
+    },
+    {
+      "key": "RKFORGE",
+      "exchange": "NSE",
+      "tradingsymbol": "RKFORGE-EQ",
+      "token": "11411",
+      "label": "RKFORGE"
+    },
+    {
+      "key": "RPOWER",
+      "exchange": "NSE",
+      "tradingsymbol": "RPOWER-EQ",
+      "token": "15259",
+      "label": "RPOWER"
+    },
+    {
+      "key": "RRKABEL",
+      "exchange": "NSE",
+      "tradingsymbol": "RRKABEL-EQ",
+      "token": "18566",
+      "label": "RRKABEL"
+    },
+    {
+      "key": "RVNL",
+      "exchange": "NSE",
+      "tradingsymbol": "RVNL-EQ",
+      "token": "9552",
+      "label": "RVNL"
+    }
+  ]
+}

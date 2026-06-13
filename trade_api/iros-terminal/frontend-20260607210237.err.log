@@ -1,0 +1,3 @@
+⚠ Invalid next.config.ts options detected: 
+⚠     Unrecognized key(s) in object: 'server'
+⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
