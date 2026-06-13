@@ -67,14 +67,16 @@ export default function ForensicPanel({
 
     if (intelligence?.ledger_stocks?.length) {
       for (const row of intelligence.ledger_stocks) {
+        const action = row.action || '';
+        const reason = row.selection_reason || action;
         push({
           ticker: row.ticker,
           price: row.live_price || stockPriceMap.get(row.ticker) || '',
           score: typeof row.score === 'number' ? row.score : 0,
           kelly: '5.67 : 1',
           returnPct: typeof row.score === 'number' ? row.score / 6 : 2.4,
-          thesis: row.selection_reason || '',
-          riskFlag: row.action || '',
+          thesis: reason || 'Score-based selection',
+          riskFlag: action || 'Selected',
           state: (typeof row.score === 'number' && row.score >= 55) ? 'HIGH' : (typeof row.score === 'number' && row.score <= 40) ? 'LOW' : undefined,
         });
       }
@@ -98,7 +100,7 @@ export default function ForensicPanel({
           score: typeof s.score === 'number' ? s.score : 0,
           kelly: '5.67 : 1',
           returnPct: typeof s.score === 'number' ? s.score / 6 : 2.4,
-          thesis: s.verdict || '',
+          thesis: s.verdict || (s.state === 'POSITIVE' ? 'Upward momentum' : 'Volatility play'),
           riskFlag: s.state === 'POSITIVE' ? 'Low Vol' : 'ATR',
           state: s.state === 'POSITIVE' ? 'LOW' : 'HIGH',
         });
@@ -132,29 +134,29 @@ export default function ForensicPanel({
   };
 
   const scoreColor = (s: number) => {
-    if (s >= 60) return 'text-emerald-400';
-    if (s >= 40) return 'text-amber-400';
-    return 'text-slate-400';
+    if (s >= 60) return 'text-emerald-600';
+    if (s >= 40) return 'text-amber-600';
+    return 'text-slate-500';
   };
 
   const flagClass = (flag: string) => {
     const v = flag.toLowerCase();
-    if (v.includes('low vol')) return 'text-teal-300 border-teal-800/60 bg-teal-950/40';
-    if (v.includes('structural') || v.includes('atr')) return 'text-red-300 border-red-800/60 bg-red-950/40';
-    return 'text-slate-200 border-red-900/30 bg-red-950/20';
+    if (v.includes('low vol')) return 'text-teal-700 border-teal-200 bg-teal-50';
+    if (v.includes('structural') || v.includes('atr')) return 'text-red-700 border-red-200 bg-red-50';
+    return 'text-slate-600 border-red-200 bg-red-50';
   };
 
   return (
-    <section className="bg-[#04050d] border border-slate-800 rounded-xl p-4">
+    <section className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-emerald-400 text-[11px] font-bold tracking-wider uppercase">ASSET MATRIX</h3>
-          <p className="text-slate-400 text-[10px] mt-0.5">Active Nodes {stocks.length || assetRows.length} · Avg Kelly Ratio 5.67:1 · Top Return 13.8% · Data Date {live?.updatedAt ? new Date(live.updatedAt).toISOString().slice(0, 10) : '2026-06-11'}</p>
+          <h3 className="text-emerald-700 text-[11px] font-bold tracking-wider uppercase">ASSET MATRIX</h3>
+          <p className="text-slate-500 text-[10px] mt-0.5">Active Nodes {stocks.length || assetRows.length} · Avg Kelly Ratio 5.67:1 · Top Return 13.8% · Data Date {live?.updatedAt ? new Date(live.updatedAt).toISOString().slice(0, 10) : '2026-06-11'}</p>
         </div>
         <button
           onClick={refresh}
           disabled={refreshing}
-          className="px-3 py-1 text-[10px] rounded-full bg-slate-950 border border-slate-800 hover:bg-slate-900 text-slate-300 disabled:opacity-50 transition"
+          className="px-3 py-1 text-[10px] rounded-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition"
         >
           {refreshing ? 'Refreshing...' : 'Refresh'}
         </button>
@@ -163,7 +165,7 @@ export default function ForensicPanel({
       <div className="overflow-auto">
         <table className="w-full text-left text-[11px]">
           <thead>
-            <tr className="text-slate-400 text-[10px] uppercase">
+            <tr className="text-slate-500 text-[10px] uppercase">
               <th className="py-2.5 pr-3 font-semibold">Ticker</th>
               <th className="py-2.5 pr-3 font-semibold">Price</th>
               <th className="py-2.5 pr-3 font-semibold">Score</th>
@@ -173,26 +175,26 @@ export default function ForensicPanel({
               <th className="py-2.5 font-semibold">Risk Flag</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/30">
+          <tbody className="divide-y divide-slate-200">
             {assetRows.map((row) => (
               <tr
                 key={row.ticker}
                 onClick={() => onSelect?.(row.ticker)}
-                className={`cursor-pointer transition hover:bg-slate-800/30 ${row.state === 'HIGH' ? 'bg-emerald-900/10' : row.state === 'LOW' ? 'bg-red-900/10' : ''}`}
+                className={`cursor-pointer transition hover:bg-slate-50 ${row.state === 'HIGH' ? 'bg-emerald-50/30' : row.state === 'LOW' ? 'bg-red-50/30' : ''}`}
               >
-                <td className="py-2.5 pr-3 font-black text-white">{row.ticker}</td>
-                 <td className="py-2.5 pr-3 text-slate-300 tabular-nums">{row.price ? `₹${String(row.price).replace(/[₹]+/g, '')}` : '-'}</td>
+                <td className="py-2.5 pr-3 font-black text-slate-900">{row.ticker}</td>
+                 <td className="py-2.5 pr-3 text-slate-700 tabular-nums">{row.price ? `₹${String(row.price).replace(/[₹]+/g, '')}` : '-'}</td>
                 <td className={`py-2.5 pr-3 font-bold ${scoreColor(row.score)}`}>{row.score || '-'}</td>
-                <td className="py-2.5 pr-3 text-slate-300">{row.kelly || '-'}</td>
+                <td className="py-2.5 pr-3 text-slate-700">{row.kelly || '-'}</td>
                 <td className="py-2.5 pr-3">
-                  <span className={`font-bold tabular-nums ${row.returnPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`font-bold tabular-nums ${row.returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {row.returnPct >= 0 ? '+' : ''}{row.returnPct.toFixed(1)}%
                   </span>
                 </td>
-                <td className="py-2.5 pr-3 text-slate-400">
-                  {row.thesis ? <span className="text-teal-400">{row.thesis}</span> : '-'}
+                <td className="py-2.5 pr-3 text-slate-500">
+                  {row.thesis ? <span className="text-teal-700 font-medium">{row.thesis}</span> : '-'}
                 </td>
-                <td className="py-2.5 pr-3 text-slate-400">
+                <td className="py-2.5 pr-3 text-slate-500">
                   {row.riskFlag ? <span className={`inline-block border px-2 py-0.5 rounded text-[10px] ${flagClass(row.riskFlag)}`}>{row.riskFlag}</span> : '-'}
                 </td>
               </tr>
@@ -209,11 +211,11 @@ export default function ForensicPanel({
       </div>
 
       {selectionMeta && (
-        <div className="mt-4 bg-[#070919] p-3 rounded-lg border border-slate-800 text-[11px] text-slate-300">
-          <div className="text-slate-400 text-[10px] uppercase tracking-wider">Selection Basis</div>
-          <div className="mt-1 font-bold text-white capitalize">{selectionMeta.mode}</div>
-          <p className="mt-1 text-slate-400">{selectionMeta.reason}</p>
-          <p className="mt-1 text-slate-500">Data date: {selectionMeta.dataDate}</p>
+        <div className="mt-4 bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px] text-slate-700">
+          <div className="text-slate-500 text-[10px] uppercase tracking-wider">Selection Basis</div>
+          <div className="mt-1 font-bold text-slate-900 capitalize">{selectionMeta.mode}</div>
+          <p className="mt-1 text-slate-600">{selectionMeta.reason}</p>
+          <p className="mt-1 text-slate-400">Data date: {selectionMeta.dataDate}</p>
         </div>
       )}
     </section>

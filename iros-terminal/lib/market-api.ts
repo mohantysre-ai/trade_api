@@ -114,6 +114,7 @@ export type MarketDataResponse = {
   newsSummary?: string;
   llmError?: string;
   terminalIntelligence?: TerminalIntelligence;
+  tickerIntelligenceByTicker?: Record<string, TerminalIntelligence>;
   isSnapshotFallback?: boolean;
   selectionMeta?: SelectionMeta;
 };

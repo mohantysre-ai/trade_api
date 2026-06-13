@@ -31,7 +31,11 @@ from SmartApi import SmartConnect
 
 from global_feed import fetch_domestic_yahoo_macro, fetch_global_macro
 from symbols import MACRO_INSTRUMENTS, MOCK_TICKERS, WATCHLIST, Instrument
-from terminal_intelligence_full import TOP_SELECTION_COUNT, execute_terminal_intelligence_pipeline
+from terminal_intelligence_full import (
+    TOP_SELECTION_COUNT,
+    build_ticker_intelligence_map,
+    execute_terminal_intelligence_pipeline,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -257,6 +261,11 @@ def _apply_selection_meta(
         "reason": reason,
         "dataDate": data_date or _payload_data_date(payload),
     }
+    return payload
+
+
+def _hydrate_ticker_intelligence_map(payload: dict[str, Any]) -> dict[str, Any]:
+    payload["tickerIntelligenceByTicker"] = build_ticker_intelligence_map(payload)
     return payload
 
 
@@ -1120,9 +1129,11 @@ def _build_payload_from_live_data(
         "newsSummary": news_summary,
         "llmError": None,
         "terminalIntelligence": terminal_intel,
+        "tickerIntelligenceByTicker": {},
         "isSnapshotFallback": False,
     }
 
+    payload = _hydrate_ticker_intelligence_map(payload)
     _apply_selection_meta(
         payload,
         mode="live",
@@ -1156,7 +1167,7 @@ def build_market_payload(
                 reason="Outside the scheduled IST refresh window; serving the latest saved snapshot.",
                 data_date=_payload_data_date(snapshot),
             )
-            return snapshot
+            return _hydrate_ticker_intelligence_map(snapshot)
         if not allow_fallback:
             return {
                 "success": False,
@@ -1173,6 +1184,7 @@ def build_market_payload(
                 "newsSummary": None,
                 "llmError": None,
                 "terminalIntelligence": None,
+                "tickerIntelligenceByTicker": {},
                 "isSnapshotFallback": False,
                 "selectionMeta": {
                     "mode": "live",
@@ -1195,6 +1207,7 @@ def build_market_payload(
             "newsSummary": None,
             "llmError": None,
             "terminalIntelligence": None,
+            "tickerIntelligenceByTicker": {},
             "isSnapshotFallback": True,
             "selectionMeta": {
                 "mode": "snapshot",
@@ -1228,7 +1241,7 @@ def build_market_payload(
                 reason=f"Live refresh failed, so the latest saved snapshot was reused: {exc}",
                 data_date=_payload_data_date(snapshot),
             )
-            return snapshot
+            return _hydrate_ticker_intelligence_map(snapshot)
         raise
 
 
@@ -1298,6 +1311,7 @@ def create_app() -> FastAPI:
             return {
                 "success": True,
                 "analysis": payload.get("terminalIntelligence"),
+                "tickerIntelligenceByTicker": payload.get("tickerIntelligenceByTicker", {}),
                 "newsSummary": payload.get("newsSummary"),
                 "isSnapshotFallback": payload.get("isSnapshotFallback", False),
                 "selectionMeta": payload.get("selectionMeta"),
@@ -1310,13 +1324,19 @@ def create_app() -> FastAPI:
         try:
             client = AngelOneClient()
             payload = build_market_payload(client, pool_name=pool, custom_prompt=prompt)
-            report = dict(payload.get("terminalIntelligence") or {})
             if ticker:
-                report["focusTicker"] = ticker
+                report = (payload.get("tickerIntelligenceByTicker") or {}).get(ticker)
+                if report:
+                    report = dict(report)
+                else:
+                    report = build_ticker_intelligence_report(payload, ticker)
+            else:
+                report = dict(payload.get("terminalIntelligence") or {})
             return {
                 "success": True,
                 "terminalIntelligence": report,
                 "focusTicker": ticker,
+                "tickerIntelligenceByTicker": payload.get("tickerIntelligenceByTicker", {}),
                 "newsSummary": payload.get("newsSummary"),
                 "selectionMeta": payload.get("selectionMeta"),
                 "isSnapshotFallback": payload.get("isSnapshotFallback", False),
