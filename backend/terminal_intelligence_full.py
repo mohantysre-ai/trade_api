@@ -649,6 +649,185 @@ def _default_factor_hub(stocks: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _ticker_fundamentals(payload: dict[str, Any], ticker: str) -> dict[str, str]:
+    active_scoring_matrix = (payload.get("terminalIntelligence") or {}).get("active_scoring_matrix") or {}
+    if all(
+        active_scoring_matrix.get(key)
+        and str(active_scoring_matrix.get(key)).strip().lower() not in {"n/a", "na", "none", "-", ""}
+        for key in ("beneish_m_score", "altman_z_score", "ocf_ebitda_ratio", "mansfield_relative_strength")
+    ):
+        return {key: str(active_scoring_matrix[key]) for key in active_scoring_matrix}
+
+    fundamentals_map = _estimate_fundamentals_from_snapshot(payload)
+    if ticker in fundamentals_map:
+        return fundamentals_map[ticker]
+    if ticker in KNOWN_FUNDAMENTALS:
+        return dict(KNOWN_FUNDAMENTALS[ticker])
+
+    return {
+        "beneish_m_score": "N/A",
+        "altman_z_score": "N/A",
+        "ocf_ebitda_ratio": "N/A",
+        "mansfield_relative_strength": "N/A",
+    }
+
+
+def _ticker_ledger_row(payload: dict[str, Any], ticker: str) -> dict[str, Any]:
+    for row in (payload.get("terminalIntelligence") or {}).get("ledger_stocks") or []:
+        if row.get("ticker") == ticker:
+            return row
+    return {}
+
+
+def _ticker_stock_row(payload: dict[str, Any], ticker: str) -> dict[str, Any]:
+    stock_quotes = payload.get("stockQuotes") or {}
+    quote = stock_quotes.get(ticker)
+    if isinstance(quote, dict) and quote:
+        return quote
+    for stock in payload.get("stocks") or []:
+        if stock.get("ticker") == ticker:
+            return stock
+    return {}
+
+
+def _ticker_score(stock: dict[str, Any], ledger_row: dict[str, Any]) -> float:
+    raw = ledger_row.get("score") or stock.get("score") or (stock.get("intraday") or {}).get("score") or 0
+    try:
+        return float(raw)
+    except Exception:
+        return 0.0
+
+
+def _ticker_intraday_text(stock: dict[str, Any]) -> str:
+    intraday = stock.get("intraday") or {}
+    if not intraday:
+        return "no intraday metrics"
+    trigger = intraday.get("trigger_point") or "no trigger"
+    vwap = intraday.get("vwap") or "VWAP unavailable"
+    ema9 = intraday.get("ema9") or "EMA9 unavailable"
+    atr = intraday.get("atr_pct") or 0
+    volume_multiplier = intraday.get("volume_multiplier") or 0
+    return f"{trigger}, VWAP {vwap}, EMA9 {ema9}, ATR {atr}%, volume multiplier {volume_multiplier}x"
+
+
+def _ticker_factor_hub(stock: dict[str, Any], score: float) -> dict[str, Any]:
+    intraday = stock.get("intraday") or {}
+    price_above_vwap = bool(intraday.get("price_above_vwap"))
+    price_above_ema9 = bool(intraday.get("price_above_ema9"))
+    volume_multiplier = float(intraday.get("volume_multiplier") or 0)
+    turnover_cr = float(intraday.get("turnover_cr") or 0)
+    atr = float(intraday.get("atr_pct") or 0)
+    delta = _parse_percent(stock.get("delta"))
+
+    if price_above_vwap and price_above_ema9 and delta >= 0:
+        dominant = "momentum, liquidity, and structural trend alignment"
+    elif atr >= 3.5 or abs(delta) >= 5:
+        dominant = "range expansion with volatility-led execution risk"
+    else:
+        dominant = "liquidity and mean-reversion around intraday anchors"
+
+    return {
+        "selection_reason": "ticker-specific factor attribution from live quote, volume, and intraday structure",
+        "dominant_factors": dominant,
+        "momentum_factor": f"{'Above' if price_above_vwap and price_above_ema9 else 'Near'} VWAP/EMA9; score {score:.1f}.",
+        "liquidity_factor": f"Volume multiplier {volume_multiplier:.2f}x; turnover {turnover_cr:.2f} Cr." if turnover_cr else "Turnover data unavailable.",
+        "quality_factor": f"ATR {atr:.2f}% and hard-filter status {'pass' if intraday.get('passes_hard_filters') else 'watch'}.",
+        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
+        "low_vol_factor": "Low-vol regime" if atr <= 2 else "Volatility premium regime",
+    }
+
+
+def _ticker_risk_calc(stock: dict[str, Any], ledger_row: dict[str, Any], market_risk: dict[str, Any], score: float) -> dict[str, Any]:
+    intraday = stock.get("intraday") or {}
+    delta = _parse_percent(stock.get("delta"))
+    atr = float(intraday.get("atr_pct") or 0)
+    turnover_cr = float(intraday.get("turnover_cr") or 0)
+    volume_multiplier = float(intraday.get("volume_multiplier") or 0)
+    return {
+        "ticker_score": round(score, 2),
+        "delta_pct": round(delta, 2),
+        "atr_pct": round(atr, 2),
+        "turnover_cr": round(turnover_cr, 2),
+        "volume_multiplier": round(volume_multiplier, 2),
+        "selection_risk": "lower" if score >= 70 and delta >= 0 else "moderate" if score >= 50 else "higher",
+        "signal_quality": "live-derived" if stock else "snapshot-ledger",
+        "win_loss_ratio": market_risk.get("win_loss_ratio", "—"),
+        "kelly_policy_max": ledger_row.get("policy_allocation_pct") or market_risk.get("kelly_policy_max", "—"),
+    }
+
+
+def build_ticker_intelligence_report(payload: dict[str, Any], ticker: str) -> dict[str, Any]:
+    terminal = payload.get("terminalIntelligence") or {}
+    stock = _ticker_stock_row(payload, ticker)
+    ledger_row = _ticker_ledger_row(payload, ticker)
+    score = _ticker_score(stock, ledger_row)
+    intraday = stock.get("intraday") or {}
+    delta = _clean_value(stock.get("delta")) or "flat"
+    ltp = _clean_value(stock.get("ltp")) or "N/A"
+    volume = stock.get("volume") or "N/A"
+    action = _clean_value(ledger_row.get("action")) or "cohort selection"
+    selection_reason = _clean_value(ledger_row.get("selection_reason"))
+    fundamentals = _ticker_fundamentals(payload, ticker)
+    market_risk = terminal.get("active_risk_calc") or {}
+    market_factor_hub = terminal.get("active_factor_hub") or {}
+    market_gates = terminal.get("active_seven_ic_gates") or {}
+    market_news = terminal.get("news_catalysts_card") or "Top market catalysts were not available from the current news feed."
+    market_macro = terminal.get("macro_anchors_card") or "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks."
+    market_insti = terminal.get("insider_insti_activity_card") or "Institutional activity is inferred from live volume and price participation."
+
+    why_parts = [f"{ticker} is in the active terminal universe with LTP {ltp}, {delta} move, and volume {volume}."]
+    if selection_reason:
+        why_parts.append(selection_reason)
+    why_parts.append(f"Intraday setup: {_ticker_intraday_text(stock)}.")
+    why = " ".join(why_parts)
+
+    forensic_bits = ", ".join(
+        f"{key.replace('_', ' ').title()}: {value}" for key, value in fundamentals.items()
+    )
+    return {
+        "news_catalysts_card": f"Market context for {ticker}: {market_news}",
+        "insider_insti_activity_card": f"{market_insti} For {ticker}, participation is read through volume multiplier {intraday.get('volume_multiplier', 'N/A')}x and turnover {intraday.get('turnover_cr', 'N/A')} Cr.",
+        "macro_anchors_card": f"{market_macro} {ticker} is evaluated against this backdrop using live price, volume, and intraday structure.",
+        "forensic_screen_card": f"{ticker} forensic screen: {forensic_bits}.",
+        "why_interested": why,
+        "future_revenue_model": f"Forward model for {ticker} is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+        "current_model": f"Current model for {ticker}: LTP {ltp}, delta {delta}, volume {volume}, score {score:.1f}, action {action}.",
+        "ledger_stocks": _canonicalize_ledger_rows([ledger_row] if ledger_row else [], ticker) or _canonicalize_ledger_rows(terminal.get("ledger_stocks") or [], ticker),
+        "active_scoring_matrix": fundamentals,
+        "active_seven_ic_gates": {
+            "q1_fund_buying": f"{ticker} volume multiplier is {intraday.get('volume_multiplier', 'N/A')}x; institutional participation is inferred from turnover and price follow-through.",
+            "q2_liquidity_delivery": f"{ticker} turnover is {intraday.get('turnover_cr', 'N/A')} Cr; liquidity quality is {'institutional' if float(intraday.get('turnover_cr') or 0) >= 50 else 'watch-list'} level.",
+            "q3_catalyst_validation": f"{ticker} price action is {delta}; catalyst validation depends on follow-through above VWAP/EMA9.",
+            "q4_bear_thesis": market_gates.get("q4_bear_thesis", "Bear thesis is monitored through breakdown risk and failure to hold intraday anchors."),
+            "q5_risk_reward": f"{ticker} risk/reward is driven by score {score:.1f}, ATR {intraday.get('atr_pct', 'N/A')}%, and execution level {intraday.get('trigger_point', 'N/A')}.",
+            "q6_quantitative_milestone": f"{ticker} quantitative milestone: hard-filter {'pass' if intraday.get('passes_hard_filters') else 'watch'} with score {score:.1f}.",
+            "q7_governance_gate": market_gates.get("q7_governance_gate", "Governance gate remains a watch item; no live red flag was embedded in the market payload."),
+        },
+        "active_risk_calc": _ticker_risk_calc(stock, ledger_row, market_risk, score),
+        "active_factor_hub": _ticker_factor_hub(stock, score) if stock else market_factor_hub,
+        "focusTicker": ticker,
+        "ticker": ticker,
+        "dataQuality": "live-derived" if stock else "snapshot-ledger",
+    }
+
+
+def build_ticker_intelligence_map(payload: dict[str, Any]) -> dict[str, Any]:
+    tickers: list[str] = []
+    for stock in payload.get("stocks") or []:
+        ticker = stock.get("ticker")
+        if ticker:
+            tickers.append(str(ticker))
+    for row in (payload.get("terminalIntelligence") or {}).get("ledger_stocks") or []:
+        ticker = row.get("ticker")
+        if ticker:
+            tickers.append(str(ticker))
+
+    return {
+        ticker: build_ticker_intelligence_report(payload, ticker)
+        for ticker in dict.fromkeys(tickers)
+    }
+
+
 def _build_fallback_payload(snapshot: dict[str, Any], focus_ticker: str | None) -> dict[str, Any]:
     news = snapshot.get("news") or []
     stocks = snapshot.get("stocks") or []
@@ -998,4 +1177,4 @@ def execute_terminal_intelligence_pipeline(live_unstructured_stream: str) -> Com
     return _heuristic_analysis(live_unstructured_stream, focus_ticker)
 
 
-__all__ = ["execute_terminal_intelligence_pipeline"]
+__all__ = ["build_ticker_intelligence_map", "build_ticker_intelligence_report", "execute_terminal_intelligence_pipeline", "TOP_SELECTION_COUNT"]

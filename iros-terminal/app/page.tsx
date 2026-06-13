@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   useMarketData,
   type LiveStock,
@@ -33,23 +33,23 @@ type TabKey = 'marketSnapshot' | 'assetMatrix' | 'icGates';
 function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
     return (
-      <div className="bg-slate-900/80 border border-slate-700 rounded-lg p-4 text-slate-400 text-[10px]">
+      <div className="bg-white border border-slate-200 rounded-lg p-4 text-slate-400 text-[10px] shadow-sm">
         Waiting for global macro data.
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-900/80 border border-slate-700 rounded-lg p-3">
+    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[9px] uppercase tracking-wider text-slate-400">GLOBAL INDICES</span>
+        <span className="text-[9px] uppercase tracking-wider text-slate-500">GLOBAL INDICES</span>
         {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {items.map((item) => (
-          <div key={`${item.label}-${item.val}-${item.state}`} className="bg-slate-800/70 border border-slate-700/60 p-2 rounded">
-            <span className="text-[9px] text-slate-400 block uppercase tracking-wider">{item.label}</span>
-            <span className="text-sm font-bold text-white block mt-0.5">{item.val}</span>
+          <div key={`${item.label}-${item.val}-${item.state}`} className="bg-slate-50 border border-slate-100 p-2 rounded">
+            <span className="text-[9px] text-slate-500 block uppercase tracking-wider">{item.label}</span>
+            <span className="text-sm font-bold text-slate-900 block mt-0.5">{item.val}</span>
             <span
               className={`text-[9px] block ${
                 item.state === 'POSITIVE' ? 'text-emerald-500' : 'text-red-500'
@@ -67,23 +67,23 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
 function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
     return (
-      <div className="bg-[#070919] border border-slate-800 rounded-lg p-4 text-slate-500 text-[10px]">
+      <div className="bg-white border border-slate-200 rounded-lg p-4 text-slate-400 text-[10px] shadow-sm">
         Waiting for Indian market data.
       </div>
     );
   }
 
   return (
-    <div className="bg-[#070919] border border-slate-800 rounded-lg p-3">
+    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[9px] uppercase tracking-wider text-slate-400">INDIA MARKETS</span>
+        <span className="text-[9px] uppercase tracking-wider text-slate-500">INDIA MARKETS</span>
         {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {items.map((item) => (
-          <div key={`${item.label}-${item.val}-${item.state}`} className="bg-[#04050d] border border-slate-800/60 p-2 rounded">
-            <span className="text-[9px] text-slate-400 block uppercase tracking-wider">{item.label}</span>
-            <span className="text-sm font-bold text-white block mt-0.5">{item.val}</span>
+          <div key={`${item.label}-${item.val}-${item.state}`} className="bg-white border border-slate-100 p-2 rounded">
+            <span className="text-[9px] text-slate-500 block uppercase tracking-wider">{item.label}</span>
+            <span className="text-sm font-bold text-slate-900 block mt-0.5">{item.val}</span>
             <span
               className={`text-[9px] block ${
                 item.state === 'POSITIVE' ? 'text-emerald-500' : 'text-red-500'
@@ -101,7 +101,7 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
 function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null }) {
   if (!stock) {
     return (
-      <div className="bg-[#070919] border border-emerald-500/10 rounded-lg p-4 text-slate-500 min-h-[120px] flex items-center justify-center text-[10px]">
+      <div className="bg-white border border-emerald-200 rounded-lg p-4 text-slate-500 min-h-[120px] flex items-center justify-center text-[10px] shadow-sm">
         Select an asset to view quote detail.
       </div>
     );
@@ -117,12 +117,12 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
   const delta = 'delta' in stock ? (stock as LiveStock).delta : (stock as LedgerStock).delta;
 
   return (
-    <div className="bg-[#070919] border border-emerald-500/20 rounded-lg p-4">
+    <div className="bg-white border border-emerald-200 rounded-lg p-4 shadow-sm">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <div className="text-slate-400 text-[10px] uppercase tracking-wider">{name}</div>
+          <div className="text-slate-500 text-[10px] uppercase tracking-wider">{name}</div>
           <div className="flex items-baseline gap-3 mt-1">
-              <span className="text-3xl font-black text-white">{normalizedPrice}</span>
+              <span className="text-3xl font-black text-slate-900">{normalizedPrice}</span>
             {delta && (
               <span
                 className={`text-xs font-bold ${
@@ -136,21 +136,21 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
         </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-[10px]">
-        <div className="bg-[#04050d] border border-slate-800 p-2 rounded">
+        <div className="bg-slate-50 border border-slate-100 p-2 rounded">
           <div className="text-slate-500 uppercase tracking-wider text-[9px]">Open</div>
-          <div className="font-bold text-white mt-0.5">{open ?? 'N/A'}</div>
+          <div className="font-bold text-slate-900 mt-0.5">{open ?? 'N/A'}</div>
         </div>
-        <div className="bg-[#04050d] border border-slate-800 p-2 rounded">
+        <div className="bg-slate-50 border border-slate-100 p-2 rounded">
           <div className="text-slate-500 uppercase tracking-wider text-[9px]">High</div>
-          <div className="font-bold text-white mt-0.5">{high ?? 'N/A'}</div>
+          <div className="font-bold text-slate-900 mt-0.5">{high ?? 'N/A'}</div>
         </div>
-        <div className="bg-[#04050d] border border-slate-800 p-2 rounded">
+        <div className="bg-slate-50 border border-slate-100 p-2 rounded">
           <div className="text-slate-500 uppercase tracking-wider text-[9px]">Low</div>
-          <div className="font-bold text-white mt-0.5">{low ?? 'N/A'}</div>
+          <div className="font-bold text-slate-900 mt-0.5">{low ?? 'N/A'}</div>
         </div>
-        <div className="bg-[#04050d] border border-slate-800 p-2 rounded">
+        <div className="bg-slate-50 border border-slate-100 p-2 rounded">
           <div className="text-slate-500 uppercase tracking-wider text-[9px]">Volume</div>
-          <div className="font-bold text-white mt-0.5">{volume != null ? new Intl.NumberFormat().format(volume) : 'N/A'}</div>
+          <div className="font-bold text-slate-900 mt-0.5">{volume != null ? new Intl.NumberFormat().format(volume) : 'N/A'}</div>
         </div>
       </div>
     </div>
@@ -160,47 +160,91 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
 function AISummaryPanel({ summary, llmError, isSnapshotFallback, selectionMeta }: { summary?: string; llmError?: string | null; isSnapshotFallback: boolean; selectionMeta?: { mode?: string; reason?: string; dataDate?: string } | null }) {
   if (llmError) {
     return (
-      <div className="bg-[#070919] border border-amber-700/40 rounded-lg p-3">
-        <div className="text-[9px] uppercase tracking-wider text-amber-400 mb-1">AI SUMMARY</div>
-        <p className="text-[11px] text-amber-200 leading-relaxed">{llmError}</p>
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+        <div className="text-[9px] uppercase tracking-wider text-amber-700 mb-1">AI SUMMARY</div>
+        <p className="text-[11px] text-amber-800 leading-relaxed">{llmError}</p>
       </div>
     );
   }
 
   if (summary) {
     return (
-    <div className="bg-slate-900/80 border border-slate-700 rounded-lg p-3">
-        <div className="text-[9px] uppercase tracking-wider text-slate-400 mb-1">AI SUMMARY</div>
-        <p className="text-[11px] text-slate-300 leading-relaxed">{summary}</p>
+    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+        <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1">AI SUMMARY</div>
+        <p className="text-[11px] text-slate-700 leading-relaxed">{summary}</p>
       </div>
     );
   }
 
   if (isSnapshotFallback) {
     return (
-      <div className="bg-[#070919]/60 border border-amber-700/30 rounded-lg p-3">
-        <div className="text-[9px] uppercase tracking-wider text-slate-400 mb-1">AI SUMMARY</div>
-        <p className="text-[11px] text-amber-300/90 leading-relaxed">Top market catalysts were not available from the current news feed.</p>
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+        <div className="text-[9px] uppercase tracking-wider text-amber-700 mb-1">AI SUMMARY</div>
+        <p className="text-[11px] text-amber-700 leading-relaxed">Top market catalysts were not available from the current news feed.</p>
         {selectionMeta?.reason && <p className="text-[9px] text-slate-500 mt-1">Basis: {selectionMeta.reason}</p>}
       </div>
     );
   }
 
   return (
-    <div className="bg-[#070919] border border-slate-800 rounded-lg p-3">
-      <div className="text-[9px] uppercase tracking-wider text-slate-400 mb-1">AI SUMMARY</div>
+    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+      <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1">AI SUMMARY</div>
       <p className="text-[11px] text-slate-500 leading-relaxed">Top market catalysts were not available from the current news feed.</p>
+    </div>
+  );
+}
+
+function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: string; link: string; summary: string; publishedAt: string }>; now: number }) {
+  if (!items?.length) return null;
+
+  const timeAgo = (dateStr: string) => {
+    const diff = now - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    return `${hrs}h ago`;
+  };
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+      <div className="flex items-center justify-between p-3 border-b border-slate-100">
+        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">LIVE NEWS FEED</span>
+        <span className="text-[9px] text-slate-400">{items.length} stories</span>
+      </div>
+      <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
+        {items.map((item, i) => (
+          <div key={i} className="p-3 hover:bg-slate-50 transition">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <a
+                  href={item.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] font-medium text-slate-800 hover:text-teal-700 leading-tight block truncate"
+                >
+                  {item.title}
+                </a>
+                <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed line-clamp-2">{item.summary}</p>
+              </div>
+              <div className="flex-shrink-0 text-right">
+                <span className="text-[9px] text-slate-400 block">{timeAgo(item.publishedAt)}</span>
+                <span className="text-[8px] text-slate-400 block mt-0.5 max-w-[100px] truncate">{item.source.split(' ').slice(0, 3).join(' ')}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 function LiveIntelligencePanel({ count, description }: { count: number; description?: string | null }) {
   return (
-    <div className="bg-[#070919] border border-slate-800 rounded-lg p-3">
-      <div className="text-[9px] uppercase tracking-wider text-slate-400 mb-1">
+    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+      <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1">
         LIVE INTELLIGENCE · {count} NODES
       </div>
-      <p className="text-[11px] text-slate-400 leading-relaxed">
+      <p className="text-[11px] text-slate-600 leading-relaxed">
         Dynamic live universe label applied for Nifty 500. Gemini / Pydantic mapped payload from live Angel One ingestion stream.
       </p>
       {description && <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{description}</p>}
@@ -212,10 +256,10 @@ function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIn
   const hasData = !!intelligence;
 
   return (
-    <div className="bg-[#04050d] border border-slate-800 rounded-xl p-4">
+    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Structured Reasoning Output</h3>
+          <h3 className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Structured Reasoning Output</h3>
           <p className="text-[10px] text-slate-500 mt-0.5">Gemini / Pydantic mapped payload from the live ingestion stream.</p>
         </div>
         <div className="text-[10px] text-slate-500">{hasData ? 'Available' : 'Unavailable'}</div>
@@ -223,41 +267,41 @@ function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIn
 
       {hasData ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[10px] text-slate-300">
-            <div className="bg-[#070919] border border-emerald-500/10 p-3 rounded-lg">
-              <div className="text-[9px] uppercase tracking-wider text-emerald-400 mb-1">News Catalysts</div>
-              <p className="text-[11px] text-slate-300 leading-relaxed">{intelligence.news_catalysts_card ?? 'Not produced.'}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[10px] text-slate-700">
+            <div className="bg-white border border-emerald-100 p-3 rounded-lg">
+              <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">News Catalysts</div>
+              <p className="text-[11px] text-slate-700 leading-relaxed">{intelligence.news_catalysts_card ?? 'Not produced.'}</p>
             </div>
-            <div className="bg-[#070919] border border-emerald-500/10 p-3 rounded-lg">
-              <div className="text-[9px] uppercase tracking-wider text-emerald-400 mb-1">Macro Anchors</div>
-              <p className="text-[11px] text-slate-300 leading-relaxed">{intelligence.macro_anchors_card ?? 'Not produced.'}</p>
+            <div className="bg-white border border-emerald-100 p-3 rounded-lg">
+              <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Macro Anchors</div>
+              <p className="text-[11px] text-slate-700 leading-relaxed">{intelligence.macro_anchors_card ?? 'Not produced.'}</p>
             </div>
-            <div className="bg-[#070919] border border-emerald-500/10 p-3 rounded-lg">
-              <div className="text-[9px] uppercase tracking-wider text-emerald-400 mb-1">Insider / Insti Activity</div>
-              <p className="text-[11px] text-slate-300 leading-relaxed">{intelligence.insider_insti_activity_card ?? 'Not produced.'}</p>
+            <div className="bg-white border border-emerald-100 p-3 rounded-lg">
+              <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Insider / Insti Activity</div>
+              <p className="text-[11px] text-slate-700 leading-relaxed">{intelligence.insider_insti_activity_card ?? 'Not produced.'}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[10px] text-slate-300 mt-3">
-            <div className="bg-[#070919] border border-emerald-500/10 p-3 rounded-lg">
-              <div className="text-[9px] uppercase tracking-wider text-emerald-400 mb-1">Structural Thesis</div>
-              <p className="text-[10px] text-slate-400 leading-relaxed">
-                <span className="text-slate-300">Why Interested: </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[10px] text-slate-700 mt-3">
+            <div className="bg-white border border-emerald-100 p-3 rounded-lg">
+              <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Structural Thesis</div>
+              <p className="text-[10px] text-slate-600 leading-relaxed">
+                <span className="text-slate-700">Why Interested: </span>
                 {intelligence.why_interested ?? 'Not produced.'}
               </p>
-              <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
-                <span className="text-slate-300">Forward Revenue: </span>
+              <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">
+                <span className="text-slate-700">Forward Revenue: </span>
                 {intelligence.future_revenue_model ?? 'Not produced.'}
               </p>
             </div>
-            <div className="bg-[#070919] border border-emerald-500/10 p-3 rounded-lg">
-              <div className="text-[9px] uppercase tracking-wider text-emerald-400 mb-1">Risk Calc / Factor Hub</div>
+            <div className="bg-white border border-emerald-100 p-3 rounded-lg">
+              <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Risk Calc / Factor Hub</div>
               {intelligence.active_risk_calc ? (
                 <div className="space-y-1">
                   {Object.entries(intelligence.active_risk_calc).map(([label, value]) => (
                     <div key={label} className="flex items-center justify-between">
                       <span className="text-slate-500 uppercase tracking-wider text-[9px]">{label.replace(/_/g, ' ')}</span>
-                      <span className="text-slate-300">{String(value)}</span>
+                      <span className="text-slate-700">{String(value)}</span>
                     </div>
                   ))}
                 </div>
@@ -283,6 +327,12 @@ export default function IrosMasterAdvancedTerminal() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerContent, setDrawerContent] = useState<DrawerContent | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('marketSnapshot');
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const { data: liveMarket, status: feedStatus, refreshOnDemand, invalidateKey } = useMarketData(selectedPool);
   const stocks = liveMarket?.stocks ?? [];
@@ -299,8 +349,10 @@ export default function IrosMasterAdvancedTerminal() {
   const newsSummary = liveMarket?.newsSummary;
   const llmError = liveMarket?.llmError;
   const selectionMeta = liveMarket?.selectionMeta ?? null;
-  const intelligence = liveMarket?.terminalIntelligence as TerminalIntelligence | undefined;
+  const marketIntelligence = liveMarket?.terminalIntelligence as TerminalIntelligence | undefined;
   const isSnapshotFallback = liveMarket?.isSnapshotFallback ?? false;
+  const [tickerIntelligence, setTickerIntelligence] = useState<TerminalIntelligence | null>(null);
+  const intelligence = useMemo(() => tickerIntelligence ?? marketIntelligence, [tickerIntelligence, marketIntelligence]);
 
   const selectedQuote = useMemo(
     () => selectedTickerForView ? liveMarket?.stockQuotes?.[selectedTickerForView] ?? stocks.find((stock) => stock.ticker === selectedTickerForView) : undefined,
@@ -310,6 +362,28 @@ export default function IrosMasterAdvancedTerminal() {
   const handleSelect = async (t: string) => {
     setSelectedTicker(t);
     setDrawerOpen(true);
+
+    const tickerIntelligence = liveMarket?.tickerIntelligenceByTicker?.[t];
+    if (tickerIntelligence) {
+      setTickerIntelligence(tickerIntelligence);
+      setDrawerContent({
+        stock: stocks.find((s) => s.ticker === t) ?? null,
+        analysis: {
+          ...tickerIntelligence,
+          selectionMeta: liveMarket?.selectionMeta,
+          isSnapshotFallback: liveMarket?.isSnapshotFallback ?? false,
+        },
+        snapshot: {
+          newsSummary: liveMarket?.newsSummary,
+          llmError: liveMarket?.llmError,
+          isSnapshotFallback: liveMarket?.isSnapshotFallback ?? false,
+          selectionMeta: liveMarket?.selectionMeta ?? null,
+          poolDescription: liveMarket?.poolDescription ?? null,
+        }
+      });
+      return;
+    }
+
     try {
       const params = new URLSearchParams();
       if (t) params.set("ticker", t);
@@ -317,9 +391,11 @@ export default function IrosMasterAdvancedTerminal() {
       const resp = await fetch(`/api/terminal-intelligence${params.toString() ? `?${params.toString()}` : ""}`);
       if (resp.ok) {
         const body = await resp.json();
+        const ti = body.terminalIntelligence ?? body;
+        setTickerIntelligence(ti);
         setDrawerContent({
           stock: stocks.find((s) => s.ticker === t) ?? null,
-          analysis: { ...(body.terminalIntelligence ?? body), selectionMeta: body.selectionMeta, isSnapshotFallback: body.isSnapshotFallback },
+          analysis: { ...ti, selectionMeta: body.selectionMeta, isSnapshotFallback: body.isSnapshotFallback },
           snapshot: {
             newsSummary: liveMarket?.newsSummary,
             llmError: liveMarket?.llmError,
@@ -341,35 +417,34 @@ export default function IrosMasterAdvancedTerminal() {
     await refreshOnDemand();
   };
 
-  const now = Date.now();
   const snapshotAgeMin = liveMarket?.updatedAt ? Math.round((now - new Date(liveMarket.updatedAt).getTime()) / 60000) : null;
   const staleMacroLabel = snapshotAgeMin == null ? "" : `STALE ${snapshotAgeMin}M`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 font-mono text-xs antialiased">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 text-slate-900 font-mono text-xs antialiased">
       <div className="max-w-[1600px] mx-auto p-4 space-y-4">
-        <header className="bg-[#070919] border border-slate-800 rounded-xl shadow-xl">
+        <header className="bg-white border border-slate-200 rounded-xl shadow-sm">
           <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span className={`w-2.5 h-2.5 rounded-full ${feedStatus === 'live' ? 'bg-emerald-500 animate-pulse' : feedStatus === 'loading' ? 'bg-amber-500' : 'bg-red-500'}`} />
-                <h1 className="text-sm font-black tracking-wider text-white">IROS Live Market Intelligence</h1>
+                <h1 className="text-sm font-black tracking-wider text-slate-900">IROS Live Market Intelligence</h1>
               </div>
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider xl:hidden">Nifty 500</span>
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider xl:hidden">Nifty 500</span>
             </div>
 
             <div className="flex items-center justify-between xl:justify-end gap-3">
-              <span className="text-[10px] font-bold uppercase text-slate-400 hidden xl:inline tracking-wider">
+              <span className="text-[10px] font-bold uppercase text-slate-500 hidden xl:inline tracking-wider">
                 {liveMarket?.rawSources?.join(' · ') ?? 'Reuters · TradingView · Moneycontrol'}
               </span>
-              <div className="flex items-center gap-2 text-[10px] text-slate-400">
+              <div className="flex items-center gap-2 text-[10px] text-slate-500">
                 <span className="hidden sm:inline">
                   {liveMarket?.updatedAt ? new Date(liveMarket.updatedAt).toLocaleTimeString() : '--:--'} IST
                 </span>
                 <button
                   onClick={handleRefresh}
                   disabled={feedStatus === 'loading'}
-                  className="px-3 py-1.5 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-black uppercase tracking-wider hover:bg-emerald-400 disabled:opacity-50 transition"
+                  className="px-3 py-1.5 rounded-full bg-teal-600 text-white text-[10px] font-black uppercase tracking-wider hover:bg-teal-500 disabled:opacity-50 transition"
                 >
                   Snapshot
                 </button>
@@ -379,14 +454,14 @@ export default function IrosMasterAdvancedTerminal() {
 
           {isSnapshotFallback && (
             <div className="px-4 pb-3">
-              <div className="bg-amber-900/10 text-amber-200 border border-amber-700 p-2 rounded text-[11px]">
+              <div className="bg-amber-50 text-amber-800 border border-amber-200 p-2 rounded text-[11px]">
                 Snapshot fallback active — outside scheduled IST refresh window. Showing latest saved analysis.
               </div>
             </div>
           )}
         </header>
 
-        <nav className="bg-[#070919] border border-slate-800 rounded-xl flex gap-1 p-1">
+        <nav className="bg-white border border-slate-200 rounded-xl flex gap-1 p-1 shadow-sm">
           {([
             { key: 'marketSnapshot' as TabKey, label: 'MARKET SNAPSHOT' },
             { key: 'assetMatrix' as TabKey, label: 'ASSET MATRIX' },
@@ -396,11 +471,11 @@ export default function IrosMasterAdvancedTerminal() {
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`flex-1 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg transition relative ${
-                activeTab === tab.key ? 'text-white' : 'text-slate-500 hover:text-slate-300'
+                activeTab === tab.key ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
               }`}
             >
               {activeTab === tab.key && (
-                <span className="absolute inset-x-2 -bottom-0.5 h-0.5 bg-teal-500 rounded-full" />
+                <span className="absolute inset-x-2 -bottom-0.5 h-0.5 bg-teal-600 rounded-full" />
               )}
               {tab.label}
             </button>
@@ -412,12 +487,13 @@ export default function IrosMasterAdvancedTerminal() {
             <div className="xl:col-span-8 space-y-4">
               <GlobalIndicesGrid items={globalMacroItems} staleLabel={staleMacroLabel} />
               <IndiaMarketsGrid items={currentMacros} staleLabel={staleMacroLabel} />
+              <NewsFeedPanel items={liveMarket?.news} now={now} />
             </div>
 
             <div className="xl:col-span-4 space-y-4">
-    <div className="bg-slate-900/80 border border-slate-700 rounded-lg p-3">
-                <div className="text-[9px] uppercase tracking-wider text-slate-400 mb-2">Snapshot Status</div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
+    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-2">Snapshot Status</div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
                   Snapshot basis active. Open ASSET MATRIX, select a ticker to view quote, AI summary and live intelligence.
                 </p>
               </div>
@@ -434,7 +510,7 @@ export default function IrosMasterAdvancedTerminal() {
             />
             <StockDetailPanel stock={selectedQuote} />
             <AISummaryPanel
-              summary={newsSummary}
+              summary={tickerIntelligence?.news_catalysts_card ?? newsSummary}
               llmError={llmError}
               isSnapshotFallback={isSnapshotFallback}
               selectionMeta={selectionMeta}
@@ -444,7 +520,7 @@ export default function IrosMasterAdvancedTerminal() {
         )}
 
         {activeTab === 'icGates' && (
-          <div className="bg-[#070919] border border-slate-800 rounded-xl p-4">
+          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
             <StructuredReasoningOutput intelligence={intelligence} />
           </div>
         )}
