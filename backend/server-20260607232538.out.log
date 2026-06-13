@@ -1,5 +1,0 @@
-[LLM-DEBUG] env_path=D:\trade_api\backend\.env LLM_PROVIDER=gemini LLM_MODEL=gemini-3.1-flash-lite REDACTED=set resolved=('gemini', 'AQ.Ab8RN6K4fvsylYab0QFGjtntNAkvZXhHO11Mu5YeuQOMoxiCtw', '', 'gemini-3.1-flash-lite')
-INFO:     127.0.0.1:65402 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65402 - "GET /api/market-data HTTP/1.1" 200 OK
-INFO:     127.0.0.1:55053 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:55057 - "GET /api/market-data HTTP/1.1" 200 OK

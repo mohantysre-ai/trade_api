@@ -1,8 +1,0 @@
-INFO:     Will watch for changes in these directories: ['D:\\trade_api\\backend']
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [8260] using WatchFiles
-WARNING:  ASGI app factory detected. Using it, but please consider setting the --factory flag explicitly.
-INFO:     Started server process [10596]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-[I 260613 17:34:47 smartConnect:124] in pool
