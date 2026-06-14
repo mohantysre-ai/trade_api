@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import type { TerminalIntelligence } from "@/lib/market-api";
+import AITickerNewsPanel from "./AITickerNewsPanel";
 
 type DrawerAnalysis = TerminalIntelligence & {
   error?: string;
@@ -15,9 +16,19 @@ type DrawerContent = {
   analysis?: DrawerAnalysis | null;
 };
 
+type DrawerTab = "analysis" | "aiNews";
+
 export default function RightDrawer({ open, onClose, content }: { open: boolean; onClose: () => void; content?: DrawerContent | null }) {
+  const [activeTab, setActiveTab] = useState<DrawerTab>("aiNews");
+
   const analysis = content?.analysis;
   const stock = content?.stock;
+  const ticker = stock?.ticker ?? "";
+
+  // Reset to aiNews tab when stock changes
+  React.useEffect(() => {
+    if (ticker) setActiveTab("aiNews");
+  }, [ticker]);
 
   const parseNewsSummary = (text: string | undefined) => {
     if (!text) return null;
@@ -93,7 +104,8 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
         open ? "translate-x-0" : "translate-x-full"
       } transition-transform duration-300 z-50 overflow-y-auto`}
     >
-      <div className="p-4 flex items-center justify-between border-b border-slate-200 sticky top-0 bg-white/95">
+      {/* Header */}
+      <div className="p-4 flex items-center justify-between border-b border-slate-200 sticky top-0 bg-white/95 z-10">
         <div>
           <h4 className="text-slate-900 font-bold">{stock?.ticker ?? "Deep Asset Analysis"}</h4>
           <p className="text-[10px] text-slate-500">{stock?.name ?? "Analysis Payload"}</p>
@@ -103,84 +115,130 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
         </button>
       </div>
 
-      <div className="p-4 space-y-4">
-        {(score || recommendation) && (
-          <div className="grid grid-cols-2 gap-3">
-            {score && (
-              <div className="bg-slate-50 p-3 rounded border border-slate-200">
-                <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-1">Market Score</div>
-                <div className={`text-3xl font-black ${getScoreColor(score)}`}>{score}/10</div>
-              </div>
-            )}
-            {recommendation && (
-              <div className={`p-3 rounded border ${getRecommendationColor(recommendation)}`}>
-                <div className="text-[11px] uppercase tracking-wider mb-1 opacity-70">Recommendation</div>
-                <div className="text-2xl font-black">{recommendation}</div>
-              </div>
-            )}
-          </div>
-        )}
+      {/* Tab navigation */}
+      <div className="flex border-b border-slate-200 sticky top-[60px] bg-white/95 z-10">
+        <button
+          onClick={() => setActiveTab("aiNews")}
+          className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-wider transition relative ${
+            activeTab === "aiNews" ? "text-teal-700" : "text-slate-400 hover:text-slate-600"
+          }`}
+        >
+          AI News Summary
+          {activeTab === "aiNews" && <span className="absolute inset-x-2 -bottom-px h-0.5 bg-teal-600 rounded-full" />}
+        </button>
+        <button
+          onClick={() => setActiveTab("analysis")}
+          className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-wider transition relative ${
+            activeTab === "analysis" ? "text-teal-700" : "text-slate-400 hover:text-slate-600"
+          }`}
+        >
+          Terminal Analysis
+          {activeTab === "analysis" && <span className="absolute inset-x-2 -bottom-px h-0.5 bg-teal-600 rounded-full" />}
+        </button>
+      </div>
 
-        {newsSummary?.catalysts && (
-          <div className="bg-slate-50 p-3 rounded border border-slate-200">
-            <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-2">Key Catalysts</div>
-            <div className="text-[12px] text-slate-700 space-y-1 whitespace-pre-wrap">{newsSummary.catalysts}</div>
-          </div>
-        )}
-
-        {newsSummary?.outlook && (
-          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded">
-            <div className="text-[11px] text-emerald-700 uppercase tracking-wider mb-2">Actionable Outlook</div>
-            <div className="text-[12px] text-emerald-800 leading-relaxed">{newsSummary.outlook}</div>
-          </div>
-        )}
-
-        {newsSummary?.sector && (
-          <div className="bg-amber-50 p-3 rounded border border-amber-200">
-            <div className="text-[11px] text-amber-700 uppercase tracking-wider mb-2">Sector Watch</div>
-            <div className="text-[12px] text-amber-800">{newsSummary.sector}</div>
-          </div>
-        )}
-
-        {analysis && (
-          <>
-            <div className="border-t border-slate-200 pt-4">
-              <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-3">Terminal Intelligence Payload</div>
-
-              {analysis.why_interested && (
-                <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-3">
-                  <div className="text-[11px] text-slate-500 mb-1">Focus</div>
-                  <div className="text-[12px] text-slate-800">{analysis.why_interested}</div>
-                </div>
-              )}
-
-              {analysis.forensic_screen_card && (
-                <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-3">
-                  <div className="text-[11px] text-slate-500 mb-1">Forensic Screen</div>
-                  <div className="text-[12px] text-slate-700">{analysis.forensic_screen_card}</div>
-                </div>
-              )}
-
-              {analysis.active_factor_hub?.selection_reason && (
-                <div className="bg-slate-50 p-3 rounded border border-slate-200">
-                  <div className="text-[11px] text-slate-500 mb-1">Selection Reason</div>
-                  <div className="text-[12px] text-slate-700">{analysis.active_factor_hub.selection_reason}</div>
-                </div>
-              )}
+      {/* Tab content */}
+      <div className="p-4">
+        {/* AI News Tab */}
+        {activeTab === "aiNews" && (
+          ticker ? (
+            <AITickerNewsPanel
+              ticker={ticker}
+              companyName={stock?.name}
+            />
+          ) : (
+            <div className="text-slate-400 text-center py-8 text-[11px]">
+              Select a ticker from the Asset Matrix to view AI-powered news summary.
             </div>
-
-            <details className="bg-slate-50 p-3 rounded border border-slate-200">
-              <summary className="text-[11px] text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700">
-                Raw JSON Payload
-              </summary>
-              <pre className="text-[10px] text-slate-600 mt-2 overflow-auto max-h-96 whitespace-pre-wrap break-words">
-                {JSON.stringify(analysis, null, 2)}
-              </pre>
-            </details>
-          </>
+          )
         )}
 
-        {!analysis && <div className="text-slate-400 text-center py-8">Loading analysis...</div>}
+        {/* Analysis Tab */}
+        {activeTab === "analysis" && (
+          <div className="space-y-4">
+            {(score || recommendation) && (
+              <div className="grid grid-cols-2 gap-3">
+                {score && (
+                  <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                    <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-1">Market Score</div>
+                    <div className={`text-3xl font-black ${getScoreColor(score)}`}>{score}/10</div>
+                  </div>
+                )}
+                {recommendation && (
+                  <div className={`p-3 rounded border ${getRecommendationColor(recommendation)}`}>
+                    <div className="text-[11px] uppercase tracking-wider mb-1 opacity-70">Recommendation</div>
+                    <div className="text-2xl font-black">{recommendation}</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {newsSummary?.catalysts && (
+              <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-2">Key Catalysts</div>
+                <div className="text-[12px] text-slate-700 space-y-1 whitespace-pre-wrap">{newsSummary.catalysts}</div>
+              </div>
+            )}
+
+            {newsSummary?.outlook && (
+              <div className="bg-emerald-50 border border-emerald-200 p-3 rounded">
+                <div className="text-[11px] text-emerald-700 uppercase tracking-wider mb-2">Actionable Outlook</div>
+                <div className="text-[12px] text-emerald-800 leading-relaxed">{newsSummary.outlook}</div>
+              </div>
+            )}
+
+            {newsSummary?.sector && (
+              <div className="bg-amber-50 p-3 rounded border border-amber-200">
+                <div className="text-[11px] text-amber-700 uppercase tracking-wider mb-2">Sector Watch</div>
+                <div className="text-[12px] text-amber-800">{newsSummary.sector}</div>
+              </div>
+            )}
+
+            {analysis && (
+              <>
+                <div className="border-t border-slate-200 pt-4">
+                  <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-3">Terminal Intelligence Payload</div>
+
+                  {analysis.why_interested && (
+                    <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-3">
+                      <div className="text-[11px] text-slate-500 mb-1">Focus</div>
+                      <div className="text-[12px] text-slate-800">{analysis.why_interested}</div>
+                    </div>
+                  )}
+
+                  {analysis.forensic_screen_card && (
+                    <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-3">
+                      <div className="text-[11px] text-slate-500 mb-1">Forensic Screen</div>
+                      <div className="text-[12px] text-slate-700">{analysis.forensic_screen_card}</div>
+                    </div>
+                  )}
+
+                  {analysis.active_factor_hub?.selection_reason && (
+                    <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                      <div className="text-[11px] text-slate-500 mb-1">Selection Reason</div>
+                      <div className="text-[12px] text-slate-700">{analysis.active_factor_hub.selection_reason}</div>
+                    </div>
+                  )}
+                </div>
+
+                <details className="bg-slate-50 p-3 rounded border border-slate-200">
+                  <summary className="text-[11px] text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700">
+                    Raw JSON Payload
+                  </summary>
+                  <pre className="text-[10px] text-slate-600 mt-2 overflow-auto max-h-96 whitespace-pre-wrap break-words">
+                    {JSON.stringify(analysis, null, 2)}
+                  </pre>
+                </details>
+              </>
+            )}
+
+            {!analysis && (
+              <div className="text-slate-400 text-center py-8 text-[11px]">
+                Loading analysis...
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

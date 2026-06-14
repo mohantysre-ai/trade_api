@@ -1,0 +1,81 @@
+INFO:     Started server process [6660]
+INFO:     Waiting for application startup.
+2026-06-14 15:52:45,827 [INFO] ai_news_server: AI News Server starting on port 8001
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     127.0.0.1:64580 - "GET /health HTTP/1.1" 200 OK
+2026-06-14 15:53:01,133 [INFO] httpx: HTTP Request: GET https://www.nseindia.com/api/corporates/corporateAnnouncements?index=Tata%2BConsultancy%2BServices&market=equities "HTTP/1.1 404 Not Found"
+2026-06-14 15:53:01,156 [INFO] httpx: HTTP Request: GET https://economictimes.indiatimes.com/topic/tcs "HTTP/1.1 301 Moved Permanently"
+2026-06-14 15:53:01,563 [INFO] httpx: HTTP Request: GET https://economictimes.indiatimes.com/tata-consultancy-services-ltd/stocks/companyid-8345.cms "HTTP/1.1 200 OK"
+2026-06-14 15:53:01,755 [INFO] httpx: HTTP Request: GET https://news.google.com/rss/search?q=Tata+Consultancy+Services+TCS+stock+market&hl=en-IN&gl=IN&ceid=IN:en "HTTP/1.1 200 OK"
+2026-06-14 15:53:01,791 [INFO] httpx: HTTP Request: GET https://www.moneycontrol.com/news/tags/tcs.html "HTTP/1.1 200 OK"
+2026-06-14 15:53:01,805 [WARNING] ai_ticker_news: RSS scrape failed: Couldn't find a tree builder with the features you requested: xml. Do you need to install a parser library?
+2026-06-14 15:53:02,002 [INFO] httpx: HTTP Request: GET https://www.moneycontrol.com/news/business/stocks/page-1?search=Tata+Consultancy+Services+TCS "HTTP/1.1 301 Moved Permanently"
+2026-06-14 15:53:02,093 [INFO] httpx: HTTP Request: GET https://finance.yahoo.com/quote/TCS.NS/ "HTTP/1.1 200 OK"
+2026-06-14 15:53:02,174 [INFO] httpx: HTTP Request: GET https://feeds.content.dowjones.io/public/rss/mw_topstories "HTTP/1.1 200 OK"
+2026-06-14 15:53:02,176 [WARNING] ai_ticker_news: RSS scrape failed: Couldn't find a tree builder with the features you requested: xml. Do you need to install a parser library?
+2026-06-14 15:53:02,956 [INFO] ai_ticker_news: Scraped 24 articles from 5 sources for TCS (after dedup: 24)
+2026-06-14 15:53:02,956 [WARNING] ai_ticker_news: No REDACTED or GOOGLE_API_KEY set — falling back to rule-based summary
+INFO:     127.0.0.1:64581 - "GET /api/ticker-news?ticker=TCS HTTP/1.1" 200 OK
+2026-06-14 15:54:11,958 [INFO] ai_news_server: Returning cached report for TCS
+INFO:     127.0.0.1:62314 - "GET /api/ticker-news?ticker=TCS&max_articles=3 HTTP/1.1" 200 OK
+2026-06-14 15:55:05,589 [INFO] httpx: HTTP Request: GET https://news.google.com/rss/search?q=Bajaj+Finance+BAJFINANCE+stock+market&hl=en-IN&gl=IN&ceid=IN:en "HTTP/1.1 200 OK"
+2026-06-14 15:55:05,609 [INFO] httpx: HTTP Request: GET https://news.google.com/rss/search?q=Bajaj+Finance+BAJFINANCE+stock+market&hl=en-IN&gl=IN&ceid=IN:en "HTTP/1.1 200 OK"
+2026-06-14 15:55:05,691 [INFO] httpx: HTTP Request: GET https://www.nseindia.com/api/corporates/corporateAnnouncements?index=Bajaj%2BFinance&market=equities "HTTP/1.1 404 Not Found"
+2026-06-14 15:55:05,798 [WARNING] ai_ticker_news: RSS scrape failed: Couldn't find a tree builder with the features you requested: xml. Do you need to install a parser library?
+2026-06-14 15:55:05,807 [WARNING] ai_ticker_news: RSS scrape failed: Couldn't find a tree builder with the features you requested: xml. Do you need to install a parser library?
+2026-06-14 15:55:05,909 [INFO] httpx: HTTP Request: GET https://www.moneycontrol.com/news/tags/bajfinance.html "HTTP/1.1 302 Moved Temporarily"
+2026-06-14 15:55:05,917 [INFO] httpx: HTTP Request: GET https://www.moneycontrol.com/news/tags/bajfinance.html "HTTP/1.1 302 Moved Temporarily"
+2026-06-14 15:55:06,129 [INFO] httpx: HTTP Request: GET https://www.moneycontrol.com/news/business/stocks/page-1?search=Bajaj+Finance+BAJFINANCE "HTTP/1.1 301 Moved Permanently"
+2026-06-14 15:55:06,131 [INFO] httpx: HTTP Request: GET https://www.moneycontrol.com/news/business/stocks/page-1?search=Bajaj+Finance+BAJFINANCE "HTTP/1.1 301 Moved Permanently"
+2026-06-14 15:55:06,259 [INFO] httpx: HTTP Request: GET https://feeds.content.dowjones.io/public/rss/mw_topstories "HTTP/1.1 200 OK"
+2026-06-14 15:55:06,263 [INFO] httpx: HTTP Request: GET https://finance.yahoo.com/quote/BAJFINANCE.NS/ "HTTP/1.1 200 OK"
+2026-06-14 15:55:06,267 [WARNING] ai_ticker_news: RSS scrape failed: Couldn't find a tree builder with the features you requested: xml. Do you need to install a parser library?
+2026-06-14 15:55:06,270 [INFO] httpx: HTTP Request: GET https://finance.yahoo.com/quote/BAJFINANCE.NS/ "HTTP/1.1 200 OK"
+2026-06-14 15:55:06,275 [INFO] httpx: HTTP Request: GET https://feeds.content.dowjones.io/public/rss/mw_topstories "HTTP/1.1 200 OK"
+2026-06-14 15:55:06,278 [WARNING] ai_ticker_news: RSS scrape failed: Couldn't find a tree builder with the features you requested: xml. Do you need to install a parser library?
+2026-06-14 15:55:06,524 [INFO] httpx: HTTP Request: GET https://economictimes.indiatimes.com/topic/bajfinance "HTTP/1.1 200 OK"
+2026-06-14 15:55:06,795 [INFO] httpx: HTTP Request: GET https://economictimes.indiatimes.com/topic/bajfinance "HTTP/1.1 200 OK"
+2026-06-14 15:55:08,642 [INFO] ai_ticker_news: Scraped 15 articles from 5 sources for BAJFINANCE (after dedup: 14)
+2026-06-14 15:55:08,642 [WARNING] ai_ticker_news: No REDACTED or GOOGLE_API_KEY set — falling back to rule-based summary
+INFO:     127.0.0.1:59101 - "GET /api/ticker-news?ticker=BAJFINANCE&company=BAJFINANCE&max_articles=50&include_raw=true HTTP/1.1" 200 OK
+2026-06-14 15:55:09,565 [INFO] httpx: HTTP Request: GET https://www.nseindia.com/api/corporates/corporateAnnouncements?index=Bajaj%2BFinance&market=equities "HTTP/1.1 404 Not Found"
+2026-06-14 15:55:09,572 [INFO] ai_ticker_news: Scraped 15 articles from 5 sources for BAJFINANCE (after dedup: 14)
+2026-06-14 15:55:09,572 [WARNING] ai_ticker_news: No REDACTED or GOOGLE_API_KEY set — falling back to rule-based summary
+INFO:     127.0.0.1:59102 - "GET /api/ticker-news?ticker=BAJFINANCE&company=BAJFINANCE&max_articles=50&include_raw=true HTTP/1.1" 200 OK
+2026-06-14 15:55:37,446 [INFO] httpx: HTTP Request: GET https://www.nseindia.com/api/corporates/corporateAnnouncements?index=COALINDIA&market=equities "HTTP/1.1 404 Not Found"
+2026-06-14 15:55:37,495 [INFO] httpx: HTTP Request: GET https://www.nseindia.com/api/corporates/corporateAnnouncements?index=COALINDIA&market=equities "HTTP/1.1 404 Not Found"
+2026-06-14 15:55:37,864 [INFO] httpx: HTTP Request: GET https://www.moneycontrol.com/news/tags/coalindia.html "HTTP/1.1 200 OK"
+2026-06-14 15:55:37,889 [INFO] httpx: HTTP Request: GET https://www.moneycontrol.com/news/tags/coalindia.html "HTTP/1.1 200 OK"
+2026-06-14 15:55:37,949 [INFO] httpx: HTTP Request: GET https://economictimes.indiatimes.com/topic/coalindia "HTTP/1.1 200 OK"
+2026-06-14 15:55:37,990 [INFO] httpx: HTTP Request: GET https://news.google.com/rss/search?q=COALINDIA+COALINDIA+stock+market&hl=en-IN&gl=IN&ceid=IN:en "HTTP/1.1 200 OK"
+2026-06-14 15:55:38,098 [WARNING] ai_ticker_news: RSS scrape failed: Couldn't find a tree builder with the features you requested: xml. Do you need to install a parser library?
+2026-06-14 15:55:38,142 [INFO] httpx: HTTP Request: GET https://news.google.com/rss/search?q=COALINDIA+COALINDIA+stock+market&hl=en-IN&gl=IN&ceid=IN:en "HTTP/1.1 200 OK"
+2026-06-14 15:55:38,384 [INFO] httpx: HTTP Request: GET https://economictimes.indiatimes.com/topic/coalindia "HTTP/1.1 200 OK"
+2026-06-14 15:55:38,501 [INFO] httpx: HTTP Request: GET https://finance.yahoo.com/quote/COALINDIA.NS/ "HTTP/1.1 404 Not Found"
+2026-06-14 15:55:38,501 [INFO] httpx: HTTP Request: GET https://finance.yahoo.com/quote/COALINDIA.NS/ "HTTP/1.1 404 Not Found"
+2026-06-14 15:55:38,615 [WARNING] ai_ticker_news: RSS scrape failed: Couldn't find a tree builder with the features you requested: xml. Do you need to install a parser library?
+2026-06-14 15:55:38,615 [INFO] httpx: HTTP Request: GET https://www.moneycontrol.com/news/business/stocks/page-1?search=COALINDIA+COALINDIA "HTTP/1.1 301 Moved Permanently"
+2026-06-14 15:55:38,615 [INFO] httpx: HTTP Request: GET https://www.moneycontrol.com/news/business/stocks/page-1?search=COALINDIA+COALINDIA "HTTP/1.1 301 Moved Permanently"
+2026-06-14 15:55:38,875 [INFO] httpx: HTTP Request: GET https://feeds.content.dowjones.io/public/rss/mw_topstories "HTTP/1.1 200 OK"
+2026-06-14 15:55:38,879 [WARNING] ai_ticker_news: RSS scrape failed: Couldn't find a tree builder with the features you requested: xml. Do you need to install a parser library?
+2026-06-14 15:55:38,881 [INFO] ai_ticker_news: Scraped 19 articles from 5 sources for COALINDIA (after dedup: 19)
+2026-06-14 15:55:38,881 [WARNING] ai_ticker_news: No REDACTED or GOOGLE_API_KEY set — falling back to rule-based summary
+INFO:     127.0.0.1:63281 - "GET /api/ticker-news?ticker=COALINDIA&company=COALINDIA&max_articles=50&include_raw=true HTTP/1.1" 200 OK
+2026-06-14 15:55:38,978 [INFO] httpx: HTTP Request: GET https://feeds.content.dowjones.io/public/rss/mw_topstories "HTTP/1.1 200 OK"
+2026-06-14 15:55:38,978 [WARNING] ai_ticker_news: RSS scrape failed: Couldn't find a tree builder with the features you requested: xml. Do you need to install a parser library?
+2026-06-14 15:55:38,995 [INFO] ai_ticker_news: Scraped 19 articles from 5 sources for COALINDIA (after dedup: 19)
+2026-06-14 15:55:38,995 [WARNING] ai_ticker_news: No REDACTED or GOOGLE_API_KEY set — falling back to rule-based summary
+INFO:     127.0.0.1:63280 - "GET /api/ticker-news?ticker=COALINDIA&company=COALINDIA&max_articles=50&include_raw=true HTTP/1.1" 200 OK
+2026-06-14 15:56:01,374 [INFO] httpx: HTTP Request: GET https://www.nseindia.com/api/corporates/corporateAnnouncements?index=Axis%2BBank&market=equities "HTTP/1.1 404 Not Found"
+2026-06-14 15:56:01,662 [INFO] httpx: HTTP Request: GET https://news.google.com/rss/search?q=Axis+Bank+AXISBANK+stock+market&hl=en-IN&gl=IN&ceid=IN:en "HTTP/1.1 200 OK"
+2026-06-14 15:56:01,792 [WARNING] ai_ticker_news: RSS scrape failed: Couldn't find a tree builder with the features you requested: xml. Do you need to install a parser library?
+2026-06-14 15:56:02,093 [INFO] httpx: HTTP Request: GET https://www.moneycontrol.com/news/tags/axisbank.html "HTTP/1.1 200 OK"
+2026-06-14 15:56:02,286 [INFO] httpx: HTTP Request: GET https://feeds.content.dowjones.io/public/rss/mw_topstories "HTTP/1.1 200 OK"
+2026-06-14 15:56:02,286 [WARNING] ai_ticker_news: RSS scrape failed: Couldn't find a tree builder with the features you requested: xml. Do you need to install a parser library?
+2026-06-14 15:56:02,304 [INFO] httpx: HTTP Request: GET https://finance.yahoo.com/quote/AXISBANK.NS/ "HTTP/1.1 404 Not Found"
+2026-06-14 15:56:02,374 [INFO] httpx: HTTP Request: GET https://www.moneycontrol.com/news/business/stocks/page-1?search=Axis+Bank+AXISBANK "HTTP/1.1 301 Moved Permanently"
+2026-06-14 15:56:02,681 [INFO] httpx: HTTP Request: GET https://economictimes.indiatimes.com/topic/axisbank "HTTP/1.1 200 OK"
+2026-06-14 15:56:02,881 [INFO] ai_ticker_news: Scraped 26 articles from 5 sources for AXISBANK (after dedup: 26)
+2026-06-14 15:56:02,881 [WARNING] ai_ticker_news: No REDACTED or GOOGLE_API_KEY set — falling back to rule-based summary
+INFO:     127.0.0.1:52834 - "GET /api/ticker-news?ticker=AXISBANK&company=AXISBANK&max_articles=50&include_raw=true HTTP/1.1" 200 OK
