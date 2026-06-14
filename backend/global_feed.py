@@ -1,4 +1,4 @@
-"""Global macro quotes via Yahoo Finance (DJI, Nikkei, FTSE, Gold, Silver, Brent, USD/INR)."""
+"""Global macro quotes via Yahoo Finance for expanded domestic/global indices and commodities."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -33,6 +33,10 @@ def _fmt_usd_oz(v: float) -> str:
 
 def _fmt_brent(v: float) -> str:
     return f"${v:,.2f} / bbl"
+
+
+def _fmt_natgas(v: float) -> str:
+    return f"${v:,.3f} / MMBtu"
 
 
 def _fmt_usdinr(v: float) -> str:
@@ -72,12 +76,29 @@ def _extract_price(value: Any) -> float | None:
 
 # Global indices & commodities for the Global Macro Anchors panel.
 GLOBAL_INSTRUMENTS: list[YahooInstrument] = [
+    # Domestic indices
+    YahooInstrument("nifty50", "^NSEI", "NIFTY 50", "index", _fmt_index),
+    YahooInstrument("sensex", "^BSESN", "SENSEX", "index", _fmt_index),
+    YahooInstrument("niftybank", "^NSEBANK", "NIFTY BANK", "index", _fmt_index),
+    YahooInstrument("niftyit", "^CNXIT", "NIFTY IT", "index", _fmt_index),
+    YahooInstrument("niftypharma", "^CNXPHARMA", "NIFTY PHARMA", "index", _fmt_index),
+    # Global indices
     YahooInstrument("dji", "^DJI", "DJI (US 30)", "index", _fmt_index),
     YahooInstrument("sp500", "^GSPC", "S&P 500", "index", _fmt_index),
+    YahooInstrument("nasdaq100", "^NDX", "NASDAQ 100", "index", _fmt_index),
     YahooInstrument("nikkei", "^N225", "NIKKEI 225", "index", _fmt_index),
+    YahooInstrument("hangseng", "^HSI", "HANG SENG", "index", _fmt_index),
+    YahooInstrument("shanghai", "000001.SS", "SHANGHAI COMP", "index", _fmt_index),
+    YahooInstrument("dax", "^GDAXI", "DAX", "index", _fmt_index),
+    YahooInstrument("cac40", "^FCHI", "CAC 40", "index", _fmt_index),
     YahooInstrument("ftse", "^FTSE", "FTSE 100", "index", _fmt_index),
+    YahooInstrument("eurostoxx50", "^STOXX50E", "EURO STOXX 50", "index", _fmt_index),
+    # Commodities
     YahooInstrument("gold", "GC=F", "GOLD", "commodity", _fmt_usd_oz),
     YahooInstrument("silver", "SI=F", "SILVER", "commodity", _fmt_usd_oz),
+    YahooInstrument("brent", "BZ=F", "BRENT CRUDE", "commodity", _fmt_brent),
+    YahooInstrument("wticrude", "CL=F", "WTI CRUDE", "commodity", _fmt_brent),
+    YahooInstrument("natgas", "NG=F", "NATURAL GAS", "commodity", _fmt_natgas),
 ]
 
 # FX, energy, and domestic volatility for the domestic macro strip (Angel One fallback).

@@ -1,7 +1,8 @@
-- [x] Update `backend/terminal_intelligence_full.py` to generate ticker-specific dynamic `selection_reason` instead of constant text.
-- [x] Add per-ticker on-demand LLM reason helper in `backend/terminal_intelligence_full.py` with deterministic fallback.
-- [x] Add backend endpoint `POST /api/refresh-ticker-reason` in `backend/angel_one_feed.py`.
-- [x] Add frontend proxy route `iros-terminal/app/api/refresh-ticker-reason/route.ts`.
-- [x] Mark completed tasks and verify code paths/readability.
-- [ ] Add 6-label deterministic decision engine (STRONG_BUY/BUY/HOLD/CAUTION/SELL/STRONG_SELL) using risk + factor metrics.
-- [ ] Attach decision fields (`decision_label`, `decision_confidence`, `decision_reason`) into ticker `active_risk_calc` and ledger row.
+# TODO
+
+- [ ] Verify/start AI news summary backend service
+- [x] Inspect backend files responsible for market snapshot/global macro payload
+- [x] Update payload to include at least 15 domestic+global indices and include natural gas commodity
+- [ ] Restart backend services
+- [ ] Verify via curl responses
+- [ ] Verify via frontend logs
