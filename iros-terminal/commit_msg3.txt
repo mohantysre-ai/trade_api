@@ -1,1 +1,0 @@
-chore: fix .gitignore pycache and log patterns

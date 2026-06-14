@@ -1,1 +1,0 @@
-chore: ignore pycache and log files, clean up tracking
