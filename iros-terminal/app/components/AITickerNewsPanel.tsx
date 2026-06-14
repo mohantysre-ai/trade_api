@@ -89,10 +89,41 @@ export default function AITickerNewsPanel({
   }, [ticker, companyName]);
 
   useEffect(() => {
-    if (ticker) {
-      fetchNews();
+    if (!ticker) {
+      const id = window.requestAnimationFrame(() => {
+        setReport(null);
+        setError(null);
+      });
+      return () => window.cancelAnimationFrame(id);
     }
-  }, [ticker, fetchNews]);
+
+    let cancelled = false;
+    const id = window.requestAnimationFrame(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setError(null);
+    });
+
+    fetchTickerNewsReport(ticker, {
+      company: companyName,
+      maxArticles: 50,
+      includeRaw: true,
+    })
+      .then((result) => {
+        if (!cancelled) setReport(result);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to fetch news report");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(id);
+    };
+  }, [ticker, companyName]);
 
   const sentimentCfg = SENTIMENT_CONFIG[report?.sentiment_overall?.toLowerCase() ?? ""] ?? SENTIMENT_CONFIG.neutral;
   const hasNews = report && !report.error;

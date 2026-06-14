@@ -21,6 +21,12 @@ type DrawerContent = {
 
 type TabKey = 'marketSnapshot' | 'assetMatrix' | 'icGates';
 
+function marketStateClass(state: string) {
+  if (state === 'POSITIVE') return 'text-emerald-500';
+  if (state === 'NEGATIVE') return 'text-red-500';
+  return 'text-slate-400';
+}
+
 function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
     return (
@@ -42,9 +48,7 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
             <span className="text-[9px] text-slate-500 block uppercase tracking-wider">{item.label}</span>
             <span className="text-sm font-bold text-slate-900 block mt-0.5">{item.val}</span>
             <span
-              className={`text-[9px] block ${
-                item.state === 'POSITIVE' ? 'text-emerald-500' : 'text-red-500'
-              }`}
+              className={`text-[9px] block ${marketStateClass(item.state)}`}
             >
               {item.delta}
             </span>
@@ -76,9 +80,7 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
             <span className="text-[9px] text-slate-500 block uppercase tracking-wider">{item.label}</span>
             <span className="text-sm font-bold text-slate-900 block mt-0.5">{item.val}</span>
             <span
-              className={`text-[9px] block ${
-                item.state === 'POSITIVE' ? 'text-emerald-500' : 'text-red-500'
-              }`}
+              className={`text-[9px] block ${marketStateClass(item.state)}`}
             >
               {item.delta}
             </span>

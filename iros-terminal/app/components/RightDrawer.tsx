@@ -25,9 +25,10 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
   const stock = content?.stock;
   const ticker = stock?.ticker ?? "";
 
-  // Reset to aiNews tab when stock changes
   React.useEffect(() => {
-    if (ticker) setActiveTab("aiNews");
+    if (!ticker) return;
+    const id = window.requestAnimationFrame(() => setActiveTab("aiNews"));
+    return () => window.cancelAnimationFrame(id);
   }, [ticker]);
 
   const parseNewsSummary = (text: string | undefined) => {

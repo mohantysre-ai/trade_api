@@ -4342,6 +4342,46 @@
   "globalMacro": {
     "indices": [
       {
+        "label": "NIFTY 50",
+        "val": "23,622.90",
+        "delta": "+1.99%",
+        "state": "POSITIVE",
+        "group": "index",
+        "source": "yahoo_finance_live"
+      },
+      {
+        "label": "SENSEX",
+        "val": "75,527.95",
+        "delta": "+2.30%",
+        "state": "POSITIVE",
+        "group": "index",
+        "source": "yahoo_finance_live"
+      },
+      {
+        "label": "NIFTY BANK",
+        "val": "56,814.80",
+        "delta": "+2.97%",
+        "state": "POSITIVE",
+        "group": "index",
+        "source": "yahoo_finance_live"
+      },
+      {
+        "label": "NIFTY IT",
+        "val": "27,795.75",
+        "delta": "-0.09%",
+        "state": "NEGATIVE",
+        "group": "index",
+        "source": "yahoo_finance_live"
+      },
+      {
+        "label": "NIFTY PHARMA",
+        "val": "24,380.05",
+        "delta": "+0.30%",
+        "state": "POSITIVE",
+        "group": "index",
+        "source": "yahoo_finance_live"
+      },
+      {
         "label": "DJI (US 30)",
         "val": "51,202.26",
         "delta": "+0.70%",
@@ -4358,6 +4398,14 @@
         "source": "yahoo_finance_live"
       },
       {
+        "label": "NASDAQ 100",
+        "val": "29,635.95",
+        "delta": "+0.64%",
+        "state": "POSITIVE",
+        "group": "index",
+        "source": "yahoo_finance_live"
+      },
+      {
         "label": "NIKKEI 225",
         "val": "66,020.04",
         "delta": "+2.81%",
@@ -4366,9 +4414,49 @@
         "source": "yahoo_finance_live"
       },
       {
+        "label": "HANG SENG",
+        "val": "24,718.10",
+        "delta": "+1.93%",
+        "state": "POSITIVE",
+        "group": "index",
+        "source": "yahoo_finance_live"
+      },
+      {
+        "label": "SHANGHAI COMP",
+        "val": "4,031.51",
+        "delta": "+1.12%",
+        "state": "POSITIVE",
+        "group": "index",
+        "source": "yahoo_finance_live"
+      },
+      {
+        "label": "DAX",
+        "val": "24,635.30",
+        "delta": "+1.76%",
+        "state": "POSITIVE",
+        "group": "index",
+        "source": "yahoo_finance_live"
+      },
+      {
+        "label": "CAC 40",
+        "val": "8,350.87",
+        "delta": "+1.83%",
+        "state": "POSITIVE",
+        "group": "index",
+        "source": "yahoo_finance_live"
+      },
+      {
         "label": "FTSE 100",
         "val": "10,471.72",
         "delta": "+1.63%",
+        "state": "POSITIVE",
+        "group": "index",
+        "source": "yahoo_finance_live"
+      },
+      {
+        "label": "EURO STOXX 50",
+        "val": "6,187.63",
+        "delta": "+2.16%",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live"
@@ -4387,6 +4475,30 @@
         "label": "SILVER",
         "val": "$67.97/oz",
         "delta": "+6.21%",
+        "state": "POSITIVE",
+        "group": "commodity",
+        "source": "yahoo_finance_live"
+      },
+      {
+        "label": "BRENT CRUDE",
+        "val": "$87.33 / bbl",
+        "delta": "-3.37%",
+        "state": "NEGATIVE",
+        "group": "commodity",
+        "source": "yahoo_finance_live"
+      },
+      {
+        "label": "WTI CRUDE",
+        "val": "$84.88 / bbl",
+        "delta": "-3.23%",
+        "state": "NEGATIVE",
+        "group": "commodity",
+        "source": "yahoo_finance_live"
+      },
+      {
+        "label": "NATURAL GAS",
+        "val": "$3.120 / MMBtu",
+        "delta": "+1.07%",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
