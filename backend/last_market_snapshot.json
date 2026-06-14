@@ -4282,15 +4282,21 @@
         "state": "POSITIVE"
       },
       {
-        "label": "USD / INR Spot",
-        "val": "95.10",
-        "delta": "-0.68%",
+        "label": "NIFTY IT",
+        "val": "27,795.75",
+        "delta": "-0.09%",
         "state": "NEGATIVE"
       },
       {
-        "label": "Brent Crude Oil",
-        "val": "$87.33 / bbl",
-        "delta": "-3.37%",
+        "label": "NIFTY PHARMA",
+        "val": "24,380.05",
+        "delta": "+0.30%",
+        "state": "POSITIVE"
+      },
+      {
+        "label": "USD / INR Spot",
+        "val": "95.10",
+        "delta": "-0.68%",
         "state": "NEGATIVE"
       },
       {
@@ -4308,7 +4314,19 @@
         "state": "POSITIVE"
       },
       {
+        "label": "NIFTY 50",
+        "val": "23,622.90",
+        "delta": "+1.99%",
+        "state": "POSITIVE"
+      },
+      {
         "label": "Sensex Close",
+        "val": "75,527.95",
+        "delta": "+2.30%",
+        "state": "POSITIVE"
+      },
+      {
+        "label": "SENSEX",
         "val": "75,527.95",
         "delta": "+2.30%",
         "state": "POSITIVE"
@@ -4320,15 +4338,27 @@
         "state": "POSITIVE"
       },
       {
-        "label": "USD / INR Spot Close",
-        "val": "95.10",
-        "delta": "-0.68%",
+        "label": "NIFTY BANK",
+        "val": "56,814.80",
+        "delta": "+2.97%",
+        "state": "POSITIVE"
+      },
+      {
+        "label": "NIFTY IT",
+        "val": "27,795.75",
+        "delta": "-0.09%",
         "state": "NEGATIVE"
       },
       {
-        "label": "Brent Crude Oil Close",
-        "val": "$87.33 / bbl",
-        "delta": "-3.37%",
+        "label": "NIFTY PHARMA",
+        "val": "24,380.05",
+        "delta": "+0.30%",
+        "state": "POSITIVE"
+      },
+      {
+        "label": "USD / INR Spot Close",
+        "val": "95.10",
+        "delta": "-0.68%",
         "state": "NEGATIVE"
       },
       {
@@ -4336,51 +4366,17 @@
         "val": "14.72",
         "delta": "-5.72%",
         "state": "NEGATIVE"
+      },
+      {
+        "label": "Brent Crude Oil Close",
+        "val": "$87.33 / bbl",
+        "delta": "-3.37%",
+        "state": "NEGATIVE"
       }
     ]
   },
   "globalMacro": {
     "indices": [
-      {
-        "label": "NIFTY 50",
-        "val": "23,622.90",
-        "delta": "+1.99%",
-        "state": "POSITIVE",
-        "group": "index",
-        "source": "yahoo_finance_live"
-      },
-      {
-        "label": "SENSEX",
-        "val": "75,527.95",
-        "delta": "+2.30%",
-        "state": "POSITIVE",
-        "group": "index",
-        "source": "yahoo_finance_live"
-      },
-      {
-        "label": "NIFTY BANK",
-        "val": "56,814.80",
-        "delta": "+2.97%",
-        "state": "POSITIVE",
-        "group": "index",
-        "source": "yahoo_finance_live"
-      },
-      {
-        "label": "NIFTY IT",
-        "val": "27,795.75",
-        "delta": "-0.09%",
-        "state": "NEGATIVE",
-        "group": "index",
-        "source": "yahoo_finance_live"
-      },
-      {
-        "label": "NIFTY PHARMA",
-        "val": "24,380.05",
-        "delta": "+0.30%",
-        "state": "POSITIVE",
-        "group": "index",
-        "source": "yahoo_finance_live"
-      },
       {
         "label": "DJI (US 30)",
         "val": "51,202.26",
@@ -4480,7 +4476,7 @@
         "source": "yahoo_finance_live"
       },
       {
-        "label": "BRENT CRUDE",
+        "label": "BRENT CRUDE OIL",
         "val": "$87.33 / bbl",
         "delta": "-3.37%",
         "state": "NEGATIVE",

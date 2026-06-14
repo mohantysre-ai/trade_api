@@ -29,7 +29,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from SmartApi import SmartConnect
 
-from global_feed import fetch_domestic_yahoo_macro, fetch_global_macro
+from global_feed import fetch_domestic_index_macro, fetch_domestic_yahoo_macro, fetch_global_macro
 from symbols import MACRO_INSTRUMENTS, MOCK_TICKERS, WATCHLIST, Instrument
 from terminal_intelligence_full import (
     TOP_SELECTION_COUNT,
@@ -1000,6 +1000,7 @@ def _select_dynamic_top_stocks(
 def _build_macro_strips(macro_raw: dict[str, Any]) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     morning: list[dict[str, str]] = []
     evening: list[dict[str, str]] = []
+    seen_labels: set[str] = set()
 
     for inst in MACRO_INSTRUMENTS:
         quote = macro_raw.get(inst.key)
@@ -1011,6 +1012,15 @@ def _build_macro_strips(macro_raw: dict[str, Any]) -> tuple[list[dict[str, str]]
         label = inst.label or inst.key
         morning.append({"label": label, "val": f"{ltp:,.2f}", "delta": delta, "state": state})
         evening.append({"label": f"{label} Close", "val": f"{ltp:,.2f}", "delta": delta, "state": state})
+        seen_labels.add(label.upper())
+
+    for row in fetch_domestic_index_macro():
+        label = str(row["label"])
+        if label.upper() in seen_labels:
+            continue
+        morning.append({k: row[k] for k in ("label", "val", "delta", "state")})
+        evening.append({"label": f"{row['label']} Close", "val": row["val"], "delta": row["delta"], "state": row["state"]})
+        seen_labels.add(label.upper())
 
     for row in fetch_domestic_yahoo_macro():
         morning.append({k: row[k] for k in ("label", "val", "delta", "state")})
