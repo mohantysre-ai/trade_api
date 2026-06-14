@@ -27,7 +27,7 @@
     "NSE Corporate Announcements",
     "Economic Times Markets"
   ],
-  "updatedAt": "2026-06-13T12:06:14.879514+00:00",
+  "updatedAt": "2026-06-14T12:15:03.238078+00:00",
   "mockTickers": [
     "AWFI"
   ],
@@ -39,119 +39,40 @@
   "poolDescription": "Nifty 100 Angel One live universe ranked by your filter prompt.",
   "stocks": [
     {
-      "ticker": "AAVAS",
-      "name": "AAVAS",
+      "ticker": "AIIL",
+      "name": "AIIL",
       "capSize": "Nifty 100",
-      "ltp": "\u20b91,405.70",
-      "ltpRaw": 1405.7,
-      "delta": "+5.83%",
+      "ltp": "\u20b9530.15",
+      "ltpRaw": 530.15,
+      "delta": "+15.26%",
       "state": "POSITIVE",
-      "volume": 840069,
-      "open": 1360.0,
-      "high": 1444.8,
-      "low": 1353.4,
-      "close": 1328.2,
+      "volume": 19070826,
+      "open": 468.9,
+      "high": 547.0,
+      "low": 467.7,
+      "close": 459.95,
       "intraday": {
-        "atr_pct": 3.5,
-        "volume_multiplier": 0.7,
-        "today_volume": 128660.0,
-        "avg_daily_volume_20": 182862.0,
-        "vwap": 1384.41,
-        "ema9": 1337.37,
-        "ema_angle_deg": 55.34,
-        "orb_high": 1410.0,
-        "orb_low": 1302.0,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
         "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 0.446,
-        "turnover_cr": 18.09,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
-        "trigger_point": "VWAP Bounce",
-        "passes_hard_filters": false,
-        "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "wick noise too high",
-          "turnover under 50 Cr"
-        ]
-      },
-      "score": 88.5
-    },
-    {
-      "ticker": "ABCAPITAL",
-      "name": "ABCAPITAL",
-      "capSize": "Nifty 100",
-      "ltp": "\u20b9358.10",
-      "ltpRaw": 358.1,
-      "delta": "+6.39%",
-      "state": "POSITIVE",
-      "volume": 3057116,
-      "open": 344.7,
-      "high": 359.3,
-      "low": 341.9,
-      "close": 336.6,
-      "intraday": {
-        "atr_pct": 3.1,
-        "volume_multiplier": 1.05,
-        "today_volume": 3774189.0,
-        "avg_daily_volume_20": 3603156.0,
-        "vwap": 344.97,
-        "ema9": 351.36,
-        "ema_angle_deg": -56.42,
-        "orb_high": 347.0,
-        "orb_low": 323.0,
-        "orb_velocity_pct": 3.2,
-        "wick_noise_ratio": 0.315,
-        "turnover_cr": 135.15,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
-        "trigger_point": "VWAP Bounce",
-        "passes_hard_filters": false,
-        "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "wick noise too high",
-          "EMA angle below 45 degrees"
-        ]
-      },
-      "score": 86.2
-    },
-    {
-      "ticker": "ABDL",
-      "name": "ABDL",
-      "capSize": "Nifty 100",
-      "ltp": "\u20b9644.45",
-      "ltpRaw": 644.45,
-      "delta": "+5.92%",
-      "state": "POSITIVE",
-      "volume": 2054909,
-      "open": 614.5,
-      "high": 646.95,
-      "low": 608.85,
-      "close": 608.45,
-      "intraday": {
-        "atr_pct": 3.52,
-        "volume_multiplier": 3.0,
-        "today_volume": 1285975.0,
-        "avg_daily_volume_20": 429123.0,
-        "vwap": 624.05,
-        "ema9": 646.08,
-        "ema_angle_deg": -75.81,
-        "orb_high": 692.0,
-        "orb_low": 610.0,
-        "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 0.358,
-        "turnover_cr": 82.87,
-        "price_above_vwap": true,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
         "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "wick noise too high",
-          "below EMA9",
-          "EMA angle below 45 degrees"
+          "insufficient candle data"
         ]
       },
-      "score": 84.9
+      "score": 98.5
     },
     {
       "ticker": "AEGISVOPAK",
@@ -167,65 +88,135 @@
       "low": 202.51,
       "close": 199.14,
       "intraday": {
-        "atr_pct": 4.55,
-        "volume_multiplier": 4.17,
-        "today_volume": 2955194.0,
-        "avg_daily_volume_20": 708663.0,
-        "vwap": 210.45,
-        "ema9": 212.26,
-        "ema_angle_deg": -54.02,
-        "orb_high": 218.0,
-        "orb_low": 202.75,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
         "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 0.357,
-        "turnover_cr": 64.38,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "wick noise too high",
-          "EMA angle below 45 degrees"
+          "insufficient candle data"
         ]
       },
-      "score": 82.1
+      "score": 96.2
     },
     {
-      "ticker": "AIIL",
-      "name": "AIIL",
+      "ticker": "ABDL",
+      "name": "ABDL",
       "capSize": "Nifty 100",
-      "ltp": "\u20b9530.15",
-      "ltpRaw": 530.15,
-      "delta": "+15.26%",
+      "ltp": "\u20b9644.45",
+      "ltpRaw": 644.45,
+      "delta": "+5.92%",
       "state": "POSITIVE",
-      "volume": 19070826,
-      "open": 468.9,
-      "high": 547.0,
-      "low": 467.7,
-      "close": 459.95,
+      "volume": 2054909,
+      "open": 614.5,
+      "high": 646.95,
+      "low": 608.85,
+      "close": 608.45,
       "intraday": {
-        "atr_pct": 4.81,
-        "volume_multiplier": 0.14,
-        "today_volume": 188690.0,
-        "avg_daily_volume_20": 1328343.0,
-        "vwap": 484.25,
-        "ema9": 465.61,
-        "ema_angle_deg": 80.38,
-        "orb_high": 483.5,
-        "orb_low": 429.0,
-        "orb_velocity_pct": 9.65,
-        "wick_noise_ratio": 0.023,
-        "turnover_cr": 10.0,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "turnover under 50 Cr"
+          "insufficient candle data"
         ]
       },
-      "score": 81.4
+      "score": 94.1
+    },
+    {
+      "ticker": "ABCAPITAL",
+      "name": "ABCAPITAL",
+      "capSize": "Nifty 100",
+      "ltp": "\u20b9358.10",
+      "ltpRaw": 358.1,
+      "delta": "+6.39%",
+      "state": "POSITIVE",
+      "volume": 3057116,
+      "open": 344.7,
+      "high": 359.3,
+      "low": 341.9,
+      "close": 336.6,
+      "intraday": {
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
+        "trigger_point": "VWAP Bounce",
+        "passes_hard_filters": false,
+        "hard_filter_reasons": [
+          "insufficient candle data"
+        ]
+      },
+      "score": 93.8
+    },
+    {
+      "ticker": "AAVAS",
+      "name": "AAVAS",
+      "capSize": "Nifty 100",
+      "ltp": "\u20b91,405.70",
+      "ltpRaw": 1405.7,
+      "delta": "+5.83%",
+      "state": "POSITIVE",
+      "volume": 840069,
+      "open": 1360.0,
+      "high": 1444.8,
+      "low": 1353.4,
+      "close": 1328.2,
+      "intraday": {
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
+        "trigger_point": "VWAP Bounce",
+        "passes_hard_filters": false,
+        "hard_filter_reasons": [
+          "insufficient candle data"
+        ]
+      },
+      "score": 92.5
     },
     {
       "ticker": "AADHARHFC",
@@ -261,7 +252,7 @@
           "not in intraday candidate set"
         ]
       },
-      "score": 79.8
+      "score": 91.2
     },
     {
       "ticker": "ACE",
@@ -297,7 +288,7 @@
           "not in intraday candidate set"
         ]
       },
-      "score": 78.5
+      "score": 89.7
     },
     {
       "ticker": "ADANIPOWER",
@@ -333,7 +324,43 @@
           "not in intraday candidate set"
         ]
       },
-      "score": 77.2
+      "score": 88.4
+    },
+    {
+      "ticker": "ABLBL",
+      "name": "ABLBL",
+      "capSize": "Nifty 100",
+      "ltp": "\u20b998.34",
+      "ltpRaw": 98.34,
+      "delta": "+3.10%",
+      "state": "POSITIVE",
+      "volume": 354629,
+      "open": 97.0,
+      "high": 98.74,
+      "low": 96.34,
+      "close": 95.38,
+      "intraday": {
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
+        "trigger_point": "VWAP Bounce",
+        "passes_hard_filters": false,
+        "hard_filter_reasons": [
+          "not in intraday candidate set"
+        ]
+      },
+      "score": 87.1
     },
     {
       "ticker": "360ONE",
@@ -369,7 +396,7 @@
           "not in intraday candidate set"
         ]
       },
-      "score": 76.9
+      "score": 86.5
     },
     {
       "ticker": "ABSLAMC",
@@ -405,58 +432,21 @@
           "not in intraday candidate set"
         ]
       },
-      "score": 75.4
+      "score": 85.9
     },
     {
-      "ticker": "ASHOKLEY",
-      "name": "ASHOKLEY",
+      "ticker": "AARTIIND",
+      "name": "AARTIIND",
       "capSize": "Nifty 100",
-      "ltp": "\u20b9152.45",
-      "ltpRaw": 152.45,
-      "delta": "+10.01%",
+      "ltp": "\u20b9440.60",
+      "ltpRaw": 440.6,
+      "delta": "+2.98%",
       "state": "POSITIVE",
-      "volume": 69272916,
-      "open": 143.22,
-      "high": 153.45,
-      "low": 142.7,
-      "close": 138.58,
-      "intraday": {
-        "atr_pct": 3.94,
-        "volume_multiplier": 1.79,
-        "today_volume": 56084797.0,
-        "avg_daily_volume_20": 31335133.0,
-        "vwap": 144.61,
-        "ema9": 144.96,
-        "ema_angle_deg": 0.38,
-        "orb_high": 145.29,
-        "orb_low": 143.25,
-        "orb_velocity_pct": 4.93,
-        "wick_noise_ratio": 0.224,
-        "turnover_cr": 855.01,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
-        "trigger_point": "VWAP Bounce",
-        "passes_hard_filters": false,
-        "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "EMA angle below 45 degrees"
-        ]
-      },
-      "score": 74.0
-    },
-    {
-      "ticker": "BANKBARODA",
-      "name": "BANKBARODA",
-      "capSize": "Nifty 100",
-      "ltp": "\u20b9274.75",
-      "ltpRaw": 274.75,
-      "delta": "+2.67%",
-      "state": "POSITIVE",
-      "volume": 27384601,
-      "open": 270.05,
-      "high": 276.1,
-      "low": 268.65,
-      "close": 267.6,
+      "volume": 492977,
+      "open": 430.9,
+      "high": 443.95,
+      "low": 427.8,
+      "close": 427.85,
       "intraday": {
         "atr_pct": 0.0,
         "volume_multiplier": 0.0,
@@ -478,21 +468,21 @@
           "not in intraday candidate set"
         ]
       },
-      "score": 73.2
+      "score": 84.2
     },
     {
-      "ticker": "CANBK",
-      "name": "CANBK",
+      "ticker": "AFCONS",
+      "name": "AFCONS",
       "capSize": "Nifty 100",
-      "ltp": "\u20b9131.67",
-      "ltpRaw": 131.67,
-      "delta": "+0.11%",
+      "ltp": "\u20b9326.00",
+      "ltpRaw": 326.0,
+      "delta": "+2.92%",
       "state": "POSITIVE",
-      "volume": 25287693,
-      "open": 130.0,
-      "high": 131.92,
-      "low": 128.8,
-      "close": 131.52,
+      "volume": 735015,
+      "open": 320.0,
+      "high": 327.85,
+      "low": 317.0,
+      "close": 316.75,
       "intraday": {
         "atr_pct": 0.0,
         "volume_multiplier": 0.0,
@@ -514,7 +504,115 @@
           "not in intraday candidate set"
         ]
       },
-      "score": 72.4
+      "score": 83.5
+    },
+    {
+      "ticker": "ABFRL",
+      "name": "ABFRL",
+      "capSize": "Nifty 100",
+      "ltp": "\u20b959.90",
+      "ltpRaw": 59.9,
+      "delta": "+2.85%",
+      "state": "POSITIVE",
+      "volume": 1991720,
+      "open": 58.99,
+      "high": 60.05,
+      "low": 58.68,
+      "close": 58.24,
+      "intraday": {
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
+        "trigger_point": "VWAP Bounce",
+        "passes_hard_filters": false,
+        "hard_filter_reasons": [
+          "not in intraday candidate set"
+        ]
+      },
+      "score": 82.1
+    },
+    {
+      "ticker": "ACC",
+      "name": "ACC",
+      "capSize": "Nifty 100",
+      "ltp": "\u20b91,336.60",
+      "ltpRaw": 1336.6,
+      "delta": "+2.52%",
+      "state": "POSITIVE",
+      "volume": 206123,
+      "open": 1309.9,
+      "high": 1343.8,
+      "low": 1308.2,
+      "close": 1303.7,
+      "intraday": {
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
+        "trigger_point": "VWAP Bounce",
+        "passes_hard_filters": false,
+        "hard_filter_reasons": [
+          "not in intraday candidate set"
+        ]
+      },
+      "score": 81.4
+    },
+    {
+      "ticker": "ADANIGREEN",
+      "name": "ADANIGREEN",
+      "capSize": "Nifty 100",
+      "ltp": "\u20b91,485.70",
+      "ltpRaw": 1485.7,
+      "delta": "+2.15%",
+      "state": "POSITIVE",
+      "volume": 1975815,
+      "open": 1480.0,
+      "high": 1493.0,
+      "low": 1455.2,
+      "close": 1454.5,
+      "intraday": {
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
+        "trigger_point": "VWAP Bounce",
+        "passes_hard_filters": false,
+        "hard_filter_reasons": [
+          "not in intraday candidate set"
+        ]
+      },
+      "score": 80.8
     },
     {
       "ticker": "AEGISLOG",
@@ -550,59 +648,21 @@
           "not in intraday candidate set"
         ]
       },
-      "score": 71.6
+      "score": 79.5
     },
     {
-      "ticker": "BAJFINANCE",
-      "name": "BAJFINANCE",
+      "ticker": "ADANIENSOL",
+      "name": "ADANIENSOL",
       "capSize": "Nifty 100",
-      "ltp": "\u20b9918.30",
-      "ltpRaw": 918.3,
-      "delta": "+5.49%",
+      "ltp": "\u20b91,489.60",
+      "ltpRaw": 1489.6,
+      "delta": "+1.56%",
       "state": "POSITIVE",
-      "volume": 11729668,
-      "open": 881.2,
-      "high": 921.0,
-      "low": 881.1,
-      "close": 870.55,
-      "intraday": {
-        "atr_pct": 2.76,
-        "volume_multiplier": 0.39,
-        "today_volume": 4049291.0,
-        "avg_daily_volume_20": 10364587.0,
-        "vwap": 893.54,
-        "ema9": 901.21,
-        "ema_angle_deg": -69.27,
-        "orb_high": 927.5,
-        "orb_low": 926.95,
-        "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 0.144,
-        "turnover_cr": 371.85,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
-        "trigger_point": "VWAP Bounce",
-        "passes_hard_filters": false,
-        "hard_filter_reasons": [
-          "ATR under 3.0%",
-          "opening volume under 3.0x",
-          "EMA angle below 45 degrees"
-        ]
-      },
-      "score": 70.8
-    },
-    {
-      "ticker": "CENTRALBK",
-      "name": "CENTRALBK",
-      "capSize": "Nifty 100",
-      "ltp": "\u20b931.04",
-      "ltpRaw": 31.04,
-      "delta": "+2.88%",
-      "state": "POSITIVE",
-      "volume": 11020327,
-      "open": 30.6,
-      "high": 31.15,
-      "low": 30.53,
-      "close": 30.17,
+      "volume": 1607528,
+      "open": 1499.0,
+      "high": 1509.0,
+      "low": 1477.0,
+      "close": 1466.7,
       "intraday": {
         "atr_pct": 0.0,
         "volume_multiplier": 0.0,
@@ -624,58 +684,21 @@
           "not in intraday candidate set"
         ]
       },
-      "score": 70.0
+      "score": 78.2
     },
     {
-      "ticker": "BANDHANBNK",
-      "name": "BANDHANBNK",
+      "ticker": "ABREL",
+      "name": "ABREL",
       "capSize": "Nifty 100",
-      "ltp": "\u20b9204.60",
-      "ltpRaw": 204.6,
-      "delta": "+5.52%",
+      "ltp": "\u20b91,198.40",
+      "ltpRaw": 1198.4,
+      "delta": "+1.49%",
       "state": "POSITIVE",
-      "volume": 10237548,
-      "open": 198.0,
-      "high": 206.17,
-      "low": 194.4,
-      "close": 193.9,
-      "intraday": {
-        "atr_pct": 3.35,
-        "volume_multiplier": 1.22,
-        "today_volume": 10831913.0,
-        "avg_daily_volume_20": 8886886.0,
-        "vwap": 196.04,
-        "ema9": 197.36,
-        "ema_angle_deg": -52.35,
-        "orb_high": 205.87,
-        "orb_low": 196.8,
-        "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 0.164,
-        "turnover_cr": 221.62,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
-        "trigger_point": "VWAP Bounce",
-        "passes_hard_filters": false,
-        "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "EMA angle below 45 degrees"
-        ]
-      },
-      "score": 69.2
-    },
-    {
-      "ticker": "COALINDIA",
-      "name": "COALINDIA",
-      "capSize": "Nifty 100",
-      "ltp": "\u20b9443.50",
-      "ltpRaw": 443.5,
-      "delta": "-0.61%",
-      "state": "NEGATIVE",
-      "volume": 9946830,
-      "open": 453.35,
-      "high": 453.35,
-      "low": 439.65,
-      "close": 446.2,
+      "volume": 261330,
+      "open": 1190.0,
+      "high": 1228.6,
+      "low": 1181.4,
+      "close": 1180.8,
       "intraday": {
         "atr_pct": 0.0,
         "volume_multiplier": 0.0,
@@ -697,21 +720,21 @@
           "not in intraday candidate set"
         ]
       },
-      "score": 68.4
+      "score": 77.9
     },
     {
-      "ticker": "BANKINDIA",
-      "name": "BANKINDIA",
+      "ticker": "ADANIPORTS",
+      "name": "ADANIPORTS",
       "capSize": "Nifty 100",
-      "ltp": "\u20b9145.68",
-      "ltpRaw": 145.68,
-      "delta": "+3.04%",
+      "ltp": "\u20b91,812.90",
+      "ltpRaw": 1812.9,
+      "delta": "+1.44%",
       "state": "POSITIVE",
-      "volume": 9184204,
-      "open": 144.0,
-      "high": 145.95,
-      "low": 141.91,
-      "close": 141.38,
+      "volume": 2325897,
+      "open": 1804.0,
+      "high": 1818.0,
+      "low": 1777.9,
+      "close": 1787.1,
       "intraday": {
         "atr_pct": 0.0,
         "volume_multiplier": 0.0,
@@ -733,43 +756,7 @@
           "not in intraday candidate set"
         ]
       },
-      "score": 67.6
-    },
-    {
-      "ticker": "AXISBANK",
-      "name": "AXISBANK",
-      "capSize": "Nifty 100",
-      "ltp": "\u20b91,356.30",
-      "ltpRaw": 1356.3,
-      "delta": "+2.96%",
-      "state": "POSITIVE",
-      "volume": 8535670,
-      "open": 1332.0,
-      "high": 1358.5,
-      "low": 1318.5,
-      "close": 1317.3,
-      "intraday": {
-        "atr_pct": 0.0,
-        "volume_multiplier": 0.0,
-        "today_volume": 0.0,
-        "avg_daily_volume_20": 0.0,
-        "vwap": 0.0,
-        "ema9": 0.0,
-        "ema_angle_deg": 0.0,
-        "orb_high": 0.0,
-        "orb_low": 0.0,
-        "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 1.0,
-        "turnover_cr": 0.0,
-        "price_above_vwap": false,
-        "price_above_ema9": false,
-        "trigger_point": "VWAP Bounce",
-        "passes_hard_filters": false,
-        "hard_filter_reasons": [
-          "not in intraday candidate set"
-        ]
-      },
-      "score": 66.8
+      "score": 76.5
     }
   ],
   "stockQuotes": {
@@ -927,26 +914,24 @@
       "low": 1353.4,
       "close": 1328.2,
       "intraday": {
-        "atr_pct": 3.5,
-        "volume_multiplier": 0.7,
-        "today_volume": 128660.0,
-        "avg_daily_volume_20": 182862.0,
-        "vwap": 1384.41,
-        "ema9": 1337.37,
-        "ema_angle_deg": 55.34,
-        "orb_high": 1410.0,
-        "orb_low": 1302.0,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
         "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 0.446,
-        "turnover_cr": 18.09,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "wick noise too high",
-          "turnover under 50 Cr"
+          "insufficient candle data"
         ]
       }
     },
@@ -1034,26 +1019,24 @@
       "low": 341.9,
       "close": 336.6,
       "intraday": {
-        "atr_pct": 3.1,
-        "volume_multiplier": 1.05,
-        "today_volume": 3774189.0,
-        "avg_daily_volume_20": 3603156.0,
-        "vwap": 344.97,
-        "ema9": 351.36,
-        "ema_angle_deg": -56.42,
-        "orb_high": 347.0,
-        "orb_low": 323.0,
-        "orb_velocity_pct": 3.2,
-        "wick_noise_ratio": 0.315,
-        "turnover_cr": 135.15,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "wick noise too high",
-          "EMA angle below 45 degrees"
+          "insufficient candle data"
         ]
       }
     },
@@ -1071,27 +1054,24 @@
       "low": 608.85,
       "close": 608.45,
       "intraday": {
-        "atr_pct": 3.52,
-        "volume_multiplier": 3.0,
-        "today_volume": 1285975.0,
-        "avg_daily_volume_20": 429123.0,
-        "vwap": 624.05,
-        "ema9": 646.08,
-        "ema_angle_deg": -75.81,
-        "orb_high": 692.0,
-        "orb_low": 610.0,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
         "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 0.358,
-        "turnover_cr": 82.87,
-        "price_above_vwap": true,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
         "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "wick noise too high",
-          "below EMA9",
-          "EMA angle below 45 degrees"
+          "insufficient candle data"
         ]
       }
     },
@@ -1599,25 +1579,24 @@
       "low": 202.51,
       "close": 199.14,
       "intraday": {
-        "atr_pct": 4.55,
-        "volume_multiplier": 4.17,
-        "today_volume": 2955194.0,
-        "avg_daily_volume_20": 708663.0,
-        "vwap": 210.45,
-        "ema9": 212.26,
-        "ema_angle_deg": -54.02,
-        "orb_high": 218.0,
-        "orb_low": 202.75,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
         "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 0.357,
-        "turnover_cr": 64.38,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "wick noise too high",
-          "EMA angle below 45 degrees"
+          "insufficient candle data"
         ]
       }
     },
@@ -1740,25 +1719,24 @@
       "low": 467.7,
       "close": 459.95,
       "intraday": {
-        "atr_pct": 4.81,
-        "volume_multiplier": 0.14,
-        "today_volume": 188690.0,
-        "avg_daily_volume_20": 1328343.0,
-        "vwap": 484.25,
-        "ema9": 465.61,
-        "ema_angle_deg": 80.38,
-        "orb_high": 483.5,
-        "orb_low": 429.0,
-        "orb_velocity_pct": 9.65,
-        "wick_noise_ratio": 0.023,
-        "turnover_cr": 10.0,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "turnover under 50 Cr"
+          "insufficient candle data"
         ]
       }
     },
@@ -1881,27 +1859,24 @@
       "low": 408.7,
       "close": 406.05,
       "intraday": {
-        "atr_pct": 2.92,
-        "volume_multiplier": 0.48,
-        "today_volume": 1641140.0,
-        "avg_daily_volume_20": 3385597.0,
-        "vwap": 413.58,
-        "ema9": 410.64,
-        "ema_angle_deg": -2.46,
-        "orb_high": 417.55,
-        "orb_low": 401.95,
-        "orb_velocity_pct": 1.33,
-        "wick_noise_ratio": 0.554,
-        "turnover_cr": 69.44,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
-          "opening volume under 3.0x",
-          "wick noise too high",
-          "EMA angle below 45 degrees"
+          "insufficient candle data"
         ]
       }
     },
@@ -1989,25 +1964,24 @@
       "low": 325.05,
       "close": 323.75,
       "intraday": {
-        "atr_pct": 3.8,
-        "volume_multiplier": 0.33,
-        "today_volume": 2649808.0,
-        "avg_daily_volume_20": 8130071.0,
-        "vwap": 328.6,
-        "ema9": 327.82,
-        "ema_angle_deg": -40.61,
-        "orb_high": 332.6,
-        "orb_low": 328.5,
-        "orb_velocity_pct": 2.07,
-        "wick_noise_ratio": 0.246,
-        "turnover_cr": 89.96,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "EMA angle below 45 degrees"
+          "insufficient candle data"
         ]
       }
     },
@@ -2235,27 +2209,24 @@
       "low": 259.0,
       "close": 258.45,
       "intraday": {
-        "atr_pct": 3.25,
-        "volume_multiplier": 0.36,
-        "today_volume": 306645.0,
-        "avg_daily_volume_20": 853653.0,
-        "vwap": 262.65,
-        "ema9": 264.31,
-        "ema_angle_deg": -9.11,
-        "orb_high": 265.3,
-        "orb_low": 259.0,
-        "orb_velocity_pct": 2.41,
-        "wick_noise_ratio": 0.335,
-        "turnover_cr": 8.33,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "wick noise too high",
-          "EMA angle below 45 degrees",
-          "turnover under 50 Cr"
+          "insufficient candle data"
         ]
       }
     },
@@ -2343,25 +2314,24 @@
       "low": 142.7,
       "close": 138.58,
       "intraday": {
-        "atr_pct": 3.94,
-        "volume_multiplier": 1.79,
-        "today_volume": 56084797.0,
-        "avg_daily_volume_20": 31335133.0,
-        "vwap": 144.61,
-        "ema9": 144.96,
-        "ema_angle_deg": 0.38,
-        "orb_high": 145.29,
-        "orb_low": 143.25,
-        "orb_velocity_pct": 4.93,
-        "wick_noise_ratio": 0.224,
-        "turnover_cr": 855.01,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "EMA angle below 45 degrees"
+          "insufficient candle data"
         ]
       }
     },
@@ -2589,26 +2559,24 @@
       "low": 959.1,
       "close": 963.3,
       "intraday": {
-        "atr_pct": 2.86,
-        "volume_multiplier": 0.88,
-        "today_volume": 1607772.0,
-        "avg_daily_volume_20": 1823028.0,
-        "vwap": 980.86,
-        "ema9": 973.65,
-        "ema_angle_deg": -23.36,
-        "orb_high": 1066.3,
-        "orb_low": 970.6,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
         "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 0.045,
-        "turnover_cr": 163.27,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
-          "opening volume under 3.0x",
-          "EMA angle below 45 degrees"
+          "insufficient candle data"
         ]
       }
     },
@@ -2871,26 +2839,24 @@
       "low": 881.1,
       "close": 870.55,
       "intraday": {
-        "atr_pct": 2.76,
-        "volume_multiplier": 0.39,
-        "today_volume": 4049291.0,
-        "avg_daily_volume_20": 10364587.0,
-        "vwap": 893.54,
-        "ema9": 901.21,
-        "ema_angle_deg": -69.27,
-        "orb_high": 927.5,
-        "orb_low": 926.95,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
         "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 0.144,
-        "turnover_cr": 371.85,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
-          "opening volume under 3.0x",
-          "EMA angle below 45 degrees"
+          "insufficient candle data"
         ]
       }
     },
@@ -2978,25 +2944,24 @@
       "low": 194.4,
       "close": 193.9,
       "intraday": {
-        "atr_pct": 3.35,
-        "volume_multiplier": 1.22,
-        "today_volume": 10831913.0,
-        "avg_daily_volume_20": 8886886.0,
-        "vwap": 196.04,
-        "ema9": 197.36,
-        "ema_angle_deg": -52.35,
-        "orb_high": 205.87,
-        "orb_low": 196.8,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
         "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 0.164,
-        "turnover_cr": 221.62,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "EMA angle below 45 degrees"
+          "insufficient candle data"
         ]
       }
     },
@@ -3119,27 +3084,24 @@
       "low": 253.05,
       "close": 250.85,
       "intraday": {
-        "atr_pct": 3.8,
-        "volume_multiplier": 0.36,
-        "today_volume": 1073189.0,
-        "avg_daily_volume_20": 2956331.0,
-        "vwap": 255.59,
-        "ema9": 257.72,
-        "ema_angle_deg": -44.6,
-        "orb_high": 261.1,
-        "orb_low": 253.35,
-        "orb_velocity_pct": 0.38,
-        "wick_noise_ratio": 0.532,
-        "turnover_cr": 28.13,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "wick noise too high",
-          "EMA angle below 45 degrees",
-          "turnover under 50 Cr"
+          "insufficient candle data"
         ]
       }
     },
@@ -3192,25 +3154,24 @@
       "low": 732.7,
       "close": 722.65,
       "intraday": {
-        "atr_pct": 3.14,
-        "volume_multiplier": 1.26,
-        "today_volume": 1388011.0,
-        "avg_daily_volume_20": 1099822.0,
-        "vwap": 737.21,
-        "ema9": 728.66,
-        "ema_angle_deg": 45.87,
-        "orb_high": 740.6,
-        "orb_low": 725.0,
-        "orb_velocity_pct": 2.29,
-        "wick_noise_ratio": 0.536,
-        "turnover_cr": 105.15,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "wick noise too high"
+          "insufficient candle data"
         ]
       }
     },
@@ -3368,27 +3329,24 @@
       "low": 996.0,
       "close": 997.8,
       "intraday": {
-        "atr_pct": 3.77,
-        "volume_multiplier": 0.08,
-        "today_volume": 30641.0,
-        "avg_daily_volume_20": 366590.0,
-        "vwap": 1005.18,
-        "ema9": 1011.25,
-        "ema_angle_deg": -62.87,
-        "orb_high": 1039.8,
-        "orb_low": 1003.1,
-        "orb_velocity_pct": 1.28,
-        "wick_noise_ratio": 0.279,
-        "turnover_cr": 3.23,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "wick noise too high",
-          "EMA angle below 45 degrees",
-          "turnover under 50 Cr"
+          "insufficient candle data"
         ]
       }
     },
@@ -3511,26 +3469,24 @@
       "low": 3185.6,
       "close": 3149.0,
       "intraday": {
-        "atr_pct": 2.75,
-        "volume_multiplier": 0.69,
-        "today_volume": 72465.0,
-        "avg_daily_volume_20": 105347.0,
-        "vwap": 3217.71,
-        "ema9": 3197.12,
-        "ema_angle_deg": 57.9,
-        "orb_high": 3225.2,
-        "orb_low": 3013.0,
-        "orb_velocity_pct": 3.38,
-        "wick_noise_ratio": 0.173,
-        "turnover_cr": 24.16,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
-          "opening volume under 3.0x",
-          "turnover under 50 Cr"
+          "insufficient candle data"
         ]
       }
     },
@@ -3548,27 +3504,24 @@
       "low": 1116.5,
       "close": 1175.3,
       "intraday": {
-        "atr_pct": 6.29,
-        "volume_multiplier": 0.75,
-        "today_volume": 716369.0,
-        "avg_daily_volume_20": 953431.0,
-        "vwap": 1147.52,
-        "ema9": 1130.15,
-        "ema_angle_deg": -8.29,
-        "orb_high": 1178.0,
-        "orb_low": 1112.8,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
         "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 0.181,
-        "turnover_cr": 80.41,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
         "price_above_vwap": false,
         "price_above_ema9": false,
-        "trigger_point": "Flag Breakout",
+        "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "below VWAP",
-          "below EMA9",
-          "EMA angle below 45 degrees"
+          "insufficient candle data"
         ]
       }
     },
@@ -3621,28 +3574,24 @@
       "low": 199.05,
       "close": 199.29,
       "intraday": {
-        "atr_pct": 2.98,
-        "volume_multiplier": 0.17,
-        "today_volume": 593548.0,
-        "avg_daily_volume_20": 3418535.0,
-        "vwap": 200.56,
-        "ema9": 206.89,
-        "ema_angle_deg": -77.86,
-        "orb_high": 211.0,
-        "orb_low": 199.75,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
         "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 0.366,
-        "turnover_cr": 12.37,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
-          "opening volume under 3.0x",
-          "wick noise too high",
-          "EMA angle below 45 degrees",
-          "turnover under 50 Cr"
+          "insufficient candle data"
         ]
       }
     },
@@ -3800,27 +3749,24 @@
       "low": 1485.0,
       "close": 1454.9,
       "intraday": {
-        "atr_pct": 3.58,
-        "volume_multiplier": 0.59,
-        "today_volume": 846605.0,
-        "avg_daily_volume_20": 1424982.0,
-        "vwap": 1502.46,
-        "ema9": 1574.52,
-        "ema_angle_deg": -80.37,
-        "orb_high": 1712.0,
-        "orb_low": 1489.9,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
         "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 0.799,
-        "turnover_cr": 132.76,
-        "price_above_vwap": true,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
         "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "wick noise too high",
-          "below EMA9",
-          "EMA angle below 45 degrees"
+          "insufficient candle data"
         ]
       }
     },
@@ -3838,26 +3784,24 @@
       "low": 1431.0,
       "close": 1425.6,
       "intraday": {
-        "atr_pct": 3.66,
-        "volume_multiplier": 0.23,
-        "today_volume": 46486.0,
-        "avg_daily_volume_20": 200005.0,
-        "vwap": 1461.97,
-        "ema9": 1460.48,
-        "ema_angle_deg": -70.57,
-        "orb_high": 1471.3,
-        "orb_low": 1281.0,
-        "orb_velocity_pct": 3.6,
-        "wick_noise_ratio": 0.051,
-        "turnover_cr": 7.09,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "opening volume under 3.0x",
-          "EMA angle below 45 degrees",
-          "turnover under 50 Cr"
+          "insufficient candle data"
         ]
       }
     },
@@ -4452,73 +4396,73 @@
   "news": [
     {
       "source": "Seeking Alpha Market Currents",
-      "title": "MANGOS: Let's Follow The Big Money (Why I'm 30% Cash)",
-      "link": "https://seekingalpha.com/article/4914650-mangos-lets-follow-the-big-money-why-im-30-percent-cash?source=feed_all_articles",
-      "summary": "MANGOS: Let's Follow The Big Money (Why I'm 30% Cash)",
-      "publishedAt": "2026-06-13T12:00:00+00:00"
+      "title": "Lattice Semiconductor Transitioning To A Strong Upcycle",
+      "link": "https://seekingalpha.com/article/4914860-lattice-semiconductor-transitioning-to-a-strong-upcycle?source=feed_all_articles",
+      "summary": "Lattice Semiconductor Transitioning To A Strong Upcycle",
+      "publishedAt": "2026-06-14T12:03:51+00:00"
     },
     {
       "source": "Seeking Alpha Market Currents",
-      "title": "Weekly Indicators: Consumers Back Off - Slightly",
-      "link": "https://seekingalpha.com/article/4914677-weekly-indicators-consumers-back-off-slightly?source=feed_all_articles",
-      "summary": "Weekly Indicators: Consumers Back Off - Slightly",
-      "publishedAt": "2026-06-13T12:00:00+00:00"
-    },
-    {
-      "source": "The Hindu Business Line",
-      "title": "Mag 7? MANGOS? SpaceX forces name rethink on Wall Street's tech-stock moniker",
-      "link": "https://www.thehindubusinessline.com/markets/mag-7-mangos-spacex-forces-name-rethink-on-wall-streets-tech-stock-moniker/article71097309.ece",
-      "summary": "The IPO, the biggest in U.S. history, vaulted SpaceX's value above two Mag 7 members: CEO Elon Musk's other company, Tesla , and Meta Platforms",
-      "publishedAt": "2026-06-13T11:53:26+00:00"
+      "title": "Arthur J. Gallagher & Co.: Bolt-On Acquisitions Fuel Growth",
+      "link": "https://seekingalpha.com/article/4914259-arthur-gallagher-bolt-on-acquisitions-fuel-growth?source=feed_all_articles",
+      "summary": "Arthur J. Gallagher & Co.: Bolt-On Acquisitions Fuel Growth",
+      "publishedAt": "2026-06-14T12:00:00+00:00"
     },
     {
       "source": "Seeking Alpha Market Currents",
-      "title": "Premium Brands: The M&A Flywheel Is Spinning Again",
-      "link": "https://seekingalpha.com/article/4914766-premium-brands-the-m-and-a-flywheel-is-spinning-again?source=feed_all_articles",
-      "summary": "Premium Brands: The M&A Flywheel Is Spinning Again",
-      "publishedAt": "2026-06-13T11:48:45+00:00"
+      "title": "Sallie Mae's Safest Borrowers Are Suddenly Defaulting",
+      "link": "https://seekingalpha.com/article/4914837-sallie-mae-safest-borrowers-suddenly-defaulting?source=feed_all_articles",
+      "summary": "Sallie Mae's Safest Borrowers Are Suddenly Defaulting",
+      "publishedAt": "2026-06-14T12:00:00+00:00"
     },
     {
       "source": "Nasdaq Market Intelligence",
-      "title": "Social Security Retirees Just Got Bad News",
-      "link": "https://www.nasdaq.com/articles/social-security-retirees-just-got-bad-news",
-      "summary": "Key PointsThe Social Security trust funds are at risk of being fully depleted in less than a decade.",
-      "publishedAt": "2026-06-13T11:20:00+00:00"
+      "title": "2 Energy Dividend Stocks With Cheap Valuations and Growing Payouts",
+      "link": "https://www.nasdaq.com/articles/2-energy-dividend-stocks-cheap-valuations-and-growing-payouts",
+      "summary": "Key PointsIt's challenging to find bargains in the energy sector given its strong price gains this year.",
+      "publishedAt": "2026-06-14T11:45:00+00:00"
     },
     {
       "source": "Nasdaq Market Intelligence",
-      "title": "MGK vs. IWO: Which Growth ETF Is the Better Buy for Investors in 2026?",
-      "link": "https://www.nasdaq.com/articles/mgk-vs-iwo-which-growth-etf-better-buy-investors-2026",
-      "summary": "Key PointsVanguard Mega Cap Growth ETF (MGK) offers a significantly lower expense ratio than iShares Russell 2000 Growth ETF (IWO).",
-      "publishedAt": "2026-06-13T11:15:29+00:00"
+      "title": "What Does Brady CEO's Purchase of Over 13,000 Shares for $1 Million Mean for Investors?",
+      "link": "https://www.nasdaq.com/articles/what-does-brady-ceos-purchase-over-13000-shares-1-million-mean-investors",
+      "summary": "Key PointsCEO Vineet Nargolwala acquired 13,011 shares for a total transaction value of approximately ~$1.0 million, based on a weighted average price of $76.86 per share on June 10, 2026.",
+      "publishedAt": "2026-06-14T11:42:01+00:00"
     },
     {
       "source": "Economic Times",
-      "title": "Umar Khalid, Sharjeel Imam move fresh bail plea",
-      "link": "https://economictimes.indiatimes.com/news/india/umar-khalid-sharjeel-imam-move-fresh-bail-pleas-after-nearly-6-years-in-jail/articleshow/131702825.cms",
-      "summary": "Umar Khalid, Sharjeel Imam move fresh bail plea",
-      "publishedAt": "2026-06-13T11:10:13+00:00"
+      "title": "Ethanol shift as transport energy backbone: KPMG",
+      "link": "https://economictimes.indiatimes.com/industry/energy/oil-gas/ethanol-transition-can-shift-to-transport-energy-backbone-to-shield-india-from-oil-shocks-kpmg/articleshow/131720238.cms",
+      "summary": "Ethanol shift as transport energy backbone: KPMG",
+      "publishedAt": "2026-06-14T11:37:12+00:00"
     },
     {
       "source": "Nasdaq Market Intelligence",
-      "title": "Nvidia CEO Jensen Huang Says This Will Be the Next $1 Trillion Company",
-      "link": "https://www.nasdaq.com/articles/nvidia-ceo-jensen-huang-says-will-be-next-1-trillion-company",
-      "summary": "Key PointsMarvell and Nvidia recently announced a new partnership.",
-      "publishedAt": "2026-06-13T11:05:00+00:00"
-    },
-    {
-      "source": "Economic Times",
-      "title": "India, Nepal discusses cross-border rail",
-      "link": "https://economictimes.indiatimes.com/industry/transportation/railways/india-nepal-discusses-cross-border-rail-connectivity/articleshow/131702835.cms",
-      "summary": "India, Nepal discusses cross-border rail",
-      "publishedAt": "2026-06-13T10:58:52+00:00"
+      "title": "These 4 Artificial Intelligence Stocks Have Room to Run Thanks to Anthropic's New Fable Model",
+      "link": "https://www.nasdaq.com/articles/these-4-artificial-intelligence-stocks-have-room-run-thanks-anthropics-new-fable-model",
+      "summary": "Key PointsAnthropic says its new Claude Fable family of models is as powerful as the Mythos model that it chose not to release to the public.",
+      "publishedAt": "2026-06-14T11:37:00+00:00"
     },
     {
       "source": "The Hindu Business Line",
-      "title": "Gold expected to touch $6,000/oz by end-2026 despite recent price cooling: JP Morgan",
-      "link": "https://www.thehindubusinessline.com/markets/gold/gold-expected-to-touch-6000oz-by-end-2026-despite-recent-price-cooling-jp-morgan/article71096940.ece",
-      "summary": "Uncertainty surrounding geopolitical developments and monetary policy to shape outlook for the metal, a JP Morgan report said",
-      "publishedAt": "2026-06-13T09:23:22+00:00"
+      "title": "Sparkle over gold: Men\u2019s diamond jewellery shines despite soaring gold prices",
+      "link": "https://www.thehindubusinessline.com/markets/commodities/sparkle-over-gold-mens-diamond-jewellery-shines-despite-soaring-gold-prices/article71098181.ece",
+      "summary": "The men\u2019s jewellery market registered 30% growth last year and the market has tripled since 2020; Once restricted to weddings, men already account for 15% of the total jewellery market valued at \u20b98.70 lakh crore",
+      "publishedAt": "2026-06-14T09:54:11+00:00"
+    },
+    {
+      "source": "The Hindu Business Line",
+      "title": "Wall Street is gaining access to new catastrophe models to help predict wars",
+      "link": "https://www.thehindubusinessline.com/markets/wall-street-is-gaining-access-to-new-catastrophe-models-to-help-predict-wars/article71100809.ece",
+      "summary": "Wars are upending the finance industry\u2019s ability to predict everything from the price of oil to the cost of a mortgage",
+      "publishedAt": "2026-06-14T09:46:47+00:00"
+    },
+    {
+      "source": "The Hindu Business Line",
+      "title": "Inflation data, US Fed interest rate decision, crude oil major drivers for stock markets: Analysts",
+      "link": "https://www.thehindubusinessline.com/markets/inflation-data-us-fed-interest-rate-decision-crude-oil-major-drivers-for-stock-markets-analysts/article71100598.ece",
+      "summary": "Besides, the status of the US-Iran deal signing on Sunday, trading activity of foreign investors and movement in global markets would also drive sentiments in domestic equities, say experts",
+      "publishedAt": "2026-06-14T07:24:02+00:00"
     }
   ],
   "llmProvider": "gemini",
@@ -4535,234 +4479,244 @@
     "current_model": "Current model view is driven by live quote, volume, and intraday structure from the market snapshot.",
     "ledger_stocks": [
       {
-        "ticker": "AAVAS",
-        "name": "Aavas Financiers Ltd",
-        "ltp": "1405.70",
-        "delta": "5.83%",
-        "score": 88.5,
+        "ticker": "AIIL",
+        "name": "AIIL",
+        "ltp": "530.15",
+        "delta": "15.26%",
+        "score": 98.5,
         "action": "BUY",
         "selection_reason": "",
+        "risk_flag": "",
         "focus": false,
-        "policy_allocation_pct": "10.9%"
+        "policy_allocation_pct": "11.4%"
       },
       {
-        "ticker": "ABCAPITAL",
-        "name": "Aditya Birla Capital Ltd",
-        "ltp": "358.10",
-        "delta": "6.39%",
-        "score": 86.2,
+        "ticker": "AEGISVOPAK",
+        "name": "AEGISVOPAK",
+        "ltp": "217.85",
+        "delta": "9.40%",
+        "score": 96.2,
         "action": "BUY",
         "selection_reason": "",
+        "risk_flag": "",
         "focus": false,
-        "policy_allocation_pct": "10.6%"
+        "policy_allocation_pct": "11.1%"
       },
       {
         "ticker": "ABDL",
         "name": "ABDL",
         "ltp": "644.45",
         "delta": "5.92%",
-        "score": 84.9,
+        "score": 94.1,
         "action": "BUY",
         "selection_reason": "",
+        "risk_flag": "",
         "focus": false,
-        "policy_allocation_pct": "10.5%"
+        "policy_allocation_pct": "10.9%"
       },
       {
-        "ticker": "AEGISVOPAK",
-        "name": "Aegis Vopak Terminals Ltd",
-        "ltp": "217.85",
-        "delta": "9.40%",
-        "score": 82.1,
+        "ticker": "ABCAPITAL",
+        "name": "ABCAPITAL",
+        "ltp": "358.10",
+        "delta": "6.39%",
+        "score": 93.8,
         "action": "BUY",
         "selection_reason": "",
+        "risk_flag": "",
+        "focus": false,
+        "policy_allocation_pct": "10.9%"
+      },
+      {
+        "ticker": "AAVAS",
+        "name": "AAVAS",
+        "ltp": "1,405.70",
+        "delta": "5.83%",
+        "score": 92.5,
+        "action": "BUY",
+        "selection_reason": "",
+        "risk_flag": "",
+        "focus": false,
+        "policy_allocation_pct": "10.7%"
+      },
+      {
+        "ticker": "AADHARHFC",
+        "name": "AADHARHFC",
+        "ltp": "473.65",
+        "delta": "4.55%",
+        "score": 91.2,
+        "action": "BUY",
+        "selection_reason": "",
+        "risk_flag": "",
+        "focus": false,
+        "policy_allocation_pct": "10.6%"
+      },
+      {
+        "ticker": "ACE",
+        "name": "ACE",
+        "ltp": "931.05",
+        "delta": "4.38%",
+        "score": 89.7,
+        "action": "BUY",
+        "selection_reason": "",
+        "risk_flag": "",
+        "focus": false,
+        "policy_allocation_pct": "10.4%"
+      },
+      {
+        "ticker": "ADANIPOWER",
+        "name": "ADANIPOWER",
+        "ltp": "223.07",
+        "delta": "3.51%",
+        "score": 88.4,
+        "action": "BUY",
+        "selection_reason": "",
+        "risk_flag": "",
+        "focus": false,
+        "policy_allocation_pct": "10.2%"
+      },
+      {
+        "ticker": "ABLBL",
+        "name": "ABLBL",
+        "ltp": "98.34",
+        "delta": "3.10%",
+        "score": 87.1,
+        "action": "BUY",
+        "selection_reason": "",
+        "risk_flag": "",
         "focus": false,
         "policy_allocation_pct": "10.1%"
       },
       {
-        "ticker": "AIIL",
-        "name": "AIIL",
-        "ltp": "530.15",
-        "delta": "15.26%",
-        "score": 81.4,
+        "ticker": "360ONE",
+        "name": "360ONE",
+        "ltp": "1,096.80",
+        "delta": "3.07%",
+        "score": 86.5,
         "action": "BUY",
         "selection_reason": "",
+        "risk_flag": "",
         "focus": false,
         "policy_allocation_pct": "10.0%"
       },
       {
-        "ticker": "AADHARHFC",
-        "name": "Aadhar Housing Finance Ltd",
-        "ltp": "473.65",
-        "delta": "4.55%",
-        "score": 79.8,
+        "ticker": "ABSLAMC",
+        "name": "ABSLAMC",
+        "ltp": "1,101.20",
+        "delta": "3.05%",
+        "score": 85.9,
         "action": "BUY",
         "selection_reason": "",
+        "risk_flag": "",
         "focus": false,
-        "policy_allocation_pct": "9.8%"
+        "policy_allocation_pct": "9.9%"
       },
       {
-        "ticker": "ACE",
-        "name": "Action Construction Equipment Ltd",
-        "ltp": "931.05",
-        "delta": "4.38%",
-        "score": 78.5,
+        "ticker": "AARTIIND",
+        "name": "AARTIIND",
+        "ltp": "440.60",
+        "delta": "2.98%",
+        "score": 84.2,
         "action": "BUY",
         "selection_reason": "",
+        "risk_flag": "",
         "focus": false,
         "policy_allocation_pct": "9.7%"
       },
       {
-        "ticker": "ADANIPOWER",
-        "name": "Adani Power Ltd",
-        "ltp": "223.07",
-        "delta": "3.51%",
-        "score": 77.2,
+        "ticker": "AFCONS",
+        "name": "AFCONS",
+        "ltp": "326.00",
+        "delta": "2.92%",
+        "score": 83.5,
         "action": "BUY",
         "selection_reason": "",
+        "risk_flag": "",
+        "focus": false,
+        "policy_allocation_pct": "9.7%"
+      },
+      {
+        "ticker": "ABFRL",
+        "name": "ABFRL",
+        "ltp": "59.90",
+        "delta": "2.85%",
+        "score": 82.1,
+        "action": "BUY",
+        "selection_reason": "",
+        "risk_flag": "",
         "focus": false,
         "policy_allocation_pct": "9.5%"
       },
       {
-        "ticker": "360ONE",
-        "name": "360 ONE WAM Ltd",
-        "ltp": "1096.80",
-        "delta": "3.07%",
-        "score": 76.9,
+        "ticker": "ACC",
+        "name": "ACC",
+        "ltp": "1,336.60",
+        "delta": "2.52%",
+        "score": 81.4,
         "action": "BUY",
         "selection_reason": "",
+        "risk_flag": "",
         "focus": false,
-        "policy_allocation_pct": "9.5%"
+        "policy_allocation_pct": "9.4%"
       },
       {
-        "ticker": "ABSLAMC",
-        "name": "Aditya Birla Sun Life AMC Ltd",
-        "ltp": "1101.20",
-        "delta": "3.05%",
-        "score": 75.4,
+        "ticker": "ADANIGREEN",
+        "name": "ADANIGREEN",
+        "ltp": "1,485.70",
+        "delta": "2.15%",
+        "score": 80.8,
         "action": "BUY",
         "selection_reason": "",
+        "risk_flag": "",
         "focus": false,
-        "policy_allocation_pct": "9.3%"
-      },
-      {
-        "ticker": "ASHOKLEY",
-        "scale": "NIFTY100",
-        "live_price": "\u20b9152.45",
-        "delta": "+10.01%",
-        "score": 74.0,
-        "action": "WATCH",
-        "name": "ASHOKLEY",
-        "selection_reason": "High-volume liquid continuation candidate",
-        "wl_ratio": "N/A",
-        "policy_allocation_pct": "N/A"
-      },
-      {
-        "ticker": "BANKBARODA",
-        "scale": "NIFTY100",
-        "live_price": "\u20b9274.75",
-        "delta": "+2.67%",
-        "score": 73.2,
-        "action": "WATCH",
-        "name": "BANKBARODA",
-        "selection_reason": "High-volume liquid continuation candidate",
-        "wl_ratio": "N/A",
-        "policy_allocation_pct": "N/A"
-      },
-      {
-        "ticker": "CANBK",
-        "scale": "NIFTY100",
-        "live_price": "\u20b9131.67",
-        "delta": "+0.11%",
-        "score": 72.4,
-        "action": "WATCH",
-        "name": "CANBK",
-        "selection_reason": "High-volume liquid continuation candidate",
-        "wl_ratio": "N/A",
-        "policy_allocation_pct": "N/A"
+        "policy_allocation_pct": "9.4%"
       },
       {
         "ticker": "AEGISLOG",
-        "scale": "NIFTY100",
-        "live_price": "\u20b9944.40",
-        "delta": "+2.00%",
-        "score": 71.6,
-        "action": "WATCH",
         "name": "AEGISLOG",
-        "selection_reason": "High-volume liquid continuation candidate",
-        "wl_ratio": "N/A",
-        "policy_allocation_pct": "N/A"
+        "ltp": "944.40",
+        "delta": "2.00%",
+        "score": 79.5,
+        "action": "BUY",
+        "selection_reason": "",
+        "risk_flag": "",
+        "focus": false,
+        "policy_allocation_pct": "9.2%"
       },
       {
-        "ticker": "BAJFINANCE",
-        "scale": "NIFTY100",
-        "live_price": "\u20b9918.30",
-        "delta": "+5.49%",
-        "score": 70.8,
-        "action": "WATCH",
-        "name": "BAJFINANCE",
-        "selection_reason": "BAJFINANCE shows strong momentum with a 5.49% price increase, trading above both VWAP and EMA9, supported by a \u20b9371.85 Cr turnover and a technical VWAP bounce trigger.",
-        "wl_ratio": "N/A",
-        "policy_allocation_pct": "N/A"
+        "ticker": "ADANIENSOL",
+        "name": "ADANIENSOL",
+        "ltp": "1,489.60",
+        "delta": "1.56%",
+        "score": 78.2,
+        "action": "BUY",
+        "selection_reason": "",
+        "risk_flag": "",
+        "focus": false,
+        "policy_allocation_pct": "9.1%"
       },
       {
-        "ticker": "CENTRALBK",
-        "scale": "NIFTY100",
-        "live_price": "\u20b931.04",
-        "delta": "+2.88%",
-        "score": 70.0,
-        "action": "WATCH",
-        "name": "CENTRALBK",
-        "selection_reason": "High-volume liquid continuation candidate",
-        "wl_ratio": "N/A",
-        "policy_allocation_pct": "N/A"
+        "ticker": "ABREL",
+        "name": "ABREL",
+        "ltp": "1,198.40",
+        "delta": "1.49%",
+        "score": 77.9,
+        "action": "BUY",
+        "selection_reason": "",
+        "risk_flag": "",
+        "focus": false,
+        "policy_allocation_pct": "9.0%"
       },
       {
-        "ticker": "BANDHANBNK",
-        "scale": "NIFTY100",
-        "live_price": "\u20b9204.60",
-        "delta": "+5.52%",
-        "score": 69.2,
-        "action": "WATCH",
-        "name": "BANDHANBNK",
-        "selection_reason": "High-volume liquid continuation candidate",
-        "wl_ratio": "N/A",
-        "policy_allocation_pct": "N/A"
-      },
-      {
-        "ticker": "COALINDIA",
-        "scale": "NIFTY100",
-        "live_price": "\u20b9443.50",
-        "delta": "-0.61%",
-        "score": 68.4,
-        "action": "WATCH",
-        "name": "COALINDIA",
-        "selection_reason": "High-volume liquid continuation candidate",
-        "wl_ratio": "N/A",
-        "policy_allocation_pct": "N/A"
-      },
-      {
-        "ticker": "BANKINDIA",
-        "scale": "NIFTY100",
-        "live_price": "\u20b9145.68",
-        "delta": "+3.04%",
-        "score": 67.6,
-        "action": "WATCH",
-        "name": "BANKINDIA",
-        "selection_reason": "High-volume liquid continuation candidate",
-        "wl_ratio": "N/A",
-        "policy_allocation_pct": "N/A"
-      },
-      {
-        "ticker": "AXISBANK",
-        "scale": "NIFTY100",
-        "live_price": "\u20b91,356.30",
-        "delta": "+2.96%",
-        "score": 66.8,
-        "action": "WATCH",
-        "name": "AXISBANK",
-        "selection_reason": "High-volume liquid continuation candidate",
-        "wl_ratio": "N/A",
-        "policy_allocation_pct": "N/A"
+        "ticker": "ADANIPORTS",
+        "name": "ADANIPORTS",
+        "ltp": "1,812.90",
+        "delta": "1.44%",
+        "score": 76.5,
+        "action": "BUY",
+        "selection_reason": "",
+        "risk_flag": "",
+        "focus": false,
+        "policy_allocation_pct": "8.9%"
       }
     ],
     "active_scoring_matrix": {
@@ -4798,274 +4752,25 @@
       "low_vol_factor": "Low-vol names excluded per hard filter regime."
     }
   },
-  "isSnapshotFallback": true,
-  "selectionMeta": {
-    "mode": "snapshot",
-    "reason": "Outside the scheduled IST refresh window; serving the latest saved snapshot.",
-    "dataDate": "2026-06-13"
-  },
   "tickerIntelligenceByTicker": {
-    "AAVAS": {
-      "news_catalysts_card": "Market context for AAVAS: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For AAVAS, participation is read through volume multiplier 0.7x and turnover 18.09 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. AAVAS is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "AAVAS forensic screen: Beneish M Score: -0.40, Altman Z Score: 2.90, Ocf Ebitda Ratio: 0.68, Mansfield Relative Strength: 0.76.",
-      "why_interested": "AAVAS is in the active terminal universe with LTP \u20b91,405.70, +5.83% move, and volume 840069. Intraday setup: VWAP Bounce, VWAP 1384.41, EMA9 1337.37, ATR 3.5%, volume multiplier 0.7x.",
-      "future_revenue_model": "Forward model for AAVAS is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for AAVAS: LTP \u20b91,405.70, delta +5.83%, volume 840069, score 88.5, action BUY.",
-      "ledger_stocks": [
-        {
-          "ticker": "AAVAS",
-          "name": "Aavas Financiers Ltd",
-          "ltp": "1405.70",
-          "delta": "5.83%",
-          "score": 88.5,
-          "action": "BUY",
-          "selection_reason": "",
-          "focus": true
-        }
-      ],
-      "active_scoring_matrix": {
-        "beneish_m_score": "-0.40",
-        "altman_z_score": "2.90",
-        "ocf_ebitda_ratio": "0.68",
-        "mansfield_relative_strength": "0.76"
-      },
-      "active_seven_ic_gates": {
-        "q1_fund_buying": "AAVAS volume multiplier is 0.7x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "AAVAS turnover is 18.09 Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "AAVAS price action is +5.83%; catalyst validation depends on follow-through above VWAP/EMA9.",
-        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "AAVAS risk/reward is driven by score 88.5, ATR 3.5%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "AAVAS quantitative milestone: hard-filter watch with score 88.5.",
-        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
-      },
-      "active_risk_calc": {
-        "ticker_score": 88.5,
-        "delta_pct": 5.83,
-        "atr_pct": 3.5,
-        "turnover_cr": 18.09,
-        "volume_multiplier": 0.7,
-        "selection_risk": "lower",
-        "signal_quality": "live-derived",
-        "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "10.9%",
-        "risk_flag_score": 34.0,
-        "risk_flag": "MODERATE_RISK"
-      },
-      "active_factor_hub": {
-        "selection_reason": "trend follow-through above VWAP and EMA9; delta 5.83% with score 88.5; volume 0.70x and turnover 18.09 Cr; elevated volatility; trigger VWAP Bounce; watch-list hard-filter state.",
-        "dominant_factors": "momentum, liquidity, and structural trend alignment",
-        "momentum_factor": "Above VWAP/EMA9; score 88.5.",
-        "liquidity_factor": "Volume multiplier 0.70x; turnover 18.09 Cr.",
-        "quality_factor": "ATR 3.50% and hard-filter status watch.",
-        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
-        "low_vol_factor": "Volatility premium regime"
-      },
-      "focusTicker": "AAVAS",
-      "ticker": "AAVAS",
-      "dataQuality": "live-derived"
-    },
-    "ABCAPITAL": {
-      "news_catalysts_card": "Market context for ABCAPITAL: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For ABCAPITAL, participation is read through volume multiplier 1.05x and turnover 135.15 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. ABCAPITAL is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "ABCAPITAL forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.08, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "ABCAPITAL is in the active terminal universe with LTP \u20b9358.10, +6.39% move, and volume 3057116. Intraday setup: VWAP Bounce, VWAP 344.97, EMA9 351.36, ATR 3.1%, volume multiplier 1.05x.",
-      "future_revenue_model": "Forward model for ABCAPITAL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for ABCAPITAL: LTP \u20b9358.10, delta +6.39%, volume 3057116, score 86.2, action BUY.",
-      "ledger_stocks": [
-        {
-          "ticker": "ABCAPITAL",
-          "name": "Aditya Birla Capital Ltd",
-          "ltp": "358.10",
-          "delta": "6.39%",
-          "score": 86.2,
-          "action": "BUY",
-          "selection_reason": "",
-          "focus": true
-        }
-      ],
-      "active_scoring_matrix": {
-        "beneish_m_score": "-0.37",
-        "altman_z_score": "3.08",
-        "ocf_ebitda_ratio": "0.70",
-        "mansfield_relative_strength": "0.78"
-      },
-      "active_seven_ic_gates": {
-        "q1_fund_buying": "ABCAPITAL volume multiplier is 1.05x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "ABCAPITAL turnover is 135.15 Cr; liquidity quality is institutional level.",
-        "q3_catalyst_validation": "ABCAPITAL price action is +6.39%; catalyst validation depends on follow-through above VWAP/EMA9.",
-        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "ABCAPITAL risk/reward is driven by score 86.2, ATR 3.1%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "ABCAPITAL quantitative milestone: hard-filter watch with score 86.2.",
-        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
-      },
-      "active_risk_calc": {
-        "ticker_score": 86.2,
-        "delta_pct": 6.39,
-        "atr_pct": 3.1,
-        "turnover_cr": 135.15,
-        "volume_multiplier": 1.05,
-        "selection_risk": "lower",
-        "signal_quality": "live-derived",
-        "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "10.6%",
-        "risk_flag_score": 36.0,
-        "risk_flag": "MODERATE_RISK"
-      },
-      "active_factor_hub": {
-        "selection_reason": "trend follow-through above VWAP and EMA9; delta 6.39% with score 86.2; volume 1.05x and turnover 135.15 Cr; elevated volatility; trigger VWAP Bounce; watch-list hard-filter state.",
-        "dominant_factors": "momentum, liquidity, and structural trend alignment",
-        "momentum_factor": "Above VWAP/EMA9; score 86.2.",
-        "liquidity_factor": "Volume multiplier 1.05x; turnover 135.15 Cr.",
-        "quality_factor": "ATR 3.10% and hard-filter status watch.",
-        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
-        "low_vol_factor": "Volatility premium regime"
-      },
-      "focusTicker": "ABCAPITAL",
-      "ticker": "ABCAPITAL",
-      "dataQuality": "live-derived"
-    },
-    "ABDL": {
-      "news_catalysts_card": "Market context for ABDL: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For ABDL, participation is read through volume multiplier 3.0x and turnover 82.87 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. ABDL is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "ABDL forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.07, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "ABDL is in the active terminal universe with LTP \u20b9644.45, +5.92% move, and volume 2054909. Intraday setup: VWAP Bounce, VWAP 624.05, EMA9 646.08, ATR 3.52%, volume multiplier 3.0x.",
-      "future_revenue_model": "Forward model for ABDL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for ABDL: LTP \u20b9644.45, delta +5.92%, volume 2054909, score 84.9, action BUY.",
-      "ledger_stocks": [
-        {
-          "ticker": "ABDL",
-          "name": "ABDL",
-          "ltp": "644.45",
-          "delta": "5.92%",
-          "score": 84.9,
-          "action": "BUY",
-          "selection_reason": "",
-          "focus": true
-        }
-      ],
-      "active_scoring_matrix": {
-        "beneish_m_score": "-0.37",
-        "altman_z_score": "3.07",
-        "ocf_ebitda_ratio": "0.70",
-        "mansfield_relative_strength": "0.78"
-      },
-      "active_seven_ic_gates": {
-        "q1_fund_buying": "ABDL volume multiplier is 3.0x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "ABDL turnover is 82.87 Cr; liquidity quality is institutional level.",
-        "q3_catalyst_validation": "ABDL price action is +5.92%; catalyst validation depends on follow-through above VWAP/EMA9.",
-        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "ABDL risk/reward is driven by score 84.9, ATR 3.52%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "ABDL quantitative milestone: hard-filter watch with score 84.9.",
-        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
-      },
-      "active_risk_calc": {
-        "ticker_score": 84.9,
-        "delta_pct": 5.92,
-        "atr_pct": 3.52,
-        "turnover_cr": 82.87,
-        "volume_multiplier": 3.0,
-        "selection_risk": "lower",
-        "signal_quality": "live-derived",
-        "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "10.5%",
-        "risk_flag_score": 26.0,
-        "risk_flag": "LOW_RISK"
-      },
-      "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta 5.92% with score 84.9; volume 3.00x and turnover 82.87 Cr; elevated volatility; trigger VWAP Bounce; watch-list hard-filter state.",
-        "dominant_factors": "range expansion with volatility-led execution risk",
-        "momentum_factor": "Near VWAP/EMA9; score 84.9.",
-        "liquidity_factor": "Volume multiplier 3.00x; turnover 82.87 Cr.",
-        "quality_factor": "ATR 3.52% and hard-filter status watch.",
-        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
-        "low_vol_factor": "Volatility premium regime"
-      },
-      "focusTicker": "ABDL",
-      "ticker": "ABDL",
-      "dataQuality": "live-derived"
-    },
-    "AEGISVOPAK": {
-      "news_catalysts_card": "Market context for AEGISVOPAK: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For AEGISVOPAK, participation is read through volume multiplier 4.17x and turnover 64.38 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. AEGISVOPAK is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "AEGISVOPAK forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.09, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "AEGISVOPAK is in the active terminal universe with LTP \u20b9217.85, +9.40% move, and volume 4204329. Intraday setup: VWAP Bounce, VWAP 210.45, EMA9 212.26, ATR 4.55%, volume multiplier 4.17x.",
-      "future_revenue_model": "Forward model for AEGISVOPAK is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for AEGISVOPAK: LTP \u20b9217.85, delta +9.40%, volume 4204329, score 82.1, action BUY.",
-      "ledger_stocks": [
-        {
-          "ticker": "AEGISVOPAK",
-          "name": "Aegis Vopak Terminals Ltd",
-          "ltp": "217.85",
-          "delta": "9.40%",
-          "score": 82.1,
-          "action": "BUY",
-          "selection_reason": "",
-          "focus": true
-        }
-      ],
-      "active_scoring_matrix": {
-        "beneish_m_score": "-0.37",
-        "altman_z_score": "3.09",
-        "ocf_ebitda_ratio": "0.70",
-        "mansfield_relative_strength": "0.78"
-      },
-      "active_seven_ic_gates": {
-        "q1_fund_buying": "AEGISVOPAK volume multiplier is 4.17x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "AEGISVOPAK turnover is 64.38 Cr; liquidity quality is institutional level.",
-        "q3_catalyst_validation": "AEGISVOPAK price action is +9.40%; catalyst validation depends on follow-through above VWAP/EMA9.",
-        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "AEGISVOPAK risk/reward is driven by score 82.1, ATR 4.55%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "AEGISVOPAK quantitative milestone: hard-filter watch with score 82.1.",
-        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
-      },
-      "active_risk_calc": {
-        "ticker_score": 82.1,
-        "delta_pct": 9.4,
-        "atr_pct": 4.55,
-        "turnover_cr": 64.38,
-        "volume_multiplier": 4.17,
-        "selection_risk": "lower",
-        "signal_quality": "live-derived",
-        "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "10.1%",
-        "risk_flag_score": 40.0,
-        "risk_flag": "MODERATE_RISK"
-      },
-      "active_factor_hub": {
-        "selection_reason": "trend follow-through above VWAP and EMA9; delta 9.40% with score 82.1; volume 4.17x and turnover 64.38 Cr; elevated volatility; trigger VWAP Bounce; watch-list hard-filter state.",
-        "dominant_factors": "momentum, liquidity, and structural trend alignment",
-        "momentum_factor": "Above VWAP/EMA9; score 82.1.",
-        "liquidity_factor": "Volume multiplier 4.17x; turnover 64.38 Cr.",
-        "quality_factor": "ATR 4.55% and hard-filter status watch.",
-        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
-        "low_vol_factor": "Volatility premium regime"
-      },
-      "focusTicker": "AEGISVOPAK",
-      "ticker": "AEGISVOPAK",
-      "dataQuality": "live-derived"
-    },
     "AIIL": {
       "news_catalysts_card": "Market context for AIIL: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For AIIL, participation is read through volume multiplier 0.14x and turnover 10.0 Cr.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For AIIL, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. AIIL is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "AIIL forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.11, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "AIIL is in the active terminal universe with LTP \u20b9530.15, +15.26% move, and volume 19070826. Intraday setup: VWAP Bounce, VWAP 484.25, EMA9 465.61, ATR 4.81%, volume multiplier 0.14x.",
+      "why_interested": "AIIL is in the active terminal universe with LTP \u20b9530.15, +15.26% move, and volume 19070826. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
       "future_revenue_model": "Forward model for AIIL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for AIIL: LTP \u20b9530.15, delta +15.26%, volume 19070826, score 81.4, action BUY.",
+      "current_model": "Current model for AIIL: LTP \u20b9530.15, delta +15.26%, volume 19070826, score 98.5, action BUY.",
       "ledger_stocks": [
         {
           "ticker": "AIIL",
           "name": "AIIL",
           "ltp": "530.15",
           "delta": "15.26%",
-          "score": 81.4,
+          "score": 98.5,
           "action": "BUY",
           "selection_reason": "",
+          "risk_flag": "",
           "focus": true
         }
       ],
@@ -5076,38 +4781,286 @@
         "mansfield_relative_strength": "0.78"
       },
       "active_seven_ic_gates": {
-        "q1_fund_buying": "AIIL volume multiplier is 0.14x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "AIIL turnover is 10.0 Cr; liquidity quality is watch-list level.",
+        "q1_fund_buying": "AIIL volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "AIIL turnover is 0.0 Cr; liquidity quality is watch-list level.",
         "q3_catalyst_validation": "AIIL price action is +15.26%; catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "AIIL risk/reward is driven by score 81.4, ATR 4.81%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "AIIL quantitative milestone: hard-filter watch with score 81.4.",
+        "q5_risk_reward": "AIIL risk/reward is driven by score 98.5, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "AIIL quantitative milestone: hard-filter watch with score 98.5.",
         "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
       },
       "active_risk_calc": {
-        "ticker_score": 81.4,
+        "ticker_score": 98.5,
         "delta_pct": 15.26,
-        "atr_pct": 4.81,
-        "turnover_cr": 10.0,
-        "volume_multiplier": 0.14,
+        "atr_pct": 0.0,
+        "turnover_cr": 0.0,
+        "volume_multiplier": 0.0,
         "selection_risk": "lower",
         "signal_quality": "live-derived",
         "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "10.0%",
-        "risk_flag_score": 56.0,
-        "risk_flag": "HIGH_RISK"
+        "kelly_policy_max": "11.4%",
+        "risk_flag_score": 34.0,
+        "risk_flag": "MODERATE_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "trend follow-through above VWAP and EMA9; delta 15.26% with score 81.4; volume 0.14x and turnover 10.00 Cr; elevated volatility; trigger VWAP Bounce; watch-list hard-filter state.",
-        "dominant_factors": "momentum, liquidity, and structural trend alignment",
-        "momentum_factor": "Above VWAP/EMA9; score 81.4.",
-        "liquidity_factor": "Volume multiplier 0.14x; turnover 10.00 Cr.",
-        "quality_factor": "ATR 4.81% and hard-filter status watch.",
+        "selection_reason": "mixed trend around intraday anchors; delta 15.26% with score 98.5; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "dominant_factors": "range expansion with volatility-led execution risk",
+        "momentum_factor": "Near VWAP/EMA9; score 98.5.",
+        "liquidity_factor": "Turnover data unavailable.",
+        "quality_factor": "ATR 0.00% and hard-filter status watch.",
         "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
-        "low_vol_factor": "Volatility premium regime"
+        "low_vol_factor": "Low-vol regime"
       },
       "focusTicker": "AIIL",
       "ticker": "AIIL",
+      "dataQuality": "live-derived"
+    },
+    "AEGISVOPAK": {
+      "news_catalysts_card": "Market context for AEGISVOPAK: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For AEGISVOPAK, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. AEGISVOPAK is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "AEGISVOPAK forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.09, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
+      "why_interested": "AEGISVOPAK is in the active terminal universe with LTP \u20b9217.85, +9.40% move, and volume 4204329. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "future_revenue_model": "Forward model for AEGISVOPAK is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for AEGISVOPAK: LTP \u20b9217.85, delta +9.40%, volume 4204329, score 96.2, action BUY.",
+      "ledger_stocks": [
+        {
+          "ticker": "AEGISVOPAK",
+          "name": "AEGISVOPAK",
+          "ltp": "217.85",
+          "delta": "9.40%",
+          "score": 96.2,
+          "action": "BUY",
+          "selection_reason": "",
+          "risk_flag": "",
+          "focus": true
+        }
+      ],
+      "active_scoring_matrix": {
+        "beneish_m_score": "-0.37",
+        "altman_z_score": "3.09",
+        "ocf_ebitda_ratio": "0.70",
+        "mansfield_relative_strength": "0.78"
+      },
+      "active_seven_ic_gates": {
+        "q1_fund_buying": "AEGISVOPAK volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "AEGISVOPAK turnover is 0.0 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "AEGISVOPAK price action is +9.40%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
+        "q5_risk_reward": "AEGISVOPAK risk/reward is driven by score 96.2, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "AEGISVOPAK quantitative milestone: hard-filter watch with score 96.2.",
+        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
+      },
+      "active_risk_calc": {
+        "ticker_score": 96.2,
+        "delta_pct": 9.4,
+        "atr_pct": 0.0,
+        "turnover_cr": 0.0,
+        "volume_multiplier": 0.0,
+        "selection_risk": "lower",
+        "signal_quality": "live-derived",
+        "win_loss_ratio": "5.67:1",
+        "kelly_policy_max": "11.1%",
+        "risk_flag_score": 34.0,
+        "risk_flag": "MODERATE_RISK"
+      },
+      "active_factor_hub": {
+        "selection_reason": "mixed trend around intraday anchors; delta 9.40% with score 96.2; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "dominant_factors": "range expansion with volatility-led execution risk",
+        "momentum_factor": "Near VWAP/EMA9; score 96.2.",
+        "liquidity_factor": "Turnover data unavailable.",
+        "quality_factor": "ATR 0.00% and hard-filter status watch.",
+        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
+        "low_vol_factor": "Low-vol regime"
+      },
+      "focusTicker": "AEGISVOPAK",
+      "ticker": "AEGISVOPAK",
+      "dataQuality": "live-derived"
+    },
+    "ABDL": {
+      "news_catalysts_card": "Market context for ABDL: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For ABDL, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. ABDL is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "ABDL forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.07, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
+      "why_interested": "ABDL is in the active terminal universe with LTP \u20b9644.45, +5.92% move, and volume 2054909. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "future_revenue_model": "Forward model for ABDL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for ABDL: LTP \u20b9644.45, delta +5.92%, volume 2054909, score 94.1, action BUY.",
+      "ledger_stocks": [
+        {
+          "ticker": "ABDL",
+          "name": "ABDL",
+          "ltp": "644.45",
+          "delta": "5.92%",
+          "score": 94.1,
+          "action": "BUY",
+          "selection_reason": "",
+          "risk_flag": "",
+          "focus": true
+        }
+      ],
+      "active_scoring_matrix": {
+        "beneish_m_score": "-0.37",
+        "altman_z_score": "3.07",
+        "ocf_ebitda_ratio": "0.70",
+        "mansfield_relative_strength": "0.78"
+      },
+      "active_seven_ic_gates": {
+        "q1_fund_buying": "ABDL volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "ABDL turnover is 0.0 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "ABDL price action is +5.92%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
+        "q5_risk_reward": "ABDL risk/reward is driven by score 94.1, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "ABDL quantitative milestone: hard-filter watch with score 94.1.",
+        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
+      },
+      "active_risk_calc": {
+        "ticker_score": 94.1,
+        "delta_pct": 5.92,
+        "atr_pct": 0.0,
+        "turnover_cr": 0.0,
+        "volume_multiplier": 0.0,
+        "selection_risk": "lower",
+        "signal_quality": "live-derived",
+        "win_loss_ratio": "5.67:1",
+        "kelly_policy_max": "10.9%",
+        "risk_flag_score": 28.0,
+        "risk_flag": "LOW_RISK"
+      },
+      "active_factor_hub": {
+        "selection_reason": "mixed trend around intraday anchors; delta 5.92% with score 94.1; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "dominant_factors": "range expansion with volatility-led execution risk",
+        "momentum_factor": "Near VWAP/EMA9; score 94.1.",
+        "liquidity_factor": "Turnover data unavailable.",
+        "quality_factor": "ATR 0.00% and hard-filter status watch.",
+        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
+        "low_vol_factor": "Low-vol regime"
+      },
+      "focusTicker": "ABDL",
+      "ticker": "ABDL",
+      "dataQuality": "live-derived"
+    },
+    "ABCAPITAL": {
+      "news_catalysts_card": "Market context for ABCAPITAL: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For ABCAPITAL, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. ABCAPITAL is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "ABCAPITAL forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.08, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
+      "why_interested": "ABCAPITAL is in the active terminal universe with LTP \u20b9358.10, +6.39% move, and volume 3057116. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "future_revenue_model": "Forward model for ABCAPITAL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for ABCAPITAL: LTP \u20b9358.10, delta +6.39%, volume 3057116, score 93.8, action BUY.",
+      "ledger_stocks": [
+        {
+          "ticker": "ABCAPITAL",
+          "name": "ABCAPITAL",
+          "ltp": "358.10",
+          "delta": "6.39%",
+          "score": 93.8,
+          "action": "BUY",
+          "selection_reason": "",
+          "risk_flag": "",
+          "focus": true
+        }
+      ],
+      "active_scoring_matrix": {
+        "beneish_m_score": "-0.37",
+        "altman_z_score": "3.08",
+        "ocf_ebitda_ratio": "0.70",
+        "mansfield_relative_strength": "0.78"
+      },
+      "active_seven_ic_gates": {
+        "q1_fund_buying": "ABCAPITAL volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "ABCAPITAL turnover is 0.0 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "ABCAPITAL price action is +6.39%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
+        "q5_risk_reward": "ABCAPITAL risk/reward is driven by score 93.8, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "ABCAPITAL quantitative milestone: hard-filter watch with score 93.8.",
+        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
+      },
+      "active_risk_calc": {
+        "ticker_score": 93.8,
+        "delta_pct": 6.39,
+        "atr_pct": 0.0,
+        "turnover_cr": 0.0,
+        "volume_multiplier": 0.0,
+        "selection_risk": "lower",
+        "signal_quality": "live-derived",
+        "win_loss_ratio": "5.67:1",
+        "kelly_policy_max": "10.9%",
+        "risk_flag_score": 34.0,
+        "risk_flag": "MODERATE_RISK"
+      },
+      "active_factor_hub": {
+        "selection_reason": "mixed trend around intraday anchors; delta 6.39% with score 93.8; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "dominant_factors": "range expansion with volatility-led execution risk",
+        "momentum_factor": "Near VWAP/EMA9; score 93.8.",
+        "liquidity_factor": "Turnover data unavailable.",
+        "quality_factor": "ATR 0.00% and hard-filter status watch.",
+        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
+        "low_vol_factor": "Low-vol regime"
+      },
+      "focusTicker": "ABCAPITAL",
+      "ticker": "ABCAPITAL",
+      "dataQuality": "live-derived"
+    },
+    "AAVAS": {
+      "news_catalysts_card": "Market context for AAVAS: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For AAVAS, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. AAVAS is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "AAVAS forensic screen: Beneish M Score: -0.40, Altman Z Score: 2.90, Ocf Ebitda Ratio: 0.68, Mansfield Relative Strength: 0.76.",
+      "why_interested": "AAVAS is in the active terminal universe with LTP \u20b91,405.70, +5.83% move, and volume 840069. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "future_revenue_model": "Forward model for AAVAS is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for AAVAS: LTP \u20b91,405.70, delta +5.83%, volume 840069, score 92.5, action BUY.",
+      "ledger_stocks": [
+        {
+          "ticker": "AAVAS",
+          "name": "AAVAS",
+          "ltp": "1,405.70",
+          "delta": "5.83%",
+          "score": 92.5,
+          "action": "BUY",
+          "selection_reason": "",
+          "risk_flag": "",
+          "focus": true
+        }
+      ],
+      "active_scoring_matrix": {
+        "beneish_m_score": "-0.40",
+        "altman_z_score": "2.90",
+        "ocf_ebitda_ratio": "0.68",
+        "mansfield_relative_strength": "0.76"
+      },
+      "active_seven_ic_gates": {
+        "q1_fund_buying": "AAVAS volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "AAVAS turnover is 0.0 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "AAVAS price action is +5.83%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
+        "q5_risk_reward": "AAVAS risk/reward is driven by score 92.5, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "AAVAS quantitative milestone: hard-filter watch with score 92.5.",
+        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
+      },
+      "active_risk_calc": {
+        "ticker_score": 92.5,
+        "delta_pct": 5.83,
+        "atr_pct": 0.0,
+        "turnover_cr": 0.0,
+        "volume_multiplier": 0.0,
+        "selection_risk": "lower",
+        "signal_quality": "live-derived",
+        "win_loss_ratio": "5.67:1",
+        "kelly_policy_max": "10.7%",
+        "risk_flag_score": 28.0,
+        "risk_flag": "LOW_RISK"
+      },
+      "active_factor_hub": {
+        "selection_reason": "mixed trend around intraday anchors; delta 5.83% with score 92.5; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "dominant_factors": "range expansion with volatility-led execution risk",
+        "momentum_factor": "Near VWAP/EMA9; score 92.5.",
+        "liquidity_factor": "Turnover data unavailable.",
+        "quality_factor": "ATR 0.00% and hard-filter status watch.",
+        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
+        "low_vol_factor": "Low-vol regime"
+      },
+      "focusTicker": "AAVAS",
+      "ticker": "AAVAS",
       "dataQuality": "live-derived"
     },
     "AADHARHFC": {
@@ -5117,16 +5070,17 @@
       "forensic_screen_card": "AADHARHFC forensic screen: Beneish M Score: -0.41, Altman Z Score: 2.85, Ocf Ebitda Ratio: 0.67, Mansfield Relative Strength: 0.76.",
       "why_interested": "AADHARHFC is in the active terminal universe with LTP \u20b9473.65, +4.55% move, and volume 542229. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
       "future_revenue_model": "Forward model for AADHARHFC is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for AADHARHFC: LTP \u20b9473.65, delta +4.55%, volume 542229, score 79.8, action BUY.",
+      "current_model": "Current model for AADHARHFC: LTP \u20b9473.65, delta +4.55%, volume 542229, score 91.2, action BUY.",
       "ledger_stocks": [
         {
           "ticker": "AADHARHFC",
-          "name": "Aadhar Housing Finance Ltd",
+          "name": "AADHARHFC",
           "ltp": "473.65",
           "delta": "4.55%",
-          "score": 79.8,
+          "score": 91.2,
           "action": "BUY",
           "selection_reason": "",
+          "risk_flag": "",
           "focus": true
         }
       ],
@@ -5141,12 +5095,12 @@
         "q2_liquidity_delivery": "AADHARHFC turnover is 0.0 Cr; liquidity quality is watch-list level.",
         "q3_catalyst_validation": "AADHARHFC price action is +4.55%; catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "AADHARHFC risk/reward is driven by score 79.8, ATR 0.0%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "AADHARHFC quantitative milestone: hard-filter watch with score 79.8.",
+        "q5_risk_reward": "AADHARHFC risk/reward is driven by score 91.2, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "AADHARHFC quantitative milestone: hard-filter watch with score 91.2.",
         "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
       },
       "active_risk_calc": {
-        "ticker_score": 79.8,
+        "ticker_score": 91.2,
         "delta_pct": 4.55,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
@@ -5154,14 +5108,14 @@
         "selection_risk": "lower",
         "signal_quality": "live-derived",
         "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "9.8%",
+        "kelly_policy_max": "10.6%",
         "risk_flag_score": 28.0,
         "risk_flag": "LOW_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta 4.55% with score 79.8; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta 4.55% with score 91.2; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
-        "momentum_factor": "Near VWAP/EMA9; score 79.8.",
+        "momentum_factor": "Near VWAP/EMA9; score 91.2.",
         "liquidity_factor": "Turnover data unavailable.",
         "quality_factor": "ATR 0.00% and hard-filter status watch.",
         "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
@@ -5178,16 +5132,17 @@
       "forensic_screen_card": "ACE forensic screen: Beneish M Score: -0.40, Altman Z Score: 2.87, Ocf Ebitda Ratio: 0.67, Mansfield Relative Strength: 0.76.",
       "why_interested": "ACE is in the active terminal universe with LTP \u20b9931.05, +4.38% move, and volume 691582. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
       "future_revenue_model": "Forward model for ACE is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for ACE: LTP \u20b9931.05, delta +4.38%, volume 691582, score 78.5, action BUY.",
+      "current_model": "Current model for ACE: LTP \u20b9931.05, delta +4.38%, volume 691582, score 89.7, action BUY.",
       "ledger_stocks": [
         {
           "ticker": "ACE",
-          "name": "Action Construction Equipment Ltd",
+          "name": "ACE",
           "ltp": "931.05",
           "delta": "4.38%",
-          "score": 78.5,
+          "score": 89.7,
           "action": "BUY",
           "selection_reason": "",
+          "risk_flag": "",
           "focus": true
         }
       ],
@@ -5202,12 +5157,12 @@
         "q2_liquidity_delivery": "ACE turnover is 0.0 Cr; liquidity quality is watch-list level.",
         "q3_catalyst_validation": "ACE price action is +4.38%; catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "ACE risk/reward is driven by score 78.5, ATR 0.0%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "ACE quantitative milestone: hard-filter watch with score 78.5.",
+        "q5_risk_reward": "ACE risk/reward is driven by score 89.7, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "ACE quantitative milestone: hard-filter watch with score 89.7.",
         "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
       },
       "active_risk_calc": {
-        "ticker_score": 78.5,
+        "ticker_score": 89.7,
         "delta_pct": 4.38,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
@@ -5215,14 +5170,14 @@
         "selection_risk": "lower",
         "signal_quality": "live-derived",
         "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "9.7%",
+        "kelly_policy_max": "10.4%",
         "risk_flag_score": 28.0,
         "risk_flag": "LOW_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta 4.38% with score 78.5; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta 4.38% with score 89.7; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
-        "momentum_factor": "Near VWAP/EMA9; score 78.5.",
+        "momentum_factor": "Near VWAP/EMA9; score 89.7.",
         "liquidity_factor": "Turnover data unavailable.",
         "quality_factor": "ATR 0.00% and hard-filter status watch.",
         "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
@@ -5239,16 +5194,17 @@
       "forensic_screen_card": "ADANIPOWER forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
       "why_interested": "ADANIPOWER is in the active terminal universe with LTP \u20b9223.07, +3.51% move, and volume 27825184. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
       "future_revenue_model": "Forward model for ADANIPOWER is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for ADANIPOWER: LTP \u20b9223.07, delta +3.51%, volume 27825184, score 77.2, action BUY.",
+      "current_model": "Current model for ADANIPOWER: LTP \u20b9223.07, delta +3.51%, volume 27825184, score 88.4, action BUY.",
       "ledger_stocks": [
         {
           "ticker": "ADANIPOWER",
-          "name": "Adani Power Ltd",
+          "name": "ADANIPOWER",
           "ltp": "223.07",
           "delta": "3.51%",
-          "score": 77.2,
+          "score": 88.4,
           "action": "BUY",
           "selection_reason": "",
+          "risk_flag": "",
           "focus": true
         }
       ],
@@ -5263,12 +5219,12 @@
         "q2_liquidity_delivery": "ADANIPOWER turnover is 0.0 Cr; liquidity quality is watch-list level.",
         "q3_catalyst_validation": "ADANIPOWER price action is +3.51%; catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "ADANIPOWER risk/reward is driven by score 77.2, ATR 0.0%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "ADANIPOWER quantitative milestone: hard-filter watch with score 77.2.",
+        "q5_risk_reward": "ADANIPOWER risk/reward is driven by score 88.4, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "ADANIPOWER quantitative milestone: hard-filter watch with score 88.4.",
         "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
       },
       "active_risk_calc": {
-        "ticker_score": 77.2,
+        "ticker_score": 88.4,
         "delta_pct": 3.51,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
@@ -5276,14 +5232,14 @@
         "selection_risk": "lower",
         "signal_quality": "live-derived",
         "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "9.5%",
+        "kelly_policy_max": "10.2%",
         "risk_flag_score": 28.0,
         "risk_flag": "LOW_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta 3.51% with score 77.2; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta 3.51% with score 88.4; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
-        "momentum_factor": "Near VWAP/EMA9; score 77.2.",
+        "momentum_factor": "Near VWAP/EMA9; score 88.4.",
         "liquidity_factor": "Turnover data unavailable.",
         "quality_factor": "ATR 0.00% and hard-filter status watch.",
         "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
@@ -5293,6 +5249,68 @@
       "ticker": "ADANIPOWER",
       "dataQuality": "live-derived"
     },
+    "ABLBL": {
+      "news_catalysts_card": "Market context for ABLBL: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For ABLBL, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. ABLBL is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "ABLBL forensic screen: Beneish M Score: -0.41, Altman Z Score: 2.82, Ocf Ebitda Ratio: 0.67, Mansfield Relative Strength: 0.76.",
+      "why_interested": "ABLBL is in the active terminal universe with LTP \u20b998.34, +3.10% move, and volume 354629. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "future_revenue_model": "Forward model for ABLBL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for ABLBL: LTP \u20b998.34, delta +3.10%, volume 354629, score 87.1, action BUY.",
+      "ledger_stocks": [
+        {
+          "ticker": "ABLBL",
+          "name": "ABLBL",
+          "ltp": "98.34",
+          "delta": "3.10%",
+          "score": 87.1,
+          "action": "BUY",
+          "selection_reason": "",
+          "risk_flag": "",
+          "focus": true
+        }
+      ],
+      "active_scoring_matrix": {
+        "beneish_m_score": "-0.41",
+        "altman_z_score": "2.82",
+        "ocf_ebitda_ratio": "0.67",
+        "mansfield_relative_strength": "0.76"
+      },
+      "active_seven_ic_gates": {
+        "q1_fund_buying": "ABLBL volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "ABLBL turnover is 0.0 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "ABLBL price action is +3.10%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
+        "q5_risk_reward": "ABLBL risk/reward is driven by score 87.1, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "ABLBL quantitative milestone: hard-filter watch with score 87.1.",
+        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
+      },
+      "active_risk_calc": {
+        "ticker_score": 87.1,
+        "delta_pct": 3.1,
+        "atr_pct": 0.0,
+        "turnover_cr": 0.0,
+        "volume_multiplier": 0.0,
+        "selection_risk": "lower",
+        "signal_quality": "live-derived",
+        "win_loss_ratio": "5.67:1",
+        "kelly_policy_max": "10.1%",
+        "risk_flag_score": 28.0,
+        "risk_flag": "LOW_RISK"
+      },
+      "active_factor_hub": {
+        "selection_reason": "mixed trend around intraday anchors; delta 3.10% with score 87.1; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "dominant_factors": "liquidity and mean-reversion around intraday anchors",
+        "momentum_factor": "Near VWAP/EMA9; score 87.1.",
+        "liquidity_factor": "Turnover data unavailable.",
+        "quality_factor": "ATR 0.00% and hard-filter status watch.",
+        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
+        "low_vol_factor": "Low-vol regime"
+      },
+      "focusTicker": "ABLBL",
+      "ticker": "ABLBL",
+      "dataQuality": "live-derived"
+    },
     "360ONE": {
       "news_catalysts_card": "Market context for 360ONE: Top market catalysts were not available from the current news feed.",
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For 360ONE, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
@@ -5300,16 +5318,17 @@
       "forensic_screen_card": "360ONE forensic screen: Beneish M Score: -0.40, Altman Z Score: 2.87, Ocf Ebitda Ratio: 0.67, Mansfield Relative Strength: 0.76.",
       "why_interested": "360ONE is in the active terminal universe with LTP \u20b91,096.80, +3.07% move, and volume 696601. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
       "future_revenue_model": "Forward model for 360ONE is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for 360ONE: LTP \u20b91,096.80, delta +3.07%, volume 696601, score 76.9, action BUY.",
+      "current_model": "Current model for 360ONE: LTP \u20b91,096.80, delta +3.07%, volume 696601, score 86.5, action BUY.",
       "ledger_stocks": [
         {
           "ticker": "360ONE",
-          "name": "360 ONE WAM Ltd",
-          "ltp": "1096.80",
+          "name": "360ONE",
+          "ltp": "1,096.80",
           "delta": "3.07%",
-          "score": 76.9,
+          "score": 86.5,
           "action": "BUY",
           "selection_reason": "",
+          "risk_flag": "",
           "focus": true
         }
       ],
@@ -5324,12 +5343,12 @@
         "q2_liquidity_delivery": "360ONE turnover is 0.0 Cr; liquidity quality is watch-list level.",
         "q3_catalyst_validation": "360ONE price action is +3.07%; catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "360ONE risk/reward is driven by score 76.9, ATR 0.0%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "360ONE quantitative milestone: hard-filter watch with score 76.9.",
+        "q5_risk_reward": "360ONE risk/reward is driven by score 86.5, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "360ONE quantitative milestone: hard-filter watch with score 86.5.",
         "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
       },
       "active_risk_calc": {
-        "ticker_score": 76.9,
+        "ticker_score": 86.5,
         "delta_pct": 3.07,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
@@ -5337,14 +5356,14 @@
         "selection_risk": "lower",
         "signal_quality": "live-derived",
         "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "9.5%",
+        "kelly_policy_max": "10.0%",
         "risk_flag_score": 28.0,
         "risk_flag": "LOW_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta 3.07% with score 76.9; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta 3.07% with score 86.5; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
-        "momentum_factor": "Near VWAP/EMA9; score 76.9.",
+        "momentum_factor": "Near VWAP/EMA9; score 86.5.",
         "liquidity_factor": "Turnover data unavailable.",
         "quality_factor": "ATR 0.00% and hard-filter status watch.",
         "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
@@ -5361,16 +5380,17 @@
       "forensic_screen_card": "ABSLAMC forensic screen: Beneish M Score: -0.40, Altman Z Score: 2.88, Ocf Ebitda Ratio: 0.68, Mansfield Relative Strength: 0.76.",
       "why_interested": "ABSLAMC is in the active terminal universe with LTP \u20b91,101.20, +3.05% move, and volume 801088. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
       "future_revenue_model": "Forward model for ABSLAMC is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for ABSLAMC: LTP \u20b91,101.20, delta +3.05%, volume 801088, score 75.4, action BUY.",
+      "current_model": "Current model for ABSLAMC: LTP \u20b91,101.20, delta +3.05%, volume 801088, score 85.9, action BUY.",
       "ledger_stocks": [
         {
           "ticker": "ABSLAMC",
-          "name": "Aditya Birla Sun Life AMC Ltd",
-          "ltp": "1101.20",
+          "name": "ABSLAMC",
+          "ltp": "1,101.20",
           "delta": "3.05%",
-          "score": 75.4,
+          "score": 85.9,
           "action": "BUY",
           "selection_reason": "",
+          "risk_flag": "",
           "focus": true
         }
       ],
@@ -5385,12 +5405,12 @@
         "q2_liquidity_delivery": "ABSLAMC turnover is 0.0 Cr; liquidity quality is watch-list level.",
         "q3_catalyst_validation": "ABSLAMC price action is +3.05%; catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "ABSLAMC risk/reward is driven by score 75.4, ATR 0.0%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "ABSLAMC quantitative milestone: hard-filter watch with score 75.4.",
+        "q5_risk_reward": "ABSLAMC risk/reward is driven by score 85.9, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "ABSLAMC quantitative milestone: hard-filter watch with score 85.9.",
         "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
       },
       "active_risk_calc": {
-        "ticker_score": 75.4,
+        "ticker_score": 85.9,
         "delta_pct": 3.05,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
@@ -5398,14 +5418,14 @@
         "selection_risk": "lower",
         "signal_quality": "live-derived",
         "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "9.3%",
+        "kelly_policy_max": "9.9%",
         "risk_flag_score": 28.0,
         "risk_flag": "LOW_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta 3.05% with score 75.4; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta 3.05% with score 85.9; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
-        "momentum_factor": "Near VWAP/EMA9; score 75.4.",
+        "momentum_factor": "Near VWAP/EMA9; score 85.9.",
         "liquidity_factor": "Turnover data unavailable.",
         "quality_factor": "ATR 0.00% and hard-filter status watch.",
         "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
@@ -5415,84 +5435,148 @@
       "ticker": "ABSLAMC",
       "dataQuality": "live-derived"
     },
-    "ASHOKLEY": {
-      "news_catalysts_card": "Market context for ASHOKLEY: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For ASHOKLEY, participation is read through volume multiplier 1.79x and turnover 855.01 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. ASHOKLEY is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "ASHOKLEY forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.09, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "ASHOKLEY is in the active terminal universe with LTP \u20b9152.45, +10.01% move, and volume 69272916. High-volume liquid continuation candidate Intraday setup: VWAP Bounce, VWAP 144.61, EMA9 144.96, ATR 3.94%, volume multiplier 1.79x.",
-      "future_revenue_model": "Forward model for ASHOKLEY is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for ASHOKLEY: LTP \u20b9152.45, delta +10.01%, volume 69272916, score 74.0, action WATCH.",
+    "AARTIIND": {
+      "news_catalysts_card": "Market context for AARTIIND: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For AARTIIND, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. AARTIIND is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "AARTIIND forensic screen: Beneish M Score: -0.41, Altman Z Score: 2.84, Ocf Ebitda Ratio: 0.67, Mansfield Relative Strength: 0.76.",
+      "why_interested": "AARTIIND is in the active terminal universe with LTP \u20b9440.60, +2.98% move, and volume 492977. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "future_revenue_model": "Forward model for AARTIIND is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for AARTIIND: LTP \u20b9440.60, delta +2.98%, volume 492977, score 84.2, action BUY.",
       "ledger_stocks": [
         {
-          "ticker": "ASHOKLEY",
-          "name": "ASHOKLEY",
-          "ltp": "\u20b9152.45",
-          "delta": "+10.01%",
-          "score": 74.0,
-          "action": "WATCH",
-          "selection_reason": "High-volume liquid continuation candidate",
+          "ticker": "AARTIIND",
+          "name": "AARTIIND",
+          "ltp": "440.60",
+          "delta": "2.98%",
+          "score": 84.2,
+          "action": "BUY",
+          "selection_reason": "",
+          "risk_flag": "",
           "focus": true
         }
       ],
       "active_scoring_matrix": {
-        "beneish_m_score": "-0.37",
-        "altman_z_score": "3.09",
-        "ocf_ebitda_ratio": "0.70",
-        "mansfield_relative_strength": "0.78"
+        "beneish_m_score": "-0.41",
+        "altman_z_score": "2.84",
+        "ocf_ebitda_ratio": "0.67",
+        "mansfield_relative_strength": "0.76"
       },
       "active_seven_ic_gates": {
-        "q1_fund_buying": "ASHOKLEY volume multiplier is 1.79x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "ASHOKLEY turnover is 855.01 Cr; liquidity quality is institutional level.",
-        "q3_catalyst_validation": "ASHOKLEY price action is +10.01%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q1_fund_buying": "AARTIIND volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "AARTIIND turnover is 0.0 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "AARTIIND price action is +2.98%; catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "ASHOKLEY risk/reward is driven by score 74.0, ATR 3.94%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "ASHOKLEY quantitative milestone: hard-filter watch with score 74.0.",
+        "q5_risk_reward": "AARTIIND risk/reward is driven by score 84.2, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "AARTIIND quantitative milestone: hard-filter watch with score 84.2.",
         "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
       },
       "active_risk_calc": {
-        "ticker_score": 74.0,
-        "delta_pct": 10.01,
-        "atr_pct": 3.94,
-        "turnover_cr": 855.01,
-        "volume_multiplier": 1.79,
+        "ticker_score": 84.2,
+        "delta_pct": 2.98,
+        "atr_pct": 0.0,
+        "turnover_cr": 0.0,
+        "volume_multiplier": 0.0,
         "selection_risk": "lower",
         "signal_quality": "live-derived",
         "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "N/A",
-        "risk_flag_score": 48.0,
-        "risk_flag": "MODERATE_RISK"
+        "kelly_policy_max": "9.7%",
+        "risk_flag_score": 22.0,
+        "risk_flag": "LOW_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "trend follow-through above VWAP and EMA9; delta 10.01% with score 74.0; volume 1.79x and turnover 855.01 Cr; elevated volatility; trigger VWAP Bounce; watch-list hard-filter state.",
-        "dominant_factors": "momentum, liquidity, and structural trend alignment",
-        "momentum_factor": "Above VWAP/EMA9; score 74.0.",
-        "liquidity_factor": "Volume multiplier 1.79x; turnover 855.01 Cr.",
-        "quality_factor": "ATR 3.94% and hard-filter status watch.",
+        "selection_reason": "mixed trend around intraday anchors; delta 2.98% with score 84.2; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "dominant_factors": "liquidity and mean-reversion around intraday anchors",
+        "momentum_factor": "Near VWAP/EMA9; score 84.2.",
+        "liquidity_factor": "Turnover data unavailable.",
+        "quality_factor": "ATR 0.00% and hard-filter status watch.",
         "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
-        "low_vol_factor": "Volatility premium regime"
+        "low_vol_factor": "Low-vol regime"
       },
-      "focusTicker": "ASHOKLEY",
-      "ticker": "ASHOKLEY",
+      "focusTicker": "AARTIIND",
+      "ticker": "AARTIIND",
       "dataQuality": "live-derived"
     },
-    "BANKBARODA": {
-      "news_catalysts_card": "Market context for BANKBARODA: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For BANKBARODA, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. BANKBARODA is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "BANKBARODA forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "BANKBARODA is in the active terminal universe with LTP \u20b9274.75, +2.67% move, and volume 27384601. High-volume liquid continuation candidate Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
-      "future_revenue_model": "Forward model for BANKBARODA is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for BANKBARODA: LTP \u20b9274.75, delta +2.67%, volume 27384601, score 73.2, action WATCH.",
+    "AFCONS": {
+      "news_catalysts_card": "Market context for AFCONS: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For AFCONS, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. AFCONS is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "AFCONS forensic screen: Beneish M Score: -0.40, Altman Z Score: 2.87, Ocf Ebitda Ratio: 0.67, Mansfield Relative Strength: 0.76.",
+      "why_interested": "AFCONS is in the active terminal universe with LTP \u20b9326.00, +2.92% move, and volume 735015. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "future_revenue_model": "Forward model for AFCONS is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for AFCONS: LTP \u20b9326.00, delta +2.92%, volume 735015, score 83.5, action BUY.",
       "ledger_stocks": [
         {
-          "ticker": "BANKBARODA",
-          "name": "BANKBARODA",
-          "ltp": "\u20b9274.75",
-          "delta": "+2.67%",
-          "score": 73.2,
-          "action": "WATCH",
-          "selection_reason": "High-volume liquid continuation candidate",
+          "ticker": "AFCONS",
+          "name": "AFCONS",
+          "ltp": "326.00",
+          "delta": "2.92%",
+          "score": 83.5,
+          "action": "BUY",
+          "selection_reason": "",
+          "risk_flag": "",
+          "focus": true
+        }
+      ],
+      "active_scoring_matrix": {
+        "beneish_m_score": "-0.40",
+        "altman_z_score": "2.87",
+        "ocf_ebitda_ratio": "0.67",
+        "mansfield_relative_strength": "0.76"
+      },
+      "active_seven_ic_gates": {
+        "q1_fund_buying": "AFCONS volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "AFCONS turnover is 0.0 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "AFCONS price action is +2.92%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
+        "q5_risk_reward": "AFCONS risk/reward is driven by score 83.5, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "AFCONS quantitative milestone: hard-filter watch with score 83.5.",
+        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
+      },
+      "active_risk_calc": {
+        "ticker_score": 83.5,
+        "delta_pct": 2.92,
+        "atr_pct": 0.0,
+        "turnover_cr": 0.0,
+        "volume_multiplier": 0.0,
+        "selection_risk": "lower",
+        "signal_quality": "live-derived",
+        "win_loss_ratio": "5.67:1",
+        "kelly_policy_max": "9.7%",
+        "risk_flag_score": 22.0,
+        "risk_flag": "LOW_RISK"
+      },
+      "active_factor_hub": {
+        "selection_reason": "mixed trend around intraday anchors; delta 2.92% with score 83.5; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "dominant_factors": "liquidity and mean-reversion around intraday anchors",
+        "momentum_factor": "Near VWAP/EMA9; score 83.5.",
+        "liquidity_factor": "Turnover data unavailable.",
+        "quality_factor": "ATR 0.00% and hard-filter status watch.",
+        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
+        "low_vol_factor": "Low-vol regime"
+      },
+      "focusTicker": "AFCONS",
+      "ticker": "AFCONS",
+      "dataQuality": "live-derived"
+    },
+    "ABFRL": {
+      "news_catalysts_card": "Market context for ABFRL: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For ABFRL, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. ABFRL is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "ABFRL forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
+      "why_interested": "ABFRL is in the active terminal universe with LTP \u20b959.90, +2.85% move, and volume 1991720. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "future_revenue_model": "Forward model for ABFRL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for ABFRL: LTP \u20b959.90, delta +2.85%, volume 1991720, score 82.1, action BUY.",
+      "ledger_stocks": [
+        {
+          "ticker": "ABFRL",
+          "name": "ABFRL",
+          "ltp": "59.90",
+          "delta": "2.85%",
+          "score": 82.1,
+          "action": "BUY",
+          "selection_reason": "",
+          "risk_flag": "",
           "focus": true
         }
       ],
@@ -5503,57 +5587,120 @@
         "mansfield_relative_strength": "0.78"
       },
       "active_seven_ic_gates": {
-        "q1_fund_buying": "BANKBARODA volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "BANKBARODA turnover is 0.0 Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "BANKBARODA price action is +2.67%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q1_fund_buying": "ABFRL volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "ABFRL turnover is 0.0 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "ABFRL price action is +2.85%; catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "BANKBARODA risk/reward is driven by score 73.2, ATR 0.0%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "BANKBARODA quantitative milestone: hard-filter watch with score 73.2.",
+        "q5_risk_reward": "ABFRL risk/reward is driven by score 82.1, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "ABFRL quantitative milestone: hard-filter watch with score 82.1.",
         "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
       },
       "active_risk_calc": {
-        "ticker_score": 73.2,
-        "delta_pct": 2.67,
+        "ticker_score": 82.1,
+        "delta_pct": 2.85,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
         "volume_multiplier": 0.0,
         "selection_risk": "lower",
         "signal_quality": "live-derived",
         "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "N/A",
-        "risk_flag_score": 34.0,
-        "risk_flag": "MODERATE_RISK"
+        "kelly_policy_max": "9.5%",
+        "risk_flag_score": 22.0,
+        "risk_flag": "LOW_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta 2.67% with score 73.2; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta 2.85% with score 82.1; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
-        "momentum_factor": "Near VWAP/EMA9; score 73.2.",
+        "momentum_factor": "Near VWAP/EMA9; score 82.1.",
         "liquidity_factor": "Turnover data unavailable.",
         "quality_factor": "ATR 0.00% and hard-filter status watch.",
         "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
         "low_vol_factor": "Low-vol regime"
       },
-      "focusTicker": "BANKBARODA",
-      "ticker": "BANKBARODA",
+      "focusTicker": "ABFRL",
+      "ticker": "ABFRL",
       "dataQuality": "live-derived"
     },
-    "CANBK": {
-      "news_catalysts_card": "Market context for CANBK: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For CANBK, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. CANBK is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "CANBK forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.05, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "CANBK is in the active terminal universe with LTP \u20b9131.67, +0.11% move, and volume 25287693. High-volume liquid continuation candidate Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
-      "future_revenue_model": "Forward model for CANBK is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for CANBK: LTP \u20b9131.67, delta +0.11%, volume 25287693, score 72.4, action WATCH.",
+    "ACC": {
+      "news_catalysts_card": "Market context for ACC: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For ACC, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. ACC is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "ACC forensic screen: Beneish M Score: -0.41, Altman Z Score: 2.79, Ocf Ebitda Ratio: 0.66, Mansfield Relative Strength: 0.75.",
+      "why_interested": "ACC is in the active terminal universe with LTP \u20b91,336.60, +2.52% move, and volume 206123. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "future_revenue_model": "Forward model for ACC is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for ACC: LTP \u20b91,336.60, delta +2.52%, volume 206123, score 81.4, action BUY.",
       "ledger_stocks": [
         {
-          "ticker": "CANBK",
-          "name": "CANBK",
-          "ltp": "\u20b9131.67",
-          "delta": "+0.11%",
-          "score": 72.4,
-          "action": "WATCH",
-          "selection_reason": "High-volume liquid continuation candidate",
+          "ticker": "ACC",
+          "name": "ACC",
+          "ltp": "1,336.60",
+          "delta": "2.52%",
+          "score": 81.4,
+          "action": "BUY",
+          "selection_reason": "",
+          "risk_flag": "",
+          "focus": true
+        }
+      ],
+      "active_scoring_matrix": {
+        "beneish_m_score": "-0.41",
+        "altman_z_score": "2.79",
+        "ocf_ebitda_ratio": "0.66",
+        "mansfield_relative_strength": "0.75"
+      },
+      "active_seven_ic_gates": {
+        "q1_fund_buying": "ACC volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "ACC turnover is 0.0 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "ACC price action is +2.52%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
+        "q5_risk_reward": "ACC risk/reward is driven by score 81.4, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "ACC quantitative milestone: hard-filter watch with score 81.4.",
+        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
+      },
+      "active_risk_calc": {
+        "ticker_score": 81.4,
+        "delta_pct": 2.52,
+        "atr_pct": 0.0,
+        "turnover_cr": 0.0,
+        "volume_multiplier": 0.0,
+        "selection_risk": "lower",
+        "signal_quality": "live-derived",
+        "win_loss_ratio": "5.67:1",
+        "kelly_policy_max": "9.4%",
+        "risk_flag_score": 22.0,
+        "risk_flag": "LOW_RISK"
+      },
+      "active_factor_hub": {
+        "selection_reason": "mixed trend around intraday anchors; delta 2.52% with score 81.4; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "dominant_factors": "liquidity and mean-reversion around intraday anchors",
+        "momentum_factor": "Near VWAP/EMA9; score 81.4.",
+        "liquidity_factor": "Turnover data unavailable.",
+        "quality_factor": "ATR 0.00% and hard-filter status watch.",
+        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
+        "low_vol_factor": "Low-vol regime"
+      },
+      "focusTicker": "ACC",
+      "ticker": "ACC",
+      "dataQuality": "live-derived"
+    },
+    "ADANIGREEN": {
+      "news_catalysts_card": "Market context for ADANIGREEN: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For ADANIGREEN, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. ADANIGREEN is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "ADANIGREEN forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.05, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
+      "why_interested": "ADANIGREEN is in the active terminal universe with LTP \u20b91,485.70, +2.15% move, and volume 1975815. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "future_revenue_model": "Forward model for ADANIGREEN is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for ADANIGREEN: LTP \u20b91,485.70, delta +2.15%, volume 1975815, score 80.8, action BUY.",
+      "ledger_stocks": [
+        {
+          "ticker": "ADANIGREEN",
+          "name": "ADANIGREEN",
+          "ltp": "1,485.70",
+          "delta": "2.15%",
+          "score": 80.8,
+          "action": "BUY",
+          "selection_reason": "",
+          "risk_flag": "",
           "focus": true
         }
       ],
@@ -5564,38 +5711,38 @@
         "mansfield_relative_strength": "0.78"
       },
       "active_seven_ic_gates": {
-        "q1_fund_buying": "CANBK volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "CANBK turnover is 0.0 Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "CANBK price action is +0.11%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q1_fund_buying": "ADANIGREEN volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "ADANIGREEN turnover is 0.0 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "ADANIGREEN price action is +2.15%; catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "CANBK risk/reward is driven by score 72.4, ATR 0.0%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "CANBK quantitative milestone: hard-filter watch with score 72.4.",
+        "q5_risk_reward": "ADANIGREEN risk/reward is driven by score 80.8, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "ADANIGREEN quantitative milestone: hard-filter watch with score 80.8.",
         "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
       },
       "active_risk_calc": {
-        "ticker_score": 72.4,
-        "delta_pct": 0.11,
+        "ticker_score": 80.8,
+        "delta_pct": 2.15,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
         "volume_multiplier": 0.0,
         "selection_risk": "lower",
         "signal_quality": "live-derived",
         "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "N/A",
-        "risk_flag_score": 32.0,
-        "risk_flag": "MODERATE_RISK"
+        "kelly_policy_max": "9.4%",
+        "risk_flag_score": 22.0,
+        "risk_flag": "LOW_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta 0.11% with score 72.4; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta 2.15% with score 80.8; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
-        "momentum_factor": "Near VWAP/EMA9; score 72.4.",
+        "momentum_factor": "Near VWAP/EMA9; score 80.8.",
         "liquidity_factor": "Turnover data unavailable.",
         "quality_factor": "ATR 0.00% and hard-filter status watch.",
         "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
         "low_vol_factor": "Low-vol regime"
       },
-      "focusTicker": "CANBK",
-      "ticker": "CANBK",
+      "focusTicker": "ADANIGREEN",
+      "ticker": "ADANIGREEN",
       "dataQuality": "live-derived"
     },
     "AEGISLOG": {
@@ -5603,18 +5750,19 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For AEGISLOG, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. AEGISLOG is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "AEGISLOG forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "AEGISLOG is in the active terminal universe with LTP \u20b9944.40, +2.00% move, and volume 24360713. High-volume liquid continuation candidate Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "why_interested": "AEGISLOG is in the active terminal universe with LTP \u20b9944.40, +2.00% move, and volume 24360713. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
       "future_revenue_model": "Forward model for AEGISLOG is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for AEGISLOG: LTP \u20b9944.40, delta +2.00%, volume 24360713, score 71.6, action WATCH.",
+      "current_model": "Current model for AEGISLOG: LTP \u20b9944.40, delta +2.00%, volume 24360713, score 79.5, action BUY.",
       "ledger_stocks": [
         {
           "ticker": "AEGISLOG",
           "name": "AEGISLOG",
-          "ltp": "\u20b9944.40",
-          "delta": "+2.00%",
-          "score": 71.6,
-          "action": "WATCH",
-          "selection_reason": "High-volume liquid continuation candidate",
+          "ltp": "944.40",
+          "delta": "2.00%",
+          "score": 79.5,
+          "action": "BUY",
+          "selection_reason": "",
+          "risk_flag": "",
           "focus": true
         }
       ],
@@ -5629,12 +5777,12 @@
         "q2_liquidity_delivery": "AEGISLOG turnover is 0.0 Cr; liquidity quality is watch-list level.",
         "q3_catalyst_validation": "AEGISLOG price action is +2.00%; catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "AEGISLOG risk/reward is driven by score 71.6, ATR 0.0%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "AEGISLOG quantitative milestone: hard-filter watch with score 71.6.",
+        "q5_risk_reward": "AEGISLOG risk/reward is driven by score 79.5, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "AEGISLOG quantitative milestone: hard-filter watch with score 79.5.",
         "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
       },
       "active_risk_calc": {
-        "ticker_score": 71.6,
+        "ticker_score": 79.5,
         "delta_pct": 2.0,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
@@ -5642,14 +5790,14 @@
         "selection_risk": "lower",
         "signal_quality": "live-derived",
         "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "N/A",
-        "risk_flag_score": 34.0,
-        "risk_flag": "MODERATE_RISK"
+        "kelly_policy_max": "9.2%",
+        "risk_flag_score": 22.0,
+        "risk_flag": "LOW_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta 2.00% with score 71.6; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta 2.00% with score 79.5; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
-        "momentum_factor": "Near VWAP/EMA9; score 71.6.",
+        "momentum_factor": "Near VWAP/EMA9; score 79.5.",
         "liquidity_factor": "Turnover data unavailable.",
         "quality_factor": "ATR 0.00% and hard-filter status watch.",
         "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
@@ -5659,267 +5807,148 @@
       "ticker": "AEGISLOG",
       "dataQuality": "live-derived"
     },
-    "BAJFINANCE": {
-      "news_catalysts_card": "Market context for BAJFINANCE: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For BAJFINANCE, participation is read through volume multiplier 0.39x and turnover 371.85 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. BAJFINANCE is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "BAJFINANCE forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.07, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "BAJFINANCE is in the active terminal universe with LTP \u20b9918.30, +5.49% move, and volume 11729668. BAJFINANCE shows strong momentum with a 5.49% price increase, trading above both VWAP and EMA9, supported by a significant turnover of \u20b9371.85 Cr and a confirmed VWAP bounce signal. Intraday setup: VWAP Bounce, VWAP 893.54, EMA9 901.21, ATR 2.76%, volume multiplier 0.39x.",
-      "future_revenue_model": "Forward model for BAJFINANCE is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for BAJFINANCE: LTP \u20b9918.30, delta +5.49%, volume 11729668, score 70.8, action WATCH.",
+    "ADANIENSOL": {
+      "news_catalysts_card": "Market context for ADANIENSOL: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For ADANIENSOL, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. ADANIENSOL is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "ADANIENSOL forensic screen: Beneish M Score: -0.38, Altman Z Score: 3.00, Ocf Ebitda Ratio: 0.69, Mansfield Relative Strength: 0.77.",
+      "why_interested": "ADANIENSOL is in the active terminal universe with LTP \u20b91,489.60, +1.56% move, and volume 1607528. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "future_revenue_model": "Forward model for ADANIENSOL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for ADANIENSOL: LTP \u20b91,489.60, delta +1.56%, volume 1607528, score 78.2, action BUY.",
       "ledger_stocks": [
         {
-          "ticker": "BAJFINANCE",
-          "name": "BAJFINANCE",
-          "ltp": "\u20b9918.30",
-          "delta": "+5.49%",
-          "score": 70.8,
-          "action": "WATCH",
-          "selection_reason": "BAJFINANCE shows strong momentum with a 5.49% price increase, trading above both VWAP and EMA9, supported by a significant turnover of \u20b9371.85 Cr and a confirmed VWAP bounce signal.",
+          "ticker": "ADANIENSOL",
+          "name": "ADANIENSOL",
+          "ltp": "1,489.60",
+          "delta": "1.56%",
+          "score": 78.2,
+          "action": "BUY",
+          "selection_reason": "",
+          "risk_flag": "",
           "focus": true
         }
       ],
       "active_scoring_matrix": {
-        "beneish_m_score": "-0.37",
-        "altman_z_score": "3.07",
-        "ocf_ebitda_ratio": "0.70",
-        "mansfield_relative_strength": "0.78"
+        "beneish_m_score": "-0.38",
+        "altman_z_score": "3.00",
+        "ocf_ebitda_ratio": "0.69",
+        "mansfield_relative_strength": "0.77"
       },
       "active_seven_ic_gates": {
-        "q1_fund_buying": "BAJFINANCE volume multiplier is 0.39x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "BAJFINANCE turnover is 371.85 Cr; liquidity quality is institutional level.",
-        "q3_catalyst_validation": "BAJFINANCE price action is +5.49%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q1_fund_buying": "ADANIENSOL volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "ADANIENSOL turnover is 0.0 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "ADANIENSOL price action is +1.56%; catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "BAJFINANCE risk/reward is driven by score 70.8, ATR 2.76%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "BAJFINANCE quantitative milestone: hard-filter watch with score 70.8.",
+        "q5_risk_reward": "ADANIENSOL risk/reward is driven by score 78.2, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "ADANIENSOL quantitative milestone: hard-filter watch with score 78.2.",
         "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
       },
       "active_risk_calc": {
-        "ticker_score": 70.8,
-        "delta_pct": 5.49,
-        "atr_pct": 2.76,
-        "turnover_cr": 371.85,
-        "volume_multiplier": 0.39,
-        "selection_risk": "lower",
-        "signal_quality": "live-derived",
-        "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "N/A",
-        "risk_flag_score": 48.0,
-        "risk_flag": "MODERATE_RISK"
-      },
-      "active_factor_hub": {
-        "selection_reason": "BAJFINANCE shows strong momentum with a 5.49% price increase, trading above both VWAP and EMA9, supported by a \u20b9371.85 Cr turnover and a technical VWAP bounce trigger.",
-        "dominant_factors": "momentum, liquidity, and structural trend alignment",
-        "momentum_factor": "Above VWAP/EMA9; score 70.8.",
-        "liquidity_factor": "Volume multiplier 0.39x; turnover 371.85 Cr.",
-        "quality_factor": "ATR 2.76% and hard-filter status watch.",
-        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
-        "low_vol_factor": "Volatility premium regime"
-      },
-      "focusTicker": "BAJFINANCE",
-      "ticker": "BAJFINANCE",
-      "dataQuality": "live-derived"
-    },
-    "CENTRALBK": {
-      "news_catalysts_card": "Market context for CENTRALBK: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For CENTRALBK, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. CENTRALBK is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "CENTRALBK forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "CENTRALBK is in the active terminal universe with LTP \u20b931.04, +2.88% move, and volume 11020327. High-volume liquid continuation candidate Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
-      "future_revenue_model": "Forward model for CENTRALBK is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for CENTRALBK: LTP \u20b931.04, delta +2.88%, volume 11020327, score 70.0, action WATCH.",
-      "ledger_stocks": [
-        {
-          "ticker": "CENTRALBK",
-          "name": "CENTRALBK",
-          "ltp": "\u20b931.04",
-          "delta": "+2.88%",
-          "score": 70.0,
-          "action": "WATCH",
-          "selection_reason": "High-volume liquid continuation candidate",
-          "focus": true
-        }
-      ],
-      "active_scoring_matrix": {
-        "beneish_m_score": "-0.37",
-        "altman_z_score": "3.06",
-        "ocf_ebitda_ratio": "0.70",
-        "mansfield_relative_strength": "0.78"
-      },
-      "active_seven_ic_gates": {
-        "q1_fund_buying": "CENTRALBK volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "CENTRALBK turnover is 0.0 Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "CENTRALBK price action is +2.88%; catalyst validation depends on follow-through above VWAP/EMA9.",
-        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "CENTRALBK risk/reward is driven by score 70.0, ATR 0.0%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "CENTRALBK quantitative milestone: hard-filter watch with score 70.0.",
-        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
-      },
-      "active_risk_calc": {
-        "ticker_score": 70.0,
-        "delta_pct": 2.88,
+        "ticker_score": 78.2,
+        "delta_pct": 1.56,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
         "volume_multiplier": 0.0,
         "selection_risk": "lower",
         "signal_quality": "live-derived",
         "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "N/A",
-        "risk_flag_score": 34.0,
-        "risk_flag": "MODERATE_RISK"
+        "kelly_policy_max": "9.1%",
+        "risk_flag_score": 22.0,
+        "risk_flag": "LOW_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta 2.88% with score 70.0; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta 1.56% with score 78.2; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
-        "momentum_factor": "Near VWAP/EMA9; score 70.0.",
+        "momentum_factor": "Near VWAP/EMA9; score 78.2.",
         "liquidity_factor": "Turnover data unavailable.",
         "quality_factor": "ATR 0.00% and hard-filter status watch.",
         "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
         "low_vol_factor": "Low-vol regime"
       },
-      "focusTicker": "CENTRALBK",
-      "ticker": "CENTRALBK",
+      "focusTicker": "ADANIENSOL",
+      "ticker": "ADANIENSOL",
       "dataQuality": "live-derived"
     },
-    "BANDHANBNK": {
-      "news_catalysts_card": "Market context for BANDHANBNK: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For BANDHANBNK, participation is read through volume multiplier 1.22x and turnover 221.62 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. BANDHANBNK is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "BANDHANBNK forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.07, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "BANDHANBNK is in the active terminal universe with LTP \u20b9204.60, +5.52% move, and volume 10237548. High-volume liquid continuation candidate Intraday setup: VWAP Bounce, VWAP 196.04, EMA9 197.36, ATR 3.35%, volume multiplier 1.22x.",
-      "future_revenue_model": "Forward model for BANDHANBNK is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for BANDHANBNK: LTP \u20b9204.60, delta +5.52%, volume 10237548, score 69.2, action WATCH.",
+    "ABREL": {
+      "news_catalysts_card": "Market context for ABREL: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For ABREL, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. ABREL is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "ABREL forensic screen: Beneish M Score: -0.41, Altman Z Score: 2.80, Ocf Ebitda Ratio: 0.67, Mansfield Relative Strength: 0.75.",
+      "why_interested": "ABREL is in the active terminal universe with LTP \u20b91,198.40, +1.49% move, and volume 261330. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "future_revenue_model": "Forward model for ABREL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for ABREL: LTP \u20b91,198.40, delta +1.49%, volume 261330, score 77.9, action BUY.",
       "ledger_stocks": [
         {
-          "ticker": "BANDHANBNK",
-          "name": "BANDHANBNK",
-          "ltp": "\u20b9204.60",
-          "delta": "+5.52%",
-          "score": 69.2,
-          "action": "WATCH",
-          "selection_reason": "High-volume liquid continuation candidate",
+          "ticker": "ABREL",
+          "name": "ABREL",
+          "ltp": "1,198.40",
+          "delta": "1.49%",
+          "score": 77.9,
+          "action": "BUY",
+          "selection_reason": "",
+          "risk_flag": "",
           "focus": true
         }
       ],
       "active_scoring_matrix": {
-        "beneish_m_score": "-0.37",
-        "altman_z_score": "3.07",
-        "ocf_ebitda_ratio": "0.70",
-        "mansfield_relative_strength": "0.78"
+        "beneish_m_score": "-0.41",
+        "altman_z_score": "2.80",
+        "ocf_ebitda_ratio": "0.67",
+        "mansfield_relative_strength": "0.75"
       },
       "active_seven_ic_gates": {
-        "q1_fund_buying": "BANDHANBNK volume multiplier is 1.22x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "BANDHANBNK turnover is 221.62 Cr; liquidity quality is institutional level.",
-        "q3_catalyst_validation": "BANDHANBNK price action is +5.52%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q1_fund_buying": "ABREL volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "ABREL turnover is 0.0 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "ABREL price action is +1.49%; catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "BANDHANBNK risk/reward is driven by score 69.2, ATR 3.35%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "BANDHANBNK quantitative milestone: hard-filter watch with score 69.2.",
+        "q5_risk_reward": "ABREL risk/reward is driven by score 77.9, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "ABREL quantitative milestone: hard-filter watch with score 77.9.",
         "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
       },
       "active_risk_calc": {
-        "ticker_score": 69.2,
-        "delta_pct": 5.52,
-        "atr_pct": 3.35,
-        "turnover_cr": 221.62,
-        "volume_multiplier": 1.22,
-        "selection_risk": "moderate",
-        "signal_quality": "live-derived",
-        "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "N/A",
-        "risk_flag_score": 42.0,
-        "risk_flag": "MODERATE_RISK"
-      },
-      "active_factor_hub": {
-        "selection_reason": "trend follow-through above VWAP and EMA9; delta 5.52% with score 69.2; volume 1.22x and turnover 221.62 Cr; elevated volatility; trigger VWAP Bounce; watch-list hard-filter state.",
-        "dominant_factors": "momentum, liquidity, and structural trend alignment",
-        "momentum_factor": "Above VWAP/EMA9; score 69.2.",
-        "liquidity_factor": "Volume multiplier 1.22x; turnover 221.62 Cr.",
-        "quality_factor": "ATR 3.35% and hard-filter status watch.",
-        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
-        "low_vol_factor": "Volatility premium regime"
-      },
-      "focusTicker": "BANDHANBNK",
-      "ticker": "BANDHANBNK",
-      "dataQuality": "live-derived"
-    },
-    "COALINDIA": {
-      "news_catalysts_card": "Market context for COALINDIA: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For COALINDIA, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. COALINDIA is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "COALINDIA forensic screen: Beneish M Score: -0.53, Altman Z Score: 2.55, Ocf Ebitda Ratio: 0.58, Mansfield Relative Strength: 0.68.",
-      "why_interested": "COALINDIA is in the active terminal universe with LTP \u20b9443.50, -0.61% move, and volume 9946830. High-volume liquid continuation candidate Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
-      "future_revenue_model": "Forward model for COALINDIA is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for COALINDIA: LTP \u20b9443.50, delta -0.61%, volume 9946830, score 68.4, action WATCH.",
-      "ledger_stocks": [
-        {
-          "ticker": "COALINDIA",
-          "name": "COALINDIA",
-          "ltp": "\u20b9443.50",
-          "delta": "-0.61%",
-          "score": 68.4,
-          "action": "WATCH",
-          "selection_reason": "High-volume liquid continuation candidate",
-          "focus": true
-        }
-      ],
-      "active_scoring_matrix": {
-        "beneish_m_score": "-0.53",
-        "altman_z_score": "2.55",
-        "ocf_ebitda_ratio": "0.58",
-        "mansfield_relative_strength": "0.68"
-      },
-      "active_seven_ic_gates": {
-        "q1_fund_buying": "COALINDIA volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "COALINDIA turnover is 0.0 Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "COALINDIA price action is -0.61%; catalyst validation depends on follow-through above VWAP/EMA9.",
-        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "COALINDIA risk/reward is driven by score 68.4, ATR 0.0%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "COALINDIA quantitative milestone: hard-filter watch with score 68.4.",
-        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
-      },
-      "active_risk_calc": {
-        "ticker_score": 68.4,
-        "delta_pct": -0.61,
+        "ticker_score": 77.9,
+        "delta_pct": 1.49,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
         "volume_multiplier": 0.0,
-        "selection_risk": "moderate",
+        "selection_risk": "lower",
         "signal_quality": "live-derived",
         "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "N/A",
-        "risk_flag_score": 32.0,
-        "risk_flag": "MODERATE_RISK"
+        "kelly_policy_max": "9.0%",
+        "risk_flag_score": 22.0,
+        "risk_flag": "LOW_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta -0.61% with score 68.4; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta 1.49% with score 77.9; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
-        "momentum_factor": "Near VWAP/EMA9; score 68.4.",
+        "momentum_factor": "Near VWAP/EMA9; score 77.9.",
         "liquidity_factor": "Turnover data unavailable.",
         "quality_factor": "ATR 0.00% and hard-filter status watch.",
         "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
         "low_vol_factor": "Low-vol regime"
       },
-      "focusTicker": "COALINDIA",
-      "ticker": "COALINDIA",
+      "focusTicker": "ABREL",
+      "ticker": "ABREL",
       "dataQuality": "live-derived"
     },
-    "BANKINDIA": {
-      "news_catalysts_card": "Market context for BANKINDIA: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For BANKINDIA, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. BANKINDIA is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "BANKINDIA forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "BANKINDIA is in the active terminal universe with LTP \u20b9145.68, +3.04% move, and volume 9184204. High-volume liquid continuation candidate Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
-      "future_revenue_model": "Forward model for BANKINDIA is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for BANKINDIA: LTP \u20b9145.68, delta +3.04%, volume 9184204, score 67.6, action WATCH.",
+    "ADANIPORTS": {
+      "news_catalysts_card": "Market context for ADANIPORTS: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For ADANIPORTS, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. ADANIPORTS is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "ADANIPORTS forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
+      "why_interested": "ADANIPORTS is in the active terminal universe with LTP \u20b91,812.90, +1.44% move, and volume 2325897. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "future_revenue_model": "Forward model for ADANIPORTS is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for ADANIPORTS: LTP \u20b91,812.90, delta +1.44%, volume 2325897, score 76.5, action BUY.",
       "ledger_stocks": [
         {
-          "ticker": "BANKINDIA",
-          "name": "BANKINDIA",
-          "ltp": "\u20b9145.68",
-          "delta": "+3.04%",
-          "score": 67.6,
-          "action": "WATCH",
-          "selection_reason": "High-volume liquid continuation candidate",
+          "ticker": "ADANIPORTS",
+          "name": "ADANIPORTS",
+          "ltp": "1,812.90",
+          "delta": "1.44%",
+          "score": 76.5,
+          "action": "BUY",
+          "selection_reason": "",
+          "risk_flag": "",
           "focus": true
         }
       ],
@@ -5930,100 +5959,45 @@
         "mansfield_relative_strength": "0.78"
       },
       "active_seven_ic_gates": {
-        "q1_fund_buying": "BANKINDIA volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "BANKINDIA turnover is 0.0 Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "BANKINDIA price action is +3.04%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q1_fund_buying": "ADANIPORTS volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "ADANIPORTS turnover is 0.0 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "ADANIPORTS price action is +1.44%; catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "BANKINDIA risk/reward is driven by score 67.6, ATR 0.0%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "BANKINDIA quantitative milestone: hard-filter watch with score 67.6.",
+        "q5_risk_reward": "ADANIPORTS risk/reward is driven by score 76.5, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "ADANIPORTS quantitative milestone: hard-filter watch with score 76.5.",
         "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
       },
       "active_risk_calc": {
-        "ticker_score": 67.6,
-        "delta_pct": 3.04,
+        "ticker_score": 76.5,
+        "delta_pct": 1.44,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
         "volume_multiplier": 0.0,
-        "selection_risk": "moderate",
+        "selection_risk": "lower",
         "signal_quality": "live-derived",
         "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "N/A",
-        "risk_flag_score": 40.0,
-        "risk_flag": "MODERATE_RISK"
+        "kelly_policy_max": "8.9%",
+        "risk_flag_score": 22.0,
+        "risk_flag": "LOW_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta 3.04% with score 67.6; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta 1.44% with score 76.5; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
-        "momentum_factor": "Near VWAP/EMA9; score 67.6.",
+        "momentum_factor": "Near VWAP/EMA9; score 76.5.",
         "liquidity_factor": "Turnover data unavailable.",
         "quality_factor": "ATR 0.00% and hard-filter status watch.",
         "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
         "low_vol_factor": "Low-vol regime"
       },
-      "focusTicker": "BANKINDIA",
-      "ticker": "BANKINDIA",
-      "dataQuality": "live-derived"
-    },
-    "AXISBANK": {
-      "news_catalysts_card": "Market context for AXISBANK: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For AXISBANK, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. AXISBANK is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "AXISBANK forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "AXISBANK is in the active terminal universe with LTP \u20b91,356.30, +2.96% move, and volume 8535670. High-volume liquid continuation candidate Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
-      "future_revenue_model": "Forward model for AXISBANK is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for AXISBANK: LTP \u20b91,356.30, delta +2.96%, volume 8535670, score 66.8, action WATCH.",
-      "ledger_stocks": [
-        {
-          "ticker": "AXISBANK",
-          "name": "AXISBANK",
-          "ltp": "\u20b91,356.30",
-          "delta": "+2.96%",
-          "score": 66.8,
-          "action": "WATCH",
-          "selection_reason": "High-volume liquid continuation candidate",
-          "focus": true
-        }
-      ],
-      "active_scoring_matrix": {
-        "beneish_m_score": "-0.37",
-        "altman_z_score": "3.06",
-        "ocf_ebitda_ratio": "0.70",
-        "mansfield_relative_strength": "0.78"
-      },
-      "active_seven_ic_gates": {
-        "q1_fund_buying": "AXISBANK volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "AXISBANK turnover is 0.0 Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "AXISBANK price action is +2.96%; catalyst validation depends on follow-through above VWAP/EMA9.",
-        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "AXISBANK risk/reward is driven by score 66.8, ATR 0.0%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "AXISBANK quantitative milestone: hard-filter watch with score 66.8.",
-        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
-      },
-      "active_risk_calc": {
-        "ticker_score": 66.8,
-        "delta_pct": 2.96,
-        "atr_pct": 0.0,
-        "turnover_cr": 0.0,
-        "volume_multiplier": 0.0,
-        "selection_risk": "moderate",
-        "signal_quality": "live-derived",
-        "win_loss_ratio": "5.67:1",
-        "kelly_policy_max": "N/A",
-        "risk_flag_score": 34.0,
-        "risk_flag": "MODERATE_RISK"
-      },
-      "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta 2.96% with score 66.8; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
-        "dominant_factors": "liquidity and mean-reversion around intraday anchors",
-        "momentum_factor": "Near VWAP/EMA9; score 66.8.",
-        "liquidity_factor": "Turnover data unavailable.",
-        "quality_factor": "ATR 0.00% and hard-filter status watch.",
-        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
-        "low_vol_factor": "Low-vol regime"
-      },
-      "focusTicker": "AXISBANK",
-      "ticker": "AXISBANK",
+      "focusTicker": "ADANIPORTS",
+      "ticker": "ADANIPORTS",
       "dataQuality": "live-derived"
     }
+  },
+  "isSnapshotFallback": false,
+  "selectionMeta": {
+    "mode": "live",
+    "reason": "Live refresh completed successfully.",
+    "dataDate": "2026-06-14"
   }
 }
