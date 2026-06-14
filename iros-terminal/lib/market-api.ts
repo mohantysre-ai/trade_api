@@ -76,6 +76,61 @@ export type SelectionMeta = {
   dataDate: string;
 };
 
+// ---------------------------------------------------------------------------
+// AI Ticker News types
+// ---------------------------------------------------------------------------
+
+export type TickerNewsCategory = {
+  summary: string;
+  articles: Array<{
+    title: string;
+    source: string;
+    url: string;
+    publishedAt: string;
+  }>;
+};
+
+export type AITickerNewsReport = {
+  ticker: string;
+  company_name: string;
+  articles_scraped: number;
+  articles_after_dedup: number;
+  generated_at: string;
+  cached?: boolean;
+
+  // LLM-generated categories
+  insider_activity: string;
+  institutional_activity: string;
+  order_book_block_deals: string;
+  future_expansion_capex: string;
+  auditor_changes: string;
+  dividend_news: string;
+  new_orders_contracts: string;
+  earnings_results: string;
+  management_changes: string;
+  regulatory_filings: string;
+
+  // Meta
+  sentiment_overall: "Bullish" | "Neutral" | "Bearish";
+  risk_flags: string;
+  summary_headline: string;
+
+  // Optional raw articles
+  raw_articles?: Array<{
+    title: string;
+    source: string;
+    url: string;
+    summary: string;
+    published_at: string;
+    relevance: string;
+  }>;
+
+  // Error state
+  error?: boolean;
+  message?: string;
+  error_detail?: string;
+};
+
 export type TerminalIntelligence = {
   news_catalysts_card?: string;
   insider_insti_activity_card?: string;
@@ -245,4 +300,49 @@ export function useMarketData(pool?: string, pollMs = 30_000) {
   }, [lastUpdatedAt]);
 
   return { data, status, error, refresh, refreshOnDemand, invalidateKey, isStale };
+}
+
+// ---------------------------------------------------------------------------
+// AI Ticker News fetcher
+// ---------------------------------------------------------------------------
+
+export async function fetchTickerNewsReport(
+  ticker: string,
+  options?: {
+    company?: string;
+    maxArticles?: number;
+    includeRaw?: boolean;
+    forceRefresh?: boolean;
+  }
+): Promise<AITickerNewsReport> {
+  const params = new URLSearchParams();
+  params.set("ticker", ticker);
+  if (options?.company) params.set("company", options.company);
+  if (options?.maxArticles) params.set("max_articles", String(options.maxArticles));
+  if (options?.includeRaw) params.set("include_raw", "true");
+  if (options?.forceRefresh) params.set("force_refresh", "true");
+
+  const res = await fetch(`/api/ticker-news?${params.toString()}`, {
+    cache: "no-store",
+    // Scraping can take 30-90 seconds
+    signal: AbortSignal.timeout(130_000),
+  });
+
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.error) detail = body.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+
+  const data = await res.json();
+  if (!data.success || !data.payload) {
+    throw new Error(data.error ?? "Ticker news API returned unsuccessful response");
+  }
+
+  return data.payload as AITickerNewsReport;
 }
