@@ -81,15 +81,15 @@ npm run dev
 
 | Data | Source |
 |------|--------|
-| Stock LTP (live Angel One universe, LLM-selected top 10) | Angel One `getMarketData` + LLM filter prompt |
+| Stock LTP (live Angel One universe, LLM-selected top 20) | Angel One `getMarketData` + LLM filter prompt |
 | Nifty 50 / Nifty Bank | Angel One index quotes |
 | FII/DII, Brent, DXY, global indices | Static fallback in UI |
 | India-focused market news | Moneycontrol, Investing.com, LiveMint, Economic Times RSS |
 
 Edit watchlist tokens in [`symbols.py`](symbols.py) if a symbol fails to resolve.
-Set `MARKET_FILTER_PROMPT` in `.env` to control the selection criteria for the dynamic top-10 universe.
+Set `MARKET_FILTER_PROMPT` in `.env` to control the selection criteria for the dynamic top-20 universe.
 Set `INTRADAY_CANDIDATE_LIMIT` in `.env` if you want to change how many live symbols are candle-screened before the LLM ranking pass.
-The backend refreshes live Angel One data and LLM-selected top 10 only during the IST refresh windows around **08:00-08:30** and **16:00-16:30**. Outside those windows it serves the last saved snapshot.
+The backend refreshes live Angel One data and LLM-selected top 20 only during the IST refresh windows around **08:00-08:30** and **16:00-16:30**. Outside those windows it serves the last saved snapshot.
 Manual refreshes are still allowed and will reuse the last saved snapshot when live or LLM refreshes are unavailable.
 
 ## Response shape

@@ -33,7 +33,7 @@ class CompleteSecurityAnalysisPayload(BaseModel):
 
 
 _llm_not_before: float = 0.0
-TOP_SELECTION_COUNT = 10
+TOP_SELECTION_COUNT = 20
 
 
 KNOWN_FUNDAMENTALS: dict[str, dict[str, str]] = {

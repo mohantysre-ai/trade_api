@@ -1108,7 +1108,7 @@ def _build_payload_from_live_data(
 
     payload = {
         "success": True,
-        "source": "angel_one+news+llm_dynamic_top10",
+        "source": "angel_one+news+llm_dynamic_top20",
         "rawSources": _news_feed_sources(),
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "mockTickers": sorted(MOCK_TICKERS),

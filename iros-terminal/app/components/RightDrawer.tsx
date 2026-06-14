@@ -1,10 +1,9 @@
 "use client";
 
 import React from "react";
-import type { SelectionMeta, TerminalIntelligence } from "@/lib/market-api";
+import type { TerminalIntelligence } from "@/lib/market-api";
 
 type DrawerAnalysis = TerminalIntelligence & {
-  selectionMeta?: SelectionMeta;
   error?: string;
 };
 
@@ -147,15 +146,6 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           <>
             <div className="border-t border-slate-200 pt-4">
               <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-3">Terminal Intelligence Payload</div>
-
-              {analysis.selectionMeta && (
-                <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-3 text-[12px] text-slate-700">
-                  <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-1">Selection Basis</div>
-                  <div className="font-bold text-slate-900 capitalize">{analysis.selectionMeta.mode}</div>
-                  <div className="mt-1 text-slate-600">{analysis.selectionMeta.reason}</div>
-                  <div className="mt-1 text-slate-400">Data date: {analysis.selectionMeta.dataDate}</div>
-                </div>
-              )}
 
               {analysis.why_interested && (
                 <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-3">

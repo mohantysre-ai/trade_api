@@ -45,7 +45,6 @@ export default function ForensicPanel({
   const live = data ?? null;
   const stocks = live?.stocks ?? [];
   const intelligence = live?.terminalIntelligence ?? null;
-  const selectionMeta = live?.selectionMeta ?? null;
 
   const stockPriceMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -92,8 +91,8 @@ export default function ForensicPanel({
       }
     }
 
-    if (!rows.length && stocks.length) {
-      for (const s of stocks.slice(0, 10)) {
+    if (rows.length < stocks.length) {
+      for (const s of stocks.slice(rows.length, 20)) {
         push({
           ticker: s.ticker,
           price: s.ltp,
@@ -209,15 +208,6 @@ export default function ForensicPanel({
           </tbody>
         </table>
       </div>
-
-      {selectionMeta && (
-        <div className="mt-4 bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px] text-slate-700">
-          <div className="text-slate-500 text-[10px] uppercase tracking-wider">Selection Basis</div>
-          <div className="mt-1 font-bold text-slate-900 capitalize">{selectionMeta.mode}</div>
-          <p className="mt-1 text-slate-600">{selectionMeta.reason}</p>
-          <p className="mt-1 text-slate-400">Data date: {selectionMeta.dataDate}</p>
-        </div>
-      )}
     </section>
   );
 }
