@@ -6,7 +6,6 @@ import {
   type LiveStock,
   type MacroRow,
   type LedgerStock,
-  type SelectionMeta,
   type TerminalIntelligence,
 } from '@/lib/market-api';
 import ForensicPanel from './components/ForensicPanel';
@@ -15,17 +14,9 @@ import RightDrawer from './components/RightDrawer';
 type DrawerContent = {
   stock?: LiveStock | LedgerStock | null;
   analysis?: (TerminalIntelligence & {
-    selectionMeta?: SelectionMeta;
     isSnapshotFallback?: boolean;
     error?: string;
   }) | null;
-  snapshot?: {
-    newsSummary?: string | undefined;
-    llmError?: string | null;
-    isSnapshotFallback: boolean;
-    selectionMeta?: SelectionMeta | null;
-    poolDescription?: string | null;
-  } | null;
 };
 
 type TabKey = 'marketSnapshot' | 'assetMatrix' | 'icGates';
@@ -157,43 +148,6 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
   );
 }
 
-function AISummaryPanel({ summary, llmError, isSnapshotFallback, selectionMeta }: { summary?: string; llmError?: string | null; isSnapshotFallback: boolean; selectionMeta?: { mode?: string; reason?: string; dataDate?: string } | null }) {
-  if (llmError) {
-    return (
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-        <div className="text-[9px] uppercase tracking-wider text-amber-700 mb-1">AI SUMMARY</div>
-        <p className="text-[11px] text-amber-800 leading-relaxed">{llmError}</p>
-      </div>
-    );
-  }
-
-  if (summary) {
-    return (
-    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
-        <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1">AI SUMMARY</div>
-        <p className="text-[11px] text-slate-700 leading-relaxed">{summary}</p>
-      </div>
-    );
-  }
-
-  if (isSnapshotFallback) {
-    return (
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-        <div className="text-[9px] uppercase tracking-wider text-amber-700 mb-1">AI SUMMARY</div>
-        <p className="text-[11px] text-amber-700 leading-relaxed">Top market catalysts were not available from the current news feed.</p>
-        {selectionMeta?.reason && <p className="text-[9px] text-slate-500 mt-1">Basis: {selectionMeta.reason}</p>}
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
-      <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1">AI SUMMARY</div>
-      <p className="text-[11px] text-slate-500 leading-relaxed">Top market catalysts were not available from the current news feed.</p>
-    </div>
-  );
-}
-
 function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: string; link: string; summary: string; publishedAt: string }>; now: number }) {
   if (!items?.length) return null;
 
@@ -238,17 +192,9 @@ function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: 
   );
 }
 
-function LiveIntelligencePanel({ count, description }: { count: number; description?: string | null }) {
+function LiveIntelligencePanel() {
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
-      <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1">
-        LIVE INTELLIGENCE · {count} NODES
-      </div>
-      <p className="text-[11px] text-slate-600 leading-relaxed">
-        Dynamic live universe label applied for Nifty 500. Gemini / Pydantic mapped payload from live Angel One ingestion stream.
-      </p>
-      {description && <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{description}</p>}
-    </div>
+    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm" />
   );
 }
 
@@ -346,9 +292,6 @@ export default function IrosMasterAdvancedTerminal() {
     return [...(g.indices ?? []), ...(g.commodities ?? [])];
   }, [liveMarket]);
 
-  const newsSummary = liveMarket?.newsSummary;
-  const llmError = liveMarket?.llmError;
-  const selectionMeta = liveMarket?.selectionMeta ?? null;
   const marketIntelligence = liveMarket?.terminalIntelligence as TerminalIntelligence | undefined;
   const isSnapshotFallback = liveMarket?.isSnapshotFallback ?? false;
   const [tickerIntelligence, setTickerIntelligence] = useState<TerminalIntelligence | null>(null);
@@ -370,16 +313,8 @@ export default function IrosMasterAdvancedTerminal() {
         stock: stocks.find((s) => s.ticker === t) ?? null,
         analysis: {
           ...tickerIntelligence,
-          selectionMeta: liveMarket?.selectionMeta,
           isSnapshotFallback: liveMarket?.isSnapshotFallback ?? false,
         },
-        snapshot: {
-          newsSummary: liveMarket?.newsSummary,
-          llmError: liveMarket?.llmError,
-          isSnapshotFallback: liveMarket?.isSnapshotFallback ?? false,
-          selectionMeta: liveMarket?.selectionMeta ?? null,
-          poolDescription: liveMarket?.poolDescription ?? null,
-        }
       });
       return;
     }
@@ -395,14 +330,7 @@ export default function IrosMasterAdvancedTerminal() {
         setTickerIntelligence(ti);
         setDrawerContent({
           stock: stocks.find((s) => s.ticker === t) ?? null,
-          analysis: { ...ti, selectionMeta: body.selectionMeta, isSnapshotFallback: body.isSnapshotFallback },
-          snapshot: {
-            newsSummary: liveMarket?.newsSummary,
-            llmError: liveMarket?.llmError,
-            isSnapshotFallback: liveMarket?.isSnapshotFallback ?? false,
-            selectionMeta: liveMarket?.selectionMeta ?? null,
-            poolDescription: liveMarket?.poolDescription ?? null,
-          }
+          analysis: { ...ti, isSnapshotFallback: body.isSnapshotFallback },
         });
       } else {
         const text = await resp.text();
@@ -490,14 +418,7 @@ export default function IrosMasterAdvancedTerminal() {
               <NewsFeedPanel items={liveMarket?.news} now={now} />
             </div>
 
-            <div className="xl:col-span-4 space-y-4">
-    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
-                <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-2">Snapshot Status</div>
-                <p className="text-[11px] text-slate-600 leading-relaxed">
-                  Snapshot basis active. Open ASSET MATRIX, select a ticker to view quote, AI summary and live intelligence.
-                </p>
-              </div>
-            </div>
+            <div className="xl:col-span-4 space-y-4" />
           </div>
         )}
 
@@ -509,13 +430,7 @@ export default function IrosMasterAdvancedTerminal() {
               invalidateKey={invalidateKey}
             />
             <StockDetailPanel stock={selectedQuote} />
-            <AISummaryPanel
-              summary={tickerIntelligence?.news_catalysts_card ?? newsSummary}
-              llmError={llmError}
-              isSnapshotFallback={isSnapshotFallback}
-              selectionMeta={selectionMeta}
-            />
-            <LiveIntelligencePanel count={stocks.length} description={liveMarket?.poolDescription} />
+            <LiveIntelligencePanel />
           </div>
         )}
 
