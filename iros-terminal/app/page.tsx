@@ -28,30 +28,36 @@ function normalizeMarketLabel(label: string) {
   return label.toUpperCase().replace(/\s+/g, ' ');
 }
 
+function marketStateBorder(state: string) {
+  if (state === 'POSITIVE') return 'border-l-emerald-500';
+  if (state === 'NEGATIVE') return 'border-l-red-500';
+  return 'border-l-slate-300';
+}
+
 function marketStateClass(state: string) {
   if (state === 'POSITIVE') return 'text-emerald-500';
   if (state === 'NEGATIVE') return 'text-red-500';
-  return 'text-slate-400';
+  return 'text-slate-500';
 }
 
 function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
     return (
-      <div className="bg-white border border-slate-200 rounded-lg p-4 text-slate-400 text-[10px] shadow-sm">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 text-slate-400 text-[10px] shadow-sm">
         Waiting for global macro data.
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
       <div className="flex items-center justify-between mb-2">
         <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">GLOBAL INDICES</span>
         {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {items.map((item) => (
-          <div key={`${item.label}-${item.val}-${item.state}`} className="bg-slate-50 border border-slate-100 p-2 rounded">
+          <div key={`${item.label}-${item.val}-${item.state}`} className={`bg-slate-50 border border-slate-100 border-l-2 p-2 rounded ${marketStateBorder(item.state)}`}>
             <span className="text-[9px] text-slate-500 block uppercase tracking-wider">{item.label}</span>
             <span className="text-sm font-bold text-slate-900 block mt-0.5">{item.val}</span>
             <span
@@ -69,14 +75,14 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
 function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
     return (
-      <div className="bg-white border border-slate-200 rounded-lg p-4 text-slate-400 text-[10px] shadow-sm">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 text-slate-400 text-[10px] shadow-sm">
         Waiting for commodities & FX data.
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
       <div className="flex items-center justify-between mb-2">
         <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">COMMODITIES & FX</span>
         {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
@@ -86,7 +92,7 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
           let displayLabel = item.label;
           if (displayLabel === 'BRENT CRUDE OIL') displayLabel = 'BRENT CRUDE';
           return (
-            <div key={`${item.label}-${item.val}-${item.state}`} className="bg-slate-50 border border-slate-100 p-2 rounded">
+            <div key={`${item.label}-${item.val}-${item.state}`} className={`bg-slate-50 border border-slate-100 border-l-2 p-2 rounded ${marketStateBorder(item.state)}`}>
               <span className="text-[9px] text-slate-500 block uppercase tracking-wider">{displayLabel}</span>
               <span className="text-sm font-bold text-slate-900 block mt-0.5">{item.val}</span>
               <span
@@ -105,14 +111,14 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
 function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
     return (
-      <div className="bg-white border border-slate-200 rounded-lg p-4 text-slate-400 text-[10px] shadow-sm">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 text-slate-400 text-[10px] shadow-sm">
         Waiting for Indian market data.
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
       <div className="flex items-center justify-between mb-2">
         <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">INDIA MARKETS</span>
         {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
@@ -122,7 +128,7 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
           let displayLabel = item.label;
           if (displayLabel === 'USD / INR Spot') displayLabel = 'USD / INR';
           return (
-            <div key={`${item.label}-${item.val}-${item.state}`} className="bg-slate-50 border border-slate-100 p-2 rounded">
+            <div key={`${item.label}-${item.val}-${item.state}`} className={`bg-slate-50 border border-slate-100 border-l-2 p-2 rounded ${marketStateBorder(item.state)}`}>
               <span className="text-[9px] text-slate-500 block uppercase tracking-wider">{displayLabel}</span>
               <span className="text-sm font-bold text-slate-900 block mt-0.5">{item.val}</span>
               <span
@@ -141,7 +147,7 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
 function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null }) {
   if (!stock) {
     return (
-      <div className="bg-white border border-emerald-200 rounded-lg p-4 text-slate-500 min-h-[120px] flex items-center justify-center text-[10px] shadow-sm">
+      <div className="bg-white border border-emerald-300 border-[0.5px] rounded-lg p-4 text-slate-500 min-h-[120px] flex items-center justify-center text-[10px] shadow-sm">
         Select an asset to view quote detail.
       </div>
     );
@@ -157,7 +163,7 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
   const delta = 'delta' in stock ? (stock as LiveStock).delta : (stock as LedgerStock).delta;
 
   return (
-    <div className="bg-white border border-emerald-200 rounded-lg p-4 shadow-sm">
+    <div className="bg-white border border-emerald-300 border-[0.5px] rounded-lg p-4 shadow-sm">
       <div className="flex items-end justify-between gap-4">
         <div>
           <div className="text-slate-500 text-[10px] uppercase tracking-wider">{name}</div>
@@ -209,7 +215,7 @@ function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: 
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg shadow-sm">
       <div className="flex items-center justify-between p-3 border-b border-slate-100">
         <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">LIVE NEWS FEED</span>
         <span className="text-[9px] text-slate-400">{items.length} stories</span>
@@ -243,7 +249,7 @@ function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: 
 
 function LiveIntelligencePanel() {
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm" />
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm" />
   );
 }
 
@@ -251,7 +257,7 @@ function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIn
   const hasData = !!intelligence;
 
   return (
-    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+    <div className="bg-slate-50 border border-slate-300 border-[0.5px] rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
         <div>
           <h3 className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Structured Reasoning Output</h3>
@@ -263,22 +269,22 @@ function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIn
       {hasData ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[10px] text-slate-700">
-            <div className="bg-white border border-emerald-100 p-3 rounded-lg">
+            <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
               <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">News Catalysts</div>
               <p className="text-[11px] text-slate-700 leading-relaxed">{intelligence.news_catalysts_card ?? 'Not produced.'}</p>
             </div>
-            <div className="bg-white border border-emerald-100 p-3 rounded-lg">
+            <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
               <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Macro Anchors</div>
               <p className="text-[11px] text-slate-700 leading-relaxed">{intelligence.macro_anchors_card ?? 'Not produced.'}</p>
             </div>
-            <div className="bg-white border border-emerald-100 p-3 rounded-lg">
+            <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
               <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Insider / Insti Activity</div>
               <p className="text-[11px] text-slate-700 leading-relaxed">{intelligence.insider_insti_activity_card ?? 'Not produced.'}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[10px] text-slate-700 mt-3">
-            <div className="bg-white border border-emerald-100 p-3 rounded-lg">
+            <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
               <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Structural Thesis</div>
               <p className="text-[10px] text-slate-600 leading-relaxed">
                 <span className="text-slate-700">Why Interested: </span>
@@ -289,7 +295,7 @@ function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIn
                 {intelligence.future_revenue_model ?? 'Not produced.'}
               </p>
             </div>
-            <div className="bg-white border border-emerald-100 p-3 rounded-lg">
+            <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
               <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Risk Calc / Factor Hub</div>
               {intelligence.active_risk_calc ? (
                 <div className="space-y-1">
@@ -416,7 +422,7 @@ export default function IrosMasterAdvancedTerminal() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 text-slate-900 font-mono text-xs antialiased">
       <div className="max-w-[1600px] mx-auto p-4 space-y-4">
-        <header className="bg-white border border-slate-200 rounded-xl shadow-sm">
+        <header className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm">
           <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -454,7 +460,7 @@ export default function IrosMasterAdvancedTerminal() {
           )}
         </header>
 
-        <nav className="bg-white border border-slate-200 rounded-xl flex gap-1 p-1 shadow-sm">
+        <nav className="bg-white border border-slate-300 border-[0.5px] rounded-xl flex gap-1 p-1 shadow-sm">
           {([
             { key: 'marketSnapshot' as TabKey, label: 'MARKET SNAPSHOT' },
             { key: 'assetMatrix' as TabKey, label: 'ASSET MATRIX' },
@@ -499,7 +505,7 @@ export default function IrosMasterAdvancedTerminal() {
         )}
 
         {activeTab === 'icGates' && (
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+          <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl p-4 shadow-sm">
             <StructuredReasoningOutput intelligence={intelligence} />
           </div>
         )}
