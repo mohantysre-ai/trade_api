@@ -33,7 +33,9 @@ from global_feed import fetch_domestic_yahoo_macro, fetch_global_macro
 from symbols import MACRO_INSTRUMENTS, MOCK_TICKERS, WATCHLIST, Instrument
 from terminal_intelligence_full import (
     TOP_SELECTION_COUNT,
+    _on_demand_ticker_selection_reason,
     build_ticker_intelligence_map,
+    build_ticker_intelligence_report,
     execute_terminal_intelligence_pipeline,
 )
 
@@ -1441,6 +1443,90 @@ def create_app() -> FastAPI:
                 "selectionMeta": payload.get("selectionMeta"),
                 "isSnapshotFallback": False,
             }
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.post("/api/refresh-ticker-reason")
+    async def refresh_ticker_reason(request: Request, ticker: str | None = None, pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
+        try:
+            body: dict[str, Any] = {}
+            try:
+                parsed_body = await request.json()
+                if isinstance(parsed_body, dict):
+                    body = parsed_body
+            except Exception:
+                body = {}
+
+            resolved_ticker = str(ticker or body.get("ticker") or "").strip().upper()
+            if not resolved_ticker:
+                raise HTTPException(status_code=400, detail="Missing required ticker parameter.")
+
+            resolved_pool = pool or body.get("pool")
+            resolved_prompt = prompt or body.get("prompt")
+            client = AngelOneClient()
+            payload = build_market_payload(client, pool_name=resolved_pool, custom_prompt=resolved_prompt)
+
+            stock_row = None
+            for stock in payload.get("stocks") or []:
+                if str(stock.get("ticker", "")).upper() == resolved_ticker:
+                    stock_row = stock
+                    break
+            if stock_row is None:
+                quote = (payload.get("stockQuotes") or {}).get(resolved_ticker)
+                if isinstance(quote, dict) and quote:
+                    stock_row = quote
+
+            if stock_row is None:
+                raise HTTPException(status_code=404, detail=f"Ticker {resolved_ticker} not found in current payload.")
+
+            ledger_score = None
+            for row in ((payload.get("terminalIntelligence") or {}).get("ledger_stocks") or []):
+                if str(row.get("ticker", "")).upper() == resolved_ticker:
+                    ledger_score = row.get("score")
+                    break
+            try:
+                score = float(ledger_score if ledger_score is not None else stock_row.get("score") or 0.0)
+            except Exception:
+                score = 0.0
+
+            reason = _on_demand_ticker_selection_reason(resolved_ticker, stock_row, score)
+
+            ticker_map = payload.get("tickerIntelligenceByTicker") or {}
+            ticker_report = ticker_map.get(resolved_ticker)
+            if not ticker_report:
+                ticker_report = build_ticker_intelligence_report(payload, resolved_ticker)
+
+            ticker_report = dict(ticker_report)
+            factor_hub = dict(ticker_report.get("active_factor_hub") or {})
+            factor_hub["selection_reason"] = reason
+            ticker_report["active_factor_hub"] = factor_hub
+            ticker_report["focusTicker"] = resolved_ticker
+            ticker_report["ticker"] = resolved_ticker
+
+            ticker_map[resolved_ticker] = ticker_report
+            payload["tickerIntelligenceByTicker"] = ticker_map
+
+            terminal = payload.get("terminalIntelligence") or {}
+            ledger = terminal.get("ledger_stocks") or []
+            for row in ledger:
+                if str(row.get("ticker", "")).upper() == resolved_ticker:
+                    row["selection_reason"] = reason
+                    break
+            terminal["ledger_stocks"] = ledger
+            payload["terminalIntelligence"] = terminal
+
+            _save_last_snapshot(payload)
+
+            return {
+                "success": True,
+                "ticker": resolved_ticker,
+                "selectionReason": reason,
+                "tickerReport": ticker_report,
+                "isSnapshotFallback": payload.get("isSnapshotFallback", False),
+                "selectionMeta": payload.get("selectionMeta"),
+            }
+        except HTTPException:
+            raise
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
