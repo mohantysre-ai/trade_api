@@ -7,7 +7,7 @@ Supports per-ticker focusing for deep security-specific analysis.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Sequence
 from pydantic import BaseModel, Field
 import json
 import os
@@ -519,6 +519,7 @@ def _canonicalize_ledger_rows(rows: list[dict[str, Any]], focus_ticker: str | No
                 "score": _format_score(score),
                 "action": _clean_value(row.get("action") or row.get("intraday_trigger_point") or row.get("momentum_catalyst")),
                 "selection_reason": _clean_value(row.get("selection_reason") or row.get("sharp_execution_risk") or row.get("execution_risk")),
+                "risk_flag": _clean_value(row.get("risk_flag")) or "",
                 "focus": ticker == focus_ticker,
             }
         )
@@ -1088,7 +1089,7 @@ def _normalize_analysis_payload(
     fallback = _build_fallback_payload(snapshot, focus_ticker)
     data = payload.model_dump()
 
-    data["ledger_stocks"] = _canonicalize_ledger_rows(data.get("ledger_stocks") or [], focus_ticker, (data.get("active_factor_hub") or {}).get("selection_reason"), data.get("stocks") or [])
+    data["ledger_stocks"] = _canonicalize_ledger_rows(data.get("ledger_stocks") or [], focus_ticker)
 
     for key in (
         "news_catalysts_card",

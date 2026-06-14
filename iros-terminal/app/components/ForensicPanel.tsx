@@ -65,18 +65,31 @@ export default function ForensicPanel({
     };
 
     if (intelligence?.ledger_stocks?.length) {
-      for (const row of intelligence.ledger_stocks) {
+      // Sort by score descending first
+      const sorted = [...intelligence.ledger_stocks].sort(
+        (a, b) => (typeof b.score === 'number' ? b.score : 0) - (typeof a.score === 'number' ? a.score : 0)
+      );
+      const total = sorted.length;
+      for (let i = 0; i < sorted.length; i++) {
+        const row = sorted[i];
         const action = row.action || '';
         const reason = row.selection_reason || action;
+        const score = typeof row.score === 'number' ? row.score : 0;
+        // Risk flag based on relative rank in cohort (tertiles)
+        const tertile = total > 0 ? Math.floor((i / total) * 3) : 0;
+        let riskFlag: string;
+        if (tertile === 0) riskFlag = 'LOW_RISK';
+        else if (tertile === 1) riskFlag = 'MODERATE_RISK';
+        else riskFlag = 'HIGH_RISK';
         push({
           ticker: row.ticker,
           price: row.live_price || stockPriceMap.get(row.ticker) || '',
-          score: typeof row.score === 'number' ? row.score : 0,
+          score: score,
           kelly: '5.67 : 1',
-          returnPct: typeof row.score === 'number' ? row.score / 6 : 2.4,
+          returnPct: score / 6,
           thesis: reason || 'Score-based selection',
-          riskFlag: action || 'Selected',
-          state: (typeof row.score === 'number' && row.score >= 55) ? 'HIGH' : (typeof row.score === 'number' && row.score <= 40) ? 'LOW' : undefined,
+          riskFlag: riskFlag,
+          state: score >= 55 ? 'HIGH' : score <= 40 ? 'LOW' : undefined,
         });
       }
     }
@@ -140,8 +153,10 @@ export default function ForensicPanel({
 
   const flagClass = (flag: string) => {
     const v = flag.toLowerCase();
-    if (v.includes('low vol')) return 'text-teal-700 border-teal-200 bg-teal-50';
-    if (v.includes('structural') || v.includes('atr')) return 'text-red-700 border-red-200 bg-red-50';
+    if (v.includes('low_risk') || v.includes('low vol') || v === 'low') return 'text-teal-700 border-teal-200 bg-teal-50';
+    if (v.includes('moderate_risk') || v.includes('moderate')) return 'text-amber-700 border-amber-200 bg-amber-50';
+    if (v.includes('high_risk') || v.includes('extreme') || v.includes('structural') || v.includes('atr')) return 'text-red-700 border-red-200 bg-red-50';
+    if (v.includes('selected') || v === 'buy') return 'text-slate-400 border-slate-200 bg-slate-50';
     return 'text-slate-600 border-red-200 bg-red-50';
   };
 
@@ -161,17 +176,26 @@ export default function ForensicPanel({
         </button>
       </div>
 
-      <div className="overflow-auto">
-        <table className="w-full text-left text-[11px]">
+      <div className="overflow-x-auto -mx-4 px-4">
+        <table className="w-full text-left text-[11px] table-fixed">
+          <colgroup>
+            <col className="w-[12%]" />
+            <col className="w-[12%]" />
+            <col className="w-[8%]" />
+            <col className="w-[10%]" />
+            <col className="w-[10%]" />
+            <col className="w-[38%]" />
+            <col className="w-[10%]" />
+          </colgroup>
           <thead>
             <tr className="text-slate-500 text-[10px] uppercase">
-              <th className="py-2.5 pr-3 font-semibold">Ticker</th>
-              <th className="py-2.5 pr-3 font-semibold">Price</th>
-              <th className="py-2.5 pr-3 font-semibold">Score</th>
-              <th className="py-2.5 pr-3 font-semibold">Kelly</th>
-              <th className="py-2.5 pr-3 font-semibold">Return</th>
-              <th className="py-2.5 pr-3 font-semibold">Thesis</th>
-              <th className="py-2.5 font-semibold">Risk Flag</th>
+              <th className="py-2.5 pr-2 font-semibold truncate">Ticker</th>
+              <th className="py-2.5 pr-2 font-semibold truncate">Price</th>
+              <th className="py-2.5 pr-2 font-semibold truncate">Score</th>
+              <th className="py-2.5 pr-2 font-semibold truncate">Kelly</th>
+              <th className="py-2.5 pr-2 font-semibold truncate">Return</th>
+              <th className="py-2.5 pr-2 font-semibold truncate">Thesis</th>
+              <th className="py-2.5 font-semibold truncate">Risk Flag</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -181,20 +205,20 @@ export default function ForensicPanel({
                 onClick={() => onSelect?.(row.ticker)}
                 className={`cursor-pointer transition hover:bg-slate-50 ${row.state === 'HIGH' ? 'bg-emerald-50/30' : row.state === 'LOW' ? 'bg-red-50/30' : ''}`}
               >
-                <td className="py-2.5 pr-3 font-black text-slate-900">{row.ticker}</td>
-                 <td className="py-2.5 pr-3 text-slate-700 tabular-nums">{row.price ? `₹${String(row.price).replace(/[₹]+/g, '')}` : '-'}</td>
-                <td className={`py-2.5 pr-3 font-bold ${scoreColor(row.score)}`}>{row.score || '-'}</td>
-                <td className="py-2.5 pr-3 text-slate-700">{row.kelly || '-'}</td>
-                <td className="py-2.5 pr-3">
+                <td className="py-2.5 pr-2 font-black text-slate-900 truncate">{row.ticker}</td>
+                <td className="py-2.5 pr-2 text-slate-700 tabular-nums truncate">{row.price ? `₹${String(row.price).replace(/[₹]+/g, '')}` : '-'}</td>
+                <td className={`py-2.5 pr-2 font-bold ${scoreColor(row.score)} truncate`}>{row.score || '-'}</td>
+                <td className="py-2.5 pr-2 text-slate-700 truncate">{row.kelly || '-'}</td>
+                <td className="py-2.5 pr-2 truncate">
                   <span className={`font-bold tabular-nums ${row.returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {row.returnPct >= 0 ? '+' : ''}{row.returnPct.toFixed(1)}%
                   </span>
                 </td>
-                <td className="py-2.5 pr-3 text-slate-500">
-                  {row.thesis ? <span className="text-teal-700 font-medium">{row.thesis}</span> : '-'}
+                <td className="py-2.5 pr-2 text-slate-500 truncate" title={row.thesis}>
+                  {row.thesis ? <span className="text-teal-700 font-medium truncate block">{row.thesis}</span> : '-'}
                 </td>
-                <td className="py-2.5 pr-3 text-slate-500">
-                  {row.riskFlag ? <span className={`inline-block border px-2 py-0.5 rounded text-[10px] ${flagClass(row.riskFlag)}`}>{row.riskFlag}</span> : '-'}
+                <td className="py-2.5 pr-2 text-slate-500 truncate">
+                  {row.riskFlag ? <span className={`inline-block border px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap ${flagClass(row.riskFlag)}`}>{row.riskFlag}</span> : '-'}
                 </td>
               </tr>
             ))}
