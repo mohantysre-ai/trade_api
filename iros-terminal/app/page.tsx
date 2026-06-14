@@ -411,14 +411,12 @@ export default function IrosMasterAdvancedTerminal() {
         </nav>
 
         {activeTab === 'marketSnapshot' && (
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-            <div className="xl:col-span-8 space-y-4">
+          <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-4">
               <GlobalIndicesGrid items={globalMacroItems} staleLabel={staleMacroLabel} />
               <IndiaMarketsGrid items={currentMacros} staleLabel={staleMacroLabel} />
               <NewsFeedPanel items={liveMarket?.news} now={now} />
             </div>
-
-            <div className="xl:col-span-4 space-y-4" />
           </div>
         )}
 
