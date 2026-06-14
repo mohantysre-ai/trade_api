@@ -74,15 +74,17 @@ def _extract_price(value: Any) -> float | None:
     return None
 
 
-# Global indices & commodities for the Global Macro Anchors panel.
-GLOBAL_INSTRUMENTS: list[YahooInstrument] = [
-    # Domestic indices
+# Domestic indices for the India market panel.
+DOMESTIC_INDEX_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("nifty50", "^NSEI", "NIFTY 50", "index", _fmt_index),
     YahooInstrument("sensex", "^BSESN", "SENSEX", "index", _fmt_index),
     YahooInstrument("niftybank", "^NSEBANK", "NIFTY BANK", "index", _fmt_index),
     YahooInstrument("niftyit", "^CNXIT", "NIFTY IT", "index", _fmt_index),
     YahooInstrument("niftypharma", "^CNXPHARMA", "NIFTY PHARMA", "index", _fmt_index),
-    # Global indices
+]
+
+# Global indices and commodities for the Global Macro Anchors panel.
+GLOBAL_INDEX_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("dji", "^DJI", "DJI (US 30)", "index", _fmt_index),
     YahooInstrument("sp500", "^GSPC", "S&P 500", "index", _fmt_index),
     YahooInstrument("nasdaq100", "^NDX", "NASDAQ 100", "index", _fmt_index),
@@ -93,18 +95,21 @@ GLOBAL_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("cac40", "^FCHI", "CAC 40", "index", _fmt_index),
     YahooInstrument("ftse", "^FTSE", "FTSE 100", "index", _fmt_index),
     YahooInstrument("eurostoxx50", "^STOXX50E", "EURO STOXX 50", "index", _fmt_index),
-    # Commodities
+]
+
+COMMODITY_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("gold", "GC=F", "GOLD", "commodity", _fmt_usd_oz),
     YahooInstrument("silver", "SI=F", "SILVER", "commodity", _fmt_usd_oz),
-    YahooInstrument("brent", "BZ=F", "BRENT CRUDE", "commodity", _fmt_brent),
+    YahooInstrument("brent", "BZ=F", "BRENT CRUDE OIL", "commodity", _fmt_brent),
     YahooInstrument("wticrude", "CL=F", "WTI CRUDE", "commodity", _fmt_brent),
     YahooInstrument("natgas", "NG=F", "NATURAL GAS", "commodity", _fmt_natgas),
 ]
 
-# FX, energy, and domestic volatility for the domestic macro strip (Angel One fallback).
+GLOBAL_INSTRUMENTS: list[YahooInstrument] = [*GLOBAL_INDEX_INSTRUMENTS, *COMMODITY_INSTRUMENTS]
+
+# FX and domestic volatility for the India market panel.
 DOMESTIC_YAHOO_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("usdinr", "INR=X", "USD / INR Spot", "fx", _fmt_usdinr),
-    YahooInstrument("brent", "BZ=F", "Brent Crude Oil", "commodity", _fmt_brent),
     YahooInstrument("indiavix", "^INDIAVIX", "India VIX", "index", _fmt_index),
 ]
 
@@ -321,6 +326,11 @@ def _fetch_investing_com_quote(symbol: str, label: str) -> dict[str, Any] | None
     return None
 
 
+def _fetch_macro_rows(instruments: list[YahooInstrument]) -> list[dict[str, Any]]:
+    rows_by_key = _fetch_yahoo_api_batch(instruments)
+    return [rows_by_key.get(inst.key) or _fetch_yahoo_quote(inst) or _missing_macro_row(inst) for inst in instruments]
+
+
 def fetch_global_macro() -> dict[str, list[dict[str, Any]]]:
     indices: list[dict[str, Any]] = []
     commodities: list[dict[str, Any]] = []
@@ -336,9 +346,9 @@ def fetch_global_macro() -> dict[str, list[dict[str, Any]]]:
     return {"indices": indices, "commodities": commodities}
 
 
+def fetch_domestic_index_macro() -> list[dict[str, Any]]:
+    return _fetch_macro_rows(DOMESTIC_INDEX_INSTRUMENTS)
+
+
 def fetch_domestic_yahoo_macro() -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    rows_by_key = _fetch_yahoo_api_batch(DOMESTIC_YAHOO_INSTRUMENTS)
-    for inst in DOMESTIC_YAHOO_INSTRUMENTS:
-        rows.append(rows_by_key.get(inst.key) or _fetch_yahoo_quote(inst) or _missing_macro_row(inst))
-    return rows
+    return _fetch_macro_rows(DOMESTIC_YAHOO_INSTRUMENTS)

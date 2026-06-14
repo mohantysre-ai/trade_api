@@ -21,6 +21,13 @@ type DrawerContent = {
 
 type TabKey = 'marketSnapshot' | 'assetMatrix' | 'icGates';
 
+const INDIA_MARKET_LABELS = new Set(['NIFTY 50', 'SENSEX', 'NIFTY BANK', 'NIFTY IT', 'NIFTY PHARMA']);
+const GLOBAL_ONLY_LABELS = new Set(['BRENT CRUDE', 'BRENT CRUDE OIL']);
+
+function normalizeMarketLabel(label: string) {
+  return label.toUpperCase().replace(/\s+/g, ' ');
+}
+
 function marketStateClass(state: string) {
   if (state === 'POSITIVE') return 'text-emerald-500';
   if (state === 'NEGATIVE') return 'text-red-500';
@@ -287,11 +294,24 @@ export default function IrosMasterAdvancedTerminal() {
   const selectedTickerForView = useMemo(() => selectedTicker || stocks[0]?.ticker || '', [selectedTicker, stocks]);
   const poolOptions = liveMarket?.availablePools ?? ['Nifty 500', 'Nifty 100', 'Next 100', 'Mid Cap', 'Small Cap', 'Micro Cap', 'Live Universe'];
 
-  const currentMacros = useMemo(() => liveMarket?.macroDataStrip?.[terminalMode] ?? [], [terminalMode, liveMarket]);
+  const currentMacros = useMemo(() => {
+    const macros = liveMarket?.macroDataStrip?.[terminalMode] ?? [];
+    const globalIndices = liveMarket?.globalMacro?.indices ?? [];
+    const seen = new Set(macros.map((item) => normalizeMarketLabel(item.label)));
+    const indiaFromGlobal = globalIndices.filter((item) => INDIA_MARKET_LABELS.has(normalizeMarketLabel(item.label)));
+    const merged = [
+      ...macros.filter((item) => !GLOBAL_ONLY_LABELS.has(normalizeMarketLabel(item.label))),
+      ...indiaFromGlobal.filter((item) => !seen.has(normalizeMarketLabel(item.label))),
+    ];
+    return merged;
+  }, [terminalMode, liveMarket]);
   const globalMacroItems = useMemo(() => {
     const g = liveMarket?.globalMacro;
     if (!g) return [];
-    return [...(g.indices ?? []), ...(g.commodities ?? [])];
+    return [
+      ...(g.indices ?? []).filter((item) => !INDIA_MARKET_LABELS.has(normalizeMarketLabel(item.label))),
+      ...(g.commodities ?? []),
+    ];
   }, [liveMarket]);
 
   const marketIntelligence = liveMarket?.terminalIntelligence as TerminalIntelligence | undefined;
