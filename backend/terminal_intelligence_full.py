@@ -710,6 +710,90 @@ def _ticker_intraday_text(stock: dict[str, Any]) -> str:
     return f"{trigger}, VWAP {vwap}, EMA9 {ema9}, ATR {atr}%, volume multiplier {volume_multiplier}x"
 
 
+def _build_dynamic_selection_reason(stock: dict[str, Any], score: float) -> str:
+    intraday = stock.get("intraday") or {}
+    price_above_vwap = bool(intraday.get("price_above_vwap"))
+    price_above_ema9 = bool(intraday.get("price_above_ema9"))
+    volume_multiplier = float(intraday.get("volume_multiplier") or 0)
+    turnover_cr = float(intraday.get("turnover_cr") or 0)
+    atr = float(intraday.get("atr_pct") or 0)
+    delta = _parse_percent(stock.get("delta"))
+    trigger = intraday.get("trigger_point") or "intraday trigger"
+
+    trend_text = "trend follow-through above VWAP and EMA9" if (price_above_vwap and price_above_ema9) else "mixed trend around intraday anchors"
+    momentum_text = f"delta {delta:.2f}% with score {score:.1f}"
+    liquidity_text = (
+        f"volume {volume_multiplier:.2f}x and turnover {turnover_cr:.2f} Cr"
+        if turnover_cr > 0
+        else f"volume {volume_multiplier:.2f}x with limited turnover visibility"
+    )
+    risk_text = "contained volatility" if atr <= 2.5 else "elevated volatility"
+    filter_text = "hard-filter pass" if intraday.get("passes_hard_filters") else "watch-list hard-filter state"
+
+    return (
+        f"{trend_text}; {momentum_text}; {liquidity_text}; "
+        f"{risk_text}; trigger {trigger}; {filter_text}."
+    )
+
+
+def _build_ticker_reason_prompt(ticker: str, stock: dict[str, Any], score: float) -> str:
+    intraday = stock.get("intraday") or {}
+    payload = {
+        "ticker": ticker,
+        "name": stock.get("name"),
+        "ltp": stock.get("ltp"),
+        "delta_pct": _parse_percent(stock.get("delta")),
+        "score": score,
+        "intraday": {
+            "price_above_vwap": bool(intraday.get("price_above_vwap")),
+            "price_above_ema9": bool(intraday.get("price_above_ema9")),
+            "atr_pct": float(intraday.get("atr_pct") or 0),
+            "volume_multiplier": float(intraday.get("volume_multiplier") or 0),
+            "turnover_cr": float(intraday.get("turnover_cr") or 0),
+            "trigger_point": intraday.get("trigger_point"),
+            "passes_hard_filters": bool(intraday.get("passes_hard_filters")),
+            "hard_filter_reasons": intraday.get("hard_filter_reasons") or [],
+        },
+    }
+    return (
+        "Generate a concise ticker-specific selection reason using ONLY the structured live metrics below. "
+        "Return valid JSON only with this exact shape: {\"selection_reason\":\"...\"}. "
+        "Keep it factual, no hype, max 220 chars.\n\n"
+        f"{json.dumps(payload, ensure_ascii=False)}"
+    )
+
+
+def _on_demand_ticker_selection_reason(ticker: str, stock: dict[str, Any], score: float) -> str:
+    fallback = _build_dynamic_selection_reason(stock, score)
+    llm_config = _llm_config()
+    if llm_config is None or not _llm_quota_available():
+        return fallback
+
+    provider, api_key, api_url, model = llm_config
+    system_instruction = (
+        "You are an institutional trading co-pilot. "
+        "Produce one ticker-specific selection reason from supplied live metrics only. "
+        "No generic text. Return JSON only."
+    )
+    prompt = _build_ticker_reason_prompt(ticker, stock, score)
+
+    try:
+        if provider == "gemini":
+            raw = _call_gemini(prompt, api_key, model, system_instruction)
+        else:
+            raw = _call_openai(prompt, api_key, api_url, model)
+
+        data = json.loads(_json_block(raw))
+        reason = _clean_value((data or {}).get("selection_reason"))
+        return reason or fallback
+    except Exception as exc:
+        err = str(exc)
+        if "429" in err:
+            _record_quota_error(err)
+        _logging.getLogger(__name__).warning("On-demand ticker reason LLM call failed for %s: %s", ticker, err)
+        return fallback
+
+
 def _ticker_factor_hub(stock: dict[str, Any], score: float) -> dict[str, Any]:
     intraday = stock.get("intraday") or {}
     price_above_vwap = bool(intraday.get("price_above_vwap"))
@@ -727,7 +811,7 @@ def _ticker_factor_hub(stock: dict[str, Any], score: float) -> dict[str, Any]:
         dominant = "liquidity and mean-reversion around intraday anchors"
 
     return {
-        "selection_reason": "ticker-specific factor attribution from live quote, volume, and intraday structure",
+        "selection_reason": _build_dynamic_selection_reason(stock, score),
         "dominant_factors": dominant,
         "momentum_factor": f"{'Above' if price_above_vwap and price_above_ema9 else 'Near'} VWAP/EMA9; score {score:.1f}.",
         "liquidity_factor": f"Volume multiplier {volume_multiplier:.2f}x; turnover {turnover_cr:.2f} Cr." if turnover_cr else "Turnover data unavailable.",
@@ -737,12 +821,130 @@ def _ticker_factor_hub(stock: dict[str, Any], score: float) -> dict[str, Any]:
     }
 
 
+def _parse_win_loss_ratio(value: Any) -> float | None:
+    text = str(value or "").strip()
+    m = re.match(r"^\s*([0-9]+(?:\.[0-9]+)?)\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*$", text)
+    if not m:
+        return None
+    try:
+        left = float(m.group(1))
+        right = float(m.group(2))
+        if right <= 0:
+            return None
+        return left / right
+    except Exception:
+        return None
+
+
+def _parse_percent_value(value: Any) -> float | None:
+    text = str(value or "").strip()
+    m = re.match(r"^\s*([0-9]+(?:\.[0-9]+)?)\s*%\s*$", text)
+    if not m:
+        return None
+    try:
+        return float(m.group(1))
+    except Exception:
+        return None
+
+
+def _risk_flag_from_metrics(
+    score: float,
+    delta: float,
+    atr: float,
+    volume_multiplier: float,
+    win_loss_ratio_text: Any,
+    kelly_policy_text: Any,
+) -> tuple[float, str]:
+    # Start at neutral 50 and move based on risk signals
+    risk_score = 50.0
+
+    # Score: higher score lowers risk
+    if score >= 75:
+        risk_score -= 18
+    elif score >= 60:
+        risk_score -= 10
+    elif score >= 45:
+        risk_score -= 2
+    else:
+        risk_score += 10
+
+    # Delta: extreme moves increase risk (both directions)
+    abs_delta = abs(delta)
+    if abs_delta >= 6:
+        risk_score += 12
+    elif abs_delta >= 3:
+        risk_score += 6
+    elif abs_delta < 1:
+        risk_score -= 2
+
+    # ATR: volatility proxy
+    if atr >= 4:
+        risk_score += 18
+    elif atr >= 3:
+        risk_score += 10
+    elif atr >= 2:
+        risk_score += 4
+    else:
+        risk_score -= 4
+
+    # Volume multiplier: very low participation increases risk, healthy lowers risk
+    if volume_multiplier >= 2.0:
+        risk_score -= 8
+    elif volume_multiplier >= 1.0:
+        risk_score -= 4
+    elif volume_multiplier < 0.5:
+        risk_score += 8
+
+    # Win/Loss ratio: better ratio lowers risk
+    wl_ratio = _parse_win_loss_ratio(win_loss_ratio_text)
+    if wl_ratio is not None:
+        if wl_ratio >= 3.0:
+            risk_score -= 10
+        elif wl_ratio >= 1.8:
+            risk_score -= 5
+        elif wl_ratio < 1.0:
+            risk_score += 8
+
+    # Kelly policy max: if available and high, generally lower inferred risk
+    kelly_pct = _parse_percent_value(kelly_policy_text)
+    if kelly_pct is not None:
+        if kelly_pct >= 12:
+            risk_score -= 8
+        elif kelly_pct >= 6:
+            risk_score -= 4
+        elif kelly_pct <= 2:
+            risk_score += 4
+
+    risk_score = max(0.0, min(100.0, risk_score))
+
+    if risk_score < 30:
+        flag = "LOW_RISK"
+    elif risk_score < 55:
+        flag = "MODERATE_RISK"
+    elif risk_score < 75:
+        flag = "HIGH_RISK"
+    else:
+        flag = "EXTREME_RISK"
+
+    return round(risk_score, 2), flag
+
+
 def _ticker_risk_calc(stock: dict[str, Any], ledger_row: dict[str, Any], market_risk: dict[str, Any], score: float) -> dict[str, Any]:
     intraday = stock.get("intraday") or {}
     delta = _parse_percent(stock.get("delta"))
     atr = float(intraday.get("atr_pct") or 0)
     turnover_cr = float(intraday.get("turnover_cr") or 0)
     volume_multiplier = float(intraday.get("volume_multiplier") or 0)
+    win_loss_ratio = market_risk.get("win_loss_ratio", "—")
+    kelly_policy_max = ledger_row.get("policy_allocation_pct") or market_risk.get("kelly_policy_max", "—")
+    risk_flag_score, risk_flag = _risk_flag_from_metrics(
+        score=score,
+        delta=delta,
+        atr=atr,
+        volume_multiplier=volume_multiplier,
+        win_loss_ratio_text=win_loss_ratio,
+        kelly_policy_text=kelly_policy_max,
+    )
     return {
         "ticker_score": round(score, 2),
         "delta_pct": round(delta, 2),
@@ -751,8 +953,10 @@ def _ticker_risk_calc(stock: dict[str, Any], ledger_row: dict[str, Any], market_
         "volume_multiplier": round(volume_multiplier, 2),
         "selection_risk": "lower" if score >= 70 and delta >= 0 else "moderate" if score >= 50 else "higher",
         "signal_quality": "live-derived" if stock else "snapshot-ledger",
-        "win_loss_ratio": market_risk.get("win_loss_ratio", "—"),
-        "kelly_policy_max": ledger_row.get("policy_allocation_pct") or market_risk.get("kelly_policy_max", "—"),
+        "win_loss_ratio": win_loss_ratio,
+        "kelly_policy_max": kelly_policy_max,
+        "risk_flag_score": risk_flag_score,
+        "risk_flag": risk_flag,
     }
 
 
@@ -1177,4 +1381,10 @@ def execute_terminal_intelligence_pipeline(live_unstructured_stream: str) -> Com
     return _heuristic_analysis(live_unstructured_stream, focus_ticker)
 
 
-__all__ = ["build_ticker_intelligence_map", "build_ticker_intelligence_report", "execute_terminal_intelligence_pipeline", "TOP_SELECTION_COUNT"]
+__all__ = [
+    "build_ticker_intelligence_map",
+    "build_ticker_intelligence_report",
+    "execute_terminal_intelligence_pipeline",
+    "_on_demand_ticker_selection_reason",
+    "TOP_SELECTION_COUNT",
+]
