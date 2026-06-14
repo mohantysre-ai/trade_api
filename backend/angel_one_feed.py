@@ -16,6 +16,7 @@ import re
 import sys
 import threading
 import time
+import httpx # Added for internal API calls
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -61,6 +62,8 @@ NIFTY_100_CACHE_PATH = BASE_DIR / "nifty100_instruments.json"
 ANGEL_API_TIMEOUT_SECONDS = int(os.getenv("ANGEL_API_TIMEOUT_SECONDS", "12"))
 QUOTE_CHUNK_SIZE = int(os.getenv("QUOTE_CHUNK_SIZE", "10"))
 INTRADAY_CHUNK_SIZE = int(os.getenv("INTRADAY_CHUNK_SIZE", "10"))
+
+AI_NEWS_API_URL = os.getenv("AI_NEWS_API_URL", "http://127.0.0.1:8001")
 
 
 def _refresh_task_key(pool_name: str | None, custom_prompt: str | None) -> str:
@@ -1446,6 +1449,25 @@ def create_app() -> FastAPI:
                     "reason": payload.get("selectionMeta", {}).get("reason") or "Live refresh explicitly requested.",
                     "dataDate": payload.get("selectionMeta", {}).get("dataDate") or _payload_data_date(payload),
                 }
+
+            # --- New logic: Sequentially call AI News API for each ticker ---
+            stocks_to_refresh_news = payload.get("stocks", [])
+            if stocks_to_refresh_news:
+                async with httpx.AsyncClient() as http_client:
+                    for stock in stocks_to_refresh_news:
+                        ticker = stock.get("ticker")
+                        if ticker:
+                            news_refresh_url = f"{AI_NEWS_API_URL}/api/ticker-news?ticker={ticker}&force_refresh=true"
+                            try:
+                                response = await http_client.get(news_refresh_url, timeout=30)
+                                response.raise_for_status()
+                                print(f"INFO: Refreshed news for ticker {ticker}")
+                            except httpx.RequestError as exc:
+                                print(f"WARNING: Failed to refresh news for ticker {ticker}: {exc}")
+                            except httpx.HTTPStatusError as exc:
+                                print(f"WARNING: Failed to refresh news for ticker {ticker}, status {exc.response.status_code}: {exc.response.text}")
+            # --- End new logic ---
+
             _save_last_snapshot(payload)
             return {
                 "success": True,

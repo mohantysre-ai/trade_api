@@ -8,3 +8,4 @@ logzero>=1.7.0
 websocket-client>=1.8.0
 yfinance>=0.2.50
 google-genai>=0.18.0
+httpx>=0.27.0
