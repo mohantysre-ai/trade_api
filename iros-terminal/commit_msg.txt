@@ -1,0 +1,10 @@
+feat: AI-powered ticker news scraper + LLM summarizer pipeline
+
+- New Python scraper scrapes Moneycontrol, ET, Yahoo Finance, Google News RSS, NSE announcements
+- Uses Gemini LLM to classify news into 10 structured categories
+- Fallback rule-based categorization when Gemini API key is not set
+- FastAPI server on port 8001 with caching
+- Next.js proxy route with graceful mock fallback when backend is offline
+- New AITickerNewsPanel component with intelligence cards, sentiment, risk flags
+- RightDrawer updated with AI News Summary + Terminal Analysis tabs
+- AITickerNewsReport type + fetchTickerNewsReport() in market-api.ts
