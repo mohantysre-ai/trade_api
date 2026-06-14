@@ -46,7 +46,7 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[9px] uppercase tracking-wider text-slate-500">GLOBAL INDICES</span>
+        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">GLOBAL INDICES</span>
         {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
@@ -66,6 +66,42 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
   );
 }
 
+function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
+  if (!items.length) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-lg p-4 text-slate-400 text-[10px] shadow-sm">
+        Waiting for commodities & FX data.
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">COMMODITIES & FX</span>
+        {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+        {items.map((item) => {
+          let displayLabel = item.label;
+          if (displayLabel === 'BRENT CRUDE OIL') displayLabel = 'BRENT CRUDE';
+          return (
+            <div key={`${item.label}-${item.val}-${item.state}`} className="bg-slate-50 border border-slate-100 p-2 rounded">
+              <span className="text-[9px] text-slate-500 block uppercase tracking-wider">{displayLabel}</span>
+              <span className="text-sm font-bold text-slate-900 block mt-0.5">{item.val}</span>
+              <span
+                className={`text-[9px] block ${marketStateClass(item.state)}`}
+              >
+                {item.delta}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
     return (
@@ -78,21 +114,25 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[9px] uppercase tracking-wider text-slate-500">INDIA MARKETS</span>
+        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">INDIA MARKETS</span>
         {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-        {items.map((item) => (
-          <div key={`${item.label}-${item.val}-${item.state}`} className="bg-white border border-slate-100 p-2 rounded">
-            <span className="text-[9px] text-slate-500 block uppercase tracking-wider">{item.label}</span>
-            <span className="text-sm font-bold text-slate-900 block mt-0.5">{item.val}</span>
-            <span
-              className={`text-[9px] block ${marketStateClass(item.state)}`}
-            >
-              {item.delta}
-            </span>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
+        {items.map((item) => {
+          let displayLabel = item.label;
+          if (displayLabel === 'USD / INR Spot') displayLabel = 'USD / INR';
+          return (
+            <div key={`${item.label}-${item.val}-${item.state}`} className="bg-slate-50 border border-slate-100 p-2 rounded">
+              <span className="text-[9px] text-slate-500 block uppercase tracking-wider">{displayLabel}</span>
+              <span className="text-sm font-bold text-slate-900 block mt-0.5">{item.val}</span>
+              <span
+                className={`text-[9px] block ${marketStateClass(item.state)}`}
+              >
+                {item.delta}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -305,13 +345,16 @@ export default function IrosMasterAdvancedTerminal() {
     ];
     return merged;
   }, [terminalMode, liveMarket]);
-  const globalMacroItems = useMemo(() => {
+  const globalIndices = useMemo(() => {
     const g = liveMarket?.globalMacro;
     if (!g) return [];
-    return [
-      ...(g.indices ?? []).filter((item) => !INDIA_MARKET_LABELS.has(normalizeMarketLabel(item.label))),
-      ...(g.commodities ?? []),
-    ];
+    return (g.indices ?? []).filter((item) => !INDIA_MARKET_LABELS.has(normalizeMarketLabel(item.label)));
+  }, [liveMarket]);
+
+  const commodities = useMemo(() => {
+    const g = liveMarket?.globalMacro;
+    if (!g) return [];
+    return g.commodities ?? [];
   }, [liveMarket]);
 
   const marketIntelligence = liveMarket?.terminalIntelligence as TerminalIntelligence | undefined;
@@ -435,7 +478,8 @@ export default function IrosMasterAdvancedTerminal() {
         {activeTab === 'marketSnapshot' && (
           <div className="grid grid-cols-1 gap-4">
             <div className="space-y-4">
-              <GlobalIndicesGrid items={globalMacroItems} staleLabel={staleMacroLabel} />
+              <GlobalIndicesGrid items={globalIndices} staleLabel={staleMacroLabel} />
+              <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} />
               <IndiaMarketsGrid items={currentMacros} staleLabel={staleMacroLabel} />
               <NewsFeedPanel items={liveMarket?.news} now={now} />
             </div>
