@@ -445,7 +445,7 @@ export default function IrosMasterAdvancedTerminal() {
                   disabled={feedStatus === 'loading'}
                   className="px-3 py-1.5 rounded-full bg-teal-600 text-white text-[10px] font-black uppercase tracking-wider hover:bg-teal-500 disabled:opacity-50 transition"
                 >
-                  Snapshot
+                  Refresh
                 </button>
               </div>
             </div>
@@ -495,9 +495,9 @@ export default function IrosMasterAdvancedTerminal() {
         {activeTab === 'assetMatrix' && (
           <div className="space-y-4">
             <ForensicPanel
-              pool={selectedPool}
               onSelect={handleSelect}
-              invalidateKey={invalidateKey}
+              liveMarket={liveMarket}
+              refreshOnDemand={refreshOnDemand}
             />
             <StockDetailPanel stock={selectedQuote} />
             <LiveIntelligencePanel />

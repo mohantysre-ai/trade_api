@@ -46,6 +46,22 @@ if errorlevel 1 (
 )
 
 echo.
+echo [*] Running health checks...
+timeout /t 5 /nobreak >nul
+
+echo [*] Checking Market API (port 8000)...
+for /f %%i in ('powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/health' -UseBasicParsing -TimeoutSec 5; exit 0 } catch { exit 1 }" 2^>nul') do set HEALTH=%%i
+if %errorlevel% equ 0 ( echo     Market API: OK ) else ( echo     Market API: FAILED )
+
+echo [*] Checking AI News API (port 8001)...
+for /f %%i in ('powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:8001/health' -UseBasicParsing -TimeoutSec 5; exit 0 } catch { exit 1 }" 2^>nul') do set HEALTH=%%i
+if %errorlevel% equ 0 ( echo     AI News API: OK ) else ( echo     AI News API: FAILED )
+
+echo [*] Checking Frontend (port 3000)...
+for /f %%i in ('powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:3000' -UseBasicParsing -TimeoutSec 5; exit 0 } catch { exit 1 }" 2^>nul') do set HEALTH=%%i
+if %errorlevel% equ 0 ( echo     Frontend: OK ) else ( echo     Frontend: FAILED )
+
+echo.
 echo ================================================
 echo Restart command completed.
 echo Market API:   http://localhost:8000

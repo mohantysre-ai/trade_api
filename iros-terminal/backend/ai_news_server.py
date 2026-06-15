@@ -13,9 +13,27 @@ import logging
 import os
 import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 # Add parent path so we can import ai_ticker_news
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# Load environment variables from the main backend .env (which contains REDACTED)
+# so the AI News server can use LLM-powered summaries instead of rule-based fallback.
+_env_path = Path(__file__).resolve().parent.parent.parent / "backend" / ".env"
+if _env_path.exists():
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(_env_path)
+        logger = logging.getLogger("ai_news_server")
+        logger.info("Loaded environment from %s", _env_path)
+    except ImportError:
+        pass
+elif os.environ.get("REDACTED") or os.environ.get("GOOGLE_API_KEY"):
+    pass
+else:
+    logger = logging.getLogger("ai_news_server")
+    logger.warning("No .env found at %s — LLM summarization disabled", _env_path)
 
 try:
     from ai_ticker_news import generate_ticker_news_report

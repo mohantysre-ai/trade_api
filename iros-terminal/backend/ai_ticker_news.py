@@ -396,7 +396,7 @@ async def scrape_all_sources(ticker: str) -> list[TickerNewsArticle]:
 # ---------------------------------------------------------------------------
 
 def summarize_with_gemini(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:
-    """Use Google Gemini to produce a structured news summary."""
+    """Use Google Gemini to produce a structured news summary with model fallback on 429."""
     gemini_api_key = os.environ.get("REDACTED") or os.environ.get("GOOGLE_API_KEY")
     if not gemini_api_key:
         logger.warning("No REDACTED or GOOGLE_API_KEY set — falling back to rule-based summary")
@@ -404,15 +404,23 @@ def summarize_with_gemini(ticker: str, company: str, articles: list[TickerNewsAr
 
     try:
         from google import genai
-        client = genai.Client(api_key=gemini_api_key)
+    except ImportError:
+        logger.warning("google-genai not installed — falling back to rule-based summary")
+        return _rule_based_summary(ticker, company, articles)
 
-        # Build a concise article feed for the LLM
-        article_text = "\n\n".join(
-            f"Title: {a.title}\nSource: {a.source}\nSummary: {a.summary}\nPublished: {a.published_at}\nURL: {a.url}"
-            for a in articles[:30]  # Limit to 30 articles
-        )
+    primary_model = os.environ.get("LLM_MODEL", "gemini-2.0-flash")
+    fallback_models = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+    model_list = [primary_model]
+    for m in fallback_models:
+        if m not in model_list:
+            model_list.append(m)
 
-        prompt = f"""You are a financial news analyst. Analyze the following news articles for the company "{company}" (ticker: {ticker}) on the Indian stock market.
+    article_text = "\n\n".join(
+        f"Title: {a.title}\nSource: {a.source}\nSummary: {a.summary}\nPublished: {a.published_at}\nURL: {a.url}"
+        for a in articles[:30]
+    )
+
+    prompt = f"""You are a financial news analyst. Analyze the following news articles for the company "{company}" (ticker: {ticker}) on the Indian stock market.
 
 For each of the categories below, provide a concise 1-3 sentence summary based ONLY on information present in the articles. If no information is found for a category, write "No recent news found."
 
@@ -439,40 +447,53 @@ Here are the articles:
 Respond ONLY in valid JSON format with these exact keys: insider_activity, institutional_activity, order_book_block_deals, future_expansion_capex, auditor_changes, dividend_news, new_orders_contracts, earnings_results, management_changes, regulatory_filings, sentiment_overall, risk_flags, summary_headline
 """
 
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
-            config={
-                "temperature": 0.1,
-                "max_output_tokens": 2048,
-            },
-        )
+    expected_keys = [
+        "insider_activity", "institutional_activity", "order_book_block_deals",
+        "future_expansion_capex", "auditor_changes", "dividend_news",
+        "new_orders_contracts", "earnings_results", "management_changes",
+        "regulatory_filings", "sentiment_overall", "risk_flags", "summary_headline"
+    ]
 
-        text = response.text.strip()
-        # Extract JSON from response (handle markdown code blocks)
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0].strip()
+    last_error = None
+    for model in model_list:
+        try:
+            client = genai.Client(api_key=gemini_api_key)
 
-        result = json.loads(text)
-        # Validate expected keys
-        expected_keys = [
-            "insider_activity", "institutional_activity", "order_book_block_deals",
-            "future_expansion_capex", "auditor_changes", "dividend_news",
-            "new_orders_contracts", "earnings_results", "management_changes",
-            "regulatory_filings", "sentiment_overall", "risk_flags", "summary_headline"
-        ]
-        for key in expected_keys:
-            if key not in result:
-                result[key] = "No recent news found."
+            response = client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config={
+                    "temperature": 0.1,
+                    "max_output_tokens": 2048,
+                },
+            )
 
-        logger.info("Gemini analysis complete for %s — sentiment: %s", ticker, result.get("sentiment_overall", "N/A"))
-        return result
+            text = response.text.strip()
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0].strip()
+            elif "```" in text:
+                text = text.split("```")[1].split("```")[0].strip()
 
-    except Exception as e:
-        logger.error("Gemini summarization failed for %s: %s", ticker, e)
-        return _rule_based_summary(ticker, company, articles)
+            result = json.loads(text)
+            for key in expected_keys:
+                if key not in result:
+                    result[key] = "No recent news found."
+
+            logger.info("Gemini analysis complete for %s using model %s — sentiment: %s", ticker, model, result.get("sentiment_overall", "N/A"))
+            return result
+
+        except Exception as e:
+            err_str = str(e).lower()
+            is_rate_limit = "429" in str(e) or "rate limit" in err_str or "quota" in err_str or "resource exhausted" in err_str
+            if is_rate_limit:
+                logger.warning("Model %s hit rate limit for %s, trying next model...", model, ticker)
+                last_error = e
+                continue
+            logger.error("Gemini summarization with model %s failed for %s: %s — falling back to rule-based summary", model, ticker, e)
+            return _rule_based_summary(ticker, company, articles)
+
+    logger.error("All Gemini models failed for %s. Last error: %s", ticker, last_error)
+    return _rule_based_summary(ticker, company, articles)
 
 
 def _rule_based_summary(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:

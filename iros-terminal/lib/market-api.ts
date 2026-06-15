@@ -216,7 +216,7 @@ export async function fetchRefreshDataOnDemand(pool?: string): Promise<MarketDat
     method: "POST",
     cache: "no-store",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ pool }),
+    body: JSON.stringify({ pool, refreshTickerNews: false }),
   });
 
   if (!res.ok) {
@@ -249,13 +249,17 @@ export function useMarketData(pool?: string, pollMs = 30_000) {
   // Shared invalidate key so consumers can coordinate revalidation
   const [invalidateKey, setInvalidateKey] = useState(0);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (forceLive: boolean = false) => {
     if (status === "loading") {
       return;
     }
     setStatus((prev) => (prev === "idle" ? "loading" : prev));
     try {
-      const payload = await fetchMarketData(pool);
+      // Use the on-demand refresh endpoint when forceLive is true,
+      // so the frontend doesn't revert to a stale snapshot mid-session.
+      const payload = forceLive
+        ? await fetchRefreshDataOnDemand(pool)
+        : await fetchMarketData(pool);
       setData(payload);
       setStatus("live");
       setError(null);
@@ -287,7 +291,12 @@ export function useMarketData(pool?: string, pollMs = 30_000) {
     const tick = async () => {
       const age = Date.now() - lastUpdatedAt;
       if (age >= STALE_AFTER_MS) {
-        await refresh();
+        try {
+          await refresh(false);
+        } catch {
+          setStatus("offline");
+          setError("Feed unavailable");
+        }
       }
     };
     tick();
