@@ -100,9 +100,11 @@ const tone = (n: number) =>
 function TickerCard({ t }: { t: Tick }) {
   const isPos = t.delta > 0;
   const isNeg = t.delta < 0;
+  // Use high-contrast border indicators
+  const borderColor = isPos ? "border-l-4 border-l-emerald-600" : isNeg ? "border-l-4 border-rose-600" : "border-l-4 border-l-slate-300";
   
   return (
-    <div className={`group relative border px-3 py-2.5 transition-colors hover:bg-card ${isPos ? "border-positive hover:border-positive" : isNeg ? "border-negative hover:border-negative" : "border-border hover:border-primary/40"} bg-card/60`}>
+    <div className={`group relative border border-slate-200 px-3 py-2.5 transition-colors hover:bg-slate-50 ${isPos ? "hover:border-l-emerald-600" : isNeg ? "hover:border-l-rose-600" : "hover:border-l-slate-400"} ${borderColor} bg-white`}>
       <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
         {t.label}
       </div>
