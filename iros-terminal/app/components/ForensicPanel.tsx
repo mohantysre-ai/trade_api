@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import useSWR from 'swr';
-import { type MarketDataResponse } from '@/lib/market-api';
+import React, { useMemo, useState } from 'react';
+import type { MarketDataResponse, TerminalIntelligence, LiveStock } from '@/lib/market-api';
 
 type AssetRow = {
   ticker: string;
@@ -15,34 +14,18 @@ type AssetRow = {
   state?: string;
 };
 
-const fetcher = async (url: string): Promise<MarketDataResponse> =>
-  fetch(url).then((r) => r.json());
-
 export default function ForensicPanel({
   onSelect,
-  pool,
-  invalidateKey,
+  liveMarket,
+  refreshOnDemand,
 }: {
   onSelect?: (ticker: string) => void;
-  pool?: string;
-  invalidateKey?: number;
+  liveMarket?: MarketDataResponse | null;
+  refreshOnDemand?: () => Promise<void>;
 }) {
-  const url = pool ? `/api/market-data?pool=${encodeURIComponent(pool)}` : '/api/market-data';
-  const { data, mutate } = useSWR<MarketDataResponse>(url, fetcher, {
-    refreshInterval: 0,
-  });
   const [refreshing, setRefreshing] = useState(false);
 
-  // When the parent's invalidateKey bumps (e.g. after Snapshot click),
-  // revalidate this panel's SWR cache so it picks up fresh backend data.
-  useEffect(() => {
-    if (invalidateKey !== undefined && invalidateKey > 0) {
-      mutate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invalidateKey]);
-
-  const live = data ?? null;
+  const live = liveMarket ?? null;
   const stocks = live?.stocks ?? [];
   const intelligence = live?.terminalIntelligence ?? null;
 
@@ -131,15 +114,9 @@ export default function ForensicPanel({
   const refresh = async () => {
     setRefreshing(true);
     try {
-      // Trigger the backend on-demand refresh first, then revalidate SWR cache
-      const poolValue = pool ?? '';
-      await fetch('/api/refresh-data-on-demand', {
-        method: 'POST',
-        cache: 'no-store',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ pool: poolValue }),
-      });
-      await mutate();
+      if (refreshOnDemand) {
+        await refreshOnDemand();
+      }
     } finally {
       setRefreshing(false);
     }

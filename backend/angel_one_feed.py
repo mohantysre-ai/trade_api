@@ -20,6 +20,7 @@ import httpx # Added for internal API calls
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 from xml.etree import ElementTree as ET
 from zoneinfo import ZoneInfo
 
@@ -1127,7 +1128,7 @@ def _build_payload_from_live_data(
         "rawSources": _news_feed_sources(),
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "mockTickers": sorted(MOCK_TICKERS),
-        "availablePools": [NIFTY_100_LABEL, LIVE_UNIVERSE_LABEL],
+        "availablePools": [NIFTY_100_LABEL, "Nifty 500", LIVE_UNIVERSE_LABEL],
         "activePool": resolved_pool_name,
         "poolDescription": (
             "Nifty 100 Angel One live universe ranked by your filter prompt."
@@ -1188,7 +1189,7 @@ def build_market_payload(
                 "success": False,
                 "error": "Live refresh was requested but the scheduled refresh window is not active and fallback is disabled.",
                 "rawSources": _news_feed_sources(),
-                "availablePools": [NIFTY_100_LABEL, LIVE_UNIVERSE_LABEL],
+                "availablePools": [NIFTY_100_LABEL, "Nifty 500", LIVE_UNIVERSE_LABEL],
                 "activePool": pool_name or NIFTY_100_LABEL,
                 "poolDescription": "Nifty 100 Angel One live universe ranked by your filter prompt.",
                 "stocks": [],
@@ -1211,7 +1212,7 @@ def build_market_payload(
             "success": False,
             "error": "No cached snapshot available. Live refresh runs only during the morning or evening IST windows.",
             "rawSources": _news_feed_sources(),
-            "availablePools": [NIFTY_100_LABEL, LIVE_UNIVERSE_LABEL],
+            "availablePools": [NIFTY_100_LABEL, "Nifty 500", LIVE_UNIVERSE_LABEL],
             "activePool": pool_name or NIFTY_100_LABEL,
             "poolDescription": "Nifty 100 Angel One live universe ranked by your filter prompt.",
             "stocks": [],
@@ -1450,18 +1451,29 @@ def create_app() -> FastAPI:
                     "dataDate": payload.get("selectionMeta", {}).get("dataDate") or _payload_data_date(payload),
                 }
 
-            # --- New logic: Sequentially call AI News API for each ticker ---
-            stocks_to_refresh_news = payload.get("stocks", [])
-            if stocks_to_refresh_news:
+            refresh_ticker_news = bool(
+                body.get("refreshTickerNews", body.get("refresh_ticker_news", False))
+            )
+
+            # Refreshing every ticker news report is intentionally opt-in.
+            # The default keeps Snapshot/refresh responsive; ticker news can still
+            # be refreshed on demand from the drawer when needed.
+            if refresh_ticker_news and stocks_to_refresh_news:
                 async with httpx.AsyncClient() as http_client:
                     for stock in stocks_to_refresh_news:
                         ticker = stock.get("ticker")
                         if ticker:
-                            news_refresh_url = f"{AI_NEWS_API_URL}/api/ticker-news?ticker={ticker}&force_refresh=true"
+                            encoded_ticker = quote(str(ticker), safe="")
+                            news_refresh_url = (
+                                f"{AI_NEWS_API_URL}/api/ticker-news?"
+                                f"ticker={encoded_ticker}&max_articles=20&include_raw=false&force_refresh=true"
+                            )
                             try:
-                                response = await http_client.get(news_refresh_url, timeout=30)
+                                response = await http_client.get(news_refresh_url, timeout=8)
                                 response.raise_for_status()
                                 print(f"INFO: Refreshed news for ticker {ticker}")
+                            except httpx.TimeoutException as exc:
+                                print(f"WARNING: Timed out refreshing news for ticker {ticker}: {exc}")
                             except httpx.RequestError as exc:
                                 print(f"WARNING: Failed to refresh news for ticker {ticker}: {exc}")
                             except httpx.HTTPStatusError as exc:
