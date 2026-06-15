@@ -20,7 +20,6 @@ import httpx # Added for internal API calls
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
 from xml.etree import ElementTree as ET
 from zoneinfo import ZoneInfo
 
@@ -1455,29 +1454,23 @@ def create_app() -> FastAPI:
                 body.get("refreshTickerNews", body.get("refresh_ticker_news", False))
             )
 
-            # Refreshing every ticker news report is intentionally opt-in.
-            # The default keeps Snapshot/refresh responsive; ticker news can still
-            # be refreshed on demand from the drawer when needed.
+            stocks_to_refresh_news = [s for s in (payload.get("stocks") or []) if isinstance(s, dict) and s.get("ticker")]
+
             if refresh_ticker_news and stocks_to_refresh_news:
-                async with httpx.AsyncClient() as http_client:
-                    for stock in stocks_to_refresh_news:
-                        ticker = stock.get("ticker")
-                        if ticker:
-                            encoded_ticker = quote(str(ticker), safe="")
-                            news_refresh_url = (
-                                f"{AI_NEWS_API_URL}/api/ticker-news?"
-                                f"ticker={encoded_ticker}&max_articles=20&include_raw=false&force_refresh=true"
-                            )
-                            try:
-                                response = await http_client.get(news_refresh_url, timeout=8)
-                                response.raise_for_status()
-                                print(f"INFO: Refreshed news for ticker {ticker}")
-                            except httpx.TimeoutException as exc:
-                                print(f"WARNING: Timed out refreshing news for ticker {ticker}: {exc}")
-                            except httpx.RequestError as exc:
-                                print(f"WARNING: Failed to refresh news for ticker {ticker}: {exc}")
-                            except httpx.HTTPStatusError as exc:
-                                print(f"WARNING: Failed to refresh news for ticker {ticker}, status {exc.response.status_code}: {exc.response.text}")
+                tickers = [s["ticker"] for s in stocks_to_refresh_news]
+                try:
+                    async with httpx.AsyncClient() as http_client:
+                        response = await http_client.post(
+                            f"{AI_NEWS_API_URL}/api/ticker-news/batch-check",
+                            json={"tickers": tickers, "max_articles": 20, "include_raw": False},
+                            timeout=120,
+                        )
+                        response.raise_for_status()
+                        results = response.json().get("results", [])
+                        updated = sum(1 for item in results if isinstance(item, dict) and not item.get("error") and not item.get("cached"))
+                        print(f"INFO: Refreshed {updated} ticker news reports out of {len(tickers)} in parallel.")
+                except Exception as exc:
+                    print(f"WARNING: Batch ticker-news refresh failed: {exc}")
             # --- End new logic ---
 
             _save_last_snapshot(payload)

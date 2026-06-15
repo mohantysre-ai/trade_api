@@ -211,6 +211,10 @@ async def scrape_economic_times(ticker: str, session: httpx.AsyncClient) -> list
                 if p_text:
                     summary = p_text.get_text(strip=True)
 
+            if not any(kw.lower() in title.lower() for kw in [ticker.lower(), company[:10].lower()]):
+                if summary and not any(kw.lower() in summary.lower() for kw in [ticker.lower(), company[:10].lower()]):
+                    continue
+
             articles.append(TickerNewsArticle(
                 title=title[:300],
                 source="Economic Times",
@@ -395,7 +399,10 @@ async def scrape_all_sources(ticker: str) -> list[TickerNewsArticle]:
 # LLM Summarizer
 # ---------------------------------------------------------------------------
 
-def summarize_with_gemini(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:
+_LLM_SEMAPHORE = asyncio.Semaphore(1)
+
+
+async def summarize_with_gemini(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:
     """Use Google Gemini to produce a structured news summary with model fallback on 429."""
     gemini_api_key = os.environ.get("REDACTED") or os.environ.get("GOOGLE_API_KEY")
     if not gemini_api_key:
@@ -408,8 +415,8 @@ def summarize_with_gemini(ticker: str, company: str, articles: list[TickerNewsAr
         logger.warning("google-genai not installed — falling back to rule-based summary")
         return _rule_based_summary(ticker, company, articles)
 
-    primary_model = os.environ.get("LLM_MODEL", "gemini-2.0-flash")
-    fallback_models = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+    primary_model = os.environ.get("LLM_MODEL", "gemini-2.5-flash")
+    fallback_models = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-pro","gemini-3.0-flash","gemini-3.5-flash","gemini-3.1-flash-lite"]
     model_list = [primary_model]
     for m in fallback_models:
         if m not in model_list:
@@ -454,7 +461,6 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
         "regulatory_filings", "sentiment_overall", "risk_flags", "summary_headline"
     ]
 
-    last_error = None
     for model in model_list:
         try:
             client = genai.Client(api_key=gemini_api_key)
@@ -476,10 +482,9 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
 
             result = json.loads(text)
             for key in expected_keys:
-                if key not in result:
-                    result[key] = "No recent news found."
+                result.setdefault(key, "No recent news found.")
 
-            logger.info("Gemini analysis complete for %s using model %s — sentiment: %s", ticker, model, result.get("sentiment_overall", "N/A"))
+            logger.info("Gemini analysis complete for %s using model %s", ticker, model)
             return result
 
         except Exception as e:
@@ -487,13 +492,9 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
             is_rate_limit = "429" in str(e) or "rate limit" in err_str or "quota" in err_str or "resource exhausted" in err_str
             if is_rate_limit:
                 logger.warning("Model %s hit rate limit for %s, trying next model...", model, ticker)
-                last_error = e
                 continue
             logger.error("Gemini summarization with model %s failed for %s: %s — falling back to rule-based summary", model, ticker, e)
             return _rule_based_summary(ticker, company, articles)
-
-    logger.error("All Gemini models failed for %s. Last error: %s", ticker, last_error)
-    return _rule_based_summary(ticker, company, articles)
 
 
 def _rule_based_summary(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:

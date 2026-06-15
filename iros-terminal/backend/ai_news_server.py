@@ -14,6 +14,7 @@ import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 # Add parent path so we can import ai_ticker_news
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -111,6 +112,79 @@ async def health():
     return {"status": "ok", "service": "ai-ticker-news"}
 
 
+def _check_ticker_news_fresh(ticker: str) -> dict:
+    cached = _get_cached(ticker)
+    if cached and not cached.get("error"):
+        cached["cached"] = True
+        return {"ticker": ticker.upper(), "cached": True, "error": False}
+    return {"ticker": ticker.upper(), "cached": False, "error": False, "needs_refresh": True}
+
+
+@app.post("/api/ticker-news/batch-check")
+async def ticker_news_batch_check(payload: dict[str, Any]):  # type: ignore[misc]
+    tickers = payload.get("tickers", [])
+    max_articles = payload.get("max_articles", 50)
+    include_raw = payload.get("include_raw", False)
+
+    statuses = []
+    for ticker in tickers:
+        if not ticker:
+            continue
+        cached = _get_cached(ticker)
+        if cached and not cached.get("error"):
+            entry = dict(cached)
+            entry["cached"] = True
+            entry["needs_refresh"] = False
+            statuses.append(entry)
+        else:
+            statuses.append({"ticker": ticker.upper(), "cached": False, "needs_refresh": True})
+
+    missing = [item["ticker"] for item in statuses if item.get("needs_refresh")]
+
+    fetched: dict[str, Any] = {}
+    if missing:
+        semaphore = asyncio.Semaphore(5)
+
+        async def _fetch_one(t: str) -> tuple[str, dict[str, Any]]:
+            async with semaphore:
+                try:
+                    report = await generate_ticker_news_report(
+                        ticker=t,
+                        company_name=None,
+                        max_articles=max_articles,
+                        include_raw=include_raw,
+                    )
+                    report_dict = report.to_dict()
+                    _set_cache(t, report_dict)
+                    report_dict["cached"] = False
+                    report_dict["needs_refresh"] = False
+                    return t.upper(), report_dict
+                except Exception as e:
+                    logger.error("Failed in batch fetch for %s: %s", t, e)
+                    return (
+                        t.upper(),
+                        {
+                            "error": True,
+                            "ticker": t.upper(),
+                            "message": str(e),
+                            "needs_refresh": False,
+                            "generated_at": __import__("datetime").datetime.now(
+                                __import__("datetime").timezone.utc
+                            ).isoformat(),
+                        },
+                    )
+
+        fetched = dict(await asyncio.gather(*[_fetch_one(t) for t in missing]))
+
+    results = []
+    for item in statuses:
+        ticker = item["ticker"]
+        data = fetched.get(ticker, item)
+        results.append(data)
+
+    return {"results": results}
+
+
 @app.get("/api/ticker-news")
 async def ticker_news(
     ticker: str = Query(..., description="Stock ticker symbol (e.g., RELIANCE, TCS, INFY)"),
@@ -136,12 +210,19 @@ async def ticker_news(
             include_raw=include_raw,
         )
         report_dict = report.to_dict()
+
+        from datetime import datetime, timezone
+        generated_at = report_dict.get("generated_at", datetime.now(timezone.utc).isoformat())
+        report_dict["generated_at"] = generated_at
+
+        _set_cache(ticker, report_dict)
         report_dict["cached"] = False
 
-        # Cache the result
-        _set_cache(ticker, report_dict)
-
-        return report_dict
+        return {
+            **report_dict,
+            "generated_at": generated_at,
+            "generated_by": "backend.ai_ticker_news.generate_ticker_news_report",
+        }
     except Exception as e:
         logger.error("Failed to generate report for %s: %s", ticker, e)
         return {
