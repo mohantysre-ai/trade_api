@@ -27,7 +27,7 @@
     "NSE Corporate Announcements",
     "Economic Times Markets"
   ],
-  "updatedAt": "2026-06-15T11:36:51.081795+00:00",
+  "updatedAt": "2026-06-15T17:00:19.551465+00:00",
   "mockTickers": [
     "AWFI"
   ],
@@ -36,8 +36,8 @@
     "Nifty 500",
     "Live Universe"
   ],
-  "activePool": "Nifty 500",
-  "poolDescription": "Dynamic live universe label applied for Nifty 500.",
+  "activePool": "Nifty 100",
+  "poolDescription": "Nifty 100 Angel One live universe ranked by your filter prompt.",
   "stocks": [
     {
       "ticker": "AARTIIND",
@@ -4414,8 +4414,8 @@
       },
       {
         "label": "USD / INR Spot",
-        "val": "94.72",
-        "delta": "-0.40%",
+        "val": "94.70",
+        "delta": "-0.42%",
         "state": "NEGATIVE"
       },
       {
@@ -4458,8 +4458,8 @@
       },
       {
         "label": "USD / INR Spot Close",
-        "val": "94.72",
-        "delta": "-0.40%",
+        "val": "94.70",
+        "delta": "-0.42%",
         "state": "NEGATIVE"
       },
       {
@@ -4474,24 +4474,24 @@
     "indices": [
       {
         "label": "DJI (US 30)",
-        "val": "51,202.26",
-        "delta": "+0.70%",
+        "val": "51,903.53",
+        "delta": "+1.37%",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live"
       },
       {
         "label": "S&P 500",
-        "val": "7,431.46",
-        "delta": "+0.50%",
+        "val": "7,570.11",
+        "delta": "+1.87%",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live"
       },
       {
         "label": "NASDAQ 100",
-        "val": "29,635.95",
-        "delta": "+0.64%",
+        "val": "30,543.16",
+        "delta": "+3.06%",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live"
@@ -4522,32 +4522,32 @@
       },
       {
         "label": "DAX",
-        "val": "24,952.82",
-        "delta": "+1.29%",
+        "val": "24,894.01",
+        "delta": "+1.05%",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live"
       },
       {
         "label": "CAC 40",
-        "val": "8,448.62",
-        "delta": "+1.17%",
+        "val": "8,384.01",
+        "delta": "+0.40%",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live"
       },
       {
         "label": "FTSE 100",
-        "val": "10,484.35",
-        "delta": "+0.12%",
-        "state": "POSITIVE",
+        "val": "10,430.62",
+        "delta": "-0.39%",
+        "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live"
       },
       {
         "label": "EURO STOXX 50",
-        "val": "6,262.87",
-        "delta": "+1.22%",
+        "val": "6,229.43",
+        "delta": "+0.68%",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live"
@@ -4564,33 +4564,33 @@
       },
       {
         "label": "SILVER",
-        "val": "$70.72/oz",
-        "delta": "+4.03%",
+        "val": "$70.33/oz",
+        "delta": "+3.47%",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "BRENT CRUDE OIL",
-        "val": "$82.95 / bbl",
-        "delta": "-5.02%",
+        "val": "$83.06 / bbl",
+        "delta": "-4.89%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "WTI CRUDE",
-        "val": "$80.25 / bbl",
-        "delta": "-5.45%",
+        "val": "$80.44 / bbl",
+        "delta": "-5.23%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "NATURAL GAS",
-        "val": "$3.039 / MMBtu",
-        "delta": "-2.60%",
-        "state": "NEGATIVE",
+        "val": "$3.132 / MMBtu",
+        "delta": "+0.38%",
+        "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       }
@@ -4599,73 +4599,73 @@
   "news": [
     {
       "source": "Seeking Alpha Market Currents",
-      "title": "U.S.-Iran Framework For Peace",
-      "link": "https://seekingalpha.com/article/4914955-u-s-iran-framework-for-peace?source=feed_all_articles",
-      "summary": "U.S.-Iran Framework For Peace",
-      "publishedAt": "2026-06-15T11:29:58+00:00"
+      "title": "Lynas Rare Earths: Strategic Scarcity Is Starting To Convert Into Contracted Cash Flow",
+      "link": "https://seekingalpha.com/article/4915072-lynas-rare-earths-strategic-scarcity-is-starting-to-convert-into-contracted-cash-flow?source=feed_all_articles",
+      "summary": "Lynas Rare Earths: Strategic Scarcity Is Starting To Convert Into Contracted Cash Flow",
+      "publishedAt": "2026-06-15T16:59:07+00:00"
     },
     {
       "source": "Seeking Alpha Market Currents",
-      "title": "NXG: Strong Total Returns Continue From AI Data Centre Infrastructure And The Electrification Of Everything",
-      "link": "https://seekingalpha.com/article/4914980-nxg-strong-total-returns-continue-from-ai-data-center-infrastructure-electrification?source=feed_all_articles",
-      "summary": "NXG: Strong Total Returns Continue From AI Data Centre Infrastructure And The Electrification Of Everything",
-      "publishedAt": "2026-06-15T11:26:56+00:00"
+      "title": "Now Is Not The Time To Own Junk",
+      "link": "https://seekingalpha.com/article/4915071-now-is-not-the-time-to-own-junk?source=feed_all_articles",
+      "summary": "Now Is Not The Time To Own Junk",
+      "publishedAt": "2026-06-15T16:58:10+00:00"
     },
     {
       "source": "Seeking Alpha Market Currents",
-      "title": "Ollie's: Buying The Valuation Reset Despite A Messier Comp",
-      "link": "https://seekingalpha.com/article/4914979-ollies-stock-buying-valuation-reset-despite-messier-comp?source=feed_all_articles",
-      "summary": "Ollie's: Buying The Valuation Reset Despite A Messier Comp",
-      "publishedAt": "2026-06-15T11:21:50+00:00"
+      "title": "Coda Octopus Q2: Fantastic Performance Overshadowed By Uncertainty",
+      "link": "https://seekingalpha.com/article/4915069-coda-octopus-q2-fantastic-performance-overshadowed-by-uncertainty?source=feed_all_articles",
+      "summary": "Coda Octopus Q2: Fantastic Performance Overshadowed By Uncertainty",
+      "publishedAt": "2026-06-15T16:55:17+00:00"
     },
     {
       "source": "The Hindu Business Line",
-      "title": "Sensex today | Stock Market Highlights: Sensex gains 736 points, Nifty closes above 23,850 as US-Iran deal drives crude prices lower",
-      "link": "https://www.thehindubusinessline.com/markets/sensex-nifty50-today-stock-market-highlights-15th-june-2026/article71101316.ece",
-      "summary": "Sensex, Nifty, Share Prices Highlights: Benchmark equity indices ended higher for the second consecutive session on Monday, although they pared some gains in the latter half of the session amid profit booking. BSE Sensex settled 736.38 points, or 0.97 per cent, higher at 76,264.33 after touching an intraday high of 76,821.07. The Nifty 50 ended up 231 points, or 0.98 per cent, at 23,853.90 after hitting a high of 24,011.40.",
-      "publishedAt": "2026-06-15T11:17:15+00:00"
-    },
-    {
-      "source": "The Hindu Business Line",
-      "title": "Sensex gains 736 points, Nifty closes above 23,850 as US-Iran deal drives crude prices lower",
-      "link": "https://www.thehindubusinessline.com/markets/sensex-gains-736-points-nifty-closes-above-23850-as-us-iran-deal-drives-crude-prices-lower/article71104497.ece",
-      "summary": "India VIX declines more than 2% to 14.35, reflecting easing market volatility",
-      "publishedAt": "2026-06-15T11:15:08+00:00"
-    },
-    {
-      "source": "The Hindu Business Line",
-      "title": "Rupee rises 47 paise to settle at 94.71 against US dollar",
-      "link": "https://www.thehindubusinessline.com/markets/forex/rupee-rises-47-paise-to-settle-at-9471-against-us-dollar/article71104530.ece",
-      "summary": "At the interbank foreign exchange, the rupee opened at 94.70 against the US dollar and traded in the range of 94.45-94.77; it settled at 94.71 (provisional), up 47 paise from its previous close",
-      "publishedAt": "2026-06-15T11:15:05+00:00"
+      "title": "Markets gain on West-Asia ceasefire hopes; oil slides",
+      "link": "https://www.thehindubusinessline.com/markets/markets-gain-on-west-asia-ceasefire-hopes-oil-slides/article71105915.ece",
+      "summary": "Investor wealth jumps \u20b918 lakh crore in two sessions; FPIs turn net buyers for the first time in 11 sessions",
+      "publishedAt": "2026-06-15T16:38:26+00:00"
     },
     {
       "source": "Nasdaq Market Intelligence",
-      "title": "Genco Urges Shareholders To Vote For Its Directors",
-      "link": "https://www.nasdaq.com/articles/genco-urges-shareholders-vote-its-directors",
-      "summary": "(RTTNews) - Genco Shipping & Trading (GNK) urged shareholders to vote for Genco's directors; withhold on Diana Shipping Inc.'s nominees; and for the Genco Board's recommendations on other proposals. The deadline to vote is June 17, 2026. The company said Diana's offer is not in t",
-      "publishedAt": "2026-06-15T11:03:43+00:00"
+      "title": "Monday Sector Laggards: Oil & Gas Exploration & Production, Oil & Gas Refining & Marketing Stocks",
+      "link": "https://www.nasdaq.com/articles/monday-sector-laggards-oil-gas-exploration-production-oil-gas-refining-marketing-stocks",
+      "summary": "In trading on Monday, oil &amp; gas exploration &amp; production shares were relative laggards, down on the day by about 3.9%. Helping drag down the group were shares of W &amp; T Offshore, down about 14.4% and shares of Sasol off about 12.7% on the day. Also lagging the marke",
+      "publishedAt": "2026-06-15T16:38:13+00:00"
+    },
+    {
+      "source": "Nasdaq Market Intelligence",
+      "title": "Monday Sector Leaders: Precious Metals, Airlines",
+      "link": "https://www.nasdaq.com/articles/monday-sector-leaders-precious-metals-airlines",
+      "summary": "In trading on Monday, precious metals shares were relative leaders, up on the day by about 7.2%. Leading the group were shares of Hycroft Mining Holding, up about 11.7% and shares of Integra Resources up about 11.5% on the day. Also showing relative strength are airlines share",
+      "publishedAt": "2026-06-15T16:38:01+00:00"
+    },
+    {
+      "source": "Nasdaq Market Intelligence",
+      "title": "The Best Time to Do a Roth Conversion May Surprise You",
+      "link": "https://www.nasdaq.com/articles/best-time-do-roth-conversion-may-surprise-you",
+      "summary": "Key PointsA Roth conversion has you moving funds from a traditional retirement plan to a Roth IRA.",
+      "publishedAt": "2026-06-15T16:38:00+00:00"
+    },
+    {
+      "source": "The Hindu Business Line",
+      "title": "Milky Mist updating books with FY26 numbers, to file UDRHP for IPO, says CEO Rathnam",
+      "link": "https://www.thehindubusinessline.com/economy/agri-business/milky-mist-updating-books-with-fy26-numbers-to-file-udrhp-for-ipo-says-ceo-rathnam/article71101974.ece",
+      "summary": "Tamil Nadu-based dairy firm has got SEBI approval for a \u20b92,035 crore IPO in October 2025 and it expires in October this year",
+      "publishedAt": "2026-06-15T16:08:50+00:00"
+    },
+    {
+      "source": "The Hindu Business Line",
+      "title": "Markets rally on easing West Asia tensions, crude slump",
+      "link": "https://www.thehindubusinessline.com/markets/markets-rally-on-easing-west-asia-tensions-crude-slump/article71105464.ece",
+      "summary": "Nifty 50 gained 231 points, or 0.98%, to close at 23,853.90, while the BSE Sensex rose 736.41 points, or 0.97%, to 76,264.33",
+      "publishedAt": "2026-06-15T15:55:16+00:00"
     },
     {
       "source": "Economic Times",
-      "title": "24,600 retest? 2 stocks to outperform: Bhosale",
-      "link": "https://economictimes.indiatimes.com/markets/expert-view/nifty-eyeing-24600-retest-rajesh-bhosale-says-2-stocks-could-outperform-right-now/articleshow/131742272.cms",
-      "summary": "24,600 retest? 2 stocks to outperform: Bhosale",
-      "publishedAt": "2026-06-15T11:01:35+00:00"
-    },
-    {
-      "source": "Nasdaq Market Intelligence",
-      "title": "Why the Iran War Could Deliver the Biggest Social Security Raise in Years",
-      "link": "https://www.nasdaq.com/articles/why-iran-war-could-deliver-biggest-social-security-raise-years",
-      "summary": "Key PointsThe Iran war is driving energy prices higher, which is driving inflation higher.",
-      "publishedAt": "2026-06-15T10:54:00+00:00"
-    },
-    {
-      "source": "Nasdaq Market Intelligence",
-      "title": "The Implied Analyst 12-Month Target For XLSR",
-      "link": "https://www.nasdaq.com/articles/implied-analyst-12-month-target-xlsr-0",
-      "summary": "Looking at the underlying holdings of the ETFs in our coverage universe at ETF Channel, we have compared the trading price of each holding against the average analyst 12-month forward target price, and computed the weighted average implied analyst target price for the ETF itself.",
-      "publishedAt": "2026-06-15T10:45:06+00:00"
+      "title": "US-Iran deal a 'catastrophe' for Israel: Analysts",
+      "link": "https://economictimes.indiatimes.com/news/international/world-news/us-iran-deal-a-catastrophe-for-israel-analysts-say/articleshow/131749030.cms",
+      "summary": "US-Iran deal a 'catastrophe' for Israel: Analysts",
+      "publishedAt": "2026-06-15T15:43:09+00:00"
     }
   ],
   "llmProvider": "gemini",
