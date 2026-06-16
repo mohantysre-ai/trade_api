@@ -127,7 +127,7 @@ def execute_terminal_intelligence_pipeline(live_unstructured_stream: str) -> Com
 
 def _run_llm_intelligence_pipeline(live_unstructured_stream: str, focus_ticker: str | None = None) -> CompleteSecurityAnalysisPayload:
     """Call Gemini or OpenAI to generate institutional analysis."""
-    from angel_one_feed import _llm_config, _call_gemini, _call_openai, _llm_quota_available, _record_quota_error
+    from angel_one_feed import _llm_config, _call_gemini, _call_openai, _llm_quota_available, _record_quota_error, LLM_CALL_TIMEOUT_SECONDS
 
     if not _llm_quota_available():
         raise RuntimeError("LLM quota cooling down")
@@ -175,10 +175,10 @@ Return ONLY a single JSON object matching this schema (no explanation, no markdo
                 api_key,
                 model,
                 system_instruction,
-                response_mime_type="application/json",
+                timeout=LLM_CALL_TIMEOUT_SECONDS,
             )
         else:
-            raw = _call_openai(user_prompt, api_key, api_url, model)
+            raw = _call_openai(user_prompt, api_key, api_url, model, LLM_CALL_TIMEOUT_SECONDS)
 
         # Parse and validate JSON
         data = json.loads(raw)

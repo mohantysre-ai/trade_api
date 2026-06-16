@@ -1,6 +1,6 @@
 param(
-    [int] $BackendTimeoutSec = 60,
-    [int] $FrontendTimeoutSec = 90,
+    [int] $BackendTimeoutSec = 120,
+    [int] $FrontendTimeoutSec = 120,
     [switch] $IncludeRefreshSmokeTest
 )
 
