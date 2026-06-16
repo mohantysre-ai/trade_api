@@ -59,7 +59,8 @@ _REFRESH_TASK_LOCK = threading.Lock()
 LLM_UNIVERSE_LIMIT = int(os.getenv("LLM_UNIVERSE_LIMIT", "30"))
 NIFTY_100_LABEL = "Nifty 100"
 NIFTY_100_CACHE_PATH = BASE_DIR / "nifty100_instruments.json"
-ANGEL_API_TIMEOUT_SECONDS = int(os.getenv("ANGEL_API_TIMEOUT_SECONDS", "12"))
+ANGEL_API_TIMEOUT_SECONDS = int(os.getenv("ANGEL_API_TIMEOUT_SECONDS", "24"))
+LLM_CALL_TIMEOUT_SECONDS = min(max(1, int(os.getenv("LLM_CALL_TIMEOUT_SECONDS", "60"))), 120)
 QUOTE_CHUNK_SIZE = int(os.getenv("QUOTE_CHUNK_SIZE", "10"))
 INTRADAY_CHUNK_SIZE = int(os.getenv("INTRADAY_CHUNK_SIZE", "10"))
 
@@ -144,7 +145,7 @@ def _filter_prompt(custom_prompt: str | None = None) -> str:
         parts.append(custom_prompt.strip())
     parts.append(
         "Use the live Angel One universe below to select the top "
-        f"{TOP_SELECTION_COUNT} stocks. Prefer the Nifty 100 universe; do not restrict selection to Nifty 50 only. "
+        f"{_TI_TOP_SELECTION_COUNT} stocks. Prefer the Nifty 100 universe; do not restrict selection to Nifty 50 only. "
         "Do not invent tickers. Return valid JSON only."
     )
     return " ".join(parts)
@@ -369,7 +370,7 @@ def _llm_config() -> tuple[str, str, str, str] | None:
     return provider, api_key, api_url, model
 
 
-def _call_openai(prompt: str, api_key: str, api_url: str, model: str) -> str:
+def _call_openai(prompt: str, api_key: str, api_url: str, model: str, timeout: int) -> str:
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -386,7 +387,7 @@ def _call_openai(prompt: str, api_key: str, api_url: str, model: str) -> str:
         "temperature": 0.1,
         "max_tokens": 2000,
     }
-    response = requests.post(api_url, json=payload, headers=headers, timeout=30)
+    response = requests.post(api_url, json=payload, headers=headers, timeout=timeout)
     if response.status_code >= 300:
         raise RuntimeError(f"OpenAI request failed ({response.status_code}): {response.text}")
     data = response.json()
@@ -395,7 +396,7 @@ def _call_openai(prompt: str, api_key: str, api_url: str, model: str) -> str:
     return data["choices"][0]["message"]["content"].strip()
 
 
-def _call_gemini(prompt: str, api_key: str, model: str, system_instruction: str) -> str:
+def _call_gemini(prompt: str, api_key: str, model: str, system_instruction: str, timeout: int) -> str:
     try:
         from google import genai
         from google.genai import types
@@ -409,7 +410,7 @@ def _call_gemini(prompt: str, api_key: str, model: str, system_instruction: str)
         response_mime_type="application/json",
         max_output_tokens=2000,
     )
-    response = client.models.generate_content(model=model, contents=prompt, config=config)
+    response = client.models.generate_content(model=model, contents=prompt, config=config, timeout=timeout)
     return getattr(response, "text", None) or getattr(response, "output_text", None) or str(response)
 
 
@@ -834,7 +835,7 @@ def _heuristic_rank(stocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         )
         ranked.append({**row, "score": score})
     ranked.sort(key=lambda item: item.get("score", 0), reverse=True)
-    return ranked[:TOP_SELECTION_COUNT]
+    return ranked[:_TI_TOP_SELECTION_COUNT]
 
 
 def _coarse_pre_rank(stocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -865,7 +866,7 @@ def _compile_selection_stream(
     custom_prompt: str | None = None,
 ) -> str:
     lines = [
-        f"TOP_N: {TOP_SELECTION_COUNT}",
+        f"TOP_N: {_TI_TOP_SELECTION_COUNT}",
         f"ACTIVE_POOL: {pool_name}",
         f"FILTER_PROMPT: {_filter_prompt(custom_prompt)}",
         f"HARD_SCREEN_PASS_COUNT: {hard_screen_count}/{len(all_stocks)}",
@@ -921,7 +922,7 @@ def _select_dynamic_top_stocks(
 
     try:
         screened = [row for row in all_stocks if _hard_screen(row)]
-        selection_universe = screened if len(screened) >= TOP_SELECTION_COUNT else all_stocks
+        selection_universe = screened if len(screened) >= _TI_TOP_SELECTION_COUNT else all_stocks
         llm_universe = selection_universe[:LLM_UNIVERSE_LIMIT]
         compiled = _compile_selection_stream(
             llm_universe,
@@ -935,7 +936,7 @@ def _select_dynamic_top_stocks(
         ti = execute_terminal_intelligence_pipeline(compiled)
         ti_payload = ti.model_dump()
         selected_tickers = [row.get("ticker") for row in ti_payload.get("ledger_stocks", []) if row.get("ticker")]
-        selected_tickers = selected_tickers[:TOP_SELECTION_COUNT]
+        selected_tickers = selected_tickers[:_TI_TOP_SELECTION_COUNT]
         score_by_ticker = {
             row.get("ticker"): row.get("score")
             for row in ti_payload.get("ledger_stocks", [])
@@ -966,16 +967,16 @@ def _select_dynamic_top_stocks(
         if not selected_rows:
             selected_rows = _heuristic_rank(selection_universe)
         else:
-            if len(selected_rows) < TOP_SELECTION_COUNT:
+            if len(selected_rows) < _TI_TOP_SELECTION_COUNT:
                 remaining = [row for row in _heuristic_rank(selection_universe) if row["ticker"] not in {r["ticker"] for r in selected_rows}]
-                selected_rows.extend(remaining[: TOP_SELECTION_COUNT - len(selected_rows)])
+                selected_rows.extend(remaining[: _TI_TOP_SELECTION_COUNT - len(selected_rows)])
 
         news_summary = (
             ti_payload.get("news_catalysts_card")
             or ti_payload.get("forensic_screen_card")
             or ti_payload.get("why_interested")
         )
-        return selected_rows[:TOP_SELECTION_COUNT], ti_payload, news_summary
+        return selected_rows[:_TI_TOP_SELECTION_COUNT], ti_payload, news_summary
     except Exception:
         ranked = _heuristic_rank([row for row in all_stocks if _hard_screen(row)] or all_stocks)
         ti_payload = {
@@ -1167,19 +1168,38 @@ def build_market_payload(
     allow_fallback: bool = True,
 ) -> dict[str, Any]:
     snapshot = _load_last_snapshot()
-    should_refresh = force_refresh or _within_refresh_window()
-
-    if not should_refresh:
+    # Always attempt live data — Angel One returns last trade data even after market close
+    try:
+        payload = _build_payload_from_live_data(client, pool_name=pool_name, custom_prompt=custom_prompt)
+        _apply_selection_meta(
+            payload,
+            mode="live",
+            reason="Live refresh completed successfully.",
+            data_date=_payload_data_date(payload),
+        )
+        _save_last_snapshot(payload)
+        return payload
+    except Exception as exc:
+        if force_refresh and not allow_fallback:
+            raise
         if allow_fallback and snapshot is not None:
             snapshot = dict(snapshot)
             snapshot["isSnapshotFallback"] = True
             snapshot["llmError"] = snapshot.get("llmError")
+            snapshot["updatedAt"] = datetime.now(timezone.utc).isoformat()
             if pool_name:
                 snapshot["activePool"] = pool_name
+            # Refresh RSS news even when outside refresh window
+            try:
+                fresh_news = fetch_live_news()
+                if fresh_news:
+                    snapshot["news"] = fresh_news
+            except Exception:
+                pass
             _apply_selection_meta(
                 snapshot,
                 mode="snapshot",
-                reason="Outside the scheduled IST refresh window; serving the latest saved snapshot.",
+                reason="Outside the scheduled IST refresh window; serving the latest saved snapshot with fresh RSS news.",
                 data_date=_payload_data_date(snapshot),
             )
             return _hydrate_ticker_intelligence_map(snapshot)
@@ -1231,38 +1251,10 @@ def build_market_payload(
             },
         }
 
-    try:
-        payload = _build_payload_from_live_data(client, pool_name=pool_name, custom_prompt=custom_prompt)
-        _apply_selection_meta(
-            payload,
-            mode="live",
-            reason="Live refresh completed successfully.",
-            data_date=_payload_data_date(payload),
-        )
-        _save_last_snapshot(payload)
-        return payload
-    except Exception as exc:
-        if allow_fallback and snapshot is not None:
-            snapshot = dict(snapshot)
-            snapshot["isSnapshotFallback"] = True
-            snapshot["llmError"] = str(exc)
-            snapshot["source"] = str(snapshot.get("source", "angel_one")) + "+snapshot"
-            snapshot["updatedAt"] = datetime.now(timezone.utc).isoformat()
-            if pool_name:
-                snapshot["activePool"] = pool_name
-            _apply_selection_meta(
-                snapshot,
-                mode="snapshot",
-                reason=f"Live refresh failed, so the latest saved snapshot was reused: {exc}",
-                data_date=_payload_data_date(snapshot),
-            )
-            return _hydrate_ticker_intelligence_map(snapshot)
-        raise
-
 
 def _compile_market_analysis_stream(payload: dict[str, Any], custom_prompt: str | None = None) -> str:
     lines = [
-        f"TOP_N: {TOP_SELECTION_COUNT}",
+        f"TOP_N: {_TI_TOP_SELECTION_COUNT}",
         f"FILTER_PROMPT: {_filter_prompt(custom_prompt)}",
         "Use the live Angel One universe and return only valid JSON.",
         "",
@@ -1275,7 +1267,7 @@ def _compile_market_analysis_stream(payload: dict[str, Any], custom_prompt: str 
         )
 
     lines.append("--- TOP STOCKS ---")
-    for stock in payload.get("stocks", [])[:TOP_SELECTION_COUNT]:
+    for stock in payload.get("stocks", [])[:_TI_TOP_SELECTION_COUNT]:
         lines.append(
             f"{stock['ticker']} ({stock['name']}): LTP {stock['ltp']}, delta {stock['delta']}, "
             f"state {stock['state']}, close {stock.get('close')}, volume {stock.get('volume')}"
@@ -1438,7 +1430,7 @@ def create_app() -> FastAPI:
                 pool_name=resolved_pool,
                 force_refresh=True,
                 custom_prompt=resolved_prompt,
-                allow_fallback=False,
+                allow_fallback=True,
             )
             if not payload.get("success", False):
                 raise RuntimeError(payload.get("error") or "Live refresh produced no payload.")

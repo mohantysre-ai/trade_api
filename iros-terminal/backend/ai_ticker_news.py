@@ -560,7 +560,7 @@ async def generate_ticker_news_report(
         articles = articles[:max_articles]
 
     # Step 2: LLM Summarize
-    llm_result = summarize_with_gemini(ticker, company, articles)
+    llm_result = await summarize_with_gemini(ticker, company, articles)
 
     # Step 3: Build report
     report = AITickerNewsReport(

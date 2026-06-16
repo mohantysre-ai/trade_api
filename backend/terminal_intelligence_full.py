@@ -15,6 +15,7 @@ import re
 import time as _time
 import logging as _logging
 import requests
+from llm_client import LLM_CALL_TIMEOUT_SECONDS, _call_gemini, _call_openai
 
 
 class CompleteSecurityAnalysisPayload(BaseModel):
@@ -419,58 +420,6 @@ def _record_quota_error(error_str: str) -> None:
     _logging.getLogger(__name__).warning("Gemini 429 quota cooling down for %.0fs.", delay)
 
 
-def _call_gemini(prompt: str, api_key: str, model: str, system_instruction: str) -> str:
-    try:
-        from google import genai
-        from google.genai import types
-    except ImportError as exc:
-        raise RuntimeError("Gemini support requires google-genai. Install: pip install google-genai") from exc
-
-    if not _llm_quota_available():
-        remaining = int(_llm_not_before - _time.monotonic())
-        raise RuntimeError(f"429 quota cooldown active - {remaining}s remaining.")
-
-    client = genai.Client(api_key=api_key)
-    config = types.GenerateContentConfig(
-        system_instruction=system_instruction,
-        temperature=0.1,
-        response_mime_type="application/json",
-        max_output_tokens=2000,
-    )
-    try:
-        response = client.models.generate_content(model=model, contents=prompt, config=config)
-        return getattr(response, "text", None) or str(response)
-    except Exception as exc:
-        err_str = str(exc)
-        if "429" in err_str:
-            _record_quota_error(err_str)
-        raise
-
-
-def _call_openai(prompt: str, api_key: str, api_url: str, model: str) -> str:
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": model,
-        "messages": [
-            {
-                "role": "system",
-                "content": "You are an elite institutional financial terminal. Output valid JSON. Do not include markdown or explanations.",
-            },
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.1,
-        "max_tokens": 2000,
-    }
-    response = requests.post(api_url, json=payload, headers=headers, timeout=30)
-    if response.status_code >= 300:
-        raise RuntimeError(f"OpenAI request failed ({response.status_code}): {response.text}")
-    data = response.json()
-    if not data.get("choices") or not data["choices"][0].get("message"):
-        raise RuntimeError("OpenAI response missing expected content")
-    return data["choices"][0]["message"]["content"].strip()
 
 
 def _json_block(text: str) -> str:
@@ -780,9 +729,9 @@ def _on_demand_ticker_selection_reason(ticker: str, stock: dict[str, Any], score
 
     try:
         if provider == "gemini":
-            raw = _call_gemini(prompt, api_key, model, system_instruction)
+            raw = _call_gemini(prompt, api_key, model, system_instruction, LLM_CALL_TIMEOUT_SECONDS)
         else:
-            raw = _call_openai(prompt, api_key, api_url, model)
+            raw = _call_openai(prompt, api_key, api_url, model, LLM_CALL_TIMEOUT_SECONDS)
 
         data = json.loads(_json_block(raw))
         reason = _clean_value((data or {}).get("selection_reason"))
@@ -1191,9 +1140,9 @@ def _analyze_forensic_wl_policy(
 
     try:
         if provider == "gemini":
-            raw = _call_gemini(prompt, api_key, model, sys_instruction)
+            raw = _call_gemini(prompt, api_key, model, sys_instruction, LLM_CALL_TIMEOUT_SECONDS)
         else:
-            raw = _call_openai(prompt, api_key, api_url, model)
+            raw = _call_openai(prompt, api_key, api_url, model, LLM_CALL_TIMEOUT_SECONDS)
 
         data = json.loads(_json_block(raw))
         if not isinstance(data, dict):
@@ -1363,9 +1312,9 @@ def execute_terminal_intelligence_pipeline(live_unstructured_stream: str) -> Com
                 system_instruction += f"\nFOCUS: Provide deep analysis specifically on {focus_ticker}."
 
             if provider == "gemini":
-                raw = _call_gemini(live_unstructured_stream, api_key, model, system_instruction)
+                raw = _call_gemini(live_unstructured_stream, api_key, model, system_instruction, LLM_CALL_TIMEOUT_SECONDS)
             else:
-                raw = _call_openai(live_unstructured_stream, api_key, api_url, model)
+                raw = _call_openai(live_unstructured_stream, api_key, api_url, model, LLM_CALL_TIMEOUT_SECONDS)
 
             data = json.loads(_json_block(raw))
             result = CompleteSecurityAnalysisPayload.model_validate(data)
