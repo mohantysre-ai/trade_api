@@ -272,8 +272,8 @@ function RiskCalcFactorHub({ riskCalc, factorHub }: { riskCalc?: Record<string, 
     );
   }
 
-  const riskFlagEntry = Object.entries(riskCalc).find(([k]) => k.toLowerCase() === 'risk_flag' || k.toLowerCase() === 'risk_flag_value');
-  const regularRiskEntries = Object.entries(riskCalc).filter(([k]) => k.toLowerCase() !== 'risk_flag' && k.toLowerCase() !== 'risk_flag_value');
+  const riskFlagEntry = riskCalc ? Object.entries(riskCalc).find(([k]) => k.toLowerCase() === 'risk_flag' || k.toLowerCase() === 'risk_flag_value') : undefined;
+  const regularRiskEntries = riskCalc ? Object.entries(riskCalc).filter(([k]) => k.toLowerCase() !== 'risk_flag' && k.toLowerCase() !== 'risk_flag_value') : [];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
