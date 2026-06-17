@@ -27,7 +27,7 @@
     "NSE Corporate Announcements",
     "Economic Times Markets"
   ],
-  "updatedAt": "2026-06-17T20:16:16.860919+00:00",
+  "updatedAt": "2026-06-17T20:36:04.976170+00:00",
   "mockTickers": [
     "AWFI"
   ],
@@ -4438,40 +4438,40 @@
     "commodities": [
       {
         "label": "GOLD",
-        "val": "$4,264.70/oz",
-        "delta": "-2.06%",
+        "val": "$4,281.00/oz",
+        "delta": "-1.69%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "SILVER",
-        "val": "$67.55/oz",
-        "delta": "-3.53%",
+        "val": "$67.92/oz",
+        "delta": "-2.99%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "BRENT CRUDE OIL",
-        "val": "$78.99 / bbl",
-        "delta": "+0.04%",
-        "state": "POSITIVE",
+        "val": "$78.79 / bbl",
+        "delta": "-0.22%",
+        "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "WTI CRUDE",
-        "val": "$75.38 / bbl",
-        "delta": "+0.15%",
-        "state": "POSITIVE",
+        "val": "$75.21 / bbl",
+        "delta": "-0.08%",
+        "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "NATURAL GAS",
-        "val": "$3.187 / MMBtu",
-        "delta": "-1.61%",
+        "val": "$3.183 / MMBtu",
+        "delta": "-1.73%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
@@ -4481,45 +4481,45 @@
   "news": [
     {
       "source": "Seeking Alpha Market Currents",
-      "title": "Microsoft Just Became Irresistibly Attractive, But Only Because The Bears Were Right",
-      "link": "https://seekingalpha.com/article/4915797-microsoft-just-became-irresistibly-attractive-but-only-because-the-bears-were-right?source=feed_all_articles",
-      "summary": "Microsoft Just Became Irresistibly Attractive, But Only Because The Bears Were Right",
-      "publishedAt": "2026-06-17T20:12:16+00:00"
+      "title": "Talen Energy: A Lower-Risk AI Trade",
+      "link": "https://seekingalpha.com/article/4915800-talen-energy-a-lower-risk-ai-trade?source=feed_all_articles",
+      "summary": "Talen Energy: A Lower-Risk AI Trade",
+      "publishedAt": "2026-06-17T20:31:08+00:00"
     },
     {
       "source": "Seeking Alpha Market Currents",
-      "title": "Central Bank Gold Reserves Survey 2026",
-      "link": "https://seekingalpha.com/article/4915796-central-bank-gold-reserves-survey-2026?source=feed_all_articles",
-      "summary": "Central Bank Gold Reserves Survey 2026",
-      "publishedAt": "2026-06-17T20:05:00+00:00"
+      "title": "Colruyt Group N.V. 2026 Q4 - Results - Earnings Call Presentation",
+      "link": "https://seekingalpha.com/article/4915818-colruyt-group-n-v-2026-q4-results-earnings-call-presentation?source=feed_all_articles",
+      "summary": "Colruyt Group N.V. 2026 Q4 - Results - Earnings Call Presentation",
+      "publishedAt": "2026-06-17T20:31:07+00:00"
     },
     {
       "source": "Seeking Alpha Market Currents",
-      "title": "Brookfield Renewable Corporation (BEPC) Shareholder/Analyst Call - Slideshow",
-      "link": "https://seekingalpha.com/article/4915812-brookfield-renewable-corporation-bepc-shareholder-analyst-call-slideshow?source=feed_all_articles",
-      "summary": "Brookfield Renewable Corporation (BEPC) Shareholder/Analyst Call - Slideshow",
-      "publishedAt": "2026-06-17T20:00:49+00:00"
+      "title": "TSMC: Why Premium Multiples Don't Matter For The King Of Foundries",
+      "link": "https://seekingalpha.com/article/4915798-tsmc-why-premium-multiples-dont-matter-for-king-of-foundries?source=feed_all_articles",
+      "summary": "TSMC: Why Premium Multiples Don't Matter For The King Of Foundries",
+      "publishedAt": "2026-06-17T20:17:20+00:00"
     },
     {
       "source": "Nasdaq Market Intelligence",
-      "title": "Why SSR Mining Stock Surged Again Today",
-      "link": "https://www.nasdaq.com/articles/why-ssr-mining-stock-surged-again-today",
-      "summary": "Key PointsSSR Mining is about to receive $1.5 billion into its bank account.",
-      "publishedAt": "2026-06-17T19:46:41+00:00"
+      "title": "SpaceX IPO Priced at $135: What It Means for Investors",
+      "link": "https://www.nasdaq.com/articles/spacex-ipo-priced-135-what-it-means-investors",
+      "summary": "Key PointsA small float could help propel SpaceX stock in the near term.",
+      "publishedAt": "2026-06-17T20:13:00+00:00"
     },
     {
       "source": "Nasdaq Market Intelligence",
-      "title": "PSKY Crosses Above 2% Yield Territory",
-      "link": "https://www.nasdaq.com/articles/psky-crosses-above-2-yield-territory",
-      "summary": "Looking at the universe of stocks we cover at Dividend Channel, in trading on Wednesday, shares of Paramount Skydance Corporation - Class B (Symbol: PSKY) were yielding above the 2% mark based on its quarterly dividend (annualized to $0.2), with the stock changing hands as low a",
-      "publishedAt": "2026-06-17T19:39:06+00:00"
+      "title": "Is iShares Pharma ETF (IHE) or SPDR's Biotech ETF (XBI) the Better Long-Term Buy for Investors?",
+      "link": "https://www.nasdaq.com/articles/ishares-pharma-etf-ihe-or-spdrs-biotech-etf-xbi-better-long-term-buy-investors",
+      "summary": "Key PointsiShares U.S. Pharmaceuticals ETF offers a significantly higher dividend yield and lower volatility than State Street SPDR S&amp;P Biotech ETF.",
+      "publishedAt": "2026-06-17T20:06:42+00:00"
     },
     {
       "source": "Nasdaq Market Intelligence",
-      "title": "KMB Dividend Yield Pushes Past 5%",
-      "link": "https://www.nasdaq.com/articles/kmb-dividend-yield-pushes-past-5",
-      "summary": "Looking at the universe of stocks we cover at Dividend Channel, in trading on Wednesday, shares of Kimberly-Clark Corp. (Symbol: KMB) were yielding above the 5% mark based on its quarterly dividend (annualized to $5.12), with the stock changing hands as low as $101.95 on the day",
-      "publishedAt": "2026-06-17T19:37:52+00:00"
+      "title": "Jabil Inc. Profit Climbs In Q3",
+      "link": "https://www.nasdaq.com/articles/jabil-inc-profit-climbs-q3",
+      "summary": "(RTTNews) - Jabil Inc. (JBL) announced earnings for its third quarter that Increases, from the same period last year",
+      "publishedAt": "2026-06-17T20:06:38+00:00"
     },
     {
       "source": "Economic Times",

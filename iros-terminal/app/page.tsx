@@ -416,48 +416,99 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
 }
 
 function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: string; link: string; summary: string; publishedAt: string }>; now: number }) {
-  if (!items?.length) return null;
+  if (!items?.length) {
+    return (
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden">
+        <div className="flex items-center gap-2 p-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white">
+          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
+          <span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">LIVE NEWS FEED</span>
+          <span className="ml-auto text-[8px] text-slate-400 uppercase tracking-wider">Waiting for data</span>
+        </div>
+        <div className="p-8 text-center text-slate-400 text-[10px]">No news stories available.</div>
+      </div>
+    );
+  }
 
   const timeAgo = (dateStr: string) => {
     const diff = now - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "Just now";
     if (mins < 60) return `${mins}m ago`;
     const hrs = Math.floor(mins / 60);
-    return `${hrs}h ago`;
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
   };
 
+  const TRACK_HEIGHT = 38;
+  const VISIBLE_ITEMS = 5;
+
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg shadow-sm">
-      <div className="flex items-center justify-between p-3 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-          <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">LIVE NEWS FEED</span>
-        </div>
-        <span className="text-[9px] text-slate-400">{items.length} stories</span>
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden flex flex-col">
+      {/* Header */}
+      <div className="flex items-center gap-2.5 p-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white flex-shrink-0">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        <span className="text-[9px] uppercase tracking-widest text-slate-600 font-bold">Live News Feed</span>
+        <span className="ml-auto text-[8px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+          {items.length} stories
+        </span>
       </div>
-      <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
-        {items.map((item, i) => (
-          <div key={i} className="p-3 hover:bg-slate-50 transition">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <a
-                  href={item.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[11px] font-medium text-slate-800 hover:text-teal-700 leading-tight block"
-                >
+
+      {/* Ticker track with continuous scroll */}
+      <div className="relative flex-1 overflow-hidden" style={{ minHeight: TRACK_HEIGHT * 2 }}>
+        <div
+          className="hover:[animation-play-state:paused]"
+          style={{
+            maxHeight: TRACK_HEIGHT * VISIBLE_ITEMS,
+            animation: "tickerScroll 30s linear infinite",
+          }}
+        >
+          {items.map((item, i) => (
+            <a
+              key={`${item.title}-${i}`}
+              href={item.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-start gap-2.5 border-b border-slate-100 px-3 py-1.5 group hover:bg-emerald-50/50 transition-all duration-200 cursor-pointer"
+              style={{ minHeight: TRACK_HEIGHT }}
+            >
+              {/* Sequence badge */}
+              <span className="text-[8px] font-bold text-slate-400 bg-slate-100 px-1 py-0.5 rounded border border-slate-200 flex-shrink-0 mt-0.5">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <span className="text-[11px] font-semibold text-slate-800 leading-snug line-clamp-2 group-hover:text-emerald-700 transition-colors">
                   {item.title}
-                </a>
-                <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed line-clamp-2">{item.summary}</p>
+                </span>
+                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                  <span className="text-[8px] font-semibold text-slate-400 uppercase tracking-wider truncate max-w-[100px]">
+                    {item.source.split(" ").slice(0, 2).join(" ")}
+                  </span>
+                  {item.summary && (
+                    <>
+                      <span className="text-slate-300">·</span>
+                      <span className="text-[9px] text-slate-500 line-clamp-1">{item.summary}</span>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="flex-shrink-0 text-right">
-                <span className="text-[9px] text-slate-400 block">{timeAgo(item.publishedAt)}</span>
-                <span className="text-[8px] text-slate-400 block mt-0.5 max-w-[100px] truncate">{item.source.split(' ').slice(0, 3).join(' ')}</span>
-              </div>
-            </div>
-          </div>
-        ))}
+
+              {/* Timestamp */}
+              <span className="text-[8px] font-mono text-slate-400 flex-shrink-0 mt-0.5">
+                {timeAgo(item.publishedAt)}
+              </span>
+            </a>
+          ))}
+        </div>
       </div>
+
+      <style>{`
+        @keyframes tickerScroll {
+          0%   { transform: translateY(0%); }
+          100% { transform: translateY(-50%); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -792,13 +843,11 @@ export default function IrosMasterAdvancedTerminal() {
               <Nifty100HeatMap stockQuotes={liveMarket?.stockQuotes} />
             </div>
 
-            {/* Row 3: News Feed */}
+            {/* Row 3: News Feed + India Markets side-by-side */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <NewsFeedPanel items={liveMarket?.news} now={now} />
+              <IndiaMarketsGrid items={currentMacros} staleLabel={staleMacroLabel} />
             </div>
-
-            {/* Row 4: India Markets — Top Movers */}
-            <IndiaMarketsGrid items={currentMacros} staleLabel={staleMacroLabel} />
           </div>
         )}
 

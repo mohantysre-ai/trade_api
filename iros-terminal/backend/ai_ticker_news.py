@@ -274,44 +274,192 @@ async def scrape_yahoo_finance(ticker: str, session: httpx.AsyncClient) -> list[
     return articles
 
 
-async def scrape_rss_feeds(ticker: str, session: httpx.AsyncClient) -> list[TickerNewsArticle]:
-    """Scrape RSS feeds from financial news aggregators."""
+async def scrape_nse_nifty100(ticker: str, session: httpx.AsyncClient) -> list[TickerNewsArticle]:
+    """Scrape NSE NIFTY 100 index tracker page for relevant headlines."""
+    articles: list[TickerNewsArticle] = []
+    url = "https://www.nseindia.com/index-tracker/NIFTY%20100"
+    try:
+        headers = {
+            **HEADERS,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Referer": "https://www.nseindia.com/",
+        }
+        resp = await session.get(url, headers=headers, timeout=15.0, follow_redirects=True)
+        if resp.status_code != 200:
+            return articles
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        seen: set[str] = set()
+        for tag in soup.find_all(["h2", "h3", "a", "p"])[:80]:
+            text = tag.get_text(strip=True)
+            if not text or len(text) < 25:
+                continue
+            key = re.sub(r"\s+", " ", text.lower())[:60]
+            if key in seen:
+                continue
+            seen.add(key)
+
+            articles.append(TickerNewsArticle(
+                title=text[:300],
+                source="NSE NIFTY 100",
+                url=url,
+                summary=text[:300],
+                published_at=datetime.now(timezone.utc).isoformat(),
+            ))
+            if len(articles) >= 12:
+                break
+    except Exception as e:
+        logger.warning("NSE NIFTY 100 scrape failed: %s", e)
+
+    return articles
+
+
+async def _scrape_zerodha_pulse(ticker: str, session: httpx.AsyncClient) -> list[TickerNewsArticle]:
+    """Scrape Zerodha Pulse for market news."""
+    articles: list[TickerNewsArticle] = []
+    url = "https://pulse.zerodha.com/"
+    try:
+        resp = await session.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
+        if resp.status_code != 200:
+            return articles
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        seen: set[str] = set()
+        for tag in soup.find_all(["h2", "h3", "a", "p", "span"])[:100]:
+            text = tag.get_text(strip=True)
+            if not text or len(text) < 25:
+                continue
+            key = re.sub(r"\s+", " ", text.lower())[:60]
+            if key in seen:
+                continue
+            seen.add(key)
+
+            articles.append(TickerNewsArticle(
+                title=text[:300],
+                source="Zerodha Pulse",
+                url=url,
+                summary=text[:300],
+                published_at=datetime.now(timezone.utc).isoformat(),
+            ))
+            if len(articles) >= 10:
+                break
+    except Exception as e:
+        logger.warning("Zerodha Pulse scrape failed: %s", e)
+
+    return articles
+
+
+async def _scrape_trendlyne(ticker: str, session: httpx.AsyncClient) -> list[TickerNewsArticle]:
+    """Scrape Trendlyne for stock news and analysis."""
     articles: list[TickerNewsArticle] = []
     company = _company_name(ticker)
-    rss_urls = [
-        f"https://news.google.com/rss/search?q={quote_plus(f'{company} {ticker} stock market')}&hl=en-IN&gl=IN&ceid=IN:en",
-        f"https://feeds.content.dowjones.io/public/rss/mw_topstories",
-    ]
+    url = f"https://trendlyne.com/stock/{quote_plus(ticker)}/{quote_plus(company)}"
+    try:
+        resp = await session.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
+        if resp.status_code != 200:
+            url = f"https://trendlyne.com/news?q={quote_plus(f'{company} {ticker}')}"
+            resp = await session.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
+        if resp.status_code != 200:
+            return articles
 
-    for rss_url in rss_urls:
-        try:
-            resp = await session.get(rss_url, headers=HEADERS, timeout=15.0)
-            if resp.status_code != 200:
+        soup = BeautifulSoup(resp.text, "html.parser")
+        seen: set[str] = set()
+        for tag in soup.find_all(["h2", "h3", "a", "p"])[:80]:
+            text = tag.get_text(strip=True)
+            if not text or len(text) < 25:
                 continue
-            soup = BeautifulSoup(resp.text, "xml")
-            for item in soup.select("item"):
-                title = item.find("title")
-                link = item.find("link")
-                desc = item.find("description")
-                pub_date = item.find("pubDate")
+            key = re.sub(r"\s+", " ", text.lower())[:60]
+            if key in seen:
+                continue
+            seen.add(key)
 
-                if not title or not link:
-                    continue
-                title_text = title.get_text(strip=True)
-                if len(title_text) < 15:
-                    continue
+            articles.append(TickerNewsArticle(
+                title=text[:300],
+                source="Trendlyne",
+                url=url,
+                summary=text[:300],
+                published_at=datetime.now(timezone.utc).isoformat(),
+            ))
+            if len(articles) >= 10:
+                break
+    except Exception as e:
+        logger.warning("Trendlyne scrape failed: %s", e)
 
-                articles.append(TickerNewsArticle(
-                    title=title_text[:300],
-                    source="Google News RSS",
-                    url=(link.get_text(strip=True) or link.get("href", ""))[:500],
-                    summary=(desc.get_text(strip=True) if desc else "")[:500],
-                    published_at=(pub_date.get_text(strip=True) if pub_date else datetime.now(timezone.utc).isoformat()),
-                ))
-                if len(articles) >= 10:
-                    break
-        except Exception as e:
-            logger.warning("RSS scrape failed: %s", e)
+    return articles
+
+
+async def _scrape_finshots(ticker: str, session: httpx.AsyncClient) -> list[TickerNewsArticle]:
+    """Scrape Finshots for financial news and analysis."""
+    articles: list[TickerNewsArticle] = []
+    company = _company_name(ticker)
+    url = f"https://finshots.in/?s={quote_plus(company)}"
+    try:
+        resp = await session.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
+        if resp.status_code != 200:
+            url = "https://finshots.in/"
+            resp = await session.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
+        if resp.status_code != 200:
+            return articles
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        seen: set[str] = set()
+        for tag in soup.find_all(["h2", "h3", "a", "p", "article"])[:80]:
+            text = tag.get_text(strip=True)
+            if not text or len(text) < 25:
+                continue
+            key = re.sub(r"\s+", " ", text.lower())[:60]
+            if key in seen:
+                continue
+            seen.add(key)
+
+            articles.append(TickerNewsArticle(
+                title=text[:300],
+                source="Finshots",
+                url=url,
+                summary=text[:300],
+                published_at=datetime.now(timezone.utc).isoformat(),
+            ))
+            if len(articles) >= 10:
+                break
+    except Exception as e:
+        logger.warning("Finshots scrape failed: %s", e)
+
+    return articles
+    """Scrape NSE NIFTY 100 index tracker page for relevant headlines."""
+    articles: list[TickerNewsArticle] = []
+    url = "https://www.nseindia.com/index-tracker/NIFTY%20100"
+    try:
+        headers = {
+            **HEADERS,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Referer": "https://www.nseindia.com/",
+        }
+        resp = await session.get(url, headers=headers, timeout=15.0, follow_redirects=True)
+        if resp.status_code != 200:
+            return articles
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        seen: set[str] = set()
+        for tag in soup.find_all(["h2", "h3", "a", "p"])[:80]:
+            text = tag.get_text(strip=True)
+            if not text or len(text) < 25:
+                continue
+            key = re.sub(r"\s+", " ", text.lower())[:60]
+            if key in seen:
+                continue
+            seen.add(key)
+
+            articles.append(TickerNewsArticle(
+                title=text[:300],
+                source="NSE NIFTY 100",
+                url=url,
+                summary=text[:300],
+                published_at=datetime.now(timezone.utc).isoformat(),
+            ))
+            if len(articles) >= 12:
+                break
+    except Exception as e:
+        logger.warning("NSE NIFTY 100 scrape failed: %s", e)
 
     return articles
 
@@ -364,8 +512,11 @@ async def scrape_all_sources(ticker: str) -> list[TickerNewsArticle]:
             scrape_moneycontrol(ticker, session),
             scrape_economic_times(ticker, session),
             scrape_yahoo_finance(ticker, session),
-            scrape_rss_feeds(ticker, session),
             scrape_nse_announcements(ticker, session),
+            scrape_nse_nifty100(ticker, session),
+            _scrape_zerodha_pulse(ticker, session),
+            _scrape_trendlyne(ticker, session),
+            _scrape_finshots(ticker, session),
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 

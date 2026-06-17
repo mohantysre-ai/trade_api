@@ -170,6 +170,14 @@ function MarketSnapshot() {
         </div>
       </Panel>
 
+      <Panel label="India Markets" status="STALE 241M">
+        <div className="grid grid-cols-2 gap-px bg-border/60 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7">
+          {INDIA.map((t) => (
+            <TickerCard key={t.label} t={t} />
+          ))}
+        </div>
+      </Panel>
+
     </div>
   );
 }
