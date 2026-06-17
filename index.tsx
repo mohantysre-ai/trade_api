@@ -278,7 +278,7 @@ function IcGates() {
           ))}
         </div>
 
-        <div className="grid gap-px bg-border/60 lg:grid-cols-2">
+        <div className="grid gap-3">
           <article className="bg-card/40 p-4">
             <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
               Structural Thesis
@@ -313,9 +313,9 @@ function IcGates() {
                 ["Risk Score", "28"],
                 ["Risk Flag", "LOW_RISK"],
               ].map(([k, v]) => (
-                <div key={k} className="flex items-baseline justify-between border-b border-border/30 pb-1">
-                  <dt className="text-muted-foreground">{k}</dt>
-                  <dd className="tabular-nums text-foreground">{v}</dd>
+                <div key={k} className={`flex items-baseline justify-between border-b border-border/30 pb-1 ${k === "Risk Flag" ? "bg-red-50 border-red-100 -mx-4 px-4" : ""}`}>
+                  <dt className={`${k === "Risk Flag" ? "text-red-700 font-bold" : "text-muted-foreground"}`}>{k}</dt>
+                  <dd className={`tabular-nums ${k === "Risk Flag" ? "text-red-700 font-black uppercase tracking-wider" : "text-foreground"}`}>{v}</dd>
                 </div>
               ))}
             </dl>

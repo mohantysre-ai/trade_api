@@ -119,26 +119,45 @@ function DrawerStructuredReasoningOutput({ analysis }: { analysis?: DrawerAnalys
               {analysis.future_revenue_model ?? "Not produced."}
             </p>
           </div>
-          <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
-            <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Risk Calc / Factor Hub</div>
-            {Object.keys(riskCalc).length || Object.keys(factorHub).length ? (
-              <div className="space-y-2">
-                {Object.entries(riskCalc).map(([label, value]) => (
-                  <div key={label} className="flex items-center justify-between gap-3">
-                    <span className="text-slate-500 uppercase tracking-wider text-[9px] whitespace-nowrap">{formatSnakeKey(label)}</span>
-                    <span className="text-slate-700 text-right">{String(value)}</span>
+          <div className="bg-white border border-emerald-200 border-[0.5px] rounded-lg md:col-span-2 overflow-hidden">
+            <div className="bg-emerald-50 px-4 py-2.5 border-b border-emerald-100">
+              <div className="text-[9px] uppercase tracking-wider text-emerald-700 font-bold">Risk Calc / Factor Hub</div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+              <div className="p-3 border-r border-slate-100">
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-2 font-bold">Risk Calc</div>
+                {Object.keys(riskCalc).length ? (
+                  <div className="space-y-0">
+                    {Object.entries(riskCalc).map(([label, value], idx, arr) => {
+                      const isRiskFlag = label.toLowerCase() === 'risk_flag' || label.toLowerCase() === 'risk_flag_value';
+                      return (
+                        <div key={label} className={`flex items-center justify-between gap-2 py-1.5 ${idx < arr.length - 1 ? 'border-b border-slate-100' : ''} ${isRiskFlag ? 'bg-red-50/60 -mx-3 px-3 rounded' : ''}`}>
+                          <span className={`text-[9px] uppercase tracking-wider ${isRiskFlag ? 'text-red-700 font-bold' : 'text-slate-500'}`}>{formatSnakeKey(label)}</span>
+                          <span className={`text-[11px] ${isRiskFlag ? 'text-red-700 font-black uppercase tracking-wider animate-pulse' : 'text-slate-700 font-semibold'}`}>{String(value)}</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
-                {Object.entries(factorHub).map(([label, value]) => (
-                  <div key={label} className="flex items-center justify-between gap-3">
-                    <span className="text-slate-500 uppercase tracking-wider text-[9px] whitespace-nowrap">{formatSnakeKey(label)}</span>
-                    <span className="text-slate-700 text-right">{String(value)}</span>
-                  </div>
-                ))}
+                ) : (
+                  <p className="text-[10px] text-slate-500">No risk calc data available.</p>
+                )}
               </div>
-            ) : (
-              <p className="text-[10px] text-slate-500">Risk calc / factor data not available.</p>
-            )}
+              <div className="p-3">
+                <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-2 font-bold">Factor Hub</div>
+                {Object.keys(factorHub).length ? (
+                  <div className="space-y-0">
+                    {Object.entries(factorHub).map(([label, value], idx, arr) => (
+                      <div key={label} className={`py-1.5 ${idx < arr.length - 1 ? 'border-b border-emerald-50' : ''}`}>
+                        <div className="text-[9px] text-emerald-700 uppercase tracking-wider mb-0.5">{formatSnakeKey(label)}</div>
+                        <div className="text-[11px] text-slate-700 leading-relaxed">{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-slate-500">No factor hub data available.</p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

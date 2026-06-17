@@ -272,21 +272,28 @@ function RiskCalcFactorHub({ riskCalc, factorHub }: { riskCalc?: Record<string, 
     );
   }
 
+  const riskFlagEntry = Object.entries(riskCalc).find(([k]) => k.toLowerCase() === 'risk_flag' || k.toLowerCase() === 'risk_flag_value');
+  const regularRiskEntries = Object.entries(riskCalc).filter(([k]) => k.toLowerCase() !== 'risk_flag' && k.toLowerCase() !== 'risk_flag_value');
+
   return (
-    <div className="space-y-3">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
       {hasRisk && (
-        <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Risk Calc</h4>
-              <p className="text-[9px] text-slate-500 mt-0.5">Quantified risk metrics from live analysis.</p>
-            </div>
+        <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-slate-100 px-4 py-2.5 border-b border-slate-200">
+            <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Risk Calc</h4>
+            <p className="text-[9px] text-slate-500 mt-0.5">Quantified risk metrics from live analysis.</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[10px]">
-            {Object.entries(riskCalc).map(([label, value]) => (
-              <div key={label} className="flex items-center justify-between gap-3 bg-slate-50 border border-slate-100 p-2 rounded">
-                <span className="text-slate-500 uppercase tracking-wider text-[9px]">{formatSnakeKey(label)}</span>
-                <span className="text-slate-700 font-semibold text-right">{String(value)}</span>
+          <div className="p-3 space-y-0">
+            {riskFlagEntry && (
+              <div className="flex items-center justify-between gap-3 py-2 border-b border-red-100 bg-red-50/40 -mx-3 px-3 mb-0">
+                <span className="text-[10px] text-red-700 uppercase tracking-wider font-bold leading-tight">Risk Flag</span>
+                <span className="text-[12px] text-red-700 font-black uppercase tracking-wider animate-pulse">{String(riskFlagEntry[1])}</span>
+              </div>
+            )}
+            {regularRiskEntries.map(([label, value], idx, arr) => (
+              <div key={label} className={`flex items-center justify-between gap-3 py-2 ${idx < arr.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider leading-tight">{formatSnakeKey(label)}</span>
+                <span className="text-[11px] text-slate-900 font-bold text-right leading-tight">{String(value)}</span>
               </div>
             ))}
           </div>
@@ -294,18 +301,16 @@ function RiskCalcFactorHub({ riskCalc, factorHub }: { riskCalc?: Record<string, 
       )}
 
       {hasFactor && (
-        <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h4 className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Factor Hub</h4>
-              <p className="text-[9px] text-slate-500 mt-0.5">Active factor exposures and signals.</p>
-            </div>
+        <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-emerald-50 px-4 py-2.5 border-b border-emerald-100">
+            <h4 className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Factor Hub</h4>
+            <p className="text-[9px] text-slate-500 mt-0.5">Active factor exposures and signals.</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
-            {Object.entries(factorHub).map(([label, value]) => (
-              <div key={label} className="bg-emerald-50/60 border border-emerald-100 p-3 rounded-lg">
-                <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">{formatSnakeKey(label)}</div>
-                <div className="text-slate-700 leading-relaxed">{value}</div>
+          <div className="p-3 space-y-0">
+            {Object.entries(factorHub).map(([label, value], idx, arr) => (
+              <div key={label} className={`py-2 ${idx < arr.length - 1 ? 'border-b border-emerald-50' : ''}`}>
+                <div className="text-[9px] text-emerald-700 uppercase tracking-wider mb-0.5">{formatSnakeKey(label)}</div>
+                <div className="text-[11px] text-slate-700 leading-relaxed">{value}</div>
               </div>
             ))}
           </div>
@@ -345,7 +350,7 @@ function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIn
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[10px] text-slate-700 mt-3">
+          <div className="grid grid-cols-1 gap-3 text-[10px] text-slate-700 mt-3">
             <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
               <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Structural Thesis</div>
               <p className="text-[10px] text-slate-600 leading-relaxed">
@@ -357,7 +362,7 @@ function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIn
                 {intelligence.future_revenue_model ?? 'Not produced.'}
               </p>
             </div>
-            <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg md:col-span-2">
+            <div className="bg-white border border-emerald-200 border-[0.5px] rounded-xl overflow-hidden">
               <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-2">Risk Calc / Factor Hub</div>
               <RiskCalcFactorHub
                 riskCalc={
