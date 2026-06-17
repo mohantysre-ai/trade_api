@@ -6,7 +6,161 @@ import AITickerNewsPanel from "./AITickerNewsPanel";
 
 type DrawerAnalysis = TerminalIntelligence & {
   error?: string;
+  active_seven_ic_gates?: unknown;
+  active_risk_calc?: unknown;
+  active_factor_hub?: unknown;
 };
+
+function normalizeRecord(value: unknown): Record<string, unknown> {
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return {};
+    }
+  }
+
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+function formatSnakeKey(key: string) {
+  return key
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatGateKey(key: string) {
+  const labels: Record<string, string> = {
+    q1_fund_buying: "Q1 — Fund Buying",
+    q2_liquidity_delivery: "Q2 — Liquidity Delivery",
+    q3_catalyst_validation: "Q3 — Catalyst Validation",
+    q4_bear_thesis: "Q4 — Bear Thesis",
+    q5_risk_reward: "Q5 — Risk / Reward",
+    q6_quantitative_milestone: "Q6 — Quantitative Milestone",
+    q7_governance_gate: "Q7 — Governance Gate",
+  };
+
+  return labels[key] ?? formatSnakeKey(key);
+}
+
+function DrawerStructuredReasoningOutput({ analysis }: { analysis?: DrawerAnalysis | null }) {
+  if (!analysis) {
+    return (
+      <div className="bg-slate-50 border border-slate-300 border-[0.5px] rounded-xl p-4">
+        <div className="text-slate-500 text-[10px]">Loading analysis...</div>
+      </div>
+    );
+  }
+
+  if (analysis.error) {
+    return (
+      <div className="bg-slate-50 border border-slate-300 border-[0.5px] rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Structured Reasoning Output</h3>
+            <p className="text-[10px] text-slate-500 mt-0.5">Gemini / Pydantic mapped payload from the live ingestion stream.</p>
+          </div>
+          <div className="text-[10px] text-slate-500">Unavailable</div>
+        </div>
+        <div className="text-slate-500 text-[10px]">
+          {analysis.error}
+        </div>
+      </div>
+    );
+  }
+
+  const gates = normalizeRecord(analysis.active_seven_ic_gates);
+  const riskCalc = normalizeRecord(analysis.active_risk_calc);
+  const factorHub = normalizeRecord(analysis.active_factor_hub);
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-slate-50 border border-slate-300 border-[0.5px] rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Structured Reasoning Output</h3>
+            <p className="text-[10px] text-slate-500 mt-0.5">Gemini / Pydantic mapped payload from the live ingestion stream.</p>
+          </div>
+          <div className="text-[10px] text-slate-500">Available</div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[10px] text-slate-700">
+          <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
+            <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">News Catalysts</div>
+            <p className="text-[11px] text-slate-700 leading-relaxed">{analysis.news_catalysts_card ?? "Not produced."}</p>
+          </div>
+          <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
+            <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Macro Anchors</div>
+            <p className="text-[11px] text-slate-700 leading-relaxed">{analysis.macro_anchors_card ?? "Not produced."}</p>
+          </div>
+          <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
+            <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Insider / Insti Activity</div>
+            <p className="text-[11px] text-slate-700 leading-relaxed">{analysis.insider_insti_activity_card ?? "Not produced."}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[10px] text-slate-700 mt-3">
+          <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
+            <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Structural Thesis</div>
+            <p className="text-[10px] text-slate-600 leading-relaxed">
+              <span className="text-slate-700">Why Interested: </span>
+              {analysis.why_interested ?? "Not produced."}
+            </p>
+            <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">
+              <span className="text-slate-700">Forward Revenue: </span>
+              {analysis.future_revenue_model ?? "Not produced."}
+            </p>
+          </div>
+          <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
+            <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Risk Calc / Factor Hub</div>
+            {Object.keys(riskCalc).length || Object.keys(factorHub).length ? (
+              <div className="space-y-2">
+                {Object.entries(riskCalc).map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between gap-3">
+                    <span className="text-slate-500 uppercase tracking-wider text-[9px] whitespace-nowrap">{formatSnakeKey(label)}</span>
+                    <span className="text-slate-700 text-right">{String(value)}</span>
+                  </div>
+                ))}
+                {Object.entries(factorHub).map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between gap-3">
+                    <span className="text-slate-500 uppercase tracking-wider text-[9px] whitespace-nowrap">{formatSnakeKey(label)}</span>
+                    <span className="text-slate-700 text-right">{String(value)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[10px] text-slate-500">Risk calc / factor data not available.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-slate-50 border border-slate-200 rounded p-3">
+        <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-2">IC Gates</div>
+        {Object.keys(gates).length ? (
+          <div className="space-y-3">
+            {Object.entries(gates).map(([gate, value]) => (
+              <div key={gate} className="border-b border-slate-200 last:border-0 pb-3 last:pb-0">
+                <div className="text-[11px] font-bold text-slate-700 mb-1">{formatGateKey(gate)}</div>
+                <div className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap">{String(value)}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-slate-400 text-[11px]">IC Gates data is not available for this ticker.</div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 type DrawerContent = {
   stock?: {
@@ -16,7 +170,7 @@ type DrawerContent = {
   analysis?: DrawerAnalysis | null;
 };
 
-type DrawerTab = "analysis" | "aiNews";
+type DrawerTab = "aiNews" | "analysis" | "icGates";
 
 export default function RightDrawer({ open, onClose, content }: { open: boolean; onClose: () => void; content?: DrawerContent | null }) {
   const [activeTab, setActiveTab] = useState<DrawerTab>("aiNews");
@@ -136,6 +290,15 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           Terminal Analysis
           {activeTab === "analysis" && <span className="absolute inset-x-2 -bottom-px h-0.5 bg-teal-600 rounded-full" />}
         </button>
+        <button
+          onClick={() => setActiveTab("icGates")}
+          className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-wider transition relative ${
+            activeTab === "icGates" ? "text-teal-700" : "text-slate-400 hover:text-slate-600"
+          }`}
+        >
+          IC GATES & REASONING
+          {activeTab === "icGates" && <span className="absolute inset-x-2 -bottom-px h-0.5 bg-teal-600 rounded-full" />}
+        </button>
       </div>
 
       {/* Tab content */}
@@ -239,6 +402,10 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === "icGates" && (
+          <DrawerStructuredReasoningOutput analysis={analysis} />
         )}
       </div>
     </div>
