@@ -105,30 +105,10 @@ def _refresh_task_set_error(task_id: str, error: str) -> None:
 
 
 NEWS_FEEDS: list[tuple[str, str]] = [
-    ("Reuters India", "https://www.reuters.com/markets/india/rss"),
-    ("TradingView", "https://www.tradingview.com/rss.xml"),
-    ("Moneycontrol", "https://www.moneycontrol.com/rss/MCtopnews.xml"),
-    ("Investing.com", "https://www.investing.com/rss/news.rss"),
-    ("LiveMint Market", "https://www.livemint.com/rss/market"),
-    ("Economic Times", "https://economictimes.indiatimes.com/rssfeedstopstories.cms"),
-    ("Wall Street Journal Markets", "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"),
-    ("Financial Times Markets", "https://www.ft.com/markets?format=rss"),
-    ("CNBC Markets Global", "https://www.cnbc.com/id/15839069/device/rss/rss.html"),
-    ("Yahoo Finance Global", "https://finance.yahoo.com/rss/"),
-    ("MarketWatch Top Stories", "http://feeds.marketwatch.com/marketwatch/topstories/"),
-    ("Nasdaq Market Intelligence", "https://www.nasdaq.com/feed/rssoutbound?category=Markets"),
-    ("Seeking Alpha Market Currents", "https://seekingalpha.com/feed.xml"),
-    ("Benzinga Equities & Blocks", "https://www.benzinga.com/best-of-benzinga/feed"),
-    ("CNN Business Markets", "http://rss.cnn.com/rss/money_latest.rss"),
-    ("Barron's Financial", "https://www.barrons.com/feed/rss/markets"),
-    ("Fortune Corporate Finance", "https://fortune.com/category/finance/feed/"),
-    ("Business Standard Markets", "https://www.business-standard.com/rss/markets-106.rss"),
-    ("Financial Express Markets", "https://www.financialexpress.com/market/feed/"),
-    ("CNBC TV18 Markets", "https://www.cnbctv18.com/common/rss/market.xml"),
-    ("The Hindu Business Line", "https://www.thehindubusinessline.com/markets/feeder/default.rss"),
-    ("Zee Business Share Market", "https://www.zeebiz.com/rss/markets.xml"),
-    ("NSE Corporate Announcements", "https://www.nseindia.com/static/rss/corporate-announcements.xml"),
-    ("Economic Times Markets", "https://economictimes.indiatimes.com/markets/rssfeeds/1977021500.cms"),
+    ("Zerodha Pulse", "https://pulse.zerodha.com/"),
+    ("Trendlyne", "https://trendlyne.com/"),
+    ("Finshots", "https://finshots.in/"),
+    ("NSE NIFTY 100", "https://www.nseindia.com/index-tracker/NIFTY%20100"),
 ]
 
 LIVE_UNIVERSE_LABEL = "Live Universe"
@@ -317,28 +297,33 @@ def _parse_rss_datetime(date_text: str | None) -> str | None:
     return None
 
 
-def _extract_rss_items(source: str, url: str, limit: int = 3) -> list[dict[str, str]]:
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(url, timeout=12, headers=headers)
-    response.raise_for_status()
-    root = ET.fromstring(response.content)
+def _clean_html(html: str) -> str:
+    try:
+        from bs4 import BeautifulSoup
+        return BeautifulSoup(html, "html.parser").get_text(separator=" ", strip=True)
+    except Exception:
+        return re.sub(r"<[^>]+>", "", html)
 
+
+def _extract_html_items(source: str, url: str, limit: int = 3) -> list[dict[str, str]]:
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0 Safari/537.36"}
+    response = requests.get(url, timeout=15, headers=headers)
+    response.raise_for_status()
+    clean = _clean_html(response.text)
+    lines = [ln.strip() for ln in clean.splitlines() if ln.strip()]
     items: list[dict[str, str]] = []
-    for item in root.findall(".//item")[:limit]:
-        title = _clean_text(item.findtext("title"))
-        link = _clean_text(item.findtext("link"))
-        summary = _clean_text(item.findtext("description") or item.findtext("summary"))
-        published_at = _parse_rss_datetime(item.findtext("pubDate") or item.findtext("published"))
-        if title:
-            items.append(
-                {
-                    "source": source,
-                    "title": title,
-                    "link": link,
-                    "summary": summary or title,
-                    "publishedAt": published_at or "",
-                }
-            )
+    for line in lines[:limit]:
+        if len(line) < 20:
+            continue
+        items.append(
+            {
+                "source": source,
+                "title": line[:200],
+                "link": url,
+                "summary": line[:300],
+                "publishedAt": _ist_now().isoformat(),
+            }
+        )
     return items
 
 
@@ -346,7 +331,7 @@ def fetch_live_news(limit: int = 10) -> list[dict[str, str]]:
     news: list[dict[str, str]] = []
     for source, url in NEWS_FEEDS:
         try:
-            news.extend(_extract_rss_items(source, url, limit=3))
+            news.extend(_extract_html_items(source, url, limit=3))
         except Exception:
             continue
     news.sort(key=lambda item: item.get("publishedAt", ""), reverse=True)
@@ -1201,7 +1186,7 @@ def build_market_payload(
             _apply_selection_meta(
                 snapshot,
                 mode="snapshot",
-                reason="Outside the scheduled IST refresh window; serving the latest saved snapshot with fresh RSS news.",
+                reason="Outside the scheduled IST refresh window; serving the latest saved snapshot with fresh news.",
                 data_date=_payload_data_date(snapshot),
             )
             return _hydrate_ticker_intelligence_map(snapshot)
