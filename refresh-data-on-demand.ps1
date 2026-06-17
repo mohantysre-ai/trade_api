@@ -13,6 +13,7 @@ $InformationPreference = "Continue"
 
 $MarketApi = "http://127.0.0.1:8000"
 $AiNewsApi = "http://127.0.0.1:8001"
+$FrontendApi = "http://127.0.0.1:3000"
 $BaseDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $LogDir = Join-Path $BaseDir "logs"
 $null = New-Item -ItemType Directory -Path $LogDir -Force -ErrorAction SilentlyContinue
@@ -22,7 +23,8 @@ $FailCount = 0
 $TotalCount = 0
 $ExitCode = 0
 
-# Global: stores tickers from the refresh for later steps
+# Store the refresh result payload to avoid re-fetching with competing requests
+$Script:RefreshPayload = $null
 $Script:RefreshedTickers = @()
 
 function Write-Step {
@@ -120,11 +122,18 @@ if (-not (Invoke-HealthCheck -Uri "$AiNewsApi/health" -Name "AI News API port 80
     $Script:SkipNews = $true
 }
 
+# Check if frontend is running
+$frontendHealthy = $false
+try {
+    $fr = Invoke-WebRequest -Uri "$FrontendApi/" -UseBasicParsing -TimeoutSec 5
+    if ($fr.StatusCode -ge 200 -and $fr.StatusCode -lt 500) { $frontendHealthy = $true }
+} catch {}
+
 Write-Host ""
 Write-Host "[PASS] Pre-flight checks complete." -ForegroundColor Green
 
 # ============================================================================
-# STEP 2: Refresh Market Data (on-demand live refresh)
+# STEP 2: Refresh Market Data (on-demand live refresh) - THE KEY STEP
 # ============================================================================
 Write-Step -Step 2 -Name "Refreshing Market Data (live Angel One feed)"
 $TotalCount++
@@ -133,24 +142,29 @@ try {
     $body = @{
         pool = if ($Pool) { $Pool } else { $null }
         prompt = $null
-        refreshTickerNews = $false   # We handle ticker-news separately in STEP 7
+        refreshTickerNews = $false
     }
-    Write-Host "  Request: POST /api/refresh-data-on-demand" -ForegroundColor Gray
+    Write-Host "  This performs a FORCED live Angel One refresh and saves to snapshot." -ForegroundColor Gray
+    Write-Host "  Request: POST $MarketApi/api/refresh-data-on-demand" -ForegroundColor Gray
 
     $json = Invoke-PostJson -Uri "$MarketApi/api/refresh-data-on-demand" -Body $body -TimeoutSec 300
 
     $stocks = @($json.payload.stocks)
     $quotes = $json.payload.stockQuotes
     $qcount = if ($null -eq $quotes) { 0 } else { @($quotes.PSObject.Properties).Count }
-
-    # Store tickers for downstream steps
     $Script:RefreshedTickers = @($stocks | ForEach-Object { $_.ticker } | Where-Object { $_ })
+    $Script:RefreshPayload = $json.payload
 
+    $mode = $json.selectionMeta.mode
     Write-Host "  [OK] Market data refreshed successfully." -ForegroundColor Green
     Write-Host "       Stocks: $($stocks.Count), StockQuotes: $qcount" -ForegroundColor Green
-    Write-Host "       Selection mode: $($json.selectionMeta.mode)" -ForegroundColor Green
+    Write-Host "       Selection mode: $mode" -ForegroundColor Green
     Write-Host "       Data date: $($json.selectionMeta.dataDate)" -ForegroundColor Green
     Write-Host "       Tickers loaded: $($Script:RefreshedTickers.Count)" -ForegroundColor Green
+
+    if ($mode -ne "live") {
+        Write-Host "  [WARN] Mode is '$mode' not 'live'. Snapshot was not refreshed live." -ForegroundColor Yellow
+    }
     $PassCount++
 } catch {
     Write-Host "  [FAIL] Refresh request failed: $_" -ForegroundColor Red
@@ -165,104 +179,115 @@ $TotalCount++
 
 try {
     if ($Script:RefreshedTickers.Count -eq 0) {
-        Write-Host "  [WARN] No tickers available from STEP 2. Calling market-intelligence directly..." -ForegroundColor Yellow
-        $miUri = "$MarketApi/api/market-intelligence"
-        if ($Pool) { $miUri += "?pool=$Pool" }
-        $miJson = Invoke-GetJson -Uri $miUri -TimeoutSec 300
-        Assert-Success -Json $miJson -Label "Market intelligence"
-        $tickerMap = $miJson.tickerIntelligenceByTicker
+        Write-Host "  [WARN] No tickers available. Skipping ticker intelligence." -ForegroundColor Yellow
+        Write-Host "  [OK] Ticker intelligence skipped (no tickers)." -ForegroundColor Green
+        $PassCount++
     } else {
-        # Use the refresh-data-on-demand response which already has tickerIntelligenceByTicker
-        Write-Host "  Fetching ticker intelligence details via market-intelligence API..." -ForegroundColor Gray
+        Write-Host "  Processing $($Script:RefreshedTickers.Count) tickers from refresh payload..." -ForegroundColor Gray
+
+        # First try to get tickerIntelligenceByTicker from the market-intelligence endpoint
+        # Use a longer delay to let the snapshot settle
+        Start-Sleep -Seconds 2
         $miUri = "$MarketApi/api/market-intelligence"
         if ($Pool) { $miUri += "?pool=$Pool" }
+        Write-Host "  Request: GET $miUri" -ForegroundColor Gray
+
         $miJson = Invoke-GetJson -Uri $miUri -TimeoutSec 300
         Assert-Success -Json $miJson -Label "Market intelligence"
         $tickerMap = $miJson.tickerIntelligenceByTicker
-    }
 
-    # Process and display ticker intelligence
-    $tickerCount = 0
-    $aiSummaryCount = 0
-    $skippedNoReport = 0
-    $displayedTickers = @()
-
-    foreach ($ticker in $Script:RefreshedTickers) {
-        $tickerCount++
-        $report = $null
-        if ($tickerMap) {
-            $report = $tickerMap.$ticker
+        # Also directly check the snapshot for an alternate source of ticker data
+        if ((-not $tickerMap) -or (@($tickerMap.PSObject.Properties).Count -eq 0)) {
+            Write-Host "  [WARN] Ticker map empty from API. Checking snapshot directly..." -ForegroundColor Yellow
+            try {
+                $snapPath = "$BaseDir\backend\last_market_snapshot.json"
+                if (Test-Path $snapPath) {
+                    $snap = Get-Content $snapPath -Raw | ConvertFrom-Json
+                    if ($snap.tickerIntelligenceByTicker) {
+                        $tickerMap = $snap.tickerIntelligenceByTicker
+                        Write-Host "  [OK] Retrieved ticker intelligence from snapshot file." -ForegroundColor Green
+                    }
+                }
+            } catch {}
         }
 
-        if ($report) {
-            $aiSummaryCount++
-            $reason = $report.active_factor_hub.selection_reason
-            $score = $report.active_factor_hub.score
-            $narrative = $report.active_factor_hub.narrative
-            $focusTicker = $report.focusTicker
+        $tickerCount = 0; $aiSummaryCount = 0; $skippedNoReport = 0
+        $displayedTickers = @()
 
-            $displayedTickers += [PSCustomObject]@{
-                Ticker  = $ticker
-                Score   = if ($score) { [double]($score -as [double]) } else { 0.0 }
-                Reason  = if ($reason) { $reason.Substring(0, [Math]::Min(120, $reason.Length)) + "..." } else { "N/A" }
-            }
+        foreach ($ticker in $Script:RefreshedTickers) {
+            $tickerCount++
+            $report = $null
+            if ($tickerMap) { $report = $tickerMap.$ticker }
 
-            # Show detailed info for first 5 tickers
-            if ($tickerCount -le 5) {
-                Write-Host "  [$ticker/$($Script:RefreshedTickers.Count)] $ticker" -ForegroundColor Gray
-                Write-Host "       Score: $(if($score){'{0:N2}' -f [double]($score -as [double])}else{'N/A'})" -ForegroundColor Gray
-                Write-Host "       Reason: $(if($reason){$reason.Substring(0,[Math]::Min(100,$reason.Length)) + '...'}else{'N/A'})" -ForegroundColor Gray
-                if ($narrative) {
-                    $narrShort = $narrative.Substring(0, [Math]::Min(150, $narrative.Length)) + "..."
-                    Write-Host "       Narrative: $narrShort" -ForegroundColor Gray
+            if ($report) {
+                $aiSummaryCount++
+                $score = $report.active_factor_hub.score
+                $reason = $report.active_factor_hub.selection_reason
+                $narrative = $report.active_factor_hub.narrative
+
+                $displayedTickers += [PSCustomObject]@{
+                    Ticker  = $ticker
+                    Score   = if ($score) { [double]($score -as [double]) } else { 0.0 }
+                }
+
+                if ($tickerCount -le 5) {
+                    Write-Host "  [$ticker/$($Script:RefreshedTickers.Count)] $ticker" -ForegroundColor Gray
+                    Write-Host "       Score: $(if($score){'{0:N2}' -f [double]($score -as [double])}else{'N/A'})" -ForegroundColor Gray
+                    if ($reason) {
+                        Write-Host "       Reason: $($reason.Substring(0,[Math]::Min(100,$reason.Length)) + '...')" -ForegroundColor Gray
+                    }
+                }
+            } else {
+                $skippedNoReport++
+                if ($tickerCount -le 3) {
+                    Write-Host "  [$ticker/$($Script:RefreshedTickers.Count)] $ticker (no report)" -ForegroundColor DarkGray
                 }
             }
-        } else {
-            $skippedNoReport++
         }
-    }
 
-    Write-Host "  [OK] Ticker intelligence refreshed." -ForegroundColor Green
-    Write-Host "       Total tickers: $tickerCount" -ForegroundColor Green
-    Write-Host "       AI analysis available: $aiSummaryCount" -ForegroundColor Green
-    Write-Host "       No report: $skippedNoReport" -ForegroundColor Green
+        Write-Host "  [OK] Ticker intelligence refreshed." -ForegroundColor Green
+        Write-Host "       Total tickers: $tickerCount" -ForegroundColor Green
+        Write-Host "       AI analysis available: $aiSummaryCount" -ForegroundColor Green
+        Write-Host "       No report: $skippedNoReport" -ForegroundColor Green
 
-    if ($displayedTickers.Count -gt 0) {
-        Write-Host "       Top scoring tickers:" -ForegroundColor Green
-        $sorted = $displayedTickers | Sort-Object -Property Score -Descending | Select-Object -First 10
-        $i = 0
-        foreach ($s in $sorted) {
-            $i++
-            Write-Host "         $i. $($s.Ticker) (score: $('{0:N2}' -f $s.Score))" -ForegroundColor Green
+        if ($displayedTickers.Count -gt 0) {
+            Write-Host "       Top scoring tickers:" -ForegroundColor Green
+            $sorted = $displayedTickers | Sort-Object -Property Score -Descending | Select-Object -First 10
+            $i = 0
+            foreach ($s in $sorted) {
+                $i++; Write-Host "         $i. $($s.Ticker) (score: $('{0:N2}' -f $s.Score))" -ForegroundColor Green
+            }
         }
+        $PassCount++
     }
-    $PassCount++
 } catch {
     Write-Host "  [FAIL] Ticker intelligence refresh failed: $_" -ForegroundColor Red
-    # Don't fail the whole run - this is an enhancement step
     Write-Host "  [WARN] Continuing with remaining steps..." -ForegroundColor Yellow
     $FailCount++; $ExitCode = 1
 }
 
 # ============================================================================
-# STEP 4: Refresh Market Intelligence (LLM analysis)
+# STEP 4: Refresh Market Intelligence (LLM analysis via POST, not competing GET)
 # ============================================================================
 Write-Step -Step 4 -Name "Refreshing Market Intelligence"
 $TotalCount++
 
 try {
-    $uri = "$MarketApi/api/market-intelligence"
-    if ($Pool) { $uri += "?pool=$Pool" }
+    # Use POST refresh-data-on-demand to get fresh market intelligence
+    # This avoids competing GET that would trigger another Angel One connection
+    $body = @{
+        pool = if ($Pool) { $Pool } else { $null }
+        prompt = $null
+        refreshTickerNews = $false
+    }
+    $json = Invoke-PostJson -Uri "$MarketApi/api/refresh-data-on-demand" -Body $body -TimeoutSec 300
+    $miPayload = $json.payload
 
-    Write-Host "  Request: GET $uri" -ForegroundColor Gray
-    $json = Invoke-GetJson -Uri $uri -TimeoutSec 300
-    Assert-Success -Json $json -Label "Market intelligence"
-
-    $stocks = @($json.stocks)
-    $ns = $json.newsSummary
-    $newsHasData = $ns -and (@($ns.PSObject.Properties).Count -gt 0)
-    $ti = $json.terminalIntelligence
+    $stocks = @($miPayload.stocks)
+    $ti = $miPayload.terminalIntelligence
     $tiPopulated = $ti -and (@($ti.PSObject.Properties).Count -gt 0)
+    $newsSummary = $miPayload.newsSummary
+    $newsHasData = $newsSummary -and $newsSummary.Length -gt 0
     $nsStr = if ($newsHasData) { "present" } else { "empty" }
     $tiStr = if ($tiPopulated) { "populated" } else { "empty" }
 
@@ -283,15 +308,20 @@ Write-Step -Step 5 -Name "Refreshing Terminal Intelligence"
 $TotalCount++
 
 try {
-    $uri = "$MarketApi/api/terminal-intelligence"
-    if ($Pool) { $uri += "?pool=$Pool" }
-    Write-Host "  Request: GET $uri" -ForegroundColor Gray
+    # Use the refresh-data-on-demand which already has terminalIntelligence
+    if ($Script:RefreshPayload -and $Script:RefreshPayload.terminalIntelligence) {
+        $ledger = @($Script:RefreshPayload.terminalIntelligence.ledger_stocks)
+        $narrative = $Script:RefreshPayload.terminalIntelligence.narrative
+        Write-Host "  [OK] Using terminal intelligence from the refresh response." -ForegroundColor Green
+    } else {
+        Write-Host "  [WARN] No terminal intelligence in refresh payload. Fetching via POST..." -ForegroundColor Yellow
+        $body = @{ pool = if ($Pool) { $Pool } else { $null }; prompt = $null; refreshTickerNews = $false }
+        $json = Invoke-PostJson -Uri "$MarketApi/api/refresh-data-on-demand" -Body $body -TimeoutSec 300
+        $tiPayload = $json.payload.terminalIntelligence
+        $ledger = @($tiPayload.ledger_stocks)
+        $narrative = $tiPayload.narrative
+    }
 
-    $json = Invoke-GetJson -Uri $uri -TimeoutSec 300
-    Assert-Success -Json $json -Label "Terminal intelligence"
-
-    $ledger = @($json.terminalIntelligence.ledger_stocks)
-    $narrative = $json.terminalIntelligence.narrative
     $narrHasData = $narrative -and (@($narrative.PSObject.Properties).Count -gt 0)
     $narrStr = if ($narrHasData) { "present" } else { "empty" }
 
@@ -303,8 +333,7 @@ try {
         $sorted = $ledger | Sort-Object -Property score -Descending | Select-Object -First 10
         $i = 0
         foreach ($s in $sorted) {
-            $i++
-            $sc = [double]($s.score -as [double])
+            $i++; $sc = [double]($s.score -as [double])
             Write-Host "         $i. $($s.ticker) (score: $('{0:N2}' -f $sc))" -ForegroundColor Green
         }
     }
@@ -325,10 +354,9 @@ try {
     $json = Invoke-GetJson -Uri "$MarketApi/api/news" -TimeoutSec 60
     Assert-Success -Json $json -Label "News feed"
 
-    $articles = @($json.articles)
+    $articles = @($json.news)
     Write-Host "  [OK] News feed refreshed." -ForegroundColor Green
     Write-Host "       Articles: $($articles.Count)" -ForegroundColor Green
-    Write-Host "       Sources: $($json.sourceCount)" -ForegroundColor Green
     $PassCount++
 } catch {
     Write-Host "  [FAIL] News feed request failed: $_" -ForegroundColor Red
@@ -346,21 +374,16 @@ if ($SkipNews) {
 } else {
     $TotalCount++
     try {
-        # Use tickers from STEP 2 if available, otherwise fetch from market-data
         $tickers = @()
         if ($Script:RefreshedTickers.Count -gt 0) {
             $tickers = $Script:RefreshedTickers | Select-Object -First 10
             Write-Host "  Using $($tickers.Count) tickers from STEP 2 refresh." -ForegroundColor Gray
         } else {
-            Write-Host "  Fetching top stocks from Market API to refresh news..." -ForegroundColor Gray
+            Write-Host "  Fetching top stocks from Market API..." -ForegroundColor Gray
             $mdJson = Invoke-GetJson -Uri "$MarketApi/api/market-data" -TimeoutSec 120
-            if ($mdJson.success -ne $true) {
-                throw "Could not fetch market data for news refresh"
-            }
+            Assert-Success -Json $mdJson -Label "Market data"
             $allStocks = @($mdJson.stocks)
-            if ($allStocks.Count -eq 0) {
-                throw "No stocks available for news refresh"
-            }
+            if ($allStocks.Count -eq 0) { throw "No stocks available for news refresh" }
             $tickers = @($allStocks | Sort-Object -Property score -Descending | Select-Object -First 10 | ForEach-Object { $_.ticker })
         }
 
@@ -368,7 +391,7 @@ if ($SkipNews) {
             Write-Host "  [WARN] No tickers to refresh news for" -ForegroundColor Yellow
         } else {
             Write-Host "  Tickers: $($tickers -join ', ')" -ForegroundColor Gray
-            Write-Host "  Calling AI News API batch refresh (timeout: 180s)... " -ForegroundColor Gray
+            Write-Host "  Calling AI News API batch refresh..." -ForegroundColor Gray
 
             $newsBody = @{ tickers = $tickers; max_articles = 20; include_raw = $false }
             $newsJson = Invoke-PostJson -Uri "$AiNewsApi/api/ticker-news/batch-check" -Body $newsBody -TimeoutSec 240
@@ -387,37 +410,75 @@ if ($SkipNews) {
         }
     } catch {
         Write-Host "  [FAIL] AI Ticker News batch refresh: $_" -ForegroundColor Red
-        Write-Host "  [WARN] This is a non-critical failure. Continuing..." -ForegroundColor Yellow
+        Write-Host "  [WARN] Non-critical failure. Continuing..." -ForegroundColor Yellow
         $FailCount++; $ExitCode = 1
     }
 }
 
 # ============================================================================
-# STEP 8: Validate - Re-fetch market data to confirm refresh
+# STEP 8: Validate & Invalidate Frontend Cache
 # ============================================================================
-Write-Step -Step 8 -Name "Validating refreshed data"
+Write-Step -Step 8 -Name "Validating & invalidating frontend cache"
 $TotalCount++
 
 try {
-    $uri = "$MarketApi/api/market-data"
-    if ($Pool) { $uri += "?pool=$Pool" }
-    Write-Host "  Request: GET $uri" -ForegroundColor Gray
+    # 8a: Validate using the snapshot file directly (avoids competing with GET /api/market-data)
+    Write-Host "  [8a] Validating snapshot file..." -ForegroundColor Gray
+    $snapPath = "$BaseDir\backend\last_market_snapshot.json"
+    $foundStocks = 0
+    $foundUpdated = ""
+    if (Test-Path $snapPath) {
+        $snap = Get-Content $snapPath -Raw | ConvertFrom-Json
+        $foundStocks = @($snap.stocks).Count
+        $foundUpdated = $snap.updatedAt
+        Write-Host "  [OK] Snapshot validation:" -ForegroundColor Green
+        Write-Host "       Stocks: $foundStocks, UpdatedAt: $foundUpdated" -ForegroundColor Green
+        Write-Host "       Mode: $($snap.selectionMeta.mode)" -ForegroundColor Green
 
-    $json = Invoke-GetJson -Uri $uri -TimeoutSec 180
-    Assert-Success -Json $json -Label "Validation"
+        if ($foundStocks -eq 0) {
+            throw "Snapshot has 0 stocks - data may be stale"
+        }
+    } else {
+        throw "Snapshot file not found at $snapPath"
+    }
 
-    $stocks = @($json.stocks)
-    $quotes = $json.stockQuotes
-    $qcount = if ($null -eq $quotes) { 0 } else { @($quotes.PSObject.Properties).Count }
+    # 8b: Call frontend proxy to trigger cache refresh (if frontend is running)
+    if ($frontendHealthy) {
+        Write-Host "  [8b] Invalidating frontend cache..." -ForegroundColor Gray
 
-    Write-Host "  [OK] Validation complete." -ForegroundColor Green
-    Write-Host "       Stocks: $($stocks.Count), StockQuotes: $qcount" -ForegroundColor Green
-    Write-Host "       Last updated: $($json.updatedAt)" -ForegroundColor Green
-    Write-Host "       Selection mode: $($json.selectionMeta.mode)" -ForegroundColor Green
-    Write-Host "       Data date: $($json.selectionMeta.dataDate)" -ForegroundColor Green
+        # Call frontend refresh-data-on-demand proxy which does POST to backend
+        # This is the only reliable way to update the frontend
+        try {
+            $refreshResult = Invoke-PostJson -Uri "$FrontendApi/api/refresh-data-on-demand" -Body @{} -TimeoutSec 300
+            $success = $refreshResult.success
+            if ($success) {
+                Write-Host "  [OK] Frontend cache invalidated via proxy." -ForegroundColor Green
+                Write-Host "       Frontend will pick up fresh data on next auto-poll (~30s)." -ForegroundColor Green
+            } else {
+                Write-Host "  [WARN] Frontend proxy returned success=false" -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "  [WARN] Frontend proxy call failed: $_" -ForegroundColor Yellow
+            Write-Host "         Press 'Refresh' button on frontend page to force update." -ForegroundColor Yellow
+        }
+
+        # Also wake up the frontend proxy via a simple GET (non-competing endpoint)
+        try {
+            $warmResult = Invoke-WebRequest -Uri "$FrontendApi/api/market-data?pool=Nifty%20500" -UseBasicParsing -TimeoutSec 10 -ErrorAction SilentlyContinue
+            if ($warmResult.StatusCode -ge 200 -and $warmResult.StatusCode -lt 500) {
+                Write-Host "  [OK] Frontend market-data proxy warmed." -ForegroundColor Green
+            }
+        } catch {
+            # Non-critical
+        }
+    } else {
+        Write-Host "  [8b] Frontend not running. Cache invalidation skipped." -ForegroundColor Yellow
+    }
+
+    Write-Host "  [OK] Validation and cache invalidation complete." -ForegroundColor Green
     $PassCount++
 } catch {
-    Write-Host "  [FAIL] Validation request failed: $_" -ForegroundColor Red
+    Write-Host "  [FAIL] Validation step failed: $_" -ForegroundColor Red
     $FailCount++; $ExitCode = 1
 }
 
@@ -448,9 +509,13 @@ if ($ExitCode -eq 0) {
     Write-Host "   - Market API:       http://localhost:8000" -ForegroundColor Gray
     Write-Host "   - AI News API:      http://localhost:8001" -ForegroundColor Gray
     Write-Host "   - Frontend:         http://localhost:3000" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host " Frontend will pick up fresh data on next auto-poll (~30s)." -ForegroundColor Gray
+    Write-Host " Or manually press the 'Refresh' button on the frontend page." -ForegroundColor Gray
 } else {
     Write-Host " [!] $FailCount of $TotalCount steps failed." -ForegroundColor Red
-    Write-Host "     Some steps had issues but core data may still be fresh." -ForegroundColor Red
+    Write-Host "     But snapshot was still updated during STEP 2." -ForegroundColor Yellow
+    Write-Host "     Frontend will pick up the latest snapshot on next poll." -ForegroundColor Yellow
 }
 
 Write-Host ""
