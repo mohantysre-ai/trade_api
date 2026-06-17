@@ -180,7 +180,7 @@ export type FeedStatus = "idle" | "loading" | "live" | "offline";
 // Defaults to the direct Python backend when no build-time proxy URL is configured.
 const MARKET_API_URL = process.env.NEXT_PUBLIC_MARKET_API_URL ?? "";
 
-const STALE_AFTER_MS = 30_000;
+const STALE_AFTER_MS = 300_000;
 
 export async function fetchMarketData(pool?: string): Promise<MarketDataResponse> {
   const url = MARKET_API_URL

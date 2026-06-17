@@ -130,9 +130,10 @@ export default function ForensicPanel({
 
   const flagClass = (flag: string) => {
     const v = flag.toLowerCase();
+    if (v.includes('extreme')) return 'text-white border-red-700 bg-red-600 animate-pulse font-black';
     if (v.includes('low_risk') || v.includes('low vol') || v === 'low') return 'text-teal-700 border-teal-200 bg-teal-50';
     if (v.includes('moderate_risk') || v.includes('moderate')) return 'text-amber-700 border-amber-200 bg-amber-50';
-    if (v.includes('high_risk') || v.includes('extreme') || v.includes('structural') || v.includes('atr')) return 'text-red-700 border-red-200 bg-red-50';
+    if (v.includes('high_risk') || v.includes('structural') || v.includes('atr')) return 'text-red-700 border-red-200 bg-red-50';
     if (v.includes('selected') || v === 'buy') return 'text-slate-400 border-slate-200 bg-slate-50';
     return 'text-slate-600 border-red-200 bg-red-50';
   };
