@@ -133,6 +133,28 @@ Write-Host ""
 Write-Host "[PASS] Pre-flight checks complete." -ForegroundColor Green
 
 # ============================================================================
+# STEP 1b: Clear stale snapshots before refresh
+# ============================================================================
+Write-Host ""
+Write-Host "[PRE-CLEAR] Removing stale snapshot files..." -ForegroundColor Yellow
+$snapPath = "$BaseDir\backend\last_market_snapshot.json"
+$altSnapPath = "$BaseDir\trade_api_snapshot.json"
+$cleared = $false
+if (Test-Path $snapPath) {
+    Remove-Item -LiteralPath $snapPath -Force -ErrorAction SilentlyContinue
+    $cleared = $true
+    Write-Host "  [OK] Removed: $snapPath" -ForegroundColor Green
+}
+if (Test-Path $altSnapPath) {
+    Remove-Item -LiteralPath $altSnapPath -Force -ErrorAction SilentlyContinue
+    $cleared = $true
+    Write-Host "  [OK] Removed: $altSnapPath" -ForegroundColor Green
+}
+if (-not $cleared) {
+    Write-Host "  [OK] No stale snapshot files found." -ForegroundColor Green
+}
+
+# ============================================================================
 # STEP 2: Refresh Market Data (on-demand live refresh) - THE KEY STEP
 # ============================================================================
 Write-Step -Step 2 -Name "Refreshing Market Data (live Angel One feed)"

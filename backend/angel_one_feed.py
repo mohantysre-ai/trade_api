@@ -40,6 +40,8 @@ from terminal_intelligence_full import (
     execute_terminal_intelligence_pipeline,
 )
 
+_TI_TOP_SELECTION_COUNT = TOP_SELECTION_COUNT
+
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")

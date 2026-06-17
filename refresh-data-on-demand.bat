@@ -18,7 +18,7 @@ REM ============================================================
 setlocal enabledelayedexpansion
 
 set SCRIPT_DIR=%~dp0
-set PS1_SCRIPT="%SCRIPT_DIR%refresh-data-on-demand.ps1"
+set PS1_SCRIPT="%SCRIPT_DIR%.kilo\scripts\refresh-data-on-demand.ps1"
 
 REM Build arguments for PowerShell script
 set PS_ARGS=
