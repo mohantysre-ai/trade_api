@@ -449,17 +449,29 @@ try {
         # Call frontend refresh-data-on-demand proxy which does POST to backend
         # This is the only reliable way to update the frontend
         try {
-            $refreshResult = Invoke-PostJson -Uri "$FrontendApi/api/refresh-data-on-demand" -Body @{} -TimeoutSec 300
+            # First, call the backend directly again to make sure snapshot is 100% fresh
+            Start-Sleep -Milliseconds 500
+            $refreshResult = Invoke-PostJson -Uri "$MarketApi/api/refresh-data-on-demand" -Body @{} -TimeoutSec 300
             $success = $refreshResult.success
             if ($success) {
-                Write-Host "  [OK] Frontend cache invalidated via proxy." -ForegroundColor Green
-                Write-Host "       Frontend will pick up fresh data on next auto-poll (~30s)." -ForegroundColor Green
+                Write-Host "  [OK] Backend snapshot confirmed fresh." -ForegroundColor Green
             } else {
-                Write-Host "  [WARN] Frontend proxy returned success=false" -ForegroundColor Yellow
+                Write-Host "  [WARN] Backend returned success=false" -ForegroundColor Yellow
+            }
+
+            # Now force frontend to re-read by calling its proxy
+            Start-Sleep -Milliseconds 500
+            $frontendRefresh = Invoke-PostJson -Uri "$FrontendApi/api/refresh-data-on-demand" -Body @{} -TimeoutSec 300
+            if ($frontendRefresh -and $frontendRefresh.success) {
+                Write-Host "  [OK] Frontend cache invalidated via proxy." -ForegroundColor Green
+                Write-Host "       Frontend will pick up fresh data immediately." -ForegroundColor Green
+            } else {
+                Write-Host "  [WARN] Frontend proxy returned: $(if($frontendRefresh){$frontendRefresh.success}else{'no response'})" -ForegroundColor Yellow
+                Write-Host "         Press 'Refresh' button on frontend page." -ForegroundColor Yellow
             }
         } catch {
             Write-Host "  [WARN] Frontend proxy call failed: $_" -ForegroundColor Yellow
-            Write-Host "         Press 'Refresh' button on frontend page to force update." -ForegroundColor Yellow
+            Write-Host "         Press 'Refresh' button on frontend page." -ForegroundColor Yellow
         }
 
         # Also wake up the frontend proxy via a simple GET (non-competing endpoint)
