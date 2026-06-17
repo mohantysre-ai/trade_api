@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
+// @ts-ignore
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "IROS — Live Market Intelligence Terminal" },
       { name: "description", content: "Real-time global indices, commodities, India markets and AI-driven terminal intelligence." },
-      { property: "og:title", content: "IROS Market Intelligence" },
-      { property: "og:description", content: "Pro-grade live market terminal with AI thesis and forensic screen." },
+      { name: "og:title", content: "IROS Market Intelligence" },
+      { name: "og:description", content: "Pro-grade live market terminal with AI thesis and forensic screen." },
     ],
   }),
   component: Index,
@@ -28,6 +29,8 @@ const GLOBAL_INDICES: Tick[] = [
   { label: "CAC 40", value: "8,350.87", delta: 1.83 },
   { label: "FTSE 100", value: "10,471.72", delta: 1.63 },
   { label: "EURO STOXX 50", value: "6,187.63", delta: 2.16 },
+  { label: "S&P/ASX 200", value: "8,912.40", delta: 0.85 },
+  { label: "BOVESPA", value: "134,280.00", delta: 1.45 },
 ];
 
 const COMMODITIES: Tick[] = [
@@ -39,7 +42,7 @@ const COMMODITIES: Tick[] = [
 ];
 
 const INDIA: Tick[] = [
-  { label: "NIFTY 50", value: "23,622.90", delta: 1.99 },
+  { label: "NIFTY 100", value: "23,622.90", delta: 1.99 },
   { label: "SENSEX", value: "75,527.95", delta: 2.30 },
   { label: "NIFTY BANK", value: "56,814.80", delta: 2.97 },
   { label: "NIFTY IT", value: "27,795.75", delta: -0.09 },
@@ -167,13 +170,6 @@ function MarketSnapshot() {
         </div>
       </Panel>
 
-      <Panel label="India Markets" status="STALE 241M">
-        <div className="grid grid-cols-2 gap-px bg-border/60 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7">
-          {INDIA.map((t) => (
-            <TickerCard key={t.label} t={t} />
-          ))}
-        </div>
-      </Panel>
     </div>
   );
 }
@@ -241,88 +237,6 @@ function AssetMatrix({ onSelect }: { onSelect: (a: Asset) => void }) {
         </table>
       </div>
     </Panel>
-  );
-}
-
-function IcGates() {
-  return (
-    <div className="grid gap-4">
-      <Panel label="Structured Reasoning Output" status="AVAILABLE">
-        <div className="border-b border-border px-4 py-2 font-mono text-[11px] text-muted-foreground">
-          Gemini / Pydantic mapped payload from the live ingestion stream.
-        </div>
-
-        <div className="grid gap-px bg-border/60 lg:grid-cols-3">
-          {[
-            {
-              h: "News Catalysts",
-              b: "Market context for AADHARHFC: top market catalysts were not available from the current news feed.",
-            },
-            {
-              h: "Macro Anchors",
-              b: "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds.",
-            },
-            {
-              h: "Insider / Insti Activity",
-              b: "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation.",
-            },
-          ].map((c) => (
-            <article key={c.h} className="bg-card/40 p-4">
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
-                {c.h}
-              </h3>
-              <p className="mt-2 font-mono text-[12px] leading-relaxed text-foreground/80">
-                {c.b}
-              </p>
-            </article>
-          ))}
-        </div>
-
-        <div className="grid gap-3">
-          <article className="bg-card/40 p-4">
-            <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
-              Structural Thesis
-            </h3>
-            <p className="mt-2 font-mono text-[12px] leading-relaxed text-foreground/80">
-              <span className="text-muted-foreground">Why Interested:</span> AADHARHFC is in
-              the active terminal universe with LTP ₹473.65, +4.55% move, and volume 542,229.
-              Intraday setup: VWAP Bounce, EMA9 unavailable, ATR 0%, volume multiplier 0x.
-            </p>
-            <p className="mt-3 font-mono text-[12px] leading-relaxed text-foreground/80">
-              <span className="text-muted-foreground">Forward Revenue:</span> forward model
-              inferred from current sector momentum, order-flow quality, and live liquidity
-              participation rather than static multiples.
-            </p>
-          </article>
-
-          <article className="bg-card/40 p-4">
-            <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
-              Risk Calc / Factor Hub
-            </h3>
-            <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 font-mono text-[12px]">
-              {[
-                ["Ticker Score", "91.2"],
-                ["Delta %", "4.55"],
-                ["ATR %", "0.00"],
-                ["Turnover Cr", "0.00"],
-                ["Volume Mult", "0.00x"],
-                ["Selection Risk", "lower"],
-                ["Signal Quality", "live-derived"],
-                ["Win/Loss", "5.67 : 1"],
-                ["Kelly Max", "10.6%"],
-                ["Risk Score", "28"],
-                ["Risk Flag", "LOW_RISK"],
-              ].map(([k, v]) => (
-                <div key={k} className={`flex items-baseline justify-between border-b border-border/30 pb-1 ${k === "Risk Flag" ? "bg-red-50 border-red-100 -mx-4 px-4" : ""}`}>
-                  <dt className={`${k === "Risk Flag" ? "text-red-700 font-bold" : "text-muted-foreground"}`}>{k}</dt>
-                  <dd className={`tabular-nums ${k === "Risk Flag" ? "text-red-700 font-black uppercase tracking-wider" : "text-foreground"}`}>{v}</dd>
-                </div>
-              ))}
-            </dl>
-          </article>
-        </div>
-      </Panel>
-    </div>
   );
 }
 
@@ -416,7 +330,7 @@ function DetailDrawer({ asset, onClose }: { asset: Asset; onClose: () => void })
 
 /* ---------------------------------- root ---------------------------------- */
 
-const TABS = ["Market Snapshot", "Asset Matrix", "IC Gates & Reasoning"] as const;
+const TABS = ["Market Snapshot", "Asset Matrix"] as const;
 type Tab = (typeof TABS)[number];
 
 function Index() {
@@ -483,7 +397,6 @@ function Index() {
 
         {tab === "Market Snapshot" && <MarketSnapshot />}
         {tab === "Asset Matrix" && <AssetMatrix onSelect={setSelected} />}
-        {tab === "IC Gates & Reasoning" && <IcGates />}
       </main>
 
       {selected && (
