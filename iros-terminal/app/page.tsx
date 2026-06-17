@@ -253,6 +253,68 @@ function LiveIntelligencePanel() {
   );
 }
 
+function formatSnakeKey(key: string) {
+  return key
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function RiskCalcFactorHub({ riskCalc, factorHub }: { riskCalc?: Record<string, unknown>; factorHub?: Record<string, string> }) {
+  const hasRisk = !!riskCalc && Object.keys(riskCalc).length > 0;
+  const hasFactor = !!factorHub && Object.keys(factorHub).length > 0;
+
+  if (!hasRisk && !hasFactor) {
+    return (
+      <div className="bg-white border border-slate-300 border-[0.5px] p-4 rounded-lg shadow-sm">
+        <p className="text-[10px] text-slate-500">Risk calc / factor data not available.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {hasRisk && (
+        <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Risk Calc</h4>
+              <p className="text-[9px] text-slate-500 mt-0.5">Quantified risk metrics from live analysis.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[10px]">
+            {Object.entries(riskCalc).map(([label, value]) => (
+              <div key={label} className="flex items-center justify-between gap-3 bg-slate-50 border border-slate-100 p-2 rounded">
+                <span className="text-slate-500 uppercase tracking-wider text-[9px]">{formatSnakeKey(label)}</span>
+                <span className="text-slate-700 font-semibold text-right">{String(value)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hasFactor && (
+        <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h4 className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Factor Hub</h4>
+              <p className="text-[9px] text-slate-500 mt-0.5">Active factor exposures and signals.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
+            {Object.entries(factorHub).map(([label, value]) => (
+              <div key={label} className="bg-emerald-50/60 border border-emerald-100 p-3 rounded-lg">
+                <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">{formatSnakeKey(label)}</div>
+                <div className="text-slate-700 leading-relaxed">{value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIntelligence }) {
   const hasData = !!intelligence;
 
@@ -295,20 +357,16 @@ function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIn
                 {intelligence.future_revenue_model ?? 'Not produced.'}
               </p>
             </div>
-            <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
-              <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Risk Calc / Factor Hub</div>
-              {intelligence.active_risk_calc ? (
-                <div className="space-y-1">
-                  {Object.entries(intelligence.active_risk_calc).map(([label, value]) => (
-                    <div key={label} className="flex items-center justify-between">
-                      <span className="text-slate-500 uppercase tracking-wider text-[9px]">{label.replace(/_/g, ' ')}</span>
-                      <span className="text-slate-700">{String(value)}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-[10px] text-slate-500">Risk calc data not available.</p>
-              )}
+            <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg md:col-span-2">
+              <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-2">Risk Calc / Factor Hub</div>
+              <RiskCalcFactorHub
+                riskCalc={
+                  (intelligence.active_risk_calc as Record<string, unknown> | undefined) ?? undefined
+                }
+                factorHub={
+                  (intelligence.active_factor_hub as Record<string, string> | undefined) ?? undefined
+                }
+              />
             </div>
           </div>
         </>
@@ -464,7 +522,6 @@ export default function IrosMasterAdvancedTerminal() {
           {([
             { key: 'marketSnapshot' as TabKey, label: 'MARKET SNAPSHOT' },
             { key: 'assetMatrix' as TabKey, label: 'ASSET MATRIX' },
-            { key: 'icGates' as TabKey, label: 'IC GATES & REASONING' },
           ]).map((tab) => (
             <button
               key={tab.key}
