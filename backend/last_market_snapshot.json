@@ -27,7 +27,7 @@
     "NSE Corporate Announcements",
     "Economic Times Markets"
   ],
-  "updatedAt": "2026-06-17T18:35:22.190103+00:00",
+  "updatedAt": "2026-06-17T20:16:16.860919+00:00",
   "mockTickers": [
     "AWFI"
   ],
@@ -4356,24 +4356,24 @@
     "indices": [
       {
         "label": "DJI (US 30)",
-        "val": "51,877.19",
-        "delta": "-0.24%",
+        "val": "51,492.55",
+        "delta": "-0.98%",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live"
       },
       {
         "label": "S&P 500",
-        "val": "7,469.50",
-        "delta": "-0.56%",
+        "val": "7,420.10",
+        "delta": "-1.21%",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live"
       },
       {
         "label": "NASDAQ 100",
-        "val": "29,931.45",
-        "delta": "-0.12%",
+        "val": "29,670.95",
+        "delta": "-0.99%",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live"
@@ -4438,40 +4438,40 @@
     "commodities": [
       {
         "label": "GOLD",
-        "val": "$4,311.40/oz",
-        "delta": "-0.99%",
+        "val": "$4,264.70/oz",
+        "delta": "-2.06%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "SILVER",
-        "val": "$69.15/oz",
-        "delta": "-1.23%",
+        "val": "$67.55/oz",
+        "delta": "-3.53%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "BRENT CRUDE OIL",
-        "val": "$79.50 / bbl",
-        "delta": "+0.68%",
+        "val": "$78.99 / bbl",
+        "delta": "+0.04%",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "WTI CRUDE",
-        "val": "$75.91 / bbl",
-        "delta": "+0.85%",
+        "val": "$75.38 / bbl",
+        "delta": "+0.15%",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "NATURAL GAS",
-        "val": "$3.151 / MMBtu",
-        "delta": "-2.72%",
+        "val": "$3.187 / MMBtu",
+        "delta": "-1.61%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
@@ -4481,52 +4481,66 @@
   "news": [
     {
       "source": "Seeking Alpha Market Currents",
-      "title": "Red Robin Gourmet Burgers' Transformation Looks Irresistible (Upgrade)",
-      "link": "https://seekingalpha.com/article/4915771-red-robin-gourmet-burgers-transformation-looks-irresistible-upgrade?source=feed_all_articles",
-      "summary": "Red Robin Gourmet Burgers' Transformation Looks Irresistible (Upgrade)",
-      "publishedAt": "2026-06-17T18:25:16+00:00"
-    },
-    {
-      "source": "Nasdaq Market Intelligence",
-      "title": "Here's How Stellantis Is in Even Worse Shape Than Its Rival -- but Clear Upside Remains",
-      "link": "https://www.nasdaq.com/articles/heres-how-stellantis-even-worse-shape-its-rival-clear-upside-remains",
-      "summary": "Key PointsStellantis reported the second-highest recall volume in the U.S. last year.",
-      "publishedAt": "2026-06-17T18:15:00+00:00"
+      "title": "Microsoft Just Became Irresistibly Attractive, But Only Because The Bears Were Right",
+      "link": "https://seekingalpha.com/article/4915797-microsoft-just-became-irresistibly-attractive-but-only-because-the-bears-were-right?source=feed_all_articles",
+      "summary": "Microsoft Just Became Irresistibly Attractive, But Only Because The Bears Were Right",
+      "publishedAt": "2026-06-17T20:12:16+00:00"
     },
     {
       "source": "Seeking Alpha Market Currents",
-      "title": "Jabil Inc. (JBL) Q3 2026 Earnings Call Transcript",
-      "link": "https://seekingalpha.com/article/4915703-jabil-inc-jbl-q3-2026-earnings-call-transcript?source=feed_all_articles",
-      "summary": "Jabil Inc. (JBL) Q3 2026 Earnings Call Transcript",
-      "publishedAt": "2026-06-17T18:12:10+00:00"
+      "title": "Central Bank Gold Reserves Survey 2026",
+      "link": "https://seekingalpha.com/article/4915796-central-bank-gold-reserves-survey-2026?source=feed_all_articles",
+      "summary": "Central Bank Gold Reserves Survey 2026",
+      "publishedAt": "2026-06-17T20:05:00+00:00"
+    },
+    {
+      "source": "Seeking Alpha Market Currents",
+      "title": "Brookfield Renewable Corporation (BEPC) Shareholder/Analyst Call - Slideshow",
+      "link": "https://seekingalpha.com/article/4915812-brookfield-renewable-corporation-bepc-shareholder-analyst-call-slideshow?source=feed_all_articles",
+      "summary": "Brookfield Renewable Corporation (BEPC) Shareholder/Analyst Call - Slideshow",
+      "publishedAt": "2026-06-17T20:00:49+00:00"
     },
     {
       "source": "Nasdaq Market Intelligence",
-      "title": "Wednesday 6/17 Insider Buying Report: LULU, ADSK",
-      "link": "https://www.nasdaq.com/articles/wednesday-6-17-insider-buying-report-lulu-adsk",
-      "summary": "Bargain hunters are wise to pay careful attention to insider buying, because although there are many various reasons for an insider to sell a stock, presumably the only reason they would use their hard-earned cash to make a purchase, is that they expect to make money. Today we",
-      "publishedAt": "2026-06-17T18:08:29+00:00"
+      "title": "Why SSR Mining Stock Surged Again Today",
+      "link": "https://www.nasdaq.com/articles/why-ssr-mining-stock-surged-again-today",
+      "summary": "Key PointsSSR Mining is about to receive $1.5 billion into its bank account.",
+      "publishedAt": "2026-06-17T19:46:41+00:00"
+    },
+    {
+      "source": "Nasdaq Market Intelligence",
+      "title": "PSKY Crosses Above 2% Yield Territory",
+      "link": "https://www.nasdaq.com/articles/psky-crosses-above-2-yield-territory",
+      "summary": "Looking at the universe of stocks we cover at Dividend Channel, in trading on Wednesday, shares of Paramount Skydance Corporation - Class B (Symbol: PSKY) were yielding above the 2% mark based on its quarterly dividend (annualized to $0.2), with the stock changing hands as low a",
+      "publishedAt": "2026-06-17T19:39:06+00:00"
+    },
+    {
+      "source": "Nasdaq Market Intelligence",
+      "title": "KMB Dividend Yield Pushes Past 5%",
+      "link": "https://www.nasdaq.com/articles/kmb-dividend-yield-pushes-past-5",
+      "summary": "Looking at the universe of stocks we cover at Dividend Channel, in trading on Wednesday, shares of Kimberly-Clark Corp. (Symbol: KMB) were yielding above the 5% mark based on its quarterly dividend (annualized to $5.12), with the stock changing hands as low as $101.95 on the day",
+      "publishedAt": "2026-06-17T19:37:52+00:00"
     },
     {
       "source": "Economic Times",
-      "title": "India vs China: Who wins the next round?",
-      "link": "https://economictimes.indiatimes.com/opinion/et-commentary/why-the-world-is-betting-on-china-again-and-what-india-must-do-about-it/articleshow/131809871.cms",
-      "summary": "India vs China: Who wins the next round?",
-      "publishedAt": "2026-06-17T18:08:18+00:00"
+      "title": "Financial crime unit scans large crypto OTC deals",
+      "link": "https://economictimes.indiatimes.com/industry/banking/finance/financial-intelligence-unit-puts-large-crypto-otc-deals-under-scanner-asks-exchanges-for-trade-data/articleshow/131811947.cms",
+      "summary": "Financial crime unit scans large crypto OTC deals",
+      "publishedAt": "2026-06-17T19:25:40+00:00"
     },
     {
-      "source": "Seeking Alpha Market Currents",
-      "title": "Nio Strategic Metals Inc. (NIO:CA) Shareholder/Analyst Call Transcript",
-      "link": "https://seekingalpha.com/article/4915739-nio-strategic-metals-inc-nio-ca-shareholder-analyst-call-transcript?source=feed_all_articles",
-      "summary": "Nio Strategic Metals Inc. (NIO:CA) Shareholder/Analyst Call Transcript",
-      "publishedAt": "2026-06-17T18:02:09+00:00"
+      "source": "Economic Times",
+      "title": "Prince George joins Eton's $85K school",
+      "link": "https://economictimes.indiatimes.com/news/new-updates/prince-georges-eton-college-costs-nearly-85000-a-year-and-its-also-where-david-cameron-and-tom-hiddleston-studied/articleshow/131811976.cms",
+      "summary": "Prince George joins Eton's $85K school",
+      "publishedAt": "2026-06-17T19:22:48+00:00"
     },
     {
-      "source": "Nasdaq Market Intelligence",
-      "title": "Here's 1 Type of Investor Who's Being Utterly Neglected by SpaceX",
-      "link": "https://www.nasdaq.com/articles/heres-1-type-investor-whos-being-utterly-neglected-spacex",
-      "summary": "Key PointsSpaceX is going to channel its spending into its considerable capex needs.",
-      "publishedAt": "2026-06-17T18:02:00+00:00"
+      "source": "Economic Times",
+      "title": "Consumer groups oppose Trai telecom complaint plan",
+      "link": "https://economictimes.indiatimes.com/industry/telecom/telecom-news/consumer-groups-oppose-trai-plan-to-scrap-advisory-panel-for-telecom-complaints/articleshow/131811968.cms",
+      "summary": "Consumer groups oppose Trai telecom complaint plan",
+      "publishedAt": "2026-06-17T19:21:24+00:00"
     },
     {
       "source": "The Hindu Business Line",
@@ -4534,20 +4548,6 @@
       "link": "https://www.thehindubusinessline.com/markets/nse-ipo-back-on-track-as-exchange-files-drhp-with-sebi-for-30000-crore-issue/article71115075.ece",
       "summary": "Pure offer-for-sale of up to 149 million equity shares likely to be one of India\u2019s biggest public issues of the year",
       "publishedAt": "2026-06-17T17:51:23+00:00"
-    },
-    {
-      "source": "Economic Times",
-      "title": "India-UK FTA: Mixed response from liquor industry",
-      "link": "https://economictimes.indiatimes.com/industry/cons-products/liquor/india-uk-fta-draws-mixed-response-from-liquor-industry-over-scotch-duty-cuts/articleshow/131808485.cms",
-      "summary": "India-UK FTA: Mixed response from liquor industry",
-      "publishedAt": "2026-06-17T17:48:53+00:00"
-    },
-    {
-      "source": "The Hindu Business Line",
-      "title": "Leapfrog Engineering IPO subscribed 1.28 times on day 1, QIB demand leads surge",
-      "link": "https://www.thehindubusinessline.com/markets/stock-markets/leapfrog-engineering-ipo-subscribed-128-times-on-day-1-qib-demand-leads-surge/article71114997.ece",
-      "summary": "The Bengaluru-based EPCC company plans to use proceeds for setting up an assembling unit, working capital needs and general corporate purposes",
-      "publishedAt": "2026-06-17T17:07:01+00:00"
     }
   ],
   "llmProvider": "gemini",

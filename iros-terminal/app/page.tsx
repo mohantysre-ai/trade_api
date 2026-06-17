@@ -19,9 +19,9 @@ type DrawerContent = {
   }) | null;
 };
 
-type TabKey = 'marketSnapshot' | 'assetMatrix' | 'icGates';
+type TabKey = 'marketSnapshot' | 'assetMatrix';
 
-const INDIA_MARKET_LABELS = new Set(['NIFTY 50', 'SENSEX', 'NIFTY BANK', 'NIFTY IT', 'NIFTY PHARMA']);
+const INDIA_MARKET_LABELS = new Set(['NIFTY 100', 'SENSEX', 'NIFTY BANK', 'NIFTY IT', 'NIFTY PHARMA', 'NIFTY MIDCAP', 'NIFTY SMALLCAP']);
 const GLOBAL_ONLY_LABELS = new Set(['BRENT CRUDE', 'BRENT CRUDE OIL']);
 
 function normalizeMarketLabel(label: string) {
@@ -35,22 +35,196 @@ function marketStateBorder(state: string) {
 }
 
 function marketStateClass(state: string) {
-  if (state === 'POSITIVE') return 'text-emerald-500';
+  if (state === 'POSITIVE') return 'text-emerald-600';
   if (state === 'NEGATIVE') return 'text-red-500';
   return 'text-slate-500';
 }
 
-function SparklineSVG({ positive }: { positive: boolean }) {
-  const color = positive ? '#10b981' : '#ef4444';
-  const points = positive
-    ? '5,48 15,44 25,42 35,38 45,36 55,32 65,30 75,26 85,24 95,20'
-    : '5,15 15,20 25,25 35,30 45,35 55,40 65,42 75,45 85,48 95,50';
+/* -------------------------------------------------------------------------- */
+/*  Helper: parse delta string like "+2.73%" or "-3.12%"                     */
+/* -------------------------------------------------------------------------- */
+function parseDeltaPct(delta: string | undefined): number {
+  if (!delta) return 0;
+  const cleaned = delta.replace('%', '').replace(',', '');
+  return parseFloat(cleaned) || 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  NIFTY TOP 5 GAINERS & LOSERS (live from stockQuotes)                     */
+/* -------------------------------------------------------------------------- */
+function GainersLosersHeatmap({ stockQuotes }: { stockQuotes?: Record<string, LiveStock> }) {
+  const sorted = useMemo(() => {
+    if (!stockQuotes) return { gainers: [] as LiveStock[], losers: [] as LiveStock[] };
+    const entries = Object.values(stockQuotes).filter(s => s.delta);
+    const withPct = entries.map(s => ({ ...s, pct: parseDeltaPct(s.delta) }));
+    withPct.sort((a, b) => b.pct - a.pct);
+    return {
+      gainers: withPct.filter(s => s.pct >= 0).slice(0, 5),
+      losers: withPct.filter(s => s.pct < 0).slice(-5).reverse(),
+    };
+  }, [stockQuotes]);
+
   return (
-    <svg className="absolute top-0 right-0 w-14 h-14 opacity-15" viewBox="0 0 100 60">
-      <polyline points={points} stroke={color} strokeWidth="1.5" fill="none" />
-    </svg>
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">NIFTY TOP 5 GAINERS & LOSERS</span>
+        <span className="text-[8px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{sorted.gainers.length + sorted.losers.length} stocks</span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {/* Gainers */}
+        <div>
+          <div className="text-[9px] uppercase tracking-wider text-emerald-600 font-bold mb-2 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            TOP GAINERS
+          </div>
+          <div className="space-y-1.5">
+            {sorted.gainers.length === 0 && (
+              <div className="text-[10px] text-slate-400 px-3 py-2">No data</div>
+            )}
+            {sorted.gainers.map((s) => {
+              const pct = parseDeltaPct(s.delta);
+              return (
+                <div
+                  key={s.ticker}
+                  className="flex items-center justify-between px-3 py-2 rounded-lg transition-all hover:scale-[1.02] cursor-default"
+                  style={{ backgroundColor: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)' }}
+                >
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-800">{s.ticker}</span>
+                    <span className="text-[10px] text-slate-500 ml-2">{s.ltp}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-bold text-emerald-600">+{pct.toFixed(2)}%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {/* Losers */}
+        <div>
+          <div className="text-[9px] uppercase tracking-wider text-red-500 font-bold mb-2 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-red-500" />
+            TOP LOSERS
+          </div>
+          <div className="space-y-1.5">
+            {sorted.losers.length === 0 && (
+              <div className="text-[10px] text-slate-400 px-3 py-2">No data</div>
+            )}
+            {sorted.losers.map((s) => {
+              const pct = parseDeltaPct(s.delta);
+              return (
+                <div
+                  key={s.ticker}
+                  className="flex items-center justify-between px-3 py-2 rounded-lg transition-all hover:scale-[1.02] cursor-default"
+                  style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+                >
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-800">{s.ticker}</span>
+                    <span className="text-[10px] text-slate-500 ml-2">{s.ltp}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-bold text-red-500">{pct.toFixed(2)}%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/*  NIFTY 100 HEAT MAP (live from stockQuotes)                                */
+/* -------------------------------------------------------------------------- */
+function getHeatColor(pct: number): { bg: string; text: string; border: string } {
+  const abs = Math.min(Math.abs(pct) / 4, 1);
+  if (pct > 0) {
+    const r = Math.round(220 - abs * 160);
+    const g = Math.round(245 - abs * 65);
+    const b = Math.round(220 - abs * 140);
+    return {
+      bg: `rgba(${r}, ${g}, ${b}, 0.85)`,
+      text: `rgb(${Math.round(10 + abs * 25)}, ${Math.round(80 + abs * 20)}, ${Math.round(10 + abs * 25)})`,
+      border: `rgba(16, 185, 129, ${0.2 + abs * 0.4})`,
+    };
+  } else {
+    const absVal = Math.abs(pct) / 4;
+    const r = Math.round(245 - absVal * 25);
+    const g = Math.round(220 - absVal * 170);
+    const b = Math.round(220 - absVal * 170);
+    return {
+      bg: `rgba(${r}, ${g}, ${b}, 0.85)`,
+      text: `rgb(${Math.round(80 + absVal * 30)}, ${Math.round(10 + absVal * 25)}, ${Math.round(10 + absVal * 25)})`,
+      border: `rgba(239, 68, 68, ${0.2 + absVal * 0.4})`,
+    };
+  }
+}
+
+function Nifty100HeatMap({ stockQuotes }: { stockQuotes?: Record<string, LiveStock> }) {
+  const stocks = useMemo(() => {
+    if (!stockQuotes) return [];
+    return Object.values(stockQuotes)
+      .filter(s => s.delta)
+      .map(s => ({ ticker: s.ticker, changePct: parseDeltaPct(s.delta) }));
+  }, [stockQuotes]);
+
+  const gainers = useMemo(() => stocks.filter(s => s.changePct >= 0).length, [stocks]);
+  const losers = useMemo(() => stocks.filter(s => s.changePct < 0).length, [stocks]);
+
+  if (stocks.length === 0) {
+    return (
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
+        <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-3">NIFTY 100 HEAT MAP</div>
+        <div className="text-[10px] text-slate-400">Waiting for live data...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">NIFTY 100 HEAT MAP</span>
+          <span className="text-[9px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{stocks.length} stocks</span>
+        </div>
+        <div className="flex items-center gap-3 text-[8px] uppercase tracking-wider text-slate-400">
+          <span className="flex items-center gap-1"><span className="w-3 h-2 rounded bg-emerald-800" /> Gainers <span className="text-emerald-700 font-bold">{gainers}</span></span>
+          <span className="flex items-center gap-1"><span className="w-3 h-2 rounded bg-red-800" /> Losers <span className="text-red-700 font-bold">{losers}</span></span>
+        </div>
+      </div>
+      <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1.5">
+        {stocks.map((stock) => {
+          const colors = getHeatColor(stock.changePct);
+          return (
+            <div
+              key={stock.ticker}
+              className="flex flex-col items-center justify-center rounded-md py-2 px-1 transition-all hover:scale-110 hover:shadow-md cursor-default"
+              style={{
+                backgroundColor: colors.bg,
+                border: `1px solid ${colors.border}`,
+              }}
+              title={`${stock.ticker}: ${stock.changePct > 0 ? '+' : ''}${stock.changePct.toFixed(2)}%`}
+            >
+              <span className="text-[8px] font-bold leading-tight" style={{ color: colors.text }}>
+                {stock.ticker}
+              </span>
+              <span className="text-[7px] font-semibold mt-0.5" style={{ color: colors.text }}>
+                {stock.changePct > 0 ? '+' : ''}{stock.changePct.toFixed(2)}%
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Existing components (unchanged where possible)                             */
+/* -------------------------------------------------------------------------- */
 
 function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
@@ -192,13 +366,13 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
   }
 
   const name = 'name' in stock ? stock.name : stock.ticker;
-  const price = 'ltp' in stock ? stock.ltp : stock.live_price;
+  const price = 'ltp' in stock ? stock.ltp : (stock as LedgerStock).live_price;
   const normalizedPrice = price ? `₹${String(price).replace(/[₹]+/g, '')}` : '';
   const open = 'open' in stock ? stock.open : undefined;
   const high = 'high' in stock ? stock.high : undefined;
   const low = 'low' in stock ? stock.low : undefined;
   const volume = 'volume' in stock ? stock.volume : undefined;
-  const delta = 'delta' in stock ? (stock as LiveStock).delta : (stock as LedgerStock).delta;
+  const deltaValue = 'delta' in stock ? (stock as LiveStock).delta : (stock as LedgerStock).delta;
 
   return (
     <div className="bg-white border border-emerald-300 border-[0.5px] rounded-lg p-4 shadow-sm">
@@ -207,13 +381,13 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
           <div className="text-slate-500 text-[10px] uppercase tracking-wider">{name}</div>
           <div className="flex items-baseline gap-3 mt-1">
               <span className="text-3xl font-black text-slate-900">{normalizedPrice}</span>
-            {delta && (
+            {deltaValue && (
               <span
                 className={`text-xs font-bold ${
-                  delta.includes('+') ? 'text-emerald-500' : 'text-red-500'
+                  deltaValue.includes('+') ? 'text-emerald-500' : 'text-red-500'
                 }`}
               >
-                {delta}%
+                {deltaValue}
               </span>
             )}
           </div>
@@ -241,72 +415,6 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
   );
 }
 
-function VolumeBarChart() {
-  // Simulated hourly volume data
-  const bars = [
-    { height: 45, label: '9:30' },
-    { height: 62, label: '10:30' },
-    { height: 38, label: '11:30' },
-    { height: 75, label: '12:30' },
-    { height: 55, label: '13:30' },
-    { height: 48, label: '14:30', negative: true },
-    { height: 68, label: '15:30' },
-    { height: 82, label: '16:30' },
-    { height: 42, label: '17:30', negative: true },
-    { height: 70, label: '18:30' },
-  ];
-
-  return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">HOURLY VOLUME</span>
-      </div>
-      <div className="flex items-end gap-1.5 h-32">
-        {bars.map((bar, i) => (
-          <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
-            <div
-              className={`w-full rounded-t transition-all duration-200 group-hover:opacity-80 ${
-                bar.negative
-                  ? 'bg-gradient-to-t from-red-400 to-red-300'
-                  : 'bg-gradient-to-t from-emerald-400 to-emerald-300'
-              }`}
-              style={{ height: `${bar.height}%` }}
-            />
-            <span className="text-[7px] text-slate-400 hidden sm:block">{bar.label}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MarketStatsPanel() {
-  const stats = [
-    { label: 'Market Cap', value: '$96.4T' },
-    { label: '24h Volume', value: '$412B' },
-    { label: 'Fear & Greed', value: '68', color: 'text-emerald-500' },
-    { label: 'VIX Index', value: '13.19', color: 'text-emerald-500' },
-  ];
-
-  return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">MARKET STATS</span>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {stats.map((stat) => (
-          <div key={stat.label} className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-center">
-            <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">{stat.label}</div>
-            <div className={`text-base font-black font-mono ${stat.color ?? 'text-slate-900'}`}>
-              {stat.value}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: string; link: string; summary: string; publishedAt: string }>; now: number }) {
   if (!items?.length) return null;
 
@@ -323,7 +431,7 @@ function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: 
       <div className="flex items-center justify-between p-3 border-b border-slate-100">
         <div className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-          <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">INDIA MARKET LIVE NEWS FEED</span>
+          <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">LIVE NEWS FEED</span>
         </div>
         <span className="text-[9px] text-slate-400">{items.length} stories</span>
       </div>
@@ -491,6 +599,23 @@ function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIn
   );
 }
 
+/* Sparkline helper used by GlobalIndicesGrid */
+function SparklineSVG({ positive }: { positive: boolean }) {
+  const color = positive ? '#10b981' : '#ef4444';
+  const points = positive
+    ? '5,48 15,44 25,42 35,38 45,36 55,32 65,30 75,26 85,24 95,20'
+    : '5,15 15,20 25,25 35,30 45,35 55,40 65,42 75,45 85,48 95,50';
+  return (
+    <svg className="absolute top-0 right-0 w-14 h-14 opacity-15" viewBox="0 0 100 60">
+      <polyline points={points} stroke={color} strokeWidth="1.5" fill="none" />
+    </svg>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  MAIN COMPONENT                                                            */
+/* -------------------------------------------------------------------------- */
+
 export default function IrosMasterAdvancedTerminal() {
   const [terminalMode] = useState<'morning' | 'evening'>('morning');
   const [selectedPool, setSelectedPool] = useState<string>('Nifty 500');
@@ -505,10 +630,9 @@ export default function IrosMasterAdvancedTerminal() {
     return () => clearInterval(id);
   }, []);
 
-  const { data: liveMarket, status: feedStatus, refreshOnDemand, invalidateKey } = useMarketData(selectedPool);
+  const { data: liveMarket, status: feedStatus, refreshOnDemand } = useMarketData(selectedPool);
   const stocks = liveMarket?.stocks ?? [];
   const selectedTickerForView = useMemo(() => selectedTicker || stocks[0]?.ticker || '', [selectedTicker, stocks]);
-  const poolOptions = liveMarket?.availablePools ?? ['Nifty 500', 'Nifty 100', 'Next 100', 'Mid Cap', 'Small Cap', 'Micro Cap', 'Live Universe'];
 
   const currentMacros = useMemo(() => {
     const macros = liveMarket?.macroDataStrip?.[terminalMode] ?? [];
@@ -521,6 +645,7 @@ export default function IrosMasterAdvancedTerminal() {
     ];
     return merged;
   }, [terminalMode, liveMarket]);
+
   const globalIndices = useMemo(() => {
     const g = liveMarket?.globalMacro;
     if (!g) return [];
@@ -536,7 +661,6 @@ export default function IrosMasterAdvancedTerminal() {
   const marketIntelligence = liveMarket?.terminalIntelligence as TerminalIntelligence | undefined;
   const isSnapshotFallback = liveMarket?.isSnapshotFallback ?? false;
   const [tickerIntelligence, setTickerIntelligence] = useState<TerminalIntelligence | null>(null);
-  const intelligence = useMemo(() => tickerIntelligence ?? marketIntelligence, [tickerIntelligence, marketIntelligence]);
 
   const selectedQuote = useMemo(
     () => selectedTickerForView ? liveMarket?.stockQuotes?.[selectedTickerForView] ?? stocks.find((stock) => stock.ticker === selectedTickerForView) : undefined,
@@ -652,23 +776,29 @@ export default function IrosMasterAdvancedTerminal() {
 
         {activeTab === 'marketSnapshot' && (
           <div className="space-y-4">
-            {/* Global Indices */}
-            <GlobalIndicesGrid items={globalIndices} staleLabel={staleMacroLabel} />
-
-            {/* Commodities Heatmap */}
-            <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} />
-
-            {/* Market Stats + Volume Chart side-by-side */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <MarketStatsPanel />
-              <VolumeBarChart />
+            {/* Row 1: Global Indices + Commodities side-by-side */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-2">
+                <GlobalIndicesGrid items={globalIndices} staleLabel={staleMacroLabel} />
+              </div>
+              <div>
+                <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} />
+              </div>
             </div>
 
-            {/* Two-column section: India Markets + News Feed */}
+            {/* Row 2: NIFTY TOP 5 GAINERS & LOSERS + NIFTY 100 HEAT MAP side-by-side */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <IndiaMarketsGrid items={currentMacros} staleLabel={staleMacroLabel} />
+              <GainersLosersHeatmap stockQuotes={liveMarket?.stockQuotes} />
+              <Nifty100HeatMap stockQuotes={liveMarket?.stockQuotes} />
+            </div>
+
+            {/* Row 3: News Feed */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <NewsFeedPanel items={liveMarket?.news} now={now} />
             </div>
+
+            {/* Row 4: India Markets — Top Movers */}
+            <IndiaMarketsGrid items={currentMacros} staleLabel={staleMacroLabel} />
           </div>
         )}
 
@@ -681,12 +811,6 @@ export default function IrosMasterAdvancedTerminal() {
             />
             <StockDetailPanel stock={selectedQuote} />
             <LiveIntelligencePanel />
-          </div>
-        )}
-
-        {activeTab === 'icGates' && (
-          <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl p-4 shadow-sm">
-            <StructuredReasoningOutput intelligence={intelligence} />
           </div>
         )}
       </div>

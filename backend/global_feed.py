@@ -81,9 +81,11 @@ DOMESTIC_INDEX_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("niftybank", "^NSEBANK", "NIFTY BANK", "index", _fmt_index),
     YahooInstrument("niftyit", "^CNXIT", "NIFTY IT", "index", _fmt_index),
     YahooInstrument("niftypharma", "^CNXPHARMA", "NIFTY PHARMA", "index", _fmt_index),
+    YahooInstrument("niftymidcap", "^CNXMIDCAP", "NIFTY MIDCAP", "index", _fmt_index),
+    YahooInstrument("niftysmallcap", "^CNXSC", "NIFTY SMALLCAP", "index", _fmt_index),
 ]
 
-# Global indices and commodities for the Global Macro Anchors panel.
+# Global indices — expanded to 12 with ASX 200 and BOVESPA.
 GLOBAL_INDEX_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("dji", "^DJI", "DJI (US 30)", "index", _fmt_index),
     YahooInstrument("sp500", "^GSPC", "S&P 500", "index", _fmt_index),
@@ -95,6 +97,8 @@ GLOBAL_INDEX_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("cac40", "^FCHI", "CAC 40", "index", _fmt_index),
     YahooInstrument("ftse", "^FTSE", "FTSE 100", "index", _fmt_index),
     YahooInstrument("eurostoxx50", "^STOXX50E", "EURO STOXX 50", "index", _fmt_index),
+    YahooInstrument("asx200", "^AXJO", "S&P/ASX 200", "index", _fmt_index),
+    YahooInstrument("bovespa", "^BVSP", "BOVESPA", "index", _fmt_index),
 ]
 
 COMMODITY_INSTRUMENTS: list[YahooInstrument] = [
@@ -103,6 +107,8 @@ COMMODITY_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("brent", "BZ=F", "BRENT CRUDE OIL", "commodity", _fmt_brent),
     YahooInstrument("wticrude", "CL=F", "WTI CRUDE", "commodity", _fmt_brent),
     YahooInstrument("natgas", "NG=F", "NATURAL GAS", "commodity", _fmt_natgas),
+    YahooInstrument("bitcoin", "BTC-USD", "BITCOIN", "commodity", _fmt_usd),
+    YahooInstrument("copper", "HG=F", "COPPER", "commodity", _fmt_usd),
 ]
 
 GLOBAL_INSTRUMENTS: list[YahooInstrument] = [*GLOBAL_INDEX_INSTRUMENTS, *COMMODITY_INSTRUMENTS]
