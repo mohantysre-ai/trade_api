@@ -27,7 +27,7 @@
     "NSE Corporate Announcements",
     "Economic Times Markets"
   ],
-  "updatedAt": "2026-06-17T17:34:35.717166+00:00",
+  "updatedAt": "2026-06-17T18:00:47.715623+00:00",
   "mockTickers": [
     "AWFI"
   ],
@@ -4484,24 +4484,24 @@
     "indices": [
       {
         "label": "DJI (US 30)",
-        "val": "52,122.03",
-        "delta": "+0.24%",
+        "val": "52,070.57",
+        "delta": "+0.14%",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live"
       },
       {
         "label": "S&P 500",
-        "val": "7,505.60",
-        "delta": "-0.08%",
+        "val": "7,502.29",
+        "delta": "-0.12%",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live"
       },
       {
         "label": "NASDAQ 100",
-        "val": "30,086.29",
-        "delta": "+0.39%",
+        "val": "30,066.19",
+        "delta": "+0.33%",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live"
@@ -4566,40 +4566,40 @@
     "commodities": [
       {
         "label": "GOLD",
-        "val": "$4,378.60/oz",
-        "delta": "+0.56%",
+        "val": "$4,396.00/oz",
+        "delta": "+0.96%",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "SILVER",
-        "val": "$70.65/oz",
-        "delta": "+0.91%",
+        "val": "$71.40/oz",
+        "delta": "+1.98%",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "BRENT CRUDE OIL",
-        "val": "$79.23 / bbl",
-        "delta": "+0.34%",
+        "val": "$79.13 / bbl",
+        "delta": "+0.22%",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "WTI CRUDE",
-        "val": "$75.71 / bbl",
-        "delta": "+0.58%",
+        "val": "$75.69 / bbl",
+        "delta": "+0.56%",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "NATURAL GAS",
-        "val": "$3.151 / MMBtu",
-        "delta": "-2.72%",
+        "val": "$3.144 / MMBtu",
+        "delta": "-2.93%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
@@ -4609,24 +4609,52 @@
   "news": [
     {
       "source": "Seeking Alpha Market Currents",
-      "title": "Columbia Threadneedle Fixed-Income Monitor: June 2026",
-      "link": "https://seekingalpha.com/article/4915761-columbia-threadneedle-fixed-income-monitor-june-2026?source=feed_all_articles",
-      "summary": "Columbia Threadneedle Fixed-Income Monitor: June 2026",
-      "publishedAt": "2026-06-17T17:30:00+00:00"
+      "title": "Maximus: The Market Doesn't Seem To Trust The Earnings Growth",
+      "link": "https://seekingalpha.com/article/4915768-maximus-the-market-does-not-trust-the-earnings-growth?source=feed_all_articles",
+      "summary": "Maximus: The Market Doesn't Seem To Trust The Earnings Growth",
+      "publishedAt": "2026-06-17T17:54:52+00:00"
+    },
+    {
+      "source": "The Hindu Business Line",
+      "title": "NSE IPO back on track as exchange files prospectus with SEBI for \u20b930,000-crore issue",
+      "link": "https://www.thehindubusinessline.com/markets/nse-ipo-back-on-track-as-exchange-files-drhp-with-sebi-for-30000-crore-issue/article71115075.ece",
+      "summary": "Pure offer-for-sale of up to 149 million equity shares likely to be one of India\u2019s biggest public issues of the year",
+      "publishedAt": "2026-06-17T17:51:23+00:00"
+    },
+    {
+      "source": "Nasdaq Market Intelligence",
+      "title": "Is Penguin Solutions the Next Big AI Stock?",
+      "link": "https://www.nasdaq.com/articles/penguin-solutions-next-big-ai-stock",
+      "summary": "Key PointsPenguin Solutions is deeply ingrained in the memory industry and is phasing out of other business opportunities.",
+      "publishedAt": "2026-06-17T17:51:00+00:00"
     },
     {
       "source": "Seeking Alpha Market Currents",
-      "title": "TMFC: Solid Vehicle But QQQM Is Superior In Many Ways, A Hold",
-      "link": "https://seekingalpha.com/article/4915760-tmfc-solid-vehicle-but-qqqm-is-superior-in-many-ways-a-hold?source=feed_all_articles",
-      "summary": "TMFC: Solid Vehicle But QQQM Is Superior In Many Ways, A Hold",
-      "publishedAt": "2026-06-17T17:25:48+00:00"
+      "title": "Critical Momentum: The Nuclear Renaissance Heats Up",
+      "link": "https://seekingalpha.com/article/4915767-critical-momentum-the-nuclear-renaissance-heats-up?source=feed_all_articles",
+      "summary": "Critical Momentum: The Nuclear Renaissance Heats Up",
+      "publishedAt": "2026-06-17T17:51:00+00:00"
     },
     {
       "source": "Seeking Alpha Market Currents",
-      "title": "Coca-Cola's Dividend Is Strong But The Valuation Is Difficult To Get Bullish On",
-      "link": "https://seekingalpha.com/article/4915759-coca-colas-dividend-is-strong-but-the-valuation-is-difficult-to-get-bullish-on?source=feed_all_articles",
-      "summary": "Coca-Cola's Dividend Is Strong But The Valuation Is Difficult To Get Bullish On",
-      "publishedAt": "2026-06-17T17:20:05+00:00"
+      "title": "Invesco Rochester Limited Term New York Municipal Fund Q1 2026 Commentary",
+      "link": "https://seekingalpha.com/article/4915766-invesco-rochester-limited-term-new-york-municipal-fund-q1-2026-commentary?source=feed_all_articles",
+      "summary": "Invesco Rochester Limited Term New York Municipal Fund Q1 2026 Commentary",
+      "publishedAt": "2026-06-17T17:49:00+00:00"
+    },
+    {
+      "source": "Nasdaq Market Intelligence",
+      "title": "A Little Good News for Ford Motor Company",
+      "link": "https://www.nasdaq.com/articles/little-good-news-ford-motor-company",
+      "summary": "Key PointsTwo separate fires hindered aluminum production at a key supplier starting last fall.",
+      "publishedAt": "2026-06-17T17:35:00+00:00"
+    },
+    {
+      "source": "Nasdaq Market Intelligence",
+      "title": "Wednesday's ETF with Unusual Volume: BDVL",
+      "link": "https://www.nasdaq.com/articles/wednesdays-etf-unusual-volume-bdvl",
+      "summary": "The iShares Disciplined Volatility Equity Active ETF is seeing unusually high volume in afternoon trading Wednesday, with over 2.7 million shares traded versus three month average volume of about 302,000. Shares of BDVL were up about 0.2% on the day. Components of that ETF wit",
+      "publishedAt": "2026-06-17T17:32:53+00:00"
     },
     {
       "source": "The Hindu Business Line",
@@ -4636,13 +4664,6 @@
       "publishedAt": "2026-06-17T17:07:01+00:00"
     },
     {
-      "source": "Nasdaq Market Intelligence",
-      "title": "Here's How I'd Invest $10,000 Right Now",
-      "link": "https://www.nasdaq.com/articles/heres-how-id-invest-10000-right-now",
-      "summary": "Key PointsInvesting in blue chip stocks can help create a stable portfolio that you don't have to worry about in the long run.",
-      "publishedAt": "2026-06-17T16:50:00+00:00"
-    },
-    {
       "source": "The Hindu Business Line",
       "title": "IPO comeback: \u20b960,000 crore pipeline in next three months",
       "link": "https://www.thehindubusinessline.com/markets/ipo-comeback-rs-60000-crore-pipeline-in-next-three-months/article71114207.ece",
@@ -4650,32 +4671,11 @@
       "publishedAt": "2026-06-17T16:49:30+00:00"
     },
     {
-      "source": "Nasdaq Market Intelligence",
-      "title": "SpaceX Had the Biggest IPO in History. That Doesn't Mean You Should Buy the Stock.",
-      "link": "https://www.nasdaq.com/articles/spacex-had-biggest-ipo-history-doesnt-mean-you-should-buy-stock",
-      "summary": "Key PointsSpaceX's grand vision to put humans on other planets and build data centers in space could appeal to growth investors.",
-      "publishedAt": "2026-06-17T16:48:00+00:00"
-    },
-    {
-      "source": "Nasdaq Market Intelligence",
-      "title": "Will Micron Split Its Stock This Year?",
-      "link": "https://www.nasdaq.com/articles/will-micron-split-its-stock-year",
-      "summary": "Key PointsMicron started 2026 trading at around $295 per share.",
-      "publishedAt": "2026-06-17T16:47:00+00:00"
-    },
-    {
       "source": "Economic Times",
       "title": "Will US-Iran Hormuz deal be signed today?",
       "link": "https://economictimes.indiatimes.com/news/international/world-news/will-us-iran-hormuz-deal-be-signed-today-sources-say-signing-may-move-to-wednesday/articleshow/131806702.cms",
       "summary": "Will US-Iran Hormuz deal be signed today?",
       "publishedAt": "2026-06-17T16:37:28+00:00"
-    },
-    {
-      "source": "Economic Times",
-      "title": "US student visa: Why Boston question matters",
-      "link": "https://economictimes.indiatimes.com/news/new-updates/what-would-you-do-on-a-saturday-night-in-boston-ex-us-diplomat-explains-why-this-f-1-visa-question-matters/articleshow/131806553.cms",
-      "summary": "US student visa: Why Boston question matters",
-      "publishedAt": "2026-06-17T16:36:21+00:00"
     }
   ],
   "llmProvider": "gemini",
