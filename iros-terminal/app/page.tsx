@@ -40,6 +40,18 @@ function marketStateClass(state: string) {
   return 'text-slate-500';
 }
 
+function SparklineSVG({ positive }: { positive: boolean }) {
+  const color = positive ? '#10b981' : '#ef4444';
+  const points = positive
+    ? '5,48 15,44 25,42 35,38 45,36 55,32 65,30 75,26 85,24 95,20'
+    : '5,15 15,20 25,25 35,30 45,35 55,40 65,42 75,45 85,48 95,50';
+  return (
+    <svg className="absolute top-0 right-0 w-14 h-14 opacity-15" viewBox="0 0 100 60">
+      <polyline points={points} stroke={color} strokeWidth="1.5" fill="none" />
+    </svg>
+  );
+}
+
 function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
     return (
@@ -50,23 +62,28 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
   }
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
-      <div className="flex items-center justify-between mb-2">
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
         <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">GLOBAL INDICES</span>
         {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-        {items.map((item) => (
-          <div key={`${item.label}-${item.val}-${item.state}`} className={`bg-slate-50 border border-slate-100 border-l-2 p-2 rounded ${marketStateBorder(item.state)}`}>
-            <span className="text-[9px] text-slate-500 block uppercase tracking-wider">{item.label}</span>
-            <span className="text-sm font-bold text-slate-900 block mt-0.5">{item.val}</span>
-            <span
-              className={`text-[9px] block ${marketStateClass(item.state)}`}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {items.map((item) => {
+          const isPositive = item.state === 'POSITIVE';
+          return (
+            <div
+              key={`${item.label}-${item.val}-${item.state}`}
+              className="relative overflow-hidden bg-slate-50 border border-slate-200 rounded-lg p-3 transition-all hover:border-slate-300 hover:shadow-sm"
             >
-              {item.delta}
-            </span>
-          </div>
-        ))}
+              <SparklineSVG positive={isPositive} />
+              <span className="text-[10px] text-slate-500 block uppercase tracking-wider font-semibold">{item.label}</span>
+              <span className="text-lg font-bold text-slate-900 block mt-1 font-mono">{item.val}</span>
+              <span className={`text-[12px] font-semibold block mt-0.5 ${marketStateClass(item.state)}`}>
+                {isPositive ? '↑' : '↓'} {item.delta}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -82,22 +99,36 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
   }
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">COMMODITIES & FX</span>
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-amber-400" />
+          <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">COMMODITIES & FX</span>
+        </div>
         {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'BRENT CRUDE OIL') displayLabel = 'BRENT CRUDE';
+          const isPositive = item.state === 'POSITIVE';
+          const intensity = isPositive ? 0.2 : 0.15;
           return (
-            <div key={`${item.label}-${item.val}-${item.state}`} className={`bg-slate-50 border border-slate-100 border-l-2 p-2 rounded ${marketStateBorder(item.state)}`}>
-              <span className="text-[9px] text-slate-500 block uppercase tracking-wider">{displayLabel}</span>
-              <span className="text-sm font-bold text-slate-900 block mt-0.5">{item.val}</span>
-              <span
-                className={`text-[9px] block ${marketStateClass(item.state)}`}
-              >
+            <div
+              key={`${item.label}-${item.val}-${item.state}`}
+              className="rounded-lg p-3 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105"
+              style={{
+                background: isPositive
+                  ? `rgba(16, 185, 129, ${intensity})`
+                  : `rgba(239, 68, 68, ${intensity})`,
+                border: `1px solid ${
+                  isPositive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.25)'
+                }`,
+              }}
+            >
+              <span className="text-[11px] font-bold text-slate-800">{displayLabel}</span>
+              <span className="text-[10px] text-slate-500 mt-1 font-mono font-semibold">{item.val}</span>
+              <span className={`text-[11px] font-semibold ${marketStateClass(item.state)}`}>
                 {item.delta}
               </span>
             </div>
@@ -118,24 +149,31 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
   }
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">INDIA MARKETS</span>
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg shadow-sm">
+      <div className="flex items-center justify-between p-4 border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-blue-500" />
+          <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">INDIA MARKETS — TOP MOVERS</span>
+        </div>
         {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
+      <div className="divide-y divide-slate-100">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'USD / INR Spot') displayLabel = 'USD / INR';
+          const isPositive = item.state === 'POSITIVE';
           return (
-            <div key={`${item.label}-${item.val}-${item.state}`} className={`bg-slate-50 border border-slate-100 border-l-2 p-2 rounded ${marketStateBorder(item.state)}`}>
-              <span className="text-[9px] text-slate-500 block uppercase tracking-wider">{displayLabel}</span>
-              <span className="text-sm font-bold text-slate-900 block mt-0.5">{item.val}</span>
-              <span
-                className={`text-[9px] block ${marketStateClass(item.state)}`}
-              >
-                {item.delta}
-              </span>
+            <div
+              key={`${item.label}-${item.val}-${item.state}`}
+              className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-slate-50"
+            >
+              <span className="text-[11px] font-semibold text-slate-800">{displayLabel}</span>
+              <div className="flex items-center gap-4">
+                <span className="text-[13px] font-mono font-bold text-slate-900">{item.val}</span>
+                <span className={`text-[11px] font-semibold min-w-[60px] text-right ${marketStateClass(item.state)}`}>
+                  {isPositive ? '↑' : '↓'} {item.delta}
+                </span>
+              </div>
             </div>
           );
         })}
@@ -203,6 +241,72 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
   );
 }
 
+function VolumeBarChart() {
+  // Simulated hourly volume data
+  const bars = [
+    { height: 45, label: '9:30' },
+    { height: 62, label: '10:30' },
+    { height: 38, label: '11:30' },
+    { height: 75, label: '12:30' },
+    { height: 55, label: '13:30' },
+    { height: 48, label: '14:30', negative: true },
+    { height: 68, label: '15:30' },
+    { height: 82, label: '16:30' },
+    { height: 42, label: '17:30', negative: true },
+    { height: 70, label: '18:30' },
+  ];
+
+  return (
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">HOURLY VOLUME</span>
+      </div>
+      <div className="flex items-end gap-1.5 h-32">
+        {bars.map((bar, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
+            <div
+              className={`w-full rounded-t transition-all duration-200 group-hover:opacity-80 ${
+                bar.negative
+                  ? 'bg-gradient-to-t from-red-400 to-red-300'
+                  : 'bg-gradient-to-t from-emerald-400 to-emerald-300'
+              }`}
+              style={{ height: `${bar.height}%` }}
+            />
+            <span className="text-[7px] text-slate-400 hidden sm:block">{bar.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MarketStatsPanel() {
+  const stats = [
+    { label: 'Market Cap', value: '$96.4T' },
+    { label: '24h Volume', value: '$412B' },
+    { label: 'Fear & Greed', value: '68', color: 'text-emerald-500' },
+    { label: 'VIX Index', value: '13.19', color: 'text-emerald-500' },
+  ];
+
+  return (
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">MARKET STATS</span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {stats.map((stat) => (
+          <div key={stat.label} className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-center">
+            <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">{stat.label}</div>
+            <div className={`text-base font-black font-mono ${stat.color ?? 'text-slate-900'}`}>
+              {stat.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: string; link: string; summary: string; publishedAt: string }>; now: number }) {
   if (!items?.length) return null;
 
@@ -217,7 +321,10 @@ function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: 
   return (
     <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg shadow-sm">
       <div className="flex items-center justify-between p-3 border-b border-slate-100">
-        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">LIVE NEWS FEED</span>
+        <div className="flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
+          <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">INDIA MARKET LIVE NEWS FEED</span>
+        </div>
         <span className="text-[9px] text-slate-400">{items.length} stories</span>
       </div>
       <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
@@ -229,7 +336,7 @@ function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: 
                   href={item.link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[11px] font-medium text-slate-800 hover:text-teal-700 leading-tight block truncate"
+                  className="text-[11px] font-medium text-slate-800 hover:text-teal-700 leading-tight block"
                 >
                   {item.title}
                 </a>
@@ -544,10 +651,21 @@ export default function IrosMasterAdvancedTerminal() {
         </nav>
 
         {activeTab === 'marketSnapshot' && (
-          <div className="grid grid-cols-1 gap-4">
-            <div className="space-y-4">
-              <GlobalIndicesGrid items={globalIndices} staleLabel={staleMacroLabel} />
-              <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} />
+          <div className="space-y-4">
+            {/* Global Indices */}
+            <GlobalIndicesGrid items={globalIndices} staleLabel={staleMacroLabel} />
+
+            {/* Commodities Heatmap */}
+            <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} />
+
+            {/* Market Stats + Volume Chart side-by-side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <MarketStatsPanel />
+              <VolumeBarChart />
+            </div>
+
+            {/* Two-column section: India Markets + News Feed */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <IndiaMarketsGrid items={currentMacros} staleLabel={staleMacroLabel} />
               <NewsFeedPanel items={liveMarket?.news} now={now} />
             </div>

@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useCallback, useEffect, useState } from "react";
 import type { AITickerNewsReport } from "@/lib/market-api";
 import { fetchTickerNewsReport } from "@/lib/market-api";
