@@ -170,7 +170,7 @@ type DrawerContent = {
   analysis?: DrawerAnalysis | null;
 };
 
-type DrawerTab = "aiNews" | "analysis" | "icGates";
+type DrawerTab = "aiNews" | "analysis";
 
 export default function RightDrawer({ open, onClose, content }: { open: boolean; onClose: () => void; content?: DrawerContent | null }) {
   const [activeTab, setActiveTab] = useState<DrawerTab>("aiNews");
@@ -290,15 +290,6 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           Terminal Analysis
           {activeTab === "analysis" && <span className="absolute inset-x-2 -bottom-px h-0.5 bg-teal-600 rounded-full" />}
         </button>
-        <button
-          onClick={() => setActiveTab("icGates")}
-          className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-wider transition relative ${
-            activeTab === "icGates" ? "text-teal-700" : "text-slate-400 hover:text-slate-600"
-          }`}
-        >
-          IC GATES & REASONING
-          {activeTab === "icGates" && <span className="absolute inset-x-2 -bottom-px h-0.5 bg-teal-600 rounded-full" />}
-        </button>
       </div>
 
       {/* Tab content */}
@@ -385,6 +376,8 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
                   )}
                 </div>
 
+                <DrawerStructuredReasoningOutput analysis={analysis} />
+
                 <details className="bg-slate-50 p-3 rounded border border-slate-200">
                   <summary className="text-[11px] text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700">
                     Raw JSON Payload
@@ -402,10 +395,6 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
               </div>
             )}
           </div>
-        )}
-
-        {activeTab === "icGates" && (
-          <DrawerStructuredReasoningOutput analysis={analysis} />
         )}
       </div>
     </div>
