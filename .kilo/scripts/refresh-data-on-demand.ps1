@@ -3,9 +3,26 @@ $ErrorActionPreference = "Stop"
 $Root = "D:\trade_api"
 $BackendUrl = "http://127.0.0.1:8000"
 $OutputPath = Join-Path $Root "trade_api_snapshot.json"
+$SnapshotPath = Join-Path $Root "backend\last_market_snapshot.json"
 $Pool = $null
 $Prompt = $null
 $Index = 0
+
+Write-Host "[PRE-CLEAR] Removing stale snapshot files..." -ForegroundColor Yellow
+$cleared = $false
+if (Test-Path $OutputPath) {
+    Remove-Item -LiteralPath $OutputPath -Force -ErrorAction SilentlyContinue
+    $cleared = $true
+    Write-Host "  [OK] Removed: $OutputPath" -ForegroundColor Green
+}
+if (Test-Path $SnapshotPath) {
+    Remove-Item -LiteralPath $SnapshotPath -Force -ErrorAction SilentlyContinue
+    $cleared = $true
+    Write-Host "  [OK] Removed: $SnapshotPath" -ForegroundColor Green
+}
+if (-not $cleared) {
+    Write-Host "  [OK] No stale snapshot files found." -ForegroundColor Green
+}
 
 while ($Index -lt $args.Count) {
     $arg = $args[$Index]
