@@ -7,7 +7,7 @@
     "Finshots",
     "NSE NIFTY 100"
   ],
-  "updatedAt": "2026-06-18T17:04:27.597178+00:00",
+  "updatedAt": "2026-06-18T18:25:21.803806+00:00",
   "mockTickers": [
     "AWFI"
   ],
@@ -325,45 +325,6 @@
         ]
       },
       "score": 20.44
-    },
-    {
-      "ticker": "CAMS",
-      "name": "CAMS",
-      "capSize": "Nifty 100",
-      "ltp": "\u20b9832.80",
-      "ltpRaw": 832.8,
-      "delta": "+3.17%",
-      "state": "POSITIVE",
-      "volume": 2299896,
-      "open": 815.1,
-      "high": 836.0,
-      "low": 807.0,
-      "close": 807.25,
-      "intraday": {
-        "atr_pct": 2.88,
-        "volume_multiplier": 1.85,
-        "today_volume": 2277476.0,
-        "avg_daily_volume_20": 1233291.0,
-        "vwap": 825.23,
-        "ema9": 831.0,
-        "ema_angle_deg": 21.05,
-        "orb_high": 819.9,
-        "orb_low": 807.6,
-        "orb_velocity_pct": 1.57,
-        "wick_noise_ratio": 0.487,
-        "turnover_cr": 189.67,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
-        "trigger_point": "VWAP Bounce",
-        "passes_hard_filters": false,
-        "hard_filter_reasons": [
-          "ATR under 3.0%",
-          "opening volume under 3.0x",
-          "wick noise too high",
-          "EMA angle below 45 degrees"
-        ]
-      },
-      "score": 18.91
     },
     {
       "ticker": "COCHINSHIP",
@@ -790,6 +751,42 @@
         ]
       },
       "score": 14.37
+    },
+    {
+      "ticker": "CAMS",
+      "name": "CAMS",
+      "capSize": "Nifty 100",
+      "ltp": "\u20b9832.80",
+      "ltpRaw": 832.8,
+      "delta": "+3.17%",
+      "state": "POSITIVE",
+      "volume": 2299896,
+      "open": 815.1,
+      "high": 836.0,
+      "low": 807.0,
+      "close": 807.25,
+      "intraday": {
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
+        "trigger_point": "VWAP Bounce",
+        "passes_hard_filters": false,
+        "hard_filter_reasons": [
+          "insufficient candle data"
+        ]
+      },
+      "score": 12.33
     }
   ],
   "stockQuotes": {
@@ -3210,27 +3207,24 @@
       "low": 807.0,
       "close": 807.25,
       "intraday": {
-        "atr_pct": 2.88,
-        "volume_multiplier": 1.85,
-        "today_volume": 2277476.0,
-        "avg_daily_volume_20": 1233291.0,
-        "vwap": 825.23,
-        "ema9": 831.0,
-        "ema_angle_deg": 21.05,
-        "orb_high": 819.9,
-        "orb_low": 807.6,
-        "orb_velocity_pct": 1.57,
-        "wick_noise_ratio": 0.487,
-        "turnover_cr": 189.67,
-        "price_above_vwap": true,
-        "price_above_ema9": true,
+        "atr_pct": 0.0,
+        "volume_multiplier": 0.0,
+        "today_volume": 0.0,
+        "avg_daily_volume_20": 0.0,
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": 0.0,
+        "price_above_vwap": false,
+        "price_above_ema9": false,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
-          "opening volume under 3.0x",
-          "wick noise too high",
-          "EMA angle below 45 degrees"
+          "insufficient candle data"
         ]
       }
     },
@@ -4380,9 +4374,9 @@
       },
       {
         "label": "NIFTY MIDCAP",
-        "val": "N/A",
-        "delta": "N/A",
-        "state": "NEUTRAL"
+        "val": "20,197.30",
+        "delta": "+0.35%",
+        "state": "POSITIVE"
       },
       {
         "label": "NIFTY SMALLCAP",
@@ -4436,9 +4430,9 @@
       },
       {
         "label": "NIFTY MIDCAP Close",
-        "val": "N/A",
-        "delta": "N/A",
-        "state": "NEUTRAL"
+        "val": "20,197.30",
+        "delta": "+0.35%",
+        "state": "POSITIVE"
       },
       {
         "label": "NIFTY SMALLCAP Close",
@@ -4464,24 +4458,24 @@
     "indices": [
       {
         "label": "DJI (US 30)",
-        "val": "51,672.01",
-        "delta": "+0.35%",
+        "val": "51,641.94",
+        "delta": "+0.29%",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live"
       },
       {
         "label": "S&P 500",
-        "val": "7,500.72",
-        "delta": "+1.09%",
+        "val": "7,496.93",
+        "delta": "+1.04%",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live"
       },
       {
         "label": "NASDAQ 100",
-        "val": "30,361.01",
-        "delta": "+2.33%",
+        "val": "30,376.67",
+        "delta": "+2.38%",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live"
@@ -4552,8 +4546,8 @@
       },
       {
         "label": "BOVESPA",
-        "val": "168,119.98",
-        "delta": "-0.20%",
+        "val": "168,060.48",
+        "delta": "-0.23%",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live"
@@ -4562,56 +4556,56 @@
     "commodities": [
       {
         "label": "GOLD",
-        "val": "$4,236.00/oz",
-        "delta": "-3.32%",
+        "val": "$4,247.80/oz",
+        "delta": "-3.05%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "SILVER",
-        "val": "$66.14/oz",
-        "delta": "-6.53%",
+        "val": "$66.16/oz",
+        "delta": "-6.52%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "BRENT CRUDE OIL",
-        "val": "$78.11 / bbl",
-        "delta": "-1.81%",
+        "val": "$79.11 / bbl",
+        "delta": "-0.55%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "WTI CRUDE",
-        "val": "$74.34 / bbl",
-        "delta": "-2.20%",
+        "val": "$75.11 / bbl",
+        "delta": "-1.18%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "NATURAL GAS",
-        "val": "$3.215 / MMBtu",
-        "delta": "+2.23%",
+        "val": "$3.213 / MMBtu",
+        "delta": "+2.16%",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "BITCOIN",
-        "val": "$62,451.56",
-        "delta": "-3.10%",
+        "val": "$62,854.71",
+        "delta": "-2.48%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
       },
       {
         "label": "COPPER",
-        "val": "$6.38",
-        "delta": "-1.72%",
+        "val": "$6.39",
+        "delta": "-1.55%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
@@ -4624,49 +4618,49 @@
       "title": "NSE - National Stock Exchange of India Ltd: Live Share/Stock Market News &amp; Updates, Quotes- Nseindia.com Option Chain Market Turnover Listings IPO Circulars Daily Report Holidays Corporates Press ",
       "link": "https://www.nseindia.com/index-tracker/NIFTY%20100",
       "summary": "NSE - National Stock Exchange of India Ltd: Live Share/Stock Market News &amp; Updates, Quotes- Nseindia.com Option Chain Market Turnover Listings IPO Circulars Daily Report Holidays Corporates Press Releases Contact Us English Accessibility List Events List - - ( - %) Streaming Streaming on off Str",
-      "publishedAt": "2026-06-18T22:34:24.883217+05:30"
+      "publishedAt": "2026-06-18T23:55:16.108037+05:30"
     },
     {
       "source": "Finshots",
       "title": "Finshots | Financial News made simple Finshots Daily Finshots Markets Finshots Money Infographics Ditto Insurance Loved by 5,00,000+ subscribers Financial News Made Simple Join Finshots and get your d",
       "link": "https://finshots.in/",
       "summary": "Finshots | Financial News made simple Finshots Daily Finshots Markets Finshots Money Infographics Ditto Insurance Loved by 5,00,000+ subscribers Financial News Made Simple Join Finshots and get your daily dose of the latest, most important Financial developments",
-      "publishedAt": "2026-06-18T22:34:23.190128+05:30"
+      "publishedAt": "2026-06-18T23:55:12.671095+05:30"
     },
     {
       "source": "Finshots",
       "title": "delivered in plain English. In less than 3 minutes. SUBSCRIBE Finshots Daily View All Jun 18, 2026 The missing case of 40 lakh tonnes of coal How coal stocks may have disappeared from SCCL (Singareni ",
       "link": "https://finshots.in/",
       "summary": "delivered in plain English. In less than 3 minutes. SUBSCRIBE Finshots Daily View All Jun 18, 2026 The missing case of 40 lakh tonnes of coal How coal stocks may have disappeared from SCCL (Singareni Collieries Company Ltd). Jun 17, 2026 RBI may have found a way to bring $50 billion into India An ov",
-      "publishedAt": "2026-06-18T22:34:23.190128+05:30"
+      "publishedAt": "2026-06-18T23:55:12.671095+05:30"
     },
     {
       "source": "Finshots",
       "title": "part of our ever growing",
       "link": "https://finshots.in/",
       "summary": "part of our ever growing",
-      "publishedAt": "2026-06-18T22:34:23.190128+05:30"
+      "publishedAt": "2026-06-18T23:55:12.671095+05:30"
     },
     {
       "source": "Trendlyne",
       "title": "The Stock Market Platform to Stay Ahead: Stock Screeners, Stock Analysis, and more. Markets MarketMind AI Baskets Alerts F&O MF Reports Screeners Subscribe Superstars Portfolio Watchlist Insider Trade",
       "link": "https://trendlyne.com/",
       "summary": "The Stock Market Platform to Stay Ahead: Stock Screeners, Stock Analysis, and more. Markets MarketMind AI Baskets Alerts F&O MF Reports Screeners Subscribe Superstars Portfolio Watchlist Insider Trades Results Data Downloader Events Calendar What's New Explore FAQs All Features Widgets More Search s",
-      "publishedAt": "2026-06-18T22:34:21.398740+05:30"
+      "publishedAt": "2026-06-18T23:55:08.609767+05:30"
     },
     {
       "source": "Zerodha Pulse",
       "title": "Pulse by Zerodha - Latest financial and market news from all major Indian news sources aggregated in one place - Pulse The latest business, finance, and market news from the last 24 hours from all maj",
       "link": "https://pulse.zerodha.com/",
       "summary": "Pulse by Zerodha - Latest financial and market news from all major Indian news sources aggregated in one place - Pulse The latest business, finance, and market news from the last 24 hours from all major Indian news sources",
-      "publishedAt": "2026-06-18T22:34:19.937943+05:30"
+      "publishedAt": "2026-06-18T23:55:05.419271+05:30"
     },
     {
       "source": "Zerodha Pulse",
-      "title": "aggregated in one place. Trending check india trade live world rates fed oil today price cup bank ipo nifty tata nse updates weekly returns IRDAI issues consultation paper on changes to regulation mak",
+      "title": "aggregated in one place. Trending world cup oil price trade india ipo check live rates fed today bank tata nse updates weekly returns Iran Can Buy US Goods From $6-Billion Of Frozen Funds Under Interi",
       "link": "https://pulse.zerodha.com/",
-      "summary": "aggregated in one place. Trending check india trade live world rates fed oil today price cup bank ipo nifty tata nse updates weekly returns IRDAI issues consultation paper on changes to regulation making process 22 minutes ago \u2014 The Hindu Business Ahead of Market: 10 things that will decide stock ma",
-      "publishedAt": "2026-06-18T22:34:19.937943+05:30"
+      "summary": "aggregated in one place. Trending world cup oil price trade india ipo check live rates fed today bank tata nse updates weekly returns Iran Can Buy US Goods From $6-Billion Of Frozen Funds Under Interim Deal: Report The US-Iran bilateral trade has been negligible since the past three decades, after W",
+      "publishedAt": "2026-06-18T23:55:05.419271+05:30"
     }
   ],
   "llmProvider": "gemini",
@@ -5114,56 +5108,6 @@
       },
       "focusTicker": "ACUTAAS",
       "ticker": "ACUTAAS",
-      "dataQuality": "live-derived"
-    },
-    "CAMS": {
-      "news_catalysts_card": "Market context for CAMS: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For CAMS, participation is read through volume multiplier 1.85x and turnover 189.67 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. CAMS is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "CAMS forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "CAMS is in the active terminal universe with LTP \u20b9832.80, +3.17% move, and volume 2299896. Intraday setup: VWAP Bounce, VWAP 825.23, EMA9 831.0, ATR 2.88%, volume multiplier 1.85x.",
-      "future_revenue_model": "Forward model for CAMS is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for CAMS: LTP \u20b9832.80, delta +3.17%, volume 2299896, score 0.0, action cohort selection.",
-      "ledger_stocks": [],
-      "active_scoring_matrix": {
-        "beneish_m_score": "-0.37",
-        "altman_z_score": "3.06",
-        "ocf_ebitda_ratio": "0.70",
-        "mansfield_relative_strength": "0.78"
-      },
-      "active_seven_ic_gates": {
-        "q1_fund_buying": "CAMS volume multiplier is 1.85x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "CAMS turnover is 189.67 Cr; liquidity quality is institutional level.",
-        "q3_catalyst_validation": "CAMS price action is +3.17%; catalyst validation depends on follow-through above VWAP/EMA9.",
-        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "CAMS risk/reward is driven by score 0.0, ATR 2.88%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "CAMS quantitative milestone: hard-filter watch with score 0.0.",
-        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
-      },
-      "active_risk_calc": {
-        "ticker_score": 0.0,
-        "delta_pct": 3.17,
-        "atr_pct": 2.88,
-        "turnover_cr": 189.67,
-        "volume_multiplier": 1.85,
-        "selection_risk": "higher",
-        "signal_quality": "live-derived",
-        "win_loss_ratio": "1.0:1",
-        "kelly_policy_max": "0.0%",
-        "risk_flag_score": 70.0,
-        "risk_flag": "HIGH_RISK"
-      },
-      "active_factor_hub": {
-        "selection_reason": "trend follow-through above VWAP and EMA9; delta 3.17% with score 0.0; volume 1.85x and turnover 189.67 Cr; elevated volatility; trigger VWAP Bounce; watch-list hard-filter state.",
-        "dominant_factors": "momentum, liquidity, and structural trend alignment",
-        "momentum_factor": "Above VWAP/EMA9; score 0.0.",
-        "liquidity_factor": "Volume multiplier 1.85x; turnover 189.67 Cr.",
-        "quality_factor": "ATR 2.88% and hard-filter status watch.",
-        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
-        "low_vol_factor": "Volatility premium regime"
-      },
-      "focusTicker": "CAMS",
-      "ticker": "CAMS",
       "dataQuality": "live-derived"
     },
     "COCHINSHIP": {
@@ -5714,6 +5658,56 @@
       },
       "focusTicker": "ADANIENT",
       "ticker": "ADANIENT",
+      "dataQuality": "live-derived"
+    },
+    "CAMS": {
+      "news_catalysts_card": "Market context for CAMS: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For CAMS, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. CAMS is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "CAMS forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
+      "why_interested": "CAMS is in the active terminal universe with LTP \u20b9832.80, +3.17% move, and volume 2299896. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
+      "future_revenue_model": "Forward model for CAMS is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for CAMS: LTP \u20b9832.80, delta +3.17%, volume 2299896, score 0.0, action cohort selection.",
+      "ledger_stocks": [],
+      "active_scoring_matrix": {
+        "beneish_m_score": "-0.37",
+        "altman_z_score": "3.06",
+        "ocf_ebitda_ratio": "0.70",
+        "mansfield_relative_strength": "0.78"
+      },
+      "active_seven_ic_gates": {
+        "q1_fund_buying": "CAMS volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "CAMS turnover is 0.0 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "CAMS price action is +3.17%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
+        "q5_risk_reward": "CAMS risk/reward is driven by score 0.0, ATR 0.0%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "CAMS quantitative milestone: hard-filter watch with score 0.0.",
+        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
+      },
+      "active_risk_calc": {
+        "ticker_score": 0.0,
+        "delta_pct": 3.17,
+        "atr_pct": 0.0,
+        "turnover_cr": 0.0,
+        "volume_multiplier": 0.0,
+        "selection_risk": "higher",
+        "signal_quality": "live-derived",
+        "win_loss_ratio": "1.0:1",
+        "kelly_policy_max": "0.0%",
+        "risk_flag_score": 74.0,
+        "risk_flag": "HIGH_RISK"
+      },
+      "active_factor_hub": {
+        "selection_reason": "mixed trend around intraday anchors; delta 3.17% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "dominant_factors": "liquidity and mean-reversion around intraday anchors",
+        "momentum_factor": "Near VWAP/EMA9; score 0.0.",
+        "liquidity_factor": "Turnover data unavailable.",
+        "quality_factor": "ATR 0.00% and hard-filter status watch.",
+        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
+        "low_vol_factor": "Low-vol regime"
+      },
+      "focusTicker": "CAMS",
+      "ticker": "CAMS",
       "dataQuality": "live-derived"
     }
   },

@@ -72,8 +72,15 @@ REM Start AI News Backend in background
 echo [*] Starting AI News Backend on port 8001...
 powershell -NoProfile -Command "Start-Process -FilePath \"%PYTHON_EXE%\" -ArgumentList \"-m\", \"uvicorn\", \"ai_news_server:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8001\" -WorkingDirectory \"%AI_NEWS_BACKEND_DIR%\" -NoNewWindow -PassThru | Out-Null"
 
-REM Wait briefly so backend ports are more likely to be free before frontend starts
-powershell -NoProfile -Command "Start-Sleep -Seconds 3"
+REM =========================================================
+REM FRONTEND PREPARATION: Clear Next.js cache to fix SWC errors
+REM =========================================================
+if exist "%FRONTEND_DIR%\.next" (
+    echo [*] Clearing Next.js build cache...
+    rd /s /q "%FRONTEND_DIR%\.next"
+)
+
+powershell -NoProfile -Command "Start-Sleep -Seconds 5"
 
 REM Start Frontend in background
 echo [*] Starting Frontend on port 3000...
@@ -85,6 +92,8 @@ REM =========================================================
 REM POST-FLIGHT VALIDATION: Health + data smoke tests
 REM =========================================================
 echo [POST-FLIGHT] Running startup smoke tests...
+echo [*] Giving Next.js Turbopack 20 seconds to stabilize...
+powershell -NoProfile -Command "Start-Sleep -Seconds 20"
 echo.
 if "%IROS_SMOKE_TEST_REFRESH%"=="1" (
     powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_ROOT%\scripts\startup-smoke-test.ps1" -IncludeRefreshSmokeTest
