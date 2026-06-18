@@ -26,13 +26,14 @@ from zoneinfo import ZoneInfo
 import pyotp
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from SmartApi import SmartConnect
 
 from global_feed import fetch_domestic_index_macro, fetch_domestic_yahoo_macro, fetch_global_macro
 from symbols import MACRO_INSTRUMENTS, MOCK_TICKERS, WATCHLIST, Instrument
 from terminal_intelligence_full import (
+    CompleteSecurityAnalysisPayload,
     TOP_SELECTION_COUNT,
     _on_demand_ticker_selection_reason,
     build_ticker_intelligence_map,
@@ -41,6 +42,8 @@ from terminal_intelligence_full import (
 )
 
 _TI_TOP_SELECTION_COUNT = TOP_SELECTION_COUNT
+
+ORCHESTRATION_DELAY = 30
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -959,33 +962,19 @@ def _select_dynamic_top_stocks(
                 selected_rows.extend(remaining[: _TI_TOP_SELECTION_COUNT - len(selected_rows)])
 
         news_summary = (
-            ti_payload.get("news_catalysts_card")
-            or ti_payload.get("forensic_screen_card")
-            or ti_payload.get("why_interested")
+            ti_payload.get("news_catalysts_card") or ti_payload.get("forensic_screen_card") or ti_payload.get("why_interested")
         )
         return selected_rows[:_TI_TOP_SELECTION_COUNT], ti_payload, news_summary
-    except Exception:
-        ranked = _heuristic_rank([row for row in all_stocks if _hard_screen(row)] or all_stocks)
+    except Exception as e:
+        # Do not return heuristic data. Return error state so system knows to try on-demand later.
         ti_payload = {
-            "news_catalysts_card": "",
-            "insider_insti_activity_card": "",
-            "macro_anchors_card": "",
-            "forensic_screen_card": "",
-            "why_interested": "Heuristic selection fallback.",
-            "future_revenue_model": "",
-            "current_model": "",
-            "ledger_stocks": ranked,
-            "active_scoring_matrix": {
-                "beneish_m_score": "N/A",
-                "altman_z_score": "N/A",
-                "ocf_ebitda_ratio": "N/A",
-                "mansfield_relative_strength": "N/A",
-            },
-            "active_seven_ic_gates": {},
-            "active_risk_calc": {"max_score": max([row.get("score", 0) for row in ranked], default=0.0)},
-            "active_factor_hub": {"selection_reason": "momentum+volume heuristic"},
+            "llmError": str(e),
+            "why_interested": "LLM selection failed.",
+            "ledger_stocks": [],
+            "news_catalysts_card": None,
+            "forensic_screen_card": None,
         }
-        return ranked, ti_payload, "Heuristic selection fallback."
+        return [], ti_payload, None
 
 
 def _build_macro_strips(macro_raw: dict[str, Any]) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
@@ -1042,6 +1031,7 @@ def _build_payload_from_live_data(
     client: AngelOneClient,
     pool_name: str | None = None,
     custom_prompt: str | None = None,
+    force_llm_refresh: bool = False,
 ) -> dict[str, Any]:
     llm_config = _llm_config()
     now = _ist_now()
@@ -1100,14 +1090,31 @@ def _build_payload_from_live_data(
     global_macro = fetch_global_macro()
     news_items = fetch_live_news()
 
-    top_rows, terminal_intel, news_summary = _build_terminal_payload(
-        all_stocks=all_stocks,
-        news_items=news_items,
-        macro_morning=macro_morning,
-        macro_evening=macro_evening,
-        pool_name=resolved_pool_name,
-        custom_prompt=custom_prompt,
+    # AI NEWS ANALYSIS: Call once completely & subsequent from cache unless forced or data missing
+    snapshot = _load_last_snapshot()
+    existing_ti = snapshot.get("terminalIntelligence") if snapshot else None
+    existing_summary = snapshot.get("newsSummary") if snapshot else None
+    
+    # Logic: If we have valid AI data and aren't forcing a refresh, reuse it to avoid timeouts.
+    # If existing data is an error message or missing, we trigger the LLM.
+    can_reuse_ai = (
+        not force_llm_refresh and 
+        existing_ti and 
+        not existing_ti.get("llmError") and 
+        existing_summary
     )
+
+    if can_reuse_ai:
+        top_rows, terminal_intel, news_summary = (snapshot.get("stocks") or [], existing_ti, existing_summary)
+    else:
+        top_rows, terminal_intel, news_summary = _build_terminal_payload(
+            all_stocks=all_stocks,
+            news_items=news_items,
+            macro_morning=macro_morning,
+            macro_evening=macro_evening,
+            pool_name=resolved_pool_name,
+            custom_prompt=custom_prompt,
+        )
 
     payload = {
         "success": True,
@@ -1152,17 +1159,34 @@ def build_market_payload(
     pool_name: str | None = None,
     force_refresh: bool = False,
     custom_prompt: str | None = None,
-    allow_fallback: bool = True,
+    allow_fallback: bool = True, # If live fetch fails, allow falling back to snapshot
+    prefer_cache: bool = False, # If true, try cache first, then live if cache is empty/stale
 ) -> dict[str, Any]:
     snapshot = _load_last_snapshot()
-    # Always attempt live data — Angel One returns last trade data even after market close
-    try:
-        payload = _build_payload_from_live_data(client, pool_name=pool_name, custom_prompt=custom_prompt)
+
+    if prefer_cache and snapshot:
+        # If preferring cache and a snapshot exists, return it immediately.
+        # The frontend can then decide to trigger an on-demand refresh if data is missing.
+        snapshot = dict(snapshot)
+        snapshot["isSnapshotFallback"] = True
+        snapshot["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        if pool_name:
+            snapshot["activePool"] = pool_name
         _apply_selection_meta(
-            payload,
-            mode="live",
-            reason="Live refresh completed successfully.",
-            data_date=_payload_data_date(payload),
+            snapshot,
+            mode="snapshot",
+            reason="Cache preferred. Serving the latest saved snapshot.",
+            data_date=_payload_data_date(snapshot),
+        )
+        return _hydrate_ticker_intelligence_map(snapshot)
+
+    # Attempt live data fetch
+    try:
+        payload = _build_payload_from_live_data(
+            client, 
+            pool_name=pool_name, 
+            custom_prompt=custom_prompt,
+            force_llm_refresh=force_refresh # Only refresh LLM if explicitly forced (on-demand)
         )
         _save_last_snapshot(payload)
         return payload
@@ -1177,7 +1201,7 @@ def build_market_payload(
             if pool_name:
                 snapshot["activePool"] = pool_name
             # Refresh RSS news even when outside refresh window
-            try:
+            try: # Still try to fetch fresh news even if falling back to old stock data
                 fresh_news = fetch_live_news()
                 if fresh_news:
                     snapshot["news"] = fresh_news
@@ -1186,7 +1210,7 @@ def build_market_payload(
             _apply_selection_meta(
                 snapshot,
                 mode="snapshot",
-                reason="Outside the scheduled IST refresh window; serving the latest saved snapshot with fresh news.",
+                reason=f"Live refresh failed ({exc}). Serving the latest saved snapshot with fresh news.",
                 data_date=_payload_data_date(snapshot),
             )
             return _hydrate_ticker_intelligence_map(snapshot)
@@ -1210,7 +1234,7 @@ def build_market_payload(
                 "isSnapshotFallback": False,
                 "selectionMeta": {
                     "mode": "live",
-                    "reason": "Live refresh was explicitly requested but no live data was produced.",
+                    "reason": f"Live refresh failed ({exc}) and fallback is disabled.",
                     "dataDate": _ist_now().date().isoformat(),
                 },
             }
@@ -1233,7 +1257,7 @@ def build_market_payload(
             "isSnapshotFallback": True,
             "selectionMeta": {
                 "mode": "snapshot",
-                "reason": "No cached snapshot available outside the scheduled IST refresh window.",
+                    "reason": f"Live refresh failed ({exc}) and no cached snapshot is available.",
                 "dataDate": _ist_now().date().isoformat(),
             },
         }
@@ -1285,8 +1309,7 @@ def create_app() -> FastAPI:
     @app.get("/api/market-data")
     def market_data(pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
         try:
-            client = AngelOneClient()
-            return build_market_payload(client, pool_name=pool, custom_prompt=prompt)
+            return build_market_payload(AngelOneClient(), pool_name=pool, custom_prompt=prompt, prefer_cache=True)
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -1337,6 +1360,15 @@ def create_app() -> FastAPI:
             }
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.post("/api/orchestrated-refresh")
+    async def trigger_orchestrated_refresh(background_tasks: BackgroundTasks, pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
+        task_id = f"orchestrated:{int(time.time())}"
+        with _REFRESH_TASK_LOCK:
+            _REFRESH_TASKS[task_id] = {"status": "running", "progress": "Initializing sequence...", "created_at": time.time()}
+        
+        background_tasks.add_task(_run_orchestrated_sequence, task_id, pool, prompt)
+        return {"success": True, "taskId": task_id, "message": "Sequential orchestrated refresh started."}
 
     @app.post("/api/refresh-intelligence")
     def refresh_intelligence(pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
@@ -1416,6 +1448,7 @@ def create_app() -> FastAPI:
                 client,
                 pool_name=resolved_pool,
                 force_refresh=True,
+                prefer_cache=False, # Explicitly do not prefer cache for on-demand refresh
                 custom_prompt=resolved_prompt,
                 allow_fallback=True,
             )
@@ -1425,7 +1458,7 @@ def create_app() -> FastAPI:
             if payload.get("selectionMeta", {}).get("mode") != "live":
                 payload["selectionMeta"] = {
                     "mode": "live",
-                    "reason": payload.get("selectionMeta", {}).get("reason") or "Live refresh explicitly requested.",
+                    "reason": payload.get("selectionMeta", {}).get("reason") or "Live refresh explicitly requested by frontend.",
                     "dataDate": payload.get("selectionMeta", {}).get("dataDate") or _payload_data_date(payload),
                 }
 
@@ -1573,6 +1606,144 @@ def _run_refresh_task(task_id: str, pool_name: str | None, custom_prompt: str | 
         _refresh_task_set_error(task_id, str(exc))
 
 
+def _run_orchestrated_sequence(task_id: str, pool_name: str | None, custom_prompt: str | None) -> None:
+    """Orchestrates the sequential dashboard update with 30s delays between sections as specified."""
+    try:
+        client = AngelOneClient()
+        
+        def update_progress(msg: str, payload: dict[str, Any]):
+            with _REFRESH_TASK_LOCK:
+                if task_id in _REFRESH_TASKS:
+                    _REFRESH_TASKS[task_id]["progress"] = msg
+            # Progressive save so frontend can reflect sections being filled
+            _save_last_snapshot(payload)
+            print(f"[ORCHESTRATION] {msg}")
+
+        # 1. Immediately delete existing dashboard snapshot to start fresh
+        if SNAPSHOT_PATH.exists():
+            SNAPSHOT_PATH.unlink()
+        
+        payload: dict[str, Any] = {
+            "success": True,
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+            "stocks": [],
+            "stockQuotes": {},
+            "macroDataStrip": {"morning": [], "evening": []},
+            "globalMacro": {"indices": [], "commodities": []},
+            "news": [],
+            "terminalIntelligence": None,
+            "isSnapshotFallback": False
+        }
+
+        # Step 1: Update GLOBAL INDICES section
+        update_progress("Updating GLOBAL INDICES section...", payload)
+        gm = fetch_global_macro()
+        payload["globalMacro"]["indices"] = gm.get("indices", [])
+        update_progress("GLOBAL INDICES updated. Waiting 30 seconds...", payload)
+        time.sleep(ORCHESTRATION_DELAY)
+
+        # Step 2: Update COMMODITIES & FX section
+        update_progress("Updating COMMODITIES & FX section...", payload)
+        payload["globalMacro"]["commodities"] = gm.get("commodities", [])
+        payload["macroDataStrip"]["morning"].extend(fetch_domestic_yahoo_macro())
+        update_progress("COMMODITIES & FX updated. Waiting 30 seconds...", payload)
+        time.sleep(ORCHESTRATION_DELAY)
+
+        # Step 3: Update NIFTY TOP 5 GAINERS & LOSERS
+        update_progress("Updating NIFTY TOP 5 GAINERS & LOSERS...", payload)
+        resolved_pool = pool_name or NIFTY_100_LABEL
+        stock_universe, pool_label = _pool_watchlist(resolved_pool)
+        stock_quotes_raw = client.fetch_batch_quotes(stock_universe)
+        
+        all_stocks = []
+        for inst in stock_universe:
+            if q := stock_quotes_raw.get(inst.key):
+                all_stocks.append(_build_stock_row(inst, q, pool_label))
+        
+        # Perform intraday fetch for ranking
+        candidate_rows = _coarse_pre_rank(all_stocks)[:30]
+        all_metrics = _fetch_all_intraday_chunked(client, candidate_rows, {i.key: i for i in stock_universe}, _ist_now())
+        
+        for row in all_stocks:
+            if m := all_metrics.get(row["ticker"]):
+                row["intraday"] = m
+        
+        payload["stocks"] = _heuristic_rank(all_stocks)
+        payload["stockQuotes"] = {s["ticker"]: s for s in all_stocks}
+        update_progress("NIFTY TOP 5 MOVERS updated. Waiting 30 seconds...", payload)
+        time.sleep(ORCHESTRATION_DELAY)
+
+        # Step 4: Update NIFTY 100 HEAT MAP (gradient data is now in stockQuotes)
+        update_progress("Updating NIFTY 100 HEAT MAP data...", payload)
+        update_progress("NIFTY 100 HEAT MAP updated. Waiting 30 seconds...", payload)
+        time.sleep(ORCHESTRATION_DELAY)
+
+        # Step 5: Update LIVE NEWS FEED
+        update_progress("Updating LIVE NEWS FEED section...", payload)
+        payload["news"] = fetch_live_news()
+        update_progress("LIVE NEWS FEED updated. Waiting 30 seconds...", payload)
+        time.sleep(ORCHESTRATION_DELAY)
+
+        # Step 6: Update INDIA MARKETS section (TOP MOVERS, ASSET METRICS)
+        update_progress("Updating INDIA MARKETS section...", payload)
+        macro_raw = client.fetch_batch_quotes(list(MACRO_INSTRUMENTS))
+        m, e = _build_macro_strips(macro_raw)
+        payload["macroDataStrip"]["morning"].extend(m)
+        payload["macroDataStrip"]["evening"].extend(e)
+        payload["macroDataStrip"]["morning"].extend(fetch_domestic_index_macro())
+        update_progress("INDIA MARKETS section updated. Waiting 30 seconds...", payload)
+        time.sleep(ORCHESTRATION_DELAY)
+
+        # Step 7: Update AI NEWS TERMINAL & SUMMARY
+        # Check if we already have this in a valid state from a previous snapshot
+        snapshot = _load_last_snapshot()
+        if snapshot and snapshot.get("terminalIntelligence") and not snapshot.get("terminalIntelligence", {}).get("llmError"):
+            update_progress("AI NEWS TERMINAL & SUMMARY found in cache. Reusing...", payload)
+            top_rows = snapshot.get("stocks", [])
+            ti_intel = snapshot.get("terminalIntelligence")
+            news_summary = snapshot.get("newsSummary")
+        else:
+            update_progress("AI NEWS TERMINAL & SUMMARY missing or invalid. Calling LLM...", payload)
+            top_rows, ti_intel, news_summary = _build_terminal_payload(
+                all_stocks=all_stocks,
+                news_items=payload["news"],
+                macro_morning=payload["macroDataStrip"]["morning"],
+                macro_evening=payload["macroDataStrip"]["evening"],
+                pool_name=resolved_pool,
+                custom_prompt=custom_prompt
+            )
+            
+            if not ti_intel or ti_intel.get("llmError"):
+                 update_progress("AI ANALYSIS failed. Panel will remain empty for on-demand retry.", payload)
+            else:
+                 update_progress("AI ANALYSIS completed successfully.", payload)
+
+        payload["terminalIntelligence"] = ti_intel
+        payload["newsSummary"] = news_summary
+        update_progress("AI SUMMARY updated. Waiting 30 seconds...", payload)
+        time.sleep(ORCHESTRATION_DELAY)
+
+        # Step 8: Update TERMINAL ANALYSIS section
+        update_progress("Updating final TERMINAL ANALYSIS section...", payload)
+        payload = _hydrate_ticker_intelligence_map(payload)
+        _apply_selection_meta(
+            payload, 
+            mode="live", 
+            reason="Sequential orchestrated refresh complete. Rendering final dashboard."
+        )
+        
+        update_progress("Orchestrated refresh sequence complete. Dashboard fully generated.", payload)
+        _refresh_task_set_done(task_id, {"success": True, "message": "Sequence finished successfully."})
+
+        # NOTE: At this point, the backend has generated the complete dataset.
+        # The 'light-themed image' rendering is handled by the frontend dashboard component
+        # when it detects the 'Sequential orchestrated refresh complete' meta state.
+
+    except Exception as exc:
+        print(f"[ORCHESTRATION ERROR] {exc}")
+        _refresh_task_set_error(task_id, str(exc))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Angel One market feed for IROS")
     parser.add_argument("--serve", action="store_true", help="Start FastAPI server")
@@ -1581,6 +1752,7 @@ def main() -> int:
     parser.add_argument("--pool", default=None, help="Pool label. Defaults to Nifty 100; Live Universe is also supported.")
     parser.add_argument("--prompt", default=None, help="Custom filter prompt override")
     parser.add_argument("--refresh-on-demand", action="store_true", help="Force a non-fallback live refresh and write snapshot")
+    parser.add_argument("--orchestrate", action="store_true", help="Run the sequential orchestrated refresh sequence")
     args = parser.parse_args()
 
     try:
@@ -1603,12 +1775,18 @@ def main() -> int:
         uvicorn.run(create_app(), host=host, port=port)
         return 0
 
+    if args.orchestrate:
+        print("[INFO] Starting orchestrated sequential refresh...")
+        _run_orchestrated_sequence("cli_task", args.pool, args.prompt)
+        return 0
+
     if args.refresh_on_demand:
         client = AngelOneClient()
         payload = build_market_payload(
             client,
             pool_name=args.pool,
             force_refresh=True,
+            prefer_cache=False, # Explicitly do not prefer cache for on-demand refresh
             custom_prompt=args.prompt,
             allow_fallback=False,
         )

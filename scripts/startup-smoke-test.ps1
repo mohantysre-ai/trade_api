@@ -80,7 +80,7 @@ Wait-Http -Uri "http://127.0.0.1:3000/" -TimeoutSec 240 | Out-Null
 Write-Host "[SMOKE] Frontend health OK"
 
 Write-Host "[SMOKE] Validating backend market-data payload..."
-$backendData = Invoke-GetJson -Uri "http://127.0.0.1:8000/api/market-data?pool=Nifty%20500" -TimeoutSec $BackendTimeoutSec
+$backendData = Invoke-GetJson -Uri "http://127.0.0.1:8000/api/market-data?pool=Nifty%20100" -TimeoutSec $BackendTimeoutSec
 Assert-True ($backendData.success -eq $true) "Backend market-data returned success=false"
 Assert-True ((@($backendData.stocks) | Measure-Object).Count -gt 0) "Backend market-data returned no stocks"
 Assert-True ((Count-ObjectProperties $backendData.stockQuotes) -gt 0) "Backend market-data returned no stockQuotes"
@@ -88,7 +88,7 @@ Assert-True ($null -ne $backendData.updatedAt) "Backend market-data did not retu
 Write-Host "[SMOKE] Backend market-data OK: stocks=$((@($backendData.stocks) | Measure-Object).Count), quotes=$(Count-ObjectProperties $backendData.stockQuotes)"
 
 Write-Host "[SMOKE] Validating frontend market-data proxy payload..."
-$frontendData = Invoke-GetJson -Uri "http://127.0.0.1:3000/api/market-data?pool=Nifty%20500" -TimeoutSec $FrontendTimeoutSec
+$frontendData = Invoke-GetJson -Uri "http://127.0.0.1:3000/api/market-data?pool=Nifty%20100" -TimeoutSec $FrontendTimeoutSec
 Assert-True ($frontendData.success -eq $true) "Frontend market-data proxy returned success=false"
 Assert-True ((@($frontendData.stocks) | Measure-Object).Count -gt 0) "Frontend market-data proxy returned no stocks"
 Assert-True ((Count-ObjectProperties $frontendData.stockQuotes) -gt 0) "Frontend market-data proxy returned no stockQuotes"
@@ -98,7 +98,7 @@ Write-Host "[SMOKE] Frontend market-data proxy OK: stocks=$((@($frontendData.sto
 if ($IncludeRefreshSmokeTest) {
     Write-Host "[SMOKE] Validating refresh-data-on-demand without ticker-news refresh..."
     $body = @{
-        pool = "Nifty 500"
+        pool = "Nifty 100"
         refreshTickerNews = $false
     } | ConvertTo-Json -Depth 8
 
