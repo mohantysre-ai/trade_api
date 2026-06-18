@@ -81,7 +81,7 @@ DOMESTIC_INDEX_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("niftybank", "^NSEBANK", "NIFTY BANK", "index", _fmt_index),
     YahooInstrument("niftyit", "^CNXIT", "NIFTY IT", "index", _fmt_index),
     YahooInstrument("niftypharma", "^CNXPHARMA", "NIFTY PHARMA", "index", _fmt_index),
-    YahooInstrument("niftymidcap", "^CNXMIDCAP", "NIFTY MIDCAP", "index", _fmt_index),
+    YahooInstrument("niftymidcap", "^CRSMID", "NIFTY MIDCAP", "index", _fmt_index),
     YahooInstrument("niftysmallcap", "^CNXSC", "NIFTY SMALLCAP", "index", _fmt_index),
 ]
 

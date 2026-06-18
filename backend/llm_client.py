@@ -74,12 +74,12 @@ def _call_gemini(prompt: str, api_key: str, model: str, system_instruction: str,
     except ImportError as exc:
         raise RuntimeError("Gemini support requires google-genai. Install it in the backend venv.") from exc
 
-    client = genai.Client(api_key=api_key)
+    client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=timeout))
     config = types.GenerateContentConfig(
         system_instruction=system_instruction,
         temperature=0.1,
         response_mime_type="application/json",
         max_output_tokens=2000,
     )
-    response = client.models.generate_content(model=model, contents=prompt, config=config, timeout=timeout)
+    response = client.models.generate_content(model=model, contents=prompt, config=config)
     return getattr(response, "text", None) or getattr(response, "output_text", None) or str(response)

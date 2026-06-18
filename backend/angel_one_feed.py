@@ -397,7 +397,7 @@ def _call_gemini(prompt: str, api_key: str, model: str, system_instruction: str,
         response_mime_type="application/json",
         max_output_tokens=2000,
     )
-    response = client.models.generate_content(model=model, contents=prompt, config=config, timeout=timeout)
+    response = client.models.generate_content(model=model, contents=prompt, config=config)
     return getattr(response, "text", None) or getattr(response, "output_text", None) or str(response)
 
 
