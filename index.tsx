@@ -51,6 +51,87 @@ const INDIA: Tick[] = [
   { label: "INDIA VIX", value: "14.72", delta: -1.72 },
 ];
 
+/* ---------------------------- heatmap data -------------------------------- */
+
+type HeatMapItem = {
+  symbol: string;
+  price: number;
+  changePct: number;
+  colorClass: string;
+};
+
+const HEATMAP_COLORS = [
+  { min: 5, class: "heat-five", label: "5%+" },
+  { min: 3, class: "heat-four", label: "3-5%" },
+  { min: 2, class: "heat-three", label: "2-3%" },
+  { min: 1, class: "heat-two", label: "1-2%" },
+  { min: 0, class: "heat-one", label: "0-1%" },
+  { min: -1, class: "heat-neg-one", label: "0 to -1%" },
+  { min: -2, class: "heat-neg-two", label: "-1 to -2%" },
+  { min: -3, class: "heat-neg-three", label: "-2 to -3%" },
+  { min: -Infinity, class: "heat-neg-four", label: "< -3%" },
+];
+
+function getHeatColor(pct: number): string {
+  for (const c of HEATMAP_COLORS) {
+    if (pct >= c.min) return c.class;
+  }
+  return "heat-neg-four";
+}
+
+const NIFTY_100_HEATMAP: HeatMapItem[] = [
+  { symbol: "MAXHEALTH", price: 1092.45, changePct: 6.46, colorClass: "heat-five" },
+  { symbol: "ADANIPOWER", price: 231.90, changePct: 5.22, colorClass: "heat-five" },
+  { symbol: "VISL", price: 24.37, changePct: 5.00, colorClass: "heat-four" },
+  { symbol: "ADANIGREEN", price: 1517.00, changePct: 3.49, colorClass: "heat-four" },
+  { symbol: "UNITDSPR", price: 1352.60, changePct: 3.41, colorClass: "heat-four" },
+  { symbol: "ADANIENSOL", price: 1535.80, changePct: 3.00, colorClass: "heat-three" },
+  { symbol: "DLF", price: 642.00, changePct: 2.96, colorClass: "heat-three" },
+  { symbol: "INDIGO", price: 5014.00, changePct: 2.78, colorClass: "heat-three" },
+  { symbol: "ADANIENT", price: 3032.00, changePct: 2.71, colorClass: "heat-three" },
+  { symbol: "TRENT", price: 3182.00, changePct: 2.55, colorClass: "heat-three" },
+  { symbol: "BEL", price: 428.10, changePct: 1.96, colorClass: "heat-two" },
+  { symbol: "BOSCHLTD", price: 39990.00, changePct: 1.94, colorClass: "heat-two" },
+  { symbol: "SHREECEM", price: 25445.00, changePct: 1.90, colorClass: "heat-two" },
+  { symbol: "TATACAP", price: 343.30, changePct: 1.84, colorClass: "heat-two" },
+  { symbol: "BAJAJHLDNG", price: 10690.00, changePct: 1.81, colorClass: "heat-two" },
+  { symbol: "NTPC", price: 362.00, changePct: 1.81, colorClass: "heat-two" },
+  { symbol: "SOLARINDS", price: 17770.00, changePct: 1.79, colorClass: "heat-two" },
+  { symbol: "INDHOTEL", price: 711.50, changePct: 1.77, colorClass: "heat-two" },
+  { symbol: "HDFCBANK", price: 800.80, changePct: 1.74, colorClass: "heat-two" },
+  { symbol: "HDFCLIFE", price: 591.20, changePct: 1.62, colorClass: "heat-two" },
+  { symbol: "DIVISLAB", price: 6768.00, changePct: 1.57, colorClass: "heat-two" },
+  { symbol: "SBIN", price: 1042.50, changePct: 1.56, colorClass: "heat-two" },
+  { symbol: "AMBUJACEM", price: 432.65, changePct: 1.45, colorClass: "heat-two" },
+  { symbol: "UNIONBANK", price: 176.25, changePct: 1.44, colorClass: "heat-two" },
+  { symbol: "ZYDUSLIFE", price: 1074.00, changePct: 1.19, colorClass: "heat-two" },
+  { symbol: "EICHERMOT", price: 7593.50, changePct: 1.13, colorClass: "heat-two" },
+  { symbol: "ABB", price: 7244.00, changePct: 1.12, colorClass: "heat-two" },
+  { symbol: "TMCV", price: 407.00, changePct: 1.04, colorClass: "heat-two" },
+  { symbol: "TMPV", price: 364.55, changePct: 1.00, colorClass: "heat-one" },
+  { symbol: "POWERGRID", price: 289.20, changePct: 1.00, colorClass: "heat-one" },
+  { symbol: "NESTLEIND", price: 1400.00, changePct: -0.52, colorClass: "heat-neg-one" },
+  { symbol: "M&M", price: 3116.50, changePct: -0.52, colorClass: "heat-neg-one" },
+  { symbol: "BPCL", price: 316.25, changePct: -0.53, colorClass: "heat-neg-one" },
+  { symbol: "MUTHOOTFIN", price: 3171.90, changePct: -0.59, colorClass: "heat-neg-one" },
+  { symbol: "HCLTECH", price: 1159.60, changePct: -0.62, colorClass: "heat-neg-one" },
+  { symbol: "COALINDIA", price: 452.30, changePct: -0.76, colorClass: "heat-neg-one" },
+  { symbol: "WIPRO", price: 182.95, changePct: -0.82, colorClass: "heat-neg-one" },
+  { symbol: "MAZDOCK", price: 2530.00, changePct: -0.88, colorClass: "heat-neg-one" },
+  { symbol: "HAL", price: 4420.00, changePct: -0.91, colorClass: "heat-neg-one" },
+  { symbol: "TCS", price: 2202.50, changePct: -0.92, colorClass: "heat-neg-one" },
+  { symbol: "MARUTI", price: 13505.00, changePct: -0.92, colorClass: "heat-neg-one" },
+  { symbol: "TECHM", price: 1447.80, changePct: -1.00, colorClass: "heat-neg-two" },
+  { symbol: "CGPOWER", price: 953.00, changePct: -1.12, colorClass: "heat-neg-two" },
+  { symbol: "GODREJCP", price: 1008.40, changePct: -1.14, colorClass: "heat-neg-two" },
+  { symbol: "TATACONSUM", price: 1111.00, changePct: -1.20, colorClass: "heat-neg-two" },
+  { symbol: "VEDPOWER", price: 41.19, changePct: -1.93, colorClass: "heat-neg-two" },
+  { symbol: "VBL", price: 532.10, changePct: -2.20, colorClass: "heat-neg-three" },
+  { symbol: "VAML", price: 455.00, changePct: -2.23, colorClass: "heat-neg-three" },
+  { symbol: "INFY", price: 1127.40, changePct: -2.62, colorClass: "heat-neg-three" },
+  { symbol: "VOGL", price: 31.25, changePct: -4.11, colorClass: "heat-neg-four" },
+];
+
 type Asset = {
   ticker: string;
   price: number;
@@ -338,7 +419,48 @@ function DetailDrawer({ asset, onClose }: { asset: Asset; onClose: () => void })
 
 /* ---------------------------------- root ---------------------------------- */
 
-const TABS = ["Market Snapshot", "Asset Matrix"] as const;
+/* ----------------------------- heat map view ------------------------------ */
+
+function HeatMapView() {
+  return (
+    <div className="grid gap-4">
+      <Panel label="NIFTY 100 Heat Map">
+        <div className="flex flex-wrap">
+          {NIFTY_100_HEATMAP.map((item) => (
+            <a
+              key={item.symbol}
+              href={`/get-quotes/equity?symbol=${item.symbol}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`heatmap-tile ${item.colorClass}`}
+            >
+              <div className="compName">
+                <span className="indexName">{item.symbol}</span>
+              </div>
+              <div className="tooltipIndexData">
+                <span className="currentPrice">{item.price.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                <span className="perChange">{item.changePct >= 0 ? "+" : ""}{item.changePct.toFixed(2)}%</span>
+              </div>
+            </a>
+          ))}
+        </div>
+        {/* color legend */}
+        <div className="flex flex-wrap gap-3 border-t border-border px-4 py-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          {HEATMAP_COLORS.map((c) => (
+            <span key={c.class} className="flex items-center gap-1.5">
+              <span className={`inline-block h-3 w-3 rounded-sm ${c.class}`} />
+              {c.label}
+            </span>
+          ))}
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+/* ---------------------------------- root ---------------------------------- */
+
+const TABS = ["Market Snapshot", "NIFTY 100 Heat Map", "Asset Matrix"] as const;
 type Tab = (typeof TABS)[number];
 
 function Index() {
@@ -404,6 +526,7 @@ function Index() {
         </nav>
 
         {tab === "Market Snapshot" && <MarketSnapshot />}
+        {tab === "NIFTY 100 Heat Map" && <HeatMapView />}
         {tab === "Asset Matrix" && <AssetMatrix onSelect={setSelected} />}
       </main>
 

@@ -85,6 +85,39 @@ DOMESTIC_INDEX_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("niftysmallcap", "^CNXSC", "NIFTY SMALLCAP", "index", _fmt_index),
 ]
 
+# GIFT NIFTY via NSE India API
+GIFT_NIFTY_API_URL = "https://www.nseindia.com/api/NextApi/apiClient?functionName=getGiftNifty"
+
+def fetch_gift_nifty() -> dict[str, Any] | None:
+    """Fetch GIFT NIFTY index data from NSE India's public API."""
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+            "Referer": "https://www.nseindia.com/",
+        }
+        response = requests.get(GIFT_NIFTY_API_URL, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        # The NSE API response structure varies. Try common fields.
+        ltp = _extract_price(data.get("ltp") or data.get("lastPrice") or data.get("currentPrice"))
+        close = _extract_price(data.get("close") or data.get("previousClose") or data.get("prevClose"))
+        if ltp is None:
+            return None
+
+        delta, state = _pct_change(ltp, close)
+        return {
+            "label": "GIFT NIFTY",
+            "val": f"{ltp:,.2f}",
+            "delta": delta,
+            "state": state,
+            "group": "index",
+            "source": "nse_india_api",
+        }
+    except Exception:
+        return None
+
 # Global indices — expanded to 12 with ASX 200 and BOVESPA.
 GLOBAL_INDEX_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("dji", "^DJI", "DJI (US 30)", "index", _fmt_index),
