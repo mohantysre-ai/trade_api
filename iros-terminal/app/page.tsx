@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useMarketData,
   type LiveStock,
@@ -49,96 +49,407 @@ function parseDeltaPct(delta: string | undefined): number {
   return parseFloat(cleaned) || 0;
 }
 
+type NseTopFiveCategoryKey = 'topGainers' | 'topLoosers' | 'mostActiveValue' | 'mostActiveVolume';
+
+type NseTopFiveCategory = {
+  label: string;
+  flag: 'G' | 'L' | 'MAVA' | 'MAVO';
+  key: NseTopFiveCategoryKey;
+};
+
+type NseStock = Record<string, unknown> & {
+  symbol?: string;
+  lastPrice?: number;
+  pchange?: number;
+};
+
+type NseTopFiveResponse = {
+  data?: {
+    topGainers?: NseStock[];
+    topLoosers?: NseStock[];
+    mostActiveValue?: NseStock[];
+    mostActiveVolume?: NseStock[];
+    timestamp?: string;
+  };
+};
+
+type NseEquityStock = Record<string, unknown> & {
+  symbol?: string;
+  pChange?: number;
+};
+
+type NseEquityStockIndicesResponse = {
+  data?: NseEquityStock[];
+};
+
+const NSE_TOP_FIVE_CATEGORIES: NseTopFiveCategory[] = [
+  { label: 'TOP GAINERS', flag: 'G', key: 'topGainers' },
+  { label: 'TOP LOSERS', flag: 'L', key: 'topLoosers' },
+  { label: 'MOST ACTIVE', flag: 'MAVA', key: 'mostActiveValue' },
+  { label: 'HIGHEST VOLUME', flag: 'MAVO', key: 'mostActiveVolume' },
+];
+
+function formatNseNumber(value: number | undefined) {
+  if (typeof value !== 'number') return 'N/A';
+  return value.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+}
+
+function formatNseValue(value: unknown) {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'number') return formatNseNumber(value);
+  if (typeof value === 'object') return JSON.stringify(value, null, 2);
+  return String(value);
+}
+
+function formatNseFieldValue(key: string, value: unknown) {
+  if (typeof value === 'number' && key === 'totalTradedVolume') return `${(value / 100000).toFixed(2)} Lakhs`;
+  if (typeof value === 'number' && key === 'totalTradedValue') return `${(value / 10000000).toFixed(2)} Cr.`;
+  return formatNseValue(value);
+}
+
+function getNseGraphSrc(data: Record<string, unknown>) {
+  if (typeof data.chart30dPath === 'string' && data.chart30dPath) return data.chart30dPath;
+  if (typeof data.chart365dPath === 'string' && data.chart365dPath) return data.chart365dPath;
+  return null;
+}
+
+function formatNseKey(key: string) {
+  return key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function getCategoryAccentClass(categoryKey: NseTopFiveCategoryKey) {
+  if (categoryKey === 'topGainers') return 'text-emerald-600';
+  if (categoryKey === 'topLoosers') return 'text-red-500';
+  return 'text-slate-600';
+}
+
+function getCategoryDotClass(categoryKey: NseTopFiveCategoryKey) {
+  if (categoryKey === 'topGainers') return 'bg-emerald-500';
+  if (categoryKey === 'topLoosers') return 'bg-red-500';
+  return 'bg-slate-500';
+}
+
+function getCategoryRowStyle(categoryKey: NseTopFiveCategoryKey): React.CSSProperties {
+  if (categoryKey === 'topGainers') {
+    return { backgroundColor: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)' };
+  }
+  if (categoryKey === 'topLoosers') {
+    return { backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)' };
+  }
+  return { backgroundColor: 'rgba(15, 23, 42, 0.03)', border: '1px solid rgba(148, 163, 184, 0.2)' };
+}
+
+function getNseStocks(response: NseTopFiveResponse, key: NseTopFiveCategoryKey) {
+  const stocks = response.data?.[key];
+  if (!Array.isArray(stocks)) return [];
+  return stocks.filter((stock): stock is NseStock => stock !== null && typeof stock === 'object');
+}
+
+async function fetchNseTopFiveStock(flag: NseTopFiveCategory['flag']) {
+  const params = new URLSearchParams();
+  params.set('flag', flag);
+  params.set('index', 'NIFTY 500');
+  const res = await fetch(`/api/nse-top-five-stock?${params.toString()}`, { cache: 'no-store' });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(detail || `NSE API HTTP ${res.status}`);
+  }
+  return (await res.json()) as NseTopFiveResponse;
+}
+
+function getNseHeatMapStocks(response: NseEquityStockIndicesResponse) {
+  const stocks = response.data ?? [];
+  if (!Array.isArray(stocks)) return [];
+  return stocks.filter((stock): stock is NseEquityStock => {
+    if (stock === null || typeof stock !== 'object') return false;
+    return stock.symbol !== 'NIFTY 200' && typeof stock.pChange === 'number';
+  });
+}
+
+async function fetchNseEquityStockIndices() {
+  const params = new URLSearchParams();
+  params.set('index', 'NIFTY 200');
+  const res = await fetch(`/api/nse-equity-stock-indices?${params.toString()}`, { cache: 'no-store' });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(detail || `NSE API HTTP ${res.status}`);
+  }
+  return (await res.json()) as NseEquityStockIndicesResponse;
+}
+
 /* -------------------------------------------------------------------------- */
-/*  NIFTY TOP 5 GAINERS & LOSERS (live from stockQuotes)                     */
+/*  Modern animated tooltip shared components                                  */
 /* -------------------------------------------------------------------------- */
-function GainersLosersHeatmap({ stockQuotes }: { stockQuotes?: Record<string, LiveStock> }) {
-  const sorted = useMemo(() => {
-    if (!stockQuotes) return { gainers: [] as LiveStock[], losers: [] as LiveStock[] };
-    const entries = Object.values(stockQuotes).filter(s => s.delta);
-    const withPct = entries.map(s => ({ ...s, pct: parseDeltaPct(s.delta) }));
-    withPct.sort((a, b) => b.pct - a.pct);
-    return {
-      gainers: withPct.filter(s => s.pct >= 0).slice(0, 5),
-      losers: withPct.filter(s => s.pct < 0).slice(-5).reverse(),
-    };
-  }, [stockQuotes]);
+
+function MiniSparkline({ positive }: { positive: boolean }) {
+  const color = positive ? '#10b981' : '#ef4444';
+  return (
+    <svg className="w-full h-10" viewBox="0 0 100 30" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={`spark-fill-${positive ? 'g' : 'r'}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {positive ? (
+        <>
+          <path d="M0,25 L10,22 L20,24 L30,18 L40,16 L50,12 L60,10 L70,8 L80,6 L90,4 L100,2 L100,30 L0,30 Z" fill={`url(#spark-fill-${positive ? 'g' : 'r'})`} />
+          <polyline points="0,25 10,22 20,24 30,18 40,16 50,12 60,10 70,8 80,6 90,4 100,2" stroke={color} strokeWidth="1.5" fill="none" className="animate-pulse" />
+        </>
+      ) : (
+        <>
+          <path d="M0,5 L10,8 L20,6 L30,12 L40,14 L50,18 L60,20 L70,22 L80,24 L90,26 L100,28 L100,30 L0,30 Z" fill={`url(#spark-fill-${positive ? 'g' : 'r'})`} />
+          <polyline points="0,5 10,8 20,6 30,12 40,14 50,18 60,20 70,22 80,24 90,26 100,28" stroke={color} strokeWidth="1.5" fill="none" className="animate-pulse" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function NseTooltipContent({ data }: { data: Record<string, unknown> }) {
+  const graphSrc = getNseGraphSrc(data);
+  const pchange = typeof data.pchange === 'number' ? data.pchange : (typeof data.pChange === 'number' ? data.pChange : null);
+  const positive = pchange !== null && pchange >= 0;
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">NIFTY TOP 5 GAINERS & LOSERS</span>
-        <span className="text-[8px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{sorted.gainers.length + sorted.losers.length} stocks</span>
+    <div>
+      {/* Animated sparkline header */}
+      <div className="mb-3 rounded-t-lg" style={{ background: positive ? 'linear-gradient(180deg, rgba(16,185,129,0.08) 0%, transparent 100%)' : 'linear-gradient(180deg, rgba(239,68,68,0.08) 0%, transparent 100%)' }}>
+        <MiniSparkline positive={positive} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        {/* Gainers */}
-        <div>
-          <div className="text-[9px] uppercase tracking-wider text-emerald-600 font-bold mb-2 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            TOP GAINERS
+
+      {graphSrc && (
+        <div className="mb-3 rounded-lg border border-slate-200 bg-white shadow-sm p-2 transition-transform hover:scale-[1.01]">
+          <div className="mb-1.5 flex items-center justify-between text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+              Price Chart
+            </span>
+            <span className="text-teal-600">30D</span>
           </div>
-          <div className="space-y-1.5">
-            {sorted.gainers.length === 0 && (
-              <div className="text-[10px] text-slate-400 px-3 py-2">No data</div>
-            )}
-            {sorted.gainers.map((s) => {
-              const pct = parseDeltaPct(s.delta);
-              return (
-                <div
-                  key={s.ticker}
-                  className="flex items-center justify-between px-3 py-2 rounded-lg transition-all hover:scale-[1.02] cursor-default"
-                  style={{ backgroundColor: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)' }}
-                >
-                  <div>
-                    <span className="text-[11px] font-bold text-slate-800">{s.ticker}</span>
-                    <span className="text-[10px] text-slate-500 ml-2">{s.ltp}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[11px] font-bold text-emerald-600">+{pct.toFixed(2)}%</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <img src={graphSrc} alt="NSE chart" className="h-20 w-full rounded object-contain bg-white" />
         </div>
-        {/* Losers */}
-        <div>
-          <div className="text-[9px] uppercase tracking-wider text-red-500 font-bold mb-2 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-red-500" />
-            TOP LOSERS
+      )}
+
+      <div className="space-y-0.5">
+        {Object.entries(data).map(([key, value], idx) => {
+          const isPrice = key === 'lastPrice' || key === 'lastCorpAnnouncementPrice';
+          const isChange = key === 'pchange' || key === 'pChange';
+          const accentClass = isPrice ? 'text-slate-900 font-bold' : isChange ? (positive ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500';
+          return (
+            <div key={key} className="group flex items-center justify-between gap-3 px-2 py-1.5 rounded-md transition-all hover:bg-slate-50 hover:scale-[1.01]">
+              <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold truncate">{formatNseKey(key)}</div>
+              <div className={`text-[10px] font-mono text-right ${accentClass} transition-colors`}>{formatNseFieldValue(key, value)}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }) {
+  const triggerRef = useRef<HTMLSpanElement | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [anchor, setAnchor] = useState({ x: 0, y: 0 });
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewportWidth = typeof window === 'undefined' ? 1024 : window.innerWidth;
+
+  const pchange = typeof stock.pchange === 'number' ? stock.pchange : null;
+  const positive = pchange !== null && pchange >= 0;
+
+  const cancelClose = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    closeTimer.current = setTimeout(() => setVisible(false), 180);
+  };
+
+  const showTooltip = () => {
+    cancelClose();
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setAnchor({ x: rect.right, y: rect.top });
+    }
+    setVisible(true);
+  };
+
+  const tooltipWidth = 352;
+  const tooltipLeft = Math.max(8, Math.min(anchor.x + 4, viewportWidth - tooltipWidth - 8));
+
+  return (
+    <span
+      ref={triggerRef}
+      className={`text-[13px] font-bold cursor-default transition-colors ${positive !== null ? (positive ? 'text-emerald-700 hover:text-emerald-500' : 'text-red-700 hover:text-red-500') : 'text-slate-800'}`}
+      onMouseEnter={showTooltip}
+      onMouseLeave={scheduleClose}
+      onFocus={showTooltip}
+      onBlur={() => { cancelClose(); setVisible(false); }}
+      tabIndex={0}
+    >
+      {ticker}
+      {visible && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onMouseEnter={cancelClose}
+            onMouseLeave={scheduleClose}
+          />
+          <div
+            className="fixed z-50 w-[22rem] max-h-[20rem] rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl overflow-y-auto"
+            style={{
+              left: `${tooltipLeft}px`,
+              top: `${Math.max(8, anchor.y - 4)}px`,
+              boxShadow: positive !== null ? (positive ? '0 8px 32px rgba(16,185,129,0.15), 0 2px 8px rgba(0,0,0,0.06)' : '0 8px 32px rgba(239,68,68,0.15), 0 2px 8px rgba(0,0,0,0.06)') : '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
+            }}
+            onMouseEnter={() => { cancelClose(); setVisible(true); }}
+            onMouseLeave={scheduleClose}
+          >
+            <div className="flex items-center gap-2 mb-2 flex-shrink-0">
+              <span className={`w-1.5 h-1.5 rounded-full ${positive !== null ? (positive ? 'bg-emerald-500' : 'bg-red-500') : 'bg-slate-400'} animate-pulse`} />
+              <span className={`text-[9px] uppercase tracking-widest font-bold ${positive !== null ? (positive ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500'}`}>
+                {ticker} · NSE
+              </span>
+              {pchange !== null && (
+                <span className={`ml-auto text-[10px] font-black tabular-nums ${positive ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {positive ? '↑' : '↓'} {pchange > 0 ? '+' : ''}{pchange.toFixed(2)}%
+                </span>
+              )}
+            </div>
+            <NseTooltipContent data={stock} />
           </div>
-          <div className="space-y-1.5">
-            {sorted.losers.length === 0 && (
-              <div className="text-[10px] text-slate-400 px-3 py-2">No data</div>
-            )}
-            {sorted.losers.map((s) => {
-              const pct = parseDeltaPct(s.delta);
-              return (
-                <div
-                  key={s.ticker}
-                  className="flex items-center justify-between px-3 py-2 rounded-lg transition-all hover:scale-[1.02] cursor-default"
-                  style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
-                >
-                  <div>
-                    <span className="text-[11px] font-bold text-slate-800">{s.ticker}</span>
-                    <span className="text-[10px] text-slate-500 ml-2">{s.ltp}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[11px] font-bold text-red-500">{pct.toFixed(2)}%</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        </>
+      )}
+    </span>
+  );
+}
+
+function GainersLosersHeatmap() {
+  const [categories, setCategories] = useState<Record<NseTopFiveCategoryKey, NseStock[]>>({
+    topGainers: [],
+    topLoosers: [],
+    mostActiveValue: [],
+    mostActiveVolume: [],
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCategories = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const responses = await Promise.all(
+          NSE_TOP_FIVE_CATEGORIES.map(async (category) => ({
+            category,
+            stocks: getNseStocks(await fetchNseTopFiveStock(category.flag), category.key),
+          }))
+        );
+        if (cancelled) return;
+
+        const nextCategories = NSE_TOP_FIVE_CATEGORIES.reduce<Record<NseTopFiveCategoryKey, NseStock[]>>(
+          (acc, category) => {
+            const response = responses.find((item) => item.category.key === category.key);
+            acc[category.key] = response?.stocks ?? [];
+            return acc;
+          },
+          { topGainers: [], topLoosers: [], mostActiveValue: [], mostActiveVolume: [] }
+        );
+
+        setCategories(nextCategories);
+        setLoading(false);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'NSE API unavailable');
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadCategories();
+    const id = window.setInterval(loadCategories, 900_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  const totalStocks = useMemo(
+    () => NSE_TOP_FIVE_CATEGORIES.reduce((sum, category) => sum + (categories[category.key]?.length ?? 0), 0),
+    [categories]
+  );
+
+  return (
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-5 shadow-sm min-h-[320px] overflow-visible">
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">NIFTY TOP 5 GAINERS & LOSERS</span>
+        <span className="text-[9px] text-slate-400 bg-slate-100 px-2 py-1 rounded">
+          {loading ? 'LOADING' : error ? 'ERROR' : `${totalStocks} stocks`}
+        </span>
+      </div>
+      {error && totalStocks === 0 && (
+        <div className="text-[11px] text-red-500 px-3 py-2 mb-3">{error}</div>
+      )}
+      <div className="grid grid-cols-2 gap-4">
+        {NSE_TOP_FIVE_CATEGORIES.map((category) => {
+          const stocks = categories[category.key] ?? [];
+          const accentClass = getCategoryAccentClass(category.key);
+          const dotClass = getCategoryDotClass(category.key);
+          const rowStyle = getCategoryRowStyle(category.key);
+
+          return (
+            <div key={category.key}>
+              <div className={`text-[11px] uppercase tracking-wider ${accentClass} font-bold mb-3 flex items-center gap-2`}>
+                <span className={`w-2.5 h-2.5 rounded-full ${dotClass}`} />
+                {category.label}
+              </div>
+              <div className="space-y-2">
+                {stocks.length === 0 && (
+                  <div className="text-[11px] text-slate-400 px-3 py-2">No data</div>
+                )}
+                {stocks.map((stock, index) => {
+                  const ticker = stock.symbol ?? 'UNKNOWN';
+                  const changeText = typeof stock.pchange === 'number' ? `${stock.pchange > 0 ? '+' : ''}${stock.pchange.toFixed(2)}%` : 'N/A';
+                  const changeClass = typeof stock.pchange === 'number' ? (stock.pchange >= 0 ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500';
+
+                  return (
+                    <div
+                      key={`${category.key}-${ticker}-${index}`}
+                      className="group flex items-center justify-between px-4 py-2.5 rounded-lg transition-all hover:scale-[1.02] cursor-default overflow-visible"
+                      style={rowStyle}
+                    >
+                      <NseTickerTooltip stock={stock} ticker={ticker} />
+                      <div className="flex items-center gap-3">
+                        <span className="text-[12px] text-slate-500">{formatNseNumber(stock.lastPrice)}</span>
+                        <span className={`text-[12px] font-bold ${changeClass}`}>{changeText}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/*  NIFTY 100 HEAT MAP (live from stockQuotes)                                */
+/*  NIFTY 100 HEAT MAP (live from NSE equity stock indices)                   */
 /* -------------------------------------------------------------------------- */
+function getReadableTextColor(r: number, g: number, b: number): string {
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luminance > 0.52 ? 'rgb(15, 23, 42)' : 'rgb(255, 255, 255)';
+}
+
 function getHeatColor(pct: number): { bg: string; text: string; border: string } {
   const abs = Math.min(Math.abs(pct) / 4, 1);
   if (pct > 0) {
@@ -147,7 +458,7 @@ function getHeatColor(pct: number): { bg: string; text: string; border: string }
     const b = Math.round(220 - abs * 140);
     return {
       bg: `rgba(${r}, ${g}, ${b}, 0.85)`,
-      text: `rgb(${Math.round(10 + abs * 25)}, ${Math.round(80 + abs * 20)}, ${Math.round(10 + abs * 25)})`,
+      text: getReadableTextColor(r, g, b),
       border: `rgba(16, 185, 129, ${0.2 + abs * 0.4})`,
     };
   } else {
@@ -157,64 +468,153 @@ function getHeatColor(pct: number): { bg: string; text: string; border: string }
     const b = Math.round(220 - absVal * 170);
     return {
       bg: `rgba(${r}, ${g}, ${b}, 0.85)`,
-      text: `rgb(${Math.round(80 + absVal * 30)}, ${Math.round(10 + absVal * 25)}, ${Math.round(10 + absVal * 25)})`,
+      text: getReadableTextColor(r, g, b),
       border: `rgba(239, 68, 68, ${0.2 + absVal * 0.4})`,
     };
   }
 }
 
-function Nifty100HeatMap({ stockQuotes }: { stockQuotes?: Record<string, LiveStock> }) {
-  const stocks = useMemo(() => {
-    if (!stockQuotes) return [];
-    return Object.values(stockQuotes)
-      .filter(s => s.delta)
-      .map(s => ({ ticker: s.ticker, changePct: parseDeltaPct(s.delta) }));
-  }, [stockQuotes]);
+function NseHeatMapTooltip({ stock, ticker, colors }: { stock: NseEquityStock; ticker: string; colors: { bg: string; text: string; border: string } }) {
+  const triggerRef = useRef<HTMLDivElement | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [anchor, setAnchor] = useState({ x: 0, y: 0 });
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewportWidth = typeof window === 'undefined' ? 1024 : window.innerWidth;
+  const viewportHeight = typeof window === 'undefined' ? 768 : window.innerHeight;
+  const tooltipWidth = 384;
+  const tooltipLeft = Math.max(12, Math.min(anchor.x + 12, viewportWidth - tooltipWidth - 12));
+  const tooltipTop = Math.max(12, Math.min(anchor.y, viewportHeight - 320));
 
-  const gainers = useMemo(() => stocks.filter(s => s.changePct >= 0).length, [stocks]);
-  const losers = useMemo(() => stocks.filter(s => s.changePct < 0).length, [stocks]);
+  const cancelClose = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
 
-  if (stocks.length === 0) {
+  const scheduleClose = () => {
+    closeTimer.current = setTimeout(() => setVisible(false), 180);
+  };
+
+  const showTooltip = () => {
+    cancelClose();
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setAnchor({ x: rect.left, y: rect.top });
+    }
+    setVisible(true);
+  };
+
+  return (
+    <>
+      <div
+        ref={triggerRef}
+        className="flex flex-col items-center justify-center rounded-md py-3 px-2 transition-all hover:shadow-md cursor-default"
+        style={{
+          backgroundColor: colors.bg,
+          border: `1px solid ${colors.border}`,
+        }}
+        onMouseEnter={showTooltip}
+        onMouseLeave={scheduleClose}
+        onFocus={showTooltip}
+        onBlur={() => { cancelClose(); setVisible(false); }}
+        tabIndex={0}
+      >
+        <span className="text-[10px] font-bold leading-tight" style={{ color: colors.text }}>
+          {ticker}
+        </span>
+        <span className="text-[9px] font-semibold mt-1" style={{ color: colors.text }}>
+          {typeof stock.pChange === 'number' ? `${stock.pChange > 0 ? '+' : ''}${stock.pChange.toFixed(2)}%` : 'N/A'}
+        </span>
+      </div>
+      <div
+        aria-hidden={!visible}
+        className={`fixed z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-slate-300 bg-white p-4 text-left shadow-lg transition-all pointer-events-auto overflow-y-auto max-h-[calc(100vh-2rem)] ${visible ? 'visible opacity-100' : 'invisible opacity-0'}`}
+        style={{ left: `${tooltipLeft}px`, top: `${tooltipTop}px` }}
+        onMouseEnter={() => { cancelClose(); setVisible(true); }}
+        onMouseLeave={scheduleClose}
+      >
+        <div className="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-3">API DATA</div>
+        <div className="overflow-visible max-h-none">
+          <NseTooltipContent data={stock} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Nifty100HeatMap() {
+  const [stocks, setStocks] = useState<NseEquityStock[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadStocks = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetchNseEquityStockIndices();
+        if (cancelled) return;
+        setStocks(getNseHeatMapStocks(response));
+        setLoading(false);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'NSE API unavailable');
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadStocks();
+    const id = window.setInterval(loadStocks, 900_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  const heatMapStocks = useMemo(
+    () => stocks.map((stock) => ({ stock, ticker: stock.symbol ?? 'UNKNOWN', changePct: typeof stock.pChange === 'number' ? stock.pChange : 0 })),
+    [stocks]
+  );
+
+  const gainers = useMemo(() => heatMapStocks.filter(s => s.changePct >= 0).length, [heatMapStocks]);
+  const losers = useMemo(() => heatMapStocks.filter(s => s.changePct < 0).length, [heatMapStocks]);
+
+  if (loading || (error && heatMapStocks.length === 0)) {
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
-        <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-3">NIFTY 100 HEAT MAP</div>
-        <div className="text-[10px] text-slate-400">Waiting for live data...</div>
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-5 shadow-sm min-h-[520px]">
+        <div className="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-3">NIFTY 100 HEAT MAP</div>
+        <div className="text-[11px] text-slate-400">{error ?? 'Waiting for live data...'}</div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-5 shadow-sm min-h-[520px]">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">NIFTY 100 HEAT MAP</span>
-          <span className="text-[9px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{stocks.length} stocks</span>
+          <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">NIFTY 100 HEAT MAP</span>
+          <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-1 rounded">{heatMapStocks.length} stocks</span>
         </div>
-        <div className="flex items-center gap-3 text-[8px] uppercase tracking-wider text-slate-400">
+        <div className="flex items-center gap-3 text-[9px] uppercase tracking-wider text-slate-400">
           <span className="flex items-center gap-1"><span className="w-3 h-2 rounded bg-emerald-800" /> Gainers <span className="text-emerald-700 font-bold">{gainers}</span></span>
           <span className="flex items-center gap-1"><span className="w-3 h-2 rounded bg-red-800" /> Losers <span className="text-red-700 font-bold">{losers}</span></span>
         </div>
       </div>
-      <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1.5">
-        {stocks.map((stock) => {
+      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
+        {heatMapStocks.map((stock) => {
           const colors = getHeatColor(stock.changePct);
           return (
-            <div
+            <NseHeatMapTooltip
               key={stock.ticker}
-              className="flex flex-col items-center justify-center rounded-md py-2 px-1 transition-all hover:scale-110 hover:shadow-md cursor-default"
-              style={{
-                backgroundColor: colors.bg,
-                border: `1px solid ${colors.border}`,
-              }}
-              title={`${stock.ticker}: ${stock.changePct > 0 ? '+' : ''}${stock.changePct.toFixed(2)}%`}
-            >
-              <span className="text-[8px] font-bold leading-tight" style={{ color: colors.text }}>
-                {stock.ticker}
-              </span>
-              <span className="text-[7px] font-semibold mt-0.5" style={{ color: colors.text }}>
-                {stock.changePct > 0 ? '+' : ''}{stock.changePct.toFixed(2)}%
-              </span>
-            </div>
+              stock={stock.stock}
+              ticker={stock.ticker}
+              colors={colors}
+            />
           );
         })}
       </div>
@@ -443,9 +843,9 @@ function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: 
   const VISIBLE_ITEMS = 5;
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden flex flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-2.5 p-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white flex-shrink-0">
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-[280px]">
+      {/* Header - no padding left/right to match full width */}
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white flex-shrink-0">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
         <span className="text-[9px] uppercase tracking-widest text-slate-600 font-bold">Live News Feed</span>
         <span className="ml-auto text-[8px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
@@ -453,12 +853,11 @@ function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: 
         </span>
       </div>
 
-      {/* Ticker track with continuous scroll */}
+      {/* Ticker track with continuous scroll - no padding */}
       <div className="relative flex-1 overflow-hidden" style={{ minHeight: TRACK_HEIGHT * 2 }}>
         <div
-          className="hover:[animation-play-state:paused]"
+          className="hover:[animation-play-state:paused] absolute inset-0"
           style={{
-            maxHeight: TRACK_HEIGHT * VISIBLE_ITEMS,
             animation: "tickerScroll 30s linear infinite",
           }}
         >
@@ -468,11 +867,11 @@ function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: 
               href={item.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-start gap-2.5 border-b border-slate-100 px-3 py-1.5 group hover:bg-emerald-50/50 transition-all duration-200 cursor-pointer"
+              className="flex items-start gap-2.5 border-b border-slate-100 px-4 py-2 group hover:bg-emerald-50/50 transition-all duration-200 cursor-pointer"
               style={{ minHeight: TRACK_HEIGHT }}
             >
               {/* Sequence badge */}
-              <span className="text-[8px] font-bold text-slate-400 bg-slate-100 px-1 py-0.5 rounded border border-slate-200 flex-shrink-0 mt-0.5">
+              <span className="text-[8px] font-bold text-slate-400 bg-slate-100 w-5 h-5 flex items-center justify-center rounded border border-slate-200 flex-shrink-0 mt-0.5">
                 {String(i + 1).padStart(2, "0")}
               </span>
 
@@ -828,7 +1227,7 @@ export default function IrosMasterAdvancedTerminal() {
         {activeTab === 'marketSnapshot' && (
           <div className="space-y-4">
             {/* Row 1: Global Indices + Commodities side-by-side */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
               <div className="lg:col-span-2">
                 <GlobalIndicesGrid items={globalIndices} staleLabel={staleMacroLabel} />
               </div>
@@ -837,15 +1236,19 @@ export default function IrosMasterAdvancedTerminal() {
               </div>
             </div>
 
-            {/* Row 2: NIFTY TOP 5 GAINERS & LOSERS + NIFTY 100 HEAT MAP side-by-side */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <GainersLosersHeatmap stockQuotes={liveMarket?.stockQuotes} />
-              <Nifty100HeatMap stockQuotes={liveMarket?.stockQuotes} />
+            {/* Row 2: Left column — Gainers/Losers + News Feed | Right column — NIFTY 100 Heat Map */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+              <div className="flex flex-col gap-5">
+                <GainersLosersHeatmap />
+                <NewsFeedPanel items={liveMarket?.news} now={now} />
+              </div>
+              <div>
+                <Nifty100HeatMap />
+              </div>
             </div>
 
-            {/* Row 3: News Feed + India Markets side-by-side */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <NewsFeedPanel items={liveMarket?.news} now={now} />
+            {/* Row 3: India Markets */}
+            <div className="grid grid-cols-1 gap-4 items-start">
               <IndiaMarketsGrid items={currentMacros} staleLabel={staleMacroLabel} />
             </div>
           </div>

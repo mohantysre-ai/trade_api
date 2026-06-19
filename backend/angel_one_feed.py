@@ -30,7 +30,12 @@ from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from SmartApi import SmartConnect
 
-from global_feed import fetch_domestic_index_macro, fetch_domestic_yahoo_macro, fetch_global_macro
+from global_feed import (
+    fetch_domestic_index_macro,
+    fetch_domestic_yahoo_macro,
+    fetch_global_macro,
+    fetch_gift_nifty,
+)
 from symbols import MACRO_INSTRUMENTS, MOCK_TICKERS, WATCHLIST, Instrument
 from terminal_intelligence_full import (
     CompleteSecurityAnalysisPayload,
@@ -1005,6 +1010,13 @@ def _build_macro_strips(macro_raw: dict[str, Any]) -> tuple[list[dict[str, str]]
     for row in fetch_domestic_yahoo_macro():
         morning.append({k: row[k] for k in ("label", "val", "delta", "state")})
         evening.append({"label": f"{row['label']} Close", "val": row["val"], "delta": row["delta"], "state": row["state"]})
+
+    # GIFT NIFTY from NSE India API
+    gift_nifty = fetch_gift_nifty()
+    if gift_nifty and gift_nifty["label"].upper() not in seen_labels:
+        morning.append({k: gift_nifty[k] for k in ("label", "val", "delta", "state")})
+        evening.append({"label": f"{gift_nifty['label']} Close", "val": gift_nifty["val"], "delta": gift_nifty["delta"], "state": gift_nifty["state"]})
+        seen_labels.add(gift_nifty["label"].upper())
 
     return morning, evening
 
