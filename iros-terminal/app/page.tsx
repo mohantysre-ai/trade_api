@@ -840,10 +840,10 @@ function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: 
   };
 
   const TRACK_HEIGHT = 38;
-  const VISIBLE_ITEMS = 5;
+  const VISIBLE_ITEMS = 15;
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-[280px]">
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-[580px]">
       {/* Header - no padding left/right to match full width */}
       <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white flex-shrink-0">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
