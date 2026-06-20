@@ -1,0 +1,26 @@
+# Environment
+.env.local
+.env.*.local
+config/credentials/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+venv/
+.venv/
+
+# Node / Frontend
+node_modules/
+.next/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+.archive/
