@@ -7,6 +7,7 @@ import {
   type MacroRow,
   type LedgerStock,
   type TerminalIntelligence,
+  type AITickerNewsReport,
 } from '@/lib/market-api';
 import ForensicPanel from './components/ForensicPanel';
 import RightDrawer from './components/RightDrawer';
@@ -17,6 +18,7 @@ type DrawerContent = {
     isSnapshotFallback?: boolean;
     error?: string;
   }) | null;
+  tickerNews?: AITickerNewsReport | null;
 };
 
 type TabKey = 'marketSnapshot' | 'assetMatrix';
@@ -1240,6 +1242,7 @@ export default function IrosMasterAdvancedTerminal() {
     setDrawerOpen(true);
 
     const tickerIntelligence = liveMarket?.tickerIntelligenceByTicker?.[t];
+    const tickerNewsFromSnapshot = liveMarket?.tickerNewsByTicker?.[t] as AITickerNewsReport | undefined;
     if (tickerIntelligence) {
       setTickerIntelligence(tickerIntelligence);
       setDrawerContent({
@@ -1248,6 +1251,7 @@ export default function IrosMasterAdvancedTerminal() {
           ...tickerIntelligence,
           isSnapshotFallback: liveMarket?.isSnapshotFallback ?? false,
         },
+        tickerNews: tickerNewsFromSnapshot ?? null,
       });
       return;
     }
@@ -1264,6 +1268,7 @@ export default function IrosMasterAdvancedTerminal() {
         setDrawerContent({
           stock: stocks.find((s) => s.ticker === t) ?? null,
           analysis: { ...ti, isSnapshotFallback: body.isSnapshotFallback },
+          tickerNews: tickerNewsFromSnapshot ?? null,
         });
       } else {
         const text = await resp.text();
@@ -1271,6 +1276,10 @@ export default function IrosMasterAdvancedTerminal() {
       }
     } catch (err) {
       setDrawerContent({ stock: stocks.find((s) => s.ticker === t) ?? null, analysis: { error: String(err) } });
+    }
+
+    if (!tickerNewsFromSnapshot) {
+      fetch(`/api/ticker-news?ticker=${encodeURIComponent(t)}`, { cache: "no-store" }).catch(() => {});
     }
   };
 

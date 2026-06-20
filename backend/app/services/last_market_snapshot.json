@@ -7,7 +7,7 @@
     "Finshots",
     "NSE NIFTY 100"
   ],
-  "updatedAt": "2026-06-20T11:04:49.837014+00:00",
+  "updatedAt": "2026-06-20T12:56:53.289261+00:00",
   "mockTickers": [
     "AWFI"
   ],
@@ -440,6 +440,46 @@
       "score": 15.02
     },
     {
+      "ticker": "HDFCBANK",
+      "name": "HDFCBANK",
+      "capSize": "Nifty 100",
+      "ltp": "\u20b9779.80",
+      "ltpRaw": 779.8,
+      "delta": "-2.40%",
+      "state": "NEGATIVE",
+      "volume": 33798761,
+      "open": 788.7,
+      "high": 789.05,
+      "low": 776.2,
+      "close": 799.0,
+      "intraday": {
+        "atr_pct": 2.13,
+        "volume_multiplier": 0.11,
+        "today_volume": 4291653.0,
+        "avg_daily_volume_20": 39657124.0,
+        "vwap": 780.7,
+        "ema9": 761.87,
+        "ema_angle_deg": -38.04,
+        "orb_high": 850.5,
+        "orb_low": 800.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 0.344,
+        "turnover_cr": 334.66,
+        "price_above_vwap": false,
+        "price_above_ema9": true,
+        "trigger_point": "Flag Breakout",
+        "passes_hard_filters": false,
+        "hard_filter_reasons": [
+          "ATR under 3.0%",
+          "opening volume under 3.0x",
+          "wick noise too high",
+          "below VWAP",
+          "EMA angle below 45 degrees"
+        ]
+      },
+      "score": 14.16
+    },
+    {
       "ticker": "KPITTECH",
       "name": "KPITTECH",
       "capSize": "Nifty 100",
@@ -596,6 +636,45 @@
       "score": 12.93
     },
     {
+      "ticker": "BHARTIARTL",
+      "name": "BHARTIARTL",
+      "capSize": "Nifty 100",
+      "ltp": "\u20b91,910.80",
+      "ltpRaw": 1910.8,
+      "delta": "+1.92%",
+      "state": "POSITIVE",
+      "volume": 15918432,
+      "open": 1874.3,
+      "high": 1917.5,
+      "low": 1867.2,
+      "close": 1874.8,
+      "intraday": {
+        "atr_pct": 1.93,
+        "volume_multiplier": 0.03,
+        "today_volume": 238738.0,
+        "avg_daily_volume_20": 9337813.0,
+        "vwap": 1901.15,
+        "ema9": 1862.32,
+        "ema_angle_deg": 19.35,
+        "orb_high": 1939.0,
+        "orb_low": 1910.8,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 0.163,
+        "turnover_cr": 45.62,
+        "price_above_vwap": true,
+        "price_above_ema9": true,
+        "trigger_point": "VWAP Bounce",
+        "passes_hard_filters": false,
+        "hard_filter_reasons": [
+          "ATR under 3.0%",
+          "opening volume under 3.0x",
+          "EMA angle below 45 degrees",
+          "turnover under 50 Cr"
+        ]
+      },
+      "score": 12.83
+    },
+    {
       "ticker": "WIPRO",
       "name": "WIPRO",
       "capSize": "Nifty 100",
@@ -675,42 +754,6 @@
       "score": 11.99
     },
     {
-      "ticker": "HDFCBANK",
-      "name": "HDFCBANK",
-      "capSize": "Nifty 100",
-      "ltp": "\u20b9779.80",
-      "ltpRaw": 779.8,
-      "delta": "-2.40%",
-      "state": "NEGATIVE",
-      "volume": 33798761,
-      "open": 788.7,
-      "high": 789.05,
-      "low": 776.2,
-      "close": 799.0,
-      "intraday": {
-        "atr_pct": 0.0,
-        "volume_multiplier": 0.0,
-        "today_volume": 0.0,
-        "avg_daily_volume_20": 0.0,
-        "vwap": 0.0,
-        "ema9": 0.0,
-        "ema_angle_deg": 0.0,
-        "orb_high": 0.0,
-        "orb_low": 0.0,
-        "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 1.0,
-        "turnover_cr": 0.0,
-        "price_above_vwap": false,
-        "price_above_ema9": false,
-        "trigger_point": "VWAP Bounce",
-        "passes_hard_filters": false,
-        "hard_filter_reasons": [
-          "insufficient candle data"
-        ]
-      },
-      "score": 11.81
-    },
-    {
       "ticker": "POWERGRID",
       "name": "POWERGRID",
       "capSize": "Nifty 100",
@@ -749,42 +792,6 @@
         ]
       },
       "score": 11.5
-    },
-    {
-      "ticker": "BHARTIARTL",
-      "name": "BHARTIARTL",
-      "capSize": "Nifty 100",
-      "ltp": "\u20b91,910.80",
-      "ltpRaw": 1910.8,
-      "delta": "+1.92%",
-      "state": "POSITIVE",
-      "volume": 15918432,
-      "open": 1874.3,
-      "high": 1917.5,
-      "low": 1867.2,
-      "close": 1874.8,
-      "intraday": {
-        "atr_pct": 0.0,
-        "volume_multiplier": 0.0,
-        "today_volume": 0.0,
-        "avg_daily_volume_20": 0.0,
-        "vwap": 0.0,
-        "ema9": 0.0,
-        "ema_angle_deg": 0.0,
-        "orb_high": 0.0,
-        "orb_low": 0.0,
-        "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 1.0,
-        "turnover_cr": 0.0,
-        "price_above_vwap": false,
-        "price_above_ema9": false,
-        "trigger_point": "VWAP Bounce",
-        "passes_hard_filters": false,
-        "hard_filter_reasons": [
-          "insufficient candle data"
-        ]
-      },
-      "score": 10.84
     }
   ],
   "stockQuotes": {
@@ -914,24 +921,28 @@
       "low": 776.2,
       "close": 799.0,
       "intraday": {
-        "atr_pct": 0.0,
-        "volume_multiplier": 0.0,
-        "today_volume": 0.0,
-        "avg_daily_volume_20": 0.0,
-        "vwap": 0.0,
-        "ema9": 0.0,
-        "ema_angle_deg": 0.0,
-        "orb_high": 0.0,
-        "orb_low": 0.0,
+        "atr_pct": 2.13,
+        "volume_multiplier": 0.11,
+        "today_volume": 4291653.0,
+        "avg_daily_volume_20": 39657124.0,
+        "vwap": 780.7,
+        "ema9": 761.87,
+        "ema_angle_deg": -38.04,
+        "orb_high": 850.5,
+        "orb_low": 800.0,
         "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 1.0,
-        "turnover_cr": 0.0,
+        "wick_noise_ratio": 0.344,
+        "turnover_cr": 334.66,
         "price_above_vwap": false,
-        "price_above_ema9": false,
-        "trigger_point": "VWAP Bounce",
+        "price_above_ema9": true,
+        "trigger_point": "Flag Breakout",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "insufficient candle data"
+          "ATR under 3.0%",
+          "opening volume under 3.0x",
+          "wick noise too high",
+          "below VWAP",
+          "EMA angle below 45 degrees"
         ]
       }
     },
@@ -1234,24 +1245,27 @@
       "low": 1867.2,
       "close": 1874.8,
       "intraday": {
-        "atr_pct": 0.0,
-        "volume_multiplier": 0.0,
-        "today_volume": 0.0,
-        "avg_daily_volume_20": 0.0,
-        "vwap": 0.0,
-        "ema9": 0.0,
-        "ema_angle_deg": 0.0,
-        "orb_high": 0.0,
-        "orb_low": 0.0,
+        "atr_pct": 1.93,
+        "volume_multiplier": 0.03,
+        "today_volume": 238738.0,
+        "avg_daily_volume_20": 9337813.0,
+        "vwap": 1901.15,
+        "ema9": 1862.32,
+        "ema_angle_deg": 19.35,
+        "orb_high": 1939.0,
+        "orb_low": 1910.8,
         "orb_velocity_pct": 0.0,
-        "wick_noise_ratio": 1.0,
-        "turnover_cr": 0.0,
-        "price_above_vwap": false,
-        "price_above_ema9": false,
+        "wick_noise_ratio": 0.163,
+        "turnover_cr": 45.62,
+        "price_above_vwap": true,
+        "price_above_ema9": true,
         "trigger_point": "VWAP Bounce",
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "insufficient candle data"
+          "ATR under 3.0%",
+          "opening volume under 3.0x",
+          "EMA angle below 45 degrees",
+          "turnover under 50 Cr"
         ]
       }
     },
@@ -3297,8 +3311,8 @@
       },
       {
         "label": "BITCOIN",
-        "val": "$63,595.26",
-        "delta": "+0.17%",
+        "val": "$63,572.84",
+        "delta": "+0.14%",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live"
@@ -3319,49 +3333,49 @@
       "title": "NSE - National Stock Exchange of India Ltd: Live Share/Stock Market News &amp; Updates, Quotes- Nseindia.com Option Chain Market Turnover Listings IPO Circulars Daily Report Holidays Corporates Press ",
       "link": "https://www.nseindia.com/index-tracker/NIFTY%20100",
       "summary": "NSE - National Stock Exchange of India Ltd: Live Share/Stock Market News &amp; Updates, Quotes- Nseindia.com Option Chain Market Turnover Listings IPO Circulars Daily Report Holidays Corporates Press Releases Contact Us English Accessibility List Events List - - ( - %) Streaming Streaming on off Str",
-      "publishedAt": "2026-06-20T16:34:48.105850+05:30"
+      "publishedAt": "2026-06-20T18:26:51.298267+05:30"
     },
     {
       "source": "Finshots",
       "title": "Finshots | Financial News made simple Finshots Daily Finshots Markets Finshots Money Infographics Ditto Insurance Loved by 5,00,000+ subscribers Financial News Made Simple Join Finshots and get your d",
       "link": "https://finshots.in/",
       "summary": "Finshots | Financial News made simple Finshots Daily Finshots Markets Finshots Money Infographics Ditto Insurance Loved by 5,00,000+ subscribers Financial News Made Simple Join Finshots and get your daily dose of the latest, most important Financial developments",
-      "publishedAt": "2026-06-20T16:34:47.573179+05:30"
+      "publishedAt": "2026-06-20T18:26:50.739099+05:30"
     },
     {
       "source": "Finshots",
       "title": "delivered in plain English. In less than 3 minutes. SUBSCRIBE Finshots Daily View All Jun 20, 2026 FPE #6: Economics is about more than just money FPE's sixth and final edition, where we talk about th",
       "link": "https://finshots.in/",
       "summary": "delivered in plain English. In less than 3 minutes. SUBSCRIBE Finshots Daily View All Jun 20, 2026 FPE #6: Economics is about more than just money FPE's sixth and final edition, where we talk about the opportunity costs we pay in everyday life. Jun 18, 2026 The missing case of 40 lakh tonnes of coal",
-      "publishedAt": "2026-06-20T16:34:47.573179+05:30"
+      "publishedAt": "2026-06-20T18:26:50.739099+05:30"
     },
     {
       "source": "Finshots",
       "title": "part of our ever growing",
       "link": "https://finshots.in/",
       "summary": "part of our ever growing",
-      "publishedAt": "2026-06-20T16:34:47.573179+05:30"
+      "publishedAt": "2026-06-20T18:26:50.739099+05:30"
     },
     {
       "source": "Trendlyne",
       "title": "The Stock Market Platform to Stay Ahead: Stock Screeners, Stock Analysis, and more. Markets MarketMind AI Baskets Alerts F&O MF Reports Screeners Subscribe Superstars Portfolio Watchlist Insider Trade",
       "link": "https://trendlyne.com/",
       "summary": "The Stock Market Platform to Stay Ahead: Stock Screeners, Stock Analysis, and more. Markets MarketMind AI Baskets Alerts F&O MF Reports Screeners Subscribe Superstars Portfolio Watchlist Insider Trades Results Data Downloader Events Calendar What's New Explore FAQs All Features Widgets More Search s",
-      "publishedAt": "2026-06-20T16:34:46.655164+05:30"
+      "publishedAt": "2026-06-20T18:26:50.029515+05:30"
     },
     {
       "source": "Zerodha Pulse",
       "title": "Pulse by Zerodha - Latest financial and market news from all major Indian news sources aggregated in one place - Pulse The latest business, finance, and market news from the last 24 hours from all maj",
       "link": "https://pulse.zerodha.com/",
       "summary": "Pulse by Zerodha - Latest financial and market news from all major Indian news sources aggregated in one place - Pulse The latest business, finance, and market news from the last 24 hours from all major Indian news sources",
-      "publishedAt": "2026-06-20T16:34:46.374980+05:30"
+      "publishedAt": "2026-06-20T18:26:49.697067+05:30"
     },
     {
       "source": "Zerodha Pulse",
-      "title": "aggregated in one place. Trending india ipo jio ambani check amid fifa world cup key sebi rbi Amber Maps Out Smartphone Timeline: Debut Eyed With Eight Million Units For Oppo Portfolio The collaborati",
+      "title": "aggregated in one place. Trending jio ipo nse india bank june check amid fifa world cup highlights key oil sebi rbi Jio Platforms plans $3 billion debt reduction from IPO proceeds Jio Platforms is gea",
       "link": "https://pulse.zerodha.com/",
-      "summary": "aggregated in one place. Trending india ipo jio ambani check amid fifa world cup key sebi rbi Amber Maps Out Smartphone Timeline: Debut Eyed With Eight Million Units For Oppo Portfolio The collaboration will not require PN3 approval, according to Amber Enterprises. 54 minutes ago \u2014 NDTV Business Ins",
-      "publishedAt": "2026-06-20T16:34:46.374980+05:30"
+      "summary": "aggregated in one place. Trending jio ipo nse india bank june check amid fifa world cup highlights key oil sebi rbi Jio Platforms plans $3 billion debt reduction from IPO proceeds Jio Platforms is gearing up for its IPO, planning to allocate a significant portion of the funds to repay nearly $3 bill",
+      "publishedAt": "2026-06-20T18:26:49.697067+05:30"
     }
   ],
   "llmProvider": "gemini",
@@ -3961,6 +3975,56 @@
       "ticker": "BHEL",
       "dataQuality": "live-derived"
     },
+    "HDFCBANK": {
+      "news_catalysts_card": "Market context for HDFCBANK: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For HDFCBANK, participation is read through volume multiplier 0.11x and turnover 334.66 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. HDFCBANK is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "HDFCBANK forensic screen: Beneish M Score: -0.53, Altman Z Score: 2.54, Ocf Ebitda Ratio: 0.58, Mansfield Relative Strength: 0.68.",
+      "why_interested": "HDFCBANK is in the active terminal universe with LTP \u20b9779.80, -2.40% move, and volume 33798761. Intraday setup: Flag Breakout, VWAP 780.7, EMA9 761.87, ATR 2.13%, volume multiplier 0.11x.",
+      "future_revenue_model": "Forward model for HDFCBANK is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for HDFCBANK: LTP \u20b9779.80, delta -2.40%, volume 33798761, score 0.0, action cohort selection.",
+      "ledger_stocks": [],
+      "active_scoring_matrix": {
+        "beneish_m_score": "-0.53",
+        "altman_z_score": "2.54",
+        "ocf_ebitda_ratio": "0.58",
+        "mansfield_relative_strength": "0.68"
+      },
+      "active_seven_ic_gates": {
+        "q1_fund_buying": "HDFCBANK volume multiplier is 0.11x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "HDFCBANK turnover is 334.66 Cr; liquidity quality is institutional level.",
+        "q3_catalyst_validation": "HDFCBANK price action is -2.40%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
+        "q5_risk_reward": "HDFCBANK risk/reward is driven by score 0.0, ATR 2.13%, and execution level Flag Breakout.",
+        "q6_quantitative_milestone": "HDFCBANK quantitative milestone: hard-filter watch with score 0.0.",
+        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
+      },
+      "active_risk_calc": {
+        "ticker_score": 0.0,
+        "delta_pct": -2.4,
+        "atr_pct": 2.13,
+        "turnover_cr": 334.66,
+        "volume_multiplier": 0.11,
+        "selection_risk": "higher",
+        "signal_quality": "live-derived",
+        "win_loss_ratio": "1.0:1",
+        "kelly_policy_max": "0.0%",
+        "risk_flag_score": 76.0,
+        "risk_flag": "EXTREME_RISK"
+      },
+      "active_factor_hub": {
+        "selection_reason": "mixed trend around intraday anchors; delta -2.40% with score 0.0; volume 0.11x and turnover 334.66 Cr; contained volatility; trigger Flag Breakout; watch-list hard-filter state.",
+        "dominant_factors": "liquidity and mean-reversion around intraday anchors",
+        "momentum_factor": "Near VWAP/EMA9; score 0.0.",
+        "liquidity_factor": "Volume multiplier 0.11x; turnover 334.66 Cr.",
+        "quality_factor": "ATR 2.13% and hard-filter status watch.",
+        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
+        "low_vol_factor": "Volatility premium regime"
+      },
+      "focusTicker": "HDFCBANK",
+      "ticker": "HDFCBANK",
+      "dataQuality": "live-derived"
+    },
     "KPITTECH": {
       "news_catalysts_card": "Market context for KPITTECH: Top market catalysts were not available from the current news feed.",
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For KPITTECH, participation is read through volume multiplier 0.24x and turnover 25.42 Cr.",
@@ -4161,6 +4225,56 @@
       "ticker": "ABCAPITAL",
       "dataQuality": "live-derived"
     },
+    "BHARTIARTL": {
+      "news_catalysts_card": "Market context for BHARTIARTL: Top market catalysts were not available from the current news feed.",
+      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For BHARTIARTL, participation is read through volume multiplier 0.03x and turnover 45.62 Cr.",
+      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. BHARTIARTL is evaluated against this backdrop using live price, volume, and intraday structure.",
+      "forensic_screen_card": "BHARTIARTL forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
+      "why_interested": "BHARTIARTL is in the active terminal universe with LTP \u20b91,910.80, +1.92% move, and volume 15918432. Intraday setup: VWAP Bounce, VWAP 1901.15, EMA9 1862.32, ATR 1.93%, volume multiplier 0.03x.",
+      "future_revenue_model": "Forward model for BHARTIARTL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
+      "current_model": "Current model for BHARTIARTL: LTP \u20b91,910.80, delta +1.92%, volume 15918432, score 0.0, action cohort selection.",
+      "ledger_stocks": [],
+      "active_scoring_matrix": {
+        "beneish_m_score": "-0.37",
+        "altman_z_score": "3.06",
+        "ocf_ebitda_ratio": "0.70",
+        "mansfield_relative_strength": "0.78"
+      },
+      "active_seven_ic_gates": {
+        "q1_fund_buying": "BHARTIARTL volume multiplier is 0.03x; institutional participation is inferred from turnover and price follow-through.",
+        "q2_liquidity_delivery": "BHARTIARTL turnover is 45.62 Cr; liquidity quality is watch-list level.",
+        "q3_catalyst_validation": "BHARTIARTL price action is +1.92%; catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
+        "q5_risk_reward": "BHARTIARTL risk/reward is driven by score 0.0, ATR 1.93%, and execution level VWAP Bounce.",
+        "q6_quantitative_milestone": "BHARTIARTL quantitative milestone: hard-filter watch with score 0.0.",
+        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
+      },
+      "active_risk_calc": {
+        "ticker_score": 0.0,
+        "delta_pct": 1.92,
+        "atr_pct": 1.93,
+        "turnover_cr": 45.62,
+        "volume_multiplier": 0.03,
+        "selection_risk": "higher",
+        "signal_quality": "live-derived",
+        "win_loss_ratio": "1.0:1",
+        "kelly_policy_max": "0.0%",
+        "risk_flag_score": 68.0,
+        "risk_flag": "HIGH_RISK"
+      },
+      "active_factor_hub": {
+        "selection_reason": "trend follow-through above VWAP and EMA9; delta 1.92% with score 0.0; volume 0.03x and turnover 45.62 Cr; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
+        "dominant_factors": "momentum, liquidity, and structural trend alignment",
+        "momentum_factor": "Above VWAP/EMA9; score 0.0.",
+        "liquidity_factor": "Volume multiplier 0.03x; turnover 45.62 Cr.",
+        "quality_factor": "ATR 1.93% and hard-filter status watch.",
+        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
+        "low_vol_factor": "Low-vol regime"
+      },
+      "focusTicker": "BHARTIARTL",
+      "ticker": "BHARTIARTL",
+      "dataQuality": "live-derived"
+    },
     "WIPRO": {
       "news_catalysts_card": "Market context for WIPRO: Top market catalysts were not available from the current news feed.",
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For WIPRO, participation is read through volume multiplier 0.2x and turnover 133.16 Cr.",
@@ -4261,56 +4375,6 @@
       "ticker": "RELIANCE",
       "dataQuality": "live-derived"
     },
-    "HDFCBANK": {
-      "news_catalysts_card": "Market context for HDFCBANK: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For HDFCBANK, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. HDFCBANK is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "HDFCBANK forensic screen: Beneish M Score: -0.53, Altman Z Score: 2.54, Ocf Ebitda Ratio: 0.58, Mansfield Relative Strength: 0.68.",
-      "why_interested": "HDFCBANK is in the active terminal universe with LTP \u20b9779.80, -2.40% move, and volume 33798761. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
-      "future_revenue_model": "Forward model for HDFCBANK is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for HDFCBANK: LTP \u20b9779.80, delta -2.40%, volume 33798761, score 0.0, action cohort selection.",
-      "ledger_stocks": [],
-      "active_scoring_matrix": {
-        "beneish_m_score": "-0.53",
-        "altman_z_score": "2.54",
-        "ocf_ebitda_ratio": "0.58",
-        "mansfield_relative_strength": "0.68"
-      },
-      "active_seven_ic_gates": {
-        "q1_fund_buying": "HDFCBANK volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "HDFCBANK turnover is 0.0 Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "HDFCBANK price action is -2.40%; catalyst validation depends on follow-through above VWAP/EMA9.",
-        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "HDFCBANK risk/reward is driven by score 0.0, ATR 0.0%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "HDFCBANK quantitative milestone: hard-filter watch with score 0.0.",
-        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
-      },
-      "active_risk_calc": {
-        "ticker_score": 0.0,
-        "delta_pct": -2.4,
-        "atr_pct": 0.0,
-        "turnover_cr": 0.0,
-        "volume_multiplier": 0.0,
-        "selection_risk": "higher",
-        "signal_quality": "live-derived",
-        "win_loss_ratio": "1.0:1",
-        "kelly_policy_max": "0.0%",
-        "risk_flag_score": 68.0,
-        "risk_flag": "HIGH_RISK"
-      },
-      "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta -2.40% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
-        "dominant_factors": "liquidity and mean-reversion around intraday anchors",
-        "momentum_factor": "Near VWAP/EMA9; score 0.0.",
-        "liquidity_factor": "Turnover data unavailable.",
-        "quality_factor": "ATR 0.00% and hard-filter status watch.",
-        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
-        "low_vol_factor": "Low-vol regime"
-      },
-      "focusTicker": "HDFCBANK",
-      "ticker": "HDFCBANK",
-      "dataQuality": "live-derived"
-    },
     "POWERGRID": {
       "news_catalysts_card": "Market context for POWERGRID: Top market catalysts were not available from the current news feed.",
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For POWERGRID, participation is read through volume multiplier 0.03x and turnover 10.77 Cr.",
@@ -4360,56 +4424,74 @@
       "focusTicker": "POWERGRID",
       "ticker": "POWERGRID",
       "dataQuality": "live-derived"
+    }
+  },
+  "tickerNewsByTicker": {
+    "INFY": {
+      "ticker": "INFY",
+      "company_name": "INFY",
+      "articles_scraped": 20,
+      "articles_after_dedup": 20,
+      "generated_at": "2026-06-20T13:04:48.332982+00:00",
+      "insider_activity": "No recent news found.",
+      "institutional_activity": "No recent news found.",
+      "order_book_block_deals": "No recent news found.",
+      "future_expansion_capex": "Related: Indian IT firms step up Europe expansion as growth outpaces North America",
+      "auditor_changes": "No recent news found.",
+      "dividend_news": "No recent news found.",
+      "new_orders_contracts": "Related: How Infosys P/E contracts or expands on result day",
+      "earnings_results": "Related: Infosys Q3 \u2013 Soft implied guidance for Q4 dampens an otherwise strong quarter",
+      "management_changes": "Related: Infosys Q1 results| Overall pipeline strong, good demand outlook on large deals says CEO Salil Parekh",
+      "regulatory_filings": "No recent news found.",
+      "sentiment_overall": "Neutral",
+      "risk_flags": "None",
+      "summary_headline": "20 articles found for INFY.",
+      "cached": false,
+      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
     },
-    "BHARTIARTL": {
-      "news_catalysts_card": "Market context for BHARTIARTL: Top market catalysts were not available from the current news feed.",
-      "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For BHARTIARTL, participation is read through volume multiplier 0.0x and turnover 0.0 Cr.",
-      "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. BHARTIARTL is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "BHARTIARTL forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "BHARTIARTL is in the active terminal universe with LTP \u20b91,910.80, +1.92% move, and volume 15918432. Intraday setup: VWAP Bounce, VWAP VWAP unavailable, EMA9 EMA9 unavailable, ATR 0%, volume multiplier 0x.",
-      "future_revenue_model": "Forward model for BHARTIARTL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for BHARTIARTL: LTP \u20b91,910.80, delta +1.92%, volume 15918432, score 0.0, action cohort selection.",
-      "ledger_stocks": [],
-      "active_scoring_matrix": {
-        "beneish_m_score": "-0.37",
-        "altman_z_score": "3.06",
-        "ocf_ebitda_ratio": "0.70",
-        "mansfield_relative_strength": "0.78"
-      },
-      "active_seven_ic_gates": {
-        "q1_fund_buying": "BHARTIARTL volume multiplier is 0.0x; institutional participation is inferred from turnover and price follow-through.",
-        "q2_liquidity_delivery": "BHARTIARTL turnover is 0.0 Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "BHARTIARTL price action is +1.92%; catalyst validation depends on follow-through above VWAP/EMA9.",
-        "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
-        "q5_risk_reward": "BHARTIARTL risk/reward is driven by score 0.0, ATR 0.0%, and execution level VWAP Bounce.",
-        "q6_quantitative_milestone": "BHARTIARTL quantitative milestone: hard-filter watch with score 0.0.",
-        "q7_governance_gate": "Governance and auditor status are historically sound for the selected cohort; no red flags detected in recent disclosures."
-      },
-      "active_risk_calc": {
-        "ticker_score": 0.0,
-        "delta_pct": 1.92,
-        "atr_pct": 0.0,
-        "turnover_cr": 0.0,
-        "volume_multiplier": 0.0,
-        "selection_risk": "higher",
-        "signal_quality": "live-derived",
-        "win_loss_ratio": "1.0:1",
-        "kelly_policy_max": "0.0%",
-        "risk_flag_score": 68.0,
-        "risk_flag": "HIGH_RISK"
-      },
-      "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta 1.92% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger VWAP Bounce; watch-list hard-filter state.",
-        "dominant_factors": "liquidity and mean-reversion around intraday anchors",
-        "momentum_factor": "Near VWAP/EMA9; score 0.0.",
-        "liquidity_factor": "Turnover data unavailable.",
-        "quality_factor": "ATR 0.00% and hard-filter status watch.",
-        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
-        "low_vol_factor": "Low-vol regime"
-      },
-      "focusTicker": "BHARTIARTL",
-      "ticker": "BHARTIARTL",
-      "dataQuality": "live-derived"
+    "SAPPHIRE": {
+      "ticker": "SAPPHIRE",
+      "company_name": "SAPPHIRE",
+      "articles_scraped": 20,
+      "articles_after_dedup": 20,
+      "generated_at": "2026-06-20T13:14:26.848294+00:00",
+      "insider_activity": "No recent news found.",
+      "institutional_activity": "Related: NFO Alert: Franklin Templeton Mutual Fund launches Sapphire Equity Long-Short SIF",
+      "order_book_block_deals": "No recent news found.",
+      "future_expansion_capex": "Related: Sapphire Media completes acquisition of Big FM 92.7",
+      "auditor_changes": "No recent news found.",
+      "dividend_news": "Related: Sapphire Foods 1:5 stock split record date tomorrow; last date to buy for eligibility",
+      "new_orders_contracts": "Related: Sapphire Media completes acquisition of Big FM 92.7",
+      "earnings_results": "Related: KFC India operator Sapphire beats profit view as cheaper menu drives demand",
+      "management_changes": "Related: Sapphire Foods looks to operate 2,000 restaurants: Group CEO Sanjay Purohit",
+      "regulatory_filings": "Related: Sapphire Media completes acquisition of Big FM 92.7",
+      "sentiment_overall": "Neutral",
+      "risk_flags": "None",
+      "summary_headline": "20 articles found for SAPPHIRE.",
+      "cached": false,
+      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
+    },
+    "ZENTEC": {
+      "ticker": "ZENTEC",
+      "company_name": "ZENTEC",
+      "articles_scraped": 20,
+      "articles_after_dedup": 20,
+      "generated_at": "2026-06-20T14:06:43.338915+00:00",
+      "insider_activity": "No recent news found.",
+      "institutional_activity": "No recent news found.",
+      "order_book_block_deals": "No recent news found.",
+      "future_expansion_capex": "No recent news found.",
+      "auditor_changes": "No recent news found.",
+      "dividend_news": "No recent news found.",
+      "new_orders_contracts": "No recent news found.",
+      "earnings_results": "Zen Technologies reported a significant 69% year-over-year plunge in its Q4 profit. Following this announcement, the company's shares tumbled by 11%.",
+      "management_changes": "No recent news found.",
+      "regulatory_filings": "No recent news found.",
+      "sentiment_overall": "Bearish",
+      "risk_flags": "Profit plunge",
+      "summary_headline": "Zen Technologies shares tumble 11% after Q4 profit plunges 69% YoY.",
+      "cached": false,
+      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
     }
   },
   "isSnapshotFallback": false,

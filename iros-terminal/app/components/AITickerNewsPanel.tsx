@@ -171,16 +171,42 @@ export default function AITickerNewsPanel({
   ticker,
   companyName,
   onClose,
+  initialReport,
 }: {
   ticker: string;
   companyName?: string;
   onClose?: () => void;
+  initialReport?: AITickerNewsReport | null;
 }) {
-  const [report, setReport] = useState<AITickerNewsReport | null>(null);
+  const [report, setReport] = useState<AITickerNewsReport | null>(initialReport ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [showRawArticles, setShowRawArticles] = useState(false);
+
+  useEffect(() => {
+    setReport(initialReport ?? null);
+    setError(null);
+    setExpandedCategory(null);
+    setShowRawArticles(false);
+  }, [ticker, initialReport]);
+
+  useEffect(() => {
+    if (!ticker || report) return;
+    let cancelled = false;
+    fetchTickerNewsReport(ticker, {
+      company: companyName,
+      maxArticles: 50,
+      includeRaw: true,
+    })
+      .then((result) => {
+        if (!cancelled) setReport(result);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to fetch news report");
+      });
+    return () => { cancelled = true; };
+  }, [ticker, companyName]);
 
   const fetchNews = useCallback(async (forceRefresh = false) => {
     if (!ticker) return;
@@ -199,43 +225,6 @@ export default function AITickerNewsPanel({
     } finally {
       setLoading(false);
     }
-  }, [ticker, companyName]);
-
-  useEffect(() => {
-    if (!ticker) {
-      const id = window.requestAnimationFrame(() => {
-        setReport(null);
-        setError(null);
-      });
-      return () => window.cancelAnimationFrame(id);
-    }
-
-    let cancelled = false;
-    const id = window.requestAnimationFrame(() => {
-      if (cancelled) return;
-      setLoading(true);
-      setError(null);
-    });
-
-    fetchTickerNewsReport(ticker, {
-      company: companyName,
-      maxArticles: 50,
-      includeRaw: true,
-    })
-      .then((result) => {
-        if (!cancelled) setReport(result);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to fetch news report");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-      window.cancelAnimationFrame(id);
-    };
   }, [ticker, companyName]);
 
   const sentimentCfg = SENTIMENT_CONFIG[report?.sentiment_overall?.toLowerCase() ?? ""] ?? SENTIMENT_CONFIG.neutral;

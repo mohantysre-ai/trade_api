@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import math
 import re
@@ -198,6 +199,7 @@ def _normalize_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
     payload["availablePools"] = available_pools
     payload.setdefault("activePool", NIFTY_100_LABEL)
     payload.setdefault("poolDescription", "Nifty 100 Angel One live universe ranked by your filter prompt.")
+    payload.setdefault("tickerNewsByTicker", {})
     return payload
 
 
@@ -1106,6 +1108,7 @@ def _build_payload_from_live_data(
     snapshot = _load_last_snapshot()
     existing_ti = snapshot.get("terminalIntelligence") if snapshot else None
     existing_summary = snapshot.get("newsSummary") if snapshot else None
+    existing_ticker_news = snapshot.get("tickerNewsByTicker") if snapshot else {}
     
     # Logic: If we have valid AI data and aren't forcing a refresh, reuse it to avoid timeouts.
     # If existing data is an error message or missing, we trigger the LLM.
@@ -1152,6 +1155,7 @@ def _build_payload_from_live_data(
         "llmError": None,
         "terminalIntelligence": terminal_intel,
         "tickerIntelligenceByTicker": {},
+        "tickerNewsByTicker": existing_ticker_news or {},
         "isSnapshotFallback": False,
     }
 
@@ -1182,6 +1186,7 @@ def build_market_payload(
         snapshot = dict(snapshot)
         snapshot["isSnapshotFallback"] = True
         snapshot["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        snapshot.setdefault("tickerNewsByTicker", {})
         if pool_name:
             snapshot["activePool"] = pool_name
         _apply_selection_meta(
@@ -1210,6 +1215,7 @@ def build_market_payload(
             snapshot["isSnapshotFallback"] = True
             snapshot["llmError"] = snapshot.get("llmError")
             snapshot["updatedAt"] = datetime.now(timezone.utc).isoformat()
+            snapshot.setdefault("tickerNewsByTicker", {})
             if pool_name:
                 snapshot["activePool"] = pool_name
             # Refresh RSS news even when outside refresh window
@@ -1243,6 +1249,7 @@ def build_market_payload(
                 "llmError": None,
                 "terminalIntelligence": None,
                 "tickerIntelligenceByTicker": {},
+                "tickerNewsByTicker": {},
                 "isSnapshotFallback": False,
                 "selectionMeta": {
                     "mode": "live",
@@ -1266,6 +1273,7 @@ def build_market_payload(
             "llmError": None,
             "terminalIntelligence": None,
             "tickerIntelligenceByTicker": {},
+            "tickerNewsByTicker": {},
             "isSnapshotFallback": True,
             "selectionMeta": {
                 "mode": "snapshot",
@@ -1483,16 +1491,32 @@ def create_app() -> FastAPI:
             if refresh_ticker_news and stocks_to_refresh_news:
                 tickers = [s["ticker"] for s in stocks_to_refresh_news]
                 try:
+                    semaphore = asyncio.Semaphore(5)
                     async with httpx.AsyncClient() as http_client:
-                        response = await http_client.post(
-                            f"{AI_NEWS_API_URL}/api/ticker-news/batch-check",
-                            json={"tickers": tickers, "max_articles": 20, "include_raw": False},
-                            timeout=120,
-                        )
-                        response.raise_for_status()
-                        results = response.json().get("results", [])
-                        updated = sum(1 for item in results if isinstance(item, dict) and not item.get("error") and not item.get("cached"))
-                        print(f"INFO: Refreshed {updated} ticker news reports out of {len(tickers)} in parallel.")
+                        async def _fetch_one(t: str) -> tuple[str, dict[str, Any]]:
+                            async with semaphore:
+                                try:
+                                    resp = await http_client.get(
+                                        f"{AI_NEWS_API_URL}/api/ticker-news",
+                                        params={"ticker": t, "max_articles": 15, "include_raw": False},
+                                        timeout=60,
+                                    )
+                                    resp.raise_for_status()
+                                    data = resp.json()
+                                    return t, data
+                                except Exception as e:
+                                    logger = logging.getLogger("angel_one_feed")
+                                    logger.warning("Per-ticker news fetch failed for %s: %s", t, e)
+                                    return t, {"error": True, "ticker": t, "message": str(e)}
+
+                        results = dict(await asyncio.gather(*[_fetch_one(t) for t in tickers]))
+                        ticker_news_map = {}
+                        for t, data in results.items():
+                            if not data.get("error") and data.get("ticker"):
+                                ticker_news_map[t] = data
+                        payload["tickerNewsByTicker"] = ticker_news_map
+                        updated = len(ticker_news_map)
+                        print(f"INFO: Stored {updated} ticker news reports out of {len(tickers)} into snapshot.")
                 except Exception as exc:
                     print(f"WARNING: Batch ticker-news refresh failed: {exc}")
             # --- End new logic ---
@@ -1589,6 +1613,48 @@ def create_app() -> FastAPI:
         except HTTPException:
             raise
         except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.get("/api/ticker-news")
+    async def get_ticker_news(ticker: str, company: str | None = None) -> dict[str, Any]:
+        try:
+            resolved_ticker = ticker.strip().upper()
+            if not resolved_ticker:
+                raise HTTPException(status_code=400, detail="Missing required parameter: ticker")
+
+            snapshot = _load_last_snapshot()
+            ticker_news_map = (snapshot.get("tickerNewsByTicker") or {}) if snapshot else {}
+            cached_report = ticker_news_map.get(resolved_ticker)
+
+            if cached_report and not cached_report.get("error"):
+                cached_report = dict(cached_report)
+                cached_report["cached"] = True
+                return cached_report
+
+            async with httpx.AsyncClient() as http_client:
+                response = await http_client.get(
+                    f"{AI_NEWS_API_URL}/api/ticker-news",
+                    params={"ticker": resolved_ticker, "company": company or "", "max_articles": 20, "include_raw": False},
+                    timeout=90,
+                )
+                response.raise_for_status()
+                report_data = response.json()
+
+            report_data["cached"] = False
+
+            if snapshot:
+                updated_map = dict(snapshot.get("tickerNewsByTicker") or {})
+                updated_map[resolved_ticker] = report_data
+                snapshot = dict(snapshot)
+                snapshot["tickerNewsByTicker"] = updated_map
+                _save_last_snapshot(snapshot)
+
+            return report_data
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger = logging.getLogger("angel_one_feed")
+            logger.error("ticker-news fetch failed for %s: %s", ticker, exc)
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return app

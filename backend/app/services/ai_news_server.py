@@ -56,29 +56,33 @@ except ImportError:
     sys.exit(1)
 
 # ---------------------------------------------------------------------------
-# Cache layer to avoid re-scraping the same ticker too often
+# Cache layer — backed by trade_api_snapshot.json -> tickerNewsByTicker
 # ---------------------------------------------------------------------------
 
-_cache: dict[str, tuple[str, dict]] = {}  # ticker -> (generated_at, report)
-_CACHE_TTL_SECONDS = 600  # 10 minutes
+# Re-use the same snapshot-backed cache as ai_ticker_news.
+# Import here to avoid circular imports; the module-level _load_llm_cache()
+# in ai_ticker_news.py populates this at import time.
+from app.services.ai_ticker_news import get_cached_summary, set_cached_summary  # noqa: E402
+
+_CACHE_TTL_SECONDS = 600  # 10 minutes (server-side memory TTL for fast path)
 
 
-def _get_cached(ticker: str) -> dict | None:
-    entry = _cache.get(ticker.upper())
-    if not entry:
+def _get_cached(ticker: str, force_refresh: bool = False) -> dict | None:
+    """
+    Try snapshot cache first (24h TTL enforced inside ai_ticker_news).
+    If force_refresh=True, always return None to trigger a fresh LLM call.
+    """
+    if force_refresh:
         return None
-    from datetime import datetime, timezone
-    generated_at = entry[0]
-    age = (datetime.now(timezone.utc) - datetime.fromisoformat(generated_at.replace("Z", "+00:00"))).total_seconds()
-    if age > _CACHE_TTL_SECONDS:
-        del _cache[ticker.upper()]
-        return None
-    return entry[1]
-
-
-def _set_cache(ticker: str, report_dict: dict):
-    from datetime import datetime, timezone
-    _cache[ticker.upper()] = (report_dict.get("generated_at", datetime.now(timezone.utc).isoformat()), report_dict)
+    try:
+        # We only have the ticker here, not articles, so pass empty list / 0
+        # and let get_cached_summary handle the lookup by key alone.
+        entry = get_cached_summary(ticker, [], 0, force_refresh=False)
+        if entry:
+            return entry
+    except Exception:
+        pass
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +212,7 @@ async def ticker_news(
             company_name=company,
             max_articles=max_articles,
             include_raw=include_raw,
+            force_refresh=force_refresh,
         )
         report_dict = report.to_dict()
 
@@ -215,7 +220,7 @@ async def ticker_news(
         generated_at = report_dict.get("generated_at", datetime.now(timezone.utc).isoformat())
         report_dict["generated_at"] = generated_at
 
-        _set_cache(ticker, report_dict)
+        # Cache is automatically persisted inside generate_ticker_news_report via set_cached_summary
         report_dict["cached"] = False
 
         return {
