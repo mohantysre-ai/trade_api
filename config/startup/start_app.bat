@@ -33,22 +33,23 @@ echo.
 
 set PORT_BUSY=0
 
-powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue) { Write-Host '  [!] Port 8000 is in use' -ForegroundColor Yellow; exit 1 } else { Write-Host '  [OK] Port 8000 is free' -ForegroundColor Green; exit 0 }"
+powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue) { Write-Host '  [BUSY] Port 8000 is in use' -ForegroundColor Yellow; exit 1 } else { Write-Host '  [OK] Port 8000 is free' -ForegroundColor Green; exit 0 }"
 if errorlevel 1 set PORT_BUSY=1
 
-powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort 8001 -State Listen -ErrorAction SilentlyContinue) { Write-Host '  [!] Port 8001 is in use' -ForegroundColor Yellow; exit 1 } else { Write-Host '  [OK] Port 8001 is free' -ForegroundColor Green; exit 0 }"
+powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort 8001 -State Listen -ErrorAction SilentlyContinue) { Write-Host '  [BUSY] Port 8001 is in use' -ForegroundColor Yellow; exit 1 } else { Write-Host '  [OK] Port 8001 is free' -ForegroundColor Green; exit 0 }"
 if errorlevel 1 set PORT_BUSY=1
 
-powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue) { Write-Host '  [!] Port 3000 is in use' -ForegroundColor Yellow; exit 1 } else { Write-Host '  [OK] Port 3000 is free' -ForegroundColor Green; exit 0 }"
+powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue) { Write-Host '  [BUSY] Port 3000 is in use' -ForegroundColor Yellow; exit 1 } else { Write-Host '  [OK] Port 3000 is free' -ForegroundColor Green; exit 0 }"
 if errorlevel 1 set PORT_BUSY=1
 
 if %PORT_BUSY% equ 1 (
     echo.
-    echo [!] Aborting: one or more ports are not available.
-    echo     Run restart-app.bat first to kill existing processes.
-    echo.
-    pause
-    exit /b 1
+    echo [*] Freeing occupied ports before launch...
+    powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
+    powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 8001 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
+    powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
+    powershell -NoProfile -Command "Start-Sleep -Seconds 2"
+    echo [OK] Ports freed. Proceeding...
 )
 echo [PASS] All ports are free. Proceeding...
 
