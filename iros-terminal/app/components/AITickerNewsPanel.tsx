@@ -185,14 +185,7 @@ export default function AITickerNewsPanel({
   const [showRawArticles, setShowRawArticles] = useState(false);
 
   useEffect(() => {
-    setReport(initialReport ?? null);
-    setError(null);
-    setExpandedCategory(null);
-    setShowRawArticles(false);
-  }, [ticker, initialReport]);
-
-  useEffect(() => {
-    if (!ticker || report) return;
+    if (!ticker) return;
     let cancelled = false;
     fetchTickerNewsReport(ticker, {
       company: companyName,

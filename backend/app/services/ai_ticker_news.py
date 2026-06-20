@@ -765,7 +765,7 @@ def get_cached_summary(
     if generated_at:
         try:
             dt = datetime.fromisoformat(generated_at)
-            if datetime.now(timezone.utc) - dt > __import__("datetime").timedelta(hours=24):
+            if datetime.now(timezone.utc) - dt > __import__("datetime").timedelta(hours=1):
                 return None
         except Exception:
             pass
@@ -966,13 +966,14 @@ async def generate_ticker_news_report(
         set_cached_summary(ticker, articles, max_articles, llm_result)
 
     # Step 3: Build report
+    llm_fields = {k: v for k, v in llm_result.items() if k in AITickerNewsReport.__dataclass_fields__ and k not in ("generated_at", "ticker")}
     report = AITickerNewsReport(
         ticker=ticker,
         company_name=company,
         articles_scraped=len(articles),
         articles_after_dedup=len(articles),
-        generated_at=datetime.now(timezone.utc).isoformat(),
-        **{k: v for k, v in llm_result.items() if k in AITickerNewsReport.__dataclass_fields__},
+        generated_at=str(llm_result.get("generated_at") or datetime.now(timezone.utc).isoformat()),
+        **llm_fields,
     )
 
     if include_raw:

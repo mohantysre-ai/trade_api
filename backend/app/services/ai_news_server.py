@@ -207,13 +207,25 @@ async def ticker_news(
             return cached
 
     try:
-        report = await generate_ticker_news_report(
-            ticker=ticker,
-            company_name=company,
-            max_articles=max_articles,
-            include_raw=include_raw,
-            force_refresh=force_refresh,
-        )
+        try:
+            report = await generate_ticker_news_report(
+                ticker=ticker,
+                company_name=company,
+                max_articles=max_articles,
+                include_raw=include_raw,
+                force_refresh=force_refresh,
+            )
+        except TypeError as exc:
+            if "multiple values for keyword argument 'generated_at'" not in str(exc):
+                raise
+            logger.warning("Retrying report generation for %s without cache after generated_at collision", ticker)
+            report = await generate_ticker_news_report(
+                ticker=ticker,
+                company_name=company,
+                max_articles=max_articles,
+                include_raw=include_raw,
+                force_refresh=True,
+            )
         report_dict = report.to_dict()
 
         from datetime import datetime, timezone
