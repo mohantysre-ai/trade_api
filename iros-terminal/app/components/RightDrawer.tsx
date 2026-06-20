@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import type { AITickerNewsReport, TerminalIntelligence } from "@/lib/market-api";
 import AITickerNewsPanel from "./AITickerNewsPanel";
+import ConfidenceCheckerPanel from "./ConfidenceCheckerPanel";
 
 type DrawerAnalysis = TerminalIntelligence & {
   error?: string;
@@ -326,7 +327,7 @@ type DrawerContent = {
   tickerNews?: AITickerNewsReport | null;
 };
 
-type DrawerTab = "aiNews" | "analysis";
+type DrawerTab = "aiNews" | "analysis" | "confidenceChecker";
 
 export default function RightDrawer({ open, onClose, content }: { open: boolean; onClose: () => void; content?: DrawerContent | null }) {
   const [activeTab, setActiveTab] = useState<DrawerTab>("aiNews");
@@ -459,7 +460,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           </button>
           <button
             onClick={() => setActiveTab("analysis")}
-            className={`relative py-2.5 px-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
+            className={`relative py-2.5 px-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 mr-6 ${
               activeTab === "analysis"
                 ? "text-teal-700"
                 : "text-slate-400 hover:text-slate-600"
@@ -467,6 +468,19 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           >
             Terminal Analysis
             {activeTab === "analysis" && (
+              <span className="absolute inset-x-0 -bottom-px h-0.5 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("confidenceChecker")}
+            className={`relative py-2.5 px-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
+              activeTab === "confidenceChecker"
+                ? "text-teal-700"
+                : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            Confidence Checker
+            {activeTab === "confidenceChecker" && (
               <span className="absolute inset-x-0 -bottom-px h-0.5 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full" />
             )}
           </button>
@@ -479,7 +493,8 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
          {activeTab === "aiNews" && (
            ticker ? (
              <AITickerNewsPanel
-               ticker={ticker}
+                key={ticker}
+                ticker={ticker}
                companyName={stock?.name}
                initialReport={tickerNews ?? null}
              />
@@ -492,6 +507,11 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
               <p className="text-[10px] mt-0.5">to view AI-powered news summary.</p>
             </div>
           )
+        )}
+
+        {/* Confidence Checker Tab */}
+        {activeTab === "confidenceChecker" && (
+          <ConfidenceCheckerPanel key={ticker} ticker={ticker} companyName={stock?.name} />
         )}
 
         {/* Analysis Tab */}
@@ -622,6 +642,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
             )}
           </div>
         )}
+
       </div>
     </div>
   );
