@@ -4,8 +4,11 @@ export const runtime = "nodejs";
 
 const TRENDLYNE_URLS: Record<string, string> = {
   risingDelivery: "https://trendlyne.com/fundamentals/json-screener/515763/5/0/index/NIFTY500/",
-  topLosersVolume: "https://trendlyne.com/fundamentals/json-screener/515760/5/0/index/NIFTY500/",
+  topLosersVolume: "https://trendlyne.com/fundamentals/json-screener/515761/5/0/index/NIFTY500/",
   volumeShockers: "https://trendlyne.com/fundamentals/json-screener/515758/5/0/index/NIFTY500/",
+  highVolumeGain: "https://trendlyne.com/fundamentals/json-screener/515760/5/0/index/NIFTY500/",
+  highVolumeLoss: "https://trendlyne.com/fundamentals/json-screener/515761/5/0/index/NIFTY500/",
+  outPerformanceWeek: "https://trendlyne.com/fundamentals/json-screener/515755/5/0/index/NIFTY500/",
 };
 
 export async function GET(request: Request) {
@@ -14,7 +17,7 @@ export async function GET(request: Request) {
 
   if (!screen || !TRENDLYNE_URLS[screen]) {
     return NextResponse.json(
-      { error: "Missing or invalid screen. Use: risingDelivery, topLosersVolume, or volumeShockers." },
+      { error: "Missing or invalid screen. Use: risingDelivery, topLosersVolume, volumeShockers, highVolumeGain, highVolumeLoss, or outPerformanceWeek." },
       { status: 400 }
     );
   }
