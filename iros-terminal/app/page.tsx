@@ -51,7 +51,7 @@ function parseDeltaPct(delta: string | undefined): number {
   return parseFloat(cleaned) || 0;
 }
 
-type TrendlyneScreenKey = 'risingDelivery' | 'topLosersVolume' | 'volumeShockers';
+type TrendlyneScreenKey = 'risingDelivery' | 'topLosersVolume' | 'volumeShockers' | 'highVolumeGain' | 'highVolumeLoss' | 'outPerformanceWeek';
 
 type TrendlyneStock = {
   name: string;
@@ -69,10 +69,13 @@ type TrendlyneScreenData = {
   screenData: TrendlyneStock[];
 };
 
-const TRENDLYNE_SCREENS: { key: TrendlyneScreenKey; label: string; accent: 'emerald' | 'red' | 'amber' }[] = [
+const TRENDLYNE_SCREENS: { key: TrendlyneScreenKey; label: string; accent: 'emerald' | 'red' | 'amber' | 'indigo' }[] = [
   { key: 'risingDelivery', label: 'RISING DELIVERY %', accent: 'emerald' },
   { key: 'topLosersVolume', label: 'TOP LOSERS BY VOLUME', accent: 'red' },
   { key: 'volumeShockers', label: 'VOLUME SHOCKERS', accent: 'amber' },
+  { key: 'highVolumeGain', label: 'HIGH VOLUME/GAIN', accent: 'emerald' },
+  { key: 'highVolumeLoss', label: 'HIGH VOLUME/LOSS', accent: 'red' },
+  { key: 'outPerformanceWeek', label: 'OUTPERFORMANCE /WEEK', accent: 'indigo' },
 ];
 
 type NseTopFiveCategoryKey = 'topGainers' | 'topLoosers' | 'mostActiveValue' | 'mostActiveVolume';
@@ -354,7 +357,7 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
   );
 }
 
-function TrendlynePanel({ screenKey, label, accentClass }: { screenKey: TrendlyneScreenKey; label: string; accentClass: string }) {
+function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: TrendlyneScreenKey; label: string; accentClass: string }) {
   const [items, setItems] = useState<TrendlyneStock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -389,42 +392,45 @@ function TrendlynePanel({ screenKey, label, accentClass }: { screenKey: Trendlyn
   }, [fetchData]);
 
   const dotClass = accentClass === 'emerald' ? 'bg-emerald-500' : accentClass === 'red' ? 'bg-red-500' : 'bg-amber-500';
-  const textAccentCls = accentClass === 'emerald' ? 'text-emerald-600' : accentClass === 'red' ? 'text-red-500' : 'text-amber-600';
+  const textAccentCls = accentClass === 'emerald' ? 'text-emerald-600' : accentClass === 'red' ? 'text-red-500' : accentClass === 'indigo' ? 'text-indigo-600' : 'text-amber-600';
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm overflow-visible">
-      <div className={`text-[11px] uppercase tracking-wider ${textAccentCls} font-bold mb-3 flex items-center gap-2`}>
-        <span className={`w-2.5 h-2.5 rounded-full ${dotClass}`} />
-        {label}
-        <span className="ml-auto text-[8px] text-slate-400 font-normal">{loading ? 'loading' : error ? 'err' : `${items.length}`}</span>
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-5 shadow-sm min-h-[320px] overflow-visible">
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">{label}</span>
+        <span className="text-[9px] text-slate-400 bg-slate-100 px-2 py-1 rounded">
+          {loading ? 'LOADING' : error ? 'ERROR' : `${items.length} stocks`}
+        </span>
       </div>
-      <div className="space-y-1.5">
-        {loading && items.length === 0 && (
-          <div className="text-[11px] text-slate-400 px-3 py-2 animate-pulse">Loading...</div>
-        )}
-        {error && items.length === 0 && (
-          <div className="text-[11px] text-red-400 px-3 py-2">{error}</div>
+      {error && items.length === 0 && (
+        <div className="text-[11px] text-red-500 px-3 py-2 mb-3">{error}</div>
+      )}
+      <div className="space-y-2">
+        {items.length === 0 && !loading && !error && (
+          <div className="text-[11px] text-slate-400 px-3 py-2">No data</div>
         )}
         {items.map((item, idx) => {
           const currentPrice = item.tooltipParams.find((p) => p.key === 'currentPrice')?.value ?? '—';
-          return (
+  const dotClass = accentClass === 'emerald' ? 'bg-emerald-500' : accentClass === 'red' ? 'bg-red-500' : accentClass === 'indigo' ? 'bg-indigo-500' : 'bg-amber-500';
+  const textAccentCls = accentClass === 'emerald' ? 'text-emerald-600' : accentClass === 'red' ? 'text-red-500' : accentClass === 'indigo' ? 'text-indigo-600' : 'text-amber-600';
+  return (
             <a
               key={`${screenKey}-${item.name}-${idx}`}
               href={item.stockurl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-between px-3 py-2 rounded-lg transition-all hover:bg-slate-50 hover:scale-[1.01] cursor-pointer"
+              className="group flex items-center justify-between px-4 py-2.5 rounded-lg transition-all hover:scale-[1.02] cursor-default overflow-visible"
               style={{
                 backgroundColor: idx % 2 === 0 ? 'rgba(248, 250, 252, 0.5)' : 'transparent',
                 borderBottom: '1px solid rgba(226, 232, 240, 0.4)',
               }}
             >
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-[9px] font-bold text-slate-400 w-4 text-right">{String(idx + 1).padStart(2, '0')}</span>
+                <span className={`w-2.5 h-2.5 rounded-full ${dotClass}`} />
                 <span className="text-[12px] font-bold text-slate-800 truncate">{item.name}</span>
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
-                 <span className={`text-[11px] font-bold ${textAccentCls}`}>{item.value}</span>
+                <span className={`text-[11px] font-bold ${textAccentCls}`}>{item.value}</span>
                 <span className="text-[10px] text-slate-500">₹{currentPrice}</span>
               </div>
             </a>
@@ -546,18 +552,16 @@ function GainersLosersHeatmap() {
         })}
       </div>
 
-      {/* Trendlyne Panels */}
-      <div className="mt-5 pt-4 border-t border-slate-200">
+      {/* NIFTY SCREENERS Panels */}
         <div className="flex items-center gap-2 mb-4">
           <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-          <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">TRENDLYNE SCREENERS</span>
+          <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">NIFTY SCREENERS</span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {TRENDLYNE_SCREENS.map((screen) => (
-            <TrendlynePanel key={screen.key} screenKey={screen.key} label={screen.label} accentClass={screen.accent} />
+            <TrendlyneCategoryPanel key={screen.key} screenKey={screen.key} label={screen.label} accentClass={screen.accent} />
           ))}
         </div>
-      </div>
     </div>
   );
 }
