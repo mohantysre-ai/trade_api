@@ -283,9 +283,10 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
   const [anchor, setAnchor] = useState({ x: 0, y: 0 });
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewportWidth = typeof window === 'undefined' ? 1024 : window.innerWidth;
-
-  const pchange = typeof stock.pchange === 'number' ? stock.pchange : null;
-  const positive = pchange !== null && pchange >= 0;
+  const viewportHeight = typeof window === 'undefined' ? 768 : window.innerHeight;
+  const tooltipWidth = 352;
+  const tooltipLeft = Math.max(12, Math.min(anchor.x + 4, viewportWidth - tooltipWidth - 12));
+  const tooltipTop = Math.max(8, anchor.y);
 
   const cancelClose = () => {
     if (closeTimer.current) {
@@ -293,6 +294,9 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
       closeTimer.current = null;
     }
   };
+
+  const pchange = typeof stock.pchange === 'number' ? stock.pchange : null;
+  const positive = pchange !== null && pchange >= 0;
 
   const scheduleClose = () => {
     closeTimer.current = setTimeout(() => setVisible(false), 180);
@@ -307,9 +311,6 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
     setVisible(true);
   };
 
-  const tooltipWidth = 352;
-  const tooltipLeft = Math.max(8, Math.min(anchor.x + 4, viewportWidth - tooltipWidth - 8));
-
   return (
     <span
       ref={triggerRef}
@@ -322,22 +323,18 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
     >
       {ticker}
       {visible && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onMouseEnter={cancelClose}
-            onMouseLeave={scheduleClose}
-          />
-          <div
-            className="fixed z-50 w-[22rem] max-h-[20rem] rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl overflow-y-auto"
-            style={{
-              left: `${tooltipLeft}px`,
-              top: `${Math.max(8, anchor.y - 4)}px`,
-              boxShadow: positive !== null ? (positive ? '0 8px 32px rgba(16,185,129,0.15), 0 2px 8px rgba(0,0,0,0.06)' : '0 8px 32px rgba(239,68,68,0.15), 0 2px 8px rgba(0,0,0,0.06)') : '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
-            }}
-            onMouseEnter={() => { cancelClose(); setVisible(true); }}
-            onMouseLeave={scheduleClose}
-          >
+        <div
+          aria-hidden={!visible}
+          className="fixed z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl transition-all pointer-events-auto overflow-y-auto max-h-[calc(100vh-2rem)] visible opacity-100"
+          style={{
+            left: `${tooltipLeft}px`,
+            top: `${tooltipTop}px`,
+            boxShadow: positive !== null ? (positive ? '0 8px 32px rgba(16,185,129,0.15), 0 2px 8px rgba(0,0,0,0.06)' : '0 8px 32px rgba(239,68,68,0.15), 0 2px 8px rgba(0,0,0,0.06)') : '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
+          }}
+          onMouseEnter={() => { cancelClose(); setVisible(true); }}
+          onMouseLeave={scheduleClose}
+        >
+          <div className="overflow-visible max-h-none">
             <div className="flex items-center gap-2 mb-2 flex-shrink-0">
               <span className={`w-1.5 h-1.5 rounded-full ${positive !== null ? (positive ? 'bg-emerald-500' : 'bg-red-500') : 'bg-slate-400'} animate-pulse`} />
               <span className={`text-[9px] uppercase tracking-widest font-bold ${positive !== null ? (positive ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500'}`}>
@@ -351,7 +348,7 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
             </div>
             <NseTooltipContent data={stock} />
           </div>
-        </>
+        </div>
       )}
     </span>
   );
@@ -604,10 +601,9 @@ function NseHeatMapTooltip({ stock, ticker, colors }: { stock: NseEquityStock; t
   const [anchor, setAnchor] = useState({ x: 0, y: 0 });
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewportWidth = typeof window === 'undefined' ? 1024 : window.innerWidth;
-  const viewportHeight = typeof window === 'undefined' ? 768 : window.innerHeight;
   const tooltipWidth = 384;
   const tooltipLeft = Math.max(12, Math.min(anchor.x + 12, viewportWidth - tooltipWidth - 12));
-  const tooltipTop = Math.max(12, Math.min(anchor.y, viewportHeight - 320));
+  const tooltipTop = Math.max(8, anchor.y);
 
   const cancelClose = () => {
     if (closeTimer.current) {
