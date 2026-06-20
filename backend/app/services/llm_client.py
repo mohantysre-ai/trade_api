@@ -34,6 +34,7 @@ def _llm_config() -> tuple[str, str, str, str] | None:
 
 
 def _record_quota_error(message: str) -> None:
+    global _llm_not_before
     _llm_not_before = _time.time() + 60
 
 

@@ -170,6 +170,7 @@ export type MarketDataResponse = {
   llmError?: string;
   terminalIntelligence?: TerminalIntelligence;
   tickerIntelligenceByTicker?: Record<string, TerminalIntelligence>;
+  tickerNewsByTicker?: Record<string, AITickerNewsReport>;
   isSnapshotFallback?: boolean;
   selectionMeta?: SelectionMeta;
 };

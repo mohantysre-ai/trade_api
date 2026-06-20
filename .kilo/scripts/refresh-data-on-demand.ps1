@@ -6,6 +6,7 @@ $OutputPath = Join-Path $Root "trade_api_snapshot.json"
 $SnapshotPath = Join-Path $Root "backend\last_market_snapshot.json"
 $Pool = $null
 $Prompt = $null
+$SkipNews = $false
 $Index = 0
 
 Write-Host "[PRE-CLEAR] Removing stale snapshot files..." -ForegroundColor Yellow
@@ -34,6 +35,9 @@ while ($Index -lt $args.Count) {
             $Prompt = $value
         }
         $Index += 2
+    } elseif ($arg -eq "--skip-news") {
+        $SkipNews = $true
+        $Index++
     } else {
         $Index++
     }
@@ -57,6 +61,7 @@ function Write-Snapshot {
 $body = @{}
 if ($Pool) { $body["pool"] = $Pool }
 if ($Prompt) { $body["prompt"] = $Prompt }
+if (-not $SkipNews) { $body["refreshTickerNews"] = $true }
 
 try {
     $uri = "$BackendUrl/api/refresh-data-on-demand"

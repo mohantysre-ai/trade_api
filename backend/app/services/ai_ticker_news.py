@@ -22,6 +22,7 @@ import logging
 import os
 import re
 import sys
+import time as _time
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from typing import Optional
@@ -30,6 +31,19 @@ from urllib.parse import quote_plus
 import httpx
 import requests
 from bs4 import BeautifulSoup
+
+_llm_not_before: float = 0.0
+_LLM_COOLDOWN_SECONDS = 60
+
+
+def _llm_quota_available() -> bool:
+    return _time.monotonic() >= _llm_not_before
+
+
+def _record_quota_error(message: str) -> None:
+    global _llm_not_before
+    _llm_not_before = _time.monotonic() + _LLM_COOLDOWN_SECONDS
+    logger.warning("LLM quota cooldown activated for %.0fs due to: %s", _LLM_COOLDOWN_SECONDS, message[:120])
 
 logging.basicConfig(
     level=logging.INFO,
@@ -78,6 +92,130 @@ class AITickerNewsReport:
     def to_dict(self):
         d = asdict(self)
         return {k: v for k, v in d.items() if v is not None}
+
+# ---------------------------------------------------------------------------
+# JSON repair helper
+# ---------------------------------------------------------------------------
+
+def _parse_json_response(text: str, expected_keys: list[str]) -> dict:
+    """
+    Parse a JSON response from the LLM, with repair strategies for
+    common malformations (unterminated strings, trailing commas, etc.).
+    Raises ValueError if parsing definitively fails after all repair attempts.
+    """
+    # Strategy 1: direct parse
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 2: try to locate the JSON object boundaries and fix unterminated strings
+    # Find the outermost { ... } block
+    brace_start = text.find("{")
+    brace_end = text.rfind("}")
+    if brace_start != -1 and brace_end != -1 and brace_end > brace_start:
+        candidate = text[brace_start:brace_end + 1]
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+
+        # Strategy 3: try to salvage by repairing unterminated strings
+        # An unterminated string means the last string value wasn't closed.
+        # The error "Unterminated string starting at: line X column Y" means
+        # there's a string that never got its closing quote.
+        repaired = _repair_unterminated_json(candidate)
+        try:
+            return json.loads(repaired)
+        except json.JSONDecodeError:
+            pass
+
+        # Strategy 4: try stripping trailing unclosed content after last valid key-value
+        repaired2 = _strip_trailing_garbage(candidate)
+        try:
+            return json.loads(repaired2)
+        except json.JSONDecodeError:
+            pass
+
+    # Strategy 5: last resort — extract individual key-value pairs via regex
+    result = {}
+    for key in expected_keys:
+        # Try to find "key": "value" or "key": value patterns
+        pattern = rf'"{re.escape(key)}"\s*:\s*"((?:[^"\\]|\\.)*)"'
+        m = re.search(pattern, text)
+        if m:
+            result[key] = m.group(1)
+            continue
+        # Try non-string values (bool, number, null)
+        pattern2 = rf'"{re.escape(key)}"\s*:\s*(\btrue\b|\bfalse\b|\bnull\b|\d+(?:\.\d+)?)'
+        m2 = re.search(pattern2, text, re.IGNORECASE)
+        if m2:
+            val = m2.group(1).lower()
+            result[key] = {"true": "Bullish", "false": "Bearish"}.get(val, val)
+            continue
+        # Try to grab anything after the key colon until comma or closing brace
+        pattern3 = rf'"{re.escape(key)}"\s*:\s*([^,}}]+)'
+        m3 = re.search(pattern3, text)
+        if m3:
+            val = m3.group(1).strip().strip('"').strip("'")
+            result[key] = val
+
+    return result
+
+
+def _repair_unterminated_json(text: str) -> str:
+    """
+    Attempt to fix an unterminated string at the end of a JSON object.
+    Adds a closing quote and fills in missing value placeholders if needed.
+    """
+    # Count quotes to determine if the last string is unterminated
+    # Walk backwards from the end to find the opening quote of an unterminated string
+    in_string = False
+    escaped = False
+    last_string_start = -1
+    for i, ch in enumerate(text):
+        if escaped:
+            escaped = False
+            continue
+        if ch == "\\":
+            escaped = True
+            continue
+        if ch == '"':
+            if in_string:
+                in_string = False
+            else:
+                in_string = True
+                last_string_start = i
+
+    # If we ended inside a string, the JSON is unterminated
+    if in_string:
+        # Add a closing quote
+        text += '"'
+        # Ensure the object is properly closed
+        if not text.rstrip().endswith("}"):
+            text += "\n}"
+        return text
+
+    return text
+
+
+def _strip_trailing_garbage(text: str) -> str:
+    """
+    If text after the last complete key-value pair is garbled (e.g. unclosed string),
+    try to find the last valid comma-separated entry and truncate there.
+    """
+    # Try parsing character by character from the end, removing trailing content
+    for end_idx in range(len(text), -1, -1):
+        candidate = text[:end_idx].rstrip(",").rstrip()
+        if not candidate.endswith("}"):
+            candidate += "}"
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+    # If nothing works, return original
+    return text
+
 
 # ---------------------------------------------------------------------------
 # Scraper implementations
@@ -425,43 +563,6 @@ async def _scrape_finshots(ticker: str, session: httpx.AsyncClient) -> list[Tick
         logger.warning("Finshots scrape failed: %s", e)
 
     return articles
-    """Scrape NSE NIFTY 100 index tracker page for relevant headlines."""
-    articles: list[TickerNewsArticle] = []
-    url = "https://www.nseindia.com/index-tracker/NIFTY%20100"
-    try:
-        headers = {
-            **HEADERS,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Referer": "https://www.nseindia.com/",
-        }
-        resp = await session.get(url, headers=headers, timeout=15.0, follow_redirects=True)
-        if resp.status_code != 200:
-            return articles
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-        seen: set[str] = set()
-        for tag in soup.find_all(["h2", "h3", "a", "p"])[:80]:
-            text = tag.get_text(strip=True)
-            if not text or len(text) < 25:
-                continue
-            key = re.sub(r"\s+", " ", text.lower())[:60]
-            if key in seen:
-                continue
-            seen.add(key)
-
-            articles.append(TickerNewsArticle(
-                title=text[:300],
-                source="NSE NIFTY 100",
-                url=url,
-                summary=text[:300],
-                published_at=datetime.now(timezone.utc).isoformat(),
-            ))
-            if len(articles) >= 12:
-                break
-    except Exception as e:
-        logger.warning("NSE NIFTY 100 scrape failed: %s", e)
-
-    return articles
 
 
 async def scrape_nse_announcements(ticker: str, session: httpx.AsyncClient) -> list[TickerNewsArticle]:
@@ -551,6 +652,93 @@ async def scrape_all_sources(ticker: str) -> list[TickerNewsArticle]:
 # ---------------------------------------------------------------------------
 
 _LLM_SEMAPHORE = asyncio.Semaphore(1)
+# Snapshot file path — stores tickerNewsByTicker alongside market data
+_SNAPSHOT_FILE = os.environ.get(
+    "SNAPSHOT_FILE",
+    os.path.normpath(
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..", "..", "..", "trade_api_snapshot.json",
+        )
+    ),
+)
+_llm_cache: dict[str, dict] = {}
+
+
+def _load_llm_cache() -> None:
+    """Load cached LLM summaries from trade_api_snapshot.json -> tickerNewsByTicker."""
+    global _llm_cache
+    try:
+        if os.path.exists(_SNAPSHOT_FILE):
+            with open(_SNAPSHOT_FILE, "r", encoding="utf-8") as f:
+                snapshot = json.load(f)
+            _llm_cache = snapshot.get("tickerNewsByTicker", {})
+            logger.info("Loaded %d cached LLM summaries from snapshot", len(_llm_cache))
+    except Exception as e:
+        logger.warning("Failed to load LLM cache from snapshot: %s", e)
+        _llm_cache = {}
+
+
+def _save_llm_cache() -> None:
+    """Persist LLM summary into trade_api_snapshot.json -> tickerNewsByTicker."""
+    try:
+        snapshot = {}
+        if os.path.exists(_SNAPSHOT_FILE):
+            with open(_SNAPSHOT_FILE, "r", encoding="utf-8") as f:
+                snapshot = json.load(f)
+        snapshot["tickerNewsByTicker"] = _llm_cache
+        with open(_SNAPSHOT_FILE, "w", encoding="utf-8") as f:
+            json.dump(snapshot, f, indent=2)
+        logger.debug("Saved LLM cache to snapshot (%d tickers)", len(_llm_cache))
+    except Exception as e:
+        logger.warning("Failed to save LLM cache to snapshot: %s", e)
+
+
+def _cache_key(ticker: str, articles: list[TickerNewsArticle], max_articles: int) -> str:
+    """Simple per-ticker cache key — one LLM summary per ticker."""
+    return ticker.upper()
+
+
+def get_cached_summary(
+    ticker: str,
+    articles: list[TickerNewsArticle],
+    max_articles: int,
+    force_refresh: bool = False,
+) -> dict | None:
+    """Return cached summary if available and fresh (24h TTL), unless force_refresh=True."""
+    if force_refresh:
+        return None
+    key = _cache_key(ticker, articles, max_articles)
+    entry = _llm_cache.get(key)
+    if not entry:
+        return None
+    generated_at = entry.get("generated_at")
+    if generated_at:
+        try:
+            dt = datetime.fromisoformat(generated_at)
+            if datetime.now(timezone.utc) - dt > __import__("datetime").timedelta(hours=24):
+                return None
+        except Exception:
+            pass
+    return entry
+
+
+def set_cached_summary(
+    ticker: str,
+    articles: list[TickerNewsArticle],
+    max_articles: int,
+    llm_result: dict,
+) -> None:
+    key = _cache_key(ticker, articles, max_articles)
+    entry = dict(llm_result)
+    entry["generated_at"] = datetime.now(timezone.utc).isoformat()
+    entry["ticker"] = ticker.upper()
+    _llm_cache[key] = entry
+    _save_llm_cache()
+
+
+# Load cache at import time
+_load_llm_cache()
 
 
 async def summarize_with_gemini(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:
@@ -564,6 +752,10 @@ async def summarize_with_gemini(ticker: str, company: str, articles: list[Ticker
         from google import genai
     except ImportError:
         logger.warning("google-genai not installed — falling back to rule-based summary")
+        return _rule_based_summary(ticker, company, articles)
+
+    if not _llm_quota_available():
+        logger.warning("LLM quota exhausted, using rule-based summary for %s", ticker)
         return _rule_based_summary(ticker, company, articles)
 
     primary_model = os.environ.get("LLM_MODEL", "gemini-2.5-flash")
@@ -631,7 +823,7 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
             elif "```" in text:
                 text = text.split("```")[1].split("```")[0].strip()
 
-            result = json.loads(text)
+            result = _parse_json_response(text, expected_keys)
             for key in expected_keys:
                 result.setdefault(key, "No recent news found.")
 
@@ -646,6 +838,10 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
                 continue
             logger.error("Gemini summarization with model %s failed for %s: %s — falling back to rule-based summary", model, ticker, e)
             return _rule_based_summary(ticker, company, articles)
+
+    _record_quota_error("All models exhausted for " + ticker)
+    logger.warning("All Gemini models exhausted for %s, using rule-based summary", ticker)
+    return _rule_based_summary(ticker, company, articles)
 
 
 def _rule_based_summary(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:
@@ -700,6 +896,7 @@ async def generate_ticker_news_report(
     company_name: str | None = None,
     max_articles: int = 50,
     include_raw: bool = False,
+    force_refresh: bool = False,
 ) -> AITickerNewsReport:
     """Full pipeline: scrape → dedup → LLM summarize → return structured report."""
     ticker = ticker.upper().strip()
@@ -710,8 +907,14 @@ async def generate_ticker_news_report(
     if len(articles) > max_articles:
         articles = articles[:max_articles]
 
-    # Step 2: LLM Summarize
-    llm_result = await summarize_with_gemini(ticker, company, articles)
+    # Step 2: LLM Summarize (with snapshot cache to preserve quota)
+    cached = get_cached_summary(ticker, articles, max_articles, force_refresh=force_refresh)
+    if cached is not None:
+        logger.info("Using cached LLM summary for %s (max_articles=%d)", ticker, max_articles)
+        llm_result = cached
+    else:
+        llm_result = await summarize_with_gemini(ticker, company, articles)
+        set_cached_summary(ticker, articles, max_articles, llm_result)
 
     # Step 3: Build report
     report = AITickerNewsReport(
