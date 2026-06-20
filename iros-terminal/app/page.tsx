@@ -843,15 +843,12 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
   }
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg shadow-sm">
-      <div className="flex items-center justify-between p-4 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-blue-500" />
-          <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">INDIA MARKETS — TOP MOVERS</span>
-        </div>
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">INDIA MARKETS — TOP MOVERS</span>
         {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
-      <div className="divide-y divide-slate-100">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'USD / INR Spot') displayLabel = 'USD / INR';
@@ -859,15 +856,14 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
           return (
             <div
               key={`${item.label}-${item.val}-${item.state}`}
-              className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-slate-50"
+              className="relative overflow-hidden bg-slate-50 border border-slate-200 rounded-lg p-3 transition-all hover:border-slate-300 hover:shadow-sm"
             >
-              <span className="text-[11px] font-semibold text-slate-800">{displayLabel}</span>
-              <div className="flex items-center gap-4">
-                <span className="text-[13px] font-mono font-bold text-slate-900">{item.val}</span>
-                <span className={`text-[11px] font-semibold min-w-[60px] text-right ${marketStateClass(item.state)}`}>
-                  {isPositive ? '↑' : '↓'} {item.delta}
-                </span>
-              </div>
+              <SparklineSVG positive={isPositive} />
+              <span className="text-[10px] text-slate-500 block uppercase tracking-wider font-semibold">{displayLabel}</span>
+              <span className="text-lg font-bold text-slate-900 block mt-1 font-mono">{item.val}</span>
+              <span className={`text-[12px] font-semibold block mt-0.5 ${marketStateClass(item.state)}`}>
+                {isPositive ? '↑' : '↓'} {item.delta}
+              </span>
             </div>
           );
         })}
@@ -1353,7 +1349,11 @@ export default function IrosMasterAdvancedTerminal() {
 
         {activeTab === 'marketSnapshot' && (
           <div className="space-y-4">
-            {/* Row 1: Global Indices + Commodities side-by-side */}
+            {/* Row 1: India Markets — TOP MOVERS + Global Indices + Commodities side-by-side */}
+            <div className="grid grid-cols-1 gap-4 items-start">
+              <IndiaMarketsGrid items={currentMacros} staleLabel={staleMacroLabel} />
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
               <div className="lg:col-span-2">
                 <GlobalIndicesGrid items={globalIndices} staleLabel={staleMacroLabel} />
@@ -1363,21 +1363,14 @@ export default function IrosMasterAdvancedTerminal() {
               </div>
             </div>
 
-            {/* Row 2: Left column — Gainers/Losers + News Feed | Right column — NIFTY 100 Heat Map */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
-              <div className="flex flex-col gap-5">
-                <GainersLosersHeatmap />
-                <NewsFeedPanel items={liveMarket?.news} now={now} />
-              </div>
-              <div>
-                <Nifty100HeatMap />
-              </div>
+            {/* Row 2: Gainers/Losers + News Feed */}
+            <div className="flex flex-col gap-5">
+              <GainersLosersHeatmap />
+              <NewsFeedPanel items={liveMarket?.news} now={now} />
             </div>
 
-            {/* Row 3: India Markets */}
-            <div className="grid grid-cols-1 gap-4 items-start">
-              <IndiaMarketsGrid items={currentMacros} staleLabel={staleMacroLabel} />
-            </div>
+            {/* Row 3: NIFTY 100 Heat Map — full width single panel */}
+            <Nifty100HeatMap />
           </div>
         )}
 
