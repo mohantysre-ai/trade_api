@@ -98,15 +98,43 @@ def fetch_gift_nifty() -> dict[str, Any] | None:
         }
         response = requests.get(GIFT_NIFTY_API_URL, headers=headers, timeout=10)
         response.raise_for_status()
-        data = response.json()
+        resp = response.json()
 
-        # The NSE API response structure varies. Try common fields.
-        ltp = _extract_price(data.get("ltp") or data.get("lastPrice") or data.get("currentPrice"))
-        close = _extract_price(data.get("close") or data.get("previousClose") or data.get("prevClose"))
+        # The NSE API wraps data under a "data" key; GIFT NIFTY lives in data["giftNifty"]
+        inner = resp.get("data") if isinstance(resp, dict) else None
+        if isinstance(inner, dict):
+            gift_block = inner.get("giftNifty") or inner.get("gift_nifty") or inner
+        else:
+            gift_block = resp
+
+        ltp = _extract_price(
+            gift_block.get("lastprice")
+            or gift_block.get("lastPrice")
+            or gift_block.get("ltp")
+            or gift_block.get("currentPrice")
+        )
+        close = _extract_price(
+            gift_block.get("close")
+            or gift_block.get("previousClose")
+            or gift_block.get("prevClose")
+        )
+        perchange_raw = gift_block.get("perchange") or gift_block.get("perChange") or gift_block.get("percentChange")
         if ltp is None:
             return None
 
-        delta, state = _pct_change(ltp, close)
+        # Prefer the API's own percent-change if close is unavailable
+        if close and perchange_raw is None:
+            delta, state = _pct_change(ltp, close)
+        elif perchange_raw is not None:
+            try:
+                pct = float(perchange_raw)
+            except (TypeError, ValueError):
+                pct = 0.0
+            sign = "+" if pct >= 0 else ""
+            state = "POSITIVE" if pct >= 0 else "NEGATIVE"
+            delta = f"{sign}{pct:.2f}%"
+        else:
+            delta, state = "0.00%", "POSITIVE"
         return {
             "label": "GIFT NIFTY",
             "val": f"{ltp:,.2f}",

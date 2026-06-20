@@ -3110,6 +3110,12 @@
         "val": "12.97",
         "delta": "+2.35%",
         "state": "POSITIVE"
+      },
+      {
+        "label": "GIFT NIFTY",
+        "val": "24,042.00",
+        "delta": "-0.20%",
+        "state": "NEGATIVE"
       }
     ],
     "evening": [
@@ -3166,6 +3172,12 @@
         "val": "12.97",
         "delta": "+2.35%",
         "state": "POSITIVE"
+      },
+      {
+        "label": "GIFT NIFTY Close",
+        "val": "24,042.00",
+        "delta": "-0.20%",
+        "state": "NEGATIVE"
       }
     ]
   },
