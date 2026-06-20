@@ -143,7 +143,7 @@ export default function ForensicPanel({
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-emerald-700 text-[11px] font-bold tracking-wider uppercase">ASSET MATRIX</h3>
-          <p className="text-slate-500 text-[10px] mt-0.5">Active Nodes {stocks.length || assetRows.length} · Avg Kelly Ratio 5.67:1 · Top Return 13.8% · Data Date {live?.updatedAt ? new Date(live.updatedAt).toISOString().slice(0, 10) : '2026-06-11'}</p>
+          <p className="text-slate-500 text-[10px] mt-0.5">Active Nodes {stocks.length || assetRows.length} · Avg Kelly Ratio 5.67:1 · Top Return 13.8 · Data Date {live?.updatedAt ? new Date(live.updatedAt).toISOString().slice(0, 10) : '2026-06-11'}</p>
         </div>
         <button
           onClick={refresh}
@@ -189,7 +189,7 @@ export default function ForensicPanel({
                 <td className="py-2.5 pr-2 text-slate-700 truncate">{row.kelly || '-'}</td>
                 <td className="py-2.5 pr-2 truncate">
                   <span className={`font-bold tabular-nums ${row.returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {row.returnPct >= 0 ? '+' : ''}{row.returnPct.toFixed(1)}%
+                    {row.returnPct >= 0 ? '+' : ''}{row.returnPct.toFixed(1)}
                   </span>
                 </td>
                 <td className="py-2.5 pr-2 text-slate-500 truncate" title={row.thesis}>
