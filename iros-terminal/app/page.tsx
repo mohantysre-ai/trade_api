@@ -654,7 +654,7 @@ function NseHeatMapTooltip({ stock, ticker, colors }: { stock: NseEquityStock; t
         onMouseEnter={() => { cancelClose(); setVisible(true); }}
         onMouseLeave={scheduleClose}
       >
-        <div className="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-3">API DATA</div>
+        <div className="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-3">{ticker}</div>
         <div className="overflow-visible max-h-none">
           <NseTooltipContent data={stock} />
         </div>
