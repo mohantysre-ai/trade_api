@@ -452,39 +452,88 @@ async def scrape_nse_nifty100(ticker: str, session: httpx.AsyncClient) -> list[T
     return articles
 
 
+class PulseNewsCollector:
+    def __init__(self, session: httpx.AsyncClient | None = None):
+        self.base_url = "https://pulse.zerodha.com/"
+        self.session = session
+        self.cache: dict[tuple[str, ...], tuple[float, list[TickerNewsArticle]]] = {}
+        self.cache_ttl = 300  # 5 minutes
+
+    async def fetch_latest_news(self, symbols: list[str] | None = None) -> list[TickerNewsArticle]:
+        """Fetch latest Zerodha Pulse news and filter by ticker/company relevance."""
+        symbols = [s.strip() for s in symbols if s and s.strip()] if symbols else []
+        cache_key = tuple(sorted(s.upper() for s in symbols))
+        now = _time.monotonic()
+
+        cached = self.cache.get(cache_key)
+        if cached:
+            cached_at, articles = cached
+            if now - cached_at <= self.cache_ttl:
+                return articles
+
+        client = self.session or httpx.AsyncClient()
+        should_close_client = self.session is None
+        articles: list[TickerNewsArticle] = []
+
+        try:
+            response = await client.get(self.base_url, headers=HEADERS, timeout=15.0, follow_redirects=True)
+            if response.status_code != 200:
+                return articles
+
+            soup = BeautifulSoup(response.text, "html.parser")
+            seen_titles: set[str] = set()
+
+            for article in soup.find_all("div", recursive=True)[:30]:
+                title_tag = article.find(["h2", "h3", "a"])
+                title = title_tag.get_text(" ", strip=True) if title_tag else None
+                if not title or len(title) < 15:
+                    continue
+
+                link_tag = article.find("a", href=True)
+                href = link_tag.get("href", "") if link_tag else ""
+                if href and not href.startswith("http"):
+                    href = f"{self.base_url.rstrip('/')}{href}" if href.startswith("/") else href
+
+                timestamp_tag = article.find("span")
+                timestamp = timestamp_tag.get_text(" ", strip=True) if timestamp_tag else ""
+
+                if symbols:
+                    title_upper = title.upper()
+                    if not any(symbol.upper() in title_upper for symbol in symbols):
+                        continue
+
+                key = re.sub(r"\s+", " ", title.lower())[:60]
+                if key in seen_titles:
+                    continue
+                seen_titles.add(key)
+
+                articles.append(TickerNewsArticle(
+                    title=title[:300],
+                    source="Zerodha Pulse",
+                    url=href[:500] if href else self.base_url,
+                    summary=title[:500],
+                    published_at=timestamp or datetime.now(timezone.utc).isoformat(),
+                    relevance="medium" if symbols else "general",
+                ))
+
+                if len(articles) >= 10:
+                    break
+
+            self.cache[cache_key] = (now, articles)
+            return articles
+        except Exception as e:
+            logger.warning("Zerodha Pulse scrape failed: %s", e)
+            return []
+        finally:
+            if should_close_client:
+                await client.aclose()
+
+
 async def _scrape_zerodha_pulse(ticker: str, session: httpx.AsyncClient) -> list[TickerNewsArticle]:
     """Scrape Zerodha Pulse for market news."""
-    articles: list[TickerNewsArticle] = []
-    url = "https://pulse.zerodha.com/"
-    try:
-        resp = await session.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
-        if resp.status_code != 200:
-            return articles
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-        seen: set[str] = set()
-        for tag in soup.find_all(["h2", "h3", "a", "p", "span"])[:100]:
-            text = tag.get_text(strip=True)
-            if not text or len(text) < 25:
-                continue
-            key = re.sub(r"\s+", " ", text.lower())[:60]
-            if key in seen:
-                continue
-            seen.add(key)
-
-            articles.append(TickerNewsArticle(
-                title=text[:300],
-                source="Zerodha Pulse",
-                url=url,
-                summary=text[:300],
-                published_at=datetime.now(timezone.utc).isoformat(),
-            ))
-            if len(articles) >= 10:
-                break
-    except Exception as e:
-        logger.warning("Zerodha Pulse scrape failed: %s", e)
-
-    return articles
+    company = _company_name(ticker)
+    collector = PulseNewsCollector(session=session)
+    return await collector.fetch_latest_news([ticker, company])
 
 
 async def _scrape_trendlyne(ticker: str, session: httpx.AsyncClient) -> list[TickerNewsArticle]:
