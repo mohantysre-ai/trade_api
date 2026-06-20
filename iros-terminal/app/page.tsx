@@ -43,7 +43,7 @@ function marketStateClass(state: string) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Helper: parse delta string like "+2.73%" or "-3.12%"                     */
+/*  Helper: parse delta string like "+2.73" or "-3.12"                      */
 /* -------------------------------------------------------------------------- */
 function parseDeltaPct(delta: string | undefined): number {
   if (!delta) return 0;
@@ -342,7 +342,7 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
               </span>
               {pchange !== null && (
                 <span className={`ml-auto text-[10px] font-black tabular-nums ${positive ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {positive ? '↑' : '↓'} {pchange > 0 ? '+' : ''}{pchange.toFixed(2)}%
+                  {positive ? '↑' : '↓'} {pchange > 0 ? '+' : ''}{pchange.toFixed(2)}
                 </span>
               )}
             </div>
@@ -424,7 +424,7 @@ function TrendlynePanel({ screenKey, label, accentClass }: { screenKey: Trendlyn
                 <span className="text-[12px] font-bold text-slate-800 truncate">{item.name}</span>
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
-                <span className={`text-[11px] font-bold ${textAccentCls}`}>{item.value}%</span>
+                 <span className={`text-[11px] font-bold ${textAccentCls}`}>{item.value}</span>
                 <span className="text-[10px] text-slate-500">₹{currentPrice}</span>
               </div>
             </a>
@@ -523,7 +523,7 @@ function GainersLosersHeatmap() {
                 )}
                 {stocks.map((stock, index) => {
                   const ticker = stock.symbol ?? 'UNKNOWN';
-                  const changeText = typeof stock.pchange === 'number' ? `${stock.pchange > 0 ? '+' : ''}${stock.pchange.toFixed(2)}%` : 'N/A';
+                   const changeText = typeof stock.pchange === 'number' ? `${stock.pchange > 0 ? '+' : ''}${stock.pchange.toFixed(2)}` : 'N/A';
                   const changeClass = typeof stock.pchange === 'number' ? (stock.pchange >= 0 ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500';
 
                   return (
@@ -644,7 +644,7 @@ function NseHeatMapTooltip({ stock, ticker, colors }: { stock: NseEquityStock; t
           {ticker}
         </span>
         <span className="text-[9px] font-semibold mt-1" style={{ color: colors.text }}>
-          {typeof stock.pChange === 'number' ? `${stock.pChange > 0 ? '+' : ''}${stock.pChange.toFixed(2)}%` : 'N/A'}
+          {typeof stock.pChange === 'number' ? `${stock.pChange > 0 ? '+' : ''}${stock.pChange.toFixed(2)}` : 'N/A'}
         </span>
       </div>
       <div
