@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Load environment variables from the main backend .env (which contains REDACTED)
 # so the AI News server can use LLM-powered summaries instead of rule-based fallback.
-_env_path = Path(__file__).resolve().parent.parent.parent / "backend" / ".env"
+_env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 if _env_path.exists():
     try:
         from dotenv import load_dotenv
@@ -37,10 +37,10 @@ else:
     logger.warning("No .env found at %s — LLM summarization disabled", _env_path)
 
 try:
-    from ai_ticker_news import generate_ticker_news_report
+    from .ai_ticker_news import generate_ticker_news_report
 except ImportError:
     # Fallback if running from project root
-    from backend.ai_ticker_news import generate_ticker_news_report
+    from app.services.ai_ticker_news import generate_ticker_news_report
 
 logging.basicConfig(
     level=logging.INFO,

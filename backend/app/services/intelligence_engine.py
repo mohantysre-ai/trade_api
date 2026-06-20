@@ -15,7 +15,7 @@ import re
 import time as _time
 import logging as _logging
 import requests
-from llm_client import LLM_CALL_TIMEOUT_SECONDS, _call_gemini, _call_openai
+from .llm_client import LLM_CALL_TIMEOUT_SECONDS, _call_gemini, _call_openai
 
 
 class CompleteSecurityAnalysisPayload(BaseModel):

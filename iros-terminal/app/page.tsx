@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   useMarketData,
   type LiveStock,
@@ -48,6 +48,30 @@ function parseDeltaPct(delta: string | undefined): number {
   const cleaned = delta.replace('%', '').replace(',', '');
   return parseFloat(cleaned) || 0;
 }
+
+type TrendlyneScreenKey = 'risingDelivery' | 'topLosersVolume' | 'volumeShockers';
+
+type TrendlyneStock = {
+  name: string;
+  value: string;
+  stockurl: string;
+  tooltipParams: Array<{ name: string; key: string; value: string }>;
+};
+
+type TrendlyneScreenData = {
+  screen: {
+    description: string;
+    title: string;
+  };
+  isNextPage: boolean;
+  screenData: TrendlyneStock[];
+};
+
+const TRENDLYNE_SCREENS: { key: TrendlyneScreenKey; label: string; accent: 'emerald' | 'red' | 'amber' }[] = [
+  { key: 'risingDelivery', label: 'RISING DELIVERY %', accent: 'emerald' },
+  { key: 'topLosersVolume', label: 'TOP LOSERS BY VOLUME', accent: 'red' },
+  { key: 'volumeShockers', label: 'VOLUME SHOCKERS', accent: 'amber' },
+];
 
 type NseTopFiveCategoryKey = 'topGainers' | 'topLoosers' | 'mostActiveValue' | 'mostActiveVolume';
 
@@ -328,6 +352,87 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
   );
 }
 
+function TrendlynePanel({ screenKey, label, accentClass }: { screenKey: TrendlyneScreenKey; label: string; accentClass: string }) {
+  const [items, setItems] = useState<TrendlyneStock[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/trendlyne-screener?screen=${screenKey}`, { cache: 'no-store' });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+      const data: TrendlyneScreenData = await res.json();
+      setItems(data.screenData?.slice(0, 5) ?? []);
+      setLoading(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Trendlyne unavailable');
+      setLoading(false);
+    }
+  }, [screenKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      await fetchData();
+      if (cancelled) return;
+    };
+    void load();
+    const id = window.setInterval(() => { if (!cancelled) fetchData(); }, 900_000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [fetchData]);
+
+  const dotClass = accentClass === 'emerald' ? 'bg-emerald-500' : accentClass === 'red' ? 'bg-red-500' : 'bg-amber-500';
+  const textAccentCls = accentClass === 'emerald' ? 'text-emerald-600' : accentClass === 'red' ? 'text-red-500' : 'text-amber-600';
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm overflow-visible">
+      <div className={`text-[11px] uppercase tracking-wider ${textAccentCls} font-bold mb-3 flex items-center gap-2`}>
+        <span className={`w-2.5 h-2.5 rounded-full ${dotClass}`} />
+        {label}
+        <span className="ml-auto text-[8px] text-slate-400 font-normal">{loading ? 'loading' : error ? 'err' : `${items.length}`}</span>
+      </div>
+      <div className="space-y-1.5">
+        {loading && items.length === 0 && (
+          <div className="text-[11px] text-slate-400 px-3 py-2 animate-pulse">Loading...</div>
+        )}
+        {error && items.length === 0 && (
+          <div className="text-[11px] text-red-400 px-3 py-2">{error}</div>
+        )}
+        {items.map((item, idx) => {
+          const currentPrice = item.tooltipParams.find((p) => p.key === 'currentPrice')?.value ?? '—';
+          return (
+            <a
+              key={`${screenKey}-${item.name}-${idx}`}
+              href={item.stockurl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between px-3 py-2 rounded-lg transition-all hover:bg-slate-50 hover:scale-[1.01] cursor-pointer"
+              style={{
+                backgroundColor: idx % 2 === 0 ? 'rgba(248, 250, 252, 0.5)' : 'transparent',
+                borderBottom: '1px solid rgba(226, 232, 240, 0.4)',
+              }}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[9px] font-bold text-slate-400 w-4 text-right">{String(idx + 1).padStart(2, '0')}</span>
+                <span className="text-[12px] font-bold text-slate-800 truncate">{item.name}</span>
+              </div>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <span className={`text-[11px] font-bold ${textAccentCls}`}>{item.value}%</span>
+                <span className="text-[10px] text-slate-500">₹{currentPrice}</span>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function GainersLosersHeatmap() {
   const [categories, setCategories] = useState<Record<NseTopFiveCategoryKey, NseStock[]>>({
     topGainers: [],
@@ -437,6 +542,19 @@ function GainersLosersHeatmap() {
             </div>
           );
         })}
+      </div>
+
+      {/* Trendlyne Panels */}
+      <div className="mt-5 pt-4 border-t border-slate-200">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+          <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">TRENDLYNE SCREENERS</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {TRENDLYNE_SCREENS.map((screen) => (
+            <TrendlynePanel key={screen.key} screenKey={screen.key} label={screen.label} accentClass={screen.accent} />
+          ))}
+        </div>
       </div>
     </div>
   );

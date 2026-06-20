@@ -30,14 +30,14 @@ from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from SmartApi import SmartConnect
 
-from global_feed import (
+from .market_feeds import (
     fetch_domestic_index_macro,
     fetch_domestic_yahoo_macro,
     fetch_global_macro,
     fetch_gift_nifty,
 )
-from symbols import MACRO_INSTRUMENTS, MOCK_TICKERS, WATCHLIST, Instrument
-from terminal_intelligence_full import (
+from ..utils.symbols import MACRO_INSTRUMENTS, MOCK_TICKERS, WATCHLIST, Instrument
+from .intelligence_engine import (
     CompleteSecurityAnalysisPayload,
     TOP_SELECTION_COUNT,
     _on_demand_ticker_selection_reason,

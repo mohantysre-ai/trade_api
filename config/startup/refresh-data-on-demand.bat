@@ -19,10 +19,40 @@ REM ============================================================
 
 setlocal enabledelayedexpansion
 
+REM %~dp0 resolves to config\startup\  — go up two levels to reach project root
 set SCRIPT_DIR=%~dp0
-set PS1_SCRIPT="%SCRIPT_DIR%.kilo\scripts\refresh-data-on-demand.ps1"
-set PYTHON_SCRIPT="%SCRIPT_DIR%backend\angel_one_feed.py"
-set PYTHON_EXE="%SCRIPT_DIR%.venv\Scripts\python.exe"
+set PROJECT_ROOT=%SCRIPT_DIR%..\..\
+set VENV_DIR=%PROJECT_ROOT%.venv
+set VENV_PYTHON=%VENV_DIR%\Scripts\python.exe
+set PS1_SCRIPT="%PROJECT_ROOT%.kilo\scripts\refresh-data-on-demand.ps1"
+set PYTHON_SCRIPT="%PROJECT_ROOT%backend\app\services\angel_one_feed.py"
+set PYTHON_EXE="%VENV_PYTHON%"
+set REQUIREMENTS_TXT="%PROJECT_ROOT%backend\requirements.txt"
+
+REM ------------------------------------------------------------
+REM Auto-create virtual environment if it doesn't exist
+REM ------------------------------------------------------------
+if not exist "%VENV_PYTHON%" (
+    echo [.] Virtual environment not found at %VENV_DIR%
+    echo [.] Creating virtual environment...
+    python -m venv "%VENV_DIR%"
+    if !ERRORLEVEL! neq 0 (
+        echo [!] Failed to create virtual environment. Make sure Python is installed.
+        pause
+        exit /b 1
+    )
+    echo [.] Installing dependencies from backend\requirements.txt...
+    "%VENV_PYTHON%" -m pip install --upgrade pip
+    "%VENV_PYTHON%" -m pip install -r %REQUIREMENTS_TXT%
+    if !ERRORLEVEL! neq 0 (
+        echo [!] pip install failed. Check requirements.txt and network connection.
+        pause
+        exit /b 1
+    )
+    echo [.] Virtual environment is ready.
+) else (
+    echo [.] Using existing virtual environment at %VENV_DIR%
+)
 
 REM Initialize flags and arguments
 set ORCHESTRATE_MODE=0
