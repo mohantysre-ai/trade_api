@@ -89,8 +89,10 @@ if (-not (Test-Path $Python)) {
     $Python = "python"
 }
 
+Write-Host "  [CMD] Changing to backend directory and running module..." -ForegroundColor Cyan
 $cliArgs = @(
-    (Join-Path $Root "backend\angel_one_feed.py"),
+    "-m",
+    "app.services.angel_one_feed",
     "--refresh-on-demand",
     "--output",
     $OutputPath
@@ -98,7 +100,12 @@ $cliArgs = @(
 if ($Pool) { $cliArgs += "--pool"; $cliArgs += $Pool }
 if ($Prompt) { $cliArgs += "--prompt"; $cliArgs += $Prompt }
 
-& $Python @cliArgs
+Push-Location (Join-Path $Root "backend")
+try {
+    & $Python @cliArgs
+} finally {
+    Pop-Location
+}
 if ($LASTEXITCODE -ne 0) {
     throw "CLI refresh failed with exit code $LASTEXITCODE"
 }

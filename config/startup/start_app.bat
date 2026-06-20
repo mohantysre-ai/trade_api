@@ -4,7 +4,8 @@ REM Starts services as background processes with pre-flight and post-flight vali
 
 setlocal enabledelayedexpansion
 
-set PROJECT_ROOT=%~dp0
+set SCRIPT_DIR=%~dp0
+set PROJECT_ROOT=%SCRIPT_DIR%..\..
 REM Normalize PROJECT_ROOT (remove trailing backslash)
 if "%PROJECT_ROOT:~-1%"=="\" set "PROJECT_ROOT=%PROJECT_ROOT:~0,-1%"
 
@@ -66,11 +67,11 @@ if exist "%VENV_PYTHON%" (
 
 REM Start Market API Backend in background
 echo [*] Starting Market API Backend on port 8000...
-powershell -NoProfile -Command "Start-Process -FilePath \"%PYTHON_EXE%\" -ArgumentList \"-m\", \"uvicorn\", \"angel_one_feed:create_app\", \"--factory\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\" -WorkingDirectory \"%BACKEND_DIR%\" -NoNewWindow -PassThru | Out-Null"
+powershell -NoProfile -Command "Start-Process -FilePath \"%PYTHON_EXE%\" -ArgumentList \"-m\", \"uvicorn\", \"app.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\" -WorkingDirectory \"%BACKEND_DIR%\" -NoNewWindow -PassThru | Out-Null"
 
 REM Start AI News Backend in background
 echo [*] Starting AI News Backend on port 8001...
-powershell -NoProfile -Command "Start-Process -FilePath \"%PYTHON_EXE%\" -ArgumentList \"-m\", \"uvicorn\", \"ai_news_server:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8001\" -WorkingDirectory \"%AI_NEWS_BACKEND_DIR%\" -NoNewWindow -PassThru | Out-Null"
+powershell -NoProfile -Command "Start-Process -FilePath \"%PYTHON_EXE%\" -ArgumentList \"-m\", \"uvicorn\", \"app.services.ai_news_server:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8001\" -WorkingDirectory \"%BACKEND_DIR%\" -NoNewWindow -PassThru | Out-Null"
 
 REM =========================================================
 REM FRONTEND PREPARATION: Clear Next.js cache to fix SWC errors
