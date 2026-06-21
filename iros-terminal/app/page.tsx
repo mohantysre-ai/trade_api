@@ -21,7 +21,7 @@ type DrawerContent = {
   tickerNews?: AITickerNewsReport | null;
 };
 
-type TabKey = 'marketSnapshot' | 'assetMatrix';
+type TabKey = 'marketSnapshot' | 'stockHeatMap' | 'assetMatrix';
 
 const INDIA_MARKET_LABELS = new Set(['NIFTY 100', 'SENSEX', 'NIFTY BANK', 'NIFTY IT', 'NIFTY PHARMA', 'NIFTY MIDCAP', 'NIFTY SMALLCAP']);
 const GLOBAL_ONLY_LABELS = new Set(['BRENT CRUDE', 'BRENT CRUDE OIL']);
@@ -242,8 +242,8 @@ function NseTooltipContent({ data }: { data: Record<string, unknown> }) {
 
   return (
     <div>
-      {/* Animated sparkline header */}
-      <div className="mb-3 rounded-t-lg" style={{ background: positive ? 'linear-gradient(180deg, rgba(16,185,129,0.08) 0%, transparent 100%)' : 'linear-gradient(180deg, rgba(239,68,68,0.08) 0%, transparent 100%)' }}>
+      {/* Sparkline header */}
+      <div className="mb-3 rounded-t-lg p-2" style={{ background: positive ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)' }}>
         <MiniSparkline positive={positive} />
       </div>
 
@@ -283,7 +283,6 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
   const [anchor, setAnchor] = useState({ x: 0, y: 0 });
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewportWidth = typeof window === 'undefined' ? 1024 : window.innerWidth;
-  const viewportHeight = typeof window === 'undefined' ? 768 : window.innerHeight;
   const tooltipWidth = 352;
   const tooltipLeft = Math.max(12, Math.min(anchor.x + 4, viewportWidth - tooltipWidth - 12));
   const tooltipTop = Math.max(8, anchor.y);
@@ -325,7 +324,7 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
       {visible && (
         <div
           aria-hidden={!visible}
-          className="fixed z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl transition-all pointer-events-auto overflow-y-auto max-h-[calc(100vh-2rem)] visible opacity-100"
+          className="fixed z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl pointer-events-auto overflow-y-auto max-h-[calc(100vh-2rem)] visible opacity-100"
           style={{
             left: `${tooltipLeft}px`,
             top: `${tooltipTop}px`,
@@ -629,10 +628,10 @@ function NseHeatMapTooltip({ stock, ticker, colors }: { stock: NseEquityStock; t
     <>
       <div
         ref={triggerRef}
-        className="flex flex-col items-center justify-center rounded-md py-3 px-2 transition-all hover:shadow-md cursor-default"
+        className="flex flex-col items-center justify-center rounded-lg py-4 px-3 transition-all duration-300 hover:shadow-xl hover:scale-110 cursor-default group"
         style={{
           backgroundColor: colors.bg,
-          border: `1px solid ${colors.border}`,
+          border: `2px solid ${colors.border}`,
         }}
         onMouseEnter={showTooltip}
         onMouseLeave={scheduleClose}
@@ -640,21 +639,30 @@ function NseHeatMapTooltip({ stock, ticker, colors }: { stock: NseEquityStock; t
         onBlur={() => { cancelClose(); setVisible(false); }}
         tabIndex={0}
       >
-        <span className="text-[10px] font-bold leading-tight" style={{ color: colors.text }}>
+        <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg" />
+        <span className="text-[11px] font-bold leading-tight relative z-10" style={{ color: colors.text }}>
           {ticker}
         </span>
-        <span className="text-[9px] font-semibold mt-1" style={{ color: colors.text }}>
+        <span className="text-[10px] font-semibold mt-1.5 relative z-10" style={{ color: colors.text }}>
           {typeof stock.pChange === 'number' ? `${stock.pChange > 0 ? '+' : ''}${stock.pChange.toFixed(2)}` : 'N/A'}
         </span>
       </div>
       <div
         aria-hidden={!visible}
-        className={`fixed z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-slate-300 bg-white p-4 text-left shadow-lg transition-all pointer-events-auto overflow-y-auto max-h-[calc(100vh-2rem)] ${visible ? 'visible opacity-100' : 'invisible opacity-0'}`}
-        style={{ left: `${tooltipLeft}px`, top: `${tooltipTop}px` }}
+        className={`fixed z-50 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-slate-300 bg-white p-5 text-left shadow-2xl transition-all duration-300 pointer-events-auto overflow-y-auto max-h-[calc(100vh-2rem)] ${visible ? 'visible opacity-100 translate-y-0' : 'invisible opacity-0 translate-y-2'}`}
+        style={{ 
+          left: `${tooltipLeft}px`, 
+          top: `${tooltipTop}px`,
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15), 0 8px 16px rgba(0, 0, 0, 0.1)'
+        }}
         onMouseEnter={() => { cancelClose(); setVisible(true); }}
         onMouseLeave={scheduleClose}
       >
-        <div className="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-3">{ticker}</div>
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-blue-400 to-purple-400 rounded-t-xl" />
+        <div className="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-3 flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
+          {ticker}
+        </div>
         <div className="overflow-visible max-h-none">
           <NseTooltipContent data={stock} />
         </div>
@@ -706,38 +714,95 @@ function Nifty100HeatMap() {
 
   if (loading || (error && heatMapStocks.length === 0)) {
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-5 shadow-sm min-h-[520px]">
-        <div className="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-3">NIFTY 100 HEAT MAP</div>
-        <div className="text-[11px] text-slate-400">{error ?? 'Waiting for live data...'}</div>
+      <div className="bg-gradient-to-br from-white to-slate-50 border border-slate-300 border-[0.5px] rounded-xl p-8 shadow-lg min-h-[520px]">
+        <div className="flex flex-col items-center justify-center h-full">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-teal-400 to-blue-500 animate-spin mb-4 shadow-lg" />
+          <div className="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-2">NIFTY 100 HEAT MAP</div>
+          <div className="text-[11px] text-slate-400">{error ?? 'Waiting for live data...'}</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-5 shadow-sm min-h-[520px]">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">NIFTY 100 HEAT MAP</span>
-          <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-1 rounded">{heatMapStocks.length} stocks</span>
-        </div>
-        <div className="flex items-center gap-3 text-[9px] uppercase tracking-wider text-slate-400">
-          <span className="flex items-center gap-1"><span className="w-3 h-2 rounded bg-emerald-800" /> Gainers <span className="text-emerald-700 font-bold">{gainers}</span></span>
-          <span className="flex items-center gap-1"><span className="w-3 h-2 rounded bg-red-800" /> Losers <span className="text-red-700 font-bold">{losers}</span></span>
+    <div className="bg-gradient-to-br from-white via-slate-50/30 to-white border border-slate-300 border-[0.5px] rounded-xl p-6 shadow-lg">
+      {/* Modern Header with gradient accent */}
+      <div className="relative mb-6">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-blue-400 to-purple-400 rounded-t-xl" />
+        <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-blue-600 flex items-center justify-center shadow-lg">
+                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 animate-pulse border-2 border-white" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">NIFTY 100 HEAT MAP</h3>
+              <p className="text-[10px] text-slate-500 mt-0.5">Live market performance visualization</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-slate-100 to-slate-50 border border-slate-200">
+              <span className="text-[10px] text-slate-600 font-semibold">{heatMapStocks.length} stocks</span>
+            </div>
+            <div className="flex items-center gap-2 text-[9px] uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-emerald-700 font-bold">{gainers}</span>
+                <span className="text-emerald-600">Gainers</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-50 border border-red-200">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-red-700 font-bold">{losers}</span>
+                <span className="text-red-600">Losers</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
-        {heatMapStocks.map((stock) => {
-          const colors = getHeatColor(stock.changePct);
-          return (
-            <NseHeatMapTooltip
-              key={stock.ticker}
-              stock={stock.stock}
-              ticker={stock.ticker}
-              colors={colors}
-            />
-          );
-        })}
+
+      {/* Modern Heat Map Grid */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-teal-50/30 via-blue-50/20 to-purple-50/30 rounded-lg blur-2xl opacity-60" />
+        <div className="relative grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+          {heatMapStocks.map((stock, index) => {
+            const colors = getHeatColor(stock.changePct);
+            return (
+              <div
+                key={stock.ticker}
+                className="animate-fadeIn"
+                style={{ animationDelay: `${index * 20}ms` }}
+              >
+                <NseHeatMapTooltip
+                  stock={stock.stock}
+                  ticker={stock.ticker}
+                  colors={colors}
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
+
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: scale(0.9) translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.5s ease-out forwards;
+          opacity: 0;
+        }
+      `}</style>
     </div>
   );
 }
@@ -1330,6 +1395,7 @@ export default function IrosMasterAdvancedTerminal() {
         <nav className="bg-white border border-slate-300 border-[0.5px] rounded-xl flex gap-1 p-1 shadow-sm">
           {([
             { key: 'marketSnapshot' as TabKey, label: 'MARKET SNAPSHOT' },
+            { key: 'stockHeatMap' as TabKey, label: 'STOCK HEAT MAP' },
             { key: 'assetMatrix' as TabKey, label: 'ASSET MATRIX' },
           ]).map((tab) => (
             <button
@@ -1369,7 +1435,11 @@ export default function IrosMasterAdvancedTerminal() {
               <NewsFeedPanel items={liveMarket?.news} now={now} />
             </div>
 
-            {/* Row 3: NIFTY 100 Heat Map — full width single panel */}
+          </div>
+        )}
+
+        {activeTab === 'stockHeatMap' && (
+          <div className="space-y-4">
             <Nifty100HeatMap />
           </div>
         )}

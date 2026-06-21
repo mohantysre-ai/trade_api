@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import type { AITickerNewsReport, TerminalIntelligence } from "@/lib/market-api";
 import AITickerNewsPanel from "./AITickerNewsPanel";
 import ConfidenceCheckerPanel from "./ConfidenceCheckerPanel";
+import TechnicalAnalysisPanel from "./TechnicalAnalysisPanel";
+import SwotAnalysisPanel from "./SwotAnalysisPanel";
 
 type DrawerAnalysis = TerminalIntelligence & {
   error?: string;
@@ -327,7 +329,7 @@ type DrawerContent = {
   tickerNews?: AITickerNewsReport | null;
 };
 
-type DrawerTab = "aiNews" | "analysis" | "confidenceChecker";
+type DrawerTab = "aiNews" | "analysis" | "confidenceChecker" | "technicalAnalysis" | "swotAnalysis";
 
 export default function RightDrawer({ open, onClose, content }: { open: boolean; onClose: () => void; content?: DrawerContent | null }) {
   const [activeTab, setActiveTab] = useState<DrawerTab>("aiNews");
@@ -422,7 +424,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
 
   return (
     <div
-      className={`fixed top-0 right-0 h-full w-full lg:w-[42%] xl:w-[40%] 2xl:w-[36%] bg-white border-l border-slate-200 shadow-2xl transform ${
+      className={`fixed top-0 right-0 h-full w-full lg:w-[50%] xl:w-[50%] 2xl:w-[45%] bg-white border-l border-slate-200 shadow-2xl transform ${
         open ? "translate-x-0" : "translate-x-full"
       } transition-transform duration-300 ease-out z-50 overflow-y-auto`}
     >
@@ -473,7 +475,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           </button>
           <button
             onClick={() => setActiveTab("confidenceChecker")}
-            className={`relative py-2.5 px-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
+            className={`relative py-2.5 px-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 mr-6 ${
               activeTab === "confidenceChecker"
                 ? "text-teal-700"
                 : "text-slate-400 hover:text-slate-600"
@@ -481,6 +483,32 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           >
             Confidence Checker
             {activeTab === "confidenceChecker" && (
+              <span className="absolute inset-x-0 -bottom-px h-0.5 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("technicalAnalysis")}
+            className={`relative py-2.5 px-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 mr-6 ${
+              activeTab === "technicalAnalysis"
+                ? "text-teal-700"
+                : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            Technical Analysis
+            {activeTab === "technicalAnalysis" && (
+              <span className="absolute inset-x-0 -bottom-px h-0.5 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("swotAnalysis")}
+            className={`relative py-2.5 px-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
+              activeTab === "swotAnalysis"
+                ? "text-teal-700"
+                : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            SWOT Analysis
+            {activeTab === "swotAnalysis" && (
               <span className="absolute inset-x-0 -bottom-px h-0.5 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full" />
             )}
           </button>
@@ -512,6 +540,16 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
         {/* Confidence Checker Tab */}
         {activeTab === "confidenceChecker" && (
           <ConfidenceCheckerPanel key={ticker} ticker={ticker} companyName={stock?.name} />
+        )}
+
+        {/* Technical Analysis Tab */}
+        {activeTab === "technicalAnalysis" && (
+          <TechnicalAnalysisPanel key={ticker} ticker={ticker} companyName={stock?.name} />
+        )}
+
+        {/* SWOT Analysis Tab */}
+        {activeTab === "swotAnalysis" && (
+          <SwotAnalysisPanel key={ticker} ticker={ticker} companyName={stock?.name} />
         )}
 
         {/* Analysis Tab */}
