@@ -668,6 +668,101 @@ def _ema_angle_deg(ema_values: list[float]) -> float:
     return math.degrees(math.atan(slope_pct))
 
 
+def _intraday_metrics_from_quote(ltp: float, now: datetime, quote: dict[str, Any]) -> dict[str, Any]:
+    """Compute best-effort intraday metrics from quote data when candle API fails.
+    
+    Uses open/high/low/close/volume from the quote snapshot (which is always
+    available from Angel One's batch quote API) to approximate the metrics.
+    """
+    open_ = float(quote.get("open", 0) or 0)
+    high = float(quote.get("high", 0) or 0)
+    low = float(quote.get("low", 0) or 0)
+    close = float(quote.get("close", 0) or 0)
+    volume = float(quote.get("tradeVolume", 0) or 0)
+    
+    # Estimate ATR% from today's range vs close (single-bar proxy for daily ATR)
+    daily_range_pct = 0.0
+    if close > 0 and high > 0 and low > 0:
+        daily_range_pct = ((high - low) / close) * 100
+    
+    # VWAP approximation using OHL+C/4 typical price (single-bar estimate)
+    typical = (high + low + ltp) / 3.0 if high and low and ltp else (open_ + high + low + close) / 4.0
+    vwap = typical if typical > 0 else ltp
+    
+    # EMA9 approximated as the typical price (best single-point estimate w/o history)
+    ema9 = typical if typical > 0 else ltp
+    
+    # ORB from quote data (uses today's open as ORB reference)
+    orb_high = max(open_, ltp) if open_ else high
+    orb_low = min(open_, ltp) if open_ else low
+    
+    # Today's volume from quote (tradeVolume is cumulative for the day)
+    today_volume = volume
+    avg_daily_volume_20 = volume  # estimate: use today's volume as proxy (better than 0)
+    volume_multiplier = 1.0  # neutral
+    
+    # Wick noise ratio from single candle (open vs close vs high vs low)
+    wick_noise_ratio = 1.0
+    if high > low and high > 0:
+        body_high = max(open_, close) if open_ and close else open_ or close or ltp
+        body_low = min(open_, close) if open_ and close else open_ or close or ltp
+        total_range = high - low
+        wick = (high - body_high) + (body_low - low)
+        if total_range > 0:
+            wick_noise_ratio = min(wick / total_range, 1.0)
+    
+    # EMA angle: cannot compute without history, default neutral
+    ema_angle_deg = 0.0
+    
+    # ORB velocity
+    orb_velocity_pct = ((ltp - orb_high) / orb_high) * 100 if orb_high and ltp >= orb_high else 0.0
+    
+    # Turnover
+    turnover_cr = (ltp * today_volume) / 10_000_000 if ltp and today_volume else 0.0
+    
+    price_above_vwap = bool(vwap and ltp > vwap)
+    price_above_ema9 = bool(ema9 and ltp > ema9)
+    
+    hard_filter_reasons: list[str] = []
+    if daily_range_pct <= 3.0:
+        hard_filter_reasons.append("ATR under 3.0%")
+    if volume_multiplier <= 3.0:
+        hard_filter_reasons.append("opening volume under 3.0x")
+    if wick_noise_ratio > 0.25:
+        hard_filter_reasons.append("wick noise too high")
+    if not price_above_vwap:
+        hard_filter_reasons.append("below VWAP")
+    if not price_above_ema9:
+        hard_filter_reasons.append("below EMA9")
+    if ema_angle_deg <= 45.0:
+        hard_filter_reasons.append("EMA angle below 45 degrees")
+    if turnover_cr < 50.0:
+        hard_filter_reasons.append("turnover under 50 Cr")
+    
+    passes_hard_filters = len(hard_filter_reasons) == 0
+    trigger_point = "VWAP Bounce" if price_above_vwap else "15-min ORB" if ltp >= orb_high else "Flag Breakout"
+    
+    return {
+        "atr_pct": round(daily_range_pct, 2),
+        "volume_multiplier": round(volume_multiplier, 2),
+        "today_volume": round(today_volume, 0),
+        "avg_daily_volume_20": round(avg_daily_volume_20, 0),
+        "vwap": round(vwap, 2),
+        "ema9": round(ema9, 2),
+        "ema_angle_deg": round(ema_angle_deg, 2),
+        "orb_high": round(orb_high, 2),
+        "orb_low": round(orb_low, 2),
+        "orb_velocity_pct": round(orb_velocity_pct, 2),
+        "wick_noise_ratio": round(wick_noise_ratio, 3),
+        "turnover_cr": round(turnover_cr, 2),
+        "price_above_vwap": price_above_vwap,
+        "price_above_ema9": price_above_ema9,
+        "trigger_point": trigger_point,
+        "passes_hard_filters": passes_hard_filters,
+        "hard_filter_reasons": hard_filter_reasons + ["metrics estimated from quote (candle API unavailable)"],
+    }
+
+
 def _empty_intraday_metrics(reason: str) -> dict[str, Any]:
     return {
         "atr_pct": 0.0,
@@ -695,6 +790,7 @@ def _intraday_metrics(
     inst: Instrument,
     ltp: float,
     now: datetime,
+    quote_fallback: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     try:
         market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
@@ -711,6 +807,9 @@ def _intraday_metrics(
         intraday_candles = []
 
     if not daily_candles or not intraday_candles:
+        # Fallback: use quote data to compute best-effort metrics when candle API fails/returns empty
+        if quote_fallback is not None:
+            return _intraday_metrics_from_quote(ltp, now, quote_fallback)
         return _empty_intraday_metrics("insufficient candle data")
 
     daily_close = daily_candles[-1]["close"] or ltp or 1.0
@@ -789,8 +888,18 @@ def _fetch_intraday_chunk(
         inst = stock_universe_by_key.get(str(row["ticker"]))
         if not inst:
             continue
+        ltp = float(row.get("ltpRaw", 0) or 0)
+        # Build quote_fallback from the row data (populated from batch quote API)
+        quote_fallback = {
+            "open": row.get("open"),
+            "high": row.get("high"),
+            "low": row.get("low"),
+            "close": row.get("close"),
+            "tradeVolume": row.get("volume"),
+            "ltp": ltp,
+        }
         try:
-            metrics = _intraday_metrics(client, inst, float(row.get("ltpRaw", 0) or 0), now)
+            metrics = _intraday_metrics(client, inst, ltp, now, quote_fallback=quote_fallback)
         except Exception:
             metrics = _empty_intraday_metrics("fetch error")
         results[str(row["ticker"])] = metrics
