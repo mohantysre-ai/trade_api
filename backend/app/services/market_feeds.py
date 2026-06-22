@@ -170,6 +170,9 @@ COMMODITY_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("natgas", "NG=F", "NATURAL GAS", "commodity", _fmt_natgas),
     YahooInstrument("bitcoin", "BTC-USD", "BITCOIN", "commodity", _fmt_usd),
     YahooInstrument("copper", "HG=F", "COPPER", "commodity", _fmt_usd),
+    YahooInstrument("platinum", "PL=F", "PLATINUM", "commodity", _fmt_usd_oz),
+    YahooInstrument("palladium", "PA=F", "PALLADIUM", "commodity", _fmt_usd_oz),
+    YahooInstrument("wheat", "ZW=F", "WHEAT", "commodity", _fmt_usd),
 ]
 
 GLOBAL_INSTRUMENTS: list[YahooInstrument] = [*GLOBAL_INDEX_INSTRUMENTS, *COMMODITY_INSTRUMENTS]

@@ -4713,6 +4713,23 @@
       "summary_headline": "No specific news found for SMCGLOBAL in the provided articles.",
       "generated_at": "2026-06-22T04:40:13.194184+00:00",
       "ticker": "SMCGLOBAL"
+    },
+    "WESTLIFE": {
+      "insider_activity": "No recent news found.",
+      "institutional_activity": "HDFC Securities has a 'reduce' call on Westlife Foodworld with a target price of Rs 680",
+      "order_book_block_deals": "No recent news found.",
+      "future_expansion_capex": "No recent news found.",
+      "auditor_changes": "No recent news found.",
+      "dividend_news": "No recent news found.",
+      "new_orders_contracts": "No recent news found.",
+      "earnings_results": "No recent news found.",
+      "management_changes": "No recent news found.",
+      "regulatory_filings": "No recent news found.",
+      "sentiment_overall": "No recent news found.",
+      "risk_flags": "No recent news found.",
+      "summary_headline": "No recent news found.",
+      "generated_at": "2026-06-22T06:39:42.611225+00:00",
+      "ticker": "WESTLIFE"
     }
   },
   "isSnapshotFallback": false,

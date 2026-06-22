@@ -829,15 +829,21 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {items.map((item) => {
           const isPositive = item.state === 'POSITIVE';
+          const gradient = getGlobalIndexGradient(item.label);
           return (
             <div
               key={`${item.label}-${item.val}-${item.state}`}
-              className="relative overflow-hidden bg-slate-50 border border-slate-200 rounded-lg p-3 transition-all hover:border-slate-300 hover:shadow-sm"
+              className="relative overflow-hidden rounded-xl p-4 transition-all hover:scale-105"
+              style={{
+                background: gradient.background,
+                border: gradient.border,
+                minHeight: '120px',
+              }}
             >
               <SparklineSVG positive={isPositive} />
-              <span className="text-[10px] text-slate-500 block uppercase tracking-wider font-semibold">{item.label}</span>
-              <span className="text-lg font-bold text-slate-900 block mt-1 font-mono">{item.val}</span>
-              <span className={`text-[12px] font-semibold block mt-0.5 ${marketStateClass(item.state)}`}>
+              <span className="text-[11px] text-slate-600 block uppercase tracking-wider font-semibold">{item.label}</span>
+              <span className="text-xl font-bold text-slate-900 block mt-2 font-mono">{item.val}</span>
+              <span className={`text-[13px] font-bold block mt-1 ${marketStateClass(item.state)}`}>
                 {isPositive ? '↑' : '↓'} {item.delta}
               </span>
             </div>
@@ -846,6 +852,90 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
       </div>
     </div>
   );
+}
+
+function getCommodityGradient(label: string): { background: string; border: string } {
+  const upper = label.toUpperCase();
+  if (upper.includes('GOLD')) {
+    return { background: 'linear-gradient(135deg, #FEF3C7 0%, #FCD34D 100%)', border: '1px solid #FCD34D' };
+  }
+  if (upper.includes('SILVER')) {
+    return { background: 'linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%)', border: '1px solid #BAE6FD' };
+  }
+  if (upper.includes('BRENT')) {
+    return { background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)', border: '1px solid #FECACA' };
+  }
+  if (upper.includes('WTI')) {
+    return { background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)', border: '1px solid #FECACA' };
+  }
+  if (upper.includes('NATURAL') || upper.includes('GAS')) {
+    return { background: 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)', border: '1px solid #A7F3D0' };
+  }
+  if (upper.includes('ALUMINUM')) {
+    return { background: 'linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%)', border: '1px solid #DDD6FE' };
+  }
+  if (upper.includes('ZINC')) {
+    return { background: 'linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%)', border: '1px solid #DDD6FE' };
+  }
+  if (upper.includes('NICKEL')) {
+    return { background: 'linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%)', border: '1px solid #DDD6FE' };
+  }
+  if (upper.includes('BITCOIN')) {
+    return { background: 'linear-gradient(135deg, #FEF08A 0%, #FDE047 100%)', border: '1px solid #FDE047' };
+  }
+  if (upper.includes('COPPER')) {
+    return { background: 'linear-gradient(135deg, #FBDDD8 0%, #F7C2B5 100%)', border: '1px solid #F5A896' };
+  }
+  if (upper.includes('PLATINUM')) {
+    return { background: 'linear-gradient(135deg, #E0E7FF 0%, #C7D2FE 100%)', border: '1px solid #C7D2FE' };
+  }
+  if (upper.includes('PALLADIUM')) {
+    return { background: 'linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%)', border: '1px solid #E2E8F0' };
+  }
+  if (upper.includes('WHEAT')) {
+    return { background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', border: '1px solid #FDE68A' };
+  }
+  return { background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', border: '1px solid #E2E8F0' };
+}
+
+function getIndiaMarketGradient(label: string): { background: string; border: string } {
+  const upper = label.toUpperCase();
+  if (upper.includes('NIFTY 50') || upper.includes('NIFTY BANK') || upper.includes('NIFTY IT') || upper.includes('NIFTY PHARMA')) {
+    return { background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', border: '1px solid #A7F3D0' };
+  }
+  if (upper.includes('SENSEX')) {
+    return { background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', border: '1px solid #BFDBFE' };
+  }
+  if (upper.includes('MIDCAP')) {
+    return { background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', border: '1px solid #FDE68A' };
+  }
+  if (upper.includes('SMALLCAP')) {
+    return { background: 'linear-gradient(135deg, #FCE7F3 0%, #FBCFE8 100%)', border: '1px solid #F9A8D4' };
+  }
+  if (upper.includes('USD') || upper.includes('VIX') || upper.includes('GIFT')) {
+    return { background: 'linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%)', border: '1px solid #DDD6FE' };
+  }
+  return { background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', border: '1px solid #E2E8F0' };
+}
+
+function getGlobalIndexGradient(label: string): { background: string; border: string } {
+  const upper = label.toUpperCase();
+  if (upper.includes('DJI') || upper.includes('S&P 500') || upper.includes('NASDAQ') || upper.includes('DOW')) {
+    return { background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', border: '1px solid #BFDBFE' };
+  }
+  if (upper.includes('NIKKEI')) {
+    return { background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', border: '1px solid #FDE68A' };
+  }
+  if (upper.includes('HANG SENG') || upper.includes('SHANGHAI')) {
+    return { background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)', border: '1px solid #FECACA' };
+  }
+  if (upper.includes('DAX') || upper.includes('CAC') || upper.includes('FTSE') || upper.includes('EURO')) {
+    return { background: 'linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%)', border: '1px solid #DDD6FE' };
+  }
+  if (upper.includes('ASX') || upper.includes('BOVESPA')) {
+    return { background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', border: '1px solid #A7F3D0' };
+  }
+  return { background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', border: '1px solid #E2E8F0' };
 }
 
 function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
@@ -866,28 +956,24 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
         </div>
         {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'BRENT CRUDE OIL') displayLabel = 'BRENT CRUDE';
-          const isPositive = item.state === 'POSITIVE';
-          const intensity = isPositive ? 0.2 : 0.15;
+          const gradient = getCommodityGradient(displayLabel);
           return (
             <div
               key={`${item.label}-${item.val}-${item.state}`}
-              className="rounded-lg p-3 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105"
+              className="rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105"
               style={{
-                background: isPositive
-                  ? `rgba(16, 185, 129, ${intensity})`
-                  : `rgba(239, 68, 68, ${intensity})`,
-                border: `1px solid ${
-                  isPositive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.25)'
-                }`,
+                background: gradient.background,
+                border: gradient.border,
+                minHeight: '120px',
               }}
             >
-              <span className="text-[11px] font-bold text-slate-800">{displayLabel}</span>
-              <span className="text-[10px] text-slate-500 mt-1 font-mono font-semibold">{item.val}</span>
-              <span className={`text-[11px] font-semibold ${marketStateClass(item.state)}`}>
+              <span className="text-[12px] font-bold text-slate-800 uppercase tracking-wide">{displayLabel}</span>
+              <span className="text-[11px] text-slate-600 mt-2 font-mono font-bold">{item.val}</span>
+              <span className={`text-[12px] font-bold mt-1 ${marketStateClass(item.state)}`}>
                 {item.delta}
               </span>
             </div>
@@ -918,15 +1004,21 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
           let displayLabel = item.label;
           if (displayLabel === 'USD / INR Spot') displayLabel = 'USD / INR';
           const isPositive = item.state === 'POSITIVE';
+          const gradient = getIndiaMarketGradient(displayLabel);
           return (
             <div
               key={`${item.label}-${item.val}-${item.state}`}
-              className="relative overflow-hidden bg-slate-50 border border-slate-200 rounded-lg p-3 transition-all hover:border-slate-300 hover:shadow-sm"
+              className="relative overflow-hidden rounded-xl p-4 transition-all hover:scale-105"
+              style={{
+                background: gradient.background,
+                border: gradient.border,
+                minHeight: '120px',
+              }}
             >
               <SparklineSVG positive={isPositive} />
-              <span className="text-[10px] text-slate-500 block uppercase tracking-wider font-semibold">{displayLabel}</span>
-              <span className="text-lg font-bold text-slate-900 block mt-1 font-mono">{item.val}</span>
-              <span className={`text-[12px] font-semibold block mt-0.5 ${marketStateClass(item.state)}`}>
+              <span className="text-[11px] text-slate-600 block uppercase tracking-wider font-semibold">{displayLabel}</span>
+              <span className="text-xl font-bold text-slate-900 block mt-2 font-mono">{item.val}</span>
+              <span className={`text-[13px] font-bold block mt-1 ${marketStateClass(item.state)}`}>
                 {isPositive ? '↑' : '↓'} {item.delta}
               </span>
             </div>
@@ -1415,21 +1507,22 @@ export default function IrosMasterAdvancedTerminal() {
 
         {activeTab === 'marketSnapshot' && (
           <div className="space-y-4">
-            {/* Row 1: India Markets — TOP MOVERS + Global Indices + Commodities side-by-side */}
+            {/* Row 1: India Markets — TOP MOVERS */}
             <div className="grid grid-cols-1 gap-4 items-start">
               <IndiaMarketsGrid items={currentMacros} staleLabel={staleMacroLabel} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-              <div className="lg:col-span-2">
-                <GlobalIndicesGrid items={globalIndices} staleLabel={staleMacroLabel} />
-              </div>
-              <div>
-                <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} />
-              </div>
+            {/* Row 2: Global Indices */}
+            <div>
+              <GlobalIndicesGrid items={globalIndices} staleLabel={staleMacroLabel} />
             </div>
 
-            {/* Row 2: Gainers/Losers + News Feed */}
+            {/* Row 3: Commodities & FX - Full width panel */}
+            <div>
+              <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} />
+            </div>
+
+            {/* Row 4: Gainers/Losers + News Feed */}
             <div className="flex flex-col gap-5">
               <GainersLosersHeatmap />
               <NewsFeedPanel items={liveMarket?.news} now={now} />
