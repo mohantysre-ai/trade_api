@@ -267,7 +267,7 @@ async def scrape_moneycontrol(ticker: str, session: httpx.AsyncClient) -> list[T
     company = _company_name(ticker)
     search_q = quote_plus(f"{company} {ticker}")
     urls = [
-        f"https://www.moneycontrol.com/news/tags/{ticker.lower()}.html",
+        f"https://www.moneycontrol.com/news/business/stocks/{ticker.lower()}-news.html",
         f"https://www.moneycontrol.com/news/business/stocks/page-1?search={search_q}",
     ]
 
@@ -540,7 +540,7 @@ async def _scrape_trendlyne(ticker: str, session: httpx.AsyncClient) -> list[Tic
     """Scrape Trendlyne for stock news and analysis."""
     articles: list[TickerNewsArticle] = []
     company = _company_name(ticker)
-    url = f"https://trendlyne.com/stock/{quote_plus(ticker)}/{quote_plus(company)}"
+    url = f"https://trendlyne.com/search/?q={quote_plus(ticker)}"
     try:
         resp = await session.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
         if resp.status_code != 200:
@@ -618,7 +618,7 @@ async def scrape_nse_announcements(ticker: str, session: httpx.AsyncClient) -> l
     """Scrape NSE corporate announcements."""
     articles: list[TickerNewsArticle] = []
     company = _company_name(ticker)
-    url = "https://www.nseindia.com/api/corporates/corporateAnnouncements"
+    url = f"https://www.nseindia.com/live_market/dynaContent/live_analysis/sec_indexmap/securityWatchlist.jsp?symbol={quote_plus(ticker)}"
     params = {
         "index": quote_plus(company),
         "market": "equities",
@@ -657,11 +657,20 @@ async def scrape_nse_announcements(ticker: str, session: httpx.AsyncClient) -> l
 
 async def scrape_all_sources(ticker: str) -> list[TickerNewsArticle]:
     """Run all scrapers concurrently and return deduplicated articles."""
-    async with httpx.AsyncClient(verify=False, timeout=30.0) as session:
+    async with httpx.AsyncClient(
+        verify=False,
+        timeout=30.0,
+        follow_redirects=True,
+        headers={
+            "User-Agent": HEADERS["User-Agent"],
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Referer": "https://www.google.com/",
+        },
+    ) as session:
         tasks = [
             scrape_moneycontrol(ticker, session),
             scrape_economic_times(ticker, session),
-            scrape_yahoo_finance(ticker, session),
             scrape_nse_announcements(ticker, session),
             scrape_nse_nifty100(ticker, session),
             _scrape_zerodha_pulse(ticker, session),
