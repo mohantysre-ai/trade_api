@@ -1,0 +1,33 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "mcp": {
+    "figma-dev-mode": {
+      "type": "remote",
+      "url": "http://127.0.0.1:3845/sse"
+    },
+    "sequentialthinking": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "playwright": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@playwright/mcp@0.0.38"
+      ]
+    },
+    "memory": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ]
+    }
+  }
+}

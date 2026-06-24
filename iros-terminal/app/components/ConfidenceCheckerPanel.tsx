@@ -181,7 +181,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName }: Confiden
 
       {/* Widget view */}
       {activeView === 'widget' && (
-        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="relative w-full overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(20,184,166,0.16),transparent_34%),radial-gradient(circle_at_85%_20%,rgba(99,102,241,0.12),transparent_32%),radial-gradient(circle_at_50%_100%,rgba(245,158,11,0.10),transparent_38%)]" />
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-indigo-500" />
 
@@ -213,7 +213,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName }: Confiden
               </a>
             </div>
 
-            <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner">
+            <div className="relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner">
               {!loaded && !errored && (
                 <div className="flex flex-col items-center justify-center gap-4 bg-white min-h-[400px]">
                   <div className="relative h-14 w-14 rounded-2xl border border-emerald-200 bg-emerald-50/80 shadow-lg flex items-center justify-center">

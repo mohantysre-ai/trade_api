@@ -1,7 +1,8 @@
 # Environment
-.env
+.env*
 .venv/
 venv/
 __pycache__/
 *.pyc
 token_cache.json
+*.json
