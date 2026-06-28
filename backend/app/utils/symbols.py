@@ -87,6 +87,14 @@ WATCHLIST: list[Instrument] = [
 
 MOCK_TICKERS: set[str] = {"AWFI"}
 
+NIFTY_50_KEYS: set[str] = {
+    "RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK", "KOTAKBANK", "SBIN",
+    "LT", "HCLTECH", "ITC", "WIPRO", "AXISBANK", "BHARTIARTL", "HINDUNILVR",
+    "MARUTI", "BAJFINANCE", "TITAN", "BAJAJFINSV", "NESTLEIND", "SUNPHARMA",
+    "POWERGRID", "NTPC", "ONGC", "COALINDIA", "DRREDDY", "CIPLA", "ASIANPAINT",
+    "ULTRACEMCO", "TECHM",
+}
+
 # Macro strip instruments (NSE/BSE indices).
 MACRO_INSTRUMENTS: list[Instrument] = [
     Instrument("nifty50", "NSE", "Nifty 50", "99926000", "Nifty 50"),
