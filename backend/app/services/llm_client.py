@@ -9,28 +9,71 @@ import requests
 
 _llm_not_before: float = 0.0
 LLM_API_TIMEOUT_SECONDS = int(os.getenv("LLM_API_TIMEOUT_SECONDS", "60"))
-MIN_LLM_TIMEOUT = 1
-MAX_LLM_TIMEOUT = 120
-LLM_CALL_TIMEOUT_SECONDS = min(max(MIN_LLM_TIMEOUT, LLM_API_TIMEOUT_SECONDS), MAX_LLM_TIMEOUT)
+_MIN_LLM_TIMEOUT = 1
+_MAX_LLM_TIMEOUT = 120
+LLM_CALL_TIMEOUT_SECONDS = min(max(_MIN_LLM_TIMEOUT, LLM_API_TIMEOUT_SECONDS), _MAX_LLM_TIMEOUT)
+
+_GEMINI_OAUTH_TOKEN_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gemini_oauth_token.json")
+_GEMINI_OAUTH_REQ_SCOPES = [
+    "https://www.googleapis.com/auth/generative-language.retriever",
+]
 
 
-def _llm_config() -> tuple[str, str, str, str] | None:
+def _get_gemini_oauth_token(token_path: str | None = None) -> str | None:
+    """Load a valid access token from stored OAuth credentials."""
+    try:
+        from google.auth.transport.requests import Request
+        from google.oauth2.credentials import Credentials
+    except ImportError:
+        return None
+
+    path = token_path or _GEMINI_OAUTH_TOKEN_PATH
+    if not os.path.isabs(path):
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), path)
+    if not os.path.isfile(path):
+        return None
+
+    try:
+        creds = Credentials.from_authorized_user_file(path, _GEMINI_OAUTH_REQ_SCOPES)
+    except Exception:
+        return None
+
+    if creds.valid:
+        return creds.token
+
+    if creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+            with open(path, "w") as f:
+                f.write(creds.to_json())
+            return creds.token
+        except Exception:
+            return None
+
+    return None
+
+
+def _llm_config() -> tuple[str, str, str, str, str | None]:
     provider = os.getenv("LLM_PROVIDER", "").strip().lower()
     api_key = os.getenv("REDACTED", "").strip()
     gemini_key = os.getenv("REDACTED", "").strip()
     api_url = os.getenv("LLM_API_URL", "").strip()
     model = os.getenv("LLM_MODEL", "gpt-4o-mini").strip()
+    oauth_token_path = os.getenv("GEMINI_OAUTH_TOKEN_PATH", "").strip()
 
-    if provider == "gemini" and not api_key:
-        api_key = gemini_key
-    if not provider and gemini_key:
+    if provider == "gemini":
+        if not api_key and gemini_key:
+            api_key = gemini_key
+        if not api_key and oauth_token_path:
+            api_key = _get_gemini_oauth_token(oauth_token_path) or api_key
+    elif not provider and gemini_key:
         provider = "gemini"
         api_key = gemini_key
     if not provider or not api_key:
-        return None
+        return None, None, None, None, None
     if not api_url and provider == "openai":
         api_url = "https://api.openai.com/v1/chat/completions"
-    return provider, api_key, api_url, model
+    return provider, api_key, api_url, model, oauth_token_path
 
 
 def _record_quota_error(message: str) -> None:
@@ -68,7 +111,26 @@ def _call_openai(prompt: str, api_key: str, api_url: str, model: str, timeout: i
     return data["choices"][0]["message"]["content"].strip()
 
 
-def _call_gemini(prompt: str, api_key: str, model: str, system_instruction: str, timeout: int = LLM_CALL_TIMEOUT_SECONDS) -> str:
+def _call_gemini(
+    prompt: str,
+    api_key: str,
+    model: str,
+    system_instruction: str,
+    timeout: int = LLM_CALL_TIMEOUT_SECONDS,
+    oauth_token_path: str | None = None,
+) -> str:
+    """Call Gemini. Supports both API key auth and OAuth token auth."""
+    if oauth_token_path:
+        token = _get_gemini_oauth_token(oauth_token_path)
+        if token:
+            return _call_gemini_rest(token, model, system_instruction, prompt, timeout)
+
+    if not api_key:
+        raise RuntimeError("No Gemini credentials available (no API key or OAuth token).")
+    return _call_gemini_sdk(api_key, model, system_instruction, prompt, timeout)
+
+
+def _call_gemini_sdk(api_key: str, model: str, system_instruction: str, prompt: str, timeout: int) -> str:
     try:
         from google import genai
         from google.genai import types
@@ -84,3 +146,39 @@ def _call_gemini(prompt: str, api_key: str, model: str, system_instruction: str,
     )
     response = client.models.generate_content(model=model, contents=prompt, config=config)
     return getattr(response, "text", None) or getattr(response, "output_text", None) or str(response)
+
+
+def _call_gemini_rest(
+    access_token: str,
+    model: str,
+    system_instruction: str,
+    prompt: str,
+    timeout: int,
+) -> str:
+    """Call Gemini REST API directly using an OAuth2 access token."""
+    import httpx as _httpx
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "systemInstruction": {"parts": [{"text": system_instruction}]},
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 2000,
+            "responseMimeType": "application/json",
+        },
+    }
+    resp = _httpx.post(url, headers=headers, json=payload, timeout=timeout)
+    resp.raise_for_status()
+    data = resp.json()
+    candidates = data.get("candidates", [])
+    if not candidates:
+        raise RuntimeError(f"Gemini REST returned no candidates: {data}")
+    parts = candidates[0].get("content", {}).get("parts", [])
+    if not parts:
+        raise RuntimeError(f"Gemini REST returned empty parts: {data}")
+    return parts[0].get("text", "").strip()

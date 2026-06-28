@@ -253,6 +253,31 @@ TICKER_MAP = {
 }
 
 
+TRENDLYNE_TICKER_ID_MAP = {
+    "WIPRO": "12799",
+    "RELIANCE": "1127",
+    "TCS": "630",
+    "INFY": "630",
+    "HDFCBANK": "533",
+    "ICICIBANK": "584",
+    "KOTAKBANK": "1887",
+    "SBIN": "1193",
+    "BHARTIARTL": "276825",
+    "ITC": "1198",
+    "HINDUNILVR": "561",
+    "LT": "1199",
+}
+
+
+def _get_trendlyne_equity_url(ticker: str) -> str | None:
+    """Get Trendlyne equity page URL for a ticker if ID is known."""
+    equity_id = TRENDLYNE_TICKER_ID_MAP.get(ticker.upper())
+    if equity_id:
+        slug = TICKER_MAP.get(ticker.upper(), ticker.lower()).lower().replace(" ", "-")
+        return f"https://trendlyne.com/equity/{equity_id}/{ticker.upper()}/{slug}/"
+    return None
+
+
 def _company_name(ticker: str) -> str:
     return TICKER_MAP.get(ticker.upper(), ticker)
 
@@ -267,8 +292,7 @@ async def scrape_moneycontrol(ticker: str, session: httpx.AsyncClient) -> list[T
     company = _company_name(ticker)
     search_q = quote_plus(f"{company} {ticker}")
     urls = [
-        f"https://www.moneycontrol.com/news/business/stocks/{ticker.lower()}-news.html",
-        f"https://www.moneycontrol.com/news/business/stocks/page-1?search={search_q}",
+        f"https://www.moneycontrol.com/news/business/stocks/page-1/?search={search_q}",
     ]
 
     for url in urls:
@@ -540,37 +564,37 @@ async def _scrape_trendlyne(ticker: str, session: httpx.AsyncClient) -> list[Tic
     """Scrape Trendlyne for stock news and analysis."""
     articles: list[TickerNewsArticle] = []
     company = _company_name(ticker)
-    url = f"https://trendlyne.com/search/?q={quote_plus(ticker)}"
-    try:
-        resp = await session.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
-        if resp.status_code != 200:
-            url = f"https://trendlyne.com/news?q={quote_plus(f'{company} {ticker}')}"
+    equity_url = _get_trendlyne_equity_url(ticker)
+    urls = [equity_url] if equity_url else []
+    
+    for url in urls:
+        try:
             resp = await session.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
-        if resp.status_code != 200:
-            return articles
+            if resp.status_code != 200:
+                return articles
 
-        soup = BeautifulSoup(resp.text, "html.parser")
-        seen: set[str] = set()
-        for tag in soup.find_all(["h2", "h3", "a", "p"])[:80]:
-            text = tag.get_text(strip=True)
-            if not text or len(text) < 25:
-                continue
-            key = re.sub(r"\s+", " ", text.lower())[:60]
-            if key in seen:
-                continue
-            seen.add(key)
+            soup = BeautifulSoup(resp.text, "html.parser")
+            seen: set[str] = set()
+            for tag in soup.find_all(["h2", "h3", "a", "p"])[:80]:
+                text = tag.get_text(strip=True)
+                if not text or len(text) < 25:
+                    continue
+                key = re.sub(r"\s+", " ", text.lower())[:60]
+                if key in seen:
+                    continue
+                seen.add(key)
 
-            articles.append(TickerNewsArticle(
-                title=text[:300],
-                source="Trendlyne",
-                url=url,
-                summary=text[:300],
-                published_at=datetime.now(timezone.utc).isoformat(),
-            ))
-            if len(articles) >= 10:
-                break
-    except Exception as e:
-        logger.warning("Trendlyne scrape failed: %s", e)
+                articles.append(TickerNewsArticle(
+                    title=text[:300],
+                    source="Trendlyne",
+                    url=url,
+                    summary=text[:300],
+                    published_at=datetime.now(timezone.utc).isoformat(),
+                ))
+                if len(articles) >= 10:
+                    break
+        except Exception as e:
+            logger.warning("Trendlyne scrape failed: %s", e)
 
     return articles
 
@@ -615,22 +639,18 @@ async def _scrape_finshots(ticker: str, session: httpx.AsyncClient) -> list[Tick
 
 
 async def scrape_nse_announcements(ticker: str, session: httpx.AsyncClient) -> list[TickerNewsArticle]:
-    """Scrape NSE corporate announcements."""
+    """Scrape NSE corporate announcements via announcements API."""
     articles: list[TickerNewsArticle] = []
     company = _company_name(ticker)
-    url = f"https://www.nseindia.com/live_market/dynaContent/live_analysis/sec_indexmap/securityWatchlist.jsp?symbol={quote_plus(ticker)}"
-    params = {
-        "index": quote_plus(company),
-        "market": "equities",
-    }
-
+    url = "https://www.nseindia.com/api/corporate_announcements"
+    
     try:
         headers = {
             **HEADERS,
             "Accept": "application/json",
             "Referer": "https://www.nseindia.com/",
         }
-        resp = await session.get(url, params=params, headers=headers, timeout=15.0)
+        resp = await session.get(url, headers=headers, timeout=15.0)
         if resp.status_code == 200:
             data = resp.json()
             items = data if isinstance(data, list) else data.get("data", [])
@@ -817,7 +837,7 @@ async def summarize_with_gemini(ticker: str, company: str, articles: list[Ticker
         return _rule_based_summary(ticker, company, articles)
 
     primary_model = os.environ.get("LLM_MODEL", "gemini-2.5-flash")
-    fallback_models = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-pro","gemini-3.0-flash","gemini-3.5-flash","gemini-3.1-flash-lite"]
+    fallback_models = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-pro"]
     model_list = [primary_model]
     for m in fallback_models:
         if m not in model_list:
@@ -825,7 +845,7 @@ async def summarize_with_gemini(ticker: str, company: str, articles: list[Ticker
 
     article_text = "\n\n".join(
         f"Title: {a.title}\nSource: {a.source}\nSummary: {a.summary}\nPublished: {a.published_at}\nURL: {a.url}"
-        for a in articles[:30]
+        for a in articles[:10]
     )
 
     prompt = f"""You are a financial news analyst. Analyze the following news articles for the company "{company}" (ticker: {ticker}) on the Indian stock market.
@@ -871,7 +891,7 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
                 contents=prompt,
                 config={
                     "temperature": 0.1,
-                    "max_output_tokens": 2048,
+                    "max_output_tokens": 1024,
                 },
             )
 

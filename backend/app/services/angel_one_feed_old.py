@@ -9,7 +9,6 @@ active market list.
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
 import logging
 import os
@@ -38,8 +37,7 @@ from .market_feeds import (
     fetch_global_macro,
     fetch_gift_nifty,
 )
-from ..utils.symbols import MACRO_INSTRUMENTS, MOCK_TICKERS, NIFTY_50_KEYS, WATCHLIST, Instrument
-from .llm_client import _llm_config as _llm_config_canonical, _get_gemini_oauth_token, _llm_quota_available, _record_quota_error
+from ..utils.symbols import MACRO_INSTRUMENTS, MOCK_TICKERS, WATCHLIST, Instrument
 from .intelligence_engine import (
     CompleteSecurityAnalysisPayload,
     TOP_SELECTION_COUNT,
@@ -78,51 +76,6 @@ QUOTE_CHUNK_SIZE = int(os.getenv("QUOTE_CHUNK_SIZE", "10"))
 INTRADAY_CHUNK_SIZE = int(os.getenv("INTRADAY_CHUNK_SIZE", "10"))
 
 AI_NEWS_API_URL = os.getenv("AI_NEWS_API_URL", "http://127.0.0.1:8001")
-
-
-# =============================================================================
-# STRICT SAFETY AUDITOR SYSTEM PROMPT
-# =============================================================================
-
-SYSTEM_PROMPT = """
-You are a Safety Risk Auditor.
-
-You are NOT a stock selector.
-
-You must never:
-
-- rank stocks
-- score stocks
-- evaluate technical indicators
-- analyze momentum
-- infer chart patterns
-
-Audit only:
-
-- News Risk
-- Earnings Risk
-- Regulatory Risk
-- Corporate Action Risk
-- Governance Risk
-- Macro Event Risk
-
-Every claim requires:
-
-- source
-- publication timestamp
-
-No source = No verified evidence.
-
-REJECT only for:
-
-- earnings within 48h
-- exchange restrictions
-- regulatory actions
-- court decisions
-- corporate actions causing binary gaps
-
-Return JSON only.
-"""
 
 
 def _refresh_task_key(pool_name: str | None, custom_prompt: str | None) -> str:
@@ -278,12 +231,12 @@ def _pool_watchlist(pool_name: str | None) -> tuple[list[Instrument], str]:
     if resolved == NIFTY_100_LABEL:
         nifty100 = _load_watchlist_from_cache(NIFTY_100_CACHE_PATH)
         if nifty100:
-            return [inst for inst in nifty100 if inst.key not in NIFTY_50_KEYS], NIFTY_100_LABEL
+            return nifty100, NIFTY_100_LABEL
         nifty500 = _load_watchlist_from_cache(NIFTY_500_CACHE_PATH)
         if nifty500:
-            return [inst for inst in nifty500[:100] if inst.key not in NIFTY_50_KEYS], NIFTY_100_LABEL
+            return nifty500[:100], NIFTY_100_LABEL
 
-    return [inst for inst in WATCHLIST if inst.key not in NIFTY_50_KEYS], resolved
+    return WATCHLIST, resolved
 
 
 def _payload_data_date(payload: dict[str, Any] | None = None) -> str:
@@ -395,11 +348,26 @@ def fetch_live_news(limit: int = 10) -> list[dict[str, str]]:
     return news[:limit]
 
 
-# Use the canonical _llm_config from llm_client.py instead of this local one.
-# It supports both API key (project quota) and OAuth token (portal quota).
+def _llm_config() -> tuple[str, str, str, str] | None:
+    provider = os.getenv("LLM_PROVIDER", "").strip().lower()
+    api_key = os.getenv("REDACTED", "").strip()
+    gemini_key = os.getenv("REDACTED", "").strip()
+    api_url = os.getenv("LLM_API_URL", "").strip()
+    model = os.getenv("LLM_MODEL", "gpt-4o-mini").strip()
+
+    if provider == "gemini" and not api_key:
+        api_key = gemini_key
+    if not provider and gemini_key:
+        provider = "gemini"
+        api_key = gemini_key
+    if not provider or not api_key:
+        return None
+    if not api_url and provider == "openai":
+        api_url = "https://api.openai.com/v1/chat/completions"
+    return provider, api_key, api_url, model
 
 
-def _call_openai_deprecated(*args, **kwargs):
+def _call_openai(prompt: str, api_key: str, api_url: str, model: str, timeout: int) -> str:
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -425,7 +393,7 @@ def _call_openai_deprecated(*args, **kwargs):
     return data["choices"][0]["message"]["content"].strip()
 
 
-def _call_gemini_deprecated(*args, **kwargs):
+def _call_gemini(prompt: str, api_key: str, model: str, system_instruction: str, timeout: int) -> str:
     try:
         from google import genai
         from google.genai import types
@@ -608,8 +576,6 @@ def _build_stock_row(
         "high": quote.get("high"),
         "low": quote.get("low"),
         "close": quote.get("close"),
-        "oi": float(quote.get("opnInterest", 0) or quote.get("oi", 0) or 0),
-        "prev_oi": float(quote.get("previousOI", 0) or quote.get("prev_oi", 0) or 0),
         "intraday": intraday or {},
     }
 
@@ -702,58 +668,6 @@ def _ema_angle_deg(ema_values: list[float]) -> float:
     return math.degrees(math.atan(slope_pct))
 
 
-def _rsi(closes: list[float], period: int = 14) -> float:
-    """Wilder's RSI. Returns 50.0 (neutral) when there is insufficient history."""
-    if len(closes) < period + 1:
-        return 50.0
-    gains: list[float] = []
-    losses: list[float] = []
-    for i in range(1, len(closes)):
-        diff = closes[i] - closes[i - 1]
-        gains.append(max(diff, 0.0))
-        losses.append(max(-diff, 0.0))
-    avg_gain = sum(gains[:period]) / period
-    avg_loss = sum(losses[:period]) / period
-    for i in range(period, len(gains)):
-        avg_gain = (avg_gain * (period - 1) + gains[i]) / period
-        avg_loss = (avg_loss * (period - 1) + losses[i]) / period
-    if avg_loss == 0.0:
-        return 100.0
-    rs = avg_gain / avg_loss
-    return round(100.0 - (100.0 / (1.0 + rs)), 2)
-
-
-# =============================================================================
-# OI CLASSIFICATION - Real OI Setup Logic
-# =============================================================================
-
-def classify_oi_setup(
-    ltp: float,
-    prev_close: float,
-    current_oi: float,
-    prev_oi: float,
-) -> str:
-    """
-    Classify Open Interest setup based on price and OI movement.
-
-    LONG_BUILDUP:   Price UP + OI UP   (Bullish — new longs being added)
-    SHORT_COVERING: Price UP + OI DOWN (Bears closing positions)
-    SHORT_BUILDUP:  Price DOWN + OI UP (Bearish — new shorts being added)
-    LONG_UNWINDING: Price DOWN + OI DOWN (Bulls closing positions)
-    NEUTRAL:        No clear signal
-    """
-    price_up = ltp > prev_close
-    if price_up and current_oi > prev_oi:
-        return "LONG_BUILDUP"
-    if price_up and current_oi < prev_oi:
-        return "SHORT_COVERING"
-    if not price_up and current_oi > prev_oi:
-        return "SHORT_BUILDUP"
-    if not price_up and current_oi < prev_oi:
-        return "LONG_UNWINDING"
-    return "NEUTRAL"
-
-
 def _intraday_metrics_from_quote(ltp: float, now: datetime, quote: dict[str, Any]) -> dict[str, Any]:
     """Compute best-effort intraday metrics from quote data when candle API fails.
     
@@ -827,13 +741,6 @@ def _intraday_metrics_from_quote(ltp: float, now: datetime, quote: dict[str, Any
     
     passes_hard_filters = len(hard_filter_reasons) == 0
     trigger_point = "VWAP Bounce" if price_above_vwap else "15-min ORB" if ltp >= orb_high else "Flag Breakout"
-
-    # Best-effort defaults when using quote-only fallback (no candle data available)
-    oi_setup = "NEUTRAL"
-    relative_volume = 1.0
-    liquidity_score = 0.0
-    breakout_quality = 0.0
-    sector_strength = 0.0
     
     return {
         "atr_pct": round(daily_range_pct, 2),
@@ -851,12 +758,6 @@ def _intraday_metrics_from_quote(ltp: float, now: datetime, quote: dict[str, Any
         "price_above_vwap": price_above_vwap,
         "price_above_ema9": price_above_ema9,
         "trigger_point": trigger_point,
-        "rsi": 50.0,
-        "oi_setup": oi_setup,
-        "relative_volume": relative_volume,
-        "liquidity_score": liquidity_score,
-        "breakout_quality": breakout_quality,
-        "sector_strength": sector_strength,
         "passes_hard_filters": passes_hard_filters,
         "hard_filter_reasons": hard_filter_reasons + ["metrics estimated from quote (candle API unavailable)"],
     }
@@ -879,12 +780,6 @@ def _empty_intraday_metrics(reason: str) -> dict[str, Any]:
         "price_above_vwap": False,
         "price_above_ema9": False,
         "trigger_point": "VWAP Bounce",
-        "rsi": 50.0,
-        "oi_setup": "NEUTRAL",
-        "relative_volume": 0.0,
-        "liquidity_score": 0.0,
-        "breakout_quality": 0.0,
-        "sector_strength": 0.0,
         "passes_hard_filters": False,
         "hard_filter_reasons": [reason],
     }
@@ -942,38 +837,6 @@ def _intraday_metrics(
     price_above_vwap = bool(vwap and ltp > vwap)
     price_above_ema9 = bool(ema9 and ltp > ema9)
 
-    # RSI(14) from daily closes
-    daily_closes = [row["close"] for row in daily_candles]
-    rsi_val = _rsi(daily_closes, period=14)
-
-    # OI classification from quote_fallback row (populated by _build_stock_row)
-    current_oi = float((quote_fallback or {}).get("oi", 0) or 0)
-    prev_oi_val = float((quote_fallback or {}).get("prev_oi", 0) or 0)
-    prev_close = daily_candles[-2]["close"] if len(daily_candles) >= 2 else ltp
-    if current_oi > 0 or prev_oi_val > 0:
-        oi_setup = classify_oi_setup(ltp, prev_close, current_oi, prev_oi_val)
-    else:
-        oi_setup = "NEUTRAL"
-
-    # Alpha score components (non-filter metrics — separate from hard filter variables)
-    relative_volume = volume_multiplier
-    liquidity_score = min(turnover_cr / 2.5, 20.0)
-    last_candle = intraday_candles[-1] if intraday_candles else {}
-    body_ratio = (
-        abs(last_candle.get("close", 0) - last_candle.get("open", 0))
-        / max(last_candle.get("high", 0) - last_candle.get("low", 0), 0.001)
-    ) if last_candle else 0.0
-    vwap_dist_pct = ((ltp - vwap) / vwap * 100) if vwap > 0 else 0.0
-    breakout_quality = min(
-        (body_ratio * 10 + vwap_dist_pct * 2) if ltp > vwap else 0.0,
-        20.0,
-    )
-    highs_5 = [row["high"] for row in daily_candles[-5:]]
-    lows_5 = [row["low"] for row in daily_candles[-5:]]
-    five_day_range = max(highs_5) - min(lows_5) if highs_5 and lows_5 else 0.0
-    price_position = ((ltp - min(lows_5)) / five_day_range) if five_day_range > 0 else 0.5
-    sector_strength = min(price_position * 20, 20.0)
-
     hard_filter_reasons: list[str] = []
     if atr_pct <= 3.0:
         hard_filter_reasons.append("ATR under 3.0%")
@@ -1009,12 +872,6 @@ def _intraday_metrics(
         "price_above_vwap": price_above_vwap,
         "price_above_ema9": price_above_ema9,
         "trigger_point": trigger_point,
-        "rsi": rsi_val,
-        "oi_setup": oi_setup,
-        "relative_volume": relative_volume,
-        "liquidity_score": liquidity_score,
-        "breakout_quality": breakout_quality,
-        "sector_strength": sector_strength,
         "passes_hard_filters": passes_hard_filters,
         "hard_filter_reasons": hard_filter_reasons,
     }
@@ -1044,10 +901,6 @@ def _fetch_intraday_chunk(
         try:
             metrics = _intraday_metrics(client, inst, ltp, now, quote_fallback=quote_fallback)
         except Exception:
-            import traceback as _traceback
-            logging.getLogger(__name__).error(
-                "fetch error for %s: %s", str(row.get("ticker", "?")), _traceback.format_exc()
-            )
             metrics = _empty_intraday_metrics("fetch error")
         results[str(row["ticker"])] = metrics
     return results
@@ -1089,214 +942,6 @@ def _heuristic_rank(stocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         ranked.append({**row, "score": score})
     ranked.sort(key=lambda item: item.get("score", 0), reverse=True)
     return ranked[:_TI_TOP_SELECTION_COUNT]
-
-
-# =============================================================================
-# ALPHA SCORE — Non-filter metrics (Stage 1 Quant Engine output)
-# =============================================================================
-
-def _calculate_alpha_score(metrics: dict[str, Any]) -> float:
-    """
-    Alpha Score from non-filter metrics.
-    Prevents circular logic by keeping filter variables (ATR, turnover, RSI,
-    vol_mult) completely separate from the scoring components.
-
-    Components (max 100 pts):
-      relative_volume   x 15  -> capped at 40
-      liquidity_score         -> capped at 20
-      breakout_quality        -> capped at 20
-      sector_strength         -> capped at 20
-    """
-    score = 0.0
-    score += min(metrics.get("relative_volume", 0.0) * 15, 40.0)
-    score += min(metrics.get("liquidity_score", 0.0), 20.0)
-    score += min(metrics.get("breakout_quality", 0.0), 20.0)
-    score += min(metrics.get("sector_strength", 0.0), 20.0)
-    return round(score, 2)
-
-
-def _compute_deterministic_pipeline(all_stocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """
-    Stage 1: Deterministic Quant Engine.
-
-    Applies hard filters 100% mathematically (no LLM) then ranks survivors
-    by Alpha Score.  Hard filter variables and Alpha Score variables are kept
-    strictly separate to avoid circular scoring logic.
-
-    Hard filter gates:
-      ATR > 3%  |  turnover > 50 Cr  |  LTP > VWAP
-      OI in (LONG_BUILDUP, SHORT_COVERING)
-      vol_mult > 1.5  |  RSI > 55  |  spread < 0.10  |  wick < 0.40
-
-    Alpha score uses: relative_volume, liquidity_score,
-                      breakout_quality, sector_strength
-    """
-    ranked_universe: list[dict[str, Any]] = []
-
-    for stock in all_stocks:
-        metrics = stock.get("intraday", {})
-        ltp = float(stock.get("ltpRaw", 0.0) or 0.0)
-
-        # Hard filter variables (never reused in Alpha Score)
-        atr        = metrics.get("atr_pct", 0.0)
-        turnover   = metrics.get("turnover_cr", 0.0)
-        vwap_val   = metrics.get("vwap", 0.0)
-        oi_setup   = metrics.get("oi_setup", "UNKNOWN")
-        vol_mult   = metrics.get("volume_multiplier", 1.0)
-        rsi_val    = metrics.get("rsi", 50.0)
-        spread     = metrics.get("spread_pct", 0.0)
-        wick_noise = metrics.get("wick_noise_ratio", 0.0)
-
-        passes = all([
-            atr > 3.0,
-            turnover > 50.0,
-            ltp > vwap_val,
-            oi_setup in ("LONG_BUILDUP", "SHORT_COVERING"),
-            vol_mult > 1.5,
-            rsi_val > 55.0,
-            spread < 0.10,
-            wick_noise < 0.40,
-        ])
-
-        alpha_score = _calculate_alpha_score(metrics) if passes else 0.0
-        stock["passes_hard_filters"] = passes
-        stock["alpha_score"] = alpha_score
-
-        if passes:
-            ranked_universe.append(stock)
-
-    # Deterministic sort: Alpha Score desc, ticker asc (stable tie-break)
-    ranked_universe.sort(key=lambda x: (-x["alpha_score"], x["ticker"]))
-
-    # Pad to 20 with highest-volume non-qualifiers when fewer than 20 pass
-    if len(ranked_universe) < 20:
-        non_qualifiers = [s for s in all_stocks if not s.get("passes_hard_filters", False)]
-        non_qualifiers.sort(key=lambda x: -(x.get("volume") or 0))
-        for stock in non_qualifiers:
-            if len(ranked_universe) >= 20:
-                break
-            stock.setdefault("alpha_score", 0.0)
-            ranked_universe.append(stock)
-
-    return ranked_universe[:20]
-
-
-# =============================================================================
-# LLM SAFETY AUDITOR — Stage 2 (risk-only, never a stock ranker)
-# =============================================================================
-
-def _execute_llm_risk_audit(
-    top_20: list[dict[str, Any]],
-    news_items: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    """
-    Stage 2: LLM Safety Audit.
-
-    The LLM acts ONLY as a risk auditor -- it audits non-technical domains
-    (news risk, earnings risk, regulatory/governance/corporate-action risk).
-    It NEVER receives technical indicators (ATR, VWAP, RSI, Volume, OI, EMA).
-    Only ticker + alpha_score are forwarded.
-
-    Gracefully degrades to APPROVE + warning flag when LLM is unavailable.
-    """
-    config = _llm_config_canonical()
-    provider, api_key, api_url, model, oauth_token_path = config or (None, None, None, None, None)
-
-    if not provider or not api_key:
-        for stock in top_20:
-            stock["risk_flags"] = ["LLM unavailable -- news risk not audited"]
-            stock["verdict"] = "APPROVE"
-        return top_20
-
-    news_context = "\n".join([
-        f"Source: {n.get('source','')} | Title: {n.get('title','')} | "
-        f"Summary: {n.get('summary','')} | Link: {n.get('link','')}"
-        for n in news_items[:15]
-    ])
-
-    # ONLY ticker + alpha_score -- NO technical data sent to LLM
-    ticker_context = [
-        {"ticker": s["ticker"], "alpha_score": s.get("alpha_score", 0.0)}
-        for s in top_20
-    ]
-    ticker_json = json.dumps(ticker_context, indent=2)
-
-    prompt = (
-        f"Tickers to audit:\n{ticker_json}\n\n"
-        f"News/Event context:\n{news_context}\n\n"
-        "Return a valid JSON object matching this structure exactly:\n"
-        "{\"audits\": {\"TICKER_SYMBOL\": {\"risk_flags\": [\"Reason text (Source: name, Timestamp: iso)\"], \"verdict\": \"APPROVE or REJECT\"}}}"
-    )
-
-    try:
-        if provider == "gemini":
-            from .llm_client import _call_gemini as _llm_gemini
-            res_text = _llm_gemini(
-                prompt=prompt,
-                api_key=api_key,
-                model=model,
-                system_instruction=SYSTEM_PROMPT,
-                timeout=LLM_CALL_TIMEOUT_SECONDS,
-                oauth_token_path=oauth_token_path,
-            )
-        elif provider == "openai":
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            }
-            body = {
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.0,
-                "max_tokens": 2000,
-            }
-            resp = requests.post(api_url, json=body, headers=headers, timeout=LLM_CALL_TIMEOUT_SECONDS)
-            if resp.status_code >= 300:
-                raise RuntimeError(f"OpenAI audit failed ({resp.status_code}): {resp.text}")
-            data = resp.json()
-            res_text = data["choices"][0]["message"]["content"].strip()
-        else:
-            raise RuntimeError(f"Unsupported LLM provider for audit: {provider}")
-
-        parsed = json.loads(res_text)
-        audits = parsed.get("audits", {})
-
-        for stock in top_20:
-            ticker = stock["ticker"]
-            audit = audits.get(ticker, {"risk_flags": [], "verdict": "APPROVE"})
-            stock["risk_flags"] = audit.get("risk_flags", []) or ["None"]
-            stock["verdict"] = audit.get("verdict", "APPROVE")
-
-    except Exception as exc:
-        for stock in top_20:
-            stock["risk_flags"] = [f"LLM Audit Error ({exc}) -- news risk not audited"]
-            stock["verdict"] = "APPROVE"
-
-    return top_20
-
-
-# =============================================================================
-# INSTITUTIONAL AUDIT LEDGER
-# =============================================================================
-
-def build_audit_ledger(stocks: list[dict[str, Any]]) -> list[str]:
-    """
-    Build formatted audit ledger rows for institutional logging.
-    Isolated from business logic -- formatting only.
-    """
-    ts = _ist_now().isoformat()
-    return [
-        f"{s['ticker']} | "
-        f"Alpha Score: {s.get('alpha_score', 0.0)} | "
-        f"Risk Flags: [{', '.join(s.get('risk_flags', ['None']))}] | "
-        f"Verdict: {s.get('verdict', 'APPROVE')} | "
-        f"Timestamp: {ts}"
-        for s in stocks
-    ]
-
 
 
 def _coarse_pre_rank(stocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1511,7 +1156,7 @@ def _build_payload_from_live_data(
     custom_prompt: str | None = None,
     force_llm_refresh: bool = False,
 ) -> dict[str, Any]:
-    llm_config = _llm_config_canonical()
+    llm_config = _llm_config()
     now = _ist_now()
     resolved_pool_name = pool_name or NIFTY_100_LABEL
     stock_universe, active_pool_label = _pool_watchlist(resolved_pool_name)
@@ -1564,44 +1209,22 @@ def _build_payload_from_live_data(
             original["intraday"] = metrics
             stock_quotes[ticker] = original
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # STAGE 1: Deterministic Quant Engine
-    # Applies hard filters and computes Alpha Scores with no LLM involvement.
-    # Returns top 20 sorted by Alpha Score; pads with volume leaders if needed.
-    # ─────────────────────────────────────────────────────────────────────────
-    top_20_quant = _compute_deterministic_pipeline(all_stocks)
-
     macro_morning, macro_evening = _build_macro_strips(macro_raw)
     global_macro = fetch_global_macro()
     news_items = fetch_live_news()
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # STAGE 2: LLM Safety Auditor
-    # Audits ONLY non-technical risk domains using news context.
-    # Attaches risk_flags + verdict to each stock; never re-ranks technically.
-    # ─────────────────────────────────────────────────────────────────────────
-    final_audited = _execute_llm_risk_audit(top_20_quant, news_items)
-
-    # Print institutional audit ledger to server log
-    ledger_rows = build_audit_ledger(final_audited)
-    _log = logging.getLogger(__name__)
-    _log.info("\n" + "=" * 40 + " INSTITUTIONAL RISK AUDIT LEDGER " + "=" * 40)
-    for ledger_row in ledger_rows:
-        _log.info(ledger_row)
-    _log.info("=" * 113)
 
     # AI NEWS ANALYSIS: Call once completely & subsequent from cache unless forced or data missing
     snapshot = _load_last_snapshot()
     existing_ti = snapshot.get("terminalIntelligence") if snapshot else None
     existing_summary = snapshot.get("newsSummary") if snapshot else None
     existing_ticker_news = snapshot.get("tickerNewsByTicker") if snapshot else {}
-
+    
     # Logic: If we have valid AI data and aren't forcing a refresh, reuse it to avoid timeouts.
     # If existing data is an error message or missing, we trigger the LLM.
     can_reuse_ai = (
-        not force_llm_refresh and
-        existing_ti and
-        not existing_ti.get("llmError") and
+        not force_llm_refresh and 
+        existing_ti and 
+        not existing_ti.get("llmError") and 
         existing_summary
     )
 
@@ -1609,7 +1232,7 @@ def _build_payload_from_live_data(
         top_rows, terminal_intel, news_summary = (snapshot.get("stocks") or [], existing_ti, existing_summary)
     else:
         top_rows, terminal_intel, news_summary = _build_terminal_payload(
-            all_stocks=final_audited,
+            all_stocks=all_stocks,
             news_items=news_items,
             macro_morning=macro_morning,
             macro_evening=macro_evening,
@@ -1823,25 +1446,6 @@ def create_app() -> FastAPI:
     def news_feed() -> dict[str, Any]:
         try:
             return {"success": True, "news": fetch_live_news()}
-        except Exception as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    @app.get("/api/test-ticker")
-    def test_ticker(ticker: str = "RELIANCE") -> dict[str, Any]:
-        try:
-            client = AngelOneClient()
-            ticker_upper = ticker.upper()
-            inst = next(
-                (i for i in WATCHLIST if i.key.upper() == ticker_upper),
-                Instrument(ticker_upper, "NSE", f"{ticker_upper}-EQ", "2885")
-            )
-            quote = client.fetch_quote(inst.exchange, inst.tradingsymbol, inst.token)
-            return {
-                "success": True,
-                "ticker": ticker_upper,
-                "quote": quote,
-                "llmConfigured": _llm_config_canonical()[0] is not None,
-            }
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -2339,7 +1943,7 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        resolved = _llm_config_canonical()
+        resolved = _llm_config()
         print(
             f"[LLM-DEBUG] env_path={BASE_DIR / '.env'} "
             f"LLM_PROVIDER={os.getenv('LLM_PROVIDER','')} "

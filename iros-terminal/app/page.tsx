@@ -832,7 +832,7 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
           const gradient = getGlobalIndexGradient(item.label);
           return (
             <div
-              key={`${item.label}-${item.val}-${item.state}`}
+              key={item.label}
               className="relative overflow-hidden rounded-xl p-4 transition-all hover:scale-105"
               style={{
                 background: gradient.background,
@@ -963,7 +963,7 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
           const gradient = getCommodityGradient(displayLabel);
           return (
             <div
-              key={`${item.label}-${item.val}-${item.state}`}
+              key={item.label}
               className="rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105"
               style={{
                 background: gradient.background,
@@ -1007,7 +1007,7 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
           const gradient = getIndiaMarketGradient(displayLabel);
           return (
             <div
-              key={`${item.label}-${item.val}-${item.state}`}
+              key={item.label}
               className="relative overflow-hidden rounded-xl p-4 transition-all hover:scale-105"
               style={{
                 background: gradient.background,
@@ -1360,11 +1360,22 @@ export default function IrosMasterAdvancedTerminal() {
   const currentMacros = useMemo(() => {
     const macros = liveMarket?.macroDataStrip?.[terminalMode] ?? [];
     const globalIndices = liveMarket?.globalMacro?.indices ?? [];
-    const seen = new Set(macros.map((item) => normalizeMarketLabel(item.label)));
-    const indiaFromGlobal = globalIndices.filter((item) => INDIA_MARKET_LABELS.has(normalizeMarketLabel(item.label)));
+    const normalize = (label: string) => normalizeMarketLabel(label);
+    const dedup = (arr: MacroRow[]) => {
+      const seen = new Set<string>();
+      return arr.filter((item) => {
+        const n = normalize(item.label);
+        if (seen.has(n)) return false;
+        seen.add(n);
+        return true;
+      });
+    };
+    const macrosDeduped = dedup(macros.filter((item) => !GLOBAL_ONLY_LABELS.has(normalize(item.label))));
+    const seenMacros = new Set(macrosDeduped.map((item) => normalize(item.label)));
+    const indiaFromGlobal = dedup(globalIndices.filter((item) => INDIA_MARKET_LABELS.has(normalize(item.label))));
     const merged = [
-      ...macros.filter((item) => !GLOBAL_ONLY_LABELS.has(normalizeMarketLabel(item.label))),
-      ...indiaFromGlobal.filter((item) => !seen.has(normalizeMarketLabel(item.label))),
+      ...macrosDeduped,
+      ...indiaFromGlobal.filter((item) => !seenMacros.has(normalize(item.label))),
     ];
     return merged;
   }, [terminalMode, liveMarket]);
@@ -1372,13 +1383,26 @@ export default function IrosMasterAdvancedTerminal() {
   const globalIndices = useMemo(() => {
     const g = liveMarket?.globalMacro;
     if (!g) return [];
-    return (g.indices ?? []).filter((item) => !INDIA_MARKET_LABELS.has(normalizeMarketLabel(item.label)));
+    const seen = new Set<string>();
+    return (g.indices ?? []).filter((item) => {
+      if (INDIA_MARKET_LABELS.has(normalizeMarketLabel(item.label))) return false;
+      const n = normalizeMarketLabel(item.label);
+      if (seen.has(n)) return false;
+      seen.add(n);
+      return true;
+    });
   }, [liveMarket]);
 
   const commodities = useMemo(() => {
     const g = liveMarket?.globalMacro;
     if (!g) return [];
-    return g.commodities ?? [];
+    const seen = new Set<string>();
+    return (g.commodities ?? []).filter((item) => {
+      const n = normalizeMarketLabel(item.label);
+      if (seen.has(n)) return false;
+      seen.add(n);
+      return true;
+    });
   }, [liveMarket]);
 
   const marketIntelligence = liveMarket?.terminalIntelligence as TerminalIntelligence | undefined;

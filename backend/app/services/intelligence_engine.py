@@ -380,23 +380,28 @@ def _fallback_bullets(title: str, items: list[str]) -> str:
     return title + "\n" + "\n".join([f"• {item}" for item in clean])
 
 
-def _llm_config() -> tuple[str, str, str, str] | None:
+def _llm_config() -> tuple[str, str, str, str, str | None]:
     provider = os.getenv("LLM_PROVIDER", "").strip().lower()
     api_key = os.getenv("REDACTED", "").strip()
     gemini_key = os.getenv("REDACTED", "").strip()
     api_url = os.getenv("LLM_API_URL", "").strip()
     model = os.getenv("LLM_MODEL", "gpt-4o-mini").strip()
+    oauth_token_path = os.getenv("GEMINI_OAUTH_TOKEN_PATH", "").strip()
 
-    if provider == "gemini" and not api_key:
-        api_key = gemini_key
-    if not provider and gemini_key:
+    if provider == "gemini":
+        if not api_key and gemini_key:
+            api_key = gemini_key
+        if not api_key and oauth_token_path:
+            from app.services.llm_client import _get_gemini_oauth_token
+            api_key = _get_gemini_oauth_token(oauth_token_path) or api_key
+    elif not provider and gemini_key:
         provider = "gemini"
         api_key = gemini_key
     if not provider or not api_key:
-        return None
+        return None, None, None, None, None
     if not api_url and provider == "openai":
         api_url = "https://api.openai.com/v1/chat/completions"
-    return provider, api_key, api_url, model
+    return provider, api_key, api_url, model, oauth_token_path
 
 
 def _parse_retry_delay(error_str: str, cap: float = 90.0) -> float:
@@ -719,7 +724,7 @@ def _on_demand_ticker_selection_reason(ticker: str, stock: dict[str, Any], score
     if llm_config is None or not _llm_quota_available():
         return fallback
 
-    provider, api_key, api_url, model = llm_config
+    provider, api_key, api_url, model, _oauth_tp = llm_config
     system_instruction = (
         "You are an institutional trading co-pilot. "
         "Produce one ticker-specific selection reason from supplied live metrics only. "
@@ -729,7 +734,7 @@ def _on_demand_ticker_selection_reason(ticker: str, stock: dict[str, Any], score
 
     try:
         if provider == "gemini":
-            raw = _call_gemini(prompt, api_key, model, system_instruction, LLM_CALL_TIMEOUT_SECONDS)
+            raw = _call_gemini(prompt, api_key, model, system_instruction, LLM_CALL_TIMEOUT_SECONDS, oauth_token_path=_oauth_tp)
         else:
             raw = _call_openai(prompt, api_key, api_url, model, LLM_CALL_TIMEOUT_SECONDS)
 
@@ -1100,7 +1105,7 @@ def _analyze_forensic_wl_policy(
     if llm_config is None or not _llm_quota_available():
         return None
 
-    provider, api_key, api_url, model = llm_config
+    provider, api_key, api_url, model, _oauth_tp = llm_config
 
     forensic_context = {
         "forensic_metrics": snapshot.get("terminalIntelligence", {}).get("active_scoring_matrix", {}),
@@ -1140,7 +1145,7 @@ def _analyze_forensic_wl_policy(
 
     try:
         if provider == "gemini":
-            raw = _call_gemini(prompt, api_key, model, sys_instruction, LLM_CALL_TIMEOUT_SECONDS)
+            raw = _call_gemini(prompt, api_key, model, sys_instruction, LLM_CALL_TIMEOUT_SECONDS, oauth_token_path=_oauth_tp)
         else:
             raw = _call_openai(prompt, api_key, api_url, model, LLM_CALL_TIMEOUT_SECONDS)
 
@@ -1295,7 +1300,7 @@ def execute_terminal_intelligence_pipeline(live_unstructured_stream: str) -> Com
 
     llm_config = _llm_config()
     if llm_config is not None and _llm_quota_available():
-        provider, api_key, api_url, model = llm_config
+        provider, api_key, api_url, model, _oauth_tp = llm_config
         try:
             system_instruction = (
                 "You are an elite institutional financial terminal compiler. "
@@ -1312,7 +1317,7 @@ def execute_terminal_intelligence_pipeline(live_unstructured_stream: str) -> Com
                 system_instruction += f"\nFOCUS: Provide deep analysis specifically on {focus_ticker}."
 
             if provider == "gemini":
-                raw = _call_gemini(live_unstructured_stream, api_key, model, system_instruction, LLM_CALL_TIMEOUT_SECONDS)
+                raw = _call_gemini(live_unstructured_stream, api_key, model, system_instruction, LLM_CALL_TIMEOUT_SECONDS, oauth_token_path=_oauth_tp)
             else:
                 raw = _call_openai(live_unstructured_stream, api_key, api_url, model, LLM_CALL_TIMEOUT_SECONDS)
 
