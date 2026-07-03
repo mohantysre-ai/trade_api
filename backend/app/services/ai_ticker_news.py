@@ -591,7 +591,7 @@ async def _scrape_trendlyne(ticker: str, session: httpx.AsyncClient) -> list[Tic
                     summary=text[:300],
                     published_at=datetime.now(timezone.utc).isoformat(),
                 ))
-                if len(articles) >= 10:
+                if len(articles) >= 30:
                     break
         except Exception as e:
             logger.warning("Trendlyne scrape failed: %s", e)
@@ -630,7 +630,7 @@ async def _scrape_finshots(ticker: str, session: httpx.AsyncClient) -> list[Tick
                 summary=text[:300],
                 published_at=datetime.now(timezone.utc).isoformat(),
             ))
-            if len(articles) >= 10:
+            if len(articles) >= 30:
                 break
     except Exception as e:
         logger.warning("Finshots scrape failed: %s", e)
@@ -837,7 +837,7 @@ async def summarize_with_gemini(ticker: str, company: str, articles: list[Ticker
         return _rule_based_summary(ticker, company, articles)
 
     primary_model = os.environ.get("LLM_MODEL", "gemini-2.5-flash")
-    fallback_models = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-pro"]
+    fallback_models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"]
     model_list = [primary_model]
     for m in fallback_models:
         if m not in model_list:
@@ -845,7 +845,7 @@ async def summarize_with_gemini(ticker: str, company: str, articles: list[Ticker
 
     article_text = "\n\n".join(
         f"Title: {a.title}\nSource: {a.source}\nSummary: {a.summary}\nPublished: {a.published_at}\nURL: {a.url}"
-        for a in articles[:10]
+        for a in articles[:30]
     )
 
     prompt = f"""You are a financial news analyst. Analyze the following news articles for the company "{company}" (ticker: {ticker}) on the Indian stock market.
@@ -891,7 +891,7 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
                 contents=prompt,
                 config={
                     "temperature": 0.1,
-                    "max_output_tokens": 1024,
+                    "max_output_tokens": 2048,
                 },
             )
 

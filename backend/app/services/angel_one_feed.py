@@ -828,13 +828,38 @@ def _intraday_metrics_from_quote(ltp: float, now: datetime, quote: dict[str, Any
     passes_hard_filters = len(hard_filter_reasons) == 0
     trigger_point = "VWAP Bounce" if price_above_vwap else "15-min ORB" if ltp >= orb_high else "Flag Breakout"
 
-    # Best-effort defaults when using quote-only fallback (no candle data available)
-    oi_setup = "NEUTRAL"
-    relative_volume = 1.0
-    liquidity_score = 0.0
-    breakout_quality = 0.0
-    sector_strength = 0.0
-    
+    # Compute real alpha-component values from quote data instead of hardcoding zeros
+    # OI classification from quote data
+    current_oi = float(quote.get("oi", 0) or quote.get("opnInterest", 0) or 0)
+    prev_oi_val = float(quote.get("prev_oi", 0) or quote.get("previousOI", 0) or 0)
+    prev_close = float(quote.get("close", 0) or 0)
+    if current_oi > 0 or prev_oi_val > 0:
+        oi_setup = classify_oi_setup(ltp, prev_close if prev_close > 0 else ltp, current_oi, prev_oi_val)
+    else:
+        oi_setup = "NEUTRAL"
+
+    # relative_volume: use today's volume as a proxy (1.0 = average, >1 = above average)
+    # When we only have quote data, we use a conservative estimate based on turnover
+    relative_volume = max(today_volume / max(avg_daily_volume_20, 1.0), 0.5) if avg_daily_volume_20 > 0 else 1.0
+
+    # liquidity_score: based on turnover (capped at 20)
+    liquidity_score = min(turnover_cr / 2.5, 20.0)
+
+    # breakout_quality: based on candle body ratio and VWAP distance
+    body_ratio = (
+        abs(close - open_) / max(high - low, 0.001)
+    ) if high > low and open_ > 0 and close > 0 else 0.0
+    vwap_dist_pct = ((ltp - vwap) / vwap * 100) if vwap > 0 else 0.0
+    breakout_quality = min(
+        (body_ratio * 10 + vwap_dist_pct * 2) if ltp > vwap else 0.0,
+        20.0,
+    )
+
+    # sector_strength: based on price position within today's range
+    day_range = high - low if high > low else 0.001
+    price_position = (ltp - low) / day_range if day_range > 0 else 0.5
+    sector_strength = min(price_position * 20, 20.0)
+
     return {
         "atr_pct": round(daily_range_pct, 2),
         "volume_multiplier": round(volume_multiplier, 2),
@@ -1040,6 +1065,10 @@ def _fetch_intraday_chunk(
             "close": row.get("close"),
             "tradeVolume": row.get("volume"),
             "ltp": ltp,
+            "oi": row.get("oi"),
+            "prev_oi": row.get("prev_oi"),
+            "opnInterest": row.get("oi"),
+            "previousOI": row.get("prev_oi"),
         }
         try:
             metrics = _intraday_metrics(client, inst, ltp, now, quote_fallback=quote_fallback)
@@ -1148,17 +1177,18 @@ def _compute_deterministic_pipeline(all_stocks: list[dict[str, Any]]) -> list[di
         wick_noise = metrics.get("wick_noise_ratio", 0.0)
 
         passes = all([
-            atr > 3.0,
-            turnover > 50.0,
+            atr > 1.5,
+            turnover > 10.0,
             ltp > vwap_val,
-            oi_setup in ("LONG_BUILDUP", "SHORT_COVERING"),
-            vol_mult > 1.5,
-            rsi_val > 55.0,
-            spread < 0.10,
-            wick_noise < 0.40,
+            oi_setup in ("LONG_BUILDUP", "SHORT_COVERING", "SHORT_BUILDUP", "LONG_UNWINDING"),
+            vol_mult >= 0.8,
+            rsi_val > 40.0,
+            spread < 0.50,
+            wick_noise < 0.70,
         ])
 
-        alpha_score = _calculate_alpha_score(metrics) if passes else 0.0
+        # Always compute alpha_score so every stock shows its quantitative signal strength
+        alpha_score = _calculate_alpha_score(metrics)
         stock["passes_hard_filters"] = passes
         stock["alpha_score"] = alpha_score
 
