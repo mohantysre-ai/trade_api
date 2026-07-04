@@ -210,8 +210,11 @@ export default function IntradayMatrixPanel() {
             {lemonnData.recommendations.map((rec, idx) => {
               const isBuy = rec.direction === 'BUY';
               return (
-                <div key={`lm-${rec.symbol}-${idx}`}
-                  className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm hover:shadow-md transition-all group"
+                <a key={`lm-${rec.symbol}-${idx}`}
+                  href={`https://lemonn.co.in/stocks/${encodeURIComponent(rec.symbol.toLowerCase())}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm hover:shadow-md transition-all group cursor-pointer block"
                   style={{ borderLeft: isBuy ? '3px solid #10b981' : '3px solid #ef4444' }}>
                   <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full opacity-15 blur-2xl"
                     style={{ backgroundColor: isBuy ? '#10b981' : '#ef4444' }} />
@@ -226,7 +229,7 @@ export default function IntradayMatrixPanel() {
                     <div className="flex justify-between"><span className="text-slate-400">Stop Loss</span><span className="font-bold text-red-500">₹{rec.stopLoss.toFixed(2)}</span></div>
                     <div className="flex justify-between"><span className="text-slate-400">Risk/Sh</span><span className="font-bold text-slate-700">₹{rec.riskPerShare.toFixed(2)}</span></div>
                   </div>
-                </div>
+                </a>
               );
             })}
           </div>
@@ -294,8 +297,11 @@ export default function IntradayMatrixPanel() {
                 {dhanData.recommendations.map((rec, idx) => {
                   const isBuy = rec.direction === 'LONG';
                   return (
-                    <div key={`dh-${rec.symbol}-${idx}`}
-                      className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm hover:shadow-md transition-all group"
+                    <a key={`dh-${rec.symbol}-${idx}`}
+                      href={`https://lemonn.co.in/stocks/${encodeURIComponent(rec.symbol.toLowerCase())}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm hover:shadow-md transition-all group cursor-pointer block"
                       style={{ borderLeft: isBuy ? '3px solid #10b981' : '3px solid #ef4444' }}>
                       <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full opacity-15 blur-2xl"
                         style={{ backgroundColor: isBuy ? '#10b981' : '#ef4444' }} />
@@ -315,7 +321,7 @@ export default function IntradayMatrixPanel() {
                         <div className="flex justify-between"><span className="text-slate-400">Risk/Sh</span><span className="font-bold text-slate-700">₹{rec.riskPerShare.toFixed(2)}</span></div>
                         <div className="flex justify-between"><span className="text-slate-400">R:R (T2)</span><span className="font-bold text-slate-700">~{rec.rrT2.toFixed(1)}</span></div>
                       </div>
-                    </div>
+                    </a>
                   );
                 })}
               </div>
@@ -325,14 +331,14 @@ export default function IntradayMatrixPanel() {
             <div className="mb-3">
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+                <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
                   TRADE PLAN — ₹5,00,000 DEPLOYMENT
                 </span>
               </div>
 
               {/* Trade plan table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-[9px] border-collapse">
+                <table className="w-full text-[12px] border-collapse">
                   <thead>
                     <tr className="bg-slate-100 text-slate-600">
                       <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
@@ -346,8 +352,10 @@ export default function IntradayMatrixPanel() {
                   </thead>
                   <tbody>
                     {(dhanData?.tradePlan || dhanData?.recommendations?.slice(0, 5) || []).map((tp, idx) => (
-                      <tr key={`tp-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="p-1.5 font-bold text-slate-900">{tp.symbol}</td>
+                      <tr key={`tp-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer">
+                        <td className="p-1.5 font-bold text-slate-900">
+                          <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
+                        </td>
                         <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">{tp.buyAbove?.toFixed(2) ?? '—'}</td>
                         <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
                         <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
@@ -366,12 +374,12 @@ export default function IntradayMatrixPanel() {
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                  <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+                  <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
                     CAPITAL ALLOCATION (~₹1,00,000 per stock)
                   </span>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-[9px] border-collapse">
+                  <table className="w-full text-[12px] border-collapse">
                     <thead>
                       <tr className="bg-blue-50 text-slate-600">
                         <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
@@ -383,8 +391,10 @@ export default function IntradayMatrixPanel() {
                     </thead>
                     <tbody>
                       {dhanData.capitalAllocation.map((ca, idx) => (
-                        <tr key={`ca-${ca.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50">
-                          <td className="p-1.5 font-bold text-slate-900">{ca.symbol}</td>
+                        <tr key={`ca-${ca.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer">
+                          <td className="p-1.5 font-bold text-slate-900">
+                            <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(ca.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{ca.symbol}</a>
+                          </td>
                           <td className="p-1.5 text-right font-mono text-slate-600">₹{ca.buyAbove.toFixed(2)}</td>
                           <td className="p-1.5 text-right font-mono text-slate-700 font-bold">{ca.approxQty.toLocaleString('en-IN')}</td>
                           <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">₹{ca.deployedCapital.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
@@ -395,13 +405,13 @@ export default function IntradayMatrixPanel() {
                     {/* Totals row */}
                     <tfoot>
                       <tr className="bg-slate-100 font-bold text-slate-900">
-                        <td className="p-1.5 uppercase tracking-wider text-[8px]">TOTAL</td>
+                        <td className="p-1.5 uppercase tracking-wider text-[12px]">TOTAL</td>
                         <td className="p-1.5"></td>
                         <td className="p-1.5"></td>
-                        <td className="p-1.5 text-right font-mono text-emerald-700">
+                        <td className="p-1.5 text-right font-mono text-emerald-700 text-[12px]">
                           ≈ ₹{dhanData.capitalAllocation.reduce((s, c) => s + c.deployedCapital, 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
-                        <td className="p-1.5 text-right font-mono text-red-600">
+                        <td className="p-1.5 text-right font-mono text-red-600 text-[12px]">
                           ≈ ₹{dhanData.capitalAllocation.reduce((s, c) => s + c.riskAmount, 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
                       </tr>

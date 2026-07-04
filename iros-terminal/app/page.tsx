@@ -238,8 +238,8 @@ function useAdaptiveTooltip() {
       const rect = triggerRef.current.getBoundingClientRect();
       const viewportW = window.innerWidth;
       const viewportH = window.innerHeight;
-      const tooltipW = 340;
-      const tooltipH = 400;
+      const tooltipW = 240;
+      const tooltipH = 200;
 
       // Default: position below the trigger
       let top = rect.bottom + 8;
@@ -381,14 +381,14 @@ function AdaptiveTooltipPortal({
       style={{
         position: 'fixed',
         zIndex: 9999,
-        maxWidth: '340px',
-        maxHeight: '85vh',
+        maxWidth: '240px',
+        maxHeight: '50vh',
         top: position.top,
         left: position.left,
-        borderRadius: '12px',
+        borderRadius: '10px',
         border: '1px solid #e2e8f0',
         background: 'white',
-        padding: '14px',
+        padding: '10px',
         boxShadow: positive !== null
           ? (positive
               ? '0 8px 32px rgba(16,185,129,0.15), 0 2px 8px rgba(0,0,0,0.06)'
@@ -425,12 +425,20 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
 
   const pchange = typeof stock.pchange === 'number' ? stock.pchange : null;
   const positive = pchange !== null && pchange >= 0;
+  const symbol = (typeof stock.symbol === 'string' ? stock.symbol : ticker) || ticker;
+
+  const handleClick = () => {
+    const nseUrl = `https://www.nseindia.com/get-quotes/equity?symbol=${encodeURIComponent(symbol)}`;
+    window.open(nseUrl, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <>
       <span
         ref={triggerRef as React.RefObject<HTMLSpanElement | null>}
         className={`text-[12px] font-bold cursor-pointer transition-colors ${positive !== null ? (positive ? 'text-emerald-700 hover:text-emerald-500' : 'text-red-700 hover:text-red-500') : 'text-slate-800'}`}
+        onClick={handleClick}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleClick(); }}
         onMouseEnter={showTooltip}
         onMouseLeave={scheduleClose}
         onFocus={showTooltip}
@@ -457,6 +465,65 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
 /* -------------------------------------------------------------------------- */
 /*  TrendlyneCategoryPanel                                                      */
 /* -------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------- */
+/*  TrendlyneTickerTooltip - tooltip for Trendlyne screener stocks             */
+/* -------------------------------------------------------------------------- */
+
+function TrendlyneTickerTooltip({ item }: { item: TrendlyneStock }) {
+  const { triggerRef, visible, position, showTooltip, scheduleClose, cancelClose, mounted } = useAdaptiveTooltip();
+
+  return (
+    <>
+      <span
+        ref={triggerRef as React.RefObject<HTMLSpanElement | null>}
+        className="text-[12px] font-bold text-slate-800 truncate cursor-pointer hover:text-indigo-600 transition-colors"
+        onMouseEnter={showTooltip}
+        onMouseLeave={scheduleClose}
+        onFocus={showTooltip}
+        onBlur={() => { cancelClose(); }}
+        tabIndex={0}
+      >
+        {item.name}
+      </span>
+      {visible && mounted && (
+        <div
+          style={{
+            position: 'fixed',
+            zIndex: 9999,
+            maxWidth: '340px',
+            maxHeight: '85vh',
+            top: position.top,
+            left: position.left,
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            background: 'white',
+            padding: '14px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
+            overflowY: 'auto',
+          }}
+          onMouseEnter={() => { cancelClose(); }}
+          onMouseLeave={scheduleClose}
+        >
+          <div className="flex items-center gap-2 mb-2 flex-shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" />
+            <span className="text-[9px] uppercase tracking-widest font-bold text-slate-500">
+              {item.name} · TRENDLYNE
+            </span>
+          </div>
+          <div className="space-y-0.5">
+            {item.tooltipParams.map((param) => (
+              <div key={param.key} className="group flex items-center justify-between gap-3 px-2 py-1 rounded-md transition-all hover:bg-slate-50 hover:scale-[1.01]">
+                <div className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold truncate">{param.name}</div>
+                <span className="text-[9px] font-mono text-right text-slate-900 font-bold">{param.value || '—'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: TrendlyneScreenKey; label: string; accentClass: string }) {
   const [items, setItems] = useState<TrendlyneStock[]>([]);
@@ -498,8 +565,8 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
   return (
     <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 shadow-sm min-h-[160px] overflow-visible">
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">{label}</span>
-        <span className="text-[7px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+        <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">{label}</span>
+        <span className="text-[12px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
           {loading ? 'LOADING' : error ? 'ERROR' : `${items.length} stocks`}
         </span>
       </div>
@@ -526,11 +593,11 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
             >
               <div className="flex items-center gap-1.5 min-w-0">
                 <span className={`w-1.5 h-1.5 rounded-full ${dotCls}`} />
-                <span className="text-[10px] font-bold text-slate-800 truncate">{item.name}</span>
+                <TrendlyneTickerTooltip item={item} />
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className={`text-[9px] font-bold ${textAccentCls}`}>{item.value}</span>
-                <span className="text-[8px] text-slate-500">₹{currentPrice}</span>
+                <span className={`text-[10px] font-bold ${textAccentCls}`}>{item.value}</span>
+                <span className="text-[10px] text-slate-500">₹{currentPrice}</span>
               </div>
             </a>
           );
@@ -605,8 +672,8 @@ function GainersLosersHeatmap() {
   return (
     <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 shadow-sm min-h-[160px] overflow-visible">
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">NIFTY TOP 5 GAINERS & LOSERS</span>
-        <span className="text-[7px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+        <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">NIFTY TOP 5 GAINERS & LOSERS</span>
+        <span className="text-[12px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
           {loading ? 'LOADING' : error ? 'ERROR' : `${totalStocks} stocks`}
         </span>
       </div>
@@ -621,14 +688,14 @@ function GainersLosersHeatmap() {
           const rowStyle = getCategoryRowStyle(category.key);
 
           return (
-            <div key={category.key}>
-              <div className={`text-[9px] uppercase tracking-wider ${accentClass} font-bold mb-1 flex items-center gap-1.5`}>
+            <div key={category.key} className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 min-h-[160px] overflow-visible">
+              <div className={`text-[12px] uppercase tracking-wider ${accentClass} font-bold mb-1.5 flex items-center gap-1.5`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
                 {category.label}
               </div>
               <div className="space-y-0.5">
                 {stocks.length === 0 && (
-                  <div className="text-[9px] text-slate-400 px-2 py-1">No data</div>
+                  <div className="text-[12px] text-slate-400 px-2 py-1">No data</div>
                 )}
                 {stocks.map((stock, index) => {
                   const ticker = stock.symbol ?? 'UNKNOWN';
@@ -639,12 +706,15 @@ function GainersLosersHeatmap() {
                     <div
                       key={`${category.key}-${ticker}-${index}`}
                       className="group flex items-center justify-between px-2 py-1 rounded-lg transition-all hover:scale-[1.02] cursor-default overflow-visible"
-                      style={rowStyle}
+                      style={{
+                        backgroundColor: index % 2 === 0 ? 'rgba(248, 250, 252, 0.5)' : 'transparent',
+                        borderBottom: '1px solid rgba(226, 232, 240, 0.4)',
+                      }}
                     >
                       <NseTickerTooltip stock={stock} ticker={ticker} />
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-slate-500">{formatNseNumber(stock.lastPrice)}</span>
-                        <span className={`text-[10px] font-bold ${changeClass}`}>{changeText}</span>
+                        <span className="text-[12px] text-slate-500">{formatNseNumber(stock.lastPrice)}</span>
+                        <span className={`text-[12px] font-bold ${changeClass}`}>{changeText}</span>
                       </div>
                     </div>
                   );
@@ -659,7 +729,7 @@ function GainersLosersHeatmap() {
       {/* NIFTY SCREENERS Panels */}
       <div className="flex items-center gap-1.5 mb-1.5 mt-2">
         <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-        <span className="text-[8px] uppercase tracking-wider text-slate-500 font-bold">NIFTY SCREENERS</span>
+        <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">NIFTY SCREENERS</span>
       </div>
       {/* Remaining 5 Trendlyne screens in one row */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-1.5">
@@ -712,21 +782,29 @@ function NseHeatMapTooltip({ stock, ticker, colors }: { stock: NseEquityStock; t
 
   const pchange = typeof stock.pChange === 'number' ? stock.pChange : null;
   const positive = pchange !== null && pchange >= 0;
+  const symbol = stock.symbol ?? ticker;
+
+  const handleClick = () => {
+    const nseUrl = `https://www.nseindia.com/get-quotes/equity?symbol=${encodeURIComponent(symbol)}`;
+    window.open(nseUrl, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <>
       <div
         ref={triggerRef as React.RefObject<HTMLDivElement | null>}
-        className="flex flex-col items-center justify-center rounded-md py-1.5 px-1.5 transition-all duration-300 hover:shadow-xl hover:scale-110 cursor-default group relative"
+        className="flex flex-col items-center justify-center rounded-md py-1.5 px-1.5 transition-all duration-300 hover:shadow-xl hover:scale-110 cursor-pointer group relative"
         style={{
           backgroundColor: colors.bg,
           border: `2px solid ${colors.border}`,
         }}
+        onClick={handleClick}
         onMouseEnter={showTooltip}
         onMouseLeave={scheduleClose}
         onFocus={showTooltip}
         onBlur={() => { cancelClose(); }}
         tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleClick(); }}
       >
         <span className="text-[9px] font-bold leading-tight relative z-10" style={{ color: colors.text }}>
           {ticker}

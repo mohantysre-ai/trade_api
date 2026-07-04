@@ -142,73 +142,55 @@ export default function ForensicPanel({
     <section className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-emerald-700 text-[11px] font-bold tracking-wider uppercase">ASSET MATRIX</h3>
-          <p className="text-slate-500 text-[10px] mt-0.5">Active Nodes {stocks.length || assetRows.length} · Avg Kelly Ratio 5.67:1 · Top Return 13.8 · Data Date {live?.updatedAt ? new Date(live.updatedAt).toISOString().slice(0, 10) : '2026-06-11'}</p>
+          <h3 className="text-emerald-700 text-[12px] font-bold tracking-wider uppercase">ASSET MATRIX</h3>
+          <p className="text-slate-500 text-[12px] mt-0.5">Active Nodes {stocks.length || assetRows.length} · Avg Kelly Ratio 5.67:1 · Top Return 13.8 · Data Date {live?.updatedAt ? new Date(live.updatedAt).toISOString().slice(0, 10) : '2026-06-11'}</p>
         </div>
         <button
           onClick={refresh}
           disabled={refreshing}
-          className="px-3 py-1 text-[10px] rounded-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition"
+          className="px-3 py-1 text-[12px] rounded-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition"
         >
           {refreshing ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
 
-      <div className="overflow-x-auto -mx-4 px-4">
-        <table className="w-full text-left text-[11px] table-fixed">
-          <colgroup>
-            <col className="w-[12%]" />
-            <col className="w-[12%]" />
-            <col className="w-[8%]" />
-            <col className="w-[10%]" />
-            <col className="w-[10%]" />
-            <col className="w-[38%]" />
-            <col className="w-[10%]" />
-          </colgroup>
-          <thead>
-            <tr className="text-slate-500 text-[10px] uppercase">
-              <th className="py-2.5 pr-2 font-semibold truncate">Ticker</th>
-              <th className="py-2.5 pr-2 font-semibold truncate">Price</th>
-              <th className="py-2.5 pr-2 font-semibold truncate">Score</th>
-              <th className="py-2.5 pr-2 font-semibold truncate">Kelly</th>
-              <th className="py-2.5 pr-2 font-semibold truncate">Return</th>
-              <th className="py-2.5 pr-2 font-semibold truncate">Thesis</th>
-              <th className="py-2.5 font-semibold truncate">Risk Flag</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {assetRows.map((row) => (
-              <tr
-                key={row.ticker}
-                onClick={() => onSelect?.(row.ticker)}
-                className={`cursor-pointer transition hover:bg-slate-50 ${row.state === 'HIGH' ? 'bg-emerald-50/30' : row.state === 'LOW' ? 'bg-red-50/30' : ''}`}
-              >
-                <td className="py-2.5 pr-2 font-black text-slate-900 truncate">{row.ticker}</td>
-                <td className="py-2.5 pr-2 text-slate-700 tabular-nums truncate">{row.price ? `₹${String(row.price).replace(/[₹]+/g, '')}` : '-'}</td>
-                <td className={`py-2.5 pr-2 font-bold ${scoreColor(row.score)} truncate`}>{row.score || '-'}</td>
-                <td className="py-2.5 pr-2 text-slate-700 truncate">{row.kelly || '-'}</td>
-                <td className="py-2.5 pr-2 truncate">
-                  <span className={`font-bold tabular-nums ${row.returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {row.returnPct >= 0 ? '+' : ''}{row.returnPct.toFixed(1)}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
+        {assetRows.map((row) => {
+          const priceVal = row.price ? `₹${String(row.price).replace(/[₹]+/g, '')}` : '-';
+          const returnVal = row.returnPct >= 0 ? `+${row.returnPct.toFixed(1)}` : row.returnPct.toFixed(1);
+          const isPositive = row.returnPct >= 0;
+          return (
+            <div
+              key={row.ticker}
+              onClick={() => onSelect?.(row.ticker)}
+              className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm hover:shadow-md transition-all group cursor-pointer"
+              style={{ borderLeft: isPositive ? '3px solid #10b981' : '3px solid #ef4444' }}
+            >
+              <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full opacity-15 blur-2xl"
+                style={{ backgroundColor: isPositive ? '#10b981' : '#ef4444' }} />
+              <div className="flex items-center justify-between mb-1.5 relative z-10">
+                <span className="text-[12px] font-black text-slate-900 font-mono">{row.ticker}</span>
+                {row.riskFlag && (
+                  <span className={`inline-block border px-1.5 py-0.5 rounded text-[12px] whitespace-nowrap font-black uppercase ${flagClass(row.riskFlag)}`}>
+                    {row.riskFlag}
                   </span>
-                </td>
-                <td className="py-2.5 pr-2 text-slate-500 truncate" title={row.thesis}>
-                  {row.thesis ? <span className="text-teal-700 font-medium truncate block">{row.thesis}</span> : '-'}
-                </td>
-                <td className="py-2.5 pr-2 text-slate-500 truncate">
-                  {row.riskFlag ? <span className={`inline-block border px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap ${flagClass(row.riskFlag)}`}>{row.riskFlag}</span> : '-'}
-                </td>
-              </tr>
-            ))}
-            {!assetRows.length && (
-              <tr>
-                <td colSpan={7} className="py-6 text-center text-slate-500">
-                  No live market data for Nifty 500.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                )}
+              </div>
+              <p className="text-[12px] text-slate-500 mb-2 truncate relative z-10">{row.thesis}</p>
+              <div className="space-y-1 text-[12px] relative z-10">
+                <div className="flex justify-between"><span className="text-slate-400">Price</span><span className="font-bold text-slate-700">{priceVal}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Score</span><span className={`font-bold ${scoreColor(row.score)}`}>{row.score || '-'}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Kelly</span><span className="font-bold text-slate-700">{row.kelly || '-'}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Return</span><span className={`font-bold ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>{returnVal}</span></div>
+              </div>
+            </div>
+          );
+        })}
+        {!assetRows.length && (
+          <div className="col-span-full py-6 text-center text-slate-500">
+            No live market data for Nifty 500.
+          </div>
+        )}
       </div>
     </section>
   );
