@@ -613,7 +613,7 @@ function GainersLosersHeatmap() {
       {error && totalStocks === 0 && (
         <div className="text-[9px] text-red-500 px-2 py-1 mb-1">{error}</div>
       )}
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid grid-cols-4 gap-1.5">
         {NSE_TOP_FIVE_CATEGORIES.map((category) => {
           const stocks = categories[category.key] ?? [];
           const accentClass = getCategoryAccentClass(category.key);
@@ -660,8 +660,16 @@ function GainersLosersHeatmap() {
         <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
         <span className="text-[8px] uppercase tracking-wider text-slate-500 font-bold">NIFTY SCREENERS</span>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
-        {TRENDLYNE_SCREENS.map((screen) => (
+      {/* First 4 Trendlyne screens in one row */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-1.5">
+        {TRENDLYNE_SCREENS.slice(0, 4).map((screen) => (
+          <TrendlyneCategoryPanel key={screen.key} screenKey={screen.key} label={screen.label} accentClass={screen.accent} />
+        ))}
+      </div>
+
+      {/* HIGH VOLUME/LOSS + OUTPERFORMANCE /WEEK in one row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 mt-1.5">
+        {TRENDLYNE_SCREENS.slice(4).map((screen) => (
           <TrendlyneCategoryPanel key={screen.key} screenKey={screen.key} label={screen.label} accentClass={screen.accent} />
         ))}
       </div>
@@ -1706,11 +1714,13 @@ export default function IrosMasterAdvancedTerminal() {
               <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} />
             </div>
 
-            {/* Row 4: Gainers/Losers + News Feed */}
+            {/* Row 4: Gainers/Losers + Screeners */}
             <div className="flex flex-col gap-4">
               <GainersLosersHeatmap />
-              <NewsFeedPanel items={liveMarket?.news} now={now} />
             </div>
+
+            {/* Row 5: News Feed */}
+            <NewsFeedPanel items={liveMarket?.news} now={now} />
 
           </div>
         )}
