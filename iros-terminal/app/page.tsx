@@ -275,25 +275,29 @@ function useAdaptiveTooltip() {
 
 function MiniSparkline({ positive }: { positive: boolean }) {
   const color = positive ? '#10b981' : '#ef4444';
+  const id = `mini-${positive ? 'g' : 'r'}-${Math.random().toString(36).slice(2, 6)}`;
+  const fillUrl = 'url(#' + id + ')';
+
+  let pathD: string;
+  let areaD: string;
+  if (positive) {
+    pathD = 'M 0,25 C 20,22 30,24 50,18 C 70,12 80,8 100,4';
+    areaD = 'M 0,25 C 20,22 30,24 50,18 C 70,12 80,8 100,4 L 100,30 L 0,30 Z';
+  } else {
+    pathD = 'M 0,5 C 20,8 30,6 50,12 C 70,18 80,22 100,26';
+    areaD = 'M 0,5 C 20,8 30,6 50,12 C 70,18 80,22 100,26 L 100,30 L 0,30 Z';
+  }
+
   return (
     <svg className="w-full h-8" viewBox="0 0 100 30" preserveAspectRatio="none">
       <defs>
-        <linearGradient id={`spark-fill-${positive ? 'g' : 'r'}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
-      {positive ? (
-        <>
-          <path d="M0,25 L10,22 L20,24 L30,18 L40,16 L50,12 L60,10 L70,8 L80,6 L90,4 L100,2 L100,30 L0,30 Z" fill={`url(#spark-fill-${positive ? 'g' : 'r'})`} />
-          <polyline points="0,25 10,22 20,24 30,18 40,16 50,12 60,10 70,8 80,6 90,4 100,2" stroke={color} strokeWidth="1.5" fill="none" className="animate-pulse" />
-        </>
-      ) : (
-        <>
-          <path d="M0,5 L10,8 L20,6 L30,12 L40,14 L50,18 L60,20 L70,22 L80,24 L90,26 L100,28 L100,30 L0,30 Z" fill={`url(#spark-fill-${positive ? 'g' : 'r'})`} />
-          <polyline points="0,5 10,8 20,6 30,12 40,14 50,18 60,20 70,22 80,24 90,26 100,28" stroke={color} strokeWidth="1.5" fill="none" className="animate-pulse" />
-        </>
-      )}
+      <path d={areaD} fill={fillUrl} />
+      <path d={pathD} stroke={color} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -914,24 +918,24 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
         <span className="text-[8px] uppercase tracking-wider text-slate-500 font-bold">GLOBAL INDICES</span>
         {staleLabel && <span className="text-[8px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5">
         {items.map((item) => {
           const isPositive = item.state === 'POSITIVE';
           const gradient = getGlobalIndexGradient(item.label);
           return (
             <div
               key={item.label}
-              className="relative overflow-hidden rounded-xl p-3 transition-all hover:scale-105"
+              className="relative overflow-hidden rounded-lg p-2 transition-all hover:scale-105"
               style={{
                 background: gradient.background,
                 border: gradient.border,
-                minHeight: '90px',
+                minHeight: '70px',
               }}
             >
               <SparklineSVG positive={isPositive} />
-              <span className="text-[10px] text-slate-600 block uppercase tracking-wider font-semibold">{item.label}</span>
-              <span className="text-lg font-bold text-slate-900 block mt-1 font-mono">{item.val}</span>
-              <span className={`text-[11px] font-bold block mt-0.5 ${marketStateClass(item.state)}`}>
+              <span className="text-[9px] text-slate-600 block uppercase tracking-wider font-semibold">{item.label}</span>
+              <span className="text-base font-bold text-slate-900 block mt-0.5 font-mono">{item.val}</span>
+              <span className={`text-[10px] font-bold block mt-0.5 ${marketStateClass(item.state)}`}>
                 {isPositive ? '↑' : '↓'} {item.delta}
               </span>
             </div>
@@ -1048,7 +1052,7 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
         </div>
         {staleLabel && <span className="text-[8px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'BRENT CRUDE OIL') displayLabel = 'BRENT CRUDE';
@@ -1056,16 +1060,16 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
           return (
             <div
               key={item.label}
-              className="rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105"
+              className="rounded-lg p-2 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105"
               style={{
                 background: gradient.background,
                 border: gradient.border,
-                minHeight: '90px',
+                minHeight: '70px',
               }}
             >
-              <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wide">{displayLabel}</span>
-              <span className="text-[10px] text-slate-600 mt-1 font-mono font-bold">{item.val}</span>
-              <span className={`text-[11px] font-bold mt-0.5 ${marketStateClass(item.state)}`}>
+              <span className="text-[10px] font-bold text-slate-800 uppercase tracking-wide">{displayLabel}</span>
+              <span className="text-[9px] text-slate-600 mt-0.5 font-mono font-bold">{item.val}</span>
+              <span className={`text-[10px] font-bold mt-0.5 ${marketStateClass(item.state)}`}>
                 {item.delta}
               </span>
             </div>
@@ -1095,7 +1099,7 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
         <span className="text-[8px] uppercase tracking-wider text-slate-500 font-bold">INDIA MARKETS — TOP MOVERS</span>
         {staleLabel && <span className="text-[8px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'USD / INR Spot') displayLabel = 'USD / INR';
@@ -1104,17 +1108,17 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
           return (
             <div
               key={item.label}
-              className="relative overflow-hidden rounded-xl p-3 transition-all hover:scale-105"
+              className="relative overflow-hidden rounded-lg p-2 transition-all hover:scale-105"
               style={{
                 background: gradient.background,
                 border: gradient.border,
-                minHeight: '90px',
+                minHeight: '70px',
               }}
             >
               <SparklineSVG positive={isPositive} />
-              <span className="text-[10px] text-slate-600 block uppercase tracking-wider font-semibold">{displayLabel}</span>
-              <span className="text-lg font-bold text-slate-900 block mt-1 font-mono">{item.val}</span>
-              <span className={`text-[11px] font-bold block mt-0.5 ${marketStateClass(item.state)}`}>
+              <span className="text-[9px] text-slate-600 block uppercase tracking-wider font-semibold">{displayLabel}</span>
+              <span className="text-base font-bold text-slate-900 block mt-0.5 font-mono">{item.val}</span>
+              <span className={`text-[10px] font-bold block mt-0.5 ${marketStateClass(item.state)}`}>
                 {isPositive ? '↑' : '↓'} {item.delta}
               </span>
             </div>
@@ -1426,15 +1430,39 @@ function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIn
   );
 }
 
-/* Sparkline helper used by GlobalIndicesGrid */
+let sparkIdCounter = 0;
+
+/* Sparkline helper used by GlobalIndicesGrid - Yahoo Finance style */
 function SparklineSVG({ positive }: { positive: boolean }) {
+  const [id] = useState(() => `spk-${positive ? 'g' : 'r'}-${++sparkIdCounter}`);
   const color = positive ? '#10b981' : '#ef4444';
-  const points = positive
-    ? '5,48 15,44 25,42 35,38 45,36 55,32 65,30 75,26 85,24 95,20'
-    : '5,15 15,20 25,25 35,30 45,35 55,40 65,42 75,45 85,48 95,50';
+  const fillUrl = 'url(#' + id + ')';
+
+  // Yahoo Finance style: curved path with area gradient fill
+  let pathD: string;
+  let areaD: string;
+  if (positive) {
+    pathD = 'M 5,52 C 15,48 20,46 30,42 C 40,38 45,34 55,30 C 65,26 70,24 80,20 C 90,16 95,14 100,10';
+    areaD = 'M 5,52 C 15,48 20,46 30,42 C 40,38 45,34 55,30 C 65,26 70,24 80,20 C 90,16 95,14 100,10 L 100,60 L 5,60 Z';
+  } else {
+    pathD = 'M 5,10 C 15,14 20,16 30,22 C 40,28 45,32 55,36 C 65,40 70,44 80,48 C 90,52 95,54 100,56';
+    areaD = 'M 5,10 C 15,14 20,16 30,22 C 40,28 45,32 55,36 C 65,40 70,44 80,48 C 90,52 95,54 100,56 L 100,60 L 5,60 Z';
+  }
+
   return (
-    <svg className="absolute top-0 right-0 w-12 h-12 opacity-15" viewBox="0 0 100 60">
-      <polyline points={points} stroke={color} strokeWidth="1.5" fill="none" />
+    <svg className="absolute top-0 right-0 w-full h-full opacity-30" viewBox="0 0 100 60" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.4" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      {/* Area fill */}
+      <path d={areaD} fill={fillUrl} />
+      {/* Line */}
+      <path d={pathD} stroke={color} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      {/* End dot */}
+      <circle cx="100" cy={positive ? 10 : 56} r="2.5" fill={color} stroke="white" strokeWidth="1" />
     </svg>
   );
 }
