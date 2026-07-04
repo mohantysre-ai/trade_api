@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   useMarketData,
   type LiveStock,
@@ -207,13 +208,75 @@ async function fetchNseEquityStockIndices() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Modern animated tooltip shared components                                  */
+/*  Adaptive tooltip hook - positions tooltip near trigger element             */
+/* -------------------------------------------------------------------------- */
+
+function useAdaptiveTooltip() {
+  const triggerRef = useRef<HTMLDivElement | HTMLSpanElement | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  const cancelClose = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    closeTimer.current = setTimeout(() => setVisible(false), 200);
+  };
+
+  const showTooltip = () => {
+    cancelClose();
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const viewportW = window.innerWidth;
+      const viewportH = window.innerHeight;
+      const tooltipW = 340;
+      const tooltipH = 400;
+
+      // Default: position below the trigger
+      let top = rect.bottom + 8;
+      let left = rect.left + rect.width / 2 - tooltipW / 2;
+
+      // If below would overflow, position above
+      if (top + tooltipH > viewportH) {
+        top = rect.top - tooltipH - 8;
+      }
+
+      // If left would overflow, align to left edge
+      if (left < 8) left = 8;
+      // If right would overflow, align to right edge
+      if (left + tooltipW > viewportW - 8) {
+        left = viewportW - tooltipW - 8;
+      }
+
+      // If still out of viewport (very small screen), center horizontally
+      if (left < 8 && viewportW < tooltipW + 16) {
+        left = 8;
+      }
+
+      setPosition({ top, left });
+    }
+    setVisible(true);
+  };
+
+  return { triggerRef, visible, position, setVisible, showTooltip, scheduleClose, cancelClose, mounted };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Mini sparkline component                                                    */
 /* -------------------------------------------------------------------------- */
 
 function MiniSparkline({ positive }: { positive: boolean }) {
   const color = positive ? '#10b981' : '#ef4444';
   return (
-    <svg className="w-full h-10" viewBox="0 0 100 30" preserveAspectRatio="none">
+    <svg className="w-full h-8" viewBox="0 0 100 30" preserveAspectRatio="none">
       <defs>
         <linearGradient id={`spark-fill-${positive ? 'g' : 'r'}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.25" />
@@ -235,6 +298,10 @@ function MiniSparkline({ positive }: { positive: boolean }) {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*  NseTooltipContent - shared tooltip content for NSE stocks                   */
+/* -------------------------------------------------------------------------- */
+
 function NseTooltipContent({ data }: { data: Record<string, unknown> }) {
   const graphSrc = getNseGraphSrc(data);
   const pchange = typeof data.pchange === 'number' ? data.pchange : (typeof data.pChange === 'number' ? data.pChange : null);
@@ -243,32 +310,32 @@ function NseTooltipContent({ data }: { data: Record<string, unknown> }) {
   return (
     <div>
       {/* Sparkline header */}
-      <div className="mb-3 rounded-t-lg p-2" style={{ background: positive ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)' }}>
+      <div className="mb-2 rounded-t-lg p-1.5" style={{ background: positive ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)' }}>
         <MiniSparkline positive={positive} />
       </div>
 
       {graphSrc && (
-        <div className="mb-3 rounded-lg border border-slate-200 bg-white shadow-sm p-2 transition-transform hover:scale-[1.01]">
-          <div className="mb-1.5 flex items-center justify-between text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+        <div className="mb-2 rounded-lg border border-slate-200 bg-white shadow-sm p-1.5 transition-transform hover:scale-[1.01]">
+          <div className="mb-1 flex items-center justify-between text-[8px] uppercase tracking-wider text-slate-400 font-bold">
             <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+              <span className="w-1 h-1 rounded-full bg-teal-500 animate-pulse" />
               Price Chart
             </span>
             <span className="text-teal-600">30D</span>
           </div>
-          <img src={graphSrc} alt="NSE chart" className="h-20 w-full rounded object-contain bg-white" />
+          <img src={graphSrc} alt="NSE chart" className="h-16 w-full rounded object-contain bg-white" />
         </div>
       )}
 
       <div className="space-y-0.5">
-        {Object.entries(data).map(([key, value], idx) => {
+        {Object.entries(data).map(([key, value]) => {
           const isPrice = key === 'lastPrice' || key === 'lastCorpAnnouncementPrice';
           const isChange = key === 'pchange' || key === 'pChange';
           const accentClass = isPrice ? 'text-slate-900 font-bold' : isChange ? (positive ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500';
           return (
-            <div key={key} className="group flex items-center justify-between gap-3 px-2 py-1.5 rounded-md transition-all hover:bg-slate-50 hover:scale-[1.01]">
-              <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold truncate">{formatNseKey(key)}</div>
-              <div className={`text-[10px] font-mono text-right ${accentClass} transition-colors`}>{formatNseFieldValue(key, value)}</div>
+            <div key={key} className="group flex items-center justify-between gap-3 px-2 py-1 rounded-md transition-all hover:bg-slate-50 hover:scale-[1.01]">
+              <div className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold truncate">{formatNseKey(key)}</div>
+              <div className={`text-[9px] font-mono text-right ${accentClass} transition-colors`}>{formatNseFieldValue(key, value)}</div>
             </div>
           );
         })}
@@ -277,81 +344,114 @@ function NseTooltipContent({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }) {
-  const triggerRef = useRef<HTMLSpanElement | null>(null);
-  const [visible, setVisible] = useState(false);
-  const [anchor, setAnchor] = useState({ x: 0, y: 0 });
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const viewportWidth = typeof window === 'undefined' ? 1024 : window.innerWidth;
-  const tooltipWidth = 352;
-  const tooltipLeft = Math.max(12, Math.min(anchor.x + 4, viewportWidth - tooltipWidth - 12));
-  const tooltipTop = Math.max(8, anchor.y);
+/* -------------------------------------------------------------------------- */
+/*  Shared adaptive tooltip portal component                                    */
+/* -------------------------------------------------------------------------- */
 
-  const cancelClose = () => {
-    if (closeTimer.current) {
-      clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-  };
+function AdaptiveTooltipPortal({
+  visible,
+  position,
+  mounted,
+  positive,
+  ticker,
+  pchange,
+  stock,
+  onMouseEnter,
+  onMouseLeave,
+}: {
+  visible: boolean;
+  position: { top: number; left: number };
+  mounted: boolean;
+  positive: boolean | null;
+  ticker: string;
+  pchange: number | null;
+  stock: Record<string, unknown>;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}) {
+  if (!visible || !mounted) return null;
+
+  return createPortal(
+    <div
+      style={{
+        position: 'fixed',
+        zIndex: 9999,
+        maxWidth: '340px',
+        maxHeight: '85vh',
+        top: position.top,
+        left: position.left,
+        borderRadius: '12px',
+        border: '1px solid #e2e8f0',
+        background: 'white',
+        padding: '14px',
+        boxShadow: positive !== null
+          ? (positive
+              ? '0 8px 32px rgba(16,185,129,0.15), 0 2px 8px rgba(0,0,0,0.06)'
+              : '0 8px 32px rgba(239,68,68,0.15), 0 2px 8px rgba(0,0,0,0.06)')
+          : '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
+        overflowY: 'auto',
+      }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      <div className="flex items-center gap-2 mb-2 flex-shrink-0">
+        <span className={`w-1.5 h-1.5 rounded-full ${positive !== null ? (positive ? 'bg-emerald-500' : 'bg-red-500') : 'bg-slate-400'} animate-pulse`} />
+        <span className={`text-[9px] uppercase tracking-widest font-bold ${positive !== null ? (positive ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500'}`}>
+          {ticker} · NSE
+        </span>
+        {pchange !== null && (
+          <span className={`ml-auto text-[10px] font-black tabular-nums ${positive ? 'text-emerald-600' : 'text-red-500'}`}>
+            {positive ? '↑' : '↓'} {pchange > 0 ? '+' : ''}{pchange.toFixed(2)}
+          </span>
+        )}
+      </div>
+      <NseTooltipContent data={stock} />
+    </div>,
+    document.body
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  NseTickerTooltip - tooltip for top gainers/losers stocks with adaptive pos  */
+/* -------------------------------------------------------------------------- */
+
+function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }) {
+  const { triggerRef, visible, position, showTooltip, scheduleClose, cancelClose, mounted } = useAdaptiveTooltip();
 
   const pchange = typeof stock.pchange === 'number' ? stock.pchange : null;
   const positive = pchange !== null && pchange >= 0;
 
-  const scheduleClose = () => {
-    closeTimer.current = setTimeout(() => setVisible(false), 180);
-  };
-
-  const showTooltip = () => {
-    cancelClose();
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (rect) {
-      setAnchor({ x: rect.right, y: rect.top });
-    }
-    setVisible(true);
-  };
-
   return (
-    <span
-      ref={triggerRef}
-      className={`text-[13px] font-bold cursor-default transition-colors ${positive !== null ? (positive ? 'text-emerald-700 hover:text-emerald-500' : 'text-red-700 hover:text-red-500') : 'text-slate-800'}`}
-      onMouseEnter={showTooltip}
-      onMouseLeave={scheduleClose}
-      onFocus={showTooltip}
-      onBlur={() => { cancelClose(); setVisible(false); }}
-      tabIndex={0}
-    >
-      {ticker}
-      {visible && (
-        <div
-          aria-hidden={!visible}
-          className="fixed z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl pointer-events-auto overflow-y-auto max-h-[calc(100vh-2rem)] visible opacity-100"
-          style={{
-            left: `${tooltipLeft}px`,
-            top: `${tooltipTop}px`,
-            boxShadow: positive !== null ? (positive ? '0 8px 32px rgba(16,185,129,0.15), 0 2px 8px rgba(0,0,0,0.06)' : '0 8px 32px rgba(239,68,68,0.15), 0 2px 8px rgba(0,0,0,0.06)') : '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
-          }}
-          onMouseEnter={() => { cancelClose(); setVisible(true); }}
-          onMouseLeave={scheduleClose}
-        >
-          <div className="overflow-visible max-h-none">
-            <div className="flex items-center gap-2 mb-2 flex-shrink-0">
-              <span className={`w-1.5 h-1.5 rounded-full ${positive !== null ? (positive ? 'bg-emerald-500' : 'bg-red-500') : 'bg-slate-400'} animate-pulse`} />
-              <span className={`text-[9px] uppercase tracking-widest font-bold ${positive !== null ? (positive ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500'}`}>
-                {ticker} · NSE
-              </span>
-              {pchange !== null && (
-                <span className={`ml-auto text-[10px] font-black tabular-nums ${positive ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {positive ? '↑' : '↓'} {pchange > 0 ? '+' : ''}{pchange.toFixed(2)}
-                </span>
-              )}
-            </div>
-            <NseTooltipContent data={stock} />
-          </div>
-        </div>
-      )}
-    </span>
+    <>
+      <span
+        ref={triggerRef as React.RefObject<HTMLSpanElement | null>}
+        className={`text-[12px] font-bold cursor-pointer transition-colors ${positive !== null ? (positive ? 'text-emerald-700 hover:text-emerald-500' : 'text-red-700 hover:text-red-500') : 'text-slate-800'}`}
+        onMouseEnter={showTooltip}
+        onMouseLeave={scheduleClose}
+        onFocus={showTooltip}
+        onBlur={() => { cancelClose(); }}
+        tabIndex={0}
+      >
+        {ticker}
+      </span>
+      <AdaptiveTooltipPortal
+        visible={visible}
+        position={position}
+        mounted={mounted}
+        positive={positive}
+        ticker={ticker}
+        pchange={pchange}
+        stock={stock}
+        onMouseEnter={() => { cancelClose(); }}
+        onMouseLeave={scheduleClose}
+      />
+    </>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/*  TrendlyneCategoryPanel                                                      */
+/* -------------------------------------------------------------------------- */
 
 function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: TrendlyneScreenKey; label: string; accentClass: string }) {
   const [items, setItems] = useState<TrendlyneStock[]>([]);
@@ -387,47 +487,45 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
     return () => { cancelled = true; window.clearInterval(id); };
   }, [fetchData]);
 
-  const dotClass = accentClass === 'emerald' ? 'bg-emerald-500' : accentClass === 'red' ? 'bg-red-500' : 'bg-amber-500';
+  const dotCls = accentClass === 'emerald' ? 'bg-emerald-500' : accentClass === 'red' ? 'bg-red-500' : accentClass === 'indigo' ? 'bg-indigo-500' : 'bg-amber-500';
   const textAccentCls = accentClass === 'emerald' ? 'text-emerald-600' : accentClass === 'red' ? 'text-red-500' : accentClass === 'indigo' ? 'text-indigo-600' : 'text-amber-600';
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-5 shadow-sm min-h-[320px] overflow-visible">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">{label}</span>
-        <span className="text-[9px] text-slate-400 bg-slate-100 px-2 py-1 rounded">
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 shadow-sm min-h-[160px] overflow-visible">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">{label}</span>
+        <span className="text-[7px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
           {loading ? 'LOADING' : error ? 'ERROR' : `${items.length} stocks`}
         </span>
       </div>
       {error && items.length === 0 && (
-        <div className="text-[11px] text-red-500 px-3 py-2 mb-3">{error}</div>
+        <div className="text-[9px] text-red-500 px-2 py-1 mb-1">{error}</div>
       )}
-      <div className="space-y-2">
+      <div className="space-y-0.5">
         {items.length === 0 && !loading && !error && (
-          <div className="text-[11px] text-slate-400 px-3 py-2">No data</div>
+          <div className="text-[9px] text-slate-400 px-2 py-1">No data</div>
         )}
         {items.map((item, idx) => {
           const currentPrice = item.tooltipParams.find((p) => p.key === 'currentPrice')?.value ?? '—';
-  const dotClass = accentClass === 'emerald' ? 'bg-emerald-500' : accentClass === 'red' ? 'bg-red-500' : accentClass === 'indigo' ? 'bg-indigo-500' : 'bg-amber-500';
-  const textAccentCls = accentClass === 'emerald' ? 'text-emerald-600' : accentClass === 'red' ? 'text-red-500' : accentClass === 'indigo' ? 'text-indigo-600' : 'text-amber-600';
-  return (
+          return (
             <a
               key={`${screenKey}-${item.name}-${idx}`}
               href={item.stockurl}
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-center justify-between px-4 py-2.5 rounded-lg transition-all hover:scale-[1.02] cursor-default overflow-visible"
+              className="group flex items-center justify-between px-2 py-1 rounded-lg transition-all hover:scale-[1.02] cursor-default overflow-visible"
               style={{
                 backgroundColor: idx % 2 === 0 ? 'rgba(248, 250, 252, 0.5)' : 'transparent',
                 borderBottom: '1px solid rgba(226, 232, 240, 0.4)',
               }}
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className={`w-2.5 h-2.5 rounded-full ${dotClass}`} />
-                <span className="text-[12px] font-bold text-slate-800 truncate">{item.name}</span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className={`w-1.5 h-1.5 rounded-full ${dotCls}`} />
+                <span className="text-[10px] font-bold text-slate-800 truncate">{item.name}</span>
               </div>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <span className={`text-[11px] font-bold ${textAccentCls}`}>{item.value}</span>
-                <span className="text-[10px] text-slate-500">₹{currentPrice}</span>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className={`text-[9px] font-bold ${textAccentCls}`}>{item.value}</span>
+                <span className="text-[8px] text-slate-500">₹{currentPrice}</span>
               </div>
             </a>
           );
@@ -436,6 +534,10 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
     </div>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/*  GainersLosersHeatmap                                                         */
+/* -------------------------------------------------------------------------- */
 
 function GainersLosersHeatmap() {
   const [categories, setCategories] = useState<Record<NseTopFiveCategoryKey, NseStock[]>>({
@@ -496,17 +598,17 @@ function GainersLosersHeatmap() {
   );
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-5 shadow-sm min-h-[320px] overflow-visible">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">NIFTY TOP 5 GAINERS & LOSERS</span>
-        <span className="text-[9px] text-slate-400 bg-slate-100 px-2 py-1 rounded">
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 shadow-sm min-h-[160px] overflow-visible">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">NIFTY TOP 5 GAINERS & LOSERS</span>
+        <span className="text-[7px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
           {loading ? 'LOADING' : error ? 'ERROR' : `${totalStocks} stocks`}
         </span>
       </div>
       {error && totalStocks === 0 && (
-        <div className="text-[11px] text-red-500 px-3 py-2 mb-3">{error}</div>
+        <div className="text-[9px] text-red-500 px-2 py-1 mb-1">{error}</div>
       )}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-1.5">
         {NSE_TOP_FIVE_CATEGORIES.map((category) => {
           const stocks = categories[category.key] ?? [];
           const accentClass = getCategoryAccentClass(category.key);
@@ -515,29 +617,29 @@ function GainersLosersHeatmap() {
 
           return (
             <div key={category.key}>
-              <div className={`text-[11px] uppercase tracking-wider ${accentClass} font-bold mb-3 flex items-center gap-2`}>
-                <span className={`w-2.5 h-2.5 rounded-full ${dotClass}`} />
+              <div className={`text-[9px] uppercase tracking-wider ${accentClass} font-bold mb-1 flex items-center gap-1.5`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
                 {category.label}
               </div>
-              <div className="space-y-2">
+              <div className="space-y-0.5">
                 {stocks.length === 0 && (
-                  <div className="text-[11px] text-slate-400 px-3 py-2">No data</div>
+                  <div className="text-[9px] text-slate-400 px-2 py-1">No data</div>
                 )}
                 {stocks.map((stock, index) => {
                   const ticker = stock.symbol ?? 'UNKNOWN';
-                   const changeText = typeof stock.pchange === 'number' ? `${stock.pchange > 0 ? '+' : ''}${stock.pchange.toFixed(2)}` : 'N/A';
+                  const changeText = typeof stock.pchange === 'number' ? `${stock.pchange > 0 ? '+' : ''}${stock.pchange.toFixed(2)}` : 'N/A';
                   const changeClass = typeof stock.pchange === 'number' ? (stock.pchange >= 0 ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500';
 
                   return (
                     <div
                       key={`${category.key}-${ticker}-${index}`}
-                      className="group flex items-center justify-between px-4 py-2.5 rounded-lg transition-all hover:scale-[1.02] cursor-default overflow-visible"
+                      className="group flex items-center justify-between px-2 py-1 rounded-lg transition-all hover:scale-[1.02] cursor-default overflow-visible"
                       style={rowStyle}
                     >
                       <NseTickerTooltip stock={stock} ticker={ticker} />
-                      <div className="flex items-center gap-3">
-                        <span className="text-[12px] text-slate-500">{formatNseNumber(stock.lastPrice)}</span>
-                        <span className={`text-[12px] font-bold ${changeClass}`}>{changeText}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-500">{formatNseNumber(stock.lastPrice)}</span>
+                        <span className={`text-[10px] font-bold ${changeClass}`}>{changeText}</span>
                       </div>
                     </div>
                   );
@@ -549,15 +651,15 @@ function GainersLosersHeatmap() {
       </div>
 
       {/* NIFTY SCREENERS Panels */}
-        <div className="flex items-center gap-2 mb-4">
-          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-          <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">NIFTY SCREENERS</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {TRENDLYNE_SCREENS.map((screen) => (
-            <TrendlyneCategoryPanel key={screen.key} screenKey={screen.key} label={screen.label} accentClass={screen.accent} />
-          ))}
-        </div>
+      <div className="flex items-center gap-1.5 mb-1.5 mt-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+        <span className="text-[8px] uppercase tracking-wider text-slate-500 font-bold">NIFTY SCREENERS</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+        {TRENDLYNE_SCREENS.map((screen) => (
+          <TrendlyneCategoryPanel key={screen.key} screenKey={screen.key} label={screen.label} accentClass={screen.accent} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -594,41 +696,21 @@ function getHeatColor(pct: number): { bg: string; text: string; border: string }
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Adaptive heat map tooltip with adaptive positioning                         */
+/* -------------------------------------------------------------------------- */
+
 function NseHeatMapTooltip({ stock, ticker, colors }: { stock: NseEquityStock; ticker: string; colors: { bg: string; text: string; border: string } }) {
-  const triggerRef = useRef<HTMLDivElement | null>(null);
-  const [visible, setVisible] = useState(false);
-  const [anchor, setAnchor] = useState({ x: 0, y: 0 });
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const viewportWidth = typeof window === 'undefined' ? 1024 : window.innerWidth;
-  const tooltipWidth = 384;
-  const tooltipLeft = Math.max(12, Math.min(anchor.x + 12, viewportWidth - tooltipWidth - 12));
-  const tooltipTop = Math.max(8, anchor.y);
+  const { triggerRef, visible, position, showTooltip, scheduleClose, cancelClose, mounted } = useAdaptiveTooltip();
 
-  const cancelClose = () => {
-    if (closeTimer.current) {
-      clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-  };
-
-  const scheduleClose = () => {
-    closeTimer.current = setTimeout(() => setVisible(false), 180);
-  };
-
-  const showTooltip = () => {
-    cancelClose();
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (rect) {
-      setAnchor({ x: rect.left, y: rect.top });
-    }
-    setVisible(true);
-  };
+  const pchange = typeof stock.pChange === 'number' ? stock.pChange : null;
+  const positive = pchange !== null && pchange >= 0;
 
   return (
     <>
       <div
-        ref={triggerRef}
-        className="flex flex-col items-center justify-center rounded-lg py-4 px-3 transition-all duration-300 hover:shadow-xl hover:scale-110 cursor-default group"
+        ref={triggerRef as React.RefObject<HTMLDivElement | null>}
+        className="flex flex-col items-center justify-center rounded-md py-1.5 px-1.5 transition-all duration-300 hover:shadow-xl hover:scale-110 cursor-default group relative"
         style={{
           backgroundColor: colors.bg,
           border: `2px solid ${colors.border}`,
@@ -636,40 +718,34 @@ function NseHeatMapTooltip({ stock, ticker, colors }: { stock: NseEquityStock; t
         onMouseEnter={showTooltip}
         onMouseLeave={scheduleClose}
         onFocus={showTooltip}
-        onBlur={() => { cancelClose(); setVisible(false); }}
+        onBlur={() => { cancelClose(); }}
         tabIndex={0}
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg" />
-        <span className="text-[11px] font-bold leading-tight relative z-10" style={{ color: colors.text }}>
+        <span className="text-[9px] font-bold leading-tight relative z-10" style={{ color: colors.text }}>
           {ticker}
         </span>
-        <span className="text-[10px] font-semibold mt-1.5 relative z-10" style={{ color: colors.text }}>
+        <span className="text-[8px] font-semibold mt-0.5 relative z-10" style={{ color: colors.text }}>
           {typeof stock.pChange === 'number' ? `${stock.pChange > 0 ? '+' : ''}${stock.pChange.toFixed(2)}` : 'N/A'}
         </span>
       </div>
-      <div
-        aria-hidden={!visible}
-        className={`fixed z-50 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-slate-300 bg-white p-5 text-left shadow-2xl transition-all duration-300 pointer-events-auto overflow-y-auto max-h-[calc(100vh-2rem)] ${visible ? 'visible opacity-100 translate-y-0' : 'invisible opacity-0 translate-y-2'}`}
-        style={{ 
-          left: `${tooltipLeft}px`, 
-          top: `${tooltipTop}px`,
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15), 0 8px 16px rgba(0, 0, 0, 0.1)'
-        }}
-        onMouseEnter={() => { cancelClose(); setVisible(true); }}
+      <AdaptiveTooltipPortal
+        visible={visible}
+        position={position}
+        mounted={mounted}
+        positive={positive}
+        ticker={ticker}
+        pchange={pchange}
+        stock={stock}
+        onMouseEnter={() => { cancelClose(); }}
         onMouseLeave={scheduleClose}
-      >
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-blue-400 to-purple-400 rounded-t-xl" />
-        <div className="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-3 flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
-          {ticker}
-        </div>
-        <div className="overflow-visible max-h-none">
-          <NseTooltipContent data={stock} />
-        </div>
-      </div>
+      />
     </>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Nifty100HeatMap - SORTED by gainers first, then losers                     */
+/* -------------------------------------------------------------------------- */
 
 function Nifty100HeatMap() {
   const [stocks, setStocks] = useState<NseEquityStock[]>([]);
@@ -704,58 +780,70 @@ function Nifty100HeatMap() {
     };
   }, []);
 
-  const heatMapStocks = useMemo(
-    () => stocks.map((stock) => ({ stock, ticker: stock.symbol ?? 'UNKNOWN', changePct: typeof stock.pChange === 'number' ? stock.pChange : 0 })),
-    [stocks]
-  );
+  // Sorted heat map: gainers first (descending by change), then losers (ascending by change)
+  const heatMapStocks = useMemo(() => {
+    const mapped = stocks.map((stock) => ({
+      stock,
+      ticker: stock.symbol ?? 'UNKNOWN',
+      changePct: typeof stock.pChange === 'number' ? stock.pChange : 0,
+    }));
+    // Sort: gainers (change >= 0) first descending by change, then losers ascending by change
+    return mapped.sort((a, b) => {
+      const aIsGainer = a.changePct >= 0;
+      const bIsGainer = b.changePct >= 0;
+      if (aIsGainer && !bIsGainer) return -1;
+      if (!aIsGainer && bIsGainer) return 1;
+      if (aIsGainer && bIsGainer) return b.changePct - a.changePct;
+      return a.changePct - b.changePct; // losers: most negative last
+    });
+  }, [stocks]);
 
   const gainers = useMemo(() => heatMapStocks.filter(s => s.changePct >= 0).length, [heatMapStocks]);
   const losers = useMemo(() => heatMapStocks.filter(s => s.changePct < 0).length, [heatMapStocks]);
 
   if (loading || (error && heatMapStocks.length === 0)) {
     return (
-      <div className="bg-gradient-to-br from-white to-slate-50 border border-slate-300 border-[0.5px] rounded-xl p-8 shadow-lg min-h-[520px]">
+      <div className="bg-gradient-to-br from-white to-slate-50 border border-slate-300 border-[0.5px] rounded-xl p-4 shadow-lg min-h-[400px]">
         <div className="flex flex-col items-center justify-center h-full">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-teal-400 to-blue-500 animate-spin mb-4 shadow-lg" />
-          <div className="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-2">NIFTY 100 HEAT MAP</div>
-          <div className="text-[11px] text-slate-400">{error ?? 'Waiting for live data...'}</div>
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-teal-400 to-blue-500 animate-spin mb-3 shadow-lg" />
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">NIFTY 100 HEAT MAP</div>
+          <div className="text-[10px] text-slate-400">{error ?? 'Waiting for live data...'}</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gradient-to-br from-white via-slate-50/30 to-white border border-slate-300 border-[0.5px] rounded-xl p-6 shadow-lg">
-      {/* Modern Header with gradient accent */}
-      <div className="relative mb-6">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-blue-400 to-purple-400 rounded-t-xl" />
-        <div className="flex items-center justify-between pt-2">
-          <div className="flex items-center gap-3">
+    <div className="bg-gradient-to-br from-white via-slate-50/30 to-white border border-slate-300 border-[0.5px] rounded-xl p-3 shadow-lg">
+      {/* Header */}
+      <div className="relative mb-2">
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-400 via-blue-400 to-purple-400 rounded-t-xl" />
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center gap-2">
             <div className="relative">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-blue-600 flex items-center justify-center shadow-lg">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-6 h-6 rounded-xl bg-gradient-to-br from-teal-500 to-blue-600 flex items-center justify-center shadow-lg">
+                <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 animate-pulse border-2 border-white" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">NIFTY 100 HEAT MAP</h3>
-              <p className="text-[10px] text-slate-500 mt-0.5">Live market performance visualization</p>
+              <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-wider">NIFTY 100 HEAT MAP</h3>
+              <p className="text-[7px] text-slate-500">Sorted by gainers / losers</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-slate-100 to-slate-50 border border-slate-200">
-              <span className="text-[10px] text-slate-600 font-semibold">{heatMapStocks.length} stocks</span>
+          <div className="flex items-center gap-1.5">
+            <div className="px-1.5 py-0.5 rounded-lg bg-gradient-to-r from-slate-100 to-slate-50 border border-slate-200">
+              <span className="text-[8px] text-slate-600 font-semibold">{heatMapStocks.length} stocks</span>
             </div>
-            <div className="flex items-center gap-2 text-[9px] uppercase tracking-wider">
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="flex items-center gap-1 text-[7px] uppercase tracking-wider">
+              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-emerald-50 border border-emerald-200">
+                <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-emerald-700 font-bold">{gainers}</span>
                 <span className="text-emerald-600">Gainers</span>
               </div>
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-50 border border-red-200">
-                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-red-50 border border-red-200">
+                <div className="w-1 h-1 rounded-full bg-red-500 animate-pulse" />
                 <span className="text-red-700 font-bold">{losers}</span>
                 <span className="text-red-600">Losers</span>
               </div>
@@ -764,17 +852,17 @@ function Nifty100HeatMap() {
         </div>
       </div>
 
-      {/* Modern Heat Map Grid */}
+      {/* Heat Map Grid */}
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-br from-teal-50/30 via-blue-50/20 to-purple-50/30 rounded-lg blur-2xl opacity-60" />
-        <div className="relative grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+        <div className="relative grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-1">
           {heatMapStocks.map((stock, index) => {
             const colors = getHeatColor(stock.changePct);
             return (
               <div
                 key={stock.ticker}
                 className="animate-fadeIn"
-                style={{ animationDelay: `${index * 20}ms` }}
+                style={{ animationDelay: `${index * 15}ms` }}
               >
                 <NseHeatMapTooltip
                   stock={stock.stock}
@@ -808,42 +896,42 @@ function Nifty100HeatMap() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Existing components (unchanged where possible)                             */
+/*  GlobalIndicesGrid                                                            */
 /* -------------------------------------------------------------------------- */
 
 function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 text-slate-400 text-[10px] shadow-sm">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 text-[9px] shadow-sm">
         Waiting for global macro data.
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">GLOBAL INDICES</span>
-        {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[8px] uppercase tracking-wider text-slate-500 font-bold">GLOBAL INDICES</span>
+        {staleLabel && <span className="text-[8px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {items.map((item) => {
           const isPositive = item.state === 'POSITIVE';
           const gradient = getGlobalIndexGradient(item.label);
           return (
             <div
               key={item.label}
-              className="relative overflow-hidden rounded-xl p-4 transition-all hover:scale-105"
+              className="relative overflow-hidden rounded-xl p-3 transition-all hover:scale-105"
               style={{
                 background: gradient.background,
                 border: gradient.border,
-                minHeight: '120px',
+                minHeight: '90px',
               }}
             >
               <SparklineSVG positive={isPositive} />
-              <span className="text-[11px] text-slate-600 block uppercase tracking-wider font-semibold">{item.label}</span>
-              <span className="text-xl font-bold text-slate-900 block mt-2 font-mono">{item.val}</span>
-              <span className={`text-[13px] font-bold block mt-1 ${marketStateClass(item.state)}`}>
+              <span className="text-[10px] text-slate-600 block uppercase tracking-wider font-semibold">{item.label}</span>
+              <span className="text-lg font-bold text-slate-900 block mt-1 font-mono">{item.val}</span>
+              <span className={`text-[11px] font-bold block mt-0.5 ${marketStateClass(item.state)}`}>
                 {isPositive ? '↑' : '↓'} {item.delta}
               </span>
             </div>
@@ -938,25 +1026,29 @@ function getGlobalIndexGradient(label: string): { background: string; border: st
   return { background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', border: '1px solid #E2E8F0' };
 }
 
+/* -------------------------------------------------------------------------- */
+/*  CommoditiesFxGrid                                                            */
+/* -------------------------------------------------------------------------- */
+
 function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 text-slate-400 text-[10px] shadow-sm">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 text-[9px] shadow-sm">
         Waiting for commodities & FX data.
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-amber-400" />
-          <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">COMMODITIES & FX</span>
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          <span className="text-[8px] uppercase tracking-wider text-slate-500 font-bold">COMMODITIES & FX</span>
         </div>
-        {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
+        {staleLabel && <span className="text-[8px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'BRENT CRUDE OIL') displayLabel = 'BRENT CRUDE';
@@ -964,16 +1056,16 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
           return (
             <div
               key={item.label}
-              className="rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105"
+              className="rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105"
               style={{
                 background: gradient.background,
                 border: gradient.border,
-                minHeight: '120px',
+                minHeight: '90px',
               }}
             >
-              <span className="text-[12px] font-bold text-slate-800 uppercase tracking-wide">{displayLabel}</span>
-              <span className="text-[11px] text-slate-600 mt-2 font-mono font-bold">{item.val}</span>
-              <span className={`text-[12px] font-bold mt-1 ${marketStateClass(item.state)}`}>
+              <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wide">{displayLabel}</span>
+              <span className="text-[10px] text-slate-600 mt-1 font-mono font-bold">{item.val}</span>
+              <span className={`text-[11px] font-bold mt-0.5 ${marketStateClass(item.state)}`}>
                 {item.delta}
               </span>
             </div>
@@ -984,22 +1076,26 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*  IndiaMarketsGrid                                                             */
+/* -------------------------------------------------------------------------- */
+
 function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 text-slate-400 text-[10px] shadow-sm">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 text-[9px] shadow-sm">
         Waiting for Indian market data.
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">INDIA MARKETS — TOP MOVERS</span>
-        {staleLabel && <span className="text-[9px] text-slate-500 uppercase">{staleLabel}</span>}
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[8px] uppercase tracking-wider text-slate-500 font-bold">INDIA MARKETS — TOP MOVERS</span>
+        {staleLabel && <span className="text-[8px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'USD / INR Spot') displayLabel = 'USD / INR';
@@ -1008,17 +1104,17 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
           return (
             <div
               key={item.label}
-              className="relative overflow-hidden rounded-xl p-4 transition-all hover:scale-105"
+              className="relative overflow-hidden rounded-xl p-3 transition-all hover:scale-105"
               style={{
                 background: gradient.background,
                 border: gradient.border,
-                minHeight: '120px',
+                minHeight: '90px',
               }}
             >
               <SparklineSVG positive={isPositive} />
-              <span className="text-[11px] text-slate-600 block uppercase tracking-wider font-semibold">{displayLabel}</span>
-              <span className="text-xl font-bold text-slate-900 block mt-2 font-mono">{item.val}</span>
-              <span className={`text-[13px] font-bold block mt-1 ${marketStateClass(item.state)}`}>
+              <span className="text-[10px] text-slate-600 block uppercase tracking-wider font-semibold">{displayLabel}</span>
+              <span className="text-lg font-bold text-slate-900 block mt-1 font-mono">{item.val}</span>
+              <span className={`text-[11px] font-bold block mt-0.5 ${marketStateClass(item.state)}`}>
                 {isPositive ? '↑' : '↓'} {item.delta}
               </span>
             </div>
@@ -1029,10 +1125,14 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*  StockDetailPanel                                                             */
+/* -------------------------------------------------------------------------- */
+
 function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null }) {
   if (!stock) {
     return (
-      <div className="bg-white border border-emerald-300 border-[0.5px] rounded-lg p-4 text-slate-500 min-h-[120px] flex items-center justify-center text-[10px] shadow-sm">
+      <div className="bg-white border border-emerald-300 border-[0.5px] rounded-lg p-3 text-slate-500 min-h-[90px] flex items-center justify-center text-[9px] shadow-sm">
         Select an asset to view quote detail.
       </div>
     );
@@ -1048,12 +1148,12 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
   const deltaValue = 'delta' in stock ? (stock as LiveStock).delta : (stock as LedgerStock).delta;
 
   return (
-    <div className="bg-white border border-emerald-300 border-[0.5px] rounded-lg p-4 shadow-sm">
+    <div className="bg-white border border-emerald-300 border-[0.5px] rounded-lg p-3 shadow-sm">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <div className="text-slate-500 text-[10px] uppercase tracking-wider">{name}</div>
+          <div className="text-slate-500 text-[9px] uppercase tracking-wider">{name}</div>
           <div className="flex items-baseline gap-3 mt-1">
-              <span className="text-3xl font-black text-slate-900">{normalizedPrice}</span>
+              <span className="text-2xl font-black text-slate-900">{normalizedPrice}</span>
             {deltaValue && (
               <span
                 className={`text-xs font-bold ${
@@ -1066,21 +1166,21 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
           </div>
         </div>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-[10px]">
-        <div className="bg-slate-50 border border-slate-100 p-2 rounded">
-          <div className="text-slate-500 uppercase tracking-wider text-[9px]">Open</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 mt-2 text-[9px]">
+        <div className="bg-slate-50 border border-slate-100 p-1.5 rounded">
+          <div className="text-slate-500 uppercase tracking-wider text-[8px]">Open</div>
           <div className="font-bold text-slate-900 mt-0.5">{open ?? 'N/A'}</div>
         </div>
-        <div className="bg-slate-50 border border-slate-100 p-2 rounded">
-          <div className="text-slate-500 uppercase tracking-wider text-[9px]">High</div>
+        <div className="bg-slate-50 border border-slate-100 p-1.5 rounded">
+          <div className="text-slate-500 uppercase tracking-wider text-[8px]">High</div>
           <div className="font-bold text-slate-900 mt-0.5">{high ?? 'N/A'}</div>
         </div>
-        <div className="bg-slate-50 border border-slate-100 p-2 rounded">
-          <div className="text-slate-500 uppercase tracking-wider text-[9px]">Low</div>
+        <div className="bg-slate-50 border border-slate-100 p-1.5 rounded">
+          <div className="text-slate-500 uppercase tracking-wider text-[8px]">Low</div>
           <div className="font-bold text-slate-900 mt-0.5">{low ?? 'N/A'}</div>
         </div>
-        <div className="bg-slate-50 border border-slate-100 p-2 rounded">
-          <div className="text-slate-500 uppercase tracking-wider text-[9px]">Volume</div>
+        <div className="bg-slate-50 border border-slate-100 p-1.5 rounded">
+          <div className="text-slate-500 uppercase tracking-wider text-[8px]">Volume</div>
           <div className="font-bold text-slate-900 mt-0.5">{volume != null ? new Intl.NumberFormat().format(volume) : 'N/A'}</div>
         </div>
       </div>
@@ -1088,16 +1188,20 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*  NewsFeedPanel                                                                */
+/* -------------------------------------------------------------------------- */
+
 function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: string; link: string; summary: string; publishedAt: string }>; now: number }) {
   if (!items?.length) {
     return (
       <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden">
-        <div className="flex items-center gap-2 p-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white">
-          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-          <span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">LIVE NEWS FEED</span>
-          <span className="ml-auto text-[8px] text-slate-400 uppercase tracking-wider">Waiting for data</span>
+        <div className="flex items-center gap-2 p-2.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white">
+          <span className="w-1 h-1 rounded-full bg-teal-400 animate-pulse" />
+          <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">LIVE NEWS FEED</span>
+          <span className="ml-auto text-[7px] text-slate-400 uppercase tracking-wider">Waiting for data</span>
         </div>
-        <div className="p-8 text-center text-slate-400 text-[10px]">No news stories available.</div>
+        <div className="p-6 text-center text-slate-400 text-[9px]">No news stories available.</div>
       </div>
     );
   }
@@ -1112,21 +1216,21 @@ function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: 
     return `${Math.floor(hrs / 24)}d ago`;
   };
 
-  const TRACK_HEIGHT = 38;
+  const TRACK_HEIGHT = 34;
   const VISIBLE_ITEMS = 15;
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-[580px]">
-      {/* Header - no padding left/right to match full width */}
-      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white flex-shrink-0">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-        <span className="text-[9px] uppercase tracking-widest text-slate-600 font-bold">Live News Feed</span>
-        <span className="ml-auto text-[8px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-[480px]">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white flex-shrink-0">
+        <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+        <span className="text-[8px] uppercase tracking-widest text-slate-600 font-bold">Live News Feed</span>
+        <span className="ml-auto text-[7px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
           {items.length} stories
         </span>
       </div>
 
-      {/* Ticker track with continuous scroll - no padding */}
+      {/* Ticker track */}
       <div className="relative flex-1 overflow-hidden" style={{ minHeight: TRACK_HEIGHT * 2 }}>
         <div
           className="hover:[animation-play-state:paused] absolute inset-0"
@@ -1140,34 +1244,34 @@ function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: 
               href={item.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-start gap-2.5 border-b border-slate-100 px-4 py-2 group hover:bg-emerald-50/50 transition-all duration-200 cursor-pointer"
+              className="flex items-start gap-2 border-b border-slate-100 px-3 py-1.5 group hover:bg-emerald-50/50 transition-all duration-200 cursor-pointer"
               style={{ minHeight: TRACK_HEIGHT }}
             >
               {/* Sequence badge */}
-              <span className="text-[8px] font-bold text-slate-400 bg-slate-100 w-5 h-5 flex items-center justify-center rounded border border-slate-200 flex-shrink-0 mt-0.5">
+              <span className="text-[7px] font-bold text-slate-400 bg-slate-100 w-4 h-4 flex items-center justify-center rounded border border-slate-200 flex-shrink-0 mt-0.5">
                 {String(i + 1).padStart(2, "0")}
               </span>
 
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <span className="text-[11px] font-semibold text-slate-800 leading-snug line-clamp-2 group-hover:text-emerald-700 transition-colors">
+                <span className="text-[10px] font-semibold text-slate-800 leading-snug line-clamp-2 group-hover:text-emerald-700 transition-colors">
                   {item.title}
                 </span>
-                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                  <span className="text-[8px] font-semibold text-slate-400 uppercase tracking-wider truncate max-w-[100px]">
+                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                  <span className="text-[7px] font-semibold text-slate-400 uppercase tracking-wider truncate max-w-[80px]">
                     {item.source.split(" ").slice(0, 2).join(" ")}
                   </span>
                   {item.summary && (
                     <>
                       <span className="text-slate-300">·</span>
-                      <span className="text-[9px] text-slate-500 line-clamp-1">{item.summary}</span>
+                      <span className="text-[8px] text-slate-500 line-clamp-1">{item.summary}</span>
                     </>
                   )}
                 </div>
               </div>
 
               {/* Timestamp */}
-              <span className="text-[8px] font-mono text-slate-400 flex-shrink-0 mt-0.5">
+              <span className="text-[7px] font-mono text-slate-400 flex-shrink-0 mt-0.5">
                 {timeAgo(item.publishedAt)}
               </span>
             </a>
@@ -1187,7 +1291,7 @@ function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: 
 
 function LiveIntelligencePanel() {
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm" />
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 shadow-sm" />
   );
 }
 
@@ -1204,8 +1308,8 @@ function RiskCalcFactorHub({ riskCalc, factorHub }: { riskCalc?: Record<string, 
 
   if (!hasRisk && !hasFactor) {
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] p-4 rounded-lg shadow-sm">
-        <p className="text-[10px] text-slate-500">Risk calc / factor data not available.</p>
+      <div className="bg-white border border-slate-300 border-[0.5px] p-3 rounded-lg shadow-sm">
+        <p className="text-[9px] text-slate-500">Risk calc / factor data not available.</p>
       </div>
     );
   }
@@ -1214,24 +1318,24 @@ function RiskCalcFactorHub({ riskCalc, factorHub }: { riskCalc?: Record<string, 
   const regularRiskEntries = riskCalc ? Object.entries(riskCalc).filter(([k]) => k.toLowerCase() !== 'risk_flag' && k.toLowerCase() !== 'risk_flag_value') : [];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
       {hasRisk && (
         <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden">
-          <div className="bg-slate-100 px-4 py-2.5 border-b border-slate-200">
-            <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Risk Calc</h4>
-            <p className="text-[9px] text-slate-500 mt-0.5">Quantified risk metrics from live analysis.</p>
+          <div className="bg-slate-100 px-3 py-2 border-b border-slate-200">
+            <h4 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Risk Calc</h4>
+            <p className="text-[8px] text-slate-500 mt-0.5">Quantified risk metrics from live analysis.</p>
           </div>
-          <div className="p-3 space-y-0">
+          <div className="p-2.5 space-y-0">
             {riskFlagEntry && (
-              <div className="flex items-center justify-between gap-3 py-2 border-b border-red-100 bg-red-50/40 -mx-3 px-3 mb-0">
-                <span className="text-[10px] text-red-700 uppercase tracking-wider font-bold leading-tight">Risk Flag</span>
-                <span className="text-[12px] text-red-700 font-black uppercase tracking-wider animate-pulse">{String(riskFlagEntry[1])}</span>
+              <div className="flex items-center justify-between gap-3 py-1.5 border-b border-red-100 bg-red-50/40 -mx-2.5 px-2.5 mb-0">
+                <span className="text-[9px] text-red-700 uppercase tracking-wider font-bold leading-tight">Risk Flag</span>
+                <span className="text-[11px] text-red-700 font-black uppercase tracking-wider animate-pulse">{String(riskFlagEntry[1])}</span>
               </div>
             )}
             {regularRiskEntries.map(([label, value], idx, arr) => (
-              <div key={label} className={`flex items-center justify-between gap-3 py-2 ${idx < arr.length - 1 ? 'border-b border-slate-100' : ''}`}>
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider leading-tight">{formatSnakeKey(label)}</span>
-                <span className="text-[11px] text-slate-900 font-bold text-right leading-tight">{String(value)}</span>
+              <div key={label} className={`flex items-center justify-between gap-3 py-1.5 ${idx < arr.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                <span className="text-[9px] text-slate-500 uppercase tracking-wider leading-tight">{formatSnakeKey(label)}</span>
+                <span className="text-[10px] text-slate-900 font-bold text-right leading-tight">{String(value)}</span>
               </div>
             ))}
           </div>
@@ -1240,15 +1344,15 @@ function RiskCalcFactorHub({ riskCalc, factorHub }: { riskCalc?: Record<string, 
 
       {hasFactor && (
         <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden">
-          <div className="bg-emerald-50 px-4 py-2.5 border-b border-emerald-100">
-            <h4 className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Factor Hub</h4>
-            <p className="text-[9px] text-slate-500 mt-0.5">Active factor exposures and signals.</p>
+          <div className="bg-emerald-50 px-3 py-2 border-b border-emerald-100">
+            <h4 className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Factor Hub</h4>
+            <p className="text-[8px] text-slate-500 mt-0.5">Active factor exposures and signals.</p>
           </div>
-          <div className="p-3 space-y-0">
+          <div className="p-2.5 space-y-0">
             {Object.entries(factorHub).map(([label, value], idx, arr) => (
-              <div key={label} className={`py-2 ${idx < arr.length - 1 ? 'border-b border-emerald-50' : ''}`}>
-                <div className="text-[9px] text-emerald-700 uppercase tracking-wider mb-0.5">{formatSnakeKey(label)}</div>
-                <div className="text-[11px] text-slate-700 leading-relaxed">{value}</div>
+              <div key={label} className={`py-1.5 ${idx < arr.length - 1 ? 'border-b border-emerald-50' : ''}`}>
+                <div className="text-[8px] text-emerald-700 uppercase tracking-wider mb-0.5">{formatSnakeKey(label)}</div>
+                <div className="text-[10px] text-slate-700 leading-relaxed">{value}</div>
               </div>
             ))}
           </div>
@@ -1262,46 +1366,46 @@ function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIn
   const hasData = !!intelligence;
 
   return (
-    <div className="bg-slate-50 border border-slate-300 border-[0.5px] rounded-xl p-4">
-      <div className="flex items-center justify-between mb-3">
+    <div className="bg-slate-50 border border-slate-300 border-[0.5px] rounded-xl p-3">
+      <div className="flex items-center justify-between mb-2">
         <div>
-          <h3 className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Structured Reasoning Output</h3>
-          <p className="text-[10px] text-slate-500 mt-0.5">Gemini / Pydantic mapped payload from the live ingestion stream.</p>
+          <h3 className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Structured Reasoning Output</h3>
+          <p className="text-[9px] text-slate-500 mt-0.5">Gemini / Pydantic mapped payload from the live ingestion stream.</p>
         </div>
-        <div className="text-[10px] text-slate-500">{hasData ? 'Available' : 'Unavailable'}</div>
+        <div className="text-[9px] text-slate-500">{hasData ? 'Available' : 'Unavailable'}</div>
       </div>
 
       {hasData ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[10px] text-slate-700">
-            <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
-              <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">News Catalysts</div>
-              <p className="text-[11px] text-slate-700 leading-relaxed">{intelligence.news_catalysts_card ?? 'Not produced.'}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[9px] text-slate-700">
+            <div className="bg-white border border-emerald-200 border-[0.5px] p-2.5 rounded-lg">
+              <div className="text-[8px] uppercase tracking-wider text-emerald-700 mb-1">News Catalysts</div>
+              <p className="text-[10px] text-slate-700 leading-relaxed">{intelligence.news_catalysts_card ?? 'Not produced.'}</p>
             </div>
-            <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
-              <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Macro Anchors</div>
-              <p className="text-[11px] text-slate-700 leading-relaxed">{intelligence.macro_anchors_card ?? 'Not produced.'}</p>
+            <div className="bg-white border border-emerald-200 border-[0.5px] p-2.5 rounded-lg">
+              <div className="text-[8px] uppercase tracking-wider text-emerald-700 mb-1">Macro Anchors</div>
+              <p className="text-[10px] text-slate-700 leading-relaxed">{intelligence.macro_anchors_card ?? 'Not produced.'}</p>
             </div>
-            <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
-              <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Insider / Insti Activity</div>
-              <p className="text-[11px] text-slate-700 leading-relaxed">{intelligence.insider_insti_activity_card ?? 'Not produced.'}</p>
+            <div className="bg-white border border-emerald-200 border-[0.5px] p-2.5 rounded-lg">
+              <div className="text-[8px] uppercase tracking-wider text-emerald-700 mb-1">Insider / Insti Activity</div>
+              <p className="text-[10px] text-slate-700 leading-relaxed">{intelligence.insider_insti_activity_card ?? 'Not produced.'}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 text-[10px] text-slate-700 mt-3">
-            <div className="bg-white border border-emerald-200 border-[0.5px] p-3 rounded-lg">
-              <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-1">Structural Thesis</div>
-              <p className="text-[10px] text-slate-600 leading-relaxed">
+          <div className="grid grid-cols-1 gap-2 text-[9px] text-slate-700 mt-2">
+            <div className="bg-white border border-emerald-200 border-[0.5px] p-2.5 rounded-lg">
+              <div className="text-[8px] uppercase tracking-wider text-emerald-700 mb-1">Structural Thesis</div>
+              <p className="text-[9px] text-slate-600 leading-relaxed">
                 <span className="text-slate-700">Why Interested: </span>
                 {intelligence.why_interested ?? 'Not produced.'}
               </p>
-              <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">
+              <p className="text-[9px] text-slate-600 mt-1 leading-relaxed">
                 <span className="text-slate-700">Forward Revenue: </span>
                 {intelligence.future_revenue_model ?? 'Not produced.'}
               </p>
             </div>
             <div className="bg-white border border-emerald-200 border-[0.5px] rounded-xl overflow-hidden">
-              <div className="text-[9px] uppercase tracking-wider text-emerald-700 mb-2">Risk Calc / Factor Hub</div>
+              <div className="text-[8px] uppercase tracking-wider text-emerald-700 mb-1">Risk Calc / Factor Hub</div>
               <RiskCalcFactorHub
                 riskCalc={
                   (intelligence.active_risk_calc as Record<string, unknown> | undefined) ?? undefined
@@ -1314,7 +1418,7 @@ function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIn
           </div>
         </>
       ) : (
-        <div className="text-slate-500 text-[10px]">
+        <div className="text-slate-500 text-[9px]">
           Terminal intelligence is not currently generated. Start the backend with Gemini/OpenAI keys for structured JSON mapping.
         </div>
       )}
@@ -1329,14 +1433,14 @@ function SparklineSVG({ positive }: { positive: boolean }) {
     ? '5,48 15,44 25,42 35,38 45,36 55,32 65,30 75,26 85,24 95,20'
     : '5,15 15,20 25,25 35,30 45,35 55,40 65,42 75,45 85,48 95,50';
   return (
-    <svg className="absolute top-0 right-0 w-14 h-14 opacity-15" viewBox="0 0 100 60">
+    <svg className="absolute top-0 right-0 w-12 h-12 opacity-15" viewBox="0 0 100 60">
       <polyline points={points} stroke={color} strokeWidth="1.5" fill="none" />
     </svg>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/*  MAIN COMPONENT                                                            */
+/*  MAIN COMPONENT                                                              */
 /* -------------------------------------------------------------------------- */
 
 export default function IrosMasterAdvancedTerminal() {
@@ -1469,29 +1573,29 @@ export default function IrosMasterAdvancedTerminal() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 text-slate-900 font-mono text-xs antialiased">
-      <div className="max-w-[1600px] mx-auto p-4 space-y-4">
+      <div className="max-w-[1600px] mx-auto p-3 space-y-3">
         <header className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm">
-          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 p-4">
+          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-2 p-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className={`w-2.5 h-2.5 rounded-full ${feedStatus === 'live' ? 'bg-emerald-500 animate-pulse' : feedStatus === 'loading' ? 'bg-amber-500' : 'bg-red-500'}`} />
-                <h1 className="text-sm font-black tracking-wider text-slate-900">IROS Live Market Intelligence</h1>
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${feedStatus === 'live' ? 'bg-emerald-500 animate-pulse' : feedStatus === 'loading' ? 'bg-amber-500' : 'bg-red-500'}`} />
+                <h1 className="text-xs font-black tracking-wider text-slate-900">IROS Live Market Intelligence</h1>
               </div>
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider xl:hidden">Nifty 500</span>
+                  <span className="text-[9px] text-slate-500 uppercase tracking-wider xl:hidden">Nifty 500</span>
             </div>
 
-            <div className="flex items-center justify-between xl:justify-end gap-3">
-              <span className="text-[10px] font-bold uppercase text-slate-500 hidden xl:inline tracking-wider">
+            <div className="flex items-center justify-between xl:justify-end gap-2">
+              <span className="text-[9px] font-bold uppercase text-slate-500 hidden xl:inline tracking-wider">
                 {liveMarket?.rawSources?.join(' · ') ?? 'Reuters · TradingView · Moneycontrol'}
               </span>
-              <div className="flex items-center gap-2 text-[10px] text-slate-500">
+              <div className="flex items-center gap-1.5 text-[9px] text-slate-500">
                 <span className="hidden sm:inline">
                   {liveMarket?.updatedAt ? new Date(liveMarket.updatedAt).toLocaleTimeString() : '--:--'} IST
                 </span>
                 <button
                   onClick={handleRefresh}
                   disabled={feedStatus === 'loading'}
-                  className="px-3 py-1.5 rounded-full bg-teal-600 text-white text-[10px] font-black uppercase tracking-wider hover:bg-teal-500 disabled:opacity-50 transition"
+                  className="px-2.5 py-1 rounded-full bg-teal-600 text-white text-[9px] font-black uppercase tracking-wider hover:bg-teal-500 disabled:opacity-50 transition"
                 >
                   Refresh
                 </button>
@@ -1500,8 +1604,8 @@ export default function IrosMasterAdvancedTerminal() {
           </div>
 
           {isSnapshotFallback && (
-            <div className="px-4 pb-3">
-              <div className="bg-amber-50 text-amber-800 border border-amber-200 p-2 rounded text-[11px]">
+            <div className="px-3 pb-2">
+              <div className="bg-amber-50 text-amber-800 border border-amber-200 p-1.5 rounded text-[10px]">
                 Snapshot fallback active — outside scheduled IST refresh window. Showing latest saved analysis.
               </div>
             </div>
@@ -1517,7 +1621,7 @@ export default function IrosMasterAdvancedTerminal() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg transition relative ${
+              className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition relative ${
                 activeTab === tab.key ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
               }`}
             >
@@ -1530,9 +1634,9 @@ export default function IrosMasterAdvancedTerminal() {
         </nav>
 
         {activeTab === 'marketSnapshot' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {/* Row 1: India Markets — TOP MOVERS */}
-            <div className="grid grid-cols-1 gap-4 items-start">
+            <div className="grid grid-cols-1 gap-3 items-start">
               <IndiaMarketsGrid items={currentMacros} staleLabel={staleMacroLabel} />
             </div>
 
@@ -1541,13 +1645,13 @@ export default function IrosMasterAdvancedTerminal() {
               <GlobalIndicesGrid items={globalIndices} staleLabel={staleMacroLabel} />
             </div>
 
-            {/* Row 3: Commodities & FX - Full width panel */}
+            {/* Row 3: Commodities & FX */}
             <div>
               <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} />
             </div>
 
             {/* Row 4: Gainers/Losers + News Feed */}
-            <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-4">
               <GainersLosersHeatmap />
               <NewsFeedPanel items={liveMarket?.news} now={now} />
             </div>
@@ -1556,13 +1660,13 @@ export default function IrosMasterAdvancedTerminal() {
         )}
 
         {activeTab === 'stockHeatMap' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <Nifty100HeatMap />
           </div>
         )}
 
         {activeTab === 'assetMatrix' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <ForensicPanel
               onSelect={handleSelect}
               liveMarket={liveMarket}
