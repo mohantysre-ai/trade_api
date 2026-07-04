@@ -192,7 +192,45 @@ def _missing_macro_row(inst: YahooInstrument, source: str = "unavailable") -> di
         "state": "NEUTRAL",
         "group": inst.group,
         "source": source,
+        "sparkline": [],
     }
+
+
+# ---------------------------------------------------------------------------
+# Sparkline data: 1-month daily closes via yfinance
+# ---------------------------------------------------------------------------
+_SPARKLINE_CACHE: dict[str, tuple[float, list[float]]] = {}
+_SPARKLINE_TTL = 300.0  # seconds
+
+
+def _fetch_sparkline(symbol: str) -> list[float]:
+    """Fetch ~1 month of daily close prices for a Yahoo symbol.
+
+    Uses a simple in-process TTL cache to avoid hammering Yahoo on every
+    poll cycle. Returns an empty list on any failure so the frontend can
+    gracefully fall back.
+    """
+    import time
+
+    now = time.time()
+    cached = _SPARKLINE_CACHE.get(symbol)
+    if cached and (now - cached[0]) < _SPARKLINE_TTL:
+        return cached[1]
+
+    try:
+        hist = yf.Ticker(symbol).history(period="1mo", interval="1d")
+        if hist.empty:
+            _SPARKLINE_CACHE[symbol] = (now, [])
+            return []
+        closes = hist["Close"].dropna().tolist()
+        if len(closes) > 30:
+            closes = closes[-30:]
+        result = [round(float(c), 4) for c in closes]
+        _SPARKLINE_CACHE[symbol] = (now, result)
+        return result
+    except Exception:
+        _SPARKLINE_CACHE[symbol] = (now, [])
+        return []
 
 
 def _row_from_yahoo_quote(inst: YahooInstrument, quote: dict[str, Any]) -> dict[str, Any] | None:
@@ -214,6 +252,7 @@ def _row_from_yahoo_quote(inst: YahooInstrument, quote: dict[str, Any]) -> dict[
         "state": state,
         "group": inst.group,
         "source": "yahoo_finance_api",
+        "sparkline": _fetch_sparkline(inst.symbol),
     }
 
 
@@ -303,6 +342,7 @@ def _fetch_yfinance_quote(inst: YahooInstrument) -> dict[str, Any] | None:
                         "state": state,
                         "group": inst.group,
                         "source": "yahoo_finance_live",
+                        "sparkline": _fetch_sparkline(inst.symbol),
                     }
         except Exception:
             pass
@@ -327,6 +367,7 @@ def _fetch_yahoo_quote(inst: YahooInstrument) -> dict[str, Any] | None:
                 "state": state,
                 "group": inst.group,
                 "source": "yahoo_finance_live",
+                "sparkline": _fetch_sparkline(inst.symbol),
             }
     except Exception:
         pass
@@ -348,6 +389,7 @@ def _fetch_yahoo_quote(inst: YahooInstrument) -> dict[str, Any] | None:
                     "state": state,
                     "group": inst.group,
                     "source": "yahoo_finance",
+                    "sparkline": _fetch_sparkline(inst.symbol),
                 }
     except Exception:
         pass

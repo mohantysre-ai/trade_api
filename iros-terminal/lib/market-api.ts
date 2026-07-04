@@ -7,6 +7,7 @@ export type MacroRow = {
   val: string;
   delta: string;
   state: string;
+  sparkline?: number[];
 };
 
 export type LiveStock = {

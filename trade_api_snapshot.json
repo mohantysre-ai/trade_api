@@ -4329,6 +4329,23 @@
       "summary_headline": "No recent news found.",
       "cached": false,
       "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
+    },
+    "NETWEB": {
+      "insider_activity": "No recent news found.",
+      "institutional_activity": "No recent news found.",
+      "order_book_block_deals": "No recent news found.",
+      "future_expansion_capex": "Netweb Technologies announced a collaboration with Vertiv to jointly develop and validate GPU-based AI infrastructure solutions for next-",
+      "auditor_changes": "No recent news found.",
+      "dividend_news": "No recent news found.",
+      "new_orders_contracts": "No recent news found.",
+      "earnings_results": "No recent news found.",
+      "management_changes": "No recent news found.",
+      "regulatory_filings": "No recent news found.",
+      "sentiment_overall": "No recent news found.",
+      "risk_flags": "No recent news found.",
+      "summary_headline": "No recent news found.",
+      "generated_at": "2026-07-04T13:41:40.019499+00:00",
+      "ticker": "NETWEB"
     }
   },
   "isSnapshotFallback": false,

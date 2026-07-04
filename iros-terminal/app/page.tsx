@@ -12,6 +12,7 @@ import {
 } from '@/lib/market-api';
 import ForensicPanel from './components/ForensicPanel';
 import RightDrawer from './components/RightDrawer';
+import IntradayMatrixPanel from './components/IntradayMatrixPanel';
 
 type DrawerContent = {
   stock?: LiveStock | LedgerStock | null;
@@ -22,7 +23,7 @@ type DrawerContent = {
   tickerNews?: AITickerNewsReport | null;
 };
 
-type TabKey = 'marketSnapshot' | 'stockHeatMap' | 'assetMatrix';
+type TabKey = 'marketSnapshot' | 'stockHeatMap' | 'assetMatrix' | 'intradayMatrix';
 
 const INDIA_MARKET_LABELS = new Set(['NIFTY 100', 'SENSEX', 'NIFTY BANK', 'NIFTY IT', 'NIFTY PHARMA', 'NIFTY MIDCAP', 'NIFTY SMALLCAP']);
 const GLOBAL_ONLY_LABELS = new Set(['BRENT CRUDE', 'BRENT CRUDE OIL']);
@@ -906,7 +907,7 @@ function Nifty100HeatMap() {
 function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 text-[9px] shadow-sm">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 text-[11px] shadow-sm">
         Waiting for global macro data.
       </div>
     );
@@ -915,8 +916,8 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
   return (
     <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[8px] uppercase tracking-wider text-slate-500 font-bold">GLOBAL INDICES</span>
-        {staleLabel && <span className="text-[8px] text-slate-500 uppercase">{staleLabel}</span>}
+        <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">GLOBAL INDICES</span>
+        {staleLabel && <span className="text-[10px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5">
         {items.map((item) => {
@@ -925,19 +926,23 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
           return (
             <div
               key={item.label}
-              className="relative overflow-hidden rounded-lg p-2 transition-all hover:scale-105"
+              className="relative overflow-hidden rounded-lg p-2.5 transition-all hover:scale-105 flex items-center gap-2"
               style={{
                 background: gradient.background,
                 border: gradient.border,
-                minHeight: '70px',
+                minHeight: '80px',
               }}
             >
-              <SparklineSVG positive={isPositive} />
-              <span className="text-[9px] text-slate-600 block uppercase tracking-wider font-semibold">{item.label}</span>
-              <span className="text-base font-bold text-slate-900 block mt-0.5 font-mono">{item.val}</span>
-              <span className={`text-[10px] font-bold block mt-0.5 ${marketStateClass(item.state)}`}>
-                {isPositive ? '↑' : '↓'} {item.delta}
-              </span>
+              <div className="flex-1 min-w-0 z-10">
+                <span className="text-[11px] text-slate-700 block uppercase tracking-wider font-semibold">{item.label}</span>
+                <span className="text-lg font-bold text-slate-900 block mt-0.5 font-mono">{item.val}</span>
+                <span className={`text-[12px] font-bold block mt-0.5 ${marketStateClass(item.state)}`}>
+                  {isPositive ? '↑' : '↓'} {item.delta}
+                </span>
+              </div>
+              <div className="w-16 h-14 flex-shrink-0 relative">
+                <SparklineSVG positive={isPositive} data={item.sparkline} />
+              </div>
             </div>
           );
         })}
@@ -1037,7 +1042,7 @@ function getGlobalIndexGradient(label: string): { background: string; border: st
 function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 text-[9px] shadow-sm">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 text-[11px] shadow-sm">
         Waiting for commodities & FX data.
       </div>
     );
@@ -1048,30 +1053,36 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-          <span className="text-[8px] uppercase tracking-wider text-slate-500 font-bold">COMMODITIES & FX</span>
+          <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">COMMODITIES & FX</span>
         </div>
-        {staleLabel && <span className="text-[8px] text-slate-500 uppercase">{staleLabel}</span>}
+        {staleLabel && <span className="text-[10px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'BRENT CRUDE OIL') displayLabel = 'BRENT CRUDE';
           const gradient = getCommodityGradient(displayLabel);
+          const isPositive = item.state === 'POSITIVE';
           return (
             <div
               key={item.label}
-              className="rounded-lg p-2 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105"
+              className="relative overflow-hidden rounded-lg p-2.5 transition-all hover:scale-105 flex items-center gap-2 cursor-pointer"
               style={{
                 background: gradient.background,
                 border: gradient.border,
-                minHeight: '70px',
+                minHeight: '80px',
               }}
             >
-              <span className="text-[10px] font-bold text-slate-800 uppercase tracking-wide">{displayLabel}</span>
-              <span className="text-[9px] text-slate-600 mt-0.5 font-mono font-bold">{item.val}</span>
-              <span className={`text-[10px] font-bold mt-0.5 ${marketStateClass(item.state)}`}>
-                {item.delta}
-              </span>
+              <div className="flex-1 min-w-0 z-10">
+                <span className="text-[11px] text-slate-700 block uppercase tracking-wider font-semibold">{displayLabel}</span>
+                <span className="text-lg font-bold text-slate-900 block mt-0.5 font-mono">{item.val}</span>
+                <span className={`text-[12px] font-bold block mt-0.5 ${marketStateClass(item.state)}`}>
+                  {isPositive ? '↑' : '↓'} {item.delta}
+                </span>
+              </div>
+              <div className="w-16 h-14 flex-shrink-0 relative">
+                <SparklineSVG positive={isPositive} data={item.sparkline} />
+              </div>
             </div>
           );
         })}
@@ -1087,7 +1098,7 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
 function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
   if (!items.length) {
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 text-[9px] shadow-sm">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 text-[11px] shadow-sm">
         Waiting for Indian market data.
       </div>
     );
@@ -1096,8 +1107,8 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
   return (
     <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[8px] uppercase tracking-wider text-slate-500 font-bold">INDIA MARKETS — TOP MOVERS</span>
-        {staleLabel && <span className="text-[8px] text-slate-500 uppercase">{staleLabel}</span>}
+        <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">INDIA MARKETS — TOP MOVERS</span>
+        {staleLabel && <span className="text-[10px] text-slate-500 uppercase">{staleLabel}</span>}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5">
         {items.map((item) => {
@@ -1108,19 +1119,23 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
           return (
             <div
               key={item.label}
-              className="relative overflow-hidden rounded-lg p-2 transition-all hover:scale-105"
+              className="relative overflow-hidden rounded-lg p-2.5 transition-all hover:scale-105 flex items-center gap-2"
               style={{
                 background: gradient.background,
                 border: gradient.border,
-                minHeight: '70px',
+                minHeight: '80px',
               }}
             >
-              <SparklineSVG positive={isPositive} />
-              <span className="text-[9px] text-slate-600 block uppercase tracking-wider font-semibold">{displayLabel}</span>
-              <span className="text-base font-bold text-slate-900 block mt-0.5 font-mono">{item.val}</span>
-              <span className={`text-[10px] font-bold block mt-0.5 ${marketStateClass(item.state)}`}>
-                {isPositive ? '↑' : '↓'} {item.delta}
-              </span>
+              <div className="flex-1 min-w-0 z-10">
+                <span className="text-[11px] text-slate-700 block uppercase tracking-wider font-semibold">{displayLabel}</span>
+                <span className="text-lg font-bold text-slate-900 block mt-0.5 font-mono">{item.val}</span>
+                <span className={`text-[12px] font-bold block mt-0.5 ${marketStateClass(item.state)}`}>
+                  {isPositive ? '↑' : '↓'} {item.delta}
+                </span>
+              </div>
+              <div className="w-16 h-14 flex-shrink-0 relative">
+                <SparklineSVG positive={isPositive} data={item.sparkline} />
+              </div>
             </div>
           );
         })}
@@ -1432,25 +1447,37 @@ function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIn
 
 let sparkIdCounter = 0;
 
-/* Sparkline helper used by GlobalIndicesGrid - Yahoo Finance style */
-function SparklineSVG({ positive }: { positive: boolean }) {
+/* Real data-driven sparkline rendered from an array of close prices.
+ * Falls back to nothing when data is empty so cards stay clean. */
+function SparklineSVG({ positive, data }: { positive: boolean; data?: number[] }) {
   const [id] = useState(() => `spk-${positive ? 'g' : 'r'}-${++sparkIdCounter}`);
   const color = positive ? '#10b981' : '#ef4444';
   const fillUrl = 'url(#' + id + ')';
 
-  // Yahoo Finance style: curved path with area gradient fill
-  let pathD: string;
-  let areaD: string;
-  if (positive) {
-    pathD = 'M 5,52 C 15,48 20,46 30,42 C 40,38 45,34 55,30 C 65,26 70,24 80,20 C 90,16 95,14 100,10';
-    areaD = 'M 5,52 C 15,48 20,46 30,42 C 40,38 45,34 55,30 C 65,26 70,24 80,20 C 90,16 95,14 100,10 L 100,60 L 5,60 Z';
-  } else {
-    pathD = 'M 5,10 C 15,14 20,16 30,22 C 40,28 45,32 55,36 C 65,40 70,44 80,48 C 90,52 95,54 100,56';
-    areaD = 'M 5,10 C 15,14 20,16 30,22 C 40,28 45,32 55,36 C 65,40 70,44 80,48 C 90,52 95,54 100,56 L 100,60 L 5,60 Z';
-  }
+  // Need at least 2 points to draw a meaningful line
+  if (!data || data.length < 2) return null;
+
+  const W = 100;
+  const H = 60;
+  const pad = 4;
+
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+
+  const points = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (W - pad * 2);
+    const y = pad + (1 - (v - min) / range) * (H - pad * 2);
+    return [x, y] as const;
+  });
+
+  // Build a smooth path using simple line segments (good enough at this size)
+  const pathD = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+  const areaD = `${pathD} L ${points[points.length - 1][0].toFixed(2)},${H} L ${points[0][0].toFixed(2)},${H} Z`;
+  const lastPoint = points[points.length - 1];
 
   return (
-    <svg className="absolute top-0 right-0 w-full h-full opacity-30" viewBox="0 0 100 60" preserveAspectRatio="none">
+    <svg className="absolute top-0 right-0 w-full h-full opacity-30" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.4" />
@@ -1462,7 +1489,7 @@ function SparklineSVG({ positive }: { positive: boolean }) {
       {/* Line */}
       <path d={pathD} stroke={color} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       {/* End dot */}
-      <circle cx="100" cy={positive ? 10 : 56} r="2.5" fill={color} stroke="white" strokeWidth="1" />
+      <circle cx={lastPoint[0]} cy={lastPoint[1]} r="2.5" fill={color} stroke="white" strokeWidth="1" />
     </svg>
   );
 }
@@ -1645,6 +1672,7 @@ export default function IrosMasterAdvancedTerminal() {
             { key: 'marketSnapshot' as TabKey, label: 'MARKET SNAPSHOT' },
             { key: 'stockHeatMap' as TabKey, label: 'STOCK HEAT MAP' },
             { key: 'assetMatrix' as TabKey, label: 'ASSET MATRIX' },
+            { key: 'intradayMatrix' as TabKey, label: 'INTRA DAY MATRIX' },
           ]).map((tab) => (
             <button
               key={tab.key}
@@ -1702,6 +1730,12 @@ export default function IrosMasterAdvancedTerminal() {
             />
             <StockDetailPanel stock={selectedQuote} />
             <LiveIntelligencePanel />
+          </div>
+        )}
+
+        {activeTab === 'intradayMatrix' && (
+          <div className="space-y-3">
+            <IntradayMatrixPanel />
           </div>
         )}
       </div>
