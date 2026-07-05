@@ -203,6 +203,7 @@ def _strip_trailing_garbage(text: str) -> str:
     """
     If text after the last complete key-value pair is garbled (e.g. unclosed string),
     try to find the last valid comma-separated entry and truncate there.
+    Returns a valid JSON *string* (not a parsed dict) so the caller can json.loads() it.
     """
     # Try parsing character by character from the end, removing trailing content
     for end_idx in range(len(text), -1, -1):
@@ -210,7 +211,8 @@ def _strip_trailing_garbage(text: str) -> str:
         if not candidate.endswith("}"):
             candidate += "}"
         try:
-            return json.loads(candidate)
+            json.loads(candidate)  # validate only
+            return candidate       # return the repaired string
         except json.JSONDecodeError:
             continue
     # If nothing works, return original
@@ -642,7 +644,7 @@ async def scrape_nse_announcements(ticker: str, session: httpx.AsyncClient) -> l
     """Scrape NSE corporate announcements via announcements API."""
     articles: list[TickerNewsArticle] = []
     company = _company_name(ticker)
-    url = "https://www.nseindia.com/api/corporate_announcements"
+    url = "https://www.nseindia.com/api/corporate-announcements?index=equities"
     
     try:
         headers = {
@@ -654,21 +656,29 @@ async def scrape_nse_announcements(ticker: str, session: httpx.AsyncClient) -> l
         if resp.status_code == 200:
             data = resp.json()
             items = data if isinstance(data, list) else data.get("data", [])
-            for item in items[:15]:
-                title = item.get("heading") or item.get("desc") or item.get("subject", "")
+            # Filter by ticker symbol
+            ticker_upper = ticker.upper()
+            for item in items:
+                sym = (item.get("symbol") or "").upper()
+                if sym and sym != ticker_upper:
+                    continue
+                title = item.get("desc") or item.get("heading") or item.get("subject", "")
                 if not title:
                     continue
-                desc = item.get("details") or item.get("description", "")
-                dt = item.get("dt") or item.get("date", "")
+                desc = item.get("attchmntText") or item.get("details") or item.get("description", "")
+                dt = item.get("an_dt") or item.get("dt") or item.get("date", "")
+                attachment_url = item.get("attchmntFile", "")
 
                 articles.append(TickerNewsArticle(
                     title=str(title)[:300],
                     source="NSE Announcements",
-                    url="https://www.nseindia.com/",
+                    url=str(attachment_url) if attachment_url else "https://www.nseindia.com/",
                     summary=str(desc)[:500],
                     published_at=str(dt) if dt else datetime.now(timezone.utc).isoformat(),
                     relevance="high",
                 ))
+                if len(articles) >= 15:
+                    break
     except Exception as e:
         logger.warning("NSE announcements scrape failed: %s", e)
 

@@ -1321,7 +1321,19 @@ def execute_terminal_intelligence_pipeline(live_unstructured_stream: str) -> Com
             else:
                 raw = _call_openai(live_unstructured_stream, api_key, api_url, model, LLM_CALL_TIMEOUT_SECONDS)
 
-            data = json.loads(_json_block(raw))
+            from .ai_ticker_news import _parse_json_response
+            raw_clean = _json_block(raw)
+            try:
+                data = json.loads(raw_clean)
+            except json.JSONDecodeError:
+                # Try repair strategies for malformed LLM JSON (unterminated strings, etc.)
+                expected_keys = [
+                    "news_catalysts_card", "insider_insti_activity_card", "macro_anchors_card",
+                    "forensic_screen_card", "why_interested", "future_revenue_model", "current_model",
+                    "ledger_stocks", "active_scoring_matrix", "active_seven_ic_gates",
+                    "active_risk_calc", "active_factor_hub",
+                ]
+                data = _parse_json_response(raw_clean, expected_keys)
             result = CompleteSecurityAnalysisPayload.model_validate(data)
             normalized = _normalize_analysis_payload(result, live_unstructured_stream, focus_ticker)
             snapshot = _compile_market_context_snapshot()

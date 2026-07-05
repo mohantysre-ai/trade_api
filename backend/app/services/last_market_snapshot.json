@@ -7,7 +7,7 @@
     "Finshots",
     "NSE NIFTY 100"
   ],
-  "updatedAt": "2026-07-05T10:28:16.210667+00:00",
+  "updatedAt": "2026-07-05T13:54:38.035451+00:00",
   "mockTickers": [
     "AWFI"
   ],
@@ -40,7 +40,7 @@
         "today_volume": 2592315.0,
         "avg_daily_volume_20": 2592315.0,
         "vwap": 3290.57,
-        "ema9": 3290.57,
+        "ema9": 3158.5,
         "ema_angle_deg": 0.0,
         "orb_high": 3333.8,
         "orb_low": 3174.9,
@@ -52,7 +52,7 @@
         "trigger_point": "VWAP Bounce",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 5.0,
         "liquidity_score": 20.0,
         "breakout_quality": 3.4995902263897936,
         "sector_strength": 16.89526847421586,
@@ -65,9 +65,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 55.39,
+      "alpha_score": 80.39,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 25.06
@@ -93,7 +93,7 @@
         "today_volume": 29608874.0,
         "avg_daily_volume_20": 29608874.0,
         "vwap": 389.93,
-        "ema9": 389.93,
+        "ema9": 401.95,
         "ema_angle_deg": 0.0,
         "orb_high": 402.0,
         "orb_low": 383.6,
@@ -105,7 +105,7 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "SHORT_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 5.0,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 0.5940594059406169,
@@ -120,9 +120,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 35.59,
+      "alpha_score": 60.59,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 23.16
@@ -148,7 +148,7 @@
         "today_volume": 5528840.0,
         "avg_daily_volume_20": 5528840.0,
         "vwap": 175.48,
-        "ema9": 175.48,
+        "ema9": 171.68,
         "ema_angle_deg": 0.0,
         "orb_high": 178.01,
         "orb_low": 172.4,
@@ -160,7 +160,7 @@
         "trigger_point": "VWAP Bounce",
         "rsi": 50.0,
         "oi_setup": "NEUTRAL",
-        "relative_volume": 1.0,
+        "relative_volume": 0.6561258722666666,
         "liquidity_score": 20.0,
         "breakout_quality": 3.51346850215164,
         "sector_strength": 16.672535211267583,
@@ -173,9 +173,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 55.19,
+      "alpha_score": 50.03,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 21.99
@@ -201,7 +201,7 @@
         "today_volume": 604282.0,
         "avg_daily_volume_20": 604282.0,
         "vwap": 4557.33,
-        "ema9": 4557.33,
+        "ema9": 4656.7,
         "ema_angle_deg": 0.0,
         "orb_high": 4676.0,
         "orb_low": 4507.0,
@@ -213,7 +213,7 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "NEUTRAL",
-        "relative_volume": 1.0,
+        "relative_volume": 1.8156659826666666,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 1.9251336898395721,
@@ -228,9 +228,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 36.93,
+      "alpha_score": 49.16,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 17.45
@@ -256,7 +256,7 @@
         "today_volume": 1356520.0,
         "avg_daily_volume_20": 1356520.0,
         "vwap": 2298.53,
-        "ema9": 2298.53,
+        "ema9": 2245.4,
         "ema_angle_deg": 0.0,
         "orb_high": 2296.6,
         "orb_low": 2271.0,
@@ -264,29 +264,26 @@
         "wick_noise_ratio": 0.594,
         "turnover_cr": 311.54,
         "price_above_vwap": false,
-        "price_above_ema9": false,
+        "price_above_ema9": true,
         "trigger_point": "15-min ORB",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 2.0769225546666665,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 9.07936507936505,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "below VWAP",
-          "below EMA9",
           "EMA angle below 45 degrees",
           "metrics estimated from quote (candle API unavailable)"
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 44.08,
+      "alpha_score": 60.23,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 15.37
@@ -312,7 +309,7 @@
         "today_volume": 1551490.0,
         "avg_daily_volume_20": 1551490.0,
         "vwap": 4696.37,
-        "ema9": 4696.37,
+        "ema9": 4580.6,
         "ema_angle_deg": 0.0,
         "orb_high": 4682.7,
         "orb_low": 4670.0,
@@ -320,29 +317,26 @@
         "wick_noise_ratio": 0.288,
         "turnover_cr": 726.52,
         "price_above_vwap": false,
-        "price_above_ema9": false,
+        "price_above_ema9": true,
         "trigger_point": "15-min ORB",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 4.843441482,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 6.735668789808926,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "below VWAP",
-          "below EMA9",
           "EMA angle below 45 degrees",
           "metrics estimated from quote (candle API unavailable)"
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 41.74,
+      "alpha_score": 66.74,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 15.2
@@ -368,7 +362,7 @@
         "today_volume": 6539560.0,
         "avg_daily_volume_20": 6539560.0,
         "vwap": 400.03,
-        "ema9": 400.03,
+        "ema9": 392.95,
         "ema_angle_deg": 0.0,
         "orb_high": 401.25,
         "orb_low": 396.4,
@@ -380,23 +374,21 @@
         "trigger_point": "VWAP Bounce",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 1.7493323000000003,
         "liquidity_score": 20.0,
         "breakout_quality": 3.702453046700529,
         "sector_strength": 13.273542600896848,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "EMA angle below 45 degrees",
           "metrics estimated from quote (candle API unavailable)"
         ]
       },
       "passes_hard_filters": true,
-      "alpha_score": 51.98,
+      "alpha_score": 63.22,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 15.06
@@ -422,7 +414,7 @@
         "today_volume": 1229753.0,
         "avg_daily_volume_20": 1229753.0,
         "vwap": 1382.7,
-        "ema9": 1382.7,
+        "ema9": 1398.3,
         "ema_angle_deg": 0.0,
         "orb_high": 1407.9,
         "orb_low": 1376.0,
@@ -434,7 +426,7 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "NEUTRAL",
-        "relative_volume": 1.0,
+        "relative_volume": 1.1280934186666667,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 5.421412300683402,
@@ -449,9 +441,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 40.42,
+      "alpha_score": 42.34,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 14.33
@@ -477,7 +469,7 @@
         "today_volume": 4053069.0,
         "avg_daily_volume_20": 4053069.0,
         "vwap": 1469.3,
-        "ema9": 1469.3,
+        "ema9": 1441.9,
         "ema_angle_deg": 0.0,
         "orb_high": 1464.0,
         "orb_low": 1460.4,
@@ -485,29 +477,26 @@
         "wick_noise_ratio": 0.556,
         "turnover_cr": 593.37,
         "price_above_vwap": false,
-        "price_above_ema9": false,
+        "price_above_ema9": true,
         "trigger_point": "15-min ORB",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 3.9557953439999998,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 6.187050359712267,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "below VWAP",
-          "below EMA9",
           "EMA angle below 45 degrees",
           "metrics estimated from quote (candle API unavailable)"
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 41.19,
+      "alpha_score": 66.19,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 13.96
@@ -533,7 +522,7 @@
         "today_volume": 494145.0,
         "avg_daily_volume_20": 494145.0,
         "vwap": 1764.47,
-        "ema9": 1764.47,
+        "ema9": 1773.2,
         "ema_angle_deg": 0.0,
         "orb_high": 1784.0,
         "orb_low": 1746.7,
@@ -545,7 +534,7 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "NEUTRAL",
-        "relative_volume": 1.0,
+        "relative_volume": 0.575415381,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 1.9849624060150786,
@@ -560,9 +549,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 36.98,
+      "alpha_score": 30.62,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 13.74
@@ -588,7 +577,7 @@
         "today_volume": 1001835.0,
         "avg_daily_volume_20": 1001835.0,
         "vwap": 1989.83,
-        "ema9": 1989.83,
+        "ema9": 1968.7,
         "ema_angle_deg": 0.0,
         "orb_high": 1996.4,
         "orb_low": 1980.0,
@@ -600,23 +589,21 @@
         "trigger_point": "VWAP Bounce",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 1.333375596,
         "liquidity_score": 20.0,
         "breakout_quality": 4.180270998552102,
         "sector_strength": 16.137071651090444,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "EMA angle below 45 degrees",
           "metrics estimated from quote (candle API unavailable)"
         ]
       },
       "passes_hard_filters": true,
-      "alpha_score": 55.32,
+      "alpha_score": 60.32,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 12.44
@@ -642,7 +629,7 @@
         "today_volume": 12085695.0,
         "avg_daily_volume_20": 12085695.0,
         "vwap": 419.88,
-        "ema9": 419.88,
+        "ema9": 415.05,
         "ema_angle_deg": 0.0,
         "orb_high": 418.6,
         "orb_low": 418.05,
@@ -650,29 +637,26 @@
         "wick_noise_ratio": 0.52,
         "turnover_cr": 505.24,
         "price_above_vwap": false,
-        "price_above_ema9": false,
+        "price_above_ema9": true,
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 3.3682831964999997,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 2.5675675675675445,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "below VWAP",
-          "below EMA9",
           "EMA angle below 45 degrees",
           "metrics estimated from quote (candle API unavailable)"
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 37.57,
+      "alpha_score": 62.57,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 12.23
@@ -698,7 +682,7 @@
         "today_volume": 595572.0,
         "avg_daily_volume_20": 595572.0,
         "vwap": 193.3,
-        "ema9": 193.3,
+        "ema9": 193.91,
         "ema_angle_deg": 0.0,
         "orb_high": 196.11,
         "orb_low": 192.13,
@@ -710,15 +694,13 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "NEUTRAL",
-        "relative_volume": 1.0,
+        "relative_volume": 0.5,
         "liquidity_score": 4.5770899344,
         "breakout_quality": 0.0,
         "sector_strength": 3.4572490706319803,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "below VWAP",
           "below EMA9",
           "EMA angle below 45 degrees",
@@ -727,9 +709,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 23.03,
+      "alpha_score": 15.53,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 11.61
@@ -755,7 +737,7 @@
         "today_volume": 11864556.0,
         "avg_daily_volume_20": 11864556.0,
         "vwap": 90.82,
-        "ema9": 90.82,
+        "ema9": 90.83,
         "ema_angle_deg": 0.0,
         "orb_high": 91.4,
         "orb_low": 90.57,
@@ -767,15 +749,14 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "SHORT_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 0.71638189128,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 4.186046511627825,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
+          "ATR under 1.5%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "below VWAP",
           "below EMA9",
           "EMA angle below 45 degrees",
@@ -783,9 +764,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 39.19,
+      "alpha_score": 34.93,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 10.99
@@ -811,7 +792,7 @@
         "today_volume": 815500.0,
         "avg_daily_volume_20": 815500.0,
         "vwap": 1286.8,
-        "ema9": 1286.8,
+        "ema9": 1290.6,
         "ema_angle_deg": 0.0,
         "orb_high": 1295.5,
         "orb_low": 1280.2,
@@ -823,13 +804,12 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "SHORT_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 0.6960020666666668,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 3.443708609271548,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
           "wick noise too high",
           "below VWAP",
@@ -839,9 +819,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 38.44,
+      "alpha_score": 33.88,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 10.95
@@ -885,7 +865,7 @@
       "passes_hard_filters": false,
       "alpha_score": 0.0,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 6.05
@@ -929,7 +909,7 @@
       "passes_hard_filters": false,
       "alpha_score": 0.0,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 6.03
@@ -973,7 +953,7 @@
       "passes_hard_filters": false,
       "alpha_score": 0.0,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 5.89
@@ -1017,7 +997,7 @@
       "passes_hard_filters": false,
       "alpha_score": 0.0,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 5.34
@@ -1061,7 +1041,7 @@
       "passes_hard_filters": false,
       "alpha_score": 0.0,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE",
       "score": 5.23
@@ -1107,7 +1087,7 @@
       "passes_hard_filters": false,
       "alpha_score": 0.0,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -1132,7 +1112,7 @@
         "today_volume": 12085695.0,
         "avg_daily_volume_20": 12085695.0,
         "vwap": 419.88,
-        "ema9": 419.88,
+        "ema9": 415.05,
         "ema_angle_deg": 0.0,
         "orb_high": 418.6,
         "orb_low": 418.05,
@@ -1140,29 +1120,26 @@
         "wick_noise_ratio": 0.52,
         "turnover_cr": 505.24,
         "price_above_vwap": false,
-        "price_above_ema9": false,
+        "price_above_ema9": true,
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 3.3682831964999997,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 2.5675675675675445,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "below VWAP",
-          "below EMA9",
           "EMA angle below 45 degrees",
           "metrics estimated from quote (candle API unavailable)"
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 37.57,
+      "alpha_score": 62.57,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -1187,7 +1164,7 @@
         "today_volume": 11864556.0,
         "avg_daily_volume_20": 11864556.0,
         "vwap": 90.82,
-        "ema9": 90.82,
+        "ema9": 90.83,
         "ema_angle_deg": 0.0,
         "orb_high": 91.4,
         "orb_low": 90.57,
@@ -1199,15 +1176,14 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "SHORT_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 0.71638189128,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 4.186046511627825,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
+          "ATR under 1.5%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "below VWAP",
           "below EMA9",
           "EMA angle below 45 degrees",
@@ -1215,9 +1191,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 39.19,
+      "alpha_score": 34.93,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -1260,7 +1236,7 @@
       "passes_hard_filters": false,
       "alpha_score": 0.0,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -1285,7 +1261,7 @@
         "today_volume": 29608874.0,
         "avg_daily_volume_20": 29608874.0,
         "vwap": 389.93,
-        "ema9": 389.93,
+        "ema9": 401.95,
         "ema_angle_deg": 0.0,
         "orb_high": 402.0,
         "orb_low": 383.6,
@@ -1297,7 +1273,7 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "SHORT_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 5.0,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 0.5940594059406169,
@@ -1312,9 +1288,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 35.59,
+      "alpha_score": 60.59,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -1339,7 +1315,7 @@
         "today_volume": 1001835.0,
         "avg_daily_volume_20": 1001835.0,
         "vwap": 1989.83,
-        "ema9": 1989.83,
+        "ema9": 1968.7,
         "ema_angle_deg": 0.0,
         "orb_high": 1996.4,
         "orb_low": 1980.0,
@@ -1351,23 +1327,21 @@
         "trigger_point": "VWAP Bounce",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 1.333375596,
         "liquidity_score": 20.0,
         "breakout_quality": 4.180270998552102,
         "sector_strength": 16.137071651090444,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "EMA angle below 45 degrees",
           "metrics estimated from quote (candle API unavailable)"
         ]
       },
       "passes_hard_filters": true,
-      "alpha_score": 55.32,
+      "alpha_score": 60.32,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -1431,7 +1405,7 @@
         "today_volume": 2592315.0,
         "avg_daily_volume_20": 2592315.0,
         "vwap": 3290.57,
-        "ema9": 3290.57,
+        "ema9": 3158.5,
         "ema_angle_deg": 0.0,
         "orb_high": 3333.8,
         "orb_low": 3174.9,
@@ -1443,7 +1417,7 @@
         "trigger_point": "VWAP Bounce",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 5.0,
         "liquidity_score": 20.0,
         "breakout_quality": 3.4995902263897936,
         "sector_strength": 16.89526847421586,
@@ -1456,9 +1430,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 55.39,
+      "alpha_score": 80.39,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -1483,7 +1457,7 @@
         "today_volume": 604282.0,
         "avg_daily_volume_20": 604282.0,
         "vwap": 4557.33,
-        "ema9": 4557.33,
+        "ema9": 4656.7,
         "ema_angle_deg": 0.0,
         "orb_high": 4676.0,
         "orb_low": 4507.0,
@@ -1495,7 +1469,7 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "NEUTRAL",
-        "relative_volume": 1.0,
+        "relative_volume": 1.8156659826666666,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 1.9251336898395721,
@@ -1510,9 +1484,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 36.93,
+      "alpha_score": 49.16,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -1576,7 +1550,7 @@
         "today_volume": 4053069.0,
         "avg_daily_volume_20": 4053069.0,
         "vwap": 1469.3,
-        "ema9": 1469.3,
+        "ema9": 1441.9,
         "ema_angle_deg": 0.0,
         "orb_high": 1464.0,
         "orb_low": 1460.4,
@@ -1584,29 +1558,26 @@
         "wick_noise_ratio": 0.556,
         "turnover_cr": 593.37,
         "price_above_vwap": false,
-        "price_above_ema9": false,
+        "price_above_ema9": true,
         "trigger_point": "15-min ORB",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 3.9557953439999998,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 6.187050359712267,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "below VWAP",
-          "below EMA9",
           "EMA angle below 45 degrees",
           "metrics estimated from quote (candle API unavailable)"
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 41.19,
+      "alpha_score": 66.19,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -1631,7 +1602,7 @@
         "today_volume": 1356520.0,
         "avg_daily_volume_20": 1356520.0,
         "vwap": 2298.53,
-        "ema9": 2298.53,
+        "ema9": 2245.4,
         "ema_angle_deg": 0.0,
         "orb_high": 2296.6,
         "orb_low": 2271.0,
@@ -1639,29 +1610,26 @@
         "wick_noise_ratio": 0.594,
         "turnover_cr": 311.54,
         "price_above_vwap": false,
-        "price_above_ema9": false,
+        "price_above_ema9": true,
         "trigger_point": "15-min ORB",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 2.0769225546666665,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 9.07936507936505,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "below VWAP",
-          "below EMA9",
           "EMA angle below 45 degrees",
           "metrics estimated from quote (candle API unavailable)"
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 44.08,
+      "alpha_score": 60.23,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -1686,7 +1654,7 @@
         "today_volume": 1551490.0,
         "avg_daily_volume_20": 1551490.0,
         "vwap": 4696.37,
-        "ema9": 4696.37,
+        "ema9": 4580.6,
         "ema_angle_deg": 0.0,
         "orb_high": 4682.7,
         "orb_low": 4670.0,
@@ -1694,29 +1662,26 @@
         "wick_noise_ratio": 0.288,
         "turnover_cr": 726.52,
         "price_above_vwap": false,
-        "price_above_ema9": false,
+        "price_above_ema9": true,
         "trigger_point": "15-min ORB",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 4.843441482,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 6.735668789808926,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "below VWAP",
-          "below EMA9",
           "EMA angle below 45 degrees",
           "metrics estimated from quote (candle API unavailable)"
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 41.74,
+      "alpha_score": 66.74,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -1741,7 +1706,7 @@
         "today_volume": 815500.0,
         "avg_daily_volume_20": 815500.0,
         "vwap": 1286.8,
-        "ema9": 1286.8,
+        "ema9": 1290.6,
         "ema_angle_deg": 0.0,
         "orb_high": 1295.5,
         "orb_low": 1280.2,
@@ -1753,13 +1718,12 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "SHORT_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 0.6960020666666668,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 3.443708609271548,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
           "wick noise too high",
           "below VWAP",
@@ -1769,9 +1733,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 38.44,
+      "alpha_score": 33.88,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -1796,7 +1760,7 @@
         "today_volume": 358617.0,
         "avg_daily_volume_20": 358617.0,
         "vwap": 2636.33,
-        "ema9": 2636.33,
+        "ema9": 2608.5,
         "ema_angle_deg": 0.0,
         "orb_high": 2646.1,
         "orb_low": 2619.0,
@@ -1808,13 +1772,12 @@
         "trigger_point": "VWAP Bounce",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 0.6326242957999999,
         "liquidity_score": 20.0,
         "breakout_quality": 2.5862707631469437,
         "sector_strength": 15.149384885764443,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
           "wick noise too high",
           "EMA angle below 45 degrees",
@@ -1822,7 +1785,7 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 52.74
+      "alpha_score": 47.23
     },
     "DEEPAKNTR": {
       "ticker": "DEEPAKNTR",
@@ -1902,7 +1865,7 @@
       "passes_hard_filters": false,
       "alpha_score": 0.0,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -1927,7 +1890,7 @@
         "today_volume": 6539560.0,
         "avg_daily_volume_20": 6539560.0,
         "vwap": 400.03,
-        "ema9": 400.03,
+        "ema9": 392.95,
         "ema_angle_deg": 0.0,
         "orb_high": 401.25,
         "orb_low": 396.4,
@@ -1939,23 +1902,21 @@
         "trigger_point": "VWAP Bounce",
         "rsi": 50.0,
         "oi_setup": "LONG_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 1.7493323000000003,
         "liquidity_score": 20.0,
         "breakout_quality": 3.702453046700529,
         "sector_strength": 13.273542600896848,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "EMA angle below 45 degrees",
           "metrics estimated from quote (candle API unavailable)"
         ]
       },
       "passes_hard_filters": true,
-      "alpha_score": 51.98,
+      "alpha_score": 63.22,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -1998,7 +1959,7 @@
       "passes_hard_filters": false,
       "alpha_score": 0.0,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -2023,7 +1984,7 @@
         "today_volume": 42827.0,
         "avg_daily_volume_20": 42827.0,
         "vwap": 1654.13,
-        "ema9": 1654.13,
+        "ema9": 1670.5,
         "ema_angle_deg": 0.0,
         "orb_high": 1677.0,
         "orb_low": 1643.8,
@@ -2035,7 +1996,7 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "NEUTRAL",
-        "relative_volume": 1.0,
+        "relative_volume": 0.5,
         "liquidity_score": 2.8159609039999998,
         "breakout_quality": 0.0,
         "sector_strength": 3.96887159533075,
@@ -2051,7 +2012,7 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 21.78
+      "alpha_score": 14.28
     },
     "NETWEB": {
       "ticker": "NETWEB",
@@ -2092,7 +2053,7 @@
       "passes_hard_filters": false,
       "alpha_score": 0.0,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -2195,7 +2156,7 @@
         "today_volume": 5528840.0,
         "avg_daily_volume_20": 5528840.0,
         "vwap": 175.48,
-        "ema9": 175.48,
+        "ema9": 171.68,
         "ema_angle_deg": 0.0,
         "orb_high": 178.01,
         "orb_low": 172.4,
@@ -2207,7 +2168,7 @@
         "trigger_point": "VWAP Bounce",
         "rsi": 50.0,
         "oi_setup": "NEUTRAL",
-        "relative_volume": 1.0,
+        "relative_volume": 0.6561258722666666,
         "liquidity_score": 20.0,
         "breakout_quality": 3.51346850215164,
         "sector_strength": 16.672535211267583,
@@ -2220,9 +2181,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 55.19,
+      "alpha_score": 50.03,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -2247,7 +2208,7 @@
         "today_volume": 404221.0,
         "avg_daily_volume_20": 404221.0,
         "vwap": 552.57,
-        "ema9": 552.57,
+        "ema9": 543.15,
         "ema_angle_deg": 0.0,
         "orb_high": 553.45,
         "orb_low": 543.4,
@@ -2259,7 +2220,7 @@
         "trigger_point": "VWAP Bounce",
         "rsi": 50.0,
         "oi_setup": "NEUTRAL",
-        "relative_volume": 1.0,
+        "relative_volume": 0.5,
         "liquidity_score": 8.948644498,
         "breakout_quality": 0.4228128776114437,
         "sector_strength": 11.092783505154678,
@@ -2273,7 +2234,7 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 35.46
+      "alpha_score": 27.96
     },
     "SYRMA": {
       "ticker": "SYRMA",
@@ -2296,7 +2257,7 @@
         "today_volume": 1229753.0,
         "avg_daily_volume_20": 1229753.0,
         "vwap": 1382.7,
-        "ema9": 1382.7,
+        "ema9": 1398.3,
         "ema_angle_deg": 0.0,
         "orb_high": 1407.9,
         "orb_low": 1376.0,
@@ -2308,7 +2269,7 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "NEUTRAL",
-        "relative_volume": 1.0,
+        "relative_volume": 1.1280934186666667,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 5.421412300683402,
@@ -2323,9 +2284,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 40.42,
+      "alpha_score": 42.34,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -2350,7 +2311,7 @@
         "today_volume": 595572.0,
         "avg_daily_volume_20": 595572.0,
         "vwap": 193.3,
-        "ema9": 193.3,
+        "ema9": 193.91,
         "ema_angle_deg": 0.0,
         "orb_high": 196.11,
         "orb_low": 192.13,
@@ -2362,15 +2323,13 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "NEUTRAL",
-        "relative_volume": 1.0,
+        "relative_volume": 0.5,
         "liquidity_score": 4.5770899344,
         "breakout_quality": 0.0,
         "sector_strength": 3.4572490706319803,
         "passes_hard_filters": false,
         "hard_filter_reasons": [
-          "ATR under 3.0%",
           "opening volume under 3.0x",
-          "wick noise too high",
           "below VWAP",
           "below EMA9",
           "EMA angle below 45 degrees",
@@ -2379,9 +2338,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 23.03,
+      "alpha_score": 15.53,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -2445,7 +2404,7 @@
         "today_volume": 135798.0,
         "avg_daily_volume_20": 135798.0,
         "vwap": 69.95,
-        "ema9": 69.95,
+        "ema9": 70.91,
         "ema_angle_deg": 0.0,
         "orb_high": 71.26,
         "orb_low": 69.41,
@@ -2457,7 +2416,7 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "SHORT_BUILDUP",
-        "relative_volume": 1.0,
+        "relative_volume": 0.5,
         "liquidity_score": 0.3770295672,
         "breakout_quality": 0.0,
         "sector_strength": 3.236514522821567,
@@ -2473,7 +2432,7 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 18.61
+      "alpha_score": 11.11
     },
     "HAPPYFORGE": {
       "ticker": "HAPPYFORGE",
@@ -2496,7 +2455,7 @@
         "today_volume": 64087.0,
         "avg_daily_volume_20": 64087.0,
         "vwap": 1509.0,
-        "ema9": 1509.0,
+        "ema9": 1542.2,
         "ema_angle_deg": 0.0,
         "orb_high": 1531.0,
         "orb_low": 1499.1,
@@ -2508,7 +2467,7 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "NEUTRAL",
-        "relative_volume": 1.0,
+        "relative_volume": 0.5,
         "liquidity_score": 3.842912868,
         "breakout_quality": 0.0,
         "sector_strength": 5.201938610662321,
@@ -2524,7 +2483,7 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 24.04
+      "alpha_score": 16.54
     },
     "WESTLIFE": {
       "ticker": "WESTLIFE",
@@ -2586,7 +2545,7 @@
         "today_volume": 494145.0,
         "avg_daily_volume_20": 494145.0,
         "vwap": 1764.47,
-        "ema9": 1764.47,
+        "ema9": 1773.2,
         "ema_angle_deg": 0.0,
         "orb_high": 1784.0,
         "orb_low": 1746.7,
@@ -2598,7 +2557,7 @@
         "trigger_point": "Flag Breakout",
         "rsi": 50.0,
         "oi_setup": "NEUTRAL",
-        "relative_volume": 1.0,
+        "relative_volume": 0.575415381,
         "liquidity_score": 20.0,
         "breakout_quality": 0.0,
         "sector_strength": 1.9849624060150786,
@@ -2613,9 +2572,9 @@
         ]
       },
       "passes_hard_filters": false,
-      "alpha_score": 36.98,
+      "alpha_score": 30.62,
       "risk_flags": [
-        "LLM Audit Error (The read operation timed out) -- news risk not audited"
+        "None"
       ],
       "verdict": "APPROVE"
     },
@@ -2878,6 +2837,7 @@
           94.7905,
           94.918,
           95.4175,
+          95.5271,
           95.2
         ]
       },
@@ -3137,6 +3097,7 @@
           94.7905,
           94.918,
           95.4175,
+          95.5271,
           95.2
         ]
       },
@@ -3720,8 +3681,8 @@
       },
       {
         "label": "BITCOIN",
-        "val": "$62,633.64",
-        "delta": "-0.72%",
+        "val": "$62,739.60",
+        "delta": "-0.55%",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
@@ -3755,7 +3716,7 @@
           60003.7578,
           61485.3008,
           62544.1992,
-          62633.6406
+          62739.6016
         ]
       },
       {
@@ -3885,49 +3846,49 @@
       "title": "NSE - National Stock Exchange of India Ltd: Live Share/Stock Market News &amp; Updates, Quotes- Nseindia.com Option Chain Market Turnover Listings IPO Circulars Daily Report Holidays Corporates Press ",
       "link": "https://www.nseindia.com/index-tracker/NIFTY%20100",
       "summary": "NSE - National Stock Exchange of India Ltd: Live Share/Stock Market News &amp; Updates, Quotes- Nseindia.com Option Chain Market Turnover Listings IPO Circulars Daily Report Holidays Corporates Press Releases Contact Us English Accessibility List Events List - - ( - %) Streaming Streaming on off Str",
-      "publishedAt": "2026-07-05T15:58:12.277912+05:30"
+      "publishedAt": "2026-07-05T19:24:23.046560+05:30"
     },
     {
       "source": "Finshots",
       "title": "Finshots | Financial News made simple Finshots Daily Finshots Markets Finshots Money Infographics Ditto Insurance Loved by 5,00,000+ subscribers Financial News Made Simple Join Finshots and get your d",
       "link": "https://finshots.in/",
       "summary": "Finshots | Financial News made simple Finshots Daily Finshots Markets Finshots Money Infographics Ditto Insurance Loved by 5,00,000+ subscribers Financial News Made Simple Join Finshots and get your daily dose of the latest, most important Financial developments",
-      "publishedAt": "2026-07-05T15:58:11.784738+05:30"
+      "publishedAt": "2026-07-05T19:24:22.398553+05:30"
     },
     {
       "source": "Finshots",
       "title": "delivered in plain English. In less than 3 minutes. SUBSCRIBE Finshots Daily View All Jul 5, 2026 Cola has a new player, battery pranks, and more\u2026 A Sunny Side Up edition where we talk about ITC's for",
       "link": "https://finshots.in/",
       "summary": "delivered in plain English. In less than 3 minutes. SUBSCRIBE Finshots Daily View All Jul 5, 2026 Cola has a new player, battery pranks, and more\u2026 A Sunny Side Up edition where we talk about ITC's foray into the cola market, a battery prank with a deeper economic meaning, and more. Jul 2, 2026 The O",
-      "publishedAt": "2026-07-05T15:58:11.784738+05:30"
+      "publishedAt": "2026-07-05T19:24:22.398553+05:30"
     },
     {
       "source": "Finshots",
       "title": "part of our ever growing",
       "link": "https://finshots.in/",
       "summary": "part of our ever growing",
-      "publishedAt": "2026-07-05T15:58:11.784738+05:30"
+      "publishedAt": "2026-07-05T19:24:22.398553+05:30"
     },
     {
       "source": "Trendlyne",
       "title": "The Stock Market Platform to Stay Ahead: Stock Screeners, Stock Analysis, and more. Markets MarketMind AI Baskets Alerts F&O MF Reports Screeners Subscribe Superstars Portfolio Watchlist Insider Trade",
       "link": "https://trendlyne.com/",
       "summary": "The Stock Market Platform to Stay Ahead: Stock Screeners, Stock Analysis, and more. Markets MarketMind AI Baskets Alerts F&O MF Reports Screeners Subscribe Superstars Portfolio Watchlist Insider Trades Results Data Downloader Events Calendar What's New Explore FAQs All Features Widgets More Search s",
-      "publishedAt": "2026-07-05T15:58:10.964145+05:30"
+      "publishedAt": "2026-07-05T19:24:21.344041+05:30"
     },
     {
       "source": "Zerodha Pulse",
       "title": "Pulse by Zerodha - Latest financial and market news from all major Indian news sources aggregated in one place - Pulse The latest business, finance, and market news from the last 24 hours from all maj",
       "link": "https://pulse.zerodha.com/",
       "summary": "Pulse by Zerodha - Latest financial and market news from all major Indian news sources aggregated in one place - Pulse The latest business, finance, and market news from the last 24 hours from all major Indian news sources",
-      "publishedAt": "2026-07-05T15:58:10.582530+05:30"
+      "publishedAt": "2026-07-05T19:24:20.845209+05:30"
     },
     {
       "source": "Zerodha Pulse",
-      "title": "aggregated in one place. Trending week july india mumbai news live updates amid world hormuz check doj adani trump modi france paraguay highlights cup quarter-finals watch canada morocco ounahi atlas ",
+      "title": "aggregated in one place. Trending mumbai rain news live updates heavy adani group high case report week issues world doj trump alert ipo amid rains july india hormuz check modi france paraguay highlig",
       "link": "https://pulse.zerodha.com/",
-      "summary": "aggregated in one place. Trending week july india mumbai news live updates amid world hormuz check doj adani trump modi france paraguay highlights cup quarter-finals watch canada morocco ounahi atlas lions open monsoon Q1 Results This Week: TCS, DMart, LTM Among Companies Declaring Earnings From Jul",
-      "publishedAt": "2026-07-05T15:58:10.582530+05:30"
+      "summary": "aggregated in one place. Trending mumbai rain news live updates heavy adani group high case report week issues world doj trump alert ipo amid rains july india hormuz check modi france paraguay highlights cup quarter-finals canada morocco ounahi atlas lions Sonali Bendre Reveals How Cancer Treatment ",
+      "publishedAt": "2026-07-05T19:24:20.845209+05:30"
     }
   ],
   "llmProvider": "gemini",
@@ -3982,7 +3943,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For KAYNES, participation is read through volume multiplier 1.0x and turnover 864.23 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. KAYNES is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "KAYNES forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.07, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "KAYNES is in the active terminal universe with LTP \u20b93,333.80, +5.55% move, and volume 2592315. Intraday setup: VWAP Bounce, VWAP 3290.57, EMA9 3290.57, ATR 5.96%, volume multiplier 1.0x.",
+      "why_interested": "KAYNES is in the active terminal universe with LTP \u20b93,333.80, +5.55% move, and volume 2592315. Intraday setup: VWAP Bounce, VWAP 3290.57, EMA9 3158.5, ATR 5.96%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for KAYNES is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for KAYNES: LTP \u20b93,333.80, delta +5.55%, volume 2592315, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4032,7 +3993,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For BHEL, participation is read through volume multiplier 1.0x and turnover 1135.8 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. BHEL is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "BHEL forensic screen: Beneish M Score: -0.53, Altman Z Score: 2.53, Ocf Ebitda Ratio: 0.58, Mansfield Relative Strength: 0.68.",
-      "why_interested": "BHEL is in the active terminal universe with LTP \u20b9383.60, -4.57% move, and volume 29608874. Intraday setup: Flag Breakout, VWAP 389.93, EMA9 389.93, ATR 5.03%, volume multiplier 1.0x.",
+      "why_interested": "BHEL is in the active terminal universe with LTP \u20b9383.60, -4.57% move, and volume 29608874. Intraday setup: Flag Breakout, VWAP 389.93, EMA9 401.95, ATR 5.03%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for BHEL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for BHEL: LTP \u20b9383.60, delta -4.57%, volume 29608874, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4082,7 +4043,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For EXICOM, participation is read through volume multiplier 1.0x and turnover 98.42 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. EXICOM is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "EXICOM forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "EXICOM is in the active terminal universe with LTP \u20b9178.01, +3.69% move, and volume 5528840. Intraday setup: VWAP Bounce, VWAP 175.48, EMA9 175.48, ATR 6.62%, volume multiplier 1.0x.",
+      "why_interested": "EXICOM is in the active terminal universe with LTP \u20b9178.01, +3.69% move, and volume 5528840. Intraday setup: VWAP Bounce, VWAP 175.48, EMA9 171.68, ATR 6.62%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for EXICOM is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for EXICOM: LTP \u20b9178.01, delta +3.69%, volume 5528840, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4132,7 +4093,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For DATAPATTNS, participation is read through volume multiplier 1.0x and turnover 272.35 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. DATAPATTNS is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "DATAPATTNS forensic screen: Beneish M Score: -0.56, Altman Z Score: 2.33, Ocf Ebitda Ratio: 0.55, Mansfield Relative Strength: 0.66.",
-      "why_interested": "DATAPATTNS is in the active terminal universe with LTP \u20b94,507.00, -3.21% move, and volume 604282. Intraday setup: Flag Breakout, VWAP 4557.33, EMA9 4557.33, ATR 4.02%, volume multiplier 1.0x.",
+      "why_interested": "DATAPATTNS is in the active terminal universe with LTP \u20b94,507.00, -3.21% move, and volume 604282. Intraday setup: Flag Breakout, VWAP 4557.33, EMA9 4656.7, ATR 4.02%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for DATAPATTNS is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for DATAPATTNS: LTP \u20b94,507.00, delta -3.21%, volume 604282, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4182,7 +4143,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For MPHASIS, participation is read through volume multiplier 1.0x and turnover 311.54 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. MPHASIS is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "MPHASIS forensic screen: Beneish M Score: -0.39, Altman Z Score: 2.96, Ocf Ebitda Ratio: 0.69, Mansfield Relative Strength: 0.77.",
-      "why_interested": "MPHASIS is in the active terminal universe with LTP \u20b92,296.60, +2.28% move, and volume 1356520. Intraday setup: 15-min ORB, VWAP 2298.53, EMA9 2298.53, ATR 2.81%, volume multiplier 1.0x.",
+      "why_interested": "MPHASIS is in the active terminal universe with LTP \u20b92,296.60, +2.28% move, and volume 1356520. Intraday setup: 15-min ORB, VWAP 2298.53, EMA9 2245.4, ATR 2.81%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for MPHASIS is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for MPHASIS: LTP \u20b92,296.60, delta +2.28%, volume 1356520, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4232,7 +4193,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For PERSISTENT, participation is read through volume multiplier 1.0x and turnover 726.52 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. PERSISTENT is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "PERSISTENT forensic screen: Beneish M Score: -0.38, Altman Z Score: 2.99, Ocf Ebitda Ratio: 0.69, Mansfield Relative Strength: 0.77.",
-      "why_interested": "PERSISTENT is in the active terminal universe with LTP \u20b94,682.70, +2.23% move, and volume 1551490. Intraday setup: 15-min ORB, VWAP 4696.37, EMA9 4696.37, ATR 2.74%, volume multiplier 1.0x.",
+      "why_interested": "PERSISTENT is in the active terminal universe with LTP \u20b94,682.70, +2.23% move, and volume 1551490. Intraday setup: 15-min ORB, VWAP 4696.37, EMA9 4580.6, ATR 2.74%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for PERSISTENT is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for PERSISTENT: LTP \u20b94,682.70, delta +2.23%, volume 1551490, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4282,7 +4243,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For ABCAPITAL, participation is read through volume multiplier 1.0x and turnover 262.4 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. ABCAPITAL is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "ABCAPITAL forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "ABCAPITAL is in the active terminal universe with LTP \u20b9401.25, +2.11% move, and volume 6539560. Intraday setup: VWAP Bounce, VWAP 400.03, EMA9 400.03, ATR 2.84%, volume multiplier 1.0x.",
+      "why_interested": "ABCAPITAL is in the active terminal universe with LTP \u20b9401.25, +2.11% move, and volume 6539560. Intraday setup: VWAP Bounce, VWAP 400.03, EMA9 392.95, ATR 2.84%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for ABCAPITAL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for ABCAPITAL: LTP \u20b9401.25, delta +2.11%, volume 6539560, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4332,7 +4293,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For SYRMA, participation is read through volume multiplier 1.0x and turnover 169.21 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. SYRMA is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "SYRMA forensic screen: Beneish M Score: -0.55, Altman Z Score: 2.43, Ocf Ebitda Ratio: 0.56, Mansfield Relative Strength: 0.67.",
-      "why_interested": "SYRMA is in the active terminal universe with LTP \u20b91,376.00, -1.59% move, and volume 1229753. Intraday setup: Flag Breakout, VWAP 1382.7, EMA9 1382.7, ATR 3.14%, volume multiplier 1.0x.",
+      "why_interested": "SYRMA is in the active terminal universe with LTP \u20b91,376.00, -1.59% move, and volume 1229753. Intraday setup: Flag Breakout, VWAP 1382.7, EMA9 1398.3, ATR 3.14%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for SYRMA is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for SYRMA: LTP \u20b91,376.00, delta -1.59%, volume 1229753, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4382,7 +4343,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For COFORGE, participation is read through volume multiplier 1.0x and turnover 593.37 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. COFORGE is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "COFORGE forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.06, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "COFORGE is in the active terminal universe with LTP \u20b91,464.00, +1.53% move, and volume 4053069. Intraday setup: 15-min ORB, VWAP 1469.3, EMA9 1469.3, ATR 2.89%, volume multiplier 1.0x.",
+      "why_interested": "COFORGE is in the active terminal universe with LTP \u20b91,464.00, +1.53% move, and volume 4053069. Intraday setup: 15-min ORB, VWAP 1469.3, EMA9 1441.9, ATR 2.89%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for COFORGE is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for COFORGE: LTP \u20b91,464.00, delta +1.53%, volume 4053069, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4432,7 +4393,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For ZENTEC, participation is read through volume multiplier 1.0x and turnover 86.31 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. ZENTEC is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "ZENTEC forensic screen: Beneish M Score: -0.57, Altman Z Score: 2.32, Ocf Ebitda Ratio: 0.55, Mansfield Relative Strength: 0.66.",
-      "why_interested": "ZENTEC is in the active terminal universe with LTP \u20b91,746.70, -1.49% move, and volume 494145. Intraday setup: Flag Breakout, VWAP 1764.47, EMA9 1764.47, ATR 3.75%, volume multiplier 1.0x.",
+      "why_interested": "ZENTEC is in the active terminal universe with LTP \u20b91,746.70, -1.49% move, and volume 494145. Intraday setup: Flag Breakout, VWAP 1764.47, EMA9 1773.2, ATR 3.75%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for ZENTEC is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for ZENTEC: LTP \u20b91,746.70, delta -1.49%, volume 494145, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4482,7 +4443,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For GODREJPROP, participation is read through volume multiplier 1.0x and turnover 200.01 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. GODREJPROP is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "GODREJPROP forensic screen: Beneish M Score: -0.39, Altman Z Score: 2.91, Ocf Ebitda Ratio: 0.68, Mansfield Relative Strength: 0.77.",
-      "why_interested": "GODREJPROP is in the active terminal universe with LTP \u20b91,996.40, +1.41% move, and volume 1001835. Intraday setup: VWAP Bounce, VWAP 1989.83, EMA9 1989.83, ATR 1.63%, volume multiplier 1.0x.",
+      "why_interested": "GODREJPROP is in the active terminal universe with LTP \u20b91,996.40, +1.41% move, and volume 1001835. Intraday setup: VWAP Bounce, VWAP 1989.83, EMA9 1968.7, ATR 1.63%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for GODREJPROP is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for GODREJPROP: LTP \u20b91,996.40, delta +1.41%, volume 1001835, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4532,7 +4493,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For BEL, participation is read through volume multiplier 1.0x and turnover 505.24 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. BEL is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "BEL forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.05, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "BEL is in the active terminal universe with LTP \u20b9418.05, +0.72% move, and volume 12085695. Intraday setup: Flag Breakout, VWAP 419.88, EMA9 419.88, ATR 1.78%, volume multiplier 1.0x.",
+      "why_interested": "BEL is in the active terminal universe with LTP \u20b9418.05, +0.72% move, and volume 12085695. Intraday setup: Flag Breakout, VWAP 419.88, EMA9 415.05, ATR 1.78%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for BEL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for BEL: LTP \u20b9418.05, delta +0.72%, volume 12085695, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4582,7 +4543,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For JYOTHYLAB, participation is read through volume multiplier 1.0x and turnover 11.44 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. JYOTHYLAB is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "JYOTHYLAB forensic screen: Beneish M Score: -0.57, Altman Z Score: 2.34, Ocf Ebitda Ratio: 0.55, Mansfield Relative Strength: 0.66.",
-      "why_interested": "JYOTHYLAB is in the active terminal universe with LTP \u20b9192.13, -0.92% move, and volume 595572. Intraday setup: Flag Breakout, VWAP 193.3, EMA9 193.3, ATR 2.77%, volume multiplier 1.0x.",
+      "why_interested": "JYOTHYLAB is in the active terminal universe with LTP \u20b9192.13, -0.92% move, and volume 595572. Intraday setup: Flag Breakout, VWAP 193.3, EMA9 193.91, ATR 2.77%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for JYOTHYLAB is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for JYOTHYLAB: LTP \u20b9192.13, delta -0.92%, volume 595572, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4632,7 +4593,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For IRFC, participation is read through volume multiplier 1.0x and turnover 107.46 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. IRFC is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "IRFC forensic screen: Beneish M Score: -0.53, Altman Z Score: 2.55, Ocf Ebitda Ratio: 0.58, Mansfield Relative Strength: 0.68.",
-      "why_interested": "IRFC is in the active terminal universe with LTP \u20b990.57, -0.29% move, and volume 11864556. Intraday setup: Flag Breakout, VWAP 90.82, EMA9 90.82, ATR 1.42%, volume multiplier 1.0x.",
+      "why_interested": "IRFC is in the active terminal universe with LTP \u20b990.57, -0.29% move, and volume 11864556. Intraday setup: Flag Breakout, VWAP 90.82, EMA9 90.83, ATR 1.42%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for IRFC is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for IRFC: LTP \u20b990.57, delta -0.29%, volume 11864556, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4682,7 +4643,7 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For VOLTAS, participation is read through volume multiplier 1.0x and turnover 104.4 Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. VOLTAS is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "VOLTAS forensic screen: Beneish M Score: -0.56, Altman Z Score: 2.37, Ocf Ebitda Ratio: 0.56, Mansfield Relative Strength: 0.66.",
-      "why_interested": "VOLTAS is in the active terminal universe with LTP \u20b91,280.20, -0.81% move, and volume 815500. Intraday setup: Flag Breakout, VWAP 1286.8, EMA9 1286.8, ATR 2.34%, volume multiplier 1.0x.",
+      "why_interested": "VOLTAS is in the active terminal universe with LTP \u20b91,280.20, -0.81% move, and volume 815500. Intraday setup: Flag Breakout, VWAP 1286.8, EMA9 1290.6, ATR 2.34%, volume multiplier 1.0x.",
       "future_revenue_model": "Forward model for VOLTAS is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
       "current_model": "Current model for VOLTAS: LTP \u20b91,280.20, delta -0.81%, volume 815500, score 0.0, action cohort selection.",
       "ledger_stocks": [],
@@ -4979,268 +4940,34 @@
     }
   },
   "tickerNewsByTicker": {
-    "KAYNES": {
-      "ticker": "KAYNES",
-      "company_name": "KAYNES",
-      "articles_scraped": 15,
-      "articles_after_dedup": 15,
-      "generated_at": "2026-07-05T10:25:19.582605+00:00",
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "No recent news found.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "Kaynes Technology is a key investor in industrial projects worth Rs 7,506 crore cleared by Karnataka, focusing on aerospace, ESDM, and general engineering. This indicates significant investment and expansion plans, with many projects located outside Bengaluru.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "German chipmaker Infineon Technologies is partnering with Kaynes Semicon to strengthen India's chip collaboration. Infineon plans to transfer packaging expertise and procure packaged components from Kaynes.",
-      "earnings_results": "The company has faced scrutiny for guidance revisions, higher working capital intensity, and cash flow concerns. Investors are monitoring for improvements in these financial aspects.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "Kaynes Technology is under increased scrutiny regarding its financial disclosures, particularly those covering related party transactions. Investors are looking for improvements in governance and transparency.",
-      "sentiment_overall": "Neutral",
-      "risk_flags": "Governance concerns",
-      "summary_headline": "No recent news found.",
-      "cached": false,
-      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
-    },
-    "BHEL": {
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "UBS has downgraded BHEL shares from a 'Buy' rating to 'Neutral'. This specific downgrade contrasts with a general expert recommendation to focus on power and steel plays, a sector BHEL operates in.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "No recent news found.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "No recent news found.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "BHEL is currently at risk of losing its prestigious Maharatna tag. This potential change in status could impact the company's operational autonomy and financial flexibility.",
-      "sentiment_overall": "Bearish",
-      "risk_flags": "Risk of losing Maharatna tag, UBS downgrade",
-      "summary_headline": "BHEL faces risk of losing Maharatna status and receives a downgrade from UBS.",
-      "generated_at": "2026-07-05T10:20:24.157068+00:00",
-      "ticker": "BHEL",
-      "cached": true
-    },
-    "EXICOM": {
-      "ticker": "EXICOM",
-      "company_name": "EXICOM",
-      "articles_scraped": 15,
-      "articles_after_dedup": 15,
-      "generated_at": "2026-07-05T10:25:29.334527+00:00",
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "Exicom's IPO received massive investor interest, being subscribed over 129 times overall, with non-institutional investors booking 54.36 times and qualified institutional buyers (QIBs) 4.48 times on Day 2. The company also raised approximately Rs 178 crore from anchor investors prior to the issue opening.",
-      "order_book_block_deals": "Exicom Tele-Systems hit a fresh 52-week high during a recent trading session on the NSE.",
-      "future_expansion_capex": "Exicom acquired US-based EV charging company Tritium for USD 37 million (Rs 310 crore) and",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "No recent news found.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "No recent news found.",
-      "risk_flags": "No recent news found.",
-      "summary_headline": "No recent news found.",
-      "cached": false,
-      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
-    },
-    "DATAPATTNS": {
-      "ticker": "DATAPATTNS",
-      "company_name": "DATAPATTNS",
-      "articles_scraped": 15,
-      "articles_after_dedup": 15,
-      "generated_at": "2026-07-05T10:25:35.101226+00:00",
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "No recent news found.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "No recent news found.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "No recent news found.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "Neutral",
-      "risk_flags": "None",
-      "summary_headline": "No specific news found for DATAPATTNS in the provided articles.",
-      "cached": false,
-      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
-    },
-    "MPHASIS": {
-      "insider_activity": "Blackstone, a significant promoter of Mphasis, has pledged its entire stake in the company. This action was taken to refinance a loan.",
-      "institutional_activity": "No recent news found.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "No recent news found.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "No recent news found.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "No recent news found.",
-      "risk_flags": "No recent news found.",
-      "summary_headline": "No recent news found.",
-      "generated_at": "2026-07-05T09:44:31.466357+00:00",
-      "ticker": "MPHASIS",
-      "cached": true
-    },
-    "PERSISTENT": {
-      "ticker": "PERSISTENT",
-      "company_name": "PERSISTENT",
-      "articles_scraped": 15,
-      "articles_after_dedup": 15,
-      "generated_at": "2026-07-05T10:25:44.633130+00:00",
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "No recent news found.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "Persistent's CEO expressed confidence in the company's growth trajectory, stating that it will reward investors despite the market rout, potentially drawing parallels to Nagarro's growth. This indicates a positive outlook on future business expansion and strategic direction.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "No recent news found.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "Bullish",
-      "risk_flags": "None",
-      "summary_headline": "Persistent CEO expresses confidence in company's growth despite market downturn.",
-      "cached": false,
-      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
-    },
-    "ABCAPITAL": {
-      "ticker": "ABCAPITAL",
-      "company_name": "ABCAPITAL",
-      "articles_scraped": 15,
-      "articles_after_dedup": 15,
-      "generated_at": "2026-07-05T10:25:50.389155+00:00",
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "No recent news found.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "Aditya Birla Capital plans to utilize Rs 3,500 crore to drive growth in its lending business. This indicates a strategic investment towards expanding its core operations.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "No recent news found.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "Bullish",
-      "risk_flags": "None",
-      "summary_headline": "Aditya Birla Capital to invest Rs 3,500 crore for lending business expansion.",
-      "cached": false,
-      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
-    },
     "SYRMA": {
       "ticker": "SYRMA",
       "company_name": "SYRMA",
-      "articles_scraped": 15,
-      "articles_after_dedup": 15,
-      "generated_at": "2026-07-05T10:26:07.943154+00:00",
+      "articles_scraped": 20,
+      "articles_after_dedup": 20,
+      "generated_at": "2026-07-05T13:51:13.282761+00:00",
       "insider_activity": "No recent news found.",
-      "institutional_activity": "No recent news found.",
+      "institutional_activity": "Analysts from Motilal Oswal and HDFC Securities have given 'Buy' recommendations for Syrma SGS Technology with target prices ranging from Rs 535 to Rs 580. The company is also recommended by experts for potential gains, indicating positive sentiment from the Street.",
       "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "Syrma SGS formed a joint venture with Japan's Kaga Electronics to establish a new manufacturing facility in India",
+      "future_expansion_capex": "Syrma SGS Technology is forming a joint venture with Japan's Kaga Electronics to establish a new manufacturing facility in India, holding a 60% stake. The company is also manufacturing MSI laptops at its Chennai facility, involving technology transfer and supporting the 'Make in India' initiative.",
       "auditor_changes": "No recent news found.",
       "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
+      "new_orders_contracts": "Syrma SGS Technology has entered a significant joint venture with Japan's Kaga Electronics",
       "earnings_results": "No recent news found.",
       "management_changes": "No recent news found.",
       "regulatory_filings": "No recent news found.",
       "sentiment_overall": "No recent news found.",
       "risk_flags": "No recent news found.",
       "summary_headline": "No recent news found.",
-      "cached": false,
-      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
-    },
-    "ZENTEC": {
-      "ticker": "ZENTEC",
-      "company_name": "ZENTEC",
-      "articles_scraped": 15,
-      "articles_after_dedup": 15,
-      "generated_at": "2026-07-05T10:25:57.551261+00:00",
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "No recent news found.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "No recent news found.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "Zen Technologies' shares tumbled 11% after its Q4 profit plunged by 69% year-over-year. This significant drop in profit led to a negative market reaction.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "Bearish",
-      "risk_flags": "Q4 profit plunges 69% YoY",
-      "summary_headline": "Zen Technologies shares tumble 11% following a 69% year-over-year plunge in Q4 profit.",
-      "cached": false,
-      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
-    },
-    "GODREJPROP": {
-      "ticker": "GODREJPROP",
-      "company_name": "GODREJPROP",
-      "articles_scraped": 15,
-      "articles_after_dedup": 15,
-      "generated_at": "2026-07-05T10:26:14.663220+00:00",
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "No recent news found.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "No recent news found.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "No recent news found.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "Neutral",
-      "risk_flags": "None",
-      "summary_headline": "No specific news found for GODREJPROP in recent articles.",
-      "cached": false,
-      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
-    },
-    "BEL": {
-      "ticker": "BEL",
-      "company_name": "BEL",
-      "articles_scraped": 15,
-      "articles_after_dedup": 15,
-      "generated_at": "2026-07-05T10:26:20.305888+00:00",
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "Citi, a prominent financial institution, has maintained a 'buy' rating on BEL, indicating a positive outlook from an institutional analyst.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "No recent news found.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "No recent news found.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "Bullish",
-      "risk_flags": "None",
-      "summary_headline": "Citi maintains 'buy' rating on BEL.",
-      "cached": false,
-      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
-    },
-    "JYOTHYLAB": {
-      "ticker": "JYOTHYLAB",
-      "company_name": "JYOTHYLAB",
-      "articles_scraped": 15,
-      "articles_after_dedup": 15,
-      "generated_at": "2026-07-05T10:26:26.434666+00:00",
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "No recent news found.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "Jyothy Laboratories acquired an additional 3.29% stake in Henkel India from the open market. This increases its total shareholding in Henkel India to over 69%, indicating a strategic move to consolidate ownership.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "No recent news found.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "Bullish",
-      "risk_flags": "None",
-      "summary_headline": "JyothyLab increases its stake in Henkel India to over 69% through an open market acquisition.",
       "cached": false,
       "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
     },
     "VOLTAS": {
       "ticker": "VOLTAS",
       "company_name": "VOLTAS",
-      "articles_scraped": 15,
-      "articles_after_dedup": 15,
-      "generated_at": "2026-07-05T10:26:36.319408+00:00",
+      "articles_scraped": 20,
+      "articles_after_dedup": 20,
+      "generated_at": "2026-07-05T14:19:06.141705+00:00",
       "insider_activity": "No recent news found.",
       "institutional_activity": "No recent news found.",
       "order_book_block_deals": "No recent news found.",
@@ -5248,96 +4975,12 @@
       "auditor_changes": "No recent news found.",
       "dividend_news": "No recent news found.",
       "new_orders_contracts": "No recent news found.",
-      "earnings_results": "Voltas reported strong performance in Q1 FY27, with its AC sales crossing the 1 million mark in record time. This positive sales milestone led to a 5% surge in the company's shares.",
-      "management_changes": "Noel Tata announced his exit as the Chairman of Voltas at the company's Annual General Meeting.",
+      "earnings_results": "Voltas achieved a significant milestone in Q1 FY27, with its AC sales crossing the 1 million unit mark in record time. This strong performance contributed to a 5% surge in the company's shares.",
+      "management_changes": "Noel Tata announced his departure as the Chairman of Voltas during the company's Annual General Meeting.",
       "regulatory_filings": "No recent news found.",
       "sentiment_overall": "Bullish",
       "risk_flags": "None",
-      "summary_headline": "Voltas achieves record Q1 FY27 AC sales, boosting shares, while Chairman Noel Tata steps down.",
-      "cached": false,
-      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
-    },
-    "KPITTECH": {
-      "ticker": "KPITTECH",
-      "company_name": "KPITTECH",
-      "articles_scraped": 15,
-      "articles_after_dedup": 15,
-      "generated_at": "2026-07-05T10:26:51.976125+00:00",
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "No recent news found.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "No recent news found.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "No recent news found.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "Neutral",
-      "risk_flags": "None",
-      "summary_headline": "No specific news found for KPITTECH in the provided articles.",
-      "cached": false,
-      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
-    },
-    "MAZDOCK": {
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "No recent news found.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "No recent news found.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "No recent news found.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "Neutral",
-      "risk_flags": "Potential downside if demand zone is penetrated",
-      "summary_headline": "MAZDOCK stock faces a pivotal demand zone, with technical analysis indicating a key support level at 360 if breached.",
-      "generated_at": "2026-07-05T10:22:33.525860+00:00",
-      "ticker": "MAZDOCK",
-      "cached": true
-    },
-    "NETWEB": {
-      "ticker": "NETWEB",
-      "company_name": "NETWEB",
-      "articles_scraped": 15,
-      "articles_after_dedup": 15,
-      "generated_at": "2026-07-05T10:26:47.610366+00:00",
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "No recent news found.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "No recent news found.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "No recent news found.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "No recent news found.",
-      "risk_flags": "No recent news found.",
-      "summary_headline": "No recent news found.",
-      "cached": false,
-      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
-    },
-    "HAL": {
-      "ticker": "HAL",
-      "company_name": "HAL",
-      "articles_scraped": 15,
-      "articles_after_dedup": 15,
-      "generated_at": "2026-07-05T10:26:59.880317+00:00",
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "No recent news found.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "No recent news found.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "HAL's stock rose ahead of a Defence Acquisition Council (DAC) meeting expected to consider Rs 1 lakh crore defence proposals. The council is also anticipated to discuss the procurement of 600 HAMMER precision-guided air-to-ground munitions for the Indian Air Force and Navy, indicating potential future contract opportunities for HAL.",
-      "earnings_results": "No specific earnings results were reported. However, HAL's stock rose up to 2% in anticipation of potential defence proposals, reflecting market optimism.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "Bullish",
-      "risk_flags": "None",
-      "summary_headline": "HAL shares rise ahead of DAC meeting considering Rs 1 lakh crore defence proposals and potential new munitions procurement.",
+      "summary_headline": "Voltas reports record Q1 AC sales, leading to a stock surge, while Chairman Noel Tata announces exit.",
       "cached": false,
       "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
     }

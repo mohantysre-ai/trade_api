@@ -15,6 +15,8 @@ $MarketApi = "http://127.0.0.1:8000"
 $AiNewsApi = "http://127.0.0.1:8001"
 $FrontendApi = "http://127.0.0.1:3000"
 $BaseDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+# Project root is two levels up from config/startup/
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $BaseDir)
 $LogDir = Join-Path $BaseDir "logs"
 $null = New-Item -ItemType Directory -Path $LogDir -Force -ErrorAction SilentlyContinue
 
@@ -137,8 +139,8 @@ Write-Host "[PASS] Pre-flight checks complete." -ForegroundColor Green
 # ============================================================================
 Write-Host ""
 Write-Host "[PRE-CLEAR] Removing stale snapshot files..." -ForegroundColor Yellow
-$snapPath = "$BaseDir\backend\last_market_snapshot.json"
-$altSnapPath = "$BaseDir\trade_api_snapshot.json"
+$snapPath = "$ProjectRoot\backend\app\services\last_market_snapshot.json"
+$altSnapPath = "$ProjectRoot\trade_api_snapshot.json"
 $cleared = $false
 if (Test-Path $snapPath) {
     Remove-Item -LiteralPath $snapPath -Force -ErrorAction SilentlyContinue
@@ -222,7 +224,7 @@ try {
         if ((-not $tickerMap) -or (@($tickerMap.PSObject.Properties).Count -eq 0)) {
             Write-Host "  [WARN] Ticker map empty from API. Checking snapshot directly..." -ForegroundColor Yellow
             try {
-                $snapPath = "$BaseDir\backend\last_market_snapshot.json"
+                $snapPath = "$ProjectRoot\backend\app\services\last_market_snapshot.json"
                 if (Test-Path $snapPath) {
                     $snap = Get-Content $snapPath -Raw | ConvertFrom-Json
                     if ($snap.tickerIntelligenceByTicker) {
@@ -446,7 +448,7 @@ $TotalCount++
 try {
     # 8a: Validate using the snapshot file directly (avoids competing with GET /api/market-data)
     Write-Host "  [8a] Validating snapshot file..." -ForegroundColor Gray
-    $snapPath = "$BaseDir\backend\last_market_snapshot.json"
+    $snapPath = "$ProjectRoot\backend\app\services\last_market_snapshot.json"
     $foundStocks = 0
     $foundUpdated = ""
     if (Test-Path $snapPath) {
@@ -462,6 +464,27 @@ try {
         }
     } else {
         throw "Snapshot file not found at $snapPath"
+    }
+
+    # 8a-2: Validate audit verdicts via the new API
+    Write-Host "  [8a-2] Validating audit verdicts API..." -ForegroundColor Gray
+    try {
+        $verdictJson = Invoke-GetJson -Uri "$MarketApi/api/audit-verdicts" -TimeoutSec 30
+        if ($verdictJson.success -eq $true) {
+            $vCount = $verdictJson.count
+            $rejected = @($verdictJson.verdicts | Where-Object { $_.verdict -eq "REJECT" }).Count
+            Write-Host "  [OK] Audit verdicts: $vCount stocks, $rejected rejected" -ForegroundColor Green
+            # Show first 3 verdicts for verification
+            $top3 = @($verdictJson.verdicts | Select-Object -First 3)
+            foreach ($v in $top3) {
+                $rf = if ($v.risk_flags) { $v.risk_flags -join "; " } else { "None" }
+                Write-Host "       $($v.ticker): $($v.verdict) | alpha=$($v.alpha_score) | flags=$rf" -ForegroundColor Gray
+            }
+        } else {
+            Write-Host "  [WARN] Audit verdicts API returned success=false" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "  [WARN] Audit verdicts API call failed: $_" -ForegroundColor Yellow
     }
 
     # 8b: Call frontend proxy to trigger cache refresh (if frontend is running)

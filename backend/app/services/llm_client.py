@@ -119,15 +119,56 @@ def _call_gemini(
     timeout: int = LLM_CALL_TIMEOUT_SECONDS,
     oauth_token_path: str | None = None,
 ) -> str:
-    """Call Gemini. Supports both API key auth and OAuth token auth."""
+    """Call Gemini. Tries REST API with API key first, then OAuth, then SDK."""
+    # Try REST API with API key as query parameter (fastest, most reliable)
+    if api_key:
+        try:
+            return _call_gemini_rest_api_key(api_key, model, system_instruction, prompt, timeout)
+        except Exception:
+            pass  # Fall through to other methods
+
+    # Try OAuth token
     if oauth_token_path:
         token = _get_gemini_oauth_token(oauth_token_path)
         if token:
             return _call_gemini_rest(token, model, system_instruction, prompt, timeout)
 
-    if not api_key:
-        raise RuntimeError("No Gemini credentials available (no API key or OAuth token).")
-    return _call_gemini_sdk(api_key, model, system_instruction, prompt, timeout)
+    # Try SDK as last resort
+    if api_key:
+        return _call_gemini_sdk(api_key, model, system_instruction, prompt, timeout)
+
+    raise RuntimeError("No Gemini credentials available (no API key or OAuth token).")
+
+
+def _call_gemini_rest_api_key(
+    api_key: str,
+    model: str,
+    system_instruction: str,
+    prompt: str,
+    timeout: int,
+) -> str:
+    """Call Gemini REST API directly using API key as query parameter."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "systemInstruction": {"parts": [{"text": system_instruction}]},
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 2000,
+            "responseMimeType": "application/json",
+        },
+    }
+    resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+    resp.raise_for_status()
+    data = resp.json()
+    candidates = data.get("candidates", [])
+    if not candidates:
+        raise RuntimeError(f"Gemini REST returned no candidates: {data}")
+    parts = candidates[0].get("content", {}).get("parts", [])
+    if not parts:
+        raise RuntimeError(f"Gemini REST returned empty parts: {data}")
+    return parts[0].get("text", "").strip()
 
 
 def _call_gemini_sdk(api_key: str, model: str, system_instruction: str, prompt: str, timeout: int) -> str:

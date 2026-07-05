@@ -73,7 +73,7 @@ LLM_UNIVERSE_LIMIT = int(os.getenv("LLM_UNIVERSE_LIMIT", "30"))
 NIFTY_100_LABEL = "Nifty 100"
 NIFTY_100_CACHE_PATH = BASE_DIR / "nifty100_instruments.json"
 ANGEL_API_TIMEOUT_SECONDS = int(os.getenv("ANGEL_API_TIMEOUT_SECONDS", "24"))
-LLM_CALL_TIMEOUT_SECONDS = min(max(1, int(os.getenv("LLM_CALL_TIMEOUT_SECONDS", "120"))), 300)
+LLM_CALL_TIMEOUT_SECONDS = min(max(1, int(os.getenv("LLM_CALL_TIMEOUT_SECONDS", "180"))), 300)
 QUOTE_CHUNK_SIZE = int(os.getenv("QUOTE_CHUNK_SIZE", "10"))
 INTRADAY_CHUNK_SIZE = int(os.getenv("INTRADAY_CHUNK_SIZE", "10"))
 
@@ -1305,7 +1305,18 @@ def _execute_llm_risk_audit(
             else:
                 raise RuntimeError(f"Unsupported LLM provider for audit: {provider}")
 
-            parsed = json.loads(res_text)
+            # Strip markdown code fences if present
+            _clean_text = res_text.strip()
+            if _clean_text.startswith("```"):
+                _clean_text = _clean_text.lstrip("`")
+                if _clean_text.lower().startswith("json"):
+                    _clean_text = _clean_text[4:].lstrip("\n")
+                if "```" in _clean_text:
+                    _clean_text = _clean_text[:_clean_text.index("```")]
+                _clean_text = _clean_text.strip()
+
+            from .ai_ticker_news import _parse_json_response
+            parsed = _parse_json_response(_clean_text, ["audits"])
             audits = parsed.get("audits", {})
 
             for stock in top_20:
@@ -1893,6 +1904,33 @@ def create_app() -> FastAPI:
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+    @app.get("/api/audit-verdicts")
+    def audit_verdicts() -> dict[str, Any]:
+        """Return all ticker risk audit results (Approved or Rejected) in clean JSON."""
+        snapshot = _load_last_snapshot()
+        if not snapshot:
+            return {
+                "success": False,
+                "error": "No cached market snapshot available. Run a live refresh first."
+            }
+        
+        verdicts = []
+        for stock in snapshot.get("stocks", []):
+            verdicts.append({
+                "ticker": stock.get("ticker"),
+                "name": stock.get("name"),
+                "alpha_score": stock.get("alpha_score", 0.0),
+                "verdict": stock.get("verdict", "APPROVE"),
+                "risk_flags": stock.get("risk_flags", ["None"])
+            })
+            
+        return {
+            "success": True,
+            "updatedAt": snapshot.get("updatedAt"),
+            "count": len(verdicts),
+            "verdicts": verdicts
+        }
+
     @app.get("/api/intraday-matrix")
     def intraday_matrix() -> dict[str, Any]:
         """Return lemonn.co.in intraday stock recommendations (upper panel)."""
@@ -2392,7 +2430,28 @@ def _run_orchestrated_sequence(task_id: str, pool_name: str | None, custom_promp
             if m := all_metrics.get(row["ticker"]):
                 row["intraday"] = m
         
-        payload["stocks"] = _heuristic_rank(all_stocks)
+        # ─────────────────────────────────────────────────────────────────────────
+        # STAGE 1: Deterministic Quant Engine
+        # Applies hard filters and computes Alpha Scores with no LLM involvement.
+        # Returns top 20 sorted by Alpha Score; pads with volume leaders if needed.
+        # ─────────────────────────────────────────────────────────────────────────
+        update_progress("Running deterministic quant pipeline (hard filters + alpha scores)...", payload)
+        top_20_quant = _compute_deterministic_pipeline(all_stocks)
+
+        # ─────────────────────────────────────────────────────────────────────────
+        # STAGE 2: LLM Safety Auditor
+        # Audits ONLY non-technical risk domains using news context.
+        # Attaches risk_flags + verdict to each stock; never re-ranks technically.
+        # ─────────────────────────────────────────────────────────────────────────
+        update_progress("Running LLM risk audit on top 20 stocks...", payload)
+        final_audited = _execute_llm_risk_audit(top_20_quant, payload.get("news", []))
+
+        # Print institutional audit ledger to server log
+        ledger_rows = build_audit_ledger(final_audited)
+        for ledger_row in ledger_rows:
+            print(f"[AUDIT] {ledger_row}")
+
+        payload["stocks"] = final_audited
         payload["stockQuotes"] = {s["ticker"]: s for s in all_stocks}
         update_progress("NIFTY TOP 5 MOVERS updated. Waiting 30 seconds...", payload)
         time.sleep(ORCHESTRATION_DELAY)
@@ -2429,7 +2488,7 @@ def _run_orchestrated_sequence(task_id: str, pool_name: str | None, custom_promp
         else:
             update_progress("AI NEWS TERMINAL & SUMMARY missing or invalid. Calling LLM...", payload)
             top_rows, ti_intel, news_summary = _build_terminal_payload(
-                all_stocks=all_stocks,
+                all_stocks=final_audited,
                 news_items=payload["news"],
                 macro_morning=payload["macroDataStrip"]["morning"],
                 macro_evening=payload["macroDataStrip"]["evening"],
@@ -2477,6 +2536,7 @@ def main() -> int:
     parser.add_argument("--prompt", default=None, help="Custom filter prompt override")
     parser.add_argument("--refresh-on-demand", action="store_true", help="Force a non-fallback live refresh and write snapshot")
     parser.add_argument("--orchestrate", action="store_true", help="Run the sequential orchestrated refresh sequence")
+    parser.add_argument("--audit-verdicts", action="store_true", help="Print all ticker audit verdicts (Approved/Rejected) from the latest snapshot")
     args = parser.parse_args()
 
     try:
@@ -2502,6 +2562,23 @@ def main() -> int:
     if args.orchestrate:
         print("[INFO] Starting orchestrated sequential refresh...")
         _run_orchestrated_sequence("cli_task", args.pool, args.prompt)
+        return 0
+
+    if args.audit_verdicts:
+        snapshot = _load_last_snapshot()
+        if not snapshot:
+            print(json.dumps({"success": False, "error": "No cached snapshot available."}, indent=2))
+            return 1
+        verdicts = []
+        for s in snapshot.get("stocks", []):
+            verdicts.append({
+                "ticker": s.get("ticker"),
+                "name": s.get("name"),
+                "alpha_score": s.get("alpha_score", 0.0),
+                "verdict": s.get("verdict", "APPROVE"),
+                "risk_flags": s.get("risk_flags", ["None"])
+            })
+        print(json.dumps({"success": True, "verdicts": verdicts}, indent=2))
         return 0
 
     if args.refresh_on_demand:
