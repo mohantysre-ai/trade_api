@@ -25,7 +25,7 @@ type DrawerContent = {
 
 type TabKey = 'marketSnapshot' | 'stockHeatMap' | 'assetMatrix' | 'intradayMatrix';
 
-const INDIA_MARKET_LABELS = new Set(['NIFTY 100', 'SENSEX', 'NIFTY BANK', 'NIFTY IT', 'NIFTY PHARMA', 'NIFTY MIDCAP', 'NIFTY SMALLCAP']);
+const INDIA_MARKET_LABELS = new Set(['NIFTY 100', 'SENSEX', 'NIFTY BANK', 'NIFTY IT', 'NIFTY PHARMA', 'NIFTY MIDCAP', 'NIFTY SMALLCAP', 'GIFT NIFTY']);
 const GLOBAL_ONLY_LABELS = new Set(['BRENT CRUDE', 'BRENT CRUDE OIL']);
 
 function normalizeMarketLabel(label: string) {
@@ -1006,12 +1006,17 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
           return (
             <div
               key={item.label}
-              className="relative overflow-hidden rounded-lg p-2.5 transition-all hover:scale-105 flex items-center gap-2"
+              className="relative overflow-hidden rounded-lg p-2.5 transition-all hover:scale-105 flex items-center gap-2 cursor-pointer"
               style={{
                 background: gradient.background,
                 border: gradient.border,
                 minHeight: '80px',
               }}
+              onClick={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
+              onKeyDown={(e) => { if (e.key === 'Enter') window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer'); }}
+              tabIndex={0}
+              role="link"
+              aria-label={`View ${item.label} details`}
             >
               <div className="flex-1 min-w-0 z-10">
                 <span className="text-[11px] text-slate-700 block uppercase tracking-wider font-semibold">{item.label}</span>
@@ -1021,7 +1026,13 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
                 </span>
               </div>
               <div className="w-16 h-14 flex-shrink-0 relative">
-                <SparklineSVG positive={isPositive} data={item.sparkline} />
+                {item.sparkline && item.sparkline.length >= 2 ? (
+                  <SparklineSVG positive={isPositive} data={item.sparkline} />
+                ) : (
+                  <div className="absolute top-0 right-0 w-full h-full opacity-70">
+                    <MiniSparkline positive={isPositive} />
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -1095,6 +1106,96 @@ function getIndiaMarketGradient(label: string): { background: string; border: st
   return { background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', border: '1px solid #E2E8F0' };
 }
 
+function getIndexClickUrl(label: string): string {
+  const upper = label.toUpperCase();
+  // Indian indices → Moneycontrol (most reliable for Indian markets)
+  if (upper.includes('NIFTY 50') || upper === 'NIFTY' || upper === 'NIFTY50') return 'https://www.moneycontrol.com/indian-indices/nifty-50-9.html';
+  if (upper.includes('SENSEX')) return 'https://www.moneycontrol.com/indian-indices/sensex-1.html';
+  if (upper.includes('NIFTY BANK')) return 'https://www.moneycontrol.com/indian-indices/nifty-bank-11.html';
+  if (upper.includes('NIFTY IT')) return 'https://www.moneycontrol.com/indian-indices/nifty-it-16.html';
+  if (upper.includes('NIFTY PHARMA')) return 'https://www.moneycontrol.com/indian-indices/nifty-pharma-22.html';
+  if (upper.includes('NIFTY MIDCAP')) return 'https://www.moneycontrol.com/indian-indices/nifty-midcap-100-36.html';
+  if (upper.includes('NIFTY SMALLCAP')) return 'https://www.moneycontrol.com/indian-indices/nifty-smallcap-100-41.html';
+  if (upper.includes('GIFT NIFTY') || upper.includes('GIFT')) return 'https://www.moneycontrol.com/live-index/gift-nifty?symbol=in;gsx';
+  if (upper.includes('VIX') || upper.includes('INDIA VIX')) return 'https://www.moneycontrol.com/indian-indices/india-vix-48.html';
+  if (upper.includes('NIFTY 100')) return 'https://www.moneycontrol.com/indian-indices/nifty-100-34.html';
+  if (upper.includes('USD') && upper.includes('INR')) return 'https://www.moneycontrol.com/currency/usd-inr';
+  if (upper.includes('NIFTY')) return 'https://www.moneycontrol.com/indian-indices/nifty-50-9.html';
+  // Global indices → Google Finance (reliable)
+  if (upper.includes('DOW') || upper.includes('DJI')) return 'https://www.google.com/finance/quote/.DJI:INDEXDJX';
+  if (upper.includes('S&P 500') || upper.includes('SPX')) return 'https://www.google.com/finance/quote/.INX:INDEXSP';
+  if (upper.includes('NASDAQ')) return 'https://www.google.com/finance/quote/.IXIC:INDEXNASDAQ';
+  if (upper.includes('NIKKEI')) return 'https://www.google.com/finance/quote/NI225:INDEXNIKKEI';
+  if (upper.includes('HANG SENG')) return 'https://www.google.com/finance/quote/HSI:INDEXHANGSENG';
+  if (upper.includes('SHANGHAI')) return 'https://www.google.com/finance/quote/000001:SHA';
+  if (upper.includes('DAX')) return 'https://www.google.com/finance/quote/DAX:INDEXDB';
+  if (upper.includes('FTSE')) return 'https://www.google.com/finance/quote/UKX:INDEXFTSE';
+  if (upper.includes('CAC')) return 'https://www.google.com/finance/quote/PX1:INDEXEUROPA';
+  if (upper.includes('EURO')) return 'https://www.google.com/finance/quote/SX5E:INDEXSTOXX';
+  if (upper.includes('ASX')) return 'https://www.google.com/finance/quote/AS51:INDEXASX';
+  if (upper.includes('BOVESPA')) return 'https://www.google.com/finance/quote/IBOV:INDEXBVMF';
+  if (upper.includes('KOSPI')) return 'https://www.google.com/finance/quote/KS11:KRX';
+  if (upper.includes('TSX')) return 'https://www.google.com/finance/quote/OSPTX:INDEXTSI';
+  // Commodities → Google Finance
+  if (upper.includes('GOLD')) return 'https://www.google.com/finance/quote/GC=F:CME';
+  if (upper.includes('SILVER')) return 'https://www.google.com/finance/quote/SI=F:CME';
+  if (upper.includes('BRENT') || upper.includes('CRUDE') || upper.includes('WTI')) return 'https://www.google.com/finance/quote/CL=F:NYMEX';
+  if (upper.includes('BITCOIN') || upper.includes('BTC')) return 'https://www.google.com/finance/quote/BTC-USD';
+  if (upper.includes('COPPER')) return 'https://www.google.com/finance/quote/HG=F:CME';
+  if (upper.includes('NATURAL') || upper.includes('GAS')) return 'https://www.google.com/finance/quote/NG=F:NYMEX';
+  if (upper.includes('ALUMINUM')) return 'https://www.google.com/finance/quote/ALI=F:CME';
+  if (upper.includes('PLATINUM')) return 'https://www.google.com/finance/quote/PL=F:NYMEX';
+  if (upper.includes('PALLADIUM')) return 'https://www.google.com/finance/quote/PA=F:NYMEX';
+  if (upper.includes('WHEAT')) return 'https://www.google.com/finance/quote/ZW=F:CBOT';
+  if (upper.includes('ZINC')) return 'https://www.google.com/finance/quote/ZNC=F:CME';
+  if (upper.includes('NICKEL')) return 'https://www.google.com/finance/quote/NID=F:CME';
+  return `https://www.google.com/finance/quote/${encodeURIComponent(label)}`;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Hook: fetch sparkline data from Moneycontrol for indices missing sparklines */
+/* -------------------------------------------------------------------------- */
+function useIndexSparklines(items: MacroRow[]): Record<string, number[]> {
+  const [sparklines, setSparklines] = useState<Record<string, number[]>>({});
+  const fetchedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const missingLabels = items
+      .filter((item) => (!item.sparkline || item.sparkline.length < 2) && !fetchedRef.current.has(item.label))
+      .map((item) => item.label);
+
+    if (missingLabels.length === 0) return;
+
+    missingLabels.forEach((label) => fetchedRef.current.add(label));
+
+    const fetchSparklines = async () => {
+      const results = await Promise.allSettled(
+        missingLabels.map(async (label) => {
+          const res = await fetch(`/api/index-sparkline?label=${encodeURIComponent(label)}`, { cache: 'no-store' });
+          if (!res.ok) return { label, sparkline: [] as number[] };
+          const data = await res.json();
+          return { label, sparkline: (data.sparkline as number[]) ?? [] };
+        })
+      );
+
+      const updates: Record<string, number[]> = {};
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value.sparkline.length >= 2) {
+          updates[result.value.label] = result.value.sparkline;
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        setSparklines((prev) => ({ ...prev, ...updates }));
+      }
+    };
+
+    void fetchSparklines();
+  }, [items]);
+
+  return sparklines;
+}
+
 function getGlobalIndexGradient(label: string): { background: string; border: string } {
   const upper = label.toUpperCase();
   if (upper.includes('DJI') || upper.includes('S&P 500') || upper.includes('NASDAQ') || upper.includes('DOW')) {
@@ -1152,6 +1253,11 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
                 border: gradient.border,
                 minHeight: '80px',
               }}
+              onClick={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
+              onKeyDown={(e) => { if (e.key === 'Enter') window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer'); }}
+              tabIndex={0}
+              role="link"
+              aria-label={`View ${displayLabel} details`}
             >
               <div className="flex-1 min-w-0 z-10">
                 <span className="text-[11px] text-slate-700 block uppercase tracking-wider font-semibold">{displayLabel}</span>
@@ -1161,7 +1267,13 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
                 </span>
               </div>
               <div className="w-16 h-14 flex-shrink-0 relative">
-                <SparklineSVG positive={isPositive} data={item.sparkline} />
+                {item.sparkline && item.sparkline.length >= 2 ? (
+                  <SparklineSVG positive={isPositive} data={item.sparkline} />
+                ) : (
+                  <div className="absolute top-0 right-0 w-full h-full opacity-70">
+                    <MiniSparkline positive={isPositive} />
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -1199,12 +1311,17 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
           return (
             <div
               key={item.label}
-              className="relative overflow-hidden rounded-lg p-2.5 transition-all hover:scale-105 flex items-center gap-2"
+              className="relative overflow-hidden rounded-lg p-2.5 transition-all hover:scale-105 flex items-center gap-2 cursor-pointer"
               style={{
                 background: gradient.background,
                 border: gradient.border,
                 minHeight: '80px',
               }}
+              onClick={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
+              onKeyDown={(e) => { if (e.key === 'Enter') window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer'); }}
+              tabIndex={0}
+              role="link"
+              aria-label={`View ${displayLabel} details`}
             >
               <div className="flex-1 min-w-0 z-10">
                 <span className="text-[11px] text-slate-700 block uppercase tracking-wider font-semibold">{displayLabel}</span>
@@ -1214,7 +1331,13 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
                 </span>
               </div>
               <div className="w-16 h-14 flex-shrink-0 relative">
-                <SparklineSVG positive={isPositive} data={item.sparkline} />
+                {item.sparkline && item.sparkline.length >= 2 ? (
+                  <SparklineSVG positive={isPositive} data={item.sparkline} />
+                ) : (
+                  <div className="absolute top-0 right-0 w-full h-full opacity-70">
+                    <MiniSparkline positive={isPositive} />
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -1557,19 +1680,19 @@ function SparklineSVG({ positive, data }: { positive: boolean; data?: number[] }
   const lastPoint = points[points.length - 1];
 
   return (
-    <svg className="absolute top-0 right-0 w-full h-full opacity-30" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+    <svg className="absolute top-0 right-0 w-full h-full opacity-70" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.4" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.5" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.05" />
         </linearGradient>
       </defs>
       {/* Area fill */}
       <path d={areaD} fill={fillUrl} />
       {/* Line */}
-      <path d={pathD} stroke={color} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={pathD} stroke={color} strokeWidth="3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       {/* End dot */}
-      <circle cx={lastPoint[0]} cy={lastPoint[1]} r="2.5" fill={color} stroke="white" strokeWidth="1" />
+      <circle cx={lastPoint[0]} cy={lastPoint[1]} r="3" fill={color} stroke="white" strokeWidth="1.5" />
     </svg>
   );
 }
@@ -1706,6 +1829,27 @@ export default function IrosMasterAdvancedTerminal() {
   const snapshotAgeMin = liveMarket?.updatedAt ? Math.round((now - new Date(liveMarket.updatedAt).getTime()) / 60000) : null;
   const staleMacroLabel = snapshotAgeMin == null ? "" : `STALE ${snapshotAgeMin}M`;
 
+  /* Fetch sparkline data from Moneycontrol for indices that are missing sparklines */
+  const mcSparklines = useIndexSparklines(currentMacros);
+  const mcGlobalSparklines = useIndexSparklines(globalIndices);
+
+  /* Merge sparkline data into macro rows */
+  const enrichedMacros = useMemo(
+    () => currentMacros.map((item) => ({
+      ...item,
+      sparkline: (item.sparkline && item.sparkline.length >= 2) ? item.sparkline : (mcSparklines[item.label] ?? item.sparkline),
+    })),
+    [currentMacros, mcSparklines]
+  );
+
+  const enrichedGlobalIndices = useMemo(
+    () => globalIndices.map((item) => ({
+      ...item,
+      sparkline: (item.sparkline && item.sparkline.length >= 2) ? item.sparkline : (mcGlobalSparklines[item.label] ?? item.sparkline),
+    })),
+    [globalIndices, mcGlobalSparklines]
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 text-slate-900 font-mono text-xs antialiased">
       <div className="max-w-[1600px] mx-auto p-3 space-y-3">
@@ -1773,12 +1917,12 @@ export default function IrosMasterAdvancedTerminal() {
           <div className="space-y-3">
             {/* Row 1: India Markets — TOP MOVERS */}
             <div className="grid grid-cols-1 gap-3 items-start">
-              <IndiaMarketsGrid items={currentMacros} staleLabel={staleMacroLabel} />
+              <IndiaMarketsGrid items={enrichedMacros} staleLabel={staleMacroLabel} />
             </div>
 
             {/* Row 2: Global Indices */}
             <div>
-              <GlobalIndicesGrid items={globalIndices} staleLabel={staleMacroLabel} />
+              <GlobalIndicesGrid items={enrichedGlobalIndices} staleLabel={staleMacroLabel} />
             </div>
 
             {/* Row 3: Commodities & FX */}
