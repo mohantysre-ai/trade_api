@@ -1478,10 +1478,22 @@ def _select_dynamic_top_stocks(
         return [], ti_payload, None
 
 
-def _build_macro_strips(macro_raw: dict[str, Any]) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
-    morning: list[dict[str, str]] = []
-    evening: list[dict[str, str]] = []
+def _build_macro_strips(macro_raw: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    morning: list[dict[str, Any]] = []
+    evening: list[dict[str, Any]] = []
     seen_labels: set[str] = set()
+
+    # Build a map of label -> Yahoo row (with sparkline data) so we can attach
+    # sparklines to Angle One instrument rows and avoid losing them.
+    yahoo_sparklines: dict[str, list[float]] = {}
+    for row in fetch_domestic_index_macro():
+        sparkline = row.get("sparkline", [])
+        if isinstance(sparkline, list) and len(sparkline) > 1:
+            yahoo_sparklines[row["label"].upper()] = sparkline
+    for row in fetch_domestic_yahoo_macro():
+        sparkline = row.get("sparkline", [])
+        if isinstance(sparkline, list) and len(sparkline) > 1:
+            yahoo_sparklines[row["label"].upper()] = sparkline
 
     for inst in MACRO_INSTRUMENTS:
         quote = macro_raw.get(inst.key)
@@ -1491,27 +1503,31 @@ def _build_macro_strips(macro_raw: dict[str, Any]) -> tuple[list[dict[str, str]]
         close = float(quote.get("close", 0) or ltp)
         delta, state = _pct_change(ltp, close if close else None)
         label = inst.label or inst.key
-        morning.append({"label": label, "val": f"{ltp:,.2f}", "delta": delta, "state": state})
-        evening.append({"label": f"{label} Close", "val": f"{ltp:,.2f}", "delta": delta, "state": state})
-        seen_labels.add(label.upper())
+        # Attach sparkline from Yahoo if available for this label
+        label_upper = label.upper()
+        sparkline = yahoo_sparklines.get(label_upper, [])
+        morning.append({"label": label, "val": f"{ltp:,.2f}", "delta": delta, "state": state, "sparkline": sparkline})
+        evening.append({"label": f"{label} Close", "val": f"{ltp:,.2f}", "delta": delta, "state": state, "sparkline": sparkline})
+        seen_labels.add(label_upper)
 
     for row in fetch_domestic_index_macro():
         label = str(row["label"])
         if label.upper() in seen_labels:
             continue
-        morning.append({k: row[k] for k in ("label", "val", "delta", "state")})
-        evening.append({"label": f"{row['label']} Close", "val": row["val"], "delta": row["delta"], "state": row["state"]})
+        morning.append({k: row.get(k) for k in ("label", "val", "delta", "state", "sparkline")})
+        evening.append({"label": f"{row['label']} Close", "val": row["val"], "delta": row["delta"], "state": row["state"], "sparkline": row.get("sparkline", [])})
         seen_labels.add(label.upper())
 
     for row in fetch_domestic_yahoo_macro():
-        morning.append({k: row[k] for k in ("label", "val", "delta", "state")})
-        evening.append({"label": f"{row['label']} Close", "val": row["val"], "delta": row["delta"], "state": row["state"]})
+        morning.append({k: row.get(k) for k in ("label", "val", "delta", "state", "sparkline")})
+        evening.append({"label": f"{row['label']} Close", "val": row["val"], "delta": row["delta"], "state": row["state"], "sparkline": row.get("sparkline", [])})
 
-    # GIFT NIFTY from NSE India API
+    # GIFT NIFTY from NSE India API (has no sparkline data, so default to [])
     gift_nifty = fetch_gift_nifty()
     if gift_nifty and gift_nifty["label"].upper() not in seen_labels:
-        morning.append({k: gift_nifty[k] for k in ("label", "val", "delta", "state")})
-        evening.append({"label": f"{gift_nifty['label']} Close", "val": gift_nifty["val"], "delta": gift_nifty["delta"], "state": gift_nifty["state"]})
+        gs = gift_nifty.get("sparkline", []) or []
+        morning.append({"label": gift_nifty["label"], "val": gift_nifty["val"], "delta": gift_nifty["delta"], "state": gift_nifty["state"], "sparkline": gs})
+        evening.append({"label": f"{gift_nifty['label']} Close", "val": gift_nifty["val"], "delta": gift_nifty["delta"], "state": gift_nifty["state"], "sparkline": gs})
         seen_labels.add(gift_nifty["label"].upper())
 
     return morning, evening

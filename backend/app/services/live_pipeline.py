@@ -16,7 +16,6 @@ it will work — it's a plain http.client POST like the one you shared.
 import http.client
 import json
 import time
-from .feed_scanner import scan_feed
 
 HOST = "ow-scanx-analytics.dhan.co"
 PATH = "/customscan/fetchdt"
@@ -102,18 +101,22 @@ if __name__ == "__main__":
         print(" Run this script in your own environment where angel_one_feed.py runs.)")
         raise SystemExit(1)
 
+    from .feed_scanner import scan_feed_prob
+
     payload = {"data": rows}
     print(f"\nTotal stocks pulled: {len(rows)}\n")
 
+    MIN_PROBABILITY = 0.35  # tune this: lower = wider funnel, higher = stricter
+
     for direction in ("LONG", "SHORT"):
-        print(f"=== {direction} candidates ===")
-        hits = scan_feed(payload, direction=direction, top_n=15)
+        print(f"=== {direction} candidates (P >= {MIN_PROBABILITY}) ===")
+        hits = scan_feed_prob(payload, direction=direction, top_n=15, min_probability=MIN_PROBABILITY)
         if not hits:
-            print("  No candidates passed the filter.\n")
+            print("  No candidates cleared the probability floor.\n")
             continue
         for r in hits:
             print(f"  {r.symbol:12s} ({r.name})")
-            print(f"     Entry {r.entry}  Stop {r.stop_loss}  Target {r.target}  Risk/share {r.risk_per_share}  Score {r.score}")
+            print(f"     Entry {r.entry}  Stop {r.stop_loss}  Target {r.target}  Risk/share {r.risk_per_share}  P(setup)={r.score:.2f}")
             for reason in r.reasons:
                 print(f"       - {reason}")
         print()
