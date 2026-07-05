@@ -159,7 +159,7 @@ async def ticker_news_batch_check(payload: dict[str, Any]):  # type: ignore[misc
                         include_raw=include_raw,
                     )
                     report_dict = report.to_dict()
-                    _set_cache(t, report_dict)
+                    set_cached_summary(t, report_dict)
                     report_dict["cached"] = False
                     report_dict["needs_refresh"] = False
                     return t.upper(), report_dict
