@@ -47,65 +47,21 @@ const SENTIMENT_STYLES = {
 
 const IMPACT_WIDTH = { high: "w-1.5", medium: "w-1", low: "w-0.5" };
 
-const SEED_STORIES = [
-  {
-    id: "s1", time: "2m", source: "Reuters India", sentiment: "bullish", impact: "high", score: 78,
-    headline: "HCL Technologies beats Street estimates, guidance revision lifts IT pack",
-    snippet: "Q1 revenue growth of 8.2% YoY beat consensus by 140bps; management raised FY guidance citing deal pipeline strength.",
-    tickers: [{ sym: "HCLTECH", delta: 5.74 }, { sym: "TECHM", delta: 1.57 }, { sym: "WIPRO", delta: 1.03 }],
-  },
-  {
-    id: "s2", time: "6m", source: "CNBC-TV18", sentiment: "bearish", impact: "high", score: -84,
-    headline: "PowerIndia tumbles on large order cancellation from state utility",
-    snippet: "Client cited execution delays; brokerages flag near-term revenue visibility risk pending management clarification.",
-    tickers: [{ sym: "POWERINDIA", delta: -8.08 }],
-  },
-  {
-    id: "s3", time: "11m", source: "Moneycontrol", sentiment: "bullish", impact: "medium", score: 41,
-    headline: "Aurobindo Pharma gets USFDA nod for key oncology generic",
-    snippet: "Approval opens a ~$400M addressable US market; launch timeline still pending pricing strategy.",
-    tickers: [{ sym: "AUROPHARMA", delta: 3.37 }],
-  },
-  {
-    id: "s4", time: "18m", source: "PTI", sentiment: "neutral", impact: "low", score: 6,
-    headline: "RBI keeps repo rate unchanged, tone stays data-dependent",
-    snippet: "MPC statement largely in line with expectations; bond yields flat, banking names show muted reaction.",
-    tickers: [{ sym: "HDFCBANK", delta: 0.70 }, { sym: "ICICIBANK", delta: 0.91 }, { sym: "SBILIFE", delta: 0.31 }],
-  },
-  {
-    id: "s5", time: "24m", source: "Economic Times", sentiment: "bearish", impact: "medium", score: -37,
-    headline: "CG Power slides as promoter pledge disclosure raises governance flags",
-    snippet: "Exchange filing shows increased pledged holding; no comment yet from company on repayment plans.",
-    tickers: [{ sym: "CGPOWER", delta: -4.62 }],
-  },
-  {
-    id: "s6", time: "31m", source: "Bloomberg Quint", sentiment: "bullish", impact: "low", score: 22,
-    headline: "Adani Enterprises unit signs MoU for green hydrogen pilot plant",
-    snippet: "Early-stage agreement, capex undisclosed; market treating as long-dated optionality rather than near-term catalyst.",
-    tickers: [{ sym: "ADANIENT", delta: 1.02 }],
-  },
-  {
-    id: "s7", time: "39m", source: "Reuters India", sentiment: "bearish", impact: "high", score: -69,
-    headline: "Union Bank of India drops on unexpected NPA slippage in SME book",
-    snippet: "Q1 asset quality commentary missed expectations; management call scheduled for later today.",
-    tickers: [{ sym: "UNIONBANK", delta: -3.70 }, { sym: "PNB", delta: -1.52 }],
-  },
-];
+// Live data comes from /api/pulse-feed (Next.js route -> ai_news_server.py
+// -> PulseNewsCollector, which scrapes pulse.zerodha.com). See fetchStories()
+// below. POLL_INTERVAL_MS controls how often we re-poll; the backend caches
+// Pulse scrapes for 5 minutes server-side, so polling faster than that just
+// re-serves the same cached batch -- that's fine, it's what lets us detect
+// "new since last poll" stories without a websocket.
+const POLL_INTERVAL_MS = 30_000;
 
-const QUEUE = [
-  {
-    id: "q1", time: "just now", source: "CNBC-TV18", sentiment: "bullish", impact: "medium", score: 55,
-    headline: "Sun Pharma gains on positive Phase III trial readout",
-    snippet: "Trial met primary endpoint; regulatory filing expected within two quarters per management commentary.",
-    tickers: [{ sym: "SUNPHARMA", delta: 1.92 }],
-  },
-  {
-    id: "q2", time: "just now", source: "Moneycontrol", sentiment: "neutral", impact: "low", score: -4,
-    headline: "Nifty IT index flat as rupee holds steady against dollar",
-    snippet: "Currency stability offsetting margin pressure narrative; sector rotation muted through the session.",
-    tickers: [{ sym: "INFY", delta: 0.60 }, { sym: "TCS", delta: 0.96 }],
-  },
-];
+async function fetchStories() {
+  const res = await fetch("/api/pulse-feed?limit=30", { cache: "no-store" });
+  if (!res.ok) throw new Error(`pulse-feed responded ${res.status}`);
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || "pulse-feed request failed");
+  return { stories: data.stories || [], offline: Boolean(data.offline) };
+}
 
 function TickerChip({ sym, delta }) {
   const positive = delta >= 0;
@@ -161,7 +117,7 @@ function StoryCard({ story, isNew }) {
       <div className="flex-1 px-4 py-3">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-[11px] tracking-wide text-zinc-500" style={{ fontFamily: FONT.mono }}>
-            {story.time.toUpperCase() === "JUST NOW" ? story.time : `${story.time} AGO`}
+            {["JUST NOW", "RECENT", "NOW"].includes(story.time.toUpperCase()) ? story.time : `${story.time} AGO`}
           </span>
           <span className="text-zinc-700">·</span>
           <span className="text-[11px] text-zinc-500" style={{ fontFamily: FONT.mono }}>{story.source}</span>
@@ -208,30 +164,64 @@ function FilterPill({ active, onClick, children }) {
 }
 
 export default function NewsWire() {
-  const [stories, setStories] = useState(SEED_STORIES);
+  const [stories, setStories] = useState([]);
   const [newIds, setNewIds] = useState(new Set());
   const [sentimentFilter, setSentimentFilter] = useState("all");
   const [impactFilter, setImpactFilter] = useState("all");
   const [query, setQuery] = useState("");
-  const [syncTime, setSyncTime] = useState(new Date());
-  const queueRef = useRef([...QUEUE]);
+  const [syncTime, setSyncTime] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [offline, setOffline] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+  const knownIdsRef = useRef(new Set());
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (queueRef.current.length === 0) return;
-      const next = queueRef.current.shift();
-      setStories((prev) => [next, ...prev]);
-      setNewIds((prev) => new Set(prev).add(next.id));
-      setSyncTime(new Date());
-      setTimeout(() => {
-        setNewIds((prev) => {
-          const copy = new Set(prev);
-          copy.delete(next.id);
-          return copy;
-        });
-      }, 1800);
-    }, 9000);
-    return () => clearInterval(interval);
+    let cancelled = false;
+
+    async function poll() {
+      try {
+        const { stories: fetched, offline: isOffline } = await fetchStories();
+        if (cancelled) return;
+
+        const freshIds = fetched
+          .map((s) => s.id)
+          .filter((id) => !knownIdsRef.current.has(id));
+
+        setStories(fetched);
+        setOffline(isOffline);
+        setLoadError(null);
+        setSyncTime(new Date());
+        setLoading(false);
+
+        if (freshIds.length > 0 && knownIdsRef.current.size > 0) {
+          setNewIds((prev) => {
+            const copy = new Set(prev);
+            freshIds.forEach((id) => copy.add(id));
+            return copy;
+          });
+          setTimeout(() => {
+            if (cancelled) return;
+            setNewIds((prev) => {
+              const copy = new Set(prev);
+              freshIds.forEach((id) => copy.delete(id));
+              return copy;
+            });
+          }, 1800);
+        }
+        fetched.forEach((s) => knownIdsRef.current.add(s.id));
+      } catch (err) {
+        if (cancelled) return;
+        setLoading(false);
+        setLoadError(err.message || "Failed to load news feed");
+      }
+    }
+
+    poll();
+    const interval = setInterval(poll, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   const filtered = stories.filter((s) => {
@@ -259,15 +249,21 @@ export default function NewsWire() {
               IROS WIRE
             </span>
           </div>
-          <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium" style={{ fontFamily: FONT.mono }}>
+          <span
+            className={`flex items-center gap-1.5 text-xs font-medium ${offline || loadError ? "text-amber-400" : "text-emerald-400"}`}
+            style={{ fontFamily: FONT.mono }}
+          >
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              {!offline && !loadError && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              )}
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${offline || loadError ? "bg-amber-500" : "bg-emerald-500"}`} />
             </span>
-            LIVE
+            {offline || loadError ? "OFFLINE" : "LIVE"}
           </span>
           <span className="ml-auto text-xs text-zinc-500" style={{ fontFamily: FONT.mono }}>
-            {stories.length} stories · synced {syncTime.toLocaleTimeString("en-IN", { hour12: false })} IST
+            {stories.length} stories
+            {syncTime ? ` · synced ${syncTime.toLocaleTimeString("en-IN", { hour12: false })} IST` : ""}
           </span>
         </div>
 
@@ -298,7 +294,29 @@ export default function NewsWire() {
 
       {/* Feed */}
       <div className="max-w-3xl mx-auto px-4 py-4 flex flex-col gap-3">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col gap-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex bg-zinc-900 border border-zinc-800 rounded-md overflow-hidden animate-pulse">
+                <div className="w-1 bg-zinc-800 shrink-0" />
+                <div className="flex-1 px-4 py-3 space-y-2">
+                  <div className="h-3 w-24 bg-zinc-800 rounded" />
+                  <div className="h-4 w-3/4 bg-zinc-800 rounded" />
+                  <div className="h-3 w-full bg-zinc-800 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : loadError ? (
+          <div className="text-center py-16 text-zinc-500">
+            <p style={{ fontFamily: FONT.display, fontSize: "16px" }} className="text-amber-400">
+              Couldn't reach the news feed.
+            </p>
+            <p className="text-sm mt-1" style={{ fontFamily: FONT.body }}>
+              {loadError} — retrying every {Math.round(POLL_INTERVAL_MS / 1000)}s.
+            </p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-zinc-500">
             <p style={{ fontFamily: FONT.display, fontSize: "16px" }}>No stories match this filter.</p>
             <p className="text-sm mt-1" style={{ fontFamily: FONT.body }}>

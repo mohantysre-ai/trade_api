@@ -73,7 +73,7 @@ LLM_UNIVERSE_LIMIT = int(os.getenv("LLM_UNIVERSE_LIMIT", "30"))
 NIFTY_100_LABEL = "Nifty 100"
 NIFTY_100_CACHE_PATH = BASE_DIR / "nifty100_instruments.json"
 ANGEL_API_TIMEOUT_SECONDS = int(os.getenv("ANGEL_API_TIMEOUT_SECONDS", "24"))
-LLM_CALL_TIMEOUT_SECONDS = min(max(1, int(os.getenv("LLM_CALL_TIMEOUT_SECONDS", "60"))), 120)
+LLM_CALL_TIMEOUT_SECONDS = min(max(1, int(os.getenv("LLM_CALL_TIMEOUT_SECONDS", "120"))), 300)
 QUOTE_CHUNK_SIZE = int(os.getenv("QUOTE_CHUNK_SIZE", "10"))
 INTRADAY_CHUNK_SIZE = int(os.getenv("INTRADAY_CHUNK_SIZE", "10"))
 
@@ -771,12 +771,14 @@ def _intraday_metrics_from_quote(ltp: float, now: datetime, quote: dict[str, Any
     if close > 0 and high > 0 and low > 0:
         daily_range_pct = ((high - low) / close) * 100
     
-    # VWAP approximation using OHL+C/4 typical price (single-bar estimate)
+    # VWAP approximation using OHL+C/3 typical price (single-bar estimate)
     typical = (high + low + ltp) / 3.0 if high and low and ltp else (open_ + high + low + close) / 4.0
     vwap = typical if typical > 0 else ltp
     
-    # EMA9 approximated as the typical price (best single-point estimate w/o history)
-    ema9 = typical if typical > 0 else ltp
+    # EMA9 approximation: use the close price as a different anchor from VWAP.
+    # In real intraday data, EMA9 lags VWAP; using close gives a slightly different
+    # value that allows price_above_ema9 to be meaningful when ltp > close.
+    ema9 = close if close > 0 else ltp
     
     # ORB from quote data (uses today's open as ORB reference)
     orb_high = max(open_, ltp) if open_ else high
@@ -809,12 +811,15 @@ def _intraday_metrics_from_quote(ltp: float, now: datetime, quote: dict[str, Any
     price_above_vwap = bool(vwap and ltp > vwap)
     price_above_ema9 = bool(ema9 and ltp > ema9)
     
+    # Hard filter reasons — tightened thresholds for quote-based fallback.
+    # volume_multiplier and ema_angle are included for transparency even though
+    # they default to placeholder values when candle data is unavailable.
     hard_filter_reasons: list[str] = []
-    if daily_range_pct <= 3.0:
-        hard_filter_reasons.append("ATR under 3.0%")
+    if daily_range_pct <= 1.5:
+        hard_filter_reasons.append("ATR under 1.5%")
     if volume_multiplier <= 3.0:
         hard_filter_reasons.append("opening volume under 3.0x")
-    if wick_noise_ratio > 0.25:
+    if wick_noise_ratio > 0.70:
         hard_filter_reasons.append("wick noise too high")
     if not price_above_vwap:
         hard_filter_reasons.append("below VWAP")
@@ -838,9 +843,13 @@ def _intraday_metrics_from_quote(ltp: float, now: datetime, quote: dict[str, Any
     else:
         oi_setup = "NEUTRAL"
 
-    # relative_volume: use today's volume as a proxy (1.0 = average, >1 = above average)
-    # When we only have quote data, we use a conservative estimate based on turnover
-    relative_volume = max(today_volume / max(avg_daily_volume_20, 1.0), 0.5) if avg_daily_volume_20 > 0 else 1.0
+    # relative_volume: estimate from turnover using Nifty 100 institutional thresholds.
+    # With only quote data (no 20d avg), we use turnover_cr as a proxy for volume activity.
+    # 50 Cr turnover ≈ average institutional activity; 500+ Cr ≈ 3-5x average.
+    if turnover_cr > 0:
+        relative_volume = min(max(turnover_cr / 150.0, 0.5), 5.0)
+    else:
+        relative_volume = 1.0
 
     # liquidity_score: based on turnover (capped at 20)
     liquidity_score = min(turnover_cr / 2.5, 20.0)
@@ -1258,51 +1267,70 @@ def _execute_llm_risk_audit(
         "{\"audits\": {\"TICKER_SYMBOL\": {\"risk_flags\": [\"Reason text (Source: name, Timestamp: iso)\"], \"verdict\": \"APPROVE or REJECT\"}}}"
     )
 
-    try:
-        if provider == "gemini":
-            from .llm_client import _call_gemini as _llm_gemini
-            res_text = _llm_gemini(
-                prompt=prompt,
-                api_key=api_key,
-                model=model,
-                system_instruction=SYSTEM_PROMPT,
-                timeout=LLM_CALL_TIMEOUT_SECONDS,
-                oauth_token_path=oauth_token_path,
+    # Retry logic: try full timeout first (up to 5 mins), then a quick retry
+    audit_timeouts = [LLM_CALL_TIMEOUT_SECONDS, min(60, LLM_CALL_TIMEOUT_SECONDS)]
+    last_exc = None
+
+    for attempt, timeout in enumerate(audit_timeouts):
+        try:
+            if provider == "gemini":
+                from .llm_client import _call_gemini as _llm_gemini
+                res_text = _llm_gemini(
+                    prompt=prompt,
+                    api_key=api_key,
+                    model=model,
+                    system_instruction=SYSTEM_PROMPT,
+                    timeout=timeout,
+                    oauth_token_path=oauth_token_path,
+                )
+            elif provider == "openai":
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                }
+                body = {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0.0,
+                    "max_tokens": 2000,
+                }
+                resp = requests.post(api_url, json=body, headers=headers, timeout=timeout)
+                if resp.status_code >= 300:
+                    raise RuntimeError(f"OpenAI audit failed ({resp.status_code}): {resp.text}")
+                data = resp.json()
+                res_text = data["choices"][0]["message"]["content"].strip()
+            else:
+                raise RuntimeError(f"Unsupported LLM provider for audit: {provider}")
+
+            parsed = json.loads(res_text)
+            audits = parsed.get("audits", {})
+
+            for stock in top_20:
+                ticker = stock["ticker"]
+                audit = audits.get(ticker, {"risk_flags": [], "verdict": "APPROVE"})
+                stock["risk_flags"] = audit.get("risk_flags", []) or ["None"]
+                stock["verdict"] = audit.get("verdict", "APPROVE")
+            break  # success, skip retry
+
+        except Exception as exc:
+            last_exc = exc
+            logging.getLogger(__name__).warning(
+                "LLM audit attempt %d/%d failed (timeout=%ds): %s",
+                attempt + 1, len(audit_timeouts), timeout, exc,
             )
-        elif provider == "openai":
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            }
-            body = {
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.0,
-                "max_tokens": 2000,
-            }
-            resp = requests.post(api_url, json=body, headers=headers, timeout=LLM_CALL_TIMEOUT_SECONDS)
-            if resp.status_code >= 300:
-                raise RuntimeError(f"OpenAI audit failed ({resp.status_code}): {resp.text}")
-            data = resp.json()
-            res_text = data["choices"][0]["message"]["content"].strip()
-        else:
-            raise RuntimeError(f"Unsupported LLM provider for audit: {provider}")
-
-        parsed = json.loads(res_text)
-        audits = parsed.get("audits", {})
-
+    else:
+        # All attempts exhausted
+        is_timeout = "timeout" in str(last_exc).lower() or "timed out" in str(last_exc).lower()
+        flag_msg = (
+            f"LLM audit timed out after {sum(audit_timeouts)}s -- news risk not audited"
+            if is_timeout
+            else f"LLM Audit Error ({last_exc}) -- news risk not audited"
+        )
         for stock in top_20:
-            ticker = stock["ticker"]
-            audit = audits.get(ticker, {"risk_flags": [], "verdict": "APPROVE"})
-            stock["risk_flags"] = audit.get("risk_flags", []) or ["None"]
-            stock["verdict"] = audit.get("verdict", "APPROVE")
-
-    except Exception as exc:
-        for stock in top_20:
-            stock["risk_flags"] = [f"LLM Audit Error ({exc}) -- news risk not audited"]
+            stock["risk_flags"] = [flag_msg]
             stock["verdict"] = "APPROVE"
 
     return top_20

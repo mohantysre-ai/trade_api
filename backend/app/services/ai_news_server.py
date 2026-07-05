@@ -37,10 +37,15 @@ else:
     logger.warning("No .env found at %s — LLM summarization disabled", _env_path)
 
 try:
-    from .ai_ticker_news import generate_ticker_news_report
+    from .ai_ticker_news import generate_ticker_news_report, PulseNewsCollector
 except ImportError:
     # Fallback if running from project root
-    from app.services.ai_ticker_news import generate_ticker_news_report
+    from app.services.ai_ticker_news import generate_ticker_news_report, PulseNewsCollector
+
+try:
+    from ..utils.symbols import WATCHLIST
+except ImportError:
+    from app.utils.symbols import WATCHLIST
 
 logging.basicConfig(
     level=logging.INFO,
@@ -265,6 +270,210 @@ async def ticker_news(
             "summary_headline": f"Failed to fetch news for {ticker}.",
             "error_detail": str(e),
         }
+
+
+# ---------------------------------------------------------------------------
+# Pulse feed — general market news for NewsWire.jsx (not per-ticker)
+# ---------------------------------------------------------------------------
+# NewsWire.jsx was previously rendering a hardcoded SEED_STORIES array.
+# This endpoint replaces that with real Zerodha Pulse headlines, reusing
+# the same PulseNewsCollector the per-ticker report already relies on
+# (symbols=None => no ticker filter => general market feed instead of
+# one company's news).
+#
+# Sentiment/impact here are RULE-BASED (keyword scoring), not an LLM
+# call per headline. That's a deliberate choice: NewsWire polls this
+# endpoint every ~30s for a live-feed feel, and running Gemini on every
+# headline on every poll would be slow and burn quota for what's meant
+# to be a fast scanning tape. The per-ticker /api/ticker-news endpoint
+# above already does the deeper LLM-structured analysis when the user
+# drills into a specific stock -- this feed is the fast triage layer,
+# not a replacement for it.
+
+_BULLISH_WORDS = {
+    "beats": 30, "beat estimates": 35, "surges": 30, "surge": 28, "rallies": 28,
+    "jumps": 25, "gains": 18, "upgrade": 30, "upgraded": 30, "wins order": 32,
+    "wins contract": 32, "record profit": 35, "record high": 28, "approval": 25,
+    "nod": 20, "raises guidance": 32, "raised guidance": 32, "outperform": 25,
+    "buyback": 20, "expansion": 15, "strong demand": 22, "beats street": 32,
+    "profit jumps": 30, "profit rises": 25, "revenue growth": 18, "bullish": 22,
+}
+_BEARISH_WORDS = {
+    "tumbles": 30, "crashes": 35, "plunges": 32, "slides": 22, "slips": 18,
+    "downgrade": 30, "downgraded": 30, "misses estimates": 32, "miss estimates": 30,
+    "cancellation": 28, "cancels order": 30, "probe": 28, "fraud": 35, "raid": 30,
+    "resigns": 22, "resignation": 22, "npa": 22, "slippage": 25, "governance": 15,
+    "pledge": 18, "delay": 15, "weak guidance": 28, "cuts guidance": 30,
+    "profit falls": 28, "loss widens": 30, "bearish": 22, "sell-off": 25,
+    "selloff": 25, "scam": 32,
+}
+
+_TICKER_PATTERN_CACHE: dict[str, "re.Pattern"] = {}
+
+
+def _ticker_regex(sym: str):
+    import re as _re
+    pat = _TICKER_PATTERN_CACHE.get(sym)
+    if pat is None:
+        pat = _re.compile(rf"\b{_re.escape(sym)}\b", _re.IGNORECASE)
+        _TICKER_PATTERN_CACHE[sym] = pat
+    return pat
+
+
+# Headlines say "HCL Technologies", not "HCLTECH" -- matching WATCHLIST
+# ticker symbols alone misses most real-world Pulse headlines. This maps
+# common company display names to the WATCHLIST key so extraction
+# actually fires. NOT exhaustive -- covers the current WATCHLIST universe
+# only; extend as you add instruments. A headline mentioning a company
+# not in WATCHLIST or not in this alias map simply won't get a ticker
+# chip, same as before -- this narrows the gap, it doesn't close it.
+_COMPANY_ALIASES: dict[str, str] = {
+    "reliance industries": "RELIANCE", "tata consultancy": "TCS",
+    "hcl technologies": "HCLTECH", "hdfc bank": "HDFCBANK",
+    "icici bank": "ICICIBANK", "kotak mahindra": "KOTAKBANK",
+    "state bank of india": "SBIN", "larsen & toubro": "LT",
+    "larsen and toubro": "LT", "bharti airtel": "BHARTIARTL",
+    "hindustan unilever": "HINDUNILVR", "maruti suzuki": "MARUTI",
+    "bajaj finance": "BAJFINANCE", "bajaj finserv": "BAJAJFINSV",
+    "nestle india": "NESTLEIND", "sun pharma": "SUNPHARMA",
+    "hindustan aeronautics": "HAL", "bharat electronics": "BEL",
+    "coal india": "COALINDIA", "dr reddy": "DRREDDY", "dr. reddy": "DRREDDY",
+    "asian paints": "ASIANPAINT", "ultratech cement": "ULTRACEMCO",
+    "tech mahindra": "TECHM", "godrej properties": "GODREJPROP",
+    "tata elxsi": "TATAELXSI", "power grid": "POWERGRID",
+}
+
+
+def _classify_sentiment(text: str) -> tuple[str, int]:
+    """Keyword-weighted sentiment score in [-100, 100]. Returns
+    (bucket, score) where bucket is bullish/bearish/neutral."""
+    lowered = text.lower()
+    score = 0
+    for phrase, weight in _BULLISH_WORDS.items():
+        if phrase in lowered:
+            score += weight
+    for phrase, weight in _BEARISH_WORDS.items():
+        if phrase in lowered:
+            score -= weight
+    score = max(-100, min(100, score))
+    if score >= 12:
+        bucket = "bullish"
+    elif score <= -12:
+        bucket = "bearish"
+    else:
+        bucket = "neutral"
+    return bucket, score
+
+
+def _classify_impact(num_tickers: int, score: int) -> str:
+    if abs(score) >= 55 or num_tickers >= 3:
+        return "high"
+    if abs(score) >= 22 or num_tickers >= 1:
+        return "medium"
+    return "low"
+
+
+def _load_snapshot_deltas() -> dict[str, float]:
+    """Best-effort read of the live snapshot cache written by
+    angel_one_feed.py, so ticker chips can show a real intraday delta%
+    instead of a placeholder. Returns {} if the snapshot is missing or
+    stale-format -- callers must handle empty deltas gracefully."""
+    snapshot_path = Path(__file__).resolve().parent / "last_market_snapshot.json"
+    deltas: dict[str, float] = {}
+    try:
+        with open(snapshot_path, "r") as f:
+            data = json.load(f)
+        quotes = data.get("stockQuotes", {})
+        items = quotes.items() if isinstance(quotes, dict) else []
+        for sym, q in items:
+            raw = str(q.get("delta", "")).replace("%", "").replace("+", "").strip()
+            try:
+                deltas[sym.upper()] = float(raw)
+            except ValueError:
+                continue
+    except Exception:
+        logger.debug("No usable snapshot at %s for pulse-feed ticker deltas", snapshot_path)
+    return deltas
+
+
+def _extract_tickers(headline: str, deltas: dict[str, float]) -> list[dict[str, Any]]:
+    found_keys: list[str] = []
+    lowered = headline.lower()
+
+    # 1. Raw ticker symbol appearing literally (SBIN, TCS, ITC, etc.)
+    for inst in WATCHLIST:
+        if _ticker_regex(inst.key).search(headline):
+            found_keys.append(inst.key)
+
+    # 2. Full company name appearing instead of the ticker (the common case)
+    for alias, key in _COMPANY_ALIASES.items():
+        if alias in lowered and key not in found_keys:
+            found_keys.append(key)
+
+    hits = [
+        {"sym": key, "delta": deltas.get(key.upper(), 0.0)}
+        for key in found_keys[:4]
+    ]
+    return hits
+
+
+def _clean_time_label(raw: str) -> str:
+    """Pulse's scraped timestamp text is whatever was in the nearest
+    <span> on the page (often already 'X mins ago' / 'X hours ago' /
+    a date). Strip a trailing ' ago' so NewsWire's own '... AGO' suffix
+    doesn't double up; fall back to 'recent' if the field is unusable
+    (e.g. it grabbed an ISO string or empty text)."""
+    if not raw:
+        return "recent"
+    cleaned = raw.strip()
+    if cleaned.lower().endswith(" ago"):
+        cleaned = cleaned[: -len(" ago")].strip()
+    if len(cleaned) > 24 or "T" in cleaned and ":" in cleaned and "-" in cleaned:
+        return "recent"  # looks like a raw ISO timestamp, not a display string
+    return cleaned or "recent"
+
+
+@app.get("/api/pulse-feed")
+async def pulse_feed(
+    limit: int = Query(30, ge=1, le=50, description="Max stories to return"),
+):
+    """General market news feed for NewsWire.jsx, sourced from Zerodha
+    Pulse via the existing PulseNewsCollector (symbols=None => no
+    ticker filter, i.e. the general tape rather than one company)."""
+    try:
+        collector = PulseNewsCollector()
+        articles = await collector.fetch_latest_news(symbols=None)
+    except Exception as e:
+        logger.error("Pulse feed fetch failed: %s", e)
+        return {"stories": [], "count": 0, "error": True, "message": str(e)}
+
+    deltas = _load_snapshot_deltas()
+    stories = []
+    for a in articles[:limit]:
+        sentiment, score = _classify_sentiment(f"{a.title} {a.summary}")
+        tickers = _extract_tickers(a.title, deltas)
+        impact = _classify_impact(len(tickers), score)
+        stories.append({
+            "id": f"pulse-{abs(hash(a.url or a.title)) % (10 ** 10)}",
+            "time": _clean_time_label(a.published_at),
+            "source": a.source,
+            "sentiment": sentiment,
+            "impact": impact,
+            "score": score,
+            "headline": a.title,
+            "snippet": a.summary,
+            "url": a.url,
+            "tickers": tickers,
+        })
+
+    return {
+        "stories": stories,
+        "count": len(stories),
+        "error": False,
+        "generated_at": __import__("datetime").datetime.now(
+            __import__("datetime").timezone.utc
+        ).isoformat(),
+    }
 
 
 if __name__ == "__main__":
