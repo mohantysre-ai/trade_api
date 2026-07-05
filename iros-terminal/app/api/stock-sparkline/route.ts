@@ -44,7 +44,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "ticker param required", sparkline: [] }, { status: 400 });
     }
 
-    const identifier = ticker.toUpperCase().trim();
+    const identifier = `${ticker.toUpperCase().trim()}EQN`;
     const cookies = await getNseCookies();
 
     const nseUrl = `https://www.nseindia.com/api/NextApi/apiClient/marketWatchApi?functionName=getSymbolgraphData&&identifier=${encodeURIComponent(identifier)}&flag=${encodeURIComponent(flag)}`;
@@ -76,8 +76,10 @@ export async function GET(request: Request) {
 
     const sparkline: number[] = [];
     for (const point of graphData) {
-      if (point && typeof point === "object") {
-        const val = point.value ?? point.close ?? point.lastPrice ?? point.ltp ?? point.price;
+      if (Array.isArray(point) && point.length >= 2 && typeof point[1] === 'number') {
+        sparkline.push(point[1]);
+      } else if (point && typeof point === "object") {
+        const val = (point as Record<string, unknown>).value ?? (point as Record<string, unknown>).close ?? (point as Record<string, unknown>).lastPrice ?? (point as Record<string, unknown>).ltp ?? (point as Record<string, unknown>).price;
         if (typeof val === "number") {
           sparkline.push(val);
         } else if (typeof val === "string") {
@@ -93,7 +95,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "No chart data available", sparkline: [], graphData }, { status: 200 });
     }
 
-    return NextResponse.json({ sparkline, ticker: identifier, flag, graphData });
+    return NextResponse.json({ sparkline, ticker: identifier.replace('EQN', ''), flag, graphData });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message, sparkline: [] }, { status: 200 });

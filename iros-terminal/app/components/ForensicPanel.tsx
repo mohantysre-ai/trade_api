@@ -1,7 +1,187 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import type { MarketDataResponse, TerminalIntelligence, LiveStock } from '@/lib/market-api';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import type { MarketDataResponse, TerminalIntelligence, LiveStock, SparkFlag } from '@/lib/market-api';
+import { fetchNseSparkline } from '@/lib/market-api';
+
+/* ── Sparkline: real price data from NSE India ─────────────────────────── */
+const SPARK_FLAGS: SparkFlag[] = ['1D', '1M', '1Y'];
+
+let assetSparkIdCounter = 0;
+
+function StockSparklineSVG({ data }: { data: number[] }) {
+  const [id] = useState(() => `asset-spk-${++assetSparkIdCounter}`);
+  if (!data || data.length < 2) return null;
+
+  const first = data[0];
+  const last = data[data.length - 1];
+  const positive = last >= first;
+  const color = positive ? '#10b981' : '#ef4444';
+
+  const W = 100;
+  const H = 32;
+  const pad = 2;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+
+  const points = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (W - pad * 2);
+    const y = pad + (1 - (v - min) / range) * (H - pad * 2);
+    return [x, y] as const;
+  });
+
+  const pathD = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+  const areaD = `${pathD} L ${points[points.length - 1][0].toFixed(2)},${H} L ${points[0][0].toFixed(2)},${H} Z`;
+  const lastPt = points[points.length - 1];
+
+  /* min/max labels */
+  const minIdx = data.indexOf(Math.min(...data));
+  const maxIdx = data.indexOf(Math.max(...data));
+
+  return (
+    <svg className="w-full h-8 opacity-85" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={areaD} fill={`url(#${id})`} />
+      <path d={pathD} stroke={color} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      {/* High dot */}
+      <circle cx={points[maxIdx][0]} cy={points[maxIdx][1]} r="1.5" fill={color} stroke="white" strokeWidth="0.8" opacity="0.6" />
+      {/* Low dot */}
+      <circle cx={points[minIdx][0]} cy={points[minIdx][1]} r="1.5" fill={color} stroke="white" strokeWidth="0.8" opacity="0.6" />
+      {/* End dot */}
+      <circle cx={lastPt[0]} cy={lastPt[1]} r="2" fill={color} stroke="white" strokeWidth="1" />
+    </svg>
+  );
+}
+
+function useStockSparklines(tickers: string[], flag: SparkFlag): Record<string, Record<SparkFlag, number[]>> {
+  const [sparklines, setSparklines] = useState<Record<string, Record<SparkFlag, number[]>>>({});
+  const fetchedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const key = `__flag_${flag}`;
+    const missing = tickers.filter((t) => t && !fetchedRef.current.has(`${t}:${flag}`));
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+
+    const fetchAll = async () => {
+      const results = await Promise.allSettled(
+        missing.map(async (ticker) => {
+          let sparkline: number[] = [];
+
+          try {
+            const res = await fetch(`/api/stock-sparkline?ticker=${encodeURIComponent(ticker)}&flag=${flag}`, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            sparkline = (data.sparkline as number[]) ?? [];
+          } catch {
+            try {
+              sparkline = await fetchNseSparkline(ticker, flag);
+            } catch {
+              sparkline = [];
+            }
+          }
+
+          return { ticker, sparkline };
+        })
+      );
+
+      if (cancelled) return;
+
+      const updates: Record<string, Record<SparkFlag, number[]>> = {};
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value.sparkline.length >= 2) {
+          if (!updates[result.value.ticker]) updates[result.value.ticker] = {} as Record<SparkFlag, number[]>;
+          updates[result.value.ticker][flag] = result.value.sparkline;
+          fetchedRef.current.add(`${result.value.ticker}:${flag}`);
+        }
+      }
+      console.debug('[ForensicPanel spark] updates', Object.keys(updates).length, results.map(r => r.status === 'fulfilled' ? r.value.ticker + '=' + r.value.sparkline.length : 'rejected').join(', '));
+
+      if (Object.keys(updates).length > 0) {
+        console.debug('[ForensicPanel spark] setSparklines tickers=', Object.keys(updates));
+        setSparklines((prev) => {
+          const next = { ...prev };
+          for (const [tkr, flagData] of Object.entries(updates)) {
+            next[tkr] = { ...(next[tkr] ?? {} as Record<SparkFlag, number[]>), ...flagData };
+          }
+          return next;
+        });
+      }
+    };
+
+    void fetchAll();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tickers, flag]);
+
+  return sparklines;
+}
+
+function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag }: {
+  ticker: string;
+  sparklines: Record<SparkFlag, number[]>;
+  onFlagChange: (flag: SparkFlag) => void;
+  currentFlag: SparkFlag;
+}) {
+  const data = sparklines?.[currentFlag];
+  const hasData = data && data.length >= 2;
+
+  /* Calculate change for badge */
+  let changeLabel = '';
+  let changeColor = 'text-slate-400';
+  if (hasData) {
+    const first = data![0];
+    const last = data![data!.length - 1];
+    const pct = ((last - first) / first) * 100;
+    changeLabel = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+    changeColor = pct >= 0 ? 'text-emerald-600' : 'text-red-500';
+  }
+
+  return (
+    <div className="mb-1.5 relative z-10">
+      {/* Chart area */}
+      <div className="rounded-md overflow-hidden" style={{ background: hasData ? 'rgba(100,116,139,0.04)' : 'transparent' }}>
+        {hasData ? (
+          <StockSparklineSVG data={data!} />
+        ) : (
+          <div className="h-8 flex items-center justify-center">
+            <span className="text-[7px] text-slate-300 uppercase tracking-wider">Loading…</span>
+          </div>
+        )}
+      </div>
+      {/* Flag slider + change badge */}
+      <div className="flex items-center justify-between mt-0.5">
+        <div className="flex items-center gap-0.5">
+          {SPARK_FLAGS.map((f) => (
+            <button
+              key={f}
+              onClick={(e) => { e.stopPropagation(); onFlagChange(f); }}
+              className={`px-1 py-0 rounded text-[7px] font-bold uppercase tracking-wider transition-all ${
+                f === currentFlag
+                  ? 'bg-slate-800 text-white'
+                  : 'bg-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+        {hasData && (
+          <span className={`text-[7px] font-bold tabular-nums ${changeColor}`}>{changeLabel}</span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 type AssetRow = {
   ticker: string;
@@ -23,6 +203,7 @@ export default function ForensicPanel({
   liveMarket?: MarketDataResponse | null;
   refreshOnDemand?: () => Promise<void>;
 }) {
+  console.warn('[DEBUG] ForensicPanel render', { stocks: liveMarket?.stocks?.length });
   const [refreshing, setRefreshing] = useState(false);
 
   const live = liveMarket ?? null;
@@ -111,6 +292,37 @@ export default function ForensicPanel({
     return { value: Math.max(...vals) };
   }, [assetRows]);
 
+  /* Per-ticker flag state (default 1M) */
+  const [tickerFlags, setTickerFlags] = useState<Record<string, SparkFlag>>({});
+  const getFlag = (ticker: string): SparkFlag => tickerFlags[ticker] ?? '1M';
+  const setFlag = (ticker: string, flag: SparkFlag) => setTickerFlags((prev) => ({ ...prev, [ticker]: flag }));
+
+  /* Collect unique flags in use for fetching */
+  const activeFlags = useMemo(() => {
+    const flags = new Set<SparkFlag>();
+    for (const r of assetRows) flags.add(getFlag(r.ticker));
+    return [...flags];
+  }, [assetRows, tickerFlags]);
+
+  /* Fetch sparkline data for all tickers x all active flags */
+  const tickerList = useMemo(() => assetRows.map((r) => r.ticker), [assetRows]);
+  const stockSparklines1M = useStockSparklines(tickerList, '1M');
+  const stockSparklines1D = useStockSparklines(tickerList, '1D');
+  const stockSparklines1Y = useStockSparklines(tickerList, '1Y');
+
+  /* Merge into one lookup: ticker -> flag -> number[] */
+  const allSparklines = useMemo(() => {
+    const merged: Record<string, Record<SparkFlag, number[]>> = {};
+    for (const t of tickerList) {
+      merged[t] = {
+        '1D': stockSparklines1D[t]?.['1D'] ?? [],
+        '1M': stockSparklines1M[t]?.['1M'] ?? [],
+        '1Y': stockSparklines1Y[t]?.['1Y'] ?? [],
+      };
+    }
+    return merged;
+  }, [tickerList, stockSparklines1D, stockSparklines1M, stockSparklines1Y]);
+
   const refresh = async () => {
     setRefreshing(true);
     try {
@@ -176,7 +388,13 @@ export default function ForensicPanel({
                   </span>
                 )}
               </div>
-              <p className="text-[12px] text-slate-500 mb-2 truncate relative z-10">{row.thesis}</p>
+              <p className="text-[12px] text-slate-500 mb-1 truncate relative z-10">{row.thesis}</p>
+              <SparklineFlagSlider
+                ticker={row.ticker}
+                sparklines={allSparklines[row.ticker] ?? ({} as Record<SparkFlag, number[]>)}
+                currentFlag={getFlag(row.ticker)}
+                onFlagChange={(f) => setFlag(row.ticker, f)}
+              />
               <div className="space-y-1 text-[12px] relative z-10">
                 <div className="flex justify-between"><span className="text-slate-400">Price</span><span className="font-bold text-slate-700">{priceVal}</span></div>
                 <div className="flex justify-between"><span className="text-slate-400">Score</span><span className={`font-bold ${scoreColor(row.score)}`}>{row.score || '-'}</span></div>

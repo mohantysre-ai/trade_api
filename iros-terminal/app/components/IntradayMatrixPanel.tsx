@@ -1,6 +1,172 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import type { SparkFlag } from '@/lib/market-api';
+import { fetchNseSparkline } from '@/lib/market-api';
+
+/* ── 30-day sparkline SVG from real price data ─────────────────────────── */
+let intraSparkIdCounter = 0;
+const SPARK_FLAGS: SparkFlag[] = ['1D', '1M', '1Y'];
+
+function StockSparklineSVG({ data }: { data: number[] }) {
+  const [id] = useState(() => `intra-spk-${++intraSparkIdCounter}`);
+  if (!data || data.length < 2) return null;
+
+  const first = data[0];
+  const last = data[data.length - 1];
+  const positive = last >= first;
+  const color = positive ? '#10b981' : '#ef4444';
+
+  const W = 100;
+  const H = 32;
+  const pad = 2;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+
+  const points = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (W - pad * 2);
+    const y = pad + (1 - (v - min) / range) * (H - pad * 2);
+    return [x, y] as const;
+  });
+
+  const pathD = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+  const areaD = `${pathD} L ${points[points.length - 1][0].toFixed(2)},${H} L ${points[0][0].toFixed(2)},${H} Z`;
+  const lastPt = points[points.length - 1];
+
+  return (
+    <svg className="w-full h-8 opacity-85" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={areaD} fill={`url(#${id})`} />
+      <path d={pathD} stroke={color} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={lastPt[0]} cy={lastPt[1]} r="2" fill={color} stroke="white" strokeWidth="1" />
+    </svg>
+  );
+}
+
+function useStockSparklines(tickers: string[], flag: SparkFlag): Record<string, Record<SparkFlag, number[]>> {
+  const [sparklines, setSparklines] = useState<Record<string, Record<SparkFlag, number[]>>>({});
+  const fetchedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const missing = tickers.filter((t) => t && !fetchedRef.current.has(`${t}:${flag}`));
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+
+    const fetchAll = async () => {
+      const results = await Promise.allSettled(
+        missing.map(async (ticker) => {
+          let sparkline: number[] = [];
+
+          try {
+            const res = await fetch(`/api/stock-sparkline?ticker=${encodeURIComponent(ticker)}&flag=${flag}`, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            sparkline = (data.sparkline as number[]) ?? [];
+          } catch {
+            try {
+              sparkline = await fetchNseSparkline(ticker, flag);
+            } catch {
+              sparkline = [];
+            }
+          }
+
+          return { ticker, sparkline };
+        })
+      );
+
+      if (cancelled) return;
+
+      const updates: Record<string, Record<SparkFlag, number[]>> = {};
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value.sparkline.length >= 2) {
+          if (!updates[result.value.ticker]) updates[result.value.ticker] = {} as Record<SparkFlag, number[]>;
+          updates[result.value.ticker][flag] = result.value.sparkline;
+          fetchedRef.current.add(`${result.value.ticker}:${flag}`);
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        console.debug('[IntradayMatrix spark] setSparklines tickers=', Object.keys(updates));
+        setSparklines((prev) => {
+          const next = { ...prev };
+          for (const [tkr, flagData] of Object.entries(updates)) {
+            next[tkr] = { ...(next[tkr] ?? {} as Record<SparkFlag, number[]>), ...flagData };
+          }
+          return next;
+        });
+      }
+    };
+
+    void fetchAll();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tickers, flag]);
+
+  return sparklines;
+}
+
+function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag }: {
+  ticker: string;
+  sparklines: Record<SparkFlag, number[]>;
+  onFlagChange: (flag: SparkFlag) => void;
+  currentFlag: SparkFlag;
+}) {
+  const data = sparklines?.[currentFlag];
+  const hasData = data && data.length >= 2;
+
+  let changeLabel = '';
+  let changeColor = 'text-slate-400';
+  if (hasData) {
+    const first = data![0];
+    const last = data![data!.length - 1];
+    const pct = ((last - first) / first) * 100;
+    changeLabel = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+    changeColor = pct >= 0 ? 'text-emerald-600' : 'text-red-500';
+  }
+
+  return (
+    <div className="mb-1.5 relative z-10">
+      <div className="rounded-md overflow-hidden" style={{ background: hasData ? 'rgba(100,116,139,0.04)' : 'transparent' }}>
+        {hasData ? (
+          <StockSparklineSVG data={data!} />
+        ) : (
+          <div className="h-8 flex items-center justify-center">
+            <span className="text-[7px] text-slate-300 uppercase tracking-wider">Loading…</span>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center justify-between mt-0.5">
+        <div className="flex items-center gap-0.5">
+          {SPARK_FLAGS.map((f) => (
+            <button
+              key={f}
+              onClick={(e) => { e.stopPropagation(); e.preventDefault(); onFlagChange(f); }}
+              className={`px-1 py-0 rounded text-[7px] font-bold uppercase tracking-wider transition-all ${
+                f === currentFlag
+                  ? 'bg-slate-800 text-white'
+                  : 'bg-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+        {hasData && (
+          <span className={`text-[7px] font-bold tabular-nums ${changeColor}`}>{changeLabel}</span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /* ── lemonn types ─────────────────────────────────────────────────────── */
 type LemonnRecommendation = {
@@ -163,6 +329,40 @@ export default function IntradayMatrixPanel() {
     return () => { cancelled = true; window.clearInterval(id); };
   }, [loadLemonn, loadDhan]);
 
+  /* Collect all tickers for sparkline fetching */
+  const allTickers = useMemo(() => {
+    const tickers: string[] = [];
+    if (lemonnData?.recommendations) {
+      for (const r of lemonnData.recommendations) tickers.push(r.symbol);
+    }
+    if (dhanData?.recommendations) {
+      for (const r of dhanData.recommendations) tickers.push(r.symbol);
+    }
+    return tickers;
+  }, [lemonnData, dhanData]);
+
+  /* Per-ticker flag state (default 1M) */
+  const [tickerFlags, setTickerFlags] = useState<Record<string, SparkFlag>>({});
+  const getFlag = (ticker: string): SparkFlag => tickerFlags[ticker] ?? '1M';
+  const setFlag = (ticker: string, flag: SparkFlag) => setTickerFlags((prev) => ({ ...prev, [ticker]: flag }));
+
+  /* Fetch sparkline data for all tickers x all flags */
+  const stockSparklines1D = useStockSparklines(allTickers, '1D');
+  const stockSparklines1M = useStockSparklines(allTickers, '1M');
+  const stockSparklines1Y = useStockSparklines(allTickers, '1Y');
+
+  const allSparklines = useMemo(() => {
+    const merged: Record<string, Record<SparkFlag, number[]>> = {};
+    for (const t of allTickers) {
+      merged[t] = {
+        '1D': stockSparklines1D[t]?.['1D'] ?? [],
+        '1M': stockSparklines1M[t]?.['1M'] ?? [],
+        '1Y': stockSparklines1Y[t]?.['1Y'] ?? [],
+      };
+    }
+    return merged;
+  }, [allTickers, stockSparklines1D, stockSparklines1M, stockSparklines1Y]);
+
   /* ── RENDER ───────────────────────────────────────────────────────────── */
 
   return (
@@ -222,7 +422,13 @@ export default function IntradayMatrixPanel() {
                     <span className="text-[12px] font-black text-slate-900 font-mono">{rec.symbol}</span>
                     <DirectionBadge dir={rec.direction} />
                   </div>
-                  <p className="text-[8px] text-slate-500 mb-2 truncate relative z-10">{rec.name}</p>
+                  <p className="text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
+                  <SparklineFlagSlider
+                    ticker={rec.symbol}
+                    sparklines={allSparklines[rec.symbol] ?? ({} as Record<SparkFlag, number[]>)}
+                    currentFlag={getFlag(rec.symbol)}
+                    onFlagChange={(f) => setFlag(rec.symbol, f)}
+                  />
                   <div className="space-y-1 text-[8px] relative z-10">
                     <div className="flex justify-between"><span className="text-slate-400">Buy</span><span className="font-bold text-emerald-600">₹{rec.buyPrice.toFixed(2)}</span></div>
                     <div className="flex justify-between"><span className="text-slate-400">Sell</span><span className="font-bold text-blue-600">₹{rec.sellPrice.toFixed(2)}</span></div>
@@ -313,7 +519,13 @@ export default function IntradayMatrixPanel() {
                           </span>
                         )}
                       </div>
-                      <p className="text-[8px] text-slate-500 mb-2 truncate relative z-10">{rec.name}</p>
+                      <p className="text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
+                      <SparklineFlagSlider
+                        ticker={rec.symbol}
+                        sparklines={allSparklines[rec.symbol] ?? ({} as Record<SparkFlag, number[]>)}
+                        currentFlag={getFlag(rec.symbol)}
+                        onFlagChange={(f) => setFlag(rec.symbol, f)}
+                      />
                       <div className="space-y-1 text-[8px] relative z-10">
                         <div className="flex justify-between"><span className="text-slate-400">Buy Above</span><span className="font-bold text-emerald-600">{rec.buyAbove.toFixed(2)}</span></div>
                         <div className="flex justify-between"><span className="text-slate-400">T1 / T2</span><span className="font-bold text-blue-600">{rec.target1.toFixed(2)} / {rec.target2.toFixed(2)}</span></div>

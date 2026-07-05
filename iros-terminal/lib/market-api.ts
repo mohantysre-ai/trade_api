@@ -318,42 +318,94 @@ export function useMarketData(pool?: string, pollMs = 30_000) {
 // ---------------------------------------------------------------------------
 
 export async function fetchTickerNewsReport(
-  ticker: string,
-  options?: {
-    company?: string;
-    maxArticles?: number;
-    includeRaw?: boolean;
-    forceRefresh?: boolean;
-  }
+   ticker: string,
+   options?: {
+     company?: string;
+     maxArticles?: number;
+     includeRaw?: boolean;
+     forceRefresh?: boolean;
+   }
 ): Promise<AITickerNewsReport> {
-  const params = new URLSearchParams();
-  params.set("ticker", ticker);
-  if (options?.company) params.set("company", options.company);
-  if (options?.maxArticles) params.set("max_articles", String(options.maxArticles));
-  if (options?.includeRaw) params.set("include_raw", "true");
-  if (options?.forceRefresh) params.set("force_refresh", "true");
+   const params = new URLSearchParams();
+   params.set("ticker", ticker);
+   if (options?.company) params.set("company", options.company);
+   if (options?.maxArticles) params.set("max_articles", String(options.maxArticles));
+   if (options?.includeRaw) params.set("include_raw", "true");
+   if (options?.forceRefresh) params.set("force_refresh", "true");
 
-  const res = await fetch(`/api/ticker-news?${params.toString()}`, {
-    cache: "no-store",
-    // Scraping can take 30-90 seconds
-    signal: AbortSignal.timeout(130_000),
-  });
+   const res = await fetch(`/api/ticker-news?${params.toString()}`, {
+     cache: "no-store",
+     signal: AbortSignal.timeout(130_000),
+   });
 
-  if (!res.ok) {
-    let detail = `HTTP ${res.status}`;
-    try {
-      const body = await res.json();
-      if (body?.error) detail = body.error;
-    } catch {
-      /* ignore */
-    }
-    throw new Error(detail);
-  }
+   if (!res.ok) {
+     let detail = `HTTP ${res.status}`;
+     try {
+       const body = await res.json();
+       if (body?.error) detail = body.error;
+     } catch {
+       /* ignore */
+     }
+     throw new Error(detail);
+   }
 
-  const data = await res.json();
-  if (!data.success || !data.payload) {
-    throw new Error(data.error ?? "Ticker news API returned unsuccessful response");
-  }
+   const data = await res.json();
+   if (!data.success || !data.payload) {
+     throw new Error(data.error ?? "Ticker news API returned unsuccessful response");
+   }
 
-  return data.payload as AITickerNewsReport;
+   return data.payload as AITickerNewsReport;
+}
+
+// ---------------------------------------------------------------------------
+// NSE Sparkline fetcher - direct from NSE India API
+// ---------------------------------------------------------------------------
+
+export type SparkFlag = '1D' | '1M' | '1Y';
+
+export async function fetchNseSparkline(
+   ticker: string,
+   flag: SparkFlag
+): Promise<number[]> {
+   const identifier = `${ticker.toUpperCase().trim()}EQN`;
+   const nseUrl = `https://www.nseindia.com/api/NextApi/apiClient/marketWatchApi?functionName=getSymbolgraphData&&identifier=${encodeURIComponent(identifier)}&flag=${encodeURIComponent(flag)}`;
+
+   const res = await fetch(nseUrl, {
+     headers: {
+       "User-Agent":
+         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+       Accept: "application/json,text/plain,*/*",
+       "Accept-Language": "en-US,en;q=0.5",
+       Referer: "https://www.nseindia.com/",
+     },
+     cache: "no-store",
+   });
+
+   if (!res.ok) {
+     throw new Error(`NSE HTTP ${res.status}`);
+   }
+
+   const raw = await res.json();
+
+   const graphData: Array<Record<string, unknown>> =
+     raw?.data?.grapthData ?? raw?.data?.graphData ?? raw?.data ?? raw?.grapthData ?? raw?.graphData ?? [];
+
+   const sparkline: number[] = [];
+   for (const point of graphData) {
+     if (Array.isArray(point) && point.length >= 2 && typeof point[1] === 'number') {
+       sparkline.push(point[1]);
+     } else if (point && typeof point === "object") {
+       const val = (point as Record<string, unknown>).value ?? (point as Record<string, unknown>).close ?? (point as Record<string, unknown>).lastPrice ?? (point as Record<string, unknown>).ltp ?? (point as Record<string, unknown>).price;
+       if (typeof val === "number") {
+         sparkline.push(val);
+       } else if (typeof val === "string") {
+         const parsed = parseFloat(val.replace(/,/g, ""));
+         if (!isNaN(parsed)) sparkline.push(parsed);
+       }
+     } else if (typeof point === "number") {
+       sparkline.push(point);
+     }
+   }
+
+   return sparkline;
 }
