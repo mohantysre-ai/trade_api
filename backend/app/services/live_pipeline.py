@@ -40,6 +40,29 @@ FIELDS = [
 ]
 
 
+def extract_rows(resp):
+    """Normalize a ScanX API response into a flat list of stock rows.
+
+    The API has been observed to return either a bare JSON array
+    (``[{"Sym": ...}, ...]``) or an object that wraps the rows under a
+    ``data`` key (``{"data": [...], "count": N}``). Calling
+    ``resp.get("data", [])`` on a list raises ``AttributeError``, which
+    previously crashed the caller into the mock fallback. Handle both
+    shapes (plus a few common alternates) here so downstream code never
+    has to guess.
+    """
+    if isinstance(resp, list):
+        return resp
+    if isinstance(resp, dict):
+        data = resp.get("data")
+        if isinstance(data, list):
+            return data
+        for key in ("records", "stocks", "rows", "items", "result", "results"):
+            if isinstance(resp.get(key), list):
+                return resp[key]
+    return []
+
+
 def fetch_page(pgno: int, count: int = 500, min_volume: int = 1_000_000, retries: int = 3):
     body = json.dumps({
         "data": {
@@ -81,7 +104,7 @@ def fetch_all_pages(min_volume: int = 1_000_000, page_size: int = 500, max_pages
     all_rows = []
     for pgno in range(1, max_pages + 1):
         resp = fetch_page(pgno=pgno, count=page_size, min_volume=min_volume)
-        rows = resp.get("data", [])
+        rows = extract_rows(resp)
         if not rows:
             break
         all_rows.extend(rows)

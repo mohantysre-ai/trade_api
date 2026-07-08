@@ -219,12 +219,16 @@ type DhanScannerResponse = {
   success: boolean;
   source: string;
   recommendations: DhanRecommendation[];
+  shortRecommendations?: DhanRecommendation[];
   tradePlan: DhanRecommendation[];
+  shortTradePlan?: DhanRecommendation[];
   capitalAllocation: CapitalAllocation[];
   totalCapital: number;
   totalRisk: number;
   scannedCount: number;
   passedCount: number;
+  longPassedCount?: number;
+  shortPassedCount?: number;
   error: string | null;
   isMock?: boolean;
 };
@@ -467,7 +471,9 @@ export default function IntradayMatrixPanel() {
                 <p className="text-[7px] text-slate-500">
                   {dhanData?.source ?? 'dhan-scanx'}
                   {dhanData?.isMock && <span className="ml-1 text-amber-500 font-bold">(mock fallback — Dhan API unreachable)</span>}
-                  &nbsp;·&nbsp;Scanned {dhanData?.scannedCount ?? 0} stocks&nbsp;·&nbsp;{dhanData?.passedCount ?? 0} passed filter
+                  &nbsp;·&nbsp;Scanned {dhanData?.scannedCount ?? 0} stocks
+                  &nbsp;·&nbsp;<span className="text-emerald-600 font-semibold">LONG {dhanData?.longPassedCount ?? 0}</span>
+                  &nbsp;/&nbsp;<span className="text-rose-600 font-semibold">SHORT {dhanData?.shortPassedCount ?? 0}</span>
                   {dhanTime && <span className="ml-1 text-slate-400">@{dhanTime}</span>}
                 </p>
               </div>
@@ -489,7 +495,7 @@ export default function IntradayMatrixPanel() {
 
         {dhanLoading && <LoadingSpinner label="Fetching Dhan ScanX & feed_scanner..." />}
 
-        {!dhanLoading && dhanData?.recommendations && dhanData.recommendations.length > 0 && (
+        {!dhanLoading && dhanData && ((dhanData.recommendations?.length ?? 0) > 0 || (dhanData.shortRecommendations?.length ?? 0) > 0) && (
           <>
             {/* ── TOP 10 SCANNER PICKS ─────────────────────────────────── */}
             <div className="mb-4">
@@ -527,17 +533,67 @@ export default function IntradayMatrixPanel() {
                         onFlagChange={(f) => setFlag(rec.symbol, f)}
                       />
                       <div className="space-y-1 text-[8px] relative z-10">
-                        <div className="flex justify-between"><span className="text-slate-400">Buy Above</span><span className="font-bold text-emerald-600">{rec.buyAbove.toFixed(2)}</span></div>
-                        <div className="flex justify-between"><span className="text-slate-400">T1 / T2</span><span className="font-bold text-blue-600">{rec.target1.toFixed(2)} / {rec.target2.toFixed(2)}</span></div>
-                        <div className="flex justify-between"><span className="text-slate-400">Stop Loss</span><span className="font-bold text-red-500">{rec.stopLoss.toFixed(2)}</span></div>
-                        <div className="flex justify-between"><span className="text-slate-400">Risk/Sh</span><span className="font-bold text-slate-700">₹{rec.riskPerShare.toFixed(2)}</span></div>
-                        <div className="flex justify-between"><span className="text-slate-400">R:R (T2)</span><span className="font-bold text-slate-700">~{rec.rrT2.toFixed(1)}</span></div>
+                        <div className="flex justify-between"><span className="text-slate-400">Buy Above</span><span className="font-bold text-emerald-600">{rec.buyAbove?.toFixed(2) ?? '—'}</span></div>
+                        <div className="flex justify-between"><span className="text-slate-400">T1 / T2</span><span className="font-bold text-blue-600">{rec.target1?.toFixed(2) ?? '—'} / {rec.target2?.toFixed(2) ?? '—'}</span></div>
+                        <div className="flex justify-between"><span className="text-slate-400">Stop Loss</span><span className="font-bold text-red-500">{rec.stopLoss?.toFixed(2) ?? '—'}</span></div>
+                        <div className="flex justify-between"><span className="text-slate-400">Risk/Sh</span><span className="font-bold text-slate-700">₹{rec.riskPerShare?.toFixed(2) ?? '—'}</span></div>
+                        <div className="flex justify-between"><span className="text-slate-400">R:R (T2)</span><span className="font-bold text-slate-700">~{rec.rrT2?.toFixed(1) ?? '—'}</span></div>
                       </div>
                     </a>
                   );
                 })}
               </div>
             </div>
+
+            {/* ── TOP SHORT / SELL PICKS ───────────────────────────────── */}
+            {dhanData?.shortRecommendations && dhanData.shortRecommendations.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                  <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+                    TOP {dhanData.shortRecommendations.length} SHORT / SELL PICKS
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
+                  {dhanData.shortRecommendations.map((rec, idx) => {
+                    const isBuy = rec.direction === 'LONG';
+                    return (
+                      <a key={`dh-s-${rec.symbol}-${idx}`}
+                        href={`https://lemonn.co.in/stocks/${encodeURIComponent(rec.symbol.toLowerCase())}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm hover:shadow-md transition-all group cursor-pointer block"
+                        style={{ borderLeft: isBuy ? '3px solid #10b981' : '3px solid #ef4444' }}>
+                        <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full opacity-15 blur-2xl"
+                          style={{ backgroundColor: isBuy ? '#10b981' : '#ef4444' }} />
+                        <div className="flex items-center justify-between mb-1.5 relative z-10">
+                          <span className="text-[12px] font-black text-slate-900 font-mono">{rec.symbol}</span>
+                          {rec.score != null && (
+                            <span className="text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                              {rec.score.toFixed(0)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
+                        <SparklineFlagSlider
+                          ticker={rec.symbol}
+                          sparklines={allSparklines[rec.symbol] ?? ({} as Record<SparkFlag, number[]>)}
+                          currentFlag={getFlag(rec.symbol)}
+                          onFlagChange={(f) => setFlag(rec.symbol, f)}
+                        />
+                        <div className="space-y-1 text-[8px] relative z-10">
+                          <div className="flex justify-between"><span className="text-slate-400">Sell Below</span><span className="font-bold text-rose-600">{rec.buyAbove?.toFixed(2) ?? '—'}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-400">T1 / T2</span><span className="font-bold text-blue-600">{rec.target1?.toFixed(2) ?? '—'} / {rec.target2?.toFixed(2) ?? '—'}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-400">Stop Loss</span><span className="font-bold text-red-500">{rec.stopLoss?.toFixed(2) ?? '—'}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-400">Risk/Sh</span><span className="font-bold text-slate-700">₹{rec.riskPerShare?.toFixed(2) ?? '—'}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-400">R:R (T2)</span><span className="font-bold text-slate-700">~{rec.rrT2?.toFixed(1) ?? '—'}</span></div>
+                        </div>
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* ── TRADE PLAN — Top 5 with ₹5L allocation ───────────────── */}
             <div className="mb-3">
@@ -607,10 +663,10 @@ export default function IntradayMatrixPanel() {
                           <td className="p-1.5 font-bold text-slate-900">
                             <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(ca.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{ca.symbol}</a>
                           </td>
-                          <td className="p-1.5 text-right font-mono text-slate-600">₹{ca.buyAbove.toFixed(2)}</td>
-                          <td className="p-1.5 text-right font-mono text-slate-700 font-bold">{ca.approxQty.toLocaleString('en-IN')}</td>
-                          <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">₹{ca.deployedCapital.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                          <td className="p-1.5 text-right font-mono text-red-500">₹{ca.riskAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                          <td className="p-1.5 text-right font-mono text-slate-600">₹{ca.buyAbove?.toFixed(2) ?? '—'}</td>
+                          <td className="p-1.5 text-right font-mono text-slate-700 font-bold">{ca.approxQty?.toLocaleString('en-IN') ?? '—'}</td>
+                          <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">₹{ca.deployedCapital?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}</td>
+                          <td className="p-1.5 text-right font-mono text-red-500">₹{ca.riskAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -621,10 +677,10 @@ export default function IntradayMatrixPanel() {
                         <td className="p-1.5"></td>
                         <td className="p-1.5"></td>
                         <td className="p-1.5 text-right font-mono text-emerald-700 text-[12px]">
-                          ≈ ₹{dhanData.capitalAllocation.reduce((s, c) => s + c.deployedCapital, 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          ≈ ₹{dhanData.capitalAllocation.reduce((s, c) => s + (c.deployedCapital ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="p-1.5 text-right font-mono text-red-600 text-[12px]">
-                          ≈ ₹{dhanData.capitalAllocation.reduce((s, c) => s + c.riskAmount, 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          ≈ ₹{dhanData.capitalAllocation.reduce((s, c) => s + (c.riskAmount ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
                       </tr>
                     </tfoot>
@@ -632,10 +688,52 @@ export default function IntradayMatrixPanel() {
                 </div>
               </div>
             )}
+
+            {/* ── SHORT TRADE PLAN ─────────────────────────────────────── */}
+            {dhanData?.shortTradePlan && dhanData.shortTradePlan.length > 0 && (
+              <div className="mb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
+                    SHORT TRADE PLAN — SELL BOOK
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[12px] border-collapse">
+                    <thead>
+                      <tr className="bg-rose-50 text-slate-600">
+                        <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
+                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Sell At</th>
+                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Stop Loss</th>
+                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 1</th>
+                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 2</th>
+                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Risk/Sh</th>
+                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">R:R T2</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(dhanData?.shortTradePlan || dhanData?.shortRecommendations?.slice(0, 5) || []).map((tp, idx) => (
+                        <tr key={`stp-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-rose-50 cursor-pointer">
+                          <td className="p-1.5 font-bold text-slate-900">
+                            <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
+                          </td>
+                          <td className="p-1.5 text-right font-mono text-rose-600 font-bold">{tp.buyAbove?.toFixed(2) ?? '—'}</td>
+                          <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
+                          <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
+                          <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
+                          <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
+                          <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </>
         )}
 
-        {!dhanLoading && !dhanError && (!dhanData?.recommendations || dhanData.recommendations.length === 0) && (
+        {!dhanLoading && !dhanError && (!dhanData?.recommendations || dhanData.recommendations.length === 0) && (!dhanData?.shortRecommendations || dhanData.shortRecommendations.length === 0) && (
           <div className="flex flex-col items-center justify-center py-8 text-slate-400">
             <span className="text-[10px] uppercase tracking-wider font-semibold">No scanner signals today</span>
             <span className="text-[8px] mt-1">Dhan ScanX API may be unreachable — check logs</span>

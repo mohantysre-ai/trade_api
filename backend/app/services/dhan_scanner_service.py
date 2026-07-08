@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from .feed_scanner import ScanResult, scan_feed
-from .live_pipeline import FIELDS, fetch_page
+from .live_pipeline import FIELDS, fetch_page, extract_rows
 
 _log = logging.getLogger(__name__)
 
@@ -152,17 +152,98 @@ MOCK_CAPITAL_ALLOCATION: List[Dict[str, Any]] = [
 ]
 
 
-def fetch_dhan_scan_results(min_volume: int = 1_000_000, top_n: int = TOP_N) -> dict:
-    """Fetch from Dhan ScanX API, run through feed_scanner, return results.
+def _mock_fallback(error: str) -> dict:
+    """Build the mock-result payload used only when the Dhan API is truly
+    unreachable (network/HTTP failure)."""
+    return {
+        "success": True,  # treat as success so the frontend renders something
+        "source": "dhan-scanx (mock fallback)",
+        "recommendations": MOCK_DHAN_RESULTS,
+        "shortRecommendations": [],
+        "tradePlan": MOCK_DHAN_RESULTS[:5],
+        "shortTradePlan": [],
+        "capitalAllocation": MOCK_CAPITAL_ALLOCATION,
+        "totalRisk": sum(r["riskAmount"] for r in MOCK_CAPITAL_ALLOCATION),
+        "totalCapital": TOTAL_CAPITAL,
+        "scannedCount": 500,
+        "passedCount": 10,
+        "longPassedCount": 10,
+        "shortPassedCount": 0,
+        "error": error,
+        "isMock": True,
+    }
 
-    Returns a dict with 'success', 'source', 'recommendations', 'tradePlan',
-    'capitalAllocation', 'totalCapital', 'totalRisk', and 'error' (if any).
+
+def _empty_result() -> dict:
+    """Build a real (non-mock) empty payload.
+
+    Used when the API is reachable but returns nothing — either zero rows
+    or zero stocks that clear the feed_scanner filter. This keeps the
+    frontend honest: it shows 'no signals' instead of fake mock picks.
+    """
+    return {
+        "success": True,
+        "source": "dhan-scanx",
+        "recommendations": [],
+        "shortRecommendations": [],
+        "tradePlan": [],
+        "shortTradePlan": [],
+        "capitalAllocation": [],
+        "totalRisk": 0.0,
+        "totalCapital": TOTAL_CAPITAL,
+        "scannedCount": 0,
+        "passedCount": 0,
+        "longPassedCount": 0,
+        "shortPassedCount": 0,
+        "error": None,
+        "isMock": False,
+    }
+
+
+def _recommendation_dicts(scan_results: List[ScanResult]) -> List[dict]:
+    """Convert ScanResult rows into the frontend recommendation shape.
+
+    Direction-aware: LONG targets sit above entry, SHORT targets below.
+    """
+    return [
+        {
+            "symbol": r.symbol,
+            "name": r.name,
+            "direction": r.direction,
+            "buyAbove": r.entry,
+            "stopLoss": r.stop_loss,
+            "target1": round(r.entry + 1.5 * r.risk_per_share if r.direction == "LONG" else r.entry - 1.5 * r.risk_per_share, 2),
+            "target2": round(r.entry + 3.0 * r.risk_per_share if r.direction == "LONG" else r.entry - 3.0 * r.risk_per_share, 2),
+            "riskPerShare": round(r.risk_per_share, 2),
+            "rrT2": 3.0,
+            "rsi": r.rsi,
+            "deliveryPct": r.delivery_pct,
+            "score": r.score,
+            "reasons": r.reasons,
+        }
+        for r in scan_results
+    ]
+
+
+def fetch_dhan_scan_results(min_volume: int = 1_000_000, top_n: int = TOP_N) -> dict:
+    """Fetch from Dhan ScanX API, run through feed_scanner for BOTH directions.
+
+    Returns LONG picks in 'recommendations' and SHORT/SELL picks in
+    'shortRecommendations', each with its own trade plan. 'tradePlan' /
+    'capitalAllocation' describe the LONG deployment (buy) book;
+    'shortTradePlan' describes the SHORT book.
+
+    Returns a dict with 'success', 'source', 'recommendations',
+    'shortRecommendations', 'tradePlan', 'shortTradePlan', 'capitalAllocation',
+    'totalCapital', 'totalRisk', and 'error' (if any).
     """
     result: Dict[str, Any] = {
         "success": False,
         "source": "dhan-scanx",
         "recommendations": [],
+        "shortRecommendations": [],
         "tradePlan": [],
+        "shortTradePlan": [],
         "capitalAllocation": [],
         "totalCapital": TOTAL_CAPITAL,
         "totalRisk": 0.0,
@@ -173,75 +254,61 @@ def fetch_dhan_scan_results(min_volume: int = 1_000_000, top_n: int = TOP_N) -> 
         # Pull all pages from Dhan ScanX
         rows = []
         for pgno in range(1, 11):  # max 10 pages
-            try:
-                resp = fetch_page(pgno=pgno, count=500, min_volume=min_volume)
-                page_rows = resp.get("data", [])
-                if not page_rows:
-                    break
-                rows.extend(page_rows)
-                if len(page_rows) < 500:
-                    break
-            except Exception:
+            resp = fetch_page(pgno=pgno, count=500, min_volume=min_volume)
+            page_rows = extract_rows(resp)
+            if not page_rows:
                 break
-
-        if not rows:
-            raise RuntimeError("Dhan ScanX returned zero rows")
-
-        # Run through feed_scanner
-        payload = {"data": rows}
-        scan_results = scan_feed(payload, direction="LONG", top_n=top_n)
-
-        if not scan_results:
-            raise RuntimeError("No stocks passed the feed_scanner filter")
-
-        # Build trade plan with capital allocation
-        trade_plan = build_trade_plan(scan_results, direction="LONG")
-
-        # Convert to dicts
-        recommendations = [
-            {
-                "symbol": r.symbol,
-                "name": r.name,
-                "direction": r.direction,
-                "buyAbove": r.entry,
-                "stopLoss": r.stop_loss,
-                "target1": round(r.entry + 1.5 * r.risk_per_share if r.direction == "LONG" else r.entry - 1.5 * r.risk_per_share, 2),
-                "target2": round(r.entry + 3.0 * r.risk_per_share if r.direction == "LONG" else r.entry - 3.0 * r.risk_per_share, 2),
-                "riskPerShare": round(r.risk_per_share, 2),
-                "rrT2": 3.0,
-                "rsi": r.rsi,
-                "deliveryPct": r.delivery_pct,
-                "score": r.score,
-                "reasons": r.reasons,
-            }
-            for r in scan_results
-        ]
-
-        capital_allocation = [tp.to_dict() for tp in trade_plan]
-        total_risk = sum(tp.risk_amount for tp in trade_plan)
-
-        result.update({
-            "success": True,
-            "recommendations": recommendations,
-            "tradePlan": [tp.to_dict() for tp in trade_plan],
-            "capitalAllocation": capital_allocation[:5],
-            "totalRisk": round(total_risk, 2),
-            "scannedCount": len(rows),
-            "passedCount": len(scan_results),
-        })
-
+            rows.extend(page_rows)
+            if len(page_rows) < 500:
+                break
     except Exception as exc:
-        _log.warning("Dhan ScanX pipeline failed, using mock fallback: %s", exc)
-        result["error"] = str(exc)
-        # Fallback to mock data so the frontend never gets a 404
-        result["success"] = True  # treat as success with mock
-        result["source"] = "dhan-scanx (mock fallback)"
-        result["recommendations"] = MOCK_DHAN_RESULTS
-        result["tradePlan"] = MOCK_DHAN_RESULTS[:5]
-        result["capitalAllocation"] = MOCK_CAPITAL_ALLOCATION
-        result["totalRisk"] = sum(r["riskAmount"] for r in MOCK_CAPITAL_ALLOCATION)
-        result["scannedCount"] = 500
-        result["passedCount"] = 10
-        result["isMock"] = True
+        # Genuine API failure (network/HTTP/timeout). Mock fallback is the
+        # right call here so the frontend always renders something.
+        _log.warning("Dhan ScanX API unreachable, using mock fallback: %s", exc)
+        return _mock_fallback(str(exc))
+
+    if not rows:
+        # API is reachable but returned zero rows — no mock data, just an
+        # honest empty panel.
+        _log.info("Dhan ScanX reachable but returned 0 rows")
+        return _empty_result()
+
+    # Run through feed_scanner for both directions
+    payload = {"data": rows}
+    long_results = scan_feed(payload, direction="LONG", top_n=top_n)
+    short_results = scan_feed(payload, direction="SHORT", top_n=top_n)
+
+    if not long_results and not short_results:
+        # API is fine, but nothing cleared either filter. Show an empty panel
+        # instead of fake mock picks.
+        _log.info("Dhan ScanX returned %d rows but 0 passed the feed_scanner filter", len(rows))
+        return _empty_result()
+
+    # Build trade plans (LONG = buy book, SHORT = sell book)
+    trade_plan = build_trade_plan(long_results, direction="LONG")
+    short_trade_plan = build_trade_plan(short_results, direction="SHORT")
+
+    # Convert to dicts
+    recommendations = _recommendation_dicts(long_results)
+    short_recommendations = _recommendation_dicts(short_results)
+
+    capital_allocation = [tp.to_dict() for tp in trade_plan]
+    total_risk = sum(tp.risk_amount for tp in trade_plan)
+
+    result.update({
+        "success": True,
+        "source": "dhan-scanx",
+        "recommendations": recommendations,
+        "shortRecommendations": short_recommendations,
+        "tradePlan": [tp.to_dict() for tp in trade_plan],
+        "shortTradePlan": [tp.to_dict() for tp in short_trade_plan],
+        "capitalAllocation": capital_allocation[:5],
+        "totalRisk": round(total_risk, 2),
+        "scannedCount": len(rows),
+        "passedCount": len(long_results) + len(short_results),
+        "longPassedCount": len(long_results),
+        "shortPassedCount": len(short_results),
+        "isMock": False,
+    })
 
     return result
