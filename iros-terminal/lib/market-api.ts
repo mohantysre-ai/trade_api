@@ -33,6 +33,8 @@ export type MarketNewsItem = {
   link: string;
   summary: string;
   publishedAt: string;
+  sentiment?: "Bullish" | "Bearish" | "Neutral";
+  category?: string;
 };
 
 export type LedgerStock = {

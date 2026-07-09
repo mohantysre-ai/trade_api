@@ -1414,19 +1414,77 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
 /*  NewsFeedPanel                                                                */
 /* -------------------------------------------------------------------------- */
 
-function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: string; link: string; summary: string; publishedAt: string }>; now: number }) {
-  if (!items?.length) {
-    return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden">
-        <div className="flex items-center gap-2 p-2.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white">
-          <span className="w-1 h-1 rounded-full bg-teal-400 animate-pulse" />
-          <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold">LIVE NEWS FEED</span>
-          <span className="ml-auto text-[7px] text-slate-400 uppercase tracking-wider">Waiting for data</span>
-        </div>
-        <div className="p-6 text-center text-slate-400 text-[9px]">No news stories available.</div>
-      </div>
-    );
+/* -------------------------------------------------------------------------- */
+/*  NewsFeedPanel — modern, non-scrolling grid of source cards                 */
+/* -------------------------------------------------------------------------- */
+
+type NewsItem = {
+  source: string;
+  title: string;
+  link: string;
+  summary: string;
+  publishedAt: string;
+  sentiment?: "Bullish" | "Bearish" | "Neutral";
+  category?: string;
+};
+
+const SOURCE_BRAND: Record<string, string> = {
+  moneycontrol: "#ff6f00",
+  livemint: "#1a7a5a",
+  news18: "#d6336c",
+  "indian express": "#c0392b",
+  inc42: "#0a66c2",
+  yourstory: "#e8490b",
+  google: "#1a73e8",
+  "business standard": "#1565c0",
+  "economic times": "#e0a800",
+  "financial express": "#c62828",
+  "business line": "#00897b",
+  "business today": "#1976d2",
+  forbes: "#111111",
+  zee: "#6a1b9a",
+  cnbc: "#0b6e4f",
+  mint: "#1a7a5a",
+};
+
+const FALLBACK_PALETTE = ["#6366f1", "#0ea5e9", "#14b8a6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#22c55e"];
+
+function sourceColor(name: string): string {
+  const lower = name.toLowerCase();
+  for (const key of Object.keys(SOURCE_BRAND)) {
+    if (lower.includes(key)) return SOURCE_BRAND[key];
   }
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return FALLBACK_PALETTE[hash % FALLBACK_PALETTE.length];
+}
+
+const SENTIMENT_STYLE: Record<string, { bg: string; txt: string; dot: string; label: string }> = {
+  Bullish: { bg: "bg-emerald-50", txt: "text-emerald-700", dot: "bg-emerald-500", label: "Bullish" },
+  Bearish: { bg: "bg-red-50", txt: "text-red-700", dot: "bg-red-500", label: "Bearish" },
+  Neutral: { bg: "bg-slate-100", txt: "text-slate-600", dot: "bg-slate-400", label: "Neutral" },
+};
+
+const CATEGORY_STYLE: Record<string, { bg: string; txt: string }> = {
+  Market: { bg: "bg-sky-50", txt: "text-sky-700" },
+  Earnings: { bg: "bg-violet-50", txt: "text-violet-700" },
+  Regulatory: { bg: "bg-amber-50", txt: "text-amber-700" },
+  Corporate: { bg: "bg-indigo-50", txt: "text-indigo-700" },
+  Economy: { bg: "bg-teal-50", txt: "text-teal-700" },
+  Commodity: { bg: "bg-orange-50", txt: "text-orange-700" },
+  Global: { bg: "bg-cyan-50", txt: "text-cyan-700" },
+};
+
+function categoryStyle(category?: string): { bg: string; txt: string } {
+  if (category && CATEGORY_STYLE[category]) return CATEGORY_STYLE[category];
+  return { bg: "bg-slate-100", txt: "text-slate-600" };
+}
+
+function NewsFeedPanel({ items, now }: { items?: NewsItem[]; now: number }) {
+  const [expanded, setExpanded] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [sentimentFilter, setSentimentFilter] = useState<string | null>(null);
 
   const timeAgo = (dateStr: string) => {
     const diff = now - new Date(dateStr).getTime();
@@ -1438,75 +1496,191 @@ function NewsFeedPanel({ items, now }: { items?: Array<{ title: string; source: 
     return `${Math.floor(hrs / 24)}d ago`;
   };
 
-  const TRACK_HEIGHT = 34;
-  const VISIBLE_ITEMS = 15;
+  const sources = useMemo(() => {
+    const set = new Set<string>();
+    (items ?? []).forEach((it) => it.source && set.add(it.source));
+    return Array.from(set).sort();
+  }, [items]);
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    (items ?? []).forEach((it) => it.category && set.add(it.category));
+    return Array.from(set).sort();
+  }, [items]);
+
+  const filtered = useMemo(() => {
+    return (items ?? []).filter((it) => {
+      if (sourceFilter && it.source !== sourceFilter) return false;
+      if (categoryFilter && (it.category ?? "Market") !== categoryFilter) return false;
+      if (sentimentFilter && (it.sentiment ?? "Neutral") !== sentimentFilter) return false;
+      return true;
+    });
+  }, [items, sourceFilter, categoryFilter, sentimentFilter]);
+
+  const hasFilters = sourceFilter || categoryFilter || sentimentFilter;
+  const displayed = expanded ? filtered : filtered.slice(0, 12);
+
+  if (!items?.length) {
+    return (
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-2xl shadow-sm overflow-hidden">
+        <div className="flex items-center gap-2 p-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white">
+          <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+          <span className="text-[10px] uppercase tracking-widest text-slate-700 font-black">Live News Feed</span>
+          <span className="ml-auto text-[9px] text-slate-400 uppercase tracking-wider">Waiting for data</span>
+        </div>
+        <div className="p-6 text-center text-slate-400 text-[11px]">No news stories available.</div>
+      </div>
+    );
+  }
+
+  const resetFilters = () => {
+    setSourceFilter(null);
+    setCategoryFilter(null);
+    setSentimentFilter(null);
+  };
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-[480px]">
+    <div className="bg-white border border-slate-300 border-[0.5px] rounded-2xl shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white flex-shrink-0">
-        <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-        <span className="text-[8px] uppercase tracking-widest text-slate-600 font-bold">Live News Feed</span>
-        <span className="ml-auto text-[7px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
-          {items.length} stories
-        </span>
-      </div>
-
-      {/* Ticker track */}
-      <div className="relative flex-1 overflow-hidden" style={{ minHeight: TRACK_HEIGHT * 2 }}>
-        <div
-          className="hover:[animation-play-state:paused] absolute inset-0"
-          style={{
-            animation: "tickerScroll 30s linear infinite",
-          }}
-        >
-          {items.map((item, i) => (
-            <a
-              key={`${item.title}-${i}`}
-              href={item.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-start gap-2 border-b border-slate-100 px-3 py-1.5 group hover:bg-emerald-50/50 transition-all duration-200 cursor-pointer"
-              style={{ minHeight: TRACK_HEIGHT }}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white">
+        <div className="flex items-center gap-2.5">
+          <div className="relative flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-teal-500 to-blue-600 shadow-md">
+            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider">Live News Feed</h3>
+            <p className="text-[8px] text-slate-500">{filtered.length} of {items.length} stories · {sources.length} sources</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:inline-flex text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100">
+            RSS · live
+          </span>
+          {hasFilters && (
+            <button
+              onClick={resetFilters}
+              className="text-[9px] font-bold text-slate-500 hover:text-red-600 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-full transition-colors"
             >
-              {/* Sequence badge */}
-              <span className="text-[7px] font-bold text-slate-400 bg-slate-100 w-4 h-4 flex items-center justify-center rounded border border-slate-200 flex-shrink-0 mt-0.5">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <span className="text-[10px] font-semibold text-slate-800 leading-snug line-clamp-2 group-hover:text-emerald-700 transition-colors">
-                  {item.title}
-                </span>
-                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                  <span className="text-[7px] font-semibold text-slate-400 uppercase tracking-wider truncate max-w-[80px]">
-                    {item.source.split(" ").slice(0, 2).join(" ")}
-                  </span>
-                  {item.summary && (
-                    <>
-                      <span className="text-slate-300">·</span>
-                      <span className="text-[8px] text-slate-500 line-clamp-1">{item.summary}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Timestamp */}
-              <span className="text-[7px] font-mono text-slate-400 flex-shrink-0 mt-0.5">
-                {timeAgo(item.publishedAt)}
-              </span>
-            </a>
-          ))}
+              Clear
+            </button>
+          )}
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="text-[9px] font-bold text-slate-500 hover:text-teal-700 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-full transition-colors"
+          >
+            {expanded ? "Collapse" : "Expand"}
+          </button>
         </div>
       </div>
 
-      <style>{`
-        @keyframes tickerScroll {
-          0%   { transform: translateY(0%); }
-          100% { transform: translateY(-50%); }
-        }
-      `}</style>
+      {/* Sticky filter bar */}
+      <div className="sticky top-2 z-20 flex flex-wrap items-center gap-1.5 px-4 py-2 bg-white/95 backdrop-blur border-b border-slate-100">
+        <span className="text-[8px] uppercase tracking-widest text-slate-400 font-bold mr-0.5">Filter:</span>
+        <select
+          value={categoryFilter ?? ""}
+          onChange={(e) => setCategoryFilter(e.target.value || null)}
+          className="text-[9px] font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-full px-2 py-1 outline-none focus:ring-1 focus:ring-teal-300 cursor-pointer"
+        >
+          <option value="">All Categories</option>
+          {categories.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+        {(["Bullish", "Bearish", "Neutral"] as const).map((s) => {
+          const st = SENTIMENT_STYLE[s];
+          const active = sentimentFilter === s;
+          return (
+            <button
+              key={s}
+              onClick={() => setSentimentFilter(active ? null : s)}
+              className={`flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border transition-colors ${
+                active ? `${st.bg} ${st.txt} border-current` : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+              {st.label}
+            </button>
+          );
+        })}
+        <select
+          value={sourceFilter ?? ""}
+          onChange={(e) => setSourceFilter(e.target.value || null)}
+          className="ml-auto text-[9px] font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-full px-2 py-1 outline-none focus:ring-1 focus:ring-teal-300 cursor-pointer max-w-[140px]"
+        >
+          <option value="">All Sources</option>
+          {sources.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* News grid (masonry via CSS columns) */}
+      {displayed.length === 0 ? (
+        <div className="p-6 text-center text-slate-400 text-[11px]">No stories match the current filters.</div>
+      ) : (
+        <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-3 p-3 [column-fill:_balance]">
+          {displayed.map((item, i) => {
+            const color = sourceColor(item.source);
+            const sentiment = item.sentiment ?? "Neutral";
+            const st = SENTIMENT_STYLE[sentiment];
+            const cat = categoryStyle(item.category);
+            return (
+              <a
+                key={`${item.title}-${i}`}
+                href={item.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group block break-inside-avoid mb-3 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+              >
+                {/* Top accent bar in source brand color */}
+                <div className="h-1 w-full" style={{ background: color }} />
+                <div className="p-3">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span
+                      className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded text-white truncate max-w-[120px]"
+                      style={{ background: color }}
+                      title={item.source}
+                    >
+                      {item.source}
+                    </span>
+                    <span className="ml-auto text-[8px] font-mono text-slate-400 whitespace-nowrap">{timeAgo(item.publishedAt)}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1 mb-1.5">
+                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${cat.bg} ${cat.txt}`}>{item.category ?? "Market"}</span>
+                    <span className={`flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded ${st.bg} ${st.txt}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+                      {st.label}
+                    </span>
+                  </div>
+
+                  <h4 className="text-[11px] font-bold text-slate-800 leading-snug group-hover:text-teal-700 transition-colors line-clamp-3">
+                    {item.title}
+                  </h4>
+
+                  {/* Summary preview — revealed on hover */}
+                  <div className="grid grid-rows-[0fr] group-hover:grid-rows-[1fr] transition-all duration-200">
+                    <p className="overflow-hidden text-[9px] text-slate-500 leading-relaxed mt-0 group-hover:mt-1.5 line-clamp-4">
+                      {item.summary}
+                    </p>
+                  </div>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      )}
+
+      {!expanded && filtered.length > 12 && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="w-full py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-teal-700 hover:bg-slate-50 border-t border-slate-100 transition-colors"
+        >
+          Show {filtered.length - 12} more stories
+        </button>
+      )}
     </div>
   );
 }

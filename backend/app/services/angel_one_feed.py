@@ -10,14 +10,16 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import email
 import json
 import logging
-import os
 import math
+import os
 import re
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import httpx # Added for internal API calls
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -160,18 +162,62 @@ def _refresh_task_set_error(task_id: str, error: str) -> None:
             _REFRESH_TASKS[task_id]["error"] = error
 
 
-NEWS_FEEDS: list[tuple[str, str]] = [
-    ("Zerodha Pulse", "https://pulse.zerodha.com/"),
-    ("Trendlyne", "https://trendlyne.com/"),
-    ("Finshots", "https://finshots.in/"),
-    ("NSE NIFTY 100", "https://www.nseindia.com/index-tracker/NIFTY%20100"),
+# -----------------------------------------------------------------------------
+# NEWS INGESTION — RSS / Atom feeds (structured, not scraped HTML body text)
+# -----------------------------------------------------------------------------
+# Each entry: (display_name, rss_or_atom_url, default_category)
+# Feeds are fetched concurrently and parsed as XML. A dead feed simply raises
+# and is skipped, so it never blanks the whole panel. This replaces the old
+# HTML-body scraping which returned nav text instead of real headlines.
+
+# Direct publisher feeds (verified parseable). A number of large Indian
+# outlets (ET, Business Standard, FE, CNBC-TV18, Zee, BL) either block
+# server-side fetches or dropped public RSS, so we lean on Google News
+# topic feeds (which surface the same publishers) for reliable breadth.
+NEWS_RSS_FEEDS: list[tuple[str, str, str]] = [
+    # --- Direct publisher RSS/Atom feeds ---
+    ("Moneycontrol Latest", "https://www.moneycontrol.com/rss/latestnews.xml", "Market"),
+    ("Moneycontrol Business", "https://www.moneycontrol.com/rss/business.xml", "Corporate"),
+    ("Moneycontrol Economy", "https://www.moneycontrol.com/rss/economy.xml", "Economy"),
+    ("Livemint Markets", "https://www.livemint.com/rss/markets", "Market"),
+    ("Livemint Companies", "https://www.livemint.com/rss/companies", "Corporate"),
+    ("Livemint Money", "https://www.livemint.com/rss/money", "Economy"),
+    ("Livemint Opinion", "https://www.livemint.com/rss/opinion", "Market"),
+    ("News18 Markets", "https://www.news18.com/rss/markets.xml", "Market"),
+    ("News18 Business", "https://www.news18.com/rss/business.xml", "Market"),
+    ("Indian Express Business", "https://indianexpress.com/section/business/feed/", "Market"),
+    ("Inc42", "https://inc42.com/feed/", "Corporate"),
+    ("YourStory", "https://yourstory.com/feed", "Corporate"),
+    # --- Google News topic feeds (India-focused, reliably parseable) ---
+    # Each entry's <source> element carries the real publisher, so the
+    # frontend badge shows the actual outlet, not "Google News".
+    ("Google · Markets", "https://news.google.com/rss/search?q=indian+stock+market&hl=en-IN&gl=IN&ceid=IN:en", "Market"),
+    ("Google · Sensex Nifty", "https://news.google.com/rss/search?q=sensex+nifty&hl=en-IN&gl=IN&ceid=IN:en", "Market"),
+    ("Google · FII DII", "https://news.google.com/rss/search?q=india+FII+DII+market&hl=en-IN&gl=IN&ceid=IN:en", "Market"),
+    ("Google · RBI Policy", "https://news.google.com/rss/search?q=RBI+monetary+policy+india&hl=en-IN&gl=IN&ceid=IN:en", "Regulatory"),
+    ("Google · SEBI", "https://news.google.com/rss/search?q=SEBI+india&hl=en-IN&gl=IN&ceid=IN:en", "Regulatory"),
+    ("Google · Earnings", "https://news.google.com/rss/search?q=indian+company+earnings+results&hl=en-IN&gl=IN&ceid=IN:en", "Earnings"),
+    ("Google · Dividend Buyback", "https://news.google.com/rss/search?q=india+dividend+buyback&hl=en-IN&gl=IN&ceid=IN:en", "Corporate"),
+    ("Google · IPO", "https://news.google.com/rss/search?q=indian+IPO+listing&hl=en-IN&gl=IN&ceid=IN:en", "Corporate"),
+    ("Google · Corporate Deals", "https://news.google.com/rss/search?q=indian+company+merger+acquisition+deal&hl=en-IN&gl=IN&ceid=IN:en", "Corporate"),
+    ("Google · IT Sector", "https://news.google.com/rss/search?q=indian+IT+sector+stocks&hl=en-IN&gl=IN&ceid=IN:en", "Corporate"),
+    ("Google · Pharma", "https://news.google.com/rss/search?q=indian+pharma+stocks&hl=en-IN&gl=IN&ceid=IN:en", "Corporate"),
+    ("Google · Auto Sales", "https://news.google.com/rss/search?q=india+auto+sales&hl=en-IN&gl=IN&ceid=IN:en", "Corporate"),
+    ("Google · Bank NPA", "https://news.google.com/rss/search?q=indian+banks+NPA&hl=en-IN&gl=IN&ceid=IN:en", "Regulatory"),
+    ("Google · GST Budget", "https://news.google.com/rss/search?q=india+GST+budget+economy&hl=en-IN&gl=IN&ceid=IN:en", "Economy"),
+    ("Google · Infrastructure", "https://news.google.com/rss/search?q=india+infrastructure+ECONOMIC&hl=en-IN&gl=IN&ceid=IN:en", "Economy"),
+    ("Google · Crude Oil", "https://news.google.com/rss/search?q=india+crude+oil+price&hl=en-IN&gl=IN&ceid=IN:en", "Commodity"),
+    ("Google · Gold", "https://news.google.com/rss/search?q=india+gold+price&hl=en-IN&gl=IN&ceid=IN:en", "Commodity"),
+    ("Google · Rupee Dollar", "https://news.google.com/rss/search?q=indian+rupee+dollar+forex&hl=en-IN&gl=IN&ceid=IN:en", "Commodity"),
+    ("Google · Startup Funding", "https://news.google.com/rss/search?q=india+startup+funding&hl=en-IN&gl=IN&ceid=IN:en", "Corporate"),
+    ("Google · Mutual Funds", "https://news.google.com/rss/search?q=india+mutual+funds+AMC&hl=en-IN&gl=IN&ceid=IN:en", "Market"),
 ]
 
 LIVE_UNIVERSE_LABEL = "Live Universe"
 
 
 def _news_feed_sources() -> list[str]:
-    return [source for source, _ in NEWS_FEEDS]
+    return [name for name, _, _ in NEWS_RSS_FEEDS]
 
 
 def _filter_prompt(custom_prompt: str | None = None) -> str:
@@ -362,37 +408,201 @@ def _clean_html(html: str) -> str:
         return re.sub(r"<[^>]+>", "", html)
 
 
-def _extract_html_items(source: str, url: str, limit: int = 3) -> list[dict[str, str]]:
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0 Safari/537.36"}
-    response = requests.get(url, timeout=15, headers=headers)
-    response.raise_for_status()
-    clean = _clean_html(response.text)
-    lines = [ln.strip() for ln in clean.splitlines() if ln.strip()]
-    items: list[dict[str, str]] = []
-    for line in lines[:limit]:
-        if len(line) < 20:
+# -----------------------------------------------------------------------------
+# RSS / Atom ingestion
+# -----------------------------------------------------------------------------
+# Real, structured headlines pulled from financial-news feeds. Each article is
+# normalized to {source, title, link, summary, publishedAt, sentiment,
+# category} and de-duplicated by normalized title across all sources.
+
+_ATOM_NS = "{http://www.w3.org/2005/Atom}"
+
+_BULLISH_WORDS: dict[str, int] = {
+    "beats": 30, "beat estimates": 35, "surges": 30, "surge": 28, "rallies": 28,
+    "jumps": 25, "gains": 18, "upgrade": 30, "upgraded": 30, "wins order": 32,
+    "wins contract": 32, "record profit": 35, "record high": 28, "approval": 25,
+    "nod": 20, "raises guidance": 32, "raised guidance": 32, "outperform": 25,
+    "buyback": 20, "expansion": 15, "strong demand": 22, "beats street": 32,
+    "profit jumps": 30, "profit rises": 25, "revenue growth": 18, "bullish": 22,
+    "rally": 24, "soars": 30, "tops estimate": 30, "inflows": 14, "recovery": 15,
+}
+_BEARISH_WORDS: dict[str, int] = {
+    "tumbles": 30, "crashes": 35, "plunges": 32, "slides": 22, "slips": 18,
+    "downgrade": 30, "downgraded": 30, "misses estimates": 32, "miss estimates": 30,
+    "cancellation": 28, "cancels order": 30, "probe": 28, "fraud": 35, "raid": 30,
+    "resigns": 22, "resignation": 22, "npa": 22, "slippage": 25, "governance": 15,
+    "pledge": 18, "delay": 15, "weak guidance": 28, "cuts guidance": 30,
+    "profit falls": 28, "loss widens": 30, "bearish": 22, "sell-off": 25,
+    "selloff": 25, "scam": 32, "slumps": 28, "sinks": 28, "outflows": 14,
+    "layoffs": 22, "defaults": 28, "warning": 18,
+}
+
+_CATEGORY_KEYWORDS: dict[str, list[str]] = {
+    "Earnings": ["earnings", "result", "results", "profit", "revenue", "quarter", " q1 ", " q2 ", " q3 ", " q4 ", "eps", "dividend", "guidance", "net profit", "bottomline"],
+    "Regulatory": ["sebi", "rbi", "regulator", "regulatory", "supreme court", "cci", "penalty", "probe", "investigation", "ruling", "order", "ban", "nclt", "crackdown", "fine"],
+    "Commodity": ["crude", "gold", "silver", "oil", "commodity", "commodities", "brent", "natural gas", "wheat", "rupee", "dollar", "currency", "bullion"],
+    "Economy": ["gdp", "inflation", "fiscal", "budget", "economy", "imf", "fii", "dii", "macro", "policy", "repo rate", "monsoon", "trade deficit", "gst"],
+    "Global": ["wall street", "nasdaq", "dow", "s&p", "fed ", "us fed", "global", "china", "europe", "japan", "ukraine", "tariff"],
+    "Corporate": ["merger", "acquisition", "buyback", "promoter", "board", "ceo", "cfo", "management", "deal", "partnership", "launch", "order win", "contract", "joint venture", "subsidiary"],
+}
+
+
+def _xml_local(tag: str) -> str:
+    return tag.split("}")[-1]
+
+
+def _xml_child(el: "ET.Element", local: str) -> "ET.Element | None":
+    for child in el:
+        if _xml_local(child.tag) == local:
+            return child
+    return None
+
+
+def _xml_text(el: "ET.Element", local: str) -> str:
+    child = _xml_child(el, local)
+    if child is None:
+        return ""
+    return _clean_text(child.text or "")
+
+
+def _xml_link(el: "ET.Element") -> str:
+    links = [c for c in el if _xml_local(c.tag) == "link"]
+    if not links:
+        return ""
+    for link in links:
+        if link.get("rel") in (None, "alternate"):
+            href = link.get("href")
+            if href:
+                return href
+    href = links[0].get("href")
+    if href:
+        return href
+    return _clean_text(links[0].text or "")
+
+
+def _parse_published(value: str | None) -> str | None:
+    if not value:
+        return None
+    value = value.strip()
+    try:
+        dt = email.utils.parsedate_to_datetime(value)
+        if dt is not None:
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc).isoformat()
+    except Exception:
+        pass
+    for fmt in (
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%dT%H:%M:%SZ",
+        "%Y-%m-%d %H:%M:%S",
+        "%a, %d %b %Y %H:%M:%S %z",
+    ):
+        try:
+            return datetime.strptime(value, fmt).astimezone(timezone.utc).isoformat()
+        except Exception:
             continue
+    return None
+
+
+def _classify_sentiment(title: str, summary: str) -> str:
+    text = (title + " " + summary).lower()
+    score = 0
+    for word, weight in _BULLISH_WORDS.items():
+        if word in text:
+            score += weight
+    for word, weight in _BEARISH_WORDS.items():
+        if word in text:
+            score -= weight
+    if score >= 12:
+        return "Bullish"
+    if score <= -12:
+        return "Bearish"
+    return "Neutral"
+
+
+def _classify_category(title: str, summary: str, default_category: str) -> str:
+    text = (title + " " + summary).lower()
+    for category, words in _CATEGORY_KEYWORDS.items():
+        if any(word in text for word in words):
+            return category
+    return default_category or "Market"
+
+
+def _normalize_title(title: str) -> str:
+    return re.sub(r"\s+", " ", (title or "").lower()).strip()
+
+
+def _fetch_rss_feed(name: str, url: str, default_category: str, limit: int = 5) -> list[dict[str, str]]:
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"}
+    response = requests.get(url, timeout=10, headers=headers)
+    response.raise_for_status()
+    root = ET.fromstring(response.content)
+    nodes = root.findall(".//item")
+    if not nodes:
+        nodes = root.findall(f".//{_ATOM_NS}entry")
+    items: list[dict[str, str]] = []
+    for node in nodes[:limit]:
+        title = _xml_text(node, "title")
+        if not title or len(title) < 10:
+            continue
+        link = _xml_link(node)
+        summary = (
+            _xml_text(node, "description")
+            or _xml_text(node, "summary")
+            or _xml_text(node, "content")
+        )
+        # Use the entry's real publisher when present (Google News Atom feeds
+        # embed <source>Publisher</source>), otherwise fall back to the feed name.
+        source_child = _xml_child(node, "source")
+        source = _clean_text(source_child.text) if source_child is not None else ""
+        source = source or name
+        published = _parse_published(
+            _xml_text(node, "pubDate")
+            or _xml_text(node, "updated")
+            or _xml_text(node, "date")
+            or _xml_text(node, "published")
+        )
+        if not published:
+            published = _ist_now().isoformat()
         items.append(
             {
                 "source": source,
-                "title": line[:200],
-                "link": url,
-                "summary": line[:300],
-                "publishedAt": _ist_now().isoformat(),
+                "title": title[:300],
+                "link": link or url,
+                "summary": summary[:400],
+                "publishedAt": published,
+                "sentiment": _classify_sentiment(title, summary),
+                "category": _classify_category(title, summary, default_category),
             }
         )
     return items
 
 
-def fetch_live_news(limit: int = 10) -> list[dict[str, str]]:
-    news: list[dict[str, str]] = []
-    for source, url in NEWS_FEEDS:
-        try:
-            news.extend(_extract_html_items(source, url, limit=3))
-        except Exception:
+def fetch_live_news(limit: int = 40, per_feed: int = 4) -> list[dict[str, str]]:
+    items: list[dict[str, str]] = []
+    with ThreadPoolExecutor(max_workers=12) as executor:
+        futures = [
+            executor.submit(_fetch_rss_feed, name, url, category, per_feed)
+            for name, url, category in NEWS_RSS_FEEDS
+        ]
+        for future in as_completed(futures):
+            try:
+                items.extend(future.result())
+            except Exception:
+                continue
+
+    seen: set[str] = set()
+    deduped: list[dict[str, str]] = []
+    for item in items:
+        key = _normalize_title(item.get("title", ""))
+        if key in seen:
             continue
-    news.sort(key=lambda item: item.get("publishedAt", ""), reverse=True)
-    return news[:limit]
+        seen.add(key)
+        deduped.append(item)
+
+    deduped.sort(key=lambda item: item.get("publishedAt", ""), reverse=True)
+    return deduped[:limit]
 
 
 # Use the canonical _llm_config from llm_client.py instead of this local one.
@@ -1760,10 +1970,18 @@ def build_market_payload(
         snapshot.setdefault("tickerNewsByTicker", {})
         if pool_name:
             snapshot["activePool"] = pool_name
+        # Always serve fresh RSS news even when the rest of the snapshot is cached,
+        # so the news panel never shows stale, pre-RSS headlines.
+        try:
+            fresh_news = fetch_live_news()
+            if fresh_news:
+                snapshot["news"] = fresh_news
+        except Exception:
+            pass
         _apply_selection_meta(
             snapshot,
             mode="snapshot",
-            reason="Cache preferred. Serving the latest saved snapshot.",
+            reason="Cache preferred. Serving the latest saved snapshot with fresh news.",
             data_date=_payload_data_date(snapshot),
         )
         return _hydrate_ticker_intelligence_map(snapshot)

@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -41,6 +42,11 @@ try:
 except ImportError:
     # Fallback if running from project root
     from app.services.ai_ticker_news import generate_ticker_news_report, PulseNewsCollector
+
+try:
+    from .angel_one_feed import fetch_live_news
+except ImportError:
+    from app.services.angel_one_feed import fetch_live_news
 
 try:
     from ..utils.symbols import WATCHLIST
@@ -433,23 +439,58 @@ def _clean_time_label(raw: str) -> str:
     return cleaned or "recent"
 
 
+def _relative_time(iso: str | None) -> str:
+    """Turn an ISO-8601 timestamp into a short 'Xm/h/d ago' label for
+    RSS items that carry a real publish time."""
+    from datetime import datetime, timezone as _tz
+
+    if not iso:
+        return "recent"
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+        diff = (datetime.now(_tz.utc) - dt).total_seconds()
+        if diff < 60:
+            return "just now"
+        if diff < 3600:
+            return f"{int(diff // 60)}m ago"
+        if diff < 86400:
+            return f"{int(diff // 3600)}h ago"
+        return f"{int(diff // 86400)}d ago"
+    except Exception:
+        return "recent"
+
+
 @app.get("/api/pulse-feed")
 async def pulse_feed(
     limit: int = Query(30, ge=1, le=50, description="Max stories to return"),
 ):
-    """General market news feed for NewsWire.jsx, sourced from Zerodha
-    Pulse via the existing PulseNewsCollector (symbols=None => no
-    ticker filter, i.e. the general tape rather than one company)."""
+    """General market news feed for NewsWire.jsx.
+
+    Combines the existing Zerodha Pulse scrape (fast triage tape) with the
+    structured RSS / Atom India financial feeds from angel_one_feed
+    (Moneycontrol, Livemint, News18, Inc42/YourStory and Google News topic
+    feeds). RSS items carry real publish times and publishers, so they are
+    de-duplicated by headline and merged in.
+    """
     try:
         collector = PulseNewsCollector()
         articles = await collector.fetch_latest_news(symbols=None)
     except Exception as e:
         logger.error("Pulse feed fetch failed: %s", e)
-        return {"stories": [], "count": 0, "error": True, "message": str(e)}
+        articles = []
 
     deltas = _load_snapshot_deltas()
-    stories = []
+    stories: list[dict] = []
+    seen_headlines: set[str] = set()
+
+    def _key(text: str) -> str:
+        return re.sub(r"\s+", " ", (text or "").lower())[:80]
+
     for a in articles[:limit]:
+        key = _key(a.title)
+        if key in seen_headlines:
+            continue
+        seen_headlines.add(key)
         sentiment, score = _classify_sentiment(f"{a.title} {a.summary}")
         tickers = _extract_tickers(a.title, deltas)
         impact = _classify_impact(len(tickers), score)
@@ -464,11 +505,40 @@ async def pulse_feed(
             "snippet": a.summary,
             "url": a.url,
             "tickers": tickers,
+            "category": "Market",
         })
 
+    # Merge structured RSS / Atom India financial feeds.
+    try:
+        rss_items = await asyncio.to_thread(fetch_live_news, limit, 4)
+        for it in rss_items:
+            headline = it.get("title", "")
+            key = _key(headline)
+            if key in seen_headlines:
+                continue
+            seen_headlines.add(key)
+            sentiment = (it.get("sentiment") or "Neutral").lower()
+            tickers = _extract_tickers(headline, deltas)
+            impact = _classify_impact(len(tickers), 0)
+            stories.append({
+                "id": f"rss-{abs(hash(it.get('link') or headline)) % (10 ** 10)}",
+                "time": _relative_time(it.get("publishedAt")),
+                "source": it.get("source", ""),
+                "sentiment": sentiment,
+                "impact": impact,
+                "score": 0,
+                "headline": headline,
+                "snippet": it.get("summary", ""),
+                "url": it.get("link") or it.get("url", ""),
+                "tickers": tickers,
+                "category": it.get("category", "Market"),
+            })
+    except Exception as e:
+        logger.error("RSS merge into pulse-feed failed: %s", e)
+
     return {
-        "stories": stories,
-        "count": len(stories),
+        "stories": stories[:limit],
+        "count": len(stories[:limit]),
         "error": False,
         "generated_at": __import__("datetime").datetime.now(
             __import__("datetime").timezone.utc
