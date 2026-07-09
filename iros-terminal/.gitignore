@@ -45,3 +45,6 @@ backend/__pycache__/
 backend/*.log
 __pycache__/
 *.pyc
+
+# sparkline cache (1-hour TTL snapshot files)
+.sparkline-cache/

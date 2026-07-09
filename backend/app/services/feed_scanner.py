@@ -42,10 +42,12 @@ from typing import List, Optional
 
 
 RSI_LONG_BAND = (50, 75)
-RSI_SHORT_BAND = (25, 50)
+RSI_SHORT_BAND = (25, 45)         # tightened from (25,50) — avoids near-neutral 45-50 zone
 MIN_DELIVERY_PCT = 15.0          # filters out pure-churn/illiquid names
 BREAKOUT_TOLERANCE = 0.999        # allow LTP within 0.1% of the 15m high (not just strictly above)
+BREAKDOWN_TOLERANCE = 0.999       # LTP must be at least 0.1% BELOW 15m EMA50 for a real breakdown
 TARGET_R_MULTIPLE = 2.0
+TARGET_R_MULTIPLE_SHORT = 2.5    # shorts tend to move faster — wider target for better R:R
 
 
 @dataclass
@@ -125,19 +127,27 @@ def evaluate_stock(stock: dict, direction: str = "LONG") -> Optional[ScanResult]
 
     elif direction == "SHORT":
         rsi_ok = RSI_SHORT_BAND[0] <= rsi <= RSI_SHORT_BAND[1]
-        breakdown_ok = ltp <= m15_high / BREAKOUT_TOLERANCE and ltp < m15_ema50
+        # Proper breakdown: LTP must be below 15m EMA50 by at least the
+        # tolerance margin (not just "below 15m high / 0.999" which is
+        # true for almost any stock). Also require LTP below the 15m
+        # high to confirm we're not in an intraday bounce.
+        breakdown_ok = ltp < m15_ema50 * BREAKDOWN_TOLERANCE and ltp < m15_high
         trend_ok = ltp < m5_ema50 and ltp < m15_ema50
         daily_trend_ok = ltp < sma50
+        # Price must be down on the day (negative price change) — avoids
+        # shorting stocks that are up but below EMA50 due to a pullback
+        price_down_ok = price_chg < 0
         delivery_ok = delivery_pct is None or delivery_pct >= MIN_DELIVERY_PCT
 
-        if not (rsi_ok and breakdown_ok and trend_ok and daily_trend_ok and delivery_ok):
+        if not (rsi_ok and breakdown_ok and trend_ok and daily_trend_ok and price_down_ok and delivery_ok):
             return None
 
         reasons = [
             f"RSI {rsi:.1f} in momentum band {RSI_SHORT_BAND}",
-            f"LTP {ltp:.2f} below 15m EMA50 ({m15_ema50:.2f})",
+            f"LTP {ltp:.2f} below 15m EMA50 ({m15_ema50:.2f}) by >0.1%",
             f"Below 5m EMA50 ({m5_ema50:.2f}) and 15m EMA50",
             f"Below daily SMA50 ({sma50:.2f})",
+            f"Down {price_chg:.2f}% on the day (confirmed selling)",
         ]
         if delivery_pct is not None:
             reasons.append(f"Delivery {delivery_pct:.1f}% >= {MIN_DELIVERY_PCT}%")
@@ -145,8 +155,10 @@ def evaluate_stock(stock: dict, direction: str = "LONG") -> Optional[ScanResult]
         entry = ltp
         stop = entry + atr
         risk = stop - entry
-        target = entry - TARGET_R_MULTIPLE * risk
-        score = (50 - rsi) + (sma50 - ltp) / sma50 * 100 - price_chg
+        target = entry - TARGET_R_MULTIPLE_SHORT * risk
+        # Score: reward momentum (low RSI), distance below SMA50, and
+        # intraday decline magnitude — mirrors the LONG score structure
+        score = (50 - rsi) + (sma50 - ltp) / sma50 * 100 + abs(price_chg)
 
     else:
         return None

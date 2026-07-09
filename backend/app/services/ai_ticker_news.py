@@ -754,11 +754,12 @@ _llm_cache: dict[str, dict] = {}
 
 
 def _load_llm_cache() -> None:
-    """Load cached LLM summaries from trade_api_snapshot.json -> tickerNewsByTicker."""
+    """Load cached LLM summaries from trade_api_snapshot.json -> tickerNewsByTicker.
+    Uses utf-8-sig to handle files with a UTF-8 BOM (Byte Order Mark)."""
     global _llm_cache
     try:
         if os.path.exists(_SNAPSHOT_FILE):
-            with open(_SNAPSHOT_FILE, "r", encoding="utf-8") as f:
+            with open(_SNAPSHOT_FILE, "r", encoding="utf-8-sig") as f:
                 snapshot = json.load(f)
             _llm_cache = snapshot.get("tickerNewsByTicker", {})
             logger.info("Loaded %d cached LLM summaries from snapshot", len(_llm_cache))
@@ -768,11 +769,12 @@ def _load_llm_cache() -> None:
 
 
 def _save_llm_cache() -> None:
-    """Persist LLM summary into trade_api_snapshot.json -> tickerNewsByTicker."""
+    """Persist LLM summary into trade_api_snapshot.json -> tickerNewsByTicker.
+    Uses utf-8-sig for reading (handles BOM) and utf-8 for writing (no BOM)."""
     try:
         snapshot = {}
         if os.path.exists(_SNAPSHOT_FILE):
-            with open(_SNAPSHOT_FILE, "r", encoding="utf-8") as f:
+            with open(_SNAPSHOT_FILE, "r", encoding="utf-8-sig") as f:
                 snapshot = json.load(f)
         snapshot["tickerNewsByTicker"] = _llm_cache
         with open(_SNAPSHOT_FILE, "w", encoding="utf-8") as f:

@@ -29,7 +29,8 @@ PER_STOCK_CAPITAL = 100_000.0    # ₹1 Lakh each (5 stocks)
 TOP_N = 10                       # top 10 from scanner
 TRADE_PLAN_STOCKS = 5            # top 5 get capital allocation
 TARGET_1_R_MULTIPLE = 1.5        # first target at 1.5R
-TARGET_2_R_MULTIPLE = 3.0        # second target at 3R
+TARGET_2_R_MULTIPLE = 3.0        # second target at 3R (long)
+TARGET_2_R_MULTIPLE_SHORT = 2.5  # second target at 2.5R (short — tighter, faster moves)
 
 
 @dataclass
@@ -73,12 +74,13 @@ def build_trade_plan(scan_results: List[ScanResult], direction: str = "LONG") ->
         if r.entry <= 0 or r.risk_per_share <= 0:
             continue
 
-        # Calculate targets using the scanner's R multiples
-        # (feed_scanner uses TARGET_R_MULTIPLE=2.0 as single target,
-        #  we expand to T1=1.5R, T2=3.0R for the trade plan)
+        # Calculate targets using direction-appropriate R multiples
+        # LONG:  T1=1.5R, T2=3.0R   (standard 1:3 risk-reward)
+        # SHORT: T1=1.5R, T2=2.5R   (tighter — shorts move faster, book earlier)
         risk = r.risk_per_share
+        t2_multiple = TARGET_2_R_MULTIPLE if direction == "LONG" else TARGET_2_R_MULTIPLE_SHORT
         t1 = r.entry + TARGET_1_R_MULTIPLE * risk if direction == "LONG" else r.entry - TARGET_1_R_MULTIPLE * risk
-        t2 = r.entry + TARGET_2_R_MULTIPLE * risk if direction == "LONG" else r.entry - TARGET_2_R_MULTIPLE * risk
+        t2 = r.entry + t2_multiple * risk if direction == "LONG" else r.entry - t2_multiple * risk
 
         # Capital allocation: ₹1L per stock
         buy_price = r.entry
@@ -86,7 +88,7 @@ def build_trade_plan(scan_results: List[ScanResult], direction: str = "LONG") ->
         deployed = qty * buy_price
         risk_amount = qty * risk
 
-        rr_t2 = TARGET_2_R_MULTIPLE  # always 3.0 by construction
+        rr_t2 = t2_multiple  # 3.0 for long, 2.5 for short
 
         rows.append(TradePlanRow(
             symbol=r.symbol,
@@ -163,7 +165,9 @@ def _mock_fallback(error: str) -> dict:
         "tradePlan": MOCK_DHAN_RESULTS[:5],
         "shortTradePlan": [],
         "capitalAllocation": MOCK_CAPITAL_ALLOCATION,
+        "shortCapitalAllocation": [],
         "totalRisk": sum(r["riskAmount"] for r in MOCK_CAPITAL_ALLOCATION),
+        "shortTotalRisk": 0.0,
         "totalCapital": TOTAL_CAPITAL,
         "scannedCount": 500,
         "passedCount": 10,
@@ -189,7 +193,9 @@ def _empty_result() -> dict:
         "tradePlan": [],
         "shortTradePlan": [],
         "capitalAllocation": [],
+        "shortCapitalAllocation": [],
         "totalRisk": 0.0,
+        "shortTotalRisk": 0.0,
         "totalCapital": TOTAL_CAPITAL,
         "scannedCount": 0,
         "passedCount": 0,
@@ -213,9 +219,9 @@ def _recommendation_dicts(scan_results: List[ScanResult]) -> List[dict]:
             "buyAbove": r.entry,
             "stopLoss": r.stop_loss,
             "target1": round(r.entry + 1.5 * r.risk_per_share if r.direction == "LONG" else r.entry - 1.5 * r.risk_per_share, 2),
-            "target2": round(r.entry + 3.0 * r.risk_per_share if r.direction == "LONG" else r.entry - 3.0 * r.risk_per_share, 2),
+            "target2": round(r.entry + (3.0 if r.direction == "LONG" else 2.5) * r.risk_per_share if r.direction == "LONG" else r.entry - 2.5 * r.risk_per_share, 2),
             "riskPerShare": round(r.risk_per_share, 2),
-            "rrT2": 3.0,
+            "rrT2": 3.0 if r.direction == "LONG" else 2.5,
             "rsi": r.rsi,
             "deliveryPct": r.delivery_pct,
             "score": r.score,
@@ -231,11 +237,12 @@ def fetch_dhan_scan_results(min_volume: int = 1_000_000, top_n: int = TOP_N) -> 
     Returns LONG picks in 'recommendations' and SHORT/SELL picks in
     'shortRecommendations', each with its own trade plan. 'tradePlan' /
     'capitalAllocation' describe the LONG deployment (buy) book;
-    'shortTradePlan' describes the SHORT book.
+    'shortTradePlan' / 'shortCapitalAllocation' describe the SHORT book.
 
     Returns a dict with 'success', 'source', 'recommendations',
     'shortRecommendations', 'tradePlan', 'shortTradePlan', 'capitalAllocation',
-    'totalCapital', 'totalRisk', and 'error' (if any).
+    'shortCapitalAllocation', 'totalCapital', 'totalRisk', 'shortTotalRisk',
+    and 'error' (if any).
     """
     result: Dict[str, Any] = {
         "success": False,
@@ -245,8 +252,10 @@ def fetch_dhan_scan_results(min_volume: int = 1_000_000, top_n: int = TOP_N) -> 
         "tradePlan": [],
         "shortTradePlan": [],
         "capitalAllocation": [],
+        "shortCapitalAllocation": [],
         "totalCapital": TOTAL_CAPITAL,
         "totalRisk": 0.0,
+        "shortTotalRisk": 0.0,
         "error": None,
     }
 
@@ -293,7 +302,9 @@ def fetch_dhan_scan_results(min_volume: int = 1_000_000, top_n: int = TOP_N) -> 
     short_recommendations = _recommendation_dicts(short_results)
 
     capital_allocation = [tp.to_dict() for tp in trade_plan]
+    short_capital_allocation = [tp.to_dict() for tp in short_trade_plan]
     total_risk = sum(tp.risk_amount for tp in trade_plan)
+    short_total_risk = sum(tp.risk_amount for tp in short_trade_plan)
 
     result.update({
         "success": True,
@@ -303,7 +314,9 @@ def fetch_dhan_scan_results(min_volume: int = 1_000_000, top_n: int = TOP_N) -> 
         "tradePlan": [tp.to_dict() for tp in trade_plan],
         "shortTradePlan": [tp.to_dict() for tp in short_trade_plan],
         "capitalAllocation": capital_allocation[:5],
+        "shortCapitalAllocation": short_capital_allocation[:5],
         "totalRisk": round(total_risk, 2),
+        "shortTotalRisk": round(short_total_risk, 2),
         "scannedCount": len(rows),
         "passedCount": len(long_results) + len(short_results),
         "longPassedCount": len(long_results),

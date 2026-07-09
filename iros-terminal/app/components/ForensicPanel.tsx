@@ -4,13 +4,39 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MarketDataResponse, TerminalIntelligence, LiveStock, SparkFlag } from '@/lib/market-api';
 import { fetchNseSparkline } from '@/lib/market-api';
 
-/* ── Sparkline: real price data from NSE India ─────────────────────────── */
+/* ── Smooth sparkline SVG with Catmull-Rom spline ─────────────────────── */
 const SPARK_FLAGS: SparkFlag[] = ['1D', '1M', '1Y'];
 
 let assetSparkIdCounter = 0;
 
+/**
+ * Convert Catmull-Rom spline points to smooth cubic bezier path.
+ * Produces organic, flowing curves instead of jagged line segments.
+ */
+function catmullRomToBezier(points: readonly (readonly [number, number])[]): string {
+  if (points.length < 2) return '';
+  if (points.length === 2) {
+    return `M ${points[0][0].toFixed(2)},${points[0][1].toFixed(2)} L ${points[1][0].toFixed(2)},${points[1][1].toFixed(2)}`;
+  }
+  const tension = 0.5;
+  let d = `M ${points[0][0].toFixed(2)},${points[0][1].toFixed(2)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    const cp1x = p1[0] + (p2[0] - p0[0]) / 6 * tension * 2;
+    const cp1y = p1[1] + (p2[1] - p0[1]) / 6 * tension * 2;
+    const cp2x = p2[0] - (p3[0] - p1[0]) / 6 * tension * 2;
+    const cp2y = p2[1] - (p3[1] - p1[1]) / 6 * tension * 2;
+    d += ` C ${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2[0].toFixed(2)},${p2[1].toFixed(2)}`;
+  }
+  return d;
+}
+
 function StockSparklineSVG({ data }: { data: number[] }) {
   const [id] = useState(() => `asset-spk-${++assetSparkIdCounter}`);
+  const [glowId] = useState(() => `asset-glow-${++assetSparkIdCounter}`);
   if (!data || data.length < 2) return null;
 
   const first = data[0];
@@ -18,9 +44,9 @@ function StockSparklineSVG({ data }: { data: number[] }) {
   const positive = last >= first;
   const color = positive ? '#10b981' : '#ef4444';
 
-  const W = 100;
-  const H = 32;
-  const pad = 2;
+  const W = 120;
+  const H = 40;
+  const pad = 3;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
@@ -31,30 +57,91 @@ function StockSparklineSVG({ data }: { data: number[] }) {
     return [x, y] as const;
   });
 
-  const pathD = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+  // Smooth curve via Catmull-Rom spline
+  const pathD = catmullRomToBezier(points);
   const areaD = `${pathD} L ${points[points.length - 1][0].toFixed(2)},${H} L ${points[0][0].toFixed(2)},${H} Z`;
   const lastPt = points[points.length - 1];
+
+  // Grid lines for reference
+  const gridLines = [0.25, 0.5, 0.75].map((f) => pad + f * (H - pad * 2));
 
   /* min/max labels */
   const minIdx = data.indexOf(Math.min(...data));
   const maxIdx = data.indexOf(Math.max(...data));
 
   return (
-    <svg className="w-full h-8 opacity-85" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+    <svg
+      className="w-full h-10"
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      style={{ filter: `drop-shadow(0 1px 2px ${color}20)` }}
+    >
       <defs>
+        {/* Rich multi-stop gradient for area fill */}
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.4" />
+          <stop offset="50%" stopColor={color} stopOpacity="0.15" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
+        {/* Glow filter for the stroke */}
+        <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="1.2" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
+
+      {/* Subtle grid lines */}
+      {gridLines.map((gy, i) => (
+        <line
+          key={`grid-${i}`}
+          x1={pad}
+          y1={gy}
+          x2={W - pad}
+          y2={gy}
+          stroke="rgba(148,163,184,0.12)"
+          strokeWidth="0.3"
+          strokeDasharray="2,3"
+        />
+      ))}
+
+      {/* Area fill with gradient */}
       <path d={areaD} fill={`url(#${id})`} />
-      <path d={pathD} stroke={color} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Smooth line with glow */}
+      <path
+        d={pathD}
+        stroke={color}
+        strokeWidth="1.2"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        filter={`url(#${glowId})`}
+        className="sparkline-draw"
+        style={{
+          strokeDasharray: 300,
+          strokeDashoffset: 0,
+        }}
+      />
+
       {/* High dot */}
       <circle cx={points[maxIdx][0]} cy={points[maxIdx][1]} r="1.5" fill={color} stroke="white" strokeWidth="0.8" opacity="0.6" />
       {/* Low dot */}
       <circle cx={points[minIdx][0]} cy={points[minIdx][1]} r="1.5" fill={color} stroke="white" strokeWidth="0.8" opacity="0.6" />
-      {/* End dot */}
-      <circle cx={lastPt[0]} cy={lastPt[1]} r="2" fill={color} stroke="white" strokeWidth="1" />
+
+      {/* Pulsing dot at the latest price point */}
+      <circle cx={lastPt[0]} cy={lastPt[1]} r="2.5" fill={color} stroke="white" strokeWidth="1.2">
+        <animate attributeName="r" values="2.5;3.5;2.5" dur="2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0.7;1" dur="2s" repeatCount="indefinite" />
+      </circle>
+
+      {/* Outer pulse ring */}
+      <circle cx={lastPt[0]} cy={lastPt[1]} r="2.5" fill="none" stroke={color} strokeWidth="0.8" opacity="0.5">
+        <animate attributeName="r" values="2.5;6;2.5" dur="2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite" />
+      </circle>
     </svg>
   );
 }
@@ -64,7 +151,6 @@ function useStockSparklines(tickers: string[], flag: SparkFlag): Record<string, 
   const fetchedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    const key = `__flag_${flag}`;
     const missing = tickers.filter((t) => t && !fetchedRef.current.has(`${t}:${flag}`));
     if (missing.length === 0) return;
 
@@ -102,10 +188,8 @@ function useStockSparklines(tickers: string[], flag: SparkFlag): Record<string, 
           fetchedRef.current.add(`${result.value.ticker}:${flag}`);
         }
       }
-      console.debug('[ForensicPanel spark] updates', Object.keys(updates).length, results.map(r => r.status === 'fulfilled' ? r.value.ticker + '=' + r.value.sparkline.length : 'rejected').join(', '));
 
       if (Object.keys(updates).length > 0) {
-        console.debug('[ForensicPanel spark] setSparklines tickers=', Object.keys(updates));
         setSparklines((prev) => {
           const next = { ...prev };
           for (const [tkr, flagData] of Object.entries(updates)) {
@@ -149,12 +233,23 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag }: 
   return (
     <div className="mb-1.5 relative z-10">
       {/* Chart area */}
-      <div className="rounded-md overflow-hidden" style={{ background: hasData ? 'rgba(100,116,139,0.04)' : 'transparent' }}>
+      <div
+        className="rounded-lg overflow-hidden transition-all"
+        style={{
+          background: hasData
+            ? 'linear-gradient(135deg, rgba(100,116,139,0.03) 0%, rgba(100,116,139,0.06) 100%)'
+            : 'transparent',
+        }}
+      >
         {hasData ? (
           <StockSparklineSVG data={data!} />
         ) : (
-          <div className="h-8 flex items-center justify-center">
-            <span className="text-[7px] text-slate-300 uppercase tracking-wider">Loading…</span>
+          <div className="h-10 flex items-center justify-center">
+            <div className="flex items-center gap-1">
+              <div className="w-1 h-1 rounded-full bg-slate-300 animate-pulse" />
+              <div className="w-1 h-1 rounded-full bg-slate-300 animate-pulse" style={{ animationDelay: '0.2s' }} />
+              <div className="w-1 h-1 rounded-full bg-slate-300 animate-pulse" style={{ animationDelay: '0.4s' }} />
+            </div>
           </div>
         )}
       </div>
@@ -165,10 +260,10 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag }: 
             <button
               key={f}
               onClick={(e) => { e.stopPropagation(); onFlagChange(f); }}
-              className={`px-1 py-0 rounded text-[7px] font-bold uppercase tracking-wider transition-all ${
+              className={`px-1.5 py-0.5 rounded-md text-[7px] font-bold uppercase tracking-wider transition-all ${
                 f === currentFlag
-                  ? 'bg-slate-800 text-white'
-                  : 'bg-transparent text-slate-400 hover:text-slate-600'
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'bg-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-100'
               }`}
             >
               {f}
@@ -203,7 +298,6 @@ export default function ForensicPanel({
   liveMarket?: MarketDataResponse | null;
   refreshOnDemand?: () => Promise<void>;
 }) {
-  console.warn('[DEBUG] ForensicPanel render', { stocks: liveMarket?.stocks?.length });
   const [refreshing, setRefreshing] = useState(false);
 
   const live = liveMarket ?? null;
@@ -229,7 +323,6 @@ export default function ForensicPanel({
     };
 
     if (intelligence?.ledger_stocks?.length) {
-      // Sort by score descending first
       const sorted = [...intelligence.ledger_stocks].sort(
         (a, b) => (typeof b.score === 'number' ? b.score : 0) - (typeof a.score === 'number' ? a.score : 0)
       );
@@ -239,7 +332,6 @@ export default function ForensicPanel({
         const action = row.action || '';
         const reason = row.selection_reason || action;
         const score = typeof row.score === 'number' ? row.score : 0;
-        // Risk flag based on relative rank in cohort (tertiles)
         const tertile = total > 0 ? Math.floor((i / total) * 3) : 0;
         let riskFlag: string;
         if (tertile === 0) riskFlag = 'LOW_RISK';
@@ -410,6 +502,20 @@ export default function ForensicPanel({
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes sparkline-draw {
+          from { stroke-dashoffset: 300; }
+          to { stroke-dashoffset: 0; }
+        }
+        .sparkline-draw {
+          animation: sparkline-draw 1.2s ease-out forwards;
+        }
+        @keyframes sparkline-fade-in {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </section>
   );
 }

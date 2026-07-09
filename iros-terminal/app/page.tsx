@@ -298,7 +298,7 @@ function MiniSparkline({ positive }: { positive: boolean }) {
         </linearGradient>
       </defs>
       <path d={areaD} fill={fillUrl} />
-      <path d={pathD} stroke={color} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={pathD} stroke={color} strokeWidth="1.0" fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

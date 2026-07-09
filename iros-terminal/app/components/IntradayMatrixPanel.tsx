@@ -4,22 +4,52 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import type { SparkFlag } from '@/lib/market-api';
 import { fetchNseSparkline } from '@/lib/market-api';
 
-/* ── 30-day sparkline SVG from real price data ─────────────────────────── */
+/* ── Smooth sparkline SVG with Catmull-Rom spline ─────────────────────── */
 let intraSparkIdCounter = 0;
 const SPARK_FLAGS: SparkFlag[] = ['1D', '1M', '1Y'];
 
-function StockSparklineSVG({ data }: { data: number[] }) {
+/**
+ * Convert Catmull-Rom spline points to smooth cubic bezier path.
+ * Produces organic, flowing curves instead of jagged line segments.
+ */
+function catmullRomToBezier(points: readonly (readonly [number, number])[]): string {
+  if (points.length < 2) return '';
+  if (points.length === 2) {
+    return `M ${points[0][0].toFixed(2)},${points[0][1].toFixed(2)} L ${points[1][0].toFixed(2)},${points[1][1].toFixed(2)}`;
+  }
+  const tension = 0.5;
+  let d = `M ${points[0][0].toFixed(2)},${points[0][1].toFixed(2)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    const cp1x = p1[0] + (p2[0] - p0[0]) / 6 * tension * 2;
+    const cp1y = p1[1] + (p2[1] - p0[1]) / 6 * tension * 2;
+    const cp2x = p2[0] - (p3[0] - p1[0]) / 6 * tension * 2;
+    const cp2y = p2[1] - (p3[1] - p1[1]) / 6 * tension * 2;
+    d += ` C ${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2[0].toFixed(2)},${p2[1].toFixed(2)}`;
+  }
+  return d;
+}
+
+function StockSparklineSVG({ data, direction }: { data: number[]; direction?: string }) {
   const [id] = useState(() => `intra-spk-${++intraSparkIdCounter}`);
+  const [glowId] = useState(() => `intra-glow-${++intraSparkIdCounter}`);
   if (!data || data.length < 2) return null;
 
   const first = data[0];
   const last = data[data.length - 1];
   const positive = last >= first;
-  const color = positive ? '#10b981' : '#ef4444';
+  // For SHORT picks, invert the color logic: green when price is falling (good for shorts)
+  const isShort = direction === 'SHORT';
+  const color = isShort
+    ? (last <= first ? '#10b981' : '#ef4444')
+    : (positive ? '#10b981' : '#ef4444');
 
-  const W = 100;
-  const H = 32;
-  const pad = 2;
+  const W = 120;
+  const H = 40;
+  const pad = 3;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
@@ -30,21 +60,82 @@ function StockSparklineSVG({ data }: { data: number[] }) {
     return [x, y] as const;
   });
 
-  const pathD = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+  // Smooth curve via Catmull-Rom spline
+  const pathD = catmullRomToBezier(points);
   const areaD = `${pathD} L ${points[points.length - 1][0].toFixed(2)},${H} L ${points[0][0].toFixed(2)},${H} Z`;
   const lastPt = points[points.length - 1];
 
+  // Grid lines for reference
+  const gridLines = [0.25, 0.5, 0.75].map((f) => pad + f * (H - pad * 2));
+
   return (
-    <svg className="w-full h-8 opacity-85" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+    <svg
+      className="w-full h-10"
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      style={{ filter: `drop-shadow(0 1px 2px ${color}20)` }}
+    >
       <defs>
+        {/* Rich multi-stop gradient for area fill */}
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.4" />
+          <stop offset="50%" stopColor={color} stopOpacity="0.15" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
+        {/* Glow filter for the stroke */}
+        <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="1.2" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
+
+      {/* Subtle grid lines */}
+      {gridLines.map((gy, i) => (
+        <line
+          key={`grid-${i}`}
+          x1={pad}
+          y1={gy}
+          x2={W - pad}
+          y2={gy}
+          stroke="rgba(148,163,184,0.12)"
+          strokeWidth="0.3"
+          strokeDasharray="2,3"
+        />
+      ))}
+
+      {/* Area fill with gradient */}
       <path d={areaD} fill={`url(#${id})`} />
-      <path d={pathD} stroke={color} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={lastPt[0]} cy={lastPt[1]} r="2" fill={color} stroke="white" strokeWidth="1" />
+
+      {/* Smooth line with glow */}
+      <path
+        d={pathD}
+        stroke={color}
+        strokeWidth="1.2"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        filter={`url(#${glowId})`}
+        className="sparkline-draw"
+        style={{
+          strokeDasharray: 300,
+          strokeDashoffset: 0,
+        }}
+      />
+
+      {/* Pulsing dot at the latest price point */}
+      <circle cx={lastPt[0]} cy={lastPt[1]} r="2.5" fill={color} stroke="white" strokeWidth="1.2">
+        <animate attributeName="r" values="2.5;3.5;2.5" dur="2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0.7;1" dur="2s" repeatCount="indefinite" />
+      </circle>
+
+      {/* Outer pulse ring */}
+      <circle cx={lastPt[0]} cy={lastPt[1]} r="2.5" fill="none" stroke={color} strokeWidth="0.8" opacity="0.5">
+        <animate attributeName="r" values="2.5;6;2.5" dur="2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite" />
+      </circle>
     </svg>
   );
 }
@@ -114,11 +205,12 @@ function useStockSparklines(tickers: string[], flag: SparkFlag): Record<string, 
   return sparklines;
 }
 
-function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag }: {
+function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag, direction }: {
   ticker: string;
   sparklines: Record<SparkFlag, number[]>;
   onFlagChange: (flag: SparkFlag) => void;
   currentFlag: SparkFlag;
+  direction?: string;
 }) {
   const data = sparklines?.[currentFlag];
   const hasData = data && data.length >= 2;
@@ -130,17 +222,34 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag }: 
     const last = data![data!.length - 1];
     const pct = ((last - first) / first) * 100;
     changeLabel = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
-    changeColor = pct >= 0 ? 'text-emerald-600' : 'text-red-500';
+    // For SHORT picks, a falling price (negative pct) is favorable
+    const isShort = direction === 'SHORT';
+    if (isShort) {
+      changeColor = pct <= 0 ? 'text-emerald-600' : 'text-red-500';
+    } else {
+      changeColor = pct >= 0 ? 'text-emerald-600' : 'text-red-500';
+    }
   }
 
   return (
     <div className="mb-1.5 relative z-10">
-      <div className="rounded-md overflow-hidden" style={{ background: hasData ? 'rgba(100,116,139,0.04)' : 'transparent' }}>
+      <div
+        className="rounded-lg overflow-hidden transition-all"
+        style={{
+          background: hasData
+            ? 'linear-gradient(135deg, rgba(100,116,139,0.03) 0%, rgba(100,116,139,0.06) 100%)'
+            : 'transparent',
+        }}
+      >
         {hasData ? (
-          <StockSparklineSVG data={data!} />
+          <StockSparklineSVG data={data!} direction={direction} />
         ) : (
-          <div className="h-8 flex items-center justify-center">
-            <span className="text-[7px] text-slate-300 uppercase tracking-wider">Loading…</span>
+          <div className="h-10 flex items-center justify-center">
+            <div className="flex items-center gap-1">
+              <div className="w-1 h-1 rounded-full bg-slate-300 animate-pulse" />
+              <div className="w-1 h-1 rounded-full bg-slate-300 animate-pulse" style={{ animationDelay: '0.2s' }} />
+              <div className="w-1 h-1 rounded-full bg-slate-300 animate-pulse" style={{ animationDelay: '0.4s' }} />
+            </div>
           </div>
         )}
       </div>
@@ -150,10 +259,10 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag }: 
             <button
               key={f}
               onClick={(e) => { e.stopPropagation(); e.preventDefault(); onFlagChange(f); }}
-              className={`px-1 py-0 rounded text-[7px] font-bold uppercase tracking-wider transition-all ${
+              className={`px-1.5 py-0.5 rounded-md text-[7px] font-bold uppercase tracking-wider transition-all ${
                 f === currentFlag
-                  ? 'bg-slate-800 text-white'
-                  : 'bg-transparent text-slate-400 hover:text-slate-600'
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'bg-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-100'
               }`}
             >
               {f}
@@ -223,8 +332,10 @@ type DhanScannerResponse = {
   tradePlan: DhanRecommendation[];
   shortTradePlan?: DhanRecommendation[];
   capitalAllocation: CapitalAllocation[];
+  shortCapitalAllocation?: CapitalAllocation[];
   totalCapital: number;
   totalRisk: number;
+  shortTotalRisk?: number;
   scannedCount: number;
   passedCount: number;
   longPassedCount?: number;
@@ -333,7 +444,8 @@ export default function IntradayMatrixPanel() {
     return () => { cancelled = true; window.clearInterval(id); };
   }, [loadLemonn, loadDhan]);
 
-  /* Collect all tickers for sparkline fetching */
+  /* Collect all tickers for sparkline fetching — includes BOTH long and
+     short picks so sparklines render on sell-side cards too */
   const allTickers = useMemo(() => {
     const tickers: string[] = [];
     if (lemonnData?.recommendations) {
@@ -341,6 +453,9 @@ export default function IntradayMatrixPanel() {
     }
     if (dhanData?.recommendations) {
       for (const r of dhanData.recommendations) tickers.push(r.symbol);
+    }
+    if (dhanData?.shortRecommendations) {
+      for (const r of dhanData.shortRecommendations) tickers.push(r.symbol);
     }
     return tickers;
   }, [lemonnData, dhanData]);
@@ -531,6 +646,7 @@ export default function IntradayMatrixPanel() {
                         sparklines={allSparklines[rec.symbol] ?? ({} as Record<SparkFlag, number[]>)}
                         currentFlag={getFlag(rec.symbol)}
                         onFlagChange={(f) => setFlag(rec.symbol, f)}
+                        direction="LONG"
                       />
                       <div className="space-y-1 text-[8px] relative z-10">
                         <div className="flex justify-between"><span className="text-slate-400">Buy Above</span><span className="font-bold text-emerald-600">{rec.buyAbove?.toFixed(2) ?? '—'}</span></div>
@@ -580,6 +696,7 @@ export default function IntradayMatrixPanel() {
                           sparklines={allSparklines[rec.symbol] ?? ({} as Record<SparkFlag, number[]>)}
                           currentFlag={getFlag(rec.symbol)}
                           onFlagChange={(f) => setFlag(rec.symbol, f)}
+                          direction="SHORT"
                         />
                         <div className="space-y-1 text-[8px] relative z-10">
                           <div className="flex justify-between"><span className="text-slate-400">Sell Below</span><span className="font-bold text-rose-600">{rec.buyAbove?.toFixed(2) ?? '—'}</span></div>
@@ -695,7 +812,7 @@ export default function IntradayMatrixPanel() {
                 <div className="flex items-center gap-2 mb-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                   <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
-                    SHORT TRADE PLAN — SELL BOOK
+                    SHORT TRADE PLAN — SELL BOOK (₹5,00,000 DEPLOYMENT)
                   </span>
                 </div>
                 <div className="overflow-x-auto">
@@ -730,6 +847,57 @@ export default function IntradayMatrixPanel() {
                 </div>
               </div>
             )}
+
+            {/* ── SHORT CAPITAL ALLOCATION TABLE ────────────────────────── */}
+            {dhanData?.shortCapitalAllocation && dhanData.shortCapitalAllocation.length > 0 && (
+              <div className="mb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                  <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
+                    SHORT CAPITAL ALLOCATION (~₹1,00,000 per stock)
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[12px] border-collapse">
+                    <thead>
+                      <tr className="bg-rose-50 text-slate-600">
+                        <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
+                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Sell Price</th>
+                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Approx Qty</th>
+                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Deployed Capital</th>
+                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Risk (SL hit)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dhanData.shortCapitalAllocation.map((ca, idx) => (
+                        <tr key={`sca-${ca.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-rose-50 cursor-pointer">
+                          <td className="p-1.5 font-bold text-slate-900">
+                            <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(ca.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{ca.symbol}</a>
+                          </td>
+                          <td className="p-1.5 text-right font-mono text-slate-600">₹{ca.buyAbove?.toFixed(2) ?? '—'}</td>
+                          <td className="p-1.5 text-right font-mono text-slate-700 font-bold">{ca.approxQty?.toLocaleString('en-IN') ?? '—'}</td>
+                          <td className="p-1.5 text-right font-mono text-rose-600 font-bold">₹{ca.deployedCapital?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}</td>
+                          <td className="p-1.5 text-right font-mono text-red-500">₹{ca.riskAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-rose-100 font-bold text-slate-900">
+                        <td className="p-1.5 uppercase tracking-wider text-[12px]">TOTAL</td>
+                        <td className="p-1.5"></td>
+                        <td className="p-1.5"></td>
+                        <td className="p-1.5 text-right font-mono text-rose-700 text-[12px]">
+                          ≈ ₹{dhanData.shortCapitalAllocation.reduce((s, c) => s + (c.deployedCapital ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-1.5 text-right font-mono text-red-600 text-[12px]">
+                          ≈ ₹{dhanData.shortCapitalAllocation.reduce((s, c) => s + (c.riskAmount ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -752,6 +920,17 @@ export default function IntradayMatrixPanel() {
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
+        }
+        @keyframes sparkline-draw {
+          from { stroke-dashoffset: 300; }
+          to { stroke-dashoffset: 0; }
+        }
+        .sparkline-draw {
+          animation: sparkline-draw 1.2s ease-out forwards;
+        }
+        @keyframes sparkline-fade-in {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
