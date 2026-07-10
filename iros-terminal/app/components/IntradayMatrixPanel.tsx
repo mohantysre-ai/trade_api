@@ -317,11 +317,35 @@ type DhanRecommendation = {
 };
 
 type CapitalAllocation = {
-  symbol: string;
-  buyAbove: number;
-  approxQty: number;
-  deployedCapital: number;
-  riskAmount: number;
+    symbol: string;
+    buyAbove: number;
+    approxQty: number;
+    deployedCapital: number;
+    riskAmount: number;
+};
+
+/* ── Trade Outcome types ─────────────────────────────────────────────────── */
+type TradeOutcome = {
+    label: string;  // "TARGET 1 HIT", "TARGET 2 HIT", "STOP LOSS HIT", "PENDING"
+    detail: string;
+    hitLevel: "t1" | "t2" | "sl" | null;
+    ltp: number;
+    pctChange: number;
+    resolvedAt: string | null;
+};
+
+type OutcomePick = {
+    symbol: string;
+    name: string;
+    direction: string;
+    entryPrice: number;
+    stopLoss: number;
+    target1: number;
+    target2: number;
+    currentPrice: number | null;
+    outcome: TradeOutcome | null;
+    sessionTs: number;
+    updatedAt: string;
 };
 
 type DhanScannerResponse = {
@@ -362,7 +386,64 @@ async function fetchDhanScanner(): Promise<DhanScannerResponse> {
   return data;
 }
 
-/* ── Helpers ───────────────────────────────────────────────────────────── */
+/* ── Trade Outcomes ─────────────────────────────────────────────────── */
+type TradeOutcomesResponse = {
+  long: OutcomePick[];
+  short: OutcomePick[];
+  updatedAt: string | null;
+  error?: string;
+};
+
+async function fetchTradeOutcomes(): Promise<TradeOutcomesResponse> {
+  const res = await fetch('/api/trade-outcomes', { cache: 'no-store' });
+  if (!res.ok) {
+    return { long: [], short: [], updatedAt: null };
+  }
+  const data: TradeOutcomesResponse = await res.json();
+  return data;
+}
+
+/* ── Outcome Badge ───────────────────────────────────────────────────── */
+function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null }) {
+  if (!outcome) {
+    return <span className="text-[8px] text-slate-400">—</span>;
+  }
+  
+  const baseClasses = "inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider";
+  const hitLevel = outcome.hitLevel;
+  
+  if (hitLevel === "t2") {
+    return (
+      <span className={`${baseClasses} bg-emerald-100 text-emerald-700 border border-emerald-300 animate-pulse`}>
+        <span className="w-1 h-1 rounded-full bg-emerald-500 mr-1" />
+        TARGET 2 HIT
+      </span>
+    );
+  }
+  if (hitLevel === "t1") {
+    return (
+      <span className={`${baseClasses} bg-blue-100 text-blue-700 border border-blue-300`}>
+        <span className="w-1 h-1 rounded-full bg-blue-500 mr-1" />
+        TARGET 1 HIT
+      </span>
+    );
+  }
+  if (hitLevel === "sl") {
+    return (
+      <span className={`${baseClasses} bg-red-100 text-red-700 border border-red-300`}>
+        <span className="w-1 h-1 rounded-full bg-red-500 mr-1" />
+        STOP LOSS HIT
+      </span>
+    );
+  }
+  // PENDING
+  return (
+    <span className={`${baseClasses} bg-slate-100 text-slate-600 border border-slate-300`}>
+      <span className="w-1 h-1 rounded-full bg-slate-400 mr-1 animate-pulse" />
+      PENDING
+    </span>
+  );
+}
 
 function DirectionBadge({ dir }: { dir: string }) {
   const isBuy = dir === 'BUY';
@@ -399,6 +480,11 @@ export default function IntradayMatrixPanel() {
   const [dhanLoading, setDhanLoading] = useState(true);
   const [dhanError, setDhanError] = useState<string | null>(null);
 
+  /* trade outcomes state */
+  const [outcomesData, setOutcomesData] = useState<TradeOutcomesResponse | null>(null);
+  const [outcomesLoading, setOutcomesLoading] = useState(true);
+  const [outcomesTime, setOutcomesTime] = useState('');
+
   /* last fetch times */
   const [lemonnTime, setLemonnTime] = useState('');
   const [dhanTime, setDhanTime] = useState('');
@@ -416,7 +502,7 @@ export default function IntradayMatrixPanel() {
     }
   }, []);
 
-  const loadDhan = useCallback(async () => {
+    const loadDhan = useCallback(async () => {
     try {
       const data = await fetchDhanScanner();
       setDhanData(data);
@@ -429,20 +515,33 @@ export default function IntradayMatrixPanel() {
     }
   }, []);
 
+  const loadOutcomes = useCallback(async () => {
+    try {
+      const data = await fetchTradeOutcomes();
+      setOutcomesData(data);
+      setOutcomesTime(new Date().toLocaleTimeString('en-IN', { hour12: false }));
+    } catch {
+      // Outcomes may be empty on first load, that's OK
+    } finally {
+      setOutcomesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
-      await Promise.all([loadLemonn(), loadDhan()]);
+      await Promise.all([loadLemonn(), loadDhan(), loadOutcomes()]);
     };
     void init();
     const id = window.setInterval(() => {
       if (!cancelled) {
         loadLemonn();
         loadDhan();
+        loadOutcomes();
       }
     }, 120_000);
     return () => { cancelled = true; window.clearInterval(id); };
-  }, [loadLemonn, loadDhan]);
+  }, [loadLemonn, loadDhan, loadOutcomes]);
 
   /* Collect all tickers for sparkline fetching — includes BOTH long and
      short picks so sparklines render on sell-side cards too */
@@ -462,13 +561,23 @@ export default function IntradayMatrixPanel() {
 
   /* Per-ticker flag state (default 1M) */
   const [tickerFlags, setTickerFlags] = useState<Record<string, SparkFlag>>({});
-  const getFlag = (ticker: string): SparkFlag => tickerFlags[ticker] ?? '1M';
+  const getFlag = (ticker: string): SparkFlag => tickerFlags[ticker] ?? '1D';
   const setFlag = (ticker: string, flag: SparkFlag) => setTickerFlags((prev) => ({ ...prev, [ticker]: flag }));
 
   /* Fetch sparkline data for all tickers x all flags */
   const stockSparklines1D = useStockSparklines(allTickers, '1D');
   const stockSparklines1M = useStockSparklines(allTickers, '1M');
   const stockSparklines1Y = useStockSparklines(allTickers, '1Y');
+
+  /* Outcome lookup helper */
+  const getOutcomeForSymbol = useCallback((symbol: string, direction: 'LONG' | 'SHORT' = 'LONG'): TradeOutcome | null => {
+    const key = symbol.toUpperCase();
+    const picks = direction === 'SHORT' 
+      ? outcomesData?.short ?? [] 
+      : outcomesData?.long ?? [];
+    const pick = picks.find(p => p.symbol.toUpperCase() === key);
+    return pick?.outcome ?? null;
+  }, [outcomesData]);
 
   const allSparklines = useMemo(() => {
     const merged: Record<string, Record<SparkFlag, number[]>> = {};
@@ -712,140 +821,101 @@ export default function IntradayMatrixPanel() {
               </div>
             )}
 
-            {/* ── TRADE PLAN — Top 5 with ₹5L allocation ───────────────── */}
-            <div className="mb-3">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
-                  TRADE PLAN — ₹5,00,000 DEPLOYMENT
-                </span>
-              </div>
-
-              {/* Trade plan table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-[12px] border-collapse">
-                  <thead>
-                    <tr className="bg-slate-100 text-slate-600">
-                      <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
-                      <th className="p-1.5 text-right font-bold uppercase tracking-wider">Buy Above</th>
-                      <th className="p-1.5 text-right font-bold uppercase tracking-wider">Stop Loss</th>
-                      <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 1</th>
-                      <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 2</th>
-                      <th className="p-1.5 text-right font-bold uppercase tracking-wider">Risk/Sh</th>
-                      <th className="p-1.5 text-right font-bold uppercase tracking-wider">R:R T2</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(dhanData?.tradePlan || dhanData?.recommendations?.slice(0, 5) || []).map((tp, idx) => (
-                      <tr key={`tp-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer">
-                        <td className="p-1.5 font-bold text-slate-900">
-                          <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
-                        </td>
-                        <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">{tp.buyAbove?.toFixed(2) ?? '—'}</td>
-                        <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
-                        <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
-                        <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
-                        <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
-                        <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* ── CAPITAL ALLOCATION TABLE ─────────────────────────────── */}
-            {dhanData?.capitalAllocation && dhanData.capitalAllocation.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                  <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
-                    CAPITAL ALLOCATION (~₹1,00,000 per stock)
-                  </span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-[12px] border-collapse">
-                    <thead>
-                      <tr className="bg-blue-50 text-slate-600">
-                        <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
-                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Buy Price</th>
-                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Approx Qty</th>
-                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Deployed Capital</th>
-                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Risk (SL hit)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dhanData.capitalAllocation.map((ca, idx) => (
-                        <tr key={`ca-${ca.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer">
-                          <td className="p-1.5 font-bold text-slate-900">
-                            <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(ca.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{ca.symbol}</a>
-                          </td>
-                          <td className="p-1.5 text-right font-mono text-slate-600">₹{ca.buyAbove?.toFixed(2) ?? '—'}</td>
-                          <td className="p-1.5 text-right font-mono text-slate-700 font-bold">{ca.approxQty?.toLocaleString('en-IN') ?? '—'}</td>
-                          <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">₹{ca.deployedCapital?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}</td>
-                          <td className="p-1.5 text-right font-mono text-red-500">₹{ca.riskAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    {/* Totals row */}
-                    <tfoot>
-                      <tr className="bg-slate-100 font-bold text-slate-900">
-                        <td className="p-1.5 uppercase tracking-wider text-[12px]">TOTAL</td>
-                        <td className="p-1.5"></td>
-                        <td className="p-1.5"></td>
-                        <td className="p-1.5 text-right font-mono text-emerald-700 text-[12px]">
-                          ≈ ₹{dhanData.capitalAllocation.reduce((s, c) => s + (c.deployedCapital ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="p-1.5 text-right font-mono text-red-600 text-[12px]">
-                          ≈ ₹{dhanData.capitalAllocation.reduce((s, c) => s + (c.riskAmount ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* ── SHORT TRADE PLAN ─────────────────────────────────────── */}
-            {dhanData?.shortTradePlan && dhanData.shortTradePlan.length > 0 && (
+            {/* ── TRADE PLAN — from persistent picks (stable across the day) ── */}
+            {outcomesData && ((outcomesData.long?.length ?? 0) > 0 || (outcomesData.short?.length ?? 0) > 0) && (
+              <>
               <div className="mb-3">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                   <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
-                    SHORT TRADE PLAN — SELL BOOK (₹5,00,000 DEPLOYMENT)
+                    TRADE PLAN — ₹5,00,000 DEPLOYMENT
                   </span>
+                  <span className="text-[9px] text-slate-400 ml-2">(updated @{outcomesTime || '—'})</span>
                 </div>
+
+                {/* Trade plan table */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-[12px] border-collapse">
                     <thead>
-                      <tr className="bg-rose-50 text-slate-600">
+                      <tr className="bg-slate-100 text-slate-600">
                         <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
-                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Sell At</th>
+                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Buy Above</th>
                         <th className="p-1.5 text-right font-bold uppercase tracking-wider">Stop Loss</th>
                         <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 1</th>
                         <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 2</th>
                         <th className="p-1.5 text-right font-bold uppercase tracking-wider">Risk/Sh</th>
                         <th className="p-1.5 text-right font-bold uppercase tracking-wider">R:R T2</th>
+                        <th className="p-1.5 text-center font-bold uppercase tracking-wider">Outcome</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(dhanData?.shortTradePlan || dhanData?.shortRecommendations?.slice(0, 5) || []).map((tp, idx) => (
-                        <tr key={`stp-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-rose-50 cursor-pointer">
+                      {(outcomesData.long || []).slice(0, 5).map((tp, idx) => (
+                        <tr key={`out-long-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer">
                           <td className="p-1.5 font-bold text-slate-900">
                             <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
                           </td>
-                          <td className="p-1.5 text-right font-mono text-rose-600 font-bold">{tp.buyAbove?.toFixed(2) ?? '—'}</td>
+                          <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">{tp.entryPrice?.toFixed(2) ?? '—'}</td>
                           <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
                           <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
                           <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
                           <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
                           <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
+                          <td className="p-1.5 text-center">
+                            <OutcomeBadge outcome={tp.outcome} />
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               </div>
+
+              {/* ── SHORT TRADE PLAN — from persistent picks (stable across the day) ── */}
+              {(outcomesData.short?.length ?? 0) > 0 && (
+                <div className="mb-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                    <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
+                      SHORT TRADE PLAN — SELL BOOK (₹5,00,000 DEPLOYMENT)
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[12px] border-collapse">
+                      <thead>
+                        <tr className="bg-rose-50 text-slate-600">
+                          <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
+                          <th className="p-1.5 text-right font-bold uppercase tracking-wider">Sell At</th>
+                          <th className="p-1.5 text-right font-bold uppercase tracking-wider">Stop Loss</th>
+                          <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 1</th>
+                          <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 2</th>
+                          <th className="p-1.5 text-right font-bold uppercase tracking-wider">Risk/Sh</th>
+                          <th className="p-1.5 text-right font-bold uppercase tracking-wider">R:R T2</th>
+                          <th className="p-1.5 text-center font-bold uppercase tracking-wider">Outcome</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(outcomesData.short || []).slice(0, 5).map((tp, idx) => (
+                          <tr key={`out-short-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-rose-50 cursor-pointer">
+                            <td className="p-1.5 font-bold text-slate-900">
+                              <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
+                            </td>
+                            <td className="p-1.5 text-right font-mono text-rose-600 font-bold">{tp.entryPrice?.toFixed(2) ?? '—'}</td>
+                            <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
+                            <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
+                            <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
+                            <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
+                            <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
+                            <td className="p-1.5 text-center">
+                              <OutcomeBadge outcome={tp.outcome} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              </>
             )}
 
             {/* ── SHORT CAPITAL ALLOCATION TABLE ────────────────────────── */}

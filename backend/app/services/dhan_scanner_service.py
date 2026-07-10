@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 
 from .feed_scanner import ScanResult, scan_feed
 from .live_pipeline import FIELDS, fetch_page, extract_rows
+from .trade_outcome import _persist_picks
 
 _log = logging.getLogger(__name__)
 
@@ -31,6 +32,8 @@ TRADE_PLAN_STOCKS = 5            # top 5 get capital allocation
 TARGET_1_R_MULTIPLE = 1.5        # first target at 1.5R
 TARGET_2_R_MULTIPLE = 3.0        # second target at 3R (long)
 TARGET_2_R_MULTIPLE_SHORT = 2.5  # second target at 2.5R (short — tighter, faster moves)
+TARGET_1_PCT_DEPLOYED = 1.0      # T1 at 1% of deployed capital from entry
+TARGET_2_PCT_DEPLOYED = 2.0      # T2 at 2% of deployed capital from entry
 
 
 @dataclass
@@ -48,6 +51,10 @@ class TradePlanRow:
     approx_qty: int = 0
     deployed_capital: float = 0.0
     risk_amount: float = 0.0    # ₹ lost if SL hit
+    target1_pct_price: float = 0.0  # T1 at 1% from entry
+    target2_pct_price: float = 0.0  # T2 at 2% from entry
+    target1_pct_label: str = ""
+    target2_pct_label: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -63,6 +70,10 @@ class TradePlanRow:
             "approxQty": self.approx_qty,
             "deployedCapital": round(self.deployed_capital, 2),
             "riskAmount": round(self.risk_amount, 2),
+            "target1PctPrice": round(self.target1_pct_price, 2),
+            "target2PctPrice": round(self.target2_pct_price, 2),
+            "target1PctLabel": self.target1_pct_label,
+            "target2PctLabel": self.target2_pct_label,
         }
 
 
@@ -90,6 +101,19 @@ def build_trade_plan(scan_results: List[ScanResult], direction: str = "LONG") ->
 
         rr_t2 = t2_multiple  # 3.0 for long, 2.5 for short
 
+        t1_pct = TARGET_1_PCT_DEPLOYED  # 1%
+        t2_pct = TARGET_2_PCT_DEPLOYED  # 2%
+        if direction == "LONG":
+            target1_pct_price = round(r.entry * (1 + t1_pct / 100), 2)
+            target2_pct_price = round(r.entry * (1 + t2_pct / 100), 2)
+            target1_pct_label = f"+{t1_pct:.1f}%"
+            target2_pct_label = f"+{t2_pct:.1f}%"
+        else:
+            target1_pct_price = round(r.entry * (1 - t1_pct / 100), 2)
+            target2_pct_price = round(r.entry * (1 - t2_pct / 100), 2)
+            target1_pct_label = f"-{t1_pct:.1f}%"
+            target2_pct_label = f"-{t2_pct:.1f}%"
+
         rows.append(TradePlanRow(
             symbol=r.symbol,
             name=r.name,
@@ -103,6 +127,10 @@ def build_trade_plan(scan_results: List[ScanResult], direction: str = "LONG") ->
             approx_qty=qty,
             deployed_capital=round(deployed, 2),
             risk_amount=round(risk_amount, 2),
+            target1_pct_price=target1_pct_price,
+            target2_pct_price=target2_pct_price,
+            target1_pct_label=target1_pct_label,
+            target2_pct_label=target2_pct_label,
         ))
 
     return rows
@@ -306,11 +334,42 @@ def fetch_dhan_scan_results(min_volume: int = 1_000_000, top_n: int = TOP_N) -> 
     total_risk = sum(tp.risk_amount for tp in trade_plan)
     short_total_risk = sum(tp.risk_amount for tp in short_trade_plan)
 
+    # Build a {symbol: Ltp} map from the raw Dhan ScanX rows.
+    # This is the ONLY live-price source we trust for scanner symbols —
+    # the Angel One snapshot covers a different universe (Nifty 100).
+    _dhan_ltp_map: dict[str, float] = {}
+    for row in rows:
+        sym = (row.get("Sym") or row.get("DispSym") or "").upper()
+        raw_ltp = row.get("Ltp")
+        if sym and raw_ltp is not None:
+            try:
+                _dhan_ltp_map[sym] = float(raw_ltp)
+            except (TypeError, ValueError):
+                pass
+
+    def _with_ltp(dicts: list[dict]) -> list[dict]:
+        out = []
+        for d in dicts:
+            sym = (d.get("symbol") or "").upper()
+            ltp = _dhan_ltp_map.get(sym)
+            d2 = dict(d)
+            d2["scanLtp"] = ltp
+            out.append(d2)
+        return out
+
+    # Persist picks for outcome tracking (same stocks across refreshes)
+    # Pass Dhan LTPs so the outcome engine can evaluate without Angel One universe overlap.
+    try:
+        _persist_picks(_with_ltp(recommendations), "LONG")
+        _persist_picks(_with_ltp(short_recommendations), "SHORT")
+    except Exception as exc:
+        _log.warning("Failed to persist scanner picks: %s", exc)
+
     result.update({
         "success": True,
         "source": "dhan-scanx",
-        "recommendations": recommendations,
-        "shortRecommendations": short_recommendations,
+        "recommendations": _with_ltp(recommendations),
+        "shortRecommendations": _with_ltp(short_recommendations),
         "tradePlan": [tp.to_dict() for tp in trade_plan],
         "shortTradePlan": [tp.to_dict() for tp in short_trade_plan],
         "capitalAllocation": capital_allocation[:5],

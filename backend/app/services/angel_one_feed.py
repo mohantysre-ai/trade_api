@@ -2216,6 +2216,15 @@ def create_app() -> FastAPI:
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+    @app.get("/api/trade-outcomes")
+    def trade_outcomes() -> dict[str, Any]:
+        """Return persisted scanner picks with live target/SL hit status."""
+        try:
+            from .trade_outcome import get_trade_outcomes
+            return get_trade_outcomes()
+        except Exception as exc:
+            return {"long": [], "short": [], "updatedAt": None, "error": str(exc)}
+
     @app.get("/api/news")
     def news_feed() -> dict[str, Any]:
         try:

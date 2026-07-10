@@ -386,7 +386,7 @@ export default function ForensicPanel({
 
   /* Per-ticker flag state (default 1M) */
   const [tickerFlags, setTickerFlags] = useState<Record<string, SparkFlag>>({});
-  const getFlag = (ticker: string): SparkFlag => tickerFlags[ticker] ?? '1M';
+  const getFlag = (ticker: string): SparkFlag => tickerFlags[ticker] ?? '1D';
   const setFlag = (ticker: string, flag: SparkFlag) => setTickerFlags((prev) => ({ ...prev, [ticker]: flag }));
 
   /* Collect unique flags in use for fetching */
