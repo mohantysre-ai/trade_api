@@ -372,9 +372,84 @@ def _load_last_snapshot() -> dict[str, Any] | None:
 
 def _save_last_snapshot(payload: dict[str, Any]) -> None:
     try:
+        payload = _enrich_snapshot_with_fixed_plan(payload)
+    except Exception as exc:
+        log.warning("Fixed-plan snapshot enrichment failed: %s", exc)
+    try:
         _snapshot_path().write_text(json.dumps(_normalize_snapshot(payload), indent=2), encoding="utf-8")
     except Exception:
         pass
+
+
+# Cache so a single refresh (which may call _save_last_snapshot multiple times)
+# only resolves fixed-plan quotes once; TTL also caps background saves.
+_FIXED_PLAN_QUOTE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_FIXED_PLAN_QUOTE_TTL = 300  # seconds
+_FIXED_PLAN_CLIENT: "AngelOneClient | None" = None
+
+
+def _get_fixed_plan_client() -> "AngelOneClient | None":
+    global _FIXED_PLAN_CLIENT
+    if _FIXED_PLAN_CLIENT is None:
+        try:
+            _FIXED_PLAN_CLIENT = AngelOneClient()
+        except Exception as exc:
+            log.warning("Fixed-plan client init failed: %s", exc)
+            return None
+    return _FIXED_PLAN_CLIENT
+
+
+def _enrich_snapshot_with_fixed_plan(payload: dict[str, Any]) -> dict[str, Any]:
+    """Merge fixed-trade-plan symbols' live LTPs into stockQuotes.
+
+    The fixed plan (fixed_trade_plan.json) may contain symbols that are not in
+    the WATCHLIST / Nifty cache, so they never appear in the normal Angel One
+    batch quote. This resolves their tokens at runtime (searchScrip) and fetches
+    LTPs (ltpData) so get_live_prices_for_plan() can show real prices instead of
+    falling back to entry price.
+    """
+    try:
+        from .trade_outcome import load_fixed_trade_plan
+    except Exception:
+        return payload
+
+    fixed = load_fixed_trade_plan()
+    symbols: list[str] = []
+    for p in (fixed.get("long") or []) + (fixed.get("short") or []):
+        s = (p.get("symbol") or "").upper()
+        if s:
+            symbols.append(s)
+    if not symbols:
+        return payload
+
+    quotes = dict(payload.get("stockQuotes") or {})
+    now = time.time()
+    client = _get_fixed_plan_client()
+    if client is None:
+        return payload
+
+    for sym in symbols:
+        cached = _FIXED_PLAN_QUOTE_CACHE.get(sym)
+        if cached and (now - cached[0]) < _FIXED_PLAN_QUOTE_TTL:
+            quotes[sym] = cached[1]
+            continue
+        try:
+            quote = client.fetch_symbol_quote(sym)
+            if not quote:
+                continue
+            ltp = float(quote.get("ltp", 0) or 0)
+            if not ltp:
+                continue
+            inst = Instrument(sym, "NSE", f"{sym}-EQ", str(quote.get("token", "0")))
+            row = _build_stock_row(inst, quote, payload.get("activePool", "Fixed Plan"))
+            quotes[sym] = row
+            _FIXED_PLAN_QUOTE_CACHE[sym] = (now, row)
+        except Exception as exc:
+            log.debug("Fixed-plan quote fetch failed for %s: %s", sym, exc)
+            continue
+
+    payload["stockQuotes"] = quotes
+    return payload
 
 
 def _clean_text(value: str | None) -> str:
@@ -678,6 +753,44 @@ class AngelOneClient:
         if not response.get("status"):
             raise RuntimeError(f"{tradingsymbol}: {response.get('message', 'Quote fetch failed')}")
         return response["data"]
+
+    def fetch_symbol_quote(self, symbol: str) -> dict[str, Any] | None:
+        """Resolve an arbitrary NSE symbol's token via searchScrip and fetch its LTP.
+
+        Used to bring fixed-trade-plan symbols (which are not in the WATCHLIST /
+        Nifty cache) into the live snapshot so the intraday monitor can show real
+        prices instead of falling back to entry price.
+        """
+        smart = self.connect()
+        sym = symbol.upper()
+        tradingsymbol = f"{sym}-EQ"
+        token: str | None = None
+        for candidate in (tradingsymbol, sym):
+            try:
+                search = smart.searchScrip("NSE", candidate)
+            except Exception:
+                search = None
+            if isinstance(search, dict) and search.get("status"):
+                data = search.get("data") or []
+                if isinstance(data, list) and data:
+                    first = data[0]
+                    resolved = str(first.get("token") or first.get("symboltoken") or "")
+                    if resolved:
+                        token = resolved
+                        tradingsymbol = str(first.get("symbol") or candidate)
+                        break
+        if not token:
+            return None
+        try:
+            resp = smart.ltpData("NSE", tradingsymbol, token)
+        except Exception:
+            return None
+        if not isinstance(resp, dict) or not resp.get("status"):
+            return None
+        data = resp.get("data") or {}
+        if isinstance(data, dict):
+            data.setdefault("token", token)
+        return data if isinstance(data, dict) else None
 
     def fetch_candles(
         self,
@@ -2224,6 +2337,47 @@ def create_app() -> FastAPI:
             return get_trade_outcomes()
         except Exception as exc:
             return {"long": [], "short": [], "updatedAt": None, "error": str(exc)}
+
+    @app.get("/api/fixed-trade-plan")
+    def fixed_trade_plan() -> dict[str, Any]:
+        """Return the fixed/static trade plan persisted as JSON."""
+        try:
+            from .trade_outcome import load_fixed_trade_plan
+            return load_fixed_trade_plan() or {"long": [], "short": [], "updatedAt": None}
+        except Exception as exc:
+            return {"long": [], "short": [], "updatedAt": None, "error": str(exc)}
+
+    @app.post("/api/fixed-trade-plan")
+    def save_fixed_trade_plan(payload: dict[str, Any]) -> dict[str, Any]:
+        """Overwrite the fixed trade plan JSON with the provided payload."""
+        try:
+            from .trade_outcome import save_fixed_trade_plan, _utc_now
+            save_fixed_trade_plan(payload)
+            return {"success": True, "updatedAt": _utc_now()}
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/live-prices")
+    def live_prices() -> dict[str, Any]:
+        """Return live prices + evaluated outcomes for today's fixed plan symbols only.
+        
+        No external API calls — reads from last_market_snapshot.json (Angel One batch).
+        Designed for monitor-mode polling.
+        """
+        try:
+            from .trade_outcome import get_live_prices_for_plan
+            return get_live_prices_for_plan()
+        except Exception as exc:
+            return {"long": [], "short": [], "updatedAt": None, "error": str(exc)}
+
+    @app.get("/api/alert-history")
+    def alert_history(since: str | None = None) -> dict[str, Any]:
+        """Return fired alert history for today, optionally filtered."""
+        try:
+            from .trade_outcome import get_alert_history
+            return get_alert_history(since=since)
+        except Exception as exc:
+            return {"alerts": [], "total": 0, "error": str(exc)}
 
     @app.get("/api/news")
     def news_feed() -> dict[str, Any]:

@@ -392,6 +392,8 @@ type TradeOutcomesResponse = {
   short: OutcomePick[];
   updatedAt: string | null;
   error?: string;
+  marketOpen?: boolean;
+  sessionClosed?: boolean;
 };
 
 async function fetchTradeOutcomes(): Promise<TradeOutcomesResponse> {
@@ -403,6 +405,39 @@ async function fetchTradeOutcomes(): Promise<TradeOutcomesResponse> {
   return data;
 }
 
+/* ── Live Prices (monitor-mode) ─────────────────────────────────────── */
+type AlertRecord = {
+  key: string;
+  symbol: string;
+  direction: 'LONG' | 'SHORT';
+  hitLevel: 't1' | 't2' | 'sl';
+  label: string;
+  ltp: number;
+  planDate: string;
+  firedAt: string;
+};
+
+type LivePricesResponse = {
+  long: Array<OutcomePick & { ltp?: number; ltpSource?: string; priceUpdatedAt?: string }>;
+  short: Array<OutcomePick & { ltp?: number; ltpSource?: string; priceUpdatedAt?: string }>;
+  updatedAt: string | null;
+  snapshotUpdatedAt?: string;
+  source: string;
+  newAlerts?: AlertRecord[];
+  error?: string;
+  marketOpen?: boolean;
+  sessionClosed?: boolean;
+};
+
+async function fetchLivePrices(): Promise<LivePricesResponse> {
+  const res = await fetch('/api/live-prices', { cache: 'no-store' });
+  if (!res.ok) {
+    return { long: [], short: [], updatedAt: null, source: 'none' };
+  }
+  const data: LivePricesResponse = await res.json();
+  return data;
+}
+
 /* ── Outcome Badge ───────────────────────────────────────────────────── */
 function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null }) {
   if (!outcome) {
@@ -411,7 +446,16 @@ function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null }) {
   
   const baseClasses = "inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider";
   const hitLevel = outcome.hitLevel;
-  
+
+  if (outcome.label === "NOT TRIGGERED") {
+    return (
+      <span className={`${baseClasses} bg-slate-200 text-slate-500 border border-slate-400`}>
+        <span className="w-1 h-1 rounded-full bg-slate-500 mr-1" />
+        NOT TRIGGERED
+      </span>
+    );
+  }
+
   if (hitLevel === "t2") {
     return (
       <span className={`${baseClasses} bg-emerald-100 text-emerald-700 border border-emerald-300 animate-pulse`}>
@@ -485,6 +529,16 @@ export default function IntradayMatrixPanel() {
   const [outcomesLoading, setOutcomesLoading] = useState(true);
   const [outcomesTime, setOutcomesTime] = useState('');
 
+  /* live prices (monitor mode) state */
+  const [livePricesData, setLivePricesData] = useState<LivePricesResponse | null>(null);
+  const [monitorMode, setMonitorMode] = useState(false);
+  const [alerts, setAlerts] = useState<AlertRecord[]>([]);
+  const [alertBanner, setAlertBanner] = useState<AlertRecord | null>(null);
+  const [marketOpen, setMarketOpen] = useState(true);
+  const [sessionClosed, setSessionClosed] = useState(false);
+  const sessionClosedRef = useRef(false);
+  const prevOutcomeRef = useRef<Record<string, string | null>>({});
+
   /* last fetch times */
   const [lemonnTime, setLemonnTime] = useState('');
   const [dhanTime, setDhanTime] = useState('');
@@ -527,21 +581,82 @@ export default function IntradayMatrixPanel() {
     }
   }, []);
 
+  /* Live prices (monitor mode) */
+  const loadLivePrices = useCallback(async () => {
+    try {
+      const data = await fetchLivePrices();
+      if (data.source === 'none' || ((data.long?.length ?? 0) === 0 && (data.short?.length ?? 0) === 0)) {
+        // No fixed plan — fall back to normal mode
+        setMonitorMode(false);
+        return;
+      }
+      setMonitorMode(true);
+      setLivePricesData(data);
+
+      // Track market session state (used to halt polling after close)
+      const closed = Boolean(data.sessionClosed);
+      const open = data.marketOpen !== false;
+      setMarketOpen(open);
+      setSessionClosed(closed);
+      sessionClosedRef.current = closed;
+      // Detect new alerts (transition from PENDING → t1/t2/sl)
+      const newAlerts = data.newAlerts ?? [];
+      if (newAlerts.length > 0) {
+        setAlerts((prev) => [...newAlerts, ...prev].slice(0, 20));
+        // Show a banner for the most recent
+        setAlertBanner(newAlerts[newAlerts.length - 1]);
+        // Auto-dismiss after 8 seconds
+        window.setTimeout(() => setAlertBanner(null), 8000);
+      }
+
+      // Track outcome transitions for future polling cycles
+      const all = [...(data.long ?? []), ...(data.short ?? [])];
+      for (const p of all) {
+        const key = `${p.symbol}:${p.direction}`;
+        const level = p.outcome?.hitLevel ?? null;
+        prevOutcomeRef.current[key] = level;
+      }
+    } catch {
+      // Keep previous state on failure
+    }
+  }, []);
+
+  const dismissAlert = useCallback((idx: number) => {
+    setAlerts((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
       await Promise.all([loadLemonn(), loadDhan(), loadOutcomes()]);
+      // Attempt to enter monitor mode (uses fixed plan if available)
+      await loadLivePrices();
     };
     void init();
-    const id = window.setInterval(() => {
+
+    // Standard 2-min refresh for scanner/lemonn feeds
+    const slowId = window.setInterval(() => {
       if (!cancelled) {
         loadLemonn();
         loadDhan();
         loadOutcomes();
       }
     }, 120_000);
-    return () => { cancelled = true; window.clearInterval(id); };
-  }, [loadLemonn, loadDhan, loadOutcomes]);
+
+    // Fast monitor-mode poll (only reads local snapshot, no external calls).
+    // Halt once the session has closed so we stop recalculating on stale prices.
+    const fastId = window.setInterval(() => {
+      if (!cancelled && !sessionClosedRef.current) {
+        loadLivePrices();
+      }
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(slowId);
+      window.clearInterval(fastId);
+    };
+  }, [loadLemonn, loadDhan, loadOutcomes, loadLivePrices]);
 
   /* Collect all tickers for sparkline fetching — includes BOTH long and
      short picks so sparklines render on sell-side cards too */
@@ -595,6 +710,55 @@ export default function IntradayMatrixPanel() {
 
   return (
     <div className="space-y-4">
+      {/* ── ALERT BANNER ─────────────────────────────────────────────────── */}
+      {alertBanner && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl shadow-2xl border-2 animate-pulse ${
+          alertBanner.hitLevel === 'sl'
+            ? 'bg-red-600 border-red-800 text-white'
+            : 'bg-emerald-600 border-emerald-800 text-white'
+        }`}>
+          <div className="flex items-center gap-3">
+            <span className="text-[14px] font-black uppercase tracking-wider">
+              {alertBanner.symbol} — {alertBanner.label}
+            </span>
+            <span className="text-[10px] opacity-90">LTP ₹{alertBanner.ltp.toFixed(2)}</span>
+            <button onClick={() => setAlertBanner(null)} className="ml-2 text-white/80 hover:text-white text-[14px] font-bold">×</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── MONITOR MODE INDICATOR ──────────────────────────────────────── */}
+      {monitorMode && (
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-[9px] font-semibold uppercase tracking-wider">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          MONITOR MODE — Fixed plan active · Live prices every 2s · No external API calls
+          {livePricesData?.snapshotUpdatedAt && (
+            <span className="text-slate-400 ml-1">
+              (snapshot @{new Date(livePricesData.snapshotUpdatedAt).toLocaleTimeString('en-IN', { hour12: false })})
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── RECENT ALERTS ───────────────────────────────────────────────── */}
+      {alerts.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {alerts.map((a, idx) => (
+            <div key={`alert-${idx}`} className={`flex items-center justify-between px-3 py-1.5 rounded-lg border text-[10px] ${
+              a.hitLevel === 'sl' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+            }`}>
+              <span className="font-bold uppercase tracking-wider">
+                {a.symbol} ({a.direction}) — {a.label}
+              </span>
+              <span className="text-slate-500">
+                {new Date(a.firedAt).toLocaleTimeString('en-IN', { hour12: false })}
+              </span>
+              <button onClick={() => dismissAlert(idx)} className="text-slate-400 hover:text-slate-600">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ═══════════════════ UPPER PANEL — LEMOON ═══════════════════ */}
       <div className="bg-gradient-to-br from-white via-purple-50/10 to-white border border-slate-300 rounded-xl p-4 shadow-lg overflow-auto">
         {/* Header */}
@@ -822,101 +986,128 @@ export default function IntradayMatrixPanel() {
             )}
 
             {/* ── TRADE PLAN — from persistent picks (stable across the day) ── */}
-            {outcomesData && ((outcomesData.long?.length ?? 0) > 0 || (outcomesData.short?.length ?? 0) > 0) && (
-              <>
-              <div className="mb-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                  <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
-                    TRADE PLAN — ₹5,00,000 DEPLOYMENT
-                  </span>
-                  <span className="text-[9px] text-slate-400 ml-2">(updated @{outcomesTime || '—'})</span>
-                </div>
+            {(() => {
+              // Monitor mode uses livePricesData (fresh every 2s, no external calls)
+              const planLong = monitorMode && livePricesData ? (livePricesData.long || []) : (outcomesData?.long || []);
+              const planShort = monitorMode && livePricesData ? (livePricesData.short || []) : (outcomesData?.short || []);
+              const planTime = monitorMode && livePricesData?.updatedAt
+                ? new Date(livePricesData.updatedAt).toLocaleTimeString('en-IN', { hour12: false })
+                : outcomesTime;
+              const showPlan = (planLong.length > 0 || planShort.length > 0);
 
-                {/* Trade plan table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-[12px] border-collapse">
-                    <thead>
-                      <tr className="bg-slate-100 text-slate-600">
-                        <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
-                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Buy Above</th>
-                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Stop Loss</th>
-                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 1</th>
-                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 2</th>
-                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">Risk/Sh</th>
-                        <th className="p-1.5 text-right font-bold uppercase tracking-wider">R:R T2</th>
-                        <th className="p-1.5 text-center font-bold uppercase tracking-wider">Outcome</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(outcomesData.long || []).slice(0, 5).map((tp, idx) => (
-                        <tr key={`out-long-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer">
-                          <td className="p-1.5 font-bold text-slate-900">
-                            <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
-                          </td>
-                          <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">{tp.entryPrice?.toFixed(2) ?? '—'}</td>
-                          <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
-                          <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
-                          <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
-                          <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
-                          <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
-                          <td className="p-1.5 text-center">
-                            <OutcomeBadge outcome={tp.outcome} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              if (!showPlan) return null;
 
-              {/* ── SHORT TRADE PLAN — from persistent picks (stable across the day) ── */}
-              {(outcomesData.short?.length ?? 0) > 0 && (
-                <div className="mb-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                    <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
-                      SHORT TRADE PLAN — SELL BOOK (₹5,00,000 DEPLOYMENT)
-                    </span>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-[12px] border-collapse">
-                      <thead>
-                        <tr className="bg-rose-50 text-slate-600">
-                          <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
-                          <th className="p-1.5 text-right font-bold uppercase tracking-wider">Sell At</th>
-                          <th className="p-1.5 text-right font-bold uppercase tracking-wider">Stop Loss</th>
-                          <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 1</th>
-                          <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 2</th>
-                          <th className="p-1.5 text-right font-bold uppercase tracking-wider">Risk/Sh</th>
-                          <th className="p-1.5 text-right font-bold uppercase tracking-wider">R:R T2</th>
-                          <th className="p-1.5 text-center font-bold uppercase tracking-wider">Outcome</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(outcomesData.short || []).slice(0, 5).map((tp, idx) => (
-                          <tr key={`out-short-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-rose-50 cursor-pointer">
-                            <td className="p-1.5 font-bold text-slate-900">
-                              <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
-                            </td>
-                            <td className="p-1.5 text-right font-mono text-rose-600 font-bold">{tp.entryPrice?.toFixed(2) ?? '—'}</td>
-                            <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
-                            <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
-                            <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
-                            <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
-                            <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
-                            <td className="p-1.5 text-center">
-                              <OutcomeBadge outcome={tp.outcome} />
-                            </td>
+              return (
+                <>
+                  {sessionClosed && (
+                    <div className="mb-3 flex items-center gap-2 rounded-md bg-slate-100 border border-slate-300 px-3 py-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                      <span className="text-[11px] uppercase tracking-wider text-slate-600 font-bold">
+                        Market Closed — Session Finalized
+                      </span>
+                      <span className="text-[9px] text-slate-500 ml-1">
+                        Unfilled picks marked NOT TRIGGERED. Monitoring halted.
+                      </span>
+                    </div>
+                  )}
+                  <div className="mb-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`w-1.5 h-1.5 rounded-full ${monitorMode ? (sessionClosed ? 'bg-slate-500' : 'bg-emerald-500') : 'bg-amber-500'}`} />
+                      <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
+                        TRADE PLAN — ₹5,00,000 DEPLOYMENT {monitorMode && '(LIVE MONITOR)'}
+                      </span>
+                      <span className="text-[9px] text-slate-400 ml-2">(updated @{planTime || '—'})</span>
+                    </div>
+
+                    {/* Trade plan table — LONG */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-[12px] border-collapse">
+                        <thead>
+                          <tr className="bg-slate-100 text-slate-600">
+                            <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
+                            <th className="p-1.5 text-right font-bold uppercase tracking-wider">LTP</th>
+                            <th className="p-1.5 text-right font-bold uppercase tracking-wider">Buy Above</th>
+                            <th className="p-1.5 text-right font-bold uppercase tracking-wider">Stop Loss</th>
+                            <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 1</th>
+                            <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 2</th>
+                            <th className="p-1.5 text-right font-bold uppercase tracking-wider">Risk/Sh</th>
+                            <th className="p-1.5 text-right font-bold uppercase tracking-wider">R:R T2</th>
+                            <th className="p-1.5 text-center font-bold uppercase tracking-wider">Outcome</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {planLong.slice(0, 5).map((tp, idx) => (
+                            <tr key={`lp-long-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer">
+                              <td className="p-1.5 font-bold text-slate-900">
+                                <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
+                              </td>
+                              <td className="p-1.5 text-right font-mono text-slate-900 font-bold">{tp.ltp != null ? tp.ltp.toFixed(2) : '—'}</td>
+                              <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">{tp.entryPrice?.toFixed(2) ?? '—'}</td>
+                              <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
+                              <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
+                              <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
+                              <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
+                              <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
+                              <td className="p-1.5 text-center">
+                                <OutcomeBadge outcome={tp.outcome} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
-              )}
-              </>
-            )}
+
+                  {/* ── SHORT TRADE PLAN — from persistent picks (stable across the day) ── */}
+                  {planShort.length > 0 && (
+                    <div className="mb-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`w-1.5 h-1.5 rounded-full ${monitorMode ? 'bg-emerald-500' : 'bg-rose-500'} animate-pulse`} />
+                        <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
+                          SHORT TRADE PLAN — SELL BOOK (₹5,00,000 DEPLOYMENT) {monitorMode && '(LIVE MONITOR)'}
+                        </span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-[12px] border-collapse">
+                          <thead>
+                            <tr className="bg-rose-50 text-slate-600">
+                              <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">LTP</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">Sell At</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">Stop Loss</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 1</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 2</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">Risk/Sh</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">R:R T2</th>
+                              <th className="p-1.5 text-center font-bold uppercase tracking-wider">Outcome</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {planShort.slice(0, 5).map((tp, idx) => (
+                              <tr key={`lp-short-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-rose-50 cursor-pointer">
+                                <td className="p-1.5 font-bold text-slate-900">
+                                  <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
+                                </td>
+                                <td className="p-1.5 text-right font-mono text-slate-900 font-bold">{tp.ltp != null ? tp.ltp.toFixed(2) : '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-rose-600 font-bold">{tp.entryPrice?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
+                                <td className="p-1.5 text-center">
+                                  <OutcomeBadge outcome={tp.outcome} />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             {/* ── SHORT CAPITAL ALLOCATION TABLE ────────────────────────── */}
             {dhanData?.shortCapitalAllocation && dhanData.shortCapitalAllocation.length > 0 && (
@@ -981,7 +1172,9 @@ export default function IntradayMatrixPanel() {
 
       {/* Footer */}
       <div className="text-center text-[7px] text-slate-400 pt-1">
-        lemonn.co.in · Dhan ScanX + feed_scanner · Data refreshes every 2 minutes
+        {monitorMode
+          ? 'FIXED PLAN ACTIVE · Monitor mode · Live prices every 2s · No external API calls'
+          : 'lemonn.co.in · Dhan ScanX + feed_scanner · Data refreshes every 2 minutes'}
       </div>
 
       <style>{`
