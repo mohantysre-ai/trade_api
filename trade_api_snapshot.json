@@ -16,8 +16,8 @@
       "currentPrice": null,
       "outcome": null,
       "scanLtp": null,
-      "sessionTs": 1784380049,
-      "updatedAt": "2026-07-18T13:07:29.243949+00:00"
+      "sessionTs": 1784381725,
+      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
     },
     "RAMASTEEL:SHORT": {
       "symbol": "RAMASTEEL",
@@ -35,8 +35,8 @@
       "currentPrice": null,
       "outcome": null,
       "scanLtp": null,
-      "sessionTs": 1784380049,
-      "updatedAt": "2026-07-18T13:07:29.243949+00:00"
+      "sessionTs": 1784381725,
+      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
     },
     "GTLINFRA:SHORT": {
       "symbol": "GTLINFRA",
@@ -54,8 +54,8 @@
       "currentPrice": null,
       "outcome": null,
       "scanLtp": null,
-      "sessionTs": 1784380049,
-      "updatedAt": "2026-07-18T13:07:29.243949+00:00"
+      "sessionTs": 1784381725,
+      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
     },
     "VIKASLIFE:SHORT": {
       "symbol": "VIKASLIFE",
@@ -73,8 +73,8 @@
       "currentPrice": null,
       "outcome": null,
       "scanLtp": null,
-      "sessionTs": 1784380049,
-      "updatedAt": "2026-07-18T13:07:29.243949+00:00"
+      "sessionTs": 1784381725,
+      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
     },
     "JAINREC:SHORT": {
       "symbol": "JAINREC",
@@ -92,8 +92,8 @@
       "currentPrice": null,
       "outcome": null,
       "scanLtp": null,
-      "sessionTs": 1784380049,
-      "updatedAt": "2026-07-18T13:07:29.243949+00:00"
+      "sessionTs": 1784381725,
+      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
     },
     "GREENPOWER:SHORT": {
       "symbol": "GREENPOWER",
@@ -111,8 +111,8 @@
       "currentPrice": null,
       "outcome": null,
       "scanLtp": null,
-      "sessionTs": 1784380049,
-      "updatedAt": "2026-07-18T13:07:29.243949+00:00"
+      "sessionTs": 1784381725,
+      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
     },
     "BSE:SHORT": {
       "symbol": "BSE",
@@ -130,8 +130,8 @@
       "currentPrice": null,
       "outcome": null,
       "scanLtp": null,
-      "sessionTs": 1784380049,
-      "updatedAt": "2026-07-18T13:07:29.243949+00:00"
+      "sessionTs": 1784381725,
+      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
     },
     "BAJAJCON:SHORT": {
       "symbol": "BAJAJCON",
@@ -149,8 +149,8 @@
       "currentPrice": null,
       "outcome": null,
       "scanLtp": null,
-      "sessionTs": 1784380049,
-      "updatedAt": "2026-07-18T13:07:29.243949+00:00"
+      "sessionTs": 1784381725,
+      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
     },
     "VIKASECO:SHORT": {
       "symbol": "VIKASECO",
@@ -168,8 +168,8 @@
       "currentPrice": null,
       "outcome": null,
       "scanLtp": null,
-      "sessionTs": 1784380049,
-      "updatedAt": "2026-07-18T13:07:29.243949+00:00"
+      "sessionTs": 1784381725,
+      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
     },
     "NCC:SHORT": {
       "symbol": "NCC",
@@ -187,45 +187,9 @@
       "currentPrice": null,
       "outcome": null,
       "scanLtp": null,
-      "sessionTs": 1784380049,
-      "updatedAt": "2026-07-18T13:07:29.243949+00:00"
+      "sessionTs": 1784381725,
+      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
     }
   },
-  "scannerPicksUpdatedAt": "2026-07-18T13:07:29.243949+00:00",
-  "tickerNewsByTicker": {
-    "PERSISTENT": {
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "Carnegie Fonder, an institutional investor, has questioned Persistent Systems' acquisition of Nagarro, citing concerns about its growth prospects.",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "Persistent Systems' acquisition of Nagarro is under scrutiny from an institutional investor due to growth concerns. However, Persistent's CEO is defending the acquisition, stating that Nagarro's growth will reward investors.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "No recent news found.",
-      "management_changes": "Persistent's CEO has publicly addressed market concerns regarding the Nagarro acquisition, expressing confidence that its growth will ultimately benefit investors.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "Neutral",
-      "risk_flags": "Growth concerns regarding Nagarro acquisition, institutional investor questioning management strategy",
-      "summary_headline": "Persistent Systems faces institutional investor scrutiny over Nagarro acquisition, CEO defends growth prospects.",
-      "generated_at": "2026-07-18T11:35:05.896991+00:00",
-      "ticker": "PERSISTENT"
-    },
-    "EXICOM": {
-      "insider_activity": "No recent news found.",
-      "institutional_activity": "Exicom's IPO was massively oversubscribed",
-      "order_book_block_deals": "No recent news found.",
-      "future_expansion_capex": "No recent news found.",
-      "auditor_changes": "No recent news found.",
-      "dividend_news": "No recent news found.",
-      "new_orders_contracts": "No recent news found.",
-      "earnings_results": "No recent news found.",
-      "management_changes": "No recent news found.",
-      "regulatory_filings": "No recent news found.",
-      "sentiment_overall": "No recent news found.",
-      "risk_flags": "No recent news found.",
-      "summary_headline": "No recent news found.",
-      "generated_at": "2026-07-18T13:08:44.107306+00:00",
-      "ticker": "EXICOM"
-    }
-  }
+  "scannerPicksUpdatedAt": "2026-07-18T13:35:25.871532+00:00"
 }

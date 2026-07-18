@@ -85,6 +85,52 @@ body {
 .terminal-shell [class*="text-teal-700"],
 .terminal-shell [class*="text-teal-600"] { color: var(--terminal-cyan) !important; }
 
+/* Explicitly restore right drawer appearance */
+.right-drawer {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #1e293b !important;
+}
+.right-drawer .bg-white,
+.right-drawer .bg-white\/90 {
+  background-color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+.right-drawer .border-slate-200,
+.right-drawer .border-slate-100 {
+  border-color: #e2e8f0 !important;
+}
+.right-drawer .text-slate-900,
+.right-drawer .text-slate-800,
+.right-drawer .text-slate-700 {
+  color: #0f172a !important;
+}
+.right-drawer .text-slate-600,
+.right-drawer .text-slate-500,
+.right-drawer .text-slate-400 {
+  color: #475569 !important;
+}
+/* Ensure nested elements also follow original styling */
+.right-drawer [class*="bg-slate-50"],
+.right-drawer [class*="from-slate-50"],
+.right-drawer [class*="to-slate-50"] {
+  background: #f8fafc !important;
+}
+.right-drawer [class*="border-slate"] {
+  border-color: #e2e8f0 !important;
+}
+.right-drawer button,
+.right-drawer a,
+.right-drawer span {
+  color: inherit;
+}
+.right-drawer .hover\:text-slate-700:hover {
+  color: #374151 !important;
+}
+.right-drawer .hover\:bg-slate-100:hover {
+  background-color: #f1f5f9 !important;
+}
+
 .terminal-header, .terminal-tabs,
 .terminal-shell .rounded-xl.border,
 .terminal-shell .rounded-2xl.border,

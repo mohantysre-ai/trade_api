@@ -424,7 +424,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
 
   return (
     <div
-      className={`fixed top-0 right-0 h-full w-full lg:w-[50%] xl:w-[50%] 2xl:w-[45%] bg-white border-l border-slate-200 shadow-2xl transform ${
+      className={`right-drawer fixed top-0 right-0 h-full w-full lg:w-[50%] xl:w-[50%] 2xl:w-[45%] bg-white border-l border-slate-200 shadow-2xl transform ${
         open ? "translate-x-0" : "translate-x-full"
       } transition-transform duration-300 ease-out z-50 overflow-y-auto`}
     >
