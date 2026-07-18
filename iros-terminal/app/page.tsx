@@ -298,7 +298,7 @@ function MiniSparkline({ positive }: { positive: boolean }) {
         </linearGradient>
       </defs>
       <path d={areaD} fill={fillUrl} />
-      <path d={pathD} stroke={color} strokeWidth="1.0" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={pathD} stroke={color} strokeWidth="0.75" fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -2043,9 +2043,9 @@ function SparklineSVG({ positive, data }: { positive: boolean; data?: number[] }
       {/* Area fill */}
       <path d={areaD} fill={fillUrl} />
       {/* Smooth line with Catmull-Rom spline */}
-      <path d={pathD} stroke={color} strokeWidth="3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={pathD} stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       {/* End dot */}
-      <circle cx={lastPoint[0]} cy={lastPoint[1]} r="3" fill={color} stroke="white" strokeWidth="1.5" />
+      <circle cx={lastPoint[0]} cy={lastPoint[1]} r="2" fill={color} stroke="white" strokeWidth="1" />
     </svg>
   );
 }
