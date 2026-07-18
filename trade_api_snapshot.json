@@ -13,11 +13,19 @@
       "approxQty": 0,
       "deployedCapital": 0.0,
       "riskAmount": 0.0,
-      "currentPrice": null,
-      "outcome": null,
+      "currentPrice": 91.97,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 91.97 | Entry 91.97 | +0.00%",
+        "hitLevel": null,
+        "ltp": 91.97,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
       "scanLtp": null,
       "sessionTs": 1784381725,
-      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
+      "updatedAt": "2026-07-18T15:02:47.309592+00:00",
+      "priceUpdatedAt": null
     },
     "RAMASTEEL:SHORT": {
       "symbol": "RAMASTEEL",
@@ -32,11 +40,19 @@
       "approxQty": 0,
       "deployedCapital": 0.0,
       "riskAmount": 0.0,
-      "currentPrice": null,
-      "outcome": null,
+      "currentPrice": 4.33,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 4.33 | Entry 4.33 | +0.00%",
+        "hitLevel": null,
+        "ltp": 4.33,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
       "scanLtp": null,
       "sessionTs": 1784381725,
-      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
+      "updatedAt": "2026-07-18T15:02:47.309592+00:00",
+      "priceUpdatedAt": null
     },
     "GTLINFRA:SHORT": {
       "symbol": "GTLINFRA",
@@ -51,11 +67,19 @@
       "approxQty": 0,
       "deployedCapital": 0.0,
       "riskAmount": 0.0,
-      "currentPrice": null,
-      "outcome": null,
+      "currentPrice": 1.24,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 1.24 | Entry 1.24 | +0.00%",
+        "hitLevel": null,
+        "ltp": 1.24,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
       "scanLtp": null,
       "sessionTs": 1784381725,
-      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
+      "updatedAt": "2026-07-18T15:02:47.309592+00:00",
+      "priceUpdatedAt": null
     },
     "VIKASLIFE:SHORT": {
       "symbol": "VIKASLIFE",
@@ -70,11 +94,19 @@
       "approxQty": 0,
       "deployedCapital": 0.0,
       "riskAmount": 0.0,
-      "currentPrice": null,
-      "outcome": null,
+      "currentPrice": 1.34,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 1.34 | Entry 1.34 | +0.00%",
+        "hitLevel": null,
+        "ltp": 1.34,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
       "scanLtp": null,
       "sessionTs": 1784381725,
-      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
+      "updatedAt": "2026-07-18T15:02:47.309592+00:00",
+      "priceUpdatedAt": null
     },
     "JAINREC:SHORT": {
       "symbol": "JAINREC",
@@ -89,11 +121,19 @@
       "approxQty": 0,
       "deployedCapital": 0.0,
       "riskAmount": 0.0,
-      "currentPrice": null,
-      "outcome": null,
+      "currentPrice": 328.8,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 328.80 | Entry 328.80 | +0.00%",
+        "hitLevel": null,
+        "ltp": 328.8,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
       "scanLtp": null,
       "sessionTs": 1784381725,
-      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
+      "updatedAt": "2026-07-18T15:02:47.309592+00:00",
+      "priceUpdatedAt": null
     },
     "GREENPOWER:SHORT": {
       "symbol": "GREENPOWER",
@@ -108,11 +148,19 @@
       "approxQty": 0,
       "deployedCapital": 0.0,
       "riskAmount": 0.0,
-      "currentPrice": null,
-      "outcome": null,
+      "currentPrice": 9.95,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 9.95 | Entry 9.95 | +0.00%",
+        "hitLevel": null,
+        "ltp": 9.95,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
       "scanLtp": null,
       "sessionTs": 1784381725,
-      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
+      "updatedAt": "2026-07-18T15:02:47.309592+00:00",
+      "priceUpdatedAt": null
     },
     "BSE:SHORT": {
       "symbol": "BSE",
@@ -127,11 +175,19 @@
       "approxQty": 0,
       "deployedCapital": 0.0,
       "riskAmount": 0.0,
-      "currentPrice": null,
-      "outcome": null,
+      "currentPrice": 3581.8,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 3581.80 | Entry 3581.80 | +0.00%",
+        "hitLevel": null,
+        "ltp": 3581.8,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
       "scanLtp": null,
       "sessionTs": 1784381725,
-      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
+      "updatedAt": "2026-07-18T15:02:47.309592+00:00",
+      "priceUpdatedAt": null
     },
     "BAJAJCON:SHORT": {
       "symbol": "BAJAJCON",
@@ -146,11 +202,19 @@
       "approxQty": 0,
       "deployedCapital": 0.0,
       "riskAmount": 0.0,
-      "currentPrice": null,
-      "outcome": null,
+      "currentPrice": 525.65,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 525.65 | Entry 525.65 | +0.00%",
+        "hitLevel": null,
+        "ltp": 525.65,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
       "scanLtp": null,
       "sessionTs": 1784381725,
-      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
+      "updatedAt": "2026-07-18T15:02:47.309592+00:00",
+      "priceUpdatedAt": null
     },
     "VIKASECO:SHORT": {
       "symbol": "VIKASECO",
@@ -165,11 +229,19 @@
       "approxQty": 0,
       "deployedCapital": 0.0,
       "riskAmount": 0.0,
-      "currentPrice": null,
-      "outcome": null,
+      "currentPrice": 1.15,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 1.15 | Entry 1.15 | +0.00%",
+        "hitLevel": null,
+        "ltp": 1.15,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
       "scanLtp": null,
       "sessionTs": 1784381725,
-      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
+      "updatedAt": "2026-07-18T15:02:47.309592+00:00",
+      "priceUpdatedAt": null
     },
     "NCC:SHORT": {
       "symbol": "NCC",
@@ -184,14 +256,292 @@
       "approxQty": 0,
       "deployedCapital": 0.0,
       "riskAmount": 0.0,
-      "currentPrice": null,
-      "outcome": null,
+      "currentPrice": 139.6,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 139.60 | Entry 139.60 | +0.00%",
+        "hitLevel": null,
+        "ltp": 139.6,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
       "scanLtp": null,
       "sessionTs": 1784381725,
-      "updatedAt": "2026-07-18T13:35:25.871532+00:00"
+      "updatedAt": "2026-07-18T15:02:47.309592+00:00",
+      "priceUpdatedAt": null
+    },
+    "RELAXO:LONG": {
+      "symbol": "RELAXO",
+      "name": "Relaxo Footwears",
+      "direction": "LONG",
+      "entryPrice": 439.95,
+      "stopLoss": 418.48,
+      "target1": 472.15,
+      "target2": 504.36,
+      "riskPerShare": 21.47,
+      "rrT2": 3.0,
+      "approxQty": 0,
+      "deployedCapital": 0.0,
+      "riskAmount": 0.0,
+      "currentPrice": 439.95,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 439.95 | Entry 439.95 | +0.00%",
+        "hitLevel": null,
+        "ltp": 439.95,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
+      "scanLtp": null,
+      "sessionTs": 1784382888,
+      "updatedAt": "2026-07-18T15:02:47.291434+00:00",
+      "priceUpdatedAt": null
+    },
+    "CUPID:LONG": {
+      "symbol": "CUPID",
+      "name": "Cupid",
+      "direction": "LONG",
+      "entryPrice": 214.78,
+      "stopLoss": 203.38,
+      "target1": 231.88,
+      "target2": 248.98,
+      "riskPerShare": 11.4,
+      "rrT2": 3.0,
+      "approxQty": 0,
+      "deployedCapital": 0.0,
+      "riskAmount": 0.0,
+      "currentPrice": 214.78,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 214.78 | Entry 214.78 | +0.00%",
+        "hitLevel": null,
+        "ltp": 214.78,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
+      "scanLtp": null,
+      "sessionTs": 1784382888,
+      "updatedAt": "2026-07-18T15:02:47.291434+00:00",
+      "priceUpdatedAt": null
+    },
+    "NAVKARURB:LONG": {
+      "symbol": "NAVKARURB",
+      "name": "Navkar Urbanstructure",
+      "direction": "LONG",
+      "entryPrice": 1.16,
+      "stopLoss": 1.1,
+      "target1": 1.25,
+      "target2": 1.34,
+      "riskPerShare": 0.06,
+      "rrT2": 3.0,
+      "approxQty": 0,
+      "deployedCapital": 0.0,
+      "riskAmount": 0.0,
+      "currentPrice": 1.16,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 1.16 | Entry 1.16 | +0.00%",
+        "hitLevel": null,
+        "ltp": 1.16,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
+      "scanLtp": null,
+      "sessionTs": 1784382888,
+      "updatedAt": "2026-07-18T15:02:47.291434+00:00",
+      "priceUpdatedAt": null
+    },
+    "BAJFINANCE:LONG": {
+      "symbol": "BAJFINANCE",
+      "name": "Bajaj Finance",
+      "direction": "LONG",
+      "entryPrice": 1056.3,
+      "stopLoss": 1031.65,
+      "target1": 1093.27,
+      "target2": 1130.25,
+      "riskPerShare": 24.65,
+      "rrT2": 3.0,
+      "approxQty": 0,
+      "deployedCapital": 0.0,
+      "riskAmount": 0.0,
+      "currentPrice": 1056.3,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 1056.30 | Entry 1056.30 | +0.00%",
+        "hitLevel": null,
+        "ltp": 1056.3,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
+      "scanLtp": null,
+      "sessionTs": 1784382888,
+      "updatedAt": "2026-07-18T15:02:47.291434+00:00",
+      "priceUpdatedAt": null
+    },
+    "ADANIENT:LONG": {
+      "symbol": "ADANIENT",
+      "name": "Adani Enterprises",
+      "direction": "LONG",
+      "entryPrice": 3160.7,
+      "stopLoss": 3078.29,
+      "target1": 3284.31,
+      "target2": 3407.93,
+      "riskPerShare": 82.41,
+      "rrT2": 3.0,
+      "approxQty": 0,
+      "deployedCapital": 0.0,
+      "riskAmount": 0.0,
+      "currentPrice": 3160.7,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 3160.70 | Entry 3160.70 | +0.00%",
+        "hitLevel": null,
+        "ltp": 3160.7,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
+      "scanLtp": null,
+      "sessionTs": 1784382888,
+      "updatedAt": "2026-07-18T15:02:47.291434+00:00",
+      "priceUpdatedAt": null
+    },
+    "ZEEL:LONG": {
+      "symbol": "ZEEL",
+      "name": "Zee Entertainment",
+      "direction": "LONG",
+      "entryPrice": 107.4,
+      "stopLoss": 102.17,
+      "target1": 115.25,
+      "target2": 123.09,
+      "riskPerShare": 5.23,
+      "rrT2": 3.0,
+      "approxQty": 0,
+      "deployedCapital": 0.0,
+      "riskAmount": 0.0,
+      "currentPrice": 107.4,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 107.40 | Entry 107.40 | +0.00%",
+        "hitLevel": null,
+        "ltp": 107.4,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
+      "scanLtp": null,
+      "sessionTs": 1784382888,
+      "updatedAt": "2026-07-18T15:02:47.291434+00:00",
+      "priceUpdatedAt": null
+    },
+    "BPCL:LONG": {
+      "symbol": "BPCL",
+      "name": "Bharat Petroleum",
+      "direction": "LONG",
+      "entryPrice": 315.55,
+      "stopLoss": 307.74,
+      "target1": 327.26,
+      "target2": 338.98,
+      "riskPerShare": 7.81,
+      "rrT2": 3.0,
+      "approxQty": 0,
+      "deployedCapital": 0.0,
+      "riskAmount": 0.0,
+      "currentPrice": 315.55,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 315.55 | Entry 315.55 | +0.00%",
+        "hitLevel": null,
+        "ltp": 315.55,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
+      "scanLtp": null,
+      "sessionTs": 1784382888,
+      "updatedAt": "2026-07-18T15:02:47.291434+00:00",
+      "priceUpdatedAt": null
+    },
+    "SBIN:LONG": {
+      "symbol": "SBIN",
+      "name": "State Bank of India",
+      "direction": "LONG",
+      "entryPrice": 1044.3,
+      "stopLoss": 1024.73,
+      "target1": 1073.65,
+      "target2": 1103.01,
+      "riskPerShare": 19.57,
+      "rrT2": 3.0,
+      "approxQty": 0,
+      "deployedCapital": 0.0,
+      "riskAmount": 0.0,
+      "currentPrice": 1044.3,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 1044.30 | Entry 1044.30 | +0.00%",
+        "hitLevel": null,
+        "ltp": 1044.3,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
+      "scanLtp": null,
+      "sessionTs": 1784382888,
+      "updatedAt": "2026-07-18T15:02:47.291434+00:00",
+      "priceUpdatedAt": null
+    },
+    "M&M:LONG": {
+      "symbol": "M&M",
+      "name": "Mahindra & Mahindra",
+      "direction": "LONG",
+      "entryPrice": 3179.2,
+      "stopLoss": 3105.88,
+      "target1": 3289.18,
+      "target2": 3399.16,
+      "riskPerShare": 73.32,
+      "rrT2": 3.0,
+      "approxQty": 0,
+      "deployedCapital": 0.0,
+      "riskAmount": 0.0,
+      "currentPrice": 3179.2,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 3179.20 | Entry 3179.20 | +0.00%",
+        "hitLevel": null,
+        "ltp": 3179.2,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
+      "scanLtp": null,
+      "sessionTs": 1784382888,
+      "updatedAt": "2026-07-18T15:02:47.291434+00:00",
+      "priceUpdatedAt": null
+    },
+    "PIRAMALFIN:LONG": {
+      "symbol": "PIRAMALFIN",
+      "name": "Piramal Finance",
+      "direction": "LONG",
+      "entryPrice": 2144.3,
+      "stopLoss": 2075.93,
+      "target1": 2246.86,
+      "target2": 2349.41,
+      "riskPerShare": 68.37,
+      "rrT2": 3.0,
+      "approxQty": 0,
+      "deployedCapital": 0.0,
+      "riskAmount": 0.0,
+      "currentPrice": 2144.3,
+      "outcome": {
+        "label": "PENDING",
+        "detail": "LTP 2144.30 | Entry 2144.30 | +0.00%",
+        "hitLevel": null,
+        "ltp": 2144.3,
+        "pctChange": 0.0,
+        "resolvedAt": null
+      },
+      "scanLtp": null,
+      "sessionTs": 1784382888,
+      "updatedAt": "2026-07-18T15:02:47.291434+00:00",
+      "priceUpdatedAt": null
     }
   },
-  "scannerPicksUpdatedAt": "2026-07-18T13:35:25.871532+00:00",
+  "scannerPicksUpdatedAt": "2026-07-18T15:02:47.309592+00:00",
   "tickerNewsByTicker": {
     "MAZDOCK": {
       "insider_activity": "No recent news found.",
@@ -208,7 +558,42 @@
       "risk_flags": "Potential price decline if the immediate demand zone (393-380) is penetrated, leading to a focus on the 360 support level.",
       "summary_headline": "Technical analysis identifies key demand and support zones for MAZDOCK stock.",
       "generated_at": "2026-07-18T13:49:06.594300+00:00",
-      "ticker": "MAZDOCK"
+      "ticker": "MAZDOCK",
+      "cached": true
+    },
+    "BEL": {
+      "insider_activity": "No recent news found.",
+      "institutional_activity": "No recent news found.",
+      "order_book_block_deals": "No recent news found.",
+      "future_expansion_capex": "No recent news found.",
+      "auditor_changes": "No recent news found.",
+      "dividend_news": "No recent news found.",
+      "new_orders_contracts": "No recent news found.",
+      "earnings_results": "No recent news found.",
+      "management_changes": "No recent news found.",
+      "regulatory_filings": "No recent news found.",
+      "sentiment_overall": "No recent news found.",
+      "risk_flags": "No recent news found.",
+      "summary_headline": "No recent news found.",
+      "generated_at": "2026-07-18T13:53:16.483745+00:00",
+      "ticker": "BEL"
+    },
+    "MPHASIS": {
+      "insider_activity": "Blackstone, a major shareholder in Mphasis, has pledged its entire stake in the company. This action was taken to refinance a loan.",
+      "institutional_activity": "No recent news found.",
+      "order_book_block_deals": "No recent news found.",
+      "future_expansion_capex": "No recent news found.",
+      "auditor_changes": "No recent news found.",
+      "dividend_news": "No recent news found.",
+      "new_orders_contracts": "No recent news found.",
+      "earnings_results": "The broader Indian IT sector, which includes Mphasis, is awaiting Q1 results. These results are expected to potentially counter a significant AI-led market rout.",
+      "management_changes": "No recent news found.",
+      "regulatory_filings": "No recent news found.",
+      "sentiment_overall": "Bearish",
+      "risk_flags": "Pledging of entire promoter stake, potential financial pressure on promoter",
+      "summary_headline": "Blackstone pledges its entire Mphasis stake to refinance a loan.",
+      "generated_at": "2026-07-18T13:53:42.687462+00:00",
+      "ticker": "MPHASIS"
     }
   }
 }

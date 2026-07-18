@@ -992,6 +992,9 @@ export default function IntradayMatrixPanel() {
               // Monitor mode uses livePricesData (fresh every 2s, no external calls)
               const planLong = monitorMode && livePricesData ? (livePricesData.long || []) : (outcomesData?.long || []);
               const planShort = monitorMode && livePricesData ? (livePricesData.short || []) : (outcomesData?.short || []);
+              // Guard: ensure plan data exists before rendering
+              if (!Array.isArray(planLong)) return null;
+              if (!Array.isArray(planShort)) return null;
               const planTime = monitorMode && livePricesData?.updatedAt
                 ? new Date(livePricesData.updatedAt).toLocaleTimeString('en-IN', { hour12: false })
                 : outcomesTime;
@@ -1012,53 +1015,55 @@ export default function IntradayMatrixPanel() {
                       </span>
                     </div>
                   )}
-                  <div className="mb-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`w-1.5 h-1.5 rounded-full ${monitorMode ? (sessionClosed ? 'bg-slate-500' : 'bg-emerald-500') : 'bg-amber-500'}`} />
-                      <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
-                        TRADE PLAN — ₹5,00,000 DEPLOYMENT {monitorMode && '(LIVE MONITOR)'}
-                      </span>
-                      <span className="text-[9px] text-slate-400 ml-2">(updated @{planTime || '—'})</span>
-                    </div>
+                  {planLong.length > 0 && (
+                    <div className="mb-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`w-1.5 h-1.5 rounded-full ${monitorMode ? (sessionClosed ? 'bg-slate-500' : 'bg-emerald-500') : 'bg-amber-500'}`} />
+                        <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
+                          TRADE PLAN — ₹5,00,000 DEPLOYMENT {monitorMode && '(LIVE MONITOR)'}
+                        </span>
+                        <span className="text-[9px] text-slate-400 ml-2">(updated @{planTime || '—'})</span>
+                      </div>
 
-                    {/* Trade plan table — LONG */}
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-[12px] border-collapse">
-                        <thead>
-                          <tr className="bg-slate-100 text-slate-600">
-                            <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
-                            <th className="p-1.5 text-right font-bold uppercase tracking-wider">LTP</th>
-                            <th className="p-1.5 text-right font-bold uppercase tracking-wider">Buy Above</th>
-                            <th className="p-1.5 text-right font-bold uppercase tracking-wider">Stop Loss</th>
-                            <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 1</th>
-                            <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 2</th>
-                            <th className="p-1.5 text-right font-bold uppercase tracking-wider">Risk/Sh</th>
-                            <th className="p-1.5 text-right font-bold uppercase tracking-wider">R:R T2</th>
-                            <th className="p-1.5 text-center font-bold uppercase tracking-wider">Outcome</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {planLong.slice(0, 5).map((tp, idx) => (
-                            <tr key={`lp-long-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer">
-                              <td className="p-1.5 font-bold text-slate-900">
-                                <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
-                              </td>
-                              <td className="p-1.5 text-right font-mono text-slate-900 font-bold">{tp.currentPrice != null ? tp.currentPrice.toFixed(2) : '—'}</td>
-                              <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">{tp.entryPrice?.toFixed(2) ?? '—'}</td>
-                              <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
-                              <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
-                              <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
-                              <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
-                              <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
-                              <td className="p-1.5 text-center">
-                                <OutcomeBadge outcome={tp.outcome} />
-                              </td>
+                      {/* Trade plan table — LONG */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-[12px] border-collapse">
+                          <thead>
+                            <tr className="bg-slate-100 text-slate-600">
+                              <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">LTP</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">Buy Above</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">Stop Loss</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 1</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">Target 2</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">Risk/Sh</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">R:R T2</th>
+                              <th className="p-1.5 text-center font-bold uppercase tracking-wider">Outcome</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {planLong.slice(0, 5).map((tp, idx) => (
+                              <tr key={`lp-long-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer">
+                                <td className="p-1.5 font-bold text-slate-900">
+                                  <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
+                                </td>
+                                <td className="p-1.5 text-right font-mono text-slate-900 font-bold">{tp.currentPrice != null ? tp.currentPrice.toFixed(2) : '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">{tp.entryPrice?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
+                                <td className="p-1.5 text-center">
+                                  <OutcomeBadge outcome={tp.outcome} />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* ── LONG CAPITAL ALLOCATION TABLE ────────────────────────── */}
                   {dhanData?.capitalAllocation && dhanData.capitalAllocation.length > 0 && (

@@ -183,6 +183,40 @@ body {
 .news-card:nth-child(4n) { animation-delay: .15s; }
 .news-card > div:first-child { height: 2px !important; box-shadow: 0 0 12px currentColor; }
 
+/* NIFTY TOP 5 / GainersLosersHeatmap dark theme overrides */
+.terminal-shell .grid.grid-cols-5 > div,
+.terminal-shell [class*="grid-cols-5"] > div {
+  background-color: var(--terminal-panel) !important;
+  border-color: var(--terminal-line) !important;
+}
+.terminal-shell .grid.grid-cols-5 > div .text-slate-500,
+.terminal-shell [class*="grid-cols-5"] > div .text-slate-500 {
+  color: var(--terminal-muted) !important;
+}
+.terminal-shell .grid.grid-cols-5 > div .text-slate-400,
+.terminal-shell [class*="grid-cols-5"] > div .text-slate-400 {
+  color: var(--terminal-muted) !important;
+}
+.terminal-shell .grid.grid-cols-5 > div .bg-slate-100,
+.terminal-shell [class*="grid-cols-5"] > div .bg-slate-100 {
+  background-color: rgba(55, 215, 223, 0.1) !important;
+}
+.terminal-shell .grid.grid-cols-5 > div [style*="rgba(248, 250, 252"],
+.terminal-shell [class*="grid-cols-5"] > div [style*="rgba(248, 250, 252"] {
+  background-color: rgba(55, 215, 223, 0.06) !important;
+}
+.terminal-shell .grid.grid-cols-5 > div [style*="rgba(226, 232, 240"],
+.terminal-shell [class*="grid-cols-5"] > div [style*="rgba(226, 232, 240"] {
+  border-bottom-color: var(--terminal-line) !important;
+}
+/* TrendlyneCategoryPanel dark theme overrides */
+.terminal-shell [class*="space-y-0"] a[style*="rgba(248, 250, 252"] {
+  background-color: rgba(55, 215, 223, 0.06) !important;
+}
+.terminal-shell [class*="space-y-0"] a[style*="rgba(226, 232, 240"] {
+  border-bottom-color: var(--terminal-line) !important;
+}
+
 .terminal-shell table thead tr { background: rgba(55, 215, 223, .08) !important; color: #c8d9e8 !important; }
 .terminal-shell table tbody tr { border-color: var(--terminal-line) !important; }
 .terminal-shell table tbody tr:hover { background: rgba(55, 215, 223, .055) !important; }

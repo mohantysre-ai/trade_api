@@ -1485,6 +1485,12 @@ function NewsFeedPanel({ items, now }: { items?: NewsItem[]; now: number }) {
   const [sourceFilter, setSourceFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [sentimentFilter, setSentimentFilter] = useState<string | null>(null);
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const scrollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const handleMouseEnter = () => setAutoScroll(false);
+  const handleMouseLeave = () => setAutoScroll(true);
 
   const timeAgo = (dateStr: string) => {
     const diff = now - new Date(dateStr).getTime();
@@ -1519,6 +1525,29 @@ function NewsFeedPanel({ items, now }: { items?: NewsItem[]; now: number }) {
 
   const hasFilters = sourceFilter || categoryFilter || sentimentFilter;
   const displayed = expanded ? filtered : filtered.slice(0, 12);
+
+  // Auto-scroll the news rail horizontally
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail || !autoScroll || displayed.length === 0) return;
+
+    scrollIntervalRef.current = setInterval(() => {
+      if (!rail) return;
+      const maxScroll = rail.scrollWidth - rail.clientWidth;
+      if (rail.scrollLeft >= maxScroll - 2) {
+        rail.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        rail.scrollBy({ left: 330, behavior: 'smooth' });
+      }
+    }, 4000);
+
+    return () => {
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+    };
+  }, [items, autoScroll, displayed.length]);
 
   if (!items?.length) {
     return (
@@ -1620,7 +1649,7 @@ function NewsFeedPanel({ items, now }: { items?: NewsItem[]; now: number }) {
       {displayed.length === 0 ? (
         <div className="p-6 text-center text-slate-400 text-[11px]">No stories match the current filters.</div>
       ) : (
-        <div className="news-rail gap-3 p-3" tabIndex={0} aria-label="Scrollable live news stories">
+        <div className="news-rail gap-3 p-3" tabIndex={0} aria-label="Scrollable live news stories" ref={railRef} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
           {displayed.map((item, i) => {
             const color = sourceColor(item.source);
             const sentiment = item.sentiment ?? "Neutral";
@@ -1824,8 +1853,33 @@ function StructuredReasoningOutput({ intelligence }: { intelligence?: TerminalIn
 
 let sparkIdCounter = 0;
 
+/**
+ * Convert Catmull-Rom spline points to smooth cubic bezier path.
+ * Produces organic, flowing curves instead of jagged line segments.
+ */
+function catmullRomToBezier(points: readonly (readonly [number, number])[]): string {
+  if (points.length < 2) return '';
+  if (points.length === 2) {
+    return `M ${points[0][0].toFixed(2)},${points[0][1].toFixed(2)} L ${points[1][0].toFixed(2)},${points[1][1].toFixed(2)}`;
+  }
+  const tension = 0.5;
+  let d = `M ${points[0][0].toFixed(2)},${points[0][1].toFixed(2)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    const cp1x = p1[0] + (p2[0] - p0[0]) / 6 * tension * 2;
+    const cp1y = p1[1] + (p2[1] - p0[1]) / 6 * tension * 2;
+    const cp2x = p2[0] - (p3[0] - p1[0]) / 6 * tension * 2;
+    const cp2y = p2[1] - (p3[1] - p1[1]) / 6 * tension * 2;
+    d += ` C ${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2[0].toFixed(2)},${p2[1].toFixed(2)}`;
+  }
+  return d;
+}
+
 /* Real data-driven sparkline rendered from an array of close prices.
- * Falls back to nothing when data is empty so cards stay clean. */
+ * Uses Catmull-Rom spline for smooth, organic curves. */
 function SparklineSVG({ positive, data }: { positive: boolean; data?: number[] }) {
   const [id] = useState(() => `spk-${positive ? 'g' : 'r'}-${++sparkIdCounter}`);
   const color = positive ? '#10b981' : '#ef4444';
@@ -1848,8 +1902,8 @@ function SparklineSVG({ positive, data }: { positive: boolean; data?: number[] }
     return [x, y] as const;
   });
 
-  // Build a smooth path using simple line segments (good enough at this size)
-  const pathD = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+  // Smooth curve via Catmull-Rom spline
+  const pathD = catmullRomToBezier(points);
   const areaD = `${pathD} L ${points[points.length - 1][0].toFixed(2)},${H} L ${points[0][0].toFixed(2)},${H} Z`;
   const lastPoint = points[points.length - 1];
 
@@ -1863,7 +1917,7 @@ function SparklineSVG({ positive, data }: { positive: boolean; data?: number[] }
       </defs>
       {/* Area fill */}
       <path d={areaD} fill={fillUrl} />
-      {/* Line */}
+      {/* Smooth line with Catmull-Rom spline */}
       <path d={pathD} stroke={color} strokeWidth="3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       {/* End dot */}
       <circle cx={lastPoint[0]} cy={lastPoint[1]} r="3" fill={color} stroke="white" strokeWidth="1.5" />
