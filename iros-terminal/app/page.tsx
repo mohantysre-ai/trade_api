@@ -1480,7 +1480,7 @@ function categoryStyle(category?: string): { bg: string; txt: string } {
   return { bg: "bg-slate-100", txt: "text-slate-600" };
 }
 
-function NewsFeedPanel({ items, now }: { items?: NewsItem[]; now: number }) {
+function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: number; sidebar?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
@@ -1524,20 +1524,29 @@ function NewsFeedPanel({ items, now }: { items?: NewsItem[]; now: number }) {
   }, [items, sourceFilter, categoryFilter, sentimentFilter]);
 
   const hasFilters = sourceFilter || categoryFilter || sentimentFilter;
-  const displayed = expanded ? filtered : filtered.slice(0, 12);
+  const displayed = sidebar ? filtered : (expanded ? filtered : filtered.slice(0, 12));
 
-  // Auto-scroll the news rail horizontally
+  // Auto-scroll: horizontal for full-width, vertical for sidebar
   useEffect(() => {
     const rail = railRef.current;
-    if (!rail || !autoScroll || displayed.length === 0) return;
+    if (!rail || !autoScroll) return;
 
     scrollIntervalRef.current = setInterval(() => {
       if (!rail) return;
-      const maxScroll = rail.scrollWidth - rail.clientWidth;
-      if (rail.scrollLeft >= maxScroll - 2) {
-        rail.scrollTo({ left: 0, behavior: 'smooth' });
+      if (sidebar) {
+        const maxScroll = rail.scrollHeight - rail.clientHeight;
+        if (rail.scrollTop >= maxScroll - 4) {
+          rail.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          rail.scrollBy({ top: 80, behavior: 'smooth' });
+        }
       } else {
-        rail.scrollBy({ left: 330, behavior: 'smooth' });
+        const maxScroll = rail.scrollWidth - rail.clientWidth;
+        if (rail.scrollLeft >= maxScroll - 2) {
+          rail.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          rail.scrollBy({ left: 330, behavior: 'smooth' });
+        }
       }
     }, 4000);
 
@@ -1547,11 +1556,14 @@ function NewsFeedPanel({ items, now }: { items?: NewsItem[]; now: number }) {
         scrollIntervalRef.current = null;
       }
     };
-  }, [items, autoScroll, displayed.length]);
+  }, [autoScroll, sidebar]);
 
   if (!items?.length) {
+    const containerCls = sidebar
+      ? "bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden"
+      : "bg-white border border-slate-300 border-[0.5px] rounded-2xl shadow-sm overflow-hidden";
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-2xl shadow-sm overflow-hidden">
+      <div className={containerCls}>
         <div className="flex items-center gap-2 p-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white">
           <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
           <span className="text-[10px] uppercase tracking-widest text-slate-700 font-black">Live News Feed</span>
@@ -1568,6 +1580,92 @@ function NewsFeedPanel({ items, now }: { items?: NewsItem[]; now: number }) {
     setSentimentFilter(null);
   };
 
+  // Sidebar mode: compact, vertically scrollable news list
+  if (sidebar) {
+    return (
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden news-sidebar h-full flex flex-col">
+        {/* Compact Header */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white">
+          <div className="flex items-center gap-2">
+            <div className="relative flex items-center justify-center w-5 h-5 rounded-md bg-gradient-to-br from-teal-500 to-blue-600 shadow-sm">
+              <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-wider">Live News Feed</h3>
+              <p className="text-[7px] text-slate-500">{filtered.length} stories · {sources.length} sources</p>
+            </div>
+          </div>
+          <span className="text-[8px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
+            RSS
+          </span>
+        </div>
+
+        {/* Vertically scrollable news list */}
+        <div
+          className="news-sidebar-rail p-2 space-y-1.5"
+          tabIndex={0}
+          ref={railRef}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          {displayed.map((item, i) => {
+            const color = sourceColor(item.source);
+            const sentiment = item.sentiment ?? "Neutral";
+            const st = SENTIMENT_STYLE[sentiment];
+            const cat = categoryStyle(item.category);
+            return (
+              <a
+                key={`${item.title}-${i}`}
+                href={item.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="news-sidebar-card group block rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:shadow-sm transition-all duration-200 overflow-hidden"
+              >
+                <div className="flex items-start gap-2 p-2">
+                  {/* Left accent bar */}
+                  <div className="w-0.5 h-full min-h-[2.5rem] rounded-full flex-shrink-0" style={{ background: color }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1 mb-0.5">
+                      <span
+                        className="text-[7px] font-black uppercase tracking-wider px-1 py-0.5 rounded text-white truncate max-w-[80px]"
+                        style={{ background: color }}
+                      >
+                        {item.source}
+                      </span>
+                      <span className="text-[7px] font-mono text-slate-400 ml-auto whitespace-nowrap">{timeAgo(item.publishedAt)}</span>
+                    </div>
+                    <h4 className="text-[10px] font-bold text-slate-800 leading-snug group-hover:text-teal-700 transition-colors line-clamp-2">
+                      {item.title}
+                    </h4>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className={`text-[7px] font-bold px-1 py-0.5 rounded ${cat.bg} ${cat.txt}`}>{item.category ?? "Market"}</span>
+                      <span className={`flex items-center gap-0.5 text-[7px] font-bold px-1 py-0.5 rounded ${st.bg} ${st.txt}`}>
+                        <span className={`w-1 h-1 rounded-full ${st.dot}`} />
+                        {st.label}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+
+        {filtered.length > 20 && !expanded && (
+          <button
+            onClick={() => setExpanded(true)}
+            className="w-full py-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 hover:text-teal-700 hover:bg-slate-50 border-t border-slate-100 transition-colors"
+          >
+            Show {filtered.length} stories
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Non-sidebar (full-width horizontal) mode - unchanged
   return (
     <div className="bg-white border border-slate-300 border-[0.5px] rounded-2xl shadow-sm overflow-hidden">
       {/* Header */}
@@ -1645,7 +1743,7 @@ function NewsFeedPanel({ items, now }: { items?: NewsItem[]; now: number }) {
         </select>
       </div>
 
-      {/* News grid (masonry via CSS columns) */}
+      {/* News rail (horizontal scroll) */}
       {displayed.length === 0 ? (
         <div className="p-6 text-center text-slate-400 text-[11px]">No stories match the current filters.</div>
       ) : (
@@ -2142,29 +2240,34 @@ export default function IrosMasterAdvancedTerminal() {
         </nav>
 
         {activeTab === 'marketSnapshot' && (
-          <div className="space-y-3">
-            {/* Row 1: India Markets — TOP MOVERS */}
-            <div className="grid grid-cols-1 gap-3 items-start">
-              <IndiaMarketsGrid items={enrichedMacros} staleLabel={staleMacroLabel} />
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-3 items-stretch">
+            {/* Left Column: Core Market Panels */}
+            <div className="space-y-3 min-w-0">
+              {/* Row 1: India Markets — TOP MOVERS */}
+              <div className="grid grid-cols-1 gap-3 items-start">
+                <IndiaMarketsGrid items={enrichedMacros} staleLabel={staleMacroLabel} />
+              </div>
+
+              {/* Row 2: Global Indices */}
+              <div>
+                <GlobalIndicesGrid items={enrichedGlobalIndices} staleLabel={staleMacroLabel} />
+              </div>
+
+              {/* Row 3: Commodities & FX */}
+              <div>
+                <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} />
+              </div>
+
+              {/* Row 4: Gainers/Losers + Screeners */}
+              <div className="flex flex-col gap-4">
+                <GainersLosersHeatmap />
+              </div>
             </div>
 
-            {/* Row 2: Global Indices */}
-            <div>
-              <GlobalIndicesGrid items={enrichedGlobalIndices} staleLabel={staleMacroLabel} />
+            {/* Right Column: Live News Feed Sidebar */}
+            <div className="xl:h-full xl:min-h-0 flex flex-col self-stretch min-h-0">
+              <NewsFeedPanel items={liveMarket?.news} now={now} sidebar={true} />
             </div>
-
-            {/* Row 3: Commodities & FX */}
-            <div>
-              <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} />
-            </div>
-
-            {/* Row 4: Gainers/Losers + Screeners */}
-            <div className="flex flex-col gap-4">
-              <GainersLosersHeatmap />
-            </div>
-
-            {/* Row 5: News Feed */}
-            <NewsFeedPanel items={liveMarket?.news} now={now} />
 
           </div>
         )}
