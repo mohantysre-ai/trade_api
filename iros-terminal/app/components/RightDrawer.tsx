@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import type { AITickerNewsReport, TerminalIntelligence } from "@/lib/market-api";
 import AITickerNewsPanel from "./AITickerNewsPanel";
 import ConfidenceCheckerPanel from "./ConfidenceCheckerPanel";
@@ -422,7 +423,8 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
     return "stroke-red-500";
   };
 
-  return (
+
+  const drawer = (
     <div
       className={`right-drawer fixed top-0 right-0 h-full w-full lg:w-[50%] xl:w-[50%] 2xl:w-[45%] bg-white border-l border-slate-200 shadow-2xl transform ${
         open ? "translate-x-0" : "translate-x-full"
@@ -684,4 +686,6 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
       </div>
     </div>
   );
+
+  return typeof window !== 'undefined' ? createPortal(drawer, document.body) : null;
 }

@@ -2130,6 +2130,7 @@ export default function IrosMasterAdvancedTerminal() {
             />
             <StockDetailPanel stock={selectedQuote} />
             <LiveIntelligencePanel />
+            <RightDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} content={drawerContent} />
           </div>
         )}
 
@@ -2139,8 +2140,6 @@ export default function IrosMasterAdvancedTerminal() {
           </div>
         )}
       </div>
-
-      <RightDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} content={drawerContent} />
     </div>
   );
 }

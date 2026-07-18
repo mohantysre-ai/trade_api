@@ -191,5 +191,24 @@
       "updatedAt": "2026-07-18T13:35:25.871532+00:00"
     }
   },
-  "scannerPicksUpdatedAt": "2026-07-18T13:35:25.871532+00:00"
+  "scannerPicksUpdatedAt": "2026-07-18T13:35:25.871532+00:00",
+  "tickerNewsByTicker": {
+    "MAZDOCK": {
+      "insider_activity": "No recent news found.",
+      "institutional_activity": "No recent news found.",
+      "order_book_block_deals": "No recent news found.",
+      "future_expansion_capex": "No recent news found.",
+      "auditor_changes": "No recent news found.",
+      "dividend_news": "No recent news found.",
+      "new_orders_contracts": "No recent news found.",
+      "earnings_results": "No recent news found.",
+      "management_changes": "No recent news found.",
+      "regulatory_filings": "No recent news found.",
+      "sentiment_overall": "Neutral",
+      "risk_flags": "Potential price decline if the immediate demand zone (393-380) is penetrated, leading to a focus on the 360 support level.",
+      "summary_headline": "Technical analysis identifies key demand and support zones for MAZDOCK stock.",
+      "generated_at": "2026-07-18T13:49:06.594300+00:00",
+      "ticker": "MAZDOCK"
+    }
+  }
 }
