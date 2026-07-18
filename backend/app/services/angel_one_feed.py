@@ -58,6 +58,8 @@ ORCHESTRATION_DELAY = 30
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR.parent / ".env")
+load_dotenv(BASE_DIR.parent.parent / ".env")
 
 NIFTY_500_CACHE_PATH = BASE_DIR / "nifty500_instruments.json"
 NIFTY_500_LABEL = "Nifty 500"
@@ -242,13 +244,17 @@ def _require_env(name: str) -> str:
     return value
 
 
-def _get_mpin() -> str:
-    mpin = (os.getenv("ANGEL_MPIN") or os.getenv("REDACTED") or "").strip()
-    if not mpin:
+def _get_credential() -> str:
+    """Return Angel One credential: prefer ANGEL_MPIN (4-digit), fall back to REDACTED."""
+    mpin = (os.getenv("ANGEL_MPIN") or "").strip()
+    if mpin:
+        if len(mpin) != 4 or not mpin.isdigit():
+            raise RuntimeError("ANGEL_MPIN must be exactly 4 digits")
+        return mpin
+    password = (os.getenv("REDACTED") or "").strip()
+    if not password:
         raise RuntimeError("Missing ANGEL_MPIN or REDACTED in backend .env")
-    if len(mpin) != 4 or not mpin.isdigit():
-        raise RuntimeError("ANGEL_MPIN must be exactly 4 digits")
-    return mpin
+    return password
 
 
 def _pct_change(ltp: float, close: float | None) -> tuple[str, str]:
@@ -322,12 +328,18 @@ def _pool_watchlist(pool_name: str | None) -> tuple[list[Instrument], str]:
         resolved = NIFTY_100_LABEL
 
     if resolved == NIFTY_100_LABEL:
+        # Prefer Nifty 500 with daily rotation so different constituents
+        # get surfaced each day instead of the same static Nifty 100 set.
+        nifty500 = _load_watchlist_from_cache(NIFTY_500_CACHE_PATH)
+        if nifty500:
+            window_size = 200
+            idx = _ist_now().day % max(len(nifty500) - window_size, 1)
+            rotated = nifty500[idx:] + nifty500[:idx]
+            window = rotated[:window_size]
+            return [inst for inst in window if inst.key not in NIFTY_50_KEYS], NIFTY_100_LABEL
         nifty100 = _load_watchlist_from_cache(NIFTY_100_CACHE_PATH)
         if nifty100:
             return [inst for inst in nifty100 if inst.key not in NIFTY_50_KEYS], NIFTY_100_LABEL
-        nifty500 = _load_watchlist_from_cache(NIFTY_500_CACHE_PATH)
-        if nifty500:
-            return [inst for inst in nifty500[:100] if inst.key not in NIFTY_50_KEYS], NIFTY_100_LABEL
 
     return [inst for inst in WATCHLIST if inst.key not in NIFTY_50_KEYS], resolved
 
@@ -732,27 +744,60 @@ class AngelOneClient:
     def __init__(self) -> None:
         self.api_key = _require_env("REDACTED")
         self.client_id = _require_env("REDACTED")
-        self.mpin = _get_mpin()
+        self.credential = _get_credential()
         self.totp_secret = _require_env("REDACTED")
         self._smart: SmartConnect | None = None
+
+    def _reset_connection(self) -> None:
+        self._smart = None
+
+    def _is_auth_error(self, exc: Exception) -> bool:
+        msg = str(exc).lower()
+        return any(k in msg for k in (
+            "unauthorized", "invalid token", "token expired", "access denied",
+            "session expired", "login required", "invalid session", "ab1000",
+            "ab1001", "ab1002", "ab1003", "authentication", "session invalid",
+            "token is expired", "unauthorised"
+        ))
+
+    def _call_with_auth_retry(self, method, *args, **kwargs):
+        try:
+            return method(*args, **kwargs)
+        except Exception as exc:
+            if self._is_auth_error(exc):
+                logging.getLogger(__name__).warning("Angel One auth error, reconnecting: %s", exc)
+                self._reset_connection()
+                return method(*args, **kwargs)
+            raise
 
     def connect(self) -> SmartConnect:
         if self._smart is not None:
             return self._smart
         smart = SmartConnect(api_key=self.api_key, timeout=ANGEL_API_TIMEOUT_SECONDS)
         totp = pyotp.TOTP(self.totp_secret).now()
-        session = smart.generateSession(self.client_id, self.mpin, totp)
+        session = smart.generateSession(self.client_id, self.credential, totp)
         if not session.get("status"):
             raise RuntimeError(f"Angel One login failed: {session.get('message', 'Unknown login error')}")
+        # generateSession already calls setAccessToken / setRefreshToken / setFeedToken
+        # with the raw token (without Bearer prefix). The returned data has "Bearer "
+        # prefixed, so calling the setters again would double-prefix and break auth.
         self._smart = smart
         return smart
 
     def fetch_quote(self, exchange: str, tradingsymbol: str, token: str) -> dict[str, Any]:
-        smart = self.connect()
-        response = smart.ltpData(exchange, tradingsymbol, token)
-        if not response.get("status"):
-            raise RuntimeError(f"{tradingsymbol}: {response.get('message', 'Quote fetch failed')}")
-        return response["data"]
+        def _fetch():
+            smart = self.connect()
+            response = smart.ltpData(exchange, tradingsymbol, token)
+            if not response.get("status"):
+                raise RuntimeError(f"{tradingsymbol}: {response.get('message', 'Quote fetch failed')}")
+            return response["data"]
+        try:
+            return _fetch()
+        except Exception as exc:
+            if self._is_auth_error(exc):
+                self._reset_connection()
+                return _fetch()
+            raise
 
     def fetch_symbol_quote(self, symbol: str) -> dict[str, Any] | None:
         """Resolve an arbitrary NSE symbol's token via searchScrip and fetch its LTP.
@@ -761,36 +806,45 @@ class AngelOneClient:
         Nifty cache) into the live snapshot so the intraday monitor can show real
         prices instead of falling back to entry price.
         """
-        smart = self.connect()
-        sym = symbol.upper()
-        tradingsymbol = f"{sym}-EQ"
-        token: str | None = None
-        for candidate in (tradingsymbol, sym):
+        def _try_fetch() -> dict[str, Any] | None:
+            smart = self.connect()
+            sym = symbol.upper()
+            tradingsymbol = f"{sym}-EQ"
+            token: str | None = None
+            for candidate in (tradingsymbol, sym):
+                try:
+                    search = smart.searchScrip("NSE", candidate)
+                except Exception:
+                    search = None
+                if isinstance(search, dict) and search.get("status"):
+                    data = search.get("data") or []
+                    if isinstance(data, list) and data:
+                        first = data[0]
+                        resolved = str(first.get("token") or first.get("symboltoken") or "")
+                        if resolved:
+                            token = resolved
+                            tradingsymbol = str(first.get("symbol") or candidate)
+                            break
+            if not token:
+                return None
             try:
-                search = smart.searchScrip("NSE", candidate)
+                resp = smart.ltpData("NSE", tradingsymbol, token)
             except Exception:
-                search = None
-            if isinstance(search, dict) and search.get("status"):
-                data = search.get("data") or []
-                if isinstance(data, list) and data:
-                    first = data[0]
-                    resolved = str(first.get("token") or first.get("symboltoken") or "")
-                    if resolved:
-                        token = resolved
-                        tradingsymbol = str(first.get("symbol") or candidate)
-                        break
-        if not token:
-            return None
+                return None
+            if not isinstance(resp, dict) or not resp.get("status"):
+                return None
+            data = resp.get("data") or {}
+            if isinstance(data, dict):
+                data.setdefault("token", token)
+            return data if isinstance(data, dict) else None
+
         try:
-            resp = smart.ltpData("NSE", tradingsymbol, token)
-        except Exception:
+            return _try_fetch()
+        except Exception as exc:
+            if self._is_auth_error(exc):
+                self._reset_connection()
+                return _try_fetch()
             return None
-        if not isinstance(resp, dict) or not resp.get("status"):
-            return None
-        data = resp.get("data") or {}
-        if isinstance(data, dict):
-            data.setdefault("token", token)
-        return data if isinstance(data, dict) else None
 
     def fetch_candles(
         self,
@@ -800,19 +854,28 @@ class AngelOneClient:
         fromdate: datetime,
         todate: datetime,
     ) -> list[list[Any]]:
-        smart = self.connect()
-        params = {
-            "exchange": exchange,
-            "symboltoken": symboltoken,
-            "interval": interval,
-            "fromdate": fromdate.astimezone(IST_ZONE).strftime("%Y-%m-%d %H:%M"),
-            "todate": todate.astimezone(IST_ZONE).strftime("%Y-%m-%d %H:%M"),
-        }
-        response = smart.getCandleData(params)
-        if not response.get("status"):
+        def _fetch():
+            smart = self.connect()
+            params = {
+                "exchange": exchange,
+                "symboltoken": symboltoken,
+                "interval": interval,
+                "fromdate": fromdate.astimezone(IST_ZONE).strftime("%Y-%m-%d %H:%M"),
+                "todate": todate.astimezone(IST_ZONE).strftime("%Y-%m-%d %H:%M"),
+            }
+            response = smart.getCandleData(params)
+            if not response.get("status"):
+                return []
+            data = response.get("data") or []
+            return data if isinstance(data, list) else []
+
+        try:
+            return _fetch()
+        except Exception as exc:
+            if self._is_auth_error(exc):
+                self._reset_connection()
+                return _fetch()
             return []
-        data = response.get("data") or []
-        return data if isinstance(data, list) else []
 
     def fetch_batch_quotes(self, instruments: list[Instrument]) -> dict[str, dict[str, Any]]:
         smart = self.connect()
@@ -863,6 +926,7 @@ def _fetch_quote_chunk(
     smart: SmartConnect,
     chunk: list[Instrument],
     token_to_key: dict[str, str],
+    client: AngelOneClient | None = None,
 ) -> dict[str, dict[str, Any]]:
     tokens_by_exchange: dict[str, list[str]] = {}
     for inst in chunk:
@@ -878,15 +942,18 @@ def _fetch_quote_chunk(
                 if key:
                     fetched[key] = item
             return fetched
-    except Exception:
-        pass
+    except Exception as exc:
+        if client and client._is_auth_error(exc):
+            raise
 
     for inst in chunk:
         try:
             response = smart.ltpData(inst.exchange, inst.tradingsymbol, inst.token)
             if response.get("status"):
                 fetched[inst.key] = response["data"]
-        except Exception:
+        except Exception as exc:
+            if client and client._is_auth_error(exc):
+                raise
             continue
     return fetched
 
@@ -895,15 +962,24 @@ def _fetch_batch_quotes_chunked(
     self: AngelOneClient,
     instruments: list[Instrument],
 ) -> dict[str, dict[str, Any]]:
-    smart = self.connect()
-    token_to_key = {inst.token: inst.key for inst in instruments}
-    chunks = [instruments[i : i + QUOTE_CHUNK_SIZE] for i in range(0, len(instruments), QUOTE_CHUNK_SIZE)]
-    all_fetched: dict[str, dict[str, Any]] = {}
+    def _fetch():
+        smart = self.connect()
+        token_to_key = {inst.token: inst.key for inst in instruments}
+        chunks = [instruments[i : i + QUOTE_CHUNK_SIZE] for i in range(0, len(instruments), QUOTE_CHUNK_SIZE)]
+        all_fetched: dict[str, dict[str, Any]] = {}
 
-    for chunk in chunks:
-        all_fetched.update(_fetch_quote_chunk(smart, chunk, token_to_key))
+        for chunk in chunks:
+            all_fetched.update(_fetch_quote_chunk(smart, chunk, token_to_key, self))
 
-    return all_fetched
+        return all_fetched
+
+    try:
+        return _fetch()
+    except Exception as exc:
+        if self._is_auth_error(exc):
+            self._reset_connection()
+            return _fetch()
+        raise
 
 
 AngelOneClient.fetch_batch_quotes = _fetch_batch_quotes_chunked
@@ -1641,6 +1717,19 @@ def _execute_llm_risk_audit(
             from .ai_ticker_news import _parse_json_response
             parsed = _parse_json_response(_clean_text, ["audits"])
             audits = parsed.get("audits", {})
+            # Guard: _parse_json_response regex fallback (Strategy 5)
+            # may extract the audits value as a plain string instead of
+            # a nested dict when the LLM response is malformed JSON.
+            if isinstance(audits, str):
+                # Attempt to re-parse the audits blob as a JSON object
+                try:
+                    audits = json.loads(audits)
+                    if not isinstance(audits, dict):
+                        audits = {}
+                except (json.JSONDecodeError, TypeError):
+                    audits = {}
+            if not isinstance(audits, dict):
+                audits = {}
 
             for stock in top_20:
                 ticker = stock["ticker"]

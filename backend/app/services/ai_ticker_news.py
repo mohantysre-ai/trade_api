@@ -140,6 +140,44 @@ def _parse_json_response(text: str, expected_keys: list[str]) -> dict:
     # Strategy 5: last resort — extract individual key-value pairs via regex
     result = {}
     for key in expected_keys:
+        # First, attempt to extract a nested object value (for keys like "audits")
+        # by locating "{ ... }" after the key rather than treating it as a plain string.
+        nested_pattern = rf'"{re.escape(key)}"\s*:\s*({{)'
+        m_nested = re.search(nested_pattern, text)
+        if m_nested:
+            brace_start = m_nested.start(1)
+            depth = 0
+            in_string = False
+            escaped = False
+            brace_end = -1
+            for i in range(brace_start, len(text)):
+                ch = text[i]
+                if in_string:
+                    if escaped:
+                        escaped = False
+                    elif ch == "\\":
+                        escaped = True
+                    elif ch == '"':
+                        in_string = False
+                    continue
+                if ch == '"':
+                    in_string = True
+                    continue
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        brace_end = i
+                        break
+            if brace_end > brace_start:
+                nested_blob = text[brace_start:brace_end + 1]
+                try:
+                    result[key] = json.loads(nested_blob)
+                    continue
+                except (json.JSONDecodeError, TypeError):
+                    pass  # fall through to string extraction
+
         # Try to find "key": "value" or "key": value patterns
         pattern = rf'"{re.escape(key)}"\s*:\s*"((?:[^"\\]|\\.)*)"'
         m = re.search(pattern, text)

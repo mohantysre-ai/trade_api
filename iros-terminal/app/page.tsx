@@ -1620,7 +1620,7 @@ function NewsFeedPanel({ items, now }: { items?: NewsItem[]; now: number }) {
       {displayed.length === 0 ? (
         <div className="p-6 text-center text-slate-400 text-[11px]">No stories match the current filters.</div>
       ) : (
-        <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-3 p-3 [column-fill:_balance]">
+        <div className="news-rail gap-3 p-3" tabIndex={0} aria-label="Scrollable live news stories">
           {displayed.map((item, i) => {
             const color = sourceColor(item.source);
             const sentiment = item.sentiment ?? "Neutral";
@@ -1632,7 +1632,7 @@ function NewsFeedPanel({ items, now }: { items?: NewsItem[]; now: number }) {
                 href={item.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group block break-inside-avoid mb-3 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+                className="news-card group block break-inside-avoid mb-3 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
               >
                 {/* Top accent bar in source brand color */}
                 <div className="h-1 w-full" style={{ background: color }} />
@@ -2025,9 +2025,9 @@ export default function IrosMasterAdvancedTerminal() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 text-slate-900 font-mono text-xs antialiased">
+    <div className="terminal-shell min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 text-slate-900 font-mono text-xs antialiased">
       <div className="max-w-[1600px] mx-auto p-3 space-y-3">
-        <header className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm">
+        <header className="terminal-header bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm">
           <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-2 p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -2065,7 +2065,7 @@ export default function IrosMasterAdvancedTerminal() {
           )}
         </header>
 
-        <nav className="bg-white border border-slate-300 border-[0.5px] rounded-xl flex gap-1 p-1 shadow-sm">
+        <nav className="terminal-tabs bg-white border border-slate-300 border-[0.5px] rounded-xl flex gap-1 p-1 shadow-sm">
           {([
             { key: 'marketSnapshot' as TabKey, label: 'MARKET SNAPSHOT' },
             { key: 'stockHeatMap' as TabKey, label: 'STOCK HEAT MAP' },

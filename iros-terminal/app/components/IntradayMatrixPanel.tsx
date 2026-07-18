@@ -346,6 +346,8 @@ type OutcomePick = {
     outcome: TradeOutcome | null;
     sessionTs: number;
     updatedAt: string;
+    riskPerShare?: number;
+    rrT2?: number;
 };
 
 type DhanScannerResponse = {
@@ -1041,7 +1043,7 @@ export default function IntradayMatrixPanel() {
                               <td className="p-1.5 font-bold text-slate-900">
                                 <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
                               </td>
-                              <td className="p-1.5 text-right font-mono text-slate-900 font-bold">{tp.ltp != null ? tp.ltp.toFixed(2) : '—'}</td>
+                              <td className="p-1.5 text-right font-mono text-slate-900 font-bold">{tp.currentPrice != null ? tp.currentPrice.toFixed(2) : '—'}</td>
                               <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">{tp.entryPrice?.toFixed(2) ?? '—'}</td>
                               <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
                               <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
@@ -1057,6 +1059,57 @@ export default function IntradayMatrixPanel() {
                       </table>
                     </div>
                   </div>
+
+                  {/* ── LONG CAPITAL ALLOCATION TABLE ────────────────────────── */}
+                  {dhanData?.capitalAllocation && dhanData.capitalAllocation.length > 0 && (
+                    <div className="mb-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
+                          LONG CAPITAL ALLOCATION (~₹1,00,000 per stock)
+                        </span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-[12px] border-collapse">
+                          <thead>
+                            <tr className="bg-emerald-50 text-slate-600">
+                              <th className="p-1.5 text-left font-bold uppercase tracking-wider">Stock</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">Buy Price</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">Approx Qty</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">Deployed Capital</th>
+                              <th className="p-1.5 text-right font-bold uppercase tracking-wider">Risk (SL hit)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {dhanData.capitalAllocation.map((ca, idx) => (
+                              <tr key={`lca-${ca.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-emerald-50 cursor-pointer">
+                                <td className="p-1.5 font-bold text-slate-900">
+                                  <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(ca.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{ca.symbol}</a>
+                                </td>
+                                <td className="p-1.5 text-right font-mono text-slate-600">₹{ca.buyAbove?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-slate-700 font-bold">{ca.approxQty?.toLocaleString('en-IN') ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">₹{ca.deployedCapital?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-red-500">₹{ca.riskAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-emerald-100 font-bold text-slate-900">
+                              <td className="p-1.5 uppercase tracking-wider text-[12px]">TOTAL</td>
+                              <td className="p-1.5"></td>
+                              <td className="p-1.5"></td>
+                              <td className="p-1.5 text-right font-mono text-emerald-700 text-[12px]">
+                                ≈ ₹{dhanData.capitalAllocation.reduce((s, c) => s + (c.deployedCapital ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="p-1.5 text-right font-mono text-red-600 text-[12px]">
+                                ≈ ₹{dhanData.capitalAllocation.reduce((s, c) => s + (c.riskAmount ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
 
                   {/* ── SHORT TRADE PLAN — from persistent picks (stable across the day) ── */}
                   {planShort.length > 0 && (
@@ -1088,7 +1141,7 @@ export default function IntradayMatrixPanel() {
                                 <td className="p-1.5 font-bold text-slate-900">
                                   <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
                                 </td>
-                                <td className="p-1.5 text-right font-mono text-slate-900 font-bold">{tp.ltp != null ? tp.ltp.toFixed(2) : '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-slate-900 font-bold">{tp.currentPrice != null ? tp.currentPrice.toFixed(2) : '—'}</td>
                                 <td className="p-1.5 text-right font-mono text-rose-600 font-bold">{tp.entryPrice?.toFixed(2) ?? '—'}</td>
                                 <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
                                 <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>

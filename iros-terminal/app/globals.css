@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #07111f;
+  --foreground: #e6edf7;
+  --terminal-canvas: #07111f;
+  --terminal-panel: #0d1a2a;
+  --terminal-panel-strong: #102239;
+  --terminal-panel-hover: #132a43;
+  --terminal-line: rgba(148, 163, 184, .18);
+  --terminal-muted: #8da0b8;
+  --terminal-cyan: #37d7df;
+  --terminal-green: #42d39b;
+  --terminal-red: #fb7185;
 }
 
 @theme inline {
@@ -12,8 +21,140 @@
   --font-mono: var(--font-geist-mono);
 }
 
+* { scrollbar-width: thin; scrollbar-color: #34516d transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: #34516d; border-radius: 999px; }
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, sans-serif;
+}
+
+.terminal-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 8% -8%, rgba(32, 178, 190, .16), transparent 28rem),
+    radial-gradient(circle at 100% 14%, rgba(28, 74, 121, .22), transparent 30rem),
+    linear-gradient(135deg, #07111f 0%, #091624 46%, #07111f 100%) !important;
+}
+
+.terminal-shell > div { position: relative; }
+.terminal-shell > div::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .24; z-index: 0;
+  background-image: linear-gradient(rgba(160, 210, 235, .025) 1px, transparent 1px), linear-gradient(90deg, rgba(160, 210, 235, .02) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+.terminal-shell > div > * { position: relative; z-index: 1; }
+
+/* Shared terminal surface: this intentionally targets existing utility-based cards
+   so every tab/panel inherits the new visual language without touching its logic. */
+.terminal-shell .bg-white,
+.terminal-shell [class*="bg-white"],
+.terminal-shell .bg-slate-50,
+.terminal-shell [class*="bg-slate-50"] {
+  background-color: var(--terminal-panel) !important;
+}
+.terminal-shell [class*="from-white"],
+.terminal-shell [class*="to-white"],
+.terminal-shell [class*="via-white"],
+.terminal-shell [class*="from-slate-50"],
+.terminal-shell [class*="to-slate-50"],
+.terminal-shell [class*="via-slate-50"] { background-image: none !important; }
+.terminal-shell .border-slate-100,
+.terminal-shell .border-slate-200,
+.terminal-shell .border-slate-300,
+.terminal-shell [class*="border-slate-100"],
+.terminal-shell [class*="border-slate-200"],
+.terminal-shell [class*="border-slate-300"] { border-color: var(--terminal-line) !important; }
+
+.terminal-shell .text-slate-900,
+.terminal-shell .text-slate-800,
+.terminal-shell .text-slate-700,
+.terminal-shell [class*="text-slate-900"],
+.terminal-shell [class*="text-slate-800"],
+.terminal-shell [class*="text-slate-700"] { color: #e6edf7 !important; }
+.terminal-shell .text-slate-600,
+.terminal-shell .text-slate-500,
+.terminal-shell .text-slate-400,
+.terminal-shell [class*="text-slate-600"],
+.terminal-shell [class*="text-slate-500"],
+.terminal-shell [class*="text-slate-400"] { color: var(--terminal-muted) !important; }
+.terminal-shell .text-teal-700,
+.terminal-shell .text-teal-600,
+.terminal-shell [class*="text-teal-700"],
+.terminal-shell [class*="text-teal-600"] { color: var(--terminal-cyan) !important; }
+
+.terminal-header, .terminal-tabs,
+.terminal-shell .rounded-xl.border,
+.terminal-shell .rounded-2xl.border,
+.terminal-shell .rounded-lg.border {
+  border-color: var(--terminal-line) !important;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .20), inset 0 1px rgba(255,255,255,.025) !important;
+}
+.terminal-header {
+  background: linear-gradient(100deg, rgba(15, 35, 55, .96), rgba(10, 25, 41, .94)) !important;
+  overflow: hidden;
+}
+.terminal-header::before { content: ""; display: block; height: 2px; background: linear-gradient(90deg, var(--terminal-cyan), #377dff 44%, transparent 72%); }
+.terminal-tabs { background: rgba(9, 24, 40, .88) !important; backdrop-filter: blur(16px); }
+.terminal-tabs button { min-height: 34px; color: #92a7bd !important; letter-spacing: .09em; }
+.terminal-tabs button:hover { background: rgba(55, 215, 223, .08); color: #eafcff !important; }
+.terminal-tabs button:has(span) { color: #e9fcff !important; background: rgba(55, 215, 223, .08); }
+.terminal-tabs button span { background: var(--terminal-cyan) !important; box-shadow: 0 0 12px rgba(55,215,223,.8); }
+
+.terminal-shell button:focus-visible,
+.terminal-shell a:focus-visible,
+.terminal-shell select:focus-visible,
+.news-rail:focus-visible { outline: 2px solid var(--terminal-cyan); outline-offset: 3px; }
+.terminal-shell button { transition: color .18s ease, background-color .18s ease, transform .18s ease, box-shadow .18s ease; }
+.terminal-shell button:hover:not(:disabled) { transform: translateY(-1px); }
+.terminal-shell .font-mono, .terminal-shell .tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* Live-feed cards become the signature information treatment across the dashboard. */
+.terminal-shell .relative.overflow-hidden.rounded-lg,
+.terminal-shell .relative.overflow-hidden.rounded-xl,
+.terminal-shell .group.block.rounded-xl {
+  background: linear-gradient(135deg, rgba(18, 40, 61, .98), rgba(11, 28, 45, .98)) !important;
+  border-color: var(--terminal-line) !important;
+  box-shadow: inset 3px 0 0 rgba(55, 215, 223, .72), 0 7px 20px rgba(0,0,0,.12) !important;
+}
+.terminal-shell .relative.overflow-hidden.rounded-lg:hover,
+.terminal-shell .relative.overflow-hidden.rounded-xl:hover,
+.terminal-shell .group.block.rounded-xl:hover {
+  background-color: var(--terminal-panel-hover) !important;
+  border-color: rgba(55,215,223,.45) !important;
+  box-shadow: inset 3px 0 0 var(--terminal-cyan), 0 16px 32px rgba(0,0,0,.25) !important;
+}
+
+.news-rail {
+  display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 1rem;
+  overscroll-behavior-inline: contain; -webkit-overflow-scrolling: touch;
+}
+.news-card { flex: 0 0 min(330px, 84vw); scroll-snap-align: start; margin-bottom: 0 !important; animation: terminal-rise .48s both; }
+.news-card:nth-child(2n) { animation-delay: .05s; }
+.news-card:nth-child(3n) { animation-delay: .1s; }
+.news-card:nth-child(4n) { animation-delay: .15s; }
+.news-card > div:first-child { height: 2px !important; box-shadow: 0 0 12px currentColor; }
+
+.terminal-shell table thead tr { background: rgba(55, 215, 223, .08) !important; color: #c8d9e8 !important; }
+.terminal-shell table tbody tr { border-color: var(--terminal-line) !important; }
+.terminal-shell table tbody tr:hover { background: rgba(55, 215, 223, .055) !important; }
+.terminal-shell select { color: #dce9f6 !important; background-color: #102238 !important; border-color: var(--terminal-line) !important; }
+.terminal-shell option { background: #102238; color: #e6edf7; }
+
+@keyframes terminal-rise { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes terminal-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(55,215,223,.45); } 50% { box-shadow: 0 0 0 5px rgba(55,215,223,0); } }
+.terminal-shell .animate-pulse { animation-name: terminal-pulse; animation-duration: 1.8s; }
+
+@media (max-width: 640px) {
+  .terminal-shell > div { padding: .65rem; }
+  .terminal-tabs { overflow-x: auto; }
+  .terminal-tabs button { min-width: 142px; flex: 0 0 auto; }
+  .terminal-header h1 { font-size: .72rem; }
+  .news-card { flex-basis: min(295px, 83vw); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
