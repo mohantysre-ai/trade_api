@@ -35,7 +35,7 @@
     "Google \u00b7 Startup Funding",
     "Google \u00b7 Mutual Funds"
   ],
-  "updatedAt": "2026-07-18T11:28:03.000186+00:00",
+  "updatedAt": "2026-07-18T16:43:08.946726+00:00",
   "mockTickers": [
     "AWFI"
   ],
@@ -3673,8 +3673,8 @@
       },
       {
         "label": "BITCOIN",
-        "val": "$63,978.72",
-        "delta": "+0.14%",
+        "val": "$64,091.82",
+        "delta": "+0.32%",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
@@ -3708,7 +3708,7 @@
           64712.375,
           63789.2812,
           63899.4609,
-          63978.7188
+          64091.8203
         ]
       },
       {
@@ -3835,11 +3835,101 @@
   },
   "news": [
     {
-      "source": "The Globe and Mail",
-      "title": "MakeMyTrip Plans IPO and Indian Listing for MMT India Subsidiary - The Globe and Mail",
-      "link": "https://news.google.com/rss/articles/CBMi3gFBVV95cUxOS2dULVhpTjRTVmZYYVloRFZ2aURyX21uakhqR0pWQ1NLZm05VUswYzlWTHlEV0d0azIyN1NMcmhVTEJDUTVYdDZVMkFVYWhmbi01dERVVF9LdVI1SUlpaXJWZ2dkR3JGZ3pPUWRYVmlLM0Q2R0hIU1VBOXpKdm1jS3BVMXVoN3VMeC01b1ZoVWFINFFMamlod3d2dnhlbFR4clJ4c3ptOEVWcjJaYjdCQVZzbVZlcWJ5QkV2QmR1bEhHRGlFMzMwN2JudEVraDVqZWJ2UjBmcEh5am8waUE?oc=5",
-      "summary": "MakeMyTrip Plans IPO and Indian Listing for MMT India Subsidiary&nbsp;&nbsp;The Globe and Mail",
-      "publishedAt": "2026-07-18T10:43:23+00:00",
+      "source": "Livemint Money",
+      "title": "ITR filing 2026: FD interest is taxable \u2014 here's how to report it correctly",
+      "link": "https://www.livemint.com/money/personal-finance/itr-filing-2026-fd-interest-is-taxable-heres-how-to-report-it-correctly-11784362050243.html",
+      "summary": "FD interest income is fully taxable but tax implications may vary based on the chosen tax regime and taxpayer age. Some deductions may also be available, based on your age and income profile. Here's all you need to know.",
+      "publishedAt": "2026-07-18T15:58:05+00:00",
+      "sentiment": "Neutral",
+      "category": "Economy"
+    },
+    {
+      "source": "Livemint Money",
+      "title": "Income-tax returns: Check penalty for missing deadline for filing ITR \u2014 Key things to know",
+      "link": "https://www.livemint.com/money/personal-finance/income-tax-returns-check-penalty-31-august-missing-deadline-filing-itr-form-delayed-returns-fees-charges-key-highlights-11784388937607.html",
+      "summary": "ITR: Taxpayers must file their income-tax returns for FY26 / AY27 by 31 August this year, extended from 30 June. Here's how much penalty you can be charged and deadline for delayed ITR filing during the tax year.",
+      "publishedAt": "2026-07-18T15:57:30+00:00",
+      "sentiment": "Bearish",
+      "category": "Regulatory"
+    },
+    {
+      "source": "Livemint Money",
+      "title": "Berkshire has 30% of its portfolio in Apple, Alphabet: Expert says not \u2018appropriate strategy\u2019 for retail investors but\u2026",
+      "link": "https://www.livemint.com/money/personal-finance/berkshire-has-30-of-its-portfolio-in-apple-alphabet-expert-says-not-appropriate-strategy-for-retail-investors-but-11784382384193.html",
+      "summary": "Berkshire Hathaway now allocates nearly 30% of its $351 billion portfolio to Apple and Alphabet, reflecting a shift in Warren Buffett's investment strategy.&amp;nbsp;",
+      "publishedAt": "2026-07-18T15:40:50+00:00",
+      "sentiment": "Neutral",
+      "category": "Economy"
+    },
+    {
+      "source": "Livemint Money",
+      "title": "EPFO: Here's how to link your Aadhaar with UAN using the Umang app \u2014 Stepwise guide",
+      "link": "https://www.livemint.com/money/personal-finance/epfo-how-to-link-your-aadhaar-with-uan-using-umang-app-stepwise-guide-check-epf-status-portal-universal-account-number-11784382904694.html",
+      "summary": "EPFO: Aadhaar linking is mandatory for several EPF services. Today, we check how EPF subscribers can link Aadhaar with their Universal Account Number (UAN) using the government's Umang mobile app.",
+      "publishedAt": "2026-07-18T14:52:32+00:00",
+      "sentiment": "Neutral",
+      "category": "Economy"
+    },
+    {
+      "source": "The Times of India",
+      "title": "What is \u2018boss scam\u2019 that market regulator SEBI has warned about: How fraudsters use WhatsApp, Microsoft T - The Times of India",
+      "link": "https://news.google.com/rss/articles/CBMirAJBVV95cUxPeTlReGhFbG03Wks3bjZlYnczMDFwYnhSS2J3NmpybkIyYUxGaGdZOHc5WFpCd0xRcVFVVF9Jd0tGWHBhX0doMXBSd3JaZXVENjJxUnl2M2M3RW90b3FsdFhrczFuTmZSbTA3TU9GRVZoQkFCNXpoeUJYQnZZR291N01GWmRmTVBEOThhMmZlbDNxZVU5M2U0UVJRRXhwUjdueVNmRzFDS2VvTE5LWFFqclhpLUQ5cWJMSV9BMmE2Qy1ZdlFGRDM2UWp2eEcyRnllSFd1Vjc3YUQtd0tPVTR4YkdQRnUyOVBhTzBUc21PZ1N0NXg5MTNNZTdJd3ZmakwwNjVoRzRLUUxCbzBDYWtwQ1d4Qy1NREF0UkpITGpiRzNLOFZ5NExibDc2RELSAbICQVVfeXFMTXBMMTZfbDJ1VzZHN002OThGOTZCQmlUOTlvY1dra3NZRFRGa0NaSmFNWWlhOXBIMTRwZjdFWmtEdnFNbFJKMXByTUpUUHZQZTNpRTV3aHlzUVZ2a3R2Z29PS1ZCUnJHVHpGNUhWYk5nUTRfV1hrU2RlUVdtdWo4V3g0blAtNGtXQ3dldDNtMzZaa05vcGNJTXRiQ2g2azVuZWRJV0JxNmNVZGczQzg4MkF4VVpVcC1lOW9IaFBERHhxbjN0R013Vll2Q2QycnY4NkprRkNSTG5UV3dqSnZwRWV2VnBvV1dRbEYtTERfY05UWkF0NjhLUHZSZ2RLQjVkaHdacTFpUHBkcWhsamU4Y3UySEVHZDM4aVVqd1R5RVdzcW9rcE5HWU1KV1NpVDI3cWtR?oc=5",
+      "summary": "What is \u2018boss scam\u2019 that market regulator SEBI has warned about: How fraudsters use WhatsApp, Microsoft T&nbsp;&nbsp;The Times of India",
+      "publishedAt": "2026-07-18T14:50:00+00:00",
+      "sentiment": "Bearish",
+      "category": "Regulatory"
+    },
+    {
+      "source": "Indian Express Business",
+      "title": "ICICI, Kotak, Axis, YES Bank post double-digit Q1 profit growth; HDFC Bank lags",
+      "link": "https://indianexpress.com/article/business/rivate-bank-q1-results-icici-hdfc-axis-kotak-yes-bank-pnb-profit-npa-data-10792767/",
+      "summary": "",
+      "publishedAt": "2026-07-18T13:51:34+00:00",
+      "sentiment": "Neutral",
+      "category": "Earnings"
+    },
+    {
+      "source": "Livemint Companies",
+      "title": "Meta's 'AI overbuild' finds a buyer as Anthropic eyes $10 billion computing power deal",
+      "link": "https://www.livemint.com/companies/news/metas-ai-overbuild-finds-a-buyer-as-anthropic-eyes-10-billion-computing-power-deal-11784377532775.html",
+      "summary": "Meta is negotiating a deal to lease AI computing power to Anthropic, potentially worth $10 billion, transforming a previously seen liability into a revenue opportunity.&amp;nbsp;",
+      "publishedAt": "2026-07-18T13:33:11+00:00",
+      "sentiment": "Neutral",
+      "category": "Earnings"
+    },
+    {
+      "source": "Livemint Companies",
+      "title": "How his roommate's missed interview helped Raj Subramaniam begin his journey to becoming FedEx CEO",
+      "link": "https://www.livemint.com/companies/news/how-a-missed-roommate-interview-helped-raj-subramaniam-begin-his-journey-to-becoming-fedex-ceo-11784372625766.html",
+      "summary": "In 1991, while completing his MBA in marketing and finance at the University of Texas at Austin, the India-born executive was searching for career opportunities",
+      "publishedAt": "2026-07-18T11:47:08+00:00",
+      "sentiment": "Neutral",
+      "category": "Corporate"
+    },
+    {
+      "source": "Inc42",
+      "title": "Meet The 50 D2C Brands From D2CX By Inc42\u2019s 8th Cohort",
+      "link": "https://inc42.com/startups/meet-the-50-d2c-brands-from-d2cx-by-inc42s-8th-cohort/",
+      "summary": "Saturation doesn&#8217;t seem to be a concern that plagues India&#8217;s D2C boom. What began as a handful of digital-first brands&#8230;",
+      "publishedAt": "2026-07-18T11:30:15+00:00",
+      "sentiment": "Neutral",
+      "category": "Corporate"
+    },
+    {
+      "source": "Livemint Companies",
+      "title": "Yes Bank sees strong FCNR demand; corporate lending surges in Q1",
+      "link": "https://www.livemint.com/companies/company-results/yes-bank-q1-earnings-fcnr-deposits-corporate-lending-indian-banking-sector-11784371522518.html",
+      "summary": "Yes Bank expects margins to improve through lower funding costs and remains open to a microfinance acquisition, though none is planned immediately.",
+      "publishedAt": "2026-07-18T11:24:29+00:00",
+      "sentiment": "Bullish",
+      "category": "Earnings"
+    },
+    {
+      "source": "ascendants.in",
+      "title": "DPIIT Sets Rules for \u20b910,000 Crore Startup India Fund of Funds 2.0 - ascendants.in",
+      "link": "https://news.google.com/rss/articles/CBMihwFBVV95cUxOeks3dHp3T3lhZnpzb3ZacVA1eEZHeWRUSXVTdTZSM1gyNzF3WnhDcDVmdEFWVlVWd1lZUW40RDkyNHlpUVpOc3R2SE9keVRXOWVJOVNSTW80ZjM0SzlhY1lNX3FxdzlDTmEzeGlsYU5rYXhNNzRtYklZRmFVTk9uOTgwZVlnT0U?oc=5",
+      "summary": "DPIIT Sets Rules for \u20b910,000 Crore Startup India Fund of Funds 2.0&nbsp;&nbsp;ascendants.in",
+      "publishedAt": "2026-07-18T10:43:47+00:00",
       "sentiment": "Neutral",
       "category": "Corporate"
     },
@@ -3907,24 +3997,6 @@
       "category": "Earnings"
     },
     {
-      "source": "Livemint Companies",
-      "title": "HDFC Bank Q1 results 2026: Net profit climbs 5% YoY to \u20b919,059 crore",
-      "link": "https://www.livemint.com/companies/news/hdfc-bank-q1-results-2026-net-profit-climbs-5-yoy-to-19-059-crore-11784365854885.html",
-      "summary": "HDFC Bank reported a net profit of \u20b919,059 crore for Q1 FY 2026-27, a 5% YoY increase. Details here.",
-      "publishedAt": "2026-07-18T09:20:58+00:00",
-      "sentiment": "Neutral",
-      "category": "Earnings"
-    },
-    {
-      "source": "Livemint Money",
-      "title": "Sold a property in FY 2025-26? Why paying the flat 12.5% LTCG tax without indexation could save you more",
-      "link": "https://www.livemint.com/money/personal-finance/sold-a-property-in-fy-2025-26-why-paying-the-flat-12-5-ltcg-tax-without-indexation-could-save-you-more-11784361799806.html",
-      "summary": "Many property sellers may end up paying more tax under the 20% tax regime with indexation than under the flat 12.5% LTCG tax. The benefit of indexation depends on how much the property's value has appreciated over time, making it important to compare both tax calculations before filing.",
-      "publishedAt": "2026-07-18T09:16:18+00:00",
-      "sentiment": "Neutral",
-      "category": "Economy"
-    },
-    {
       "source": "Entrackr",
       "title": "Funding and acquisitions in Indian startups this week [July 06 - July 11] - Entrackr",
       "link": "https://news.google.com/rss/articles/CBMi5AFBVV95cUxPUVQ2Q3VQbHM5VGltX3g2cERueC0xeG1lYXladW9ISEYwUk1NUXBjZjBwQUlJNU9DaTlEbUxLR2lXOHlldlFKSmJhV0h3N0liZ1ZaOG9UYmVBWEJEUUMzWl84dXZRcTJxUk11VXFoMWJWazZLLTlVcndXNXIya1ZiV0ZYNDI0dm9fbXE5LXVUVktIRVFPYzJaNE04ZC1lbVVtX2NraFJtdzlrUkJ1eFlVWmpLV2hNOVlSTHB6aGZDQUpJOEVQM0k3MWpWUlExMTVCRHlHVk5kcUxmUzFrcGRhV3hVUmrSAeQBQVVfeXFMT1FUNkN1UGxzOVRpbV94NnBEbngtMXhtZWF5WnVvSEhGMFJNTVFwY2YwcEFJSTVPQ2k5RG1MS0dpVzh5ZXZRSkpiYVdIdzdJYmdWWjhvVGJlQVhCRFFDM1pfOHV2UXEycVJNdVVxaDFiVms2Sy05VXJ3VzVyMmtWYldGWDQyNHZvX21xOS11VFZLSEVRT2MyWjRNOGQtZW1VbV9ja2hSbXc5a1JCdXhZVVpqS1doTTlZUkxwemhmQ0FKSThFUDNJNzFqVlJRMTE1QkR5R1ZOZHFMZlMxa3BkYVd4VVJq?oc=5",
@@ -3941,33 +4013,6 @@
       "publishedAt": "2026-07-18T09:04:54+00:00",
       "sentiment": "Bullish",
       "category": "Earnings"
-    },
-    {
-      "source": "Livemint Money",
-      "title": "From Ketan Parekh scam to Covid: What 25 years of history reveals about ideal asset allocation during market downturns",
-      "link": "https://www.livemint.com/money/personal-finance/from-ketan-parekh-scam-to-covid-what-25-years-of-history-reveals-about-ideal-asset-allocation-during-market-downturns-11784356449042.html",
-      "summary": "A portfolio invested entirely in equities typically suffers the deepest drawdowns, whereas adding debt investments can substantially reduce losses during market corrections.",
-      "publishedAt": "2026-07-18T08:48:53+00:00",
-      "sentiment": "Bearish",
-      "category": "Global"
-    },
-    {
-      "source": "Livemint Money",
-      "title": "AMFI updates large, mid, and small-cap stock lists in July 2026: Which stocks climbed the ladder and which fell?",
-      "link": "https://www.livemint.com/money/personal-finance/amfi-updates-large-mid-and-small-cap-stock-lists-in-july-2026-which-stocks-climbed-the-ladder-and-which-fell-11784352919510.html",
-      "summary": "AMFI's latest market-cap review has reshuffled several stocks across the large, mid and small-cap categories. While companies such as BSE, BHEL and Vodafone Idea moved up, others including Hero MotoCorp and Dr. Reddy's Laboratories slipped to lower categories based on average market capitalisation.",
-      "publishedAt": "2026-07-18T08:46:43+00:00",
-      "sentiment": "Neutral",
-      "category": "Economy"
-    },
-    {
-      "source": "HDFC Sky",
-      "title": "Nifty, Sensex Post Weekly Gains as IT and Financials Rally; Nifty Records Tightest Weekly Range of 2026 - HDFC Sky",
-      "link": "https://news.google.com/rss/articles/CBMixAFBVV95cUxNdnYzV19YcHd4bm80OUZCSi03WmVLQnJhOTJ1dVZ0alFjRFlLcnByaVBlWnJwai1aX3BCMDBPSXFYcTh6U2Z2RndZdXhXc2hrWWkyVG1sX1M0OExRX3g3SUtDMzBXUGRzdkVGalFsN3NCRWdpalp0VWN5U3BxMzJVQ0NCQUIxQXpNRGl5UEVOSWNyejJzTnFoX3h4OHFZbi1WT0pxTXFPTzlyZ2o0bTJRbDhNSTlrc1FRaU02c3VHUVRuRlZY?oc=5",
-      "summary": "Nifty, Sensex Post Weekly Gains as IT and Financials Rally; Nifty Records Tightest Weekly Range of 2026&nbsp;&nbsp;HDFC Sky",
-      "publishedAt": "2026-07-18T08:37:39+00:00",
-      "sentiment": "Bullish",
-      "category": "Market"
     },
     {
       "source": "News18 Business",
@@ -3997,15 +4042,6 @@
       "category": "Earnings"
     },
     {
-      "source": "TICE News",
-      "title": "India Startup Funding Hits $346M as AI Leads Weekly VC Surge - TICE News",
-      "link": "https://news.google.com/rss/articles/CBMijAFBVV95cUxOS3ZPd2puck8zRWpocVpDOWtqUTRMSldTcHBZbHh6LWdJSDFDbXhPTGc3QmhtVWlUSmg3ak9sWkRFNWlXcWJwZnhzYmhaaUpQblliZFZwVTdxdTFTNUx2UFctRnVkUF8yZ0pBTVkyT0FJM0gzdVEtcUJhMG9aMzd6T3Vlam1mZVR6Y25rX9IBjAFBVV95cUxOS3ZPd2puck8zRWpocVpDOWtqUTRMSldTcHBZbHh6LWdJSDFDbXhPTGc3QmhtVWlUSmg3ak9sWkRFNWlXcWJwZnhzYmhaaUpQblliZFZwVTdxdTFTNUx2UFctRnVkUF8yZ0pBTVkyT0FJM0gzdVEtcUJhMG9aMzd6T3Vlam1mZVR6Y25rXw?oc=5",
-      "summary": "India Startup Funding Hits $346M as AI Leads Weekly VC Surge&nbsp;&nbsp;TICE News",
-      "publishedAt": "2026-07-18T07:59:29+00:00",
-      "sentiment": "Bullish",
-      "category": "Corporate"
-    },
-    {
       "source": "Inc42",
       "title": "Supreme Court Seeks Snapdeal\u2019s Reply In Prescription Drug Sale Case",
       "link": "https://inc42.com/buzz/supreme-court-seeks-snapdeals-reply-in-prescription-drug-sale-case/",
@@ -4015,13 +4051,13 @@
       "category": "Regulatory"
     },
     {
-      "source": "Livemint Money",
-      "title": "AMFI eases mutual fund transmission process: Easier address, name, and signature verification after the investor's death",
-      "link": "https://www.livemint.com/money/personal-finance/amfi-eases-mutual-fund-transmission-process-easier-address-name-and-signature-verification-after-the-investors-death-11784347655783.html",
-      "summary": "The move is intended to address operational challenges frequently faced by families during the transmission process while ensuring a smoother and more uniform experience across mutual fund houses.",
-      "publishedAt": "2026-07-18T07:51:33+00:00",
+      "source": "News On AIR",
+      "title": "RBI keeps repo rate unchanged; Projects India\u2019s real GDP growth for current fiscal at 6.9% - News On AIR",
+      "link": "https://news.google.com/rss/articles/CBMivgFBVV95cUxOTGFSNzg0VzlJdnMwYWh2TzliX3libXhnd0pFajdsbW05R3dZU3Y5V3BjRU5uV2Q0aDVOZWZNX3dDdHpvNXpGOXRTQlNnQVRScklzNU5QdjVmV2YzOWlFVWZXMXFSZWxscFJIdFY0UHhleHZreWhkRmhqNGpCeTBYTVlpZ3AxcFN5X0h6SkFqSHJzSTBhWER6N1lkQXB3cnlLRXU4TF95ZjNWdC01XzBkTm0zOGN3RmpXc1lQSkdR?oc=5",
+      "summary": "RBI keeps repo rate unchanged; Projects India\u2019s real GDP growth for current fiscal at 6.9%&nbsp;&nbsp;News On AIR",
+      "publishedAt": "2026-07-18T07:44:18+00:00",
       "sentiment": "Neutral",
-      "category": "Economy"
+      "category": "Earnings"
     },
     {
       "source": "Lapaas Voice",
@@ -4042,33 +4078,6 @@
       "category": "Earnings"
     },
     {
-      "source": "MSN",
-      "title": "Sensex, Nifty close over 1% higher on IT, bank gains despite global sell-off - MSN",
-      "link": "https://news.google.com/rss/articles/CBMihgJBVV95cUxPcXB1ZkdEb1NGVEM5UGxzb1F5UGU0TkNzRHVLR3Njdl9XblROSzNDQ1Z6NFU3d3FSNWtldWlnYVdtUUxEYnNTdl81aVFjM0hYamNHRDMyNmFOUk5EYVZHS01wam9LNzJDamJ5ZV8zdEUxckNmc0lpVUE2V2N4bkswTEhZa3BUSGxfUHZ5U25NRDJoZUpwN1c4NG1FbXNoMXQ0SnVqNm0tUjVSMy1fcVREcHFCWFhFOUMyNTFmSjJacVF1Zkh4SDhUcFNzVVN6VXRTYmM5Yk54bWpDcEhNeC1meEFOVC00bTJpMGpOYmF3Vk9KVjAzOXA2a1loV0FfRFRRczl5WmRB?oc=5",
-      "summary": "Sensex, Nifty close over 1% higher on IT, bank gains despite global sell-off&nbsp;&nbsp;MSN",
-      "publishedAt": "2026-07-18T06:54:11+00:00",
-      "sentiment": "Neutral",
-      "category": "Regulatory"
-    },
-    {
-      "source": "Inc42",
-      "title": "Skyroot Creates History With India\u2019s First Private Orbital Rocket Launch",
-      "link": "https://inc42.com/buzz/history-beckons-skyroot-lifts-off-with-indias-first-private-orbital-mission/",
-      "summary": "Spacetech unicorn Skyroot created history by becoming the first private Indian company to place a rocket into orbit. Its Vikram-1&#8230;",
-      "publishedAt": "2026-07-18T06:37:01+00:00",
-      "sentiment": "Neutral",
-      "category": "Regulatory"
-    },
-    {
-      "source": "livemint.com",
-      "title": "MakeMyTrip IPO soon! Online travel giant files confidential DRHP with SEBI, 15 years after Nasdaq listing - livemint.com",
-      "link": "https://news.google.com/rss/articles/CBMi8AFBVV95cUxQcy1NWVVoUThnUnJFS2pyX0ppSXpuNmlpSGd0TlExMDlOd0k4WmZSN05CQjFCQTc3ZU5QYW9hd0trUE1tbDZtMHNMN1B5TVFueXFYdDVudnNVdmd6dm4zOUVlTUlJbGtxRUdNSVh5aWZJZ3o0SW04MUxrRHpIRHBVRG1McGtRUFVUSnNTTGl0QThzMW01cUFSVWlTa0wzRlEtWEs4dk5QcndEN2tOanBLSjJfV0M0UzdfMlRKMUU0S29OcmVNZ0wwa3dzTl9XUDVveHdfbGJVQWpCQTdaWlJaRTRBckRCd2FQcHNka3JsRFLSAfYBQVVfeXFMTmVsV0dhZXltY1NybEhTTXVHM0FiQmhMSXVpejFfSDgtbnp1SVIzRkRWdXRwXzhDbDRJcC1fOG8yX3JvZThtN09JMDhKZkE2aG9Va3paeTJhSy1wR1BkNGhHcG5LR0N0NTJYQ19qejh6bnc2SHFPbFZlZVNTclJ5Z1NrdUhyNld4WnRRVjFsNl8xSlV1UjdCQ010Rnhydk43ZUpUamlMUFhWeFlVT05URnpEQlZTZFRiUWFLZnhwYVlYeVl4RmtUMW1Wckwyd3BXcmkta2lrWUswdkMwQ3RzdmkzdC16WDdLMm82X0FBSjJrNXNadlln?oc=5",
-      "summary": "MakeMyTrip IPO soon! Online travel giant files confidential DRHP with SEBI, 15 years after Nasdaq listing&nbsp;&nbsp;livemint.com",
-      "publishedAt": "2026-07-18T06:20:59+00:00",
-      "sentiment": "Neutral",
-      "category": "Regulatory"
-    },
-    {
       "source": "Livemint Opinion",
       "title": "A new AI order, an oil warning and unrest next door",
       "link": "https://www.livemint.com/opinion/ai-order-crude-oil-warning-xi-jinping-pok-unrest-india-crude-buy-hormuz-11784348476045.html",
@@ -4084,15 +4093,6 @@
       "summary": "Sebi eases MF transactions, allows automated withdrawals and transfers for demat investors&nbsp;&nbsp;Telegraph India",
       "publishedAt": "2026-07-18T05:44:12+00:00",
       "sentiment": "Neutral",
-      "category": "Regulatory"
-    },
-    {
-      "source": "NDTV",
-      "title": "Markets Regulator Warns Of \"Boss Scam\", Cyber Fraud Targeting Top Executives - NDTV",
-      "link": "https://news.google.com/rss/articles/CBMiuwFBVV95cUxPcUo0RW1ob1l2d3ZhY05QWVF1M0loRVZzRWVMUUdMNmZFWWRnM29zMVJCMm1TeUlFUkFyVFhIQVR4alA3UG1ULXR2VlVtSWl4cnhBZmM3ZTRIMDFyaTl6VGk0Q01YM1RkXzRDU20yRUw3UzRNeWw2UTQ4YUc1M2dhend6dkRjWDFjZ1ZaVzNYWHlPQlo2OVJFNlFrZnZoLVRZR01fQ1VvdUlZbzRfZmpDMHhjYnpEbm9PN0pN0gHDAUFVX3lxTE5aSzVkVmlhMENVczljWnhFVmhzemRNdFNTSzZoSXpFX2dxVE5qemFDUF9yVVl0c2pPTnhjSDBuM0pSZkRQdHlmUVRHV2VkbHl2Wmc1R1FHWUM2OFNFS3phb2xjMkdubFNOTHJfZG5GMmNxbTZuN0xuRTQyc09tUjVUV1E2RjVTWEZFRDJXUlZVaDhILXRiN1h1T3h5amQ5YmE5cHhuaEhQanpEQWNNZ2JaM05YNVB1R0Y2MHEtZ1UzdFhXUQ?oc=5",
-      "summary": "Markets Regulator Warns Of \"Boss Scam\", Cyber Fraud Targeting Top Executives&nbsp;&nbsp;NDTV",
-      "publishedAt": "2026-07-18T05:08:53+00:00",
-      "sentiment": "Bearish",
       "category": "Regulatory"
     },
     {
@@ -4114,6 +4114,15 @@
       "category": "Earnings"
     },
     {
+      "source": "Inc42",
+      "title": "From Emergent To Neo Group \u2014 Indian Startups Raised $281 Mn This Week - Inc42",
+      "link": "https://news.google.com/rss/articles/CBMilAFBVV95cUxNYlkzU0laMlZmajBMTnNjbC16Y1BRY3NnekpUczdWWnpsQl8wdGR5a01wZXdRdkY2X0dkV2c5ZUJBVlZDak5GMmVUYVg4Wk10dmF4X1RKOFVQRERadnl4Y202QUZQZEpfdUE0eHdUU3RhY0Y0UVFtTFdsTVhhTTE5eEMycXVLQ05pUVBSeUFwTkNJM3c5?oc=5",
+      "summary": "From Emergent To Neo Group \u2014 Indian Startups Raised $281 Mn This Week&nbsp;&nbsp;Inc42",
+      "publishedAt": "2026-07-18T04:00:28+00:00",
+      "sentiment": "Neutral",
+      "category": "Corporate"
+    },
+    {
       "source": "Indian Express Business",
       "title": "AMFI simplifies process for smooth transfer of mutual fund units to nominees, legal heirs",
       "link": "https://indianexpress.com/article/business/amfi-mutual-fund-transfer-nominees-legal-heirs-sop-10791967/",
@@ -4123,13 +4132,13 @@
       "category": "Market"
     },
     {
-      "source": "Livemint Opinion",
-      "title": "Excuse me while I speak to my knuckles",
-      "link": "https://www.livemint.com/opinion/ai-wearables-ai-rings-stream-ring-sandbar-wearables-voice-ring-gadgets-artificial-intelligence-11784175244281.html",
-      "summary": "Absurd wearable gadgets are bringing AI closer\u2014 but driving people apart.",
-      "publishedAt": "2026-07-18T01:30:50+00:00",
+      "source": "YourStory",
+      "title": "From Lithuania to the world: Hostinger\u2019s evolution; How LinkedIn India is driving global products",
+      "link": "https://yourstory.com/2026/07/lithuania-to-the-world-hostinger-evolution-linkedin-india-driving-global-products",
+      "summary": "Hostinger CMO Kristina Strimaite believes artificial intelligence will not take away jobs, but it will leave behind those who refuse to engage with it. Malai Lakshmanan, Head of India Engineering at LinkedIn, discusses the evolution of the Bengaluru centre.",
+      "publishedAt": "2026-07-18T02:00:00+00:00",
       "sentiment": "Neutral",
-      "category": "Market"
+      "category": "Global"
     },
     {
       "source": "Livemint Opinion",
@@ -4139,6 +4148,15 @@
       "publishedAt": "2026-07-18T01:30:50+00:00",
       "sentiment": "Neutral",
       "category": "Commodity"
+    },
+    {
+      "source": "Livemint Opinion",
+      "title": "Excuse me while I speak to my knuckles",
+      "link": "https://www.livemint.com/opinion/ai-wearables-ai-rings-stream-ring-sandbar-wearables-voice-ring-gadgets-artificial-intelligence-11784175244281.html",
+      "summary": "Absurd wearable gadgets are bringing AI closer\u2014 but driving people apart.",
+      "publishedAt": "2026-07-18T01:30:50+00:00",
+      "sentiment": "Neutral",
+      "category": "Market"
     },
     {
       "source": "News On AIR",
@@ -4159,40 +4177,22 @@
       "category": "Market"
     },
     {
-      "source": "ascendants.in",
-      "title": "Startup Funding in India Falls 18% to $11.7B in FY26: What\u2019s Changing? - ascendants.in",
-      "link": "https://news.google.com/rss/articles/CBMikAFBVV95cUxNdUlDSVZTZzBYdzZZdjhyR0MzRmdPWTlfaEpuTXB1bFg5SllaakszTWo1Zi1QV1R0enl4ZE41b1p0a2dvdG9lTDdDOV9NNFR2bjlvTGx3aVZMb3d4Qlo1U1FEaXhRd3VRbnhJQzMwNVItVVVpMTQtV2pRX3BiV0ROM3F6RXpnQ2FEbEtQN09NMWU?oc=5",
-      "summary": "Startup Funding in India Falls 18% to $11.7B in FY26: What\u2019s Changing?&nbsp;&nbsp;ascendants.in",
-      "publishedAt": "2026-07-17T18:51:24+00:00",
-      "sentiment": "Neutral",
-      "category": "Corporate"
-    },
-    {
-      "source": "ETLegalWorld.com",
-      "title": "SEBI warns listed firms, regulated entities against 'Boss Scam' involving CEO, MD impersonation - ETLegalWorld.com",
-      "link": "https://news.google.com/rss/articles/CBMi8gFBVV95cUxQd0xYVkRIQlY1M0psOFZ5aVhXcWF0S0VkbUdSaTJfa0tqQzNpbmQyMUJsWlhTRDNXWkRVSmVkR3M0WTNTcktTVWRMVHExUm9aU3ZFVHVCeHlXSDdCWWJkMExXSW1zdDQ1TTBJYmM0YjNNbWRQM2VpQ2lLbHhJUU5yU3A1cTM2M0ltVEJRWVhKVFpOWnBib0swTjMtV1lJcnVmTk0tclZyMTVCZkhvckhaV3oxS3FlelRxNGZ2bzFqa01oMXVtODJDYXRqb0JkMEw0SFFuMktOQzIyMEZVanpVbTEzUi1aT2lCVjl5Y0Roa1FQZ9IB9wFBVV95cUxNaDhLMnVhVjBNMXV5THpTSXF4OGN2VDBORUJxWWpmN005VzIxcHdSYkNaUk1jWGF1V0czZUVWRkloMVJ5RUc0Zi1fNFRaRFJRNFAtZHdWOVZvRGFrUFpSaWs0aGJnWFpDa0hpd3VRdjczbVBYTElrYkFvYUFPWmhQNzVCX2dlTU9jNWtQemJWNFJPR2dOTlUySVNBelB2eWIzNTdmVHNjMTdtTnJaLUZGdGc0aUtlbGM2QkVYM2MxMURkWTBJSHc3QzlYQTVGTEpkWjVhd1BxUF9sZDB3VXRTYWhabk54RkhPbXQxWHo5bXpaYzdPNEpj?oc=5",
-      "summary": "SEBI warns listed firms, regulated entities against 'Boss Scam' involving CEO, MD impersonation&nbsp;&nbsp;ETLegalWorld.com",
-      "publishedAt": "2026-07-17T17:56:43+00:00",
+      "source": "The New Indian Express",
+      "title": "Sebi cautions listed cos over 'Boss Scam' - The New Indian Express",
+      "link": "https://news.google.com/rss/articles/CBMimAFBVV95cUxQekU3TzlDQTdLZDI5WlF5bzVsb2VIRWJBUVRrLVhxekNsanRyVmt5SzFMbkZZcGZ1RzdjbjJqVWMxTXdkakxSaUJfcEdDeDB1b2wyUkpYVEpFOGZuSTlkakFPRG9FUkd4U01DeUhCRXRPSnFoUWxTMmpHQkZLSmpxbTVlLWJjMFpDZmdOR1JwNGxvZWVGWE8yadIBpgFBVV95cUxOQ0dlanRnMFItZzNUMjJoWVkwTUQ0X3FkNThHMWZTb2dvU3pVMlU1WW9wMzJraFRNNzVwSEpZQk5VRVFpUWpNdTdMeWxVSUlreG14N0FxQjdhRVhCNm0xZHoyZmRpTHBpR0ROYXMxblpVOE0wMEsyVGNMekFCb0pVeXNHSnk0eUw0anlEMzE5SVVCeUItUXlJNWtXMXpGNnhna2xwaDBB?oc=5",
+      "summary": "Sebi cautions listed cos over 'Boss Scam'&nbsp;&nbsp;The New Indian Express",
+      "publishedAt": "2026-07-17T17:54:25+00:00",
       "sentiment": "Bearish",
       "category": "Regulatory"
     },
     {
-      "source": "Livemint Companies",
-      "title": "Reliance Retail bets on JioMart scale to drive margins, growth",
-      "link": "https://www.livemint.com/companies/reliance-retail-bets-on-jiomart-scale-to-drive-margins-growth-11784303337087.html",
-      "summary": "Reliance Retail plans disciplined expansion of JioMart\u2019s dark-store network, betting on higher order density and private labels to improve margins as competition in quick commerce intensifies.",
-      "publishedAt": "2026-07-17T17:15:03+00:00",
-      "sentiment": "Bullish",
-      "category": "Regulatory"
-    },
-    {
-      "source": "Livemint Companies",
-      "title": "Reliance tops estimates as petrochemicals business stands firm in a turbulent first quarter",
-      "link": "https://www.livemint.com/companies/reliance-tops-estimates-as-petrochemicals-business-stands-firm-in-a-turbulent-first-quarter-11784300680729.html",
-      "summary": "Reliance Industries' earnings beat came despite expectations that geopolitical tensions and volatile energy markets would weigh on Reliance\u2019s flagship oil-to-chemicals (O2C) business, which contributes more than half of the company\u2019s consolidated revenue.",
-      "publishedAt": "2026-07-17T17:00:49+00:00",
-      "sentiment": "Bullish",
-      "category": "Earnings"
+      "source": "ET TravelWorld",
+      "title": "Why lower crude oil prices wont immediately reduce fuel costs in india - ET TravelWorld",
+      "link": "https://news.google.com/rss/articles/CBMi_gFBVV95cUxQRjhCU3NPNDNKdlViQ0tLZzlQUi1KbG94VGxRU1hRZU84ckx0ZlZabFJyMXVEMkdkZ2NGRnRHUVZ0MGFXb1FDVHNwSWZlRl85a0s3WXpoVE5pM3huTHU3anN6WEVSVV9rU2MtNnhSX0RTNllxUjdlRV9hRnJfYzQ1NDROSjZLRFhSV3pTV3IxQV9KanB0cmROeGJ2OW5vUlJQLS12UFF4NXdPbmRXQXNHdFg4VUotLUtZTDlsNGVnZUFMMFR3REFkMTlsb1MtQ1BEZFRJSlFfQlRNbHRXcWswUFN4QmZsTml4YnlGb0ctQWVNaVMybkJ3SGFiSHd4Zw?oc=5",
+      "summary": "Why lower crude oil prices wont immediately reduce fuel costs in india&nbsp;&nbsp;ET TravelWorld",
+      "publishedAt": "2026-07-17T17:21:29+00:00",
+      "sentiment": "Neutral",
+      "category": "Commodity"
     }
   ],
   "llmProvider": "gemini",

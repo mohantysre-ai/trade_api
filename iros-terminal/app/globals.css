@@ -187,8 +187,6 @@ body {
 .news-sidebar {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 0;
 }
 .news-sidebar-rail {
   overflow-y: auto;

@@ -1486,11 +1486,12 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [sentimentFilter, setSentimentFilter] = useState<string | null>(null);
   const railRef = useRef<HTMLDivElement | null>(null);
-  const [autoScroll, setAutoScroll] = useState(true);
-  const scrollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [infiniteItems, setInfiniteItems] = useState<NewsItem[]>([]);
+  const [infiniteOffset, setInfiniteOffset] = useState(0);
+  const [infiniteHasMore, setInfiniteHasMore] = useState(true);
+  const [infiniteLoading, setInfiniteLoading] = useState(false);
+  const pageSize = 50;
 
-  const handleMouseEnter = () => setAutoScroll(false);
-  const handleMouseLeave = () => setAutoScroll(true);
 
   const timeAgo = (dateStr: string) => {
     const diff = now - new Date(dateStr).getTime();
@@ -1502,63 +1503,87 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
     return `${Math.floor(hrs / 24)}d ago`;
   };
 
+  const baseItems = sidebar ? infiniteItems : (items ?? []);
+
   const sources = useMemo(() => {
     const set = new Set<string>();
-    (items ?? []).forEach((it) => it.source && set.add(it.source));
+    baseItems.forEach((it) => it.source && set.add(it.source));
     return Array.from(set).sort();
-  }, [items]);
+  }, [baseItems]);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
-    (items ?? []).forEach((it) => it.category && set.add(it.category));
+    baseItems.forEach((it) => it.category && set.add(it.category));
     return Array.from(set).sort();
-  }, [items]);
+  }, [baseItems]);
 
   const filtered = useMemo(() => {
-    return (items ?? []).filter((it) => {
+    return baseItems.filter((it) => {
       if (sourceFilter && it.source !== sourceFilter) return false;
       if (categoryFilter && (it.category ?? "Market") !== categoryFilter) return false;
       if (sentimentFilter && (it.sentiment ?? "Neutral") !== sentimentFilter) return false;
       return true;
     });
-  }, [items, sourceFilter, categoryFilter, sentimentFilter]);
+  }, [baseItems, sourceFilter, categoryFilter, sentimentFilter]);
 
   const hasFilters = sourceFilter || categoryFilter || sentimentFilter;
   const displayed = sidebar ? filtered : (expanded ? filtered : filtered.slice(0, 12));
 
-  // Auto-scroll: horizontal for full-width, vertical for sidebar
+  const loadMoreSidebarNews = useCallback(async () => {
+    if (!sidebar || infiniteLoading || !infiniteHasMore) return;
+    setInfiniteLoading(true);
+    try {
+      const res = await fetch(`/api/live-news?offset=${infiniteOffset}&limit=${pageSize}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = await res.json();
+      const next: NewsItem[] = Array.isArray(body?.payload) ? body.payload : [];
+      setInfiniteItems((prev) => {
+        const seen = new Set(prev.map((p) => `${p.title}::${p.link}`));
+        const merged = [...prev];
+        for (const n of next) {
+          const key = `${n.title}::${n.link}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            merged.push(n);
+          }
+        }
+        return merged;
+      });
+      setInfiniteOffset((prev) => prev + next.length);
+      setInfiniteHasMore(Boolean(body?.hasMore) && next.length > 0);
+    } catch {
+      setInfiniteHasMore(false);
+    } finally {
+      setInfiniteLoading(false);
+    }
+  }, [sidebar, infiniteLoading, infiniteHasMore, infiniteOffset]);
+
   useEffect(() => {
-    const rail = railRef.current;
-    if (!rail || !autoScroll) return;
+    if (!sidebar) return;
+    setInfiniteItems([]);
+    setInfiniteOffset(0);
+    setInfiniteHasMore(true);
+  }, [sidebar]);
 
-    scrollIntervalRef.current = setInterval(() => {
-      if (!rail) return;
-      if (sidebar) {
-        const maxScroll = rail.scrollHeight - rail.clientHeight;
-        if (rail.scrollTop >= maxScroll - 4) {
-          rail.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-          rail.scrollBy({ top: 80, behavior: 'smooth' });
-        }
-      } else {
-        const maxScroll = rail.scrollWidth - rail.clientWidth;
-        if (rail.scrollLeft >= maxScroll - 2) {
-          rail.scrollTo({ left: 0, behavior: 'smooth' });
-        } else {
-          rail.scrollBy({ left: 330, behavior: 'smooth' });
-        }
-      }
-    }, 4000);
+  useEffect(() => {
+    if (!sidebar) return;
+    if (infiniteItems.length === 0 && !infiniteLoading && infiniteHasMore) {
+      void loadMoreSidebarNews();
+    }
+  }, [sidebar, infiniteItems.length, infiniteLoading, infiniteHasMore, loadMoreSidebarNews]);
 
-    return () => {
-      if (scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
-        scrollIntervalRef.current = null;
-      }
-    };
-  }, [autoScroll, sidebar]);
+  const handleSidebarScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (!sidebar || infiniteLoading || !infiniteHasMore) return;
+    const el = e.currentTarget;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 48;
+    if (nearBottom) {
+      void loadMoreSidebarNews();
+    }
+  }, [sidebar, infiniteLoading, infiniteHasMore, loadMoreSidebarNews]);
 
-  if (!items?.length) {
+  const hasAnyItems = sidebar ? baseItems.length > 0 : Boolean(items?.length);
+
+  if (!hasAnyItems) {
     const containerCls = sidebar
       ? "bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden"
       : "bg-white border border-slate-300 border-[0.5px] rounded-2xl shadow-sm overflow-hidden";
@@ -1583,9 +1608,9 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
   // Sidebar mode: compact, vertically scrollable news list
   if (sidebar) {
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden news-sidebar h-full flex flex-col">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 shadow-sm h-[1270px] overflow-hidden news-sidebar flex flex-col">
         {/* Compact Header */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white">
+        <div className="flex items-center justify-between px-1 py-1.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white">
           <div className="flex items-center gap-2">
             <div className="relative flex items-center justify-center w-5 h-5 rounded-md bg-gradient-to-br from-teal-500 to-blue-600 shadow-sm">
               <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1604,11 +1629,10 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
 
         {/* Vertically scrollable news list */}
         <div
-          className="news-sidebar-rail p-2 space-y-1.5"
+          className="news-sidebar-rail pt-2 space-y-1.5 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1"
           tabIndex={0}
           ref={railRef}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
+          onScroll={handleSidebarScroll}
         >
           {displayed.map((item, i) => {
             const color = sourceColor(item.source);
@@ -1623,9 +1647,9 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
                 rel="noopener noreferrer"
                 className="news-sidebar-card group block rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:shadow-sm transition-all duration-200 overflow-hidden"
               >
-                <div className="flex items-start gap-2 p-2">
+                <div className="flex items-start gap-2 p-2.5">
                   {/* Left accent bar */}
-                  <div className="w-0.5 h-full min-h-[2.5rem] rounded-full flex-shrink-0" style={{ background: color }} />
+                  <div className="w-0.5 h-full min-h-[3rem] rounded-full flex-shrink-0" style={{ background: color }} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 mb-0.5">
                       <span
@@ -1651,6 +1675,9 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
               </a>
             );
           })}
+          {infiniteLoading && (
+            <div className="text-[8px] text-slate-400 px-2 py-1 text-center">Loading more stories...</div>
+          )}
         </div>
 
         {filtered.length > 20 && !expanded && (
@@ -1678,7 +1705,7 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
           </div>
           <div>
             <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider">Live News Feed</h3>
-            <p className="text-[8px] text-slate-500">{filtered.length} of {items.length} stories · {sources.length} sources</p>
+            <p className="text-[8px] text-slate-500">{filtered.length} of {(items ?? []).length} stories · {sources.length} sources</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -1747,7 +1774,7 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
       {displayed.length === 0 ? (
         <div className="p-6 text-center text-slate-400 text-[11px]">No stories match the current filters.</div>
       ) : (
-        <div className="news-rail gap-3 p-3" tabIndex={0} aria-label="Scrollable live news stories" ref={railRef} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+        <div className="news-rail gap-3 p-3" tabIndex={0} aria-label="Scrollable live news stories" ref={railRef}>
           {displayed.map((item, i) => {
             const color = sourceColor(item.source);
             const sentiment = item.sentiment ?? "Neutral";
@@ -2265,7 +2292,7 @@ export default function IrosMasterAdvancedTerminal() {
             </div>
 
             {/* Right Column: Live News Feed Sidebar */}
-            <div className="xl:h-full xl:min-h-0 flex flex-col self-stretch min-h-0">
+            <div className="flex flex-col">
               <NewsFeedPanel items={liveMarket?.news} now={now} sidebar={true} />
             </div>
 
