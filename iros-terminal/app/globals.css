@@ -183,79 +183,6 @@ body {
 .news-card:nth-child(4n) { animation-delay: .15s; }
 .news-card > div:first-child { height: 2px !important; box-shadow: 0 0 12px currentColor; }
 
-/* Sidebar news feed — vertical scroll, matches left column height via items-stretch */
-.news-sidebar {
-  display: flex;
-  flex-direction: column;
-}
-.news-sidebar-rail {
-  overflow-y: auto;
-  flex: 1 1 auto;
-  overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-  scrollbar-width: thin;
-  scrollbar-color: #34516d transparent;
-  min-height: 0;
-}
-.news-sidebar-rail::-webkit-scrollbar { width: 4px; }
-.news-sidebar-rail::-webkit-scrollbar-thumb { background: #34516d; border-radius: 999px; }
-.news-sidebar-card {
-  animation: terminal-rise .3s both;
-  transition: transform .15s ease, box-shadow .15s ease, background-color .15s ease;
-}
-.news-sidebar-card:nth-child(2n) { animation-delay: .03s; }
-.news-sidebar-card:nth-child(3n) { animation-delay: .06s; }
-.news-sidebar-card:nth-child(4n) { animation-delay: .09s; }
-.news-sidebar-card > div:first-child > div:first-child {
-  box-shadow: 0 0 6px currentColor;
-}
-.news-sidebar-card:hover {
-  background-color: var(--terminal-panel-hover) !important;
-  border-color: rgba(55,215,223,.45) !important;
-  transform: translateY(-1px);
-}
-.news-sidebar .bg-gradient-to-r {
-  flex-shrink: 0;
-}
-.news-sidebar button {
-  flex-shrink: 0;
-}
-
-/* NIFTY TOP 5 / GainersLosersHeatmap dark theme overrides */
-.terminal-shell .grid.grid-cols-5 > div,
-.terminal-shell [class*="grid-cols-5"] > div {
-  background-color: var(--terminal-panel) !important;
-  border-color: var(--terminal-line) !important;
-}
-.terminal-shell .grid.grid-cols-5 > div .text-slate-500,
-.terminal-shell [class*="grid-cols-5"] > div .text-slate-500 {
-  color: var(--terminal-muted) !important;
-}
-.terminal-shell .grid.grid-cols-5 > div .text-slate-400,
-.terminal-shell [class*="grid-cols-5"] > div .text-slate-400 {
-  color: var(--terminal-muted) !important;
-}
-.terminal-shell .grid.grid-cols-5 > div .bg-slate-100,
-.terminal-shell [class*="grid-cols-5"] > div .bg-slate-100 {
-  background-color: rgba(55, 215, 223, 0.1) !important;
-}
-.terminal-shell .grid.grid-cols-5 > div [style*="rgba(248, 250, 252"],
-.terminal-shell [class*="grid-cols-5"] > div [style*="rgba(248, 250, 252"] {
-  background-color: rgba(55, 215, 223, 0.06) !important;
-}
-.terminal-shell .grid.grid-cols-5 > div [style*="rgba(226, 232, 240"],
-.terminal-shell [class*="grid-cols-5"] > div [style*="rgba(226, 232, 240"] {
-  border-bottom-color: var(--terminal-line) !important;
-}
-/* TrendlyneCategoryPanel dark theme overrides */
-.terminal-shell [class*="space-y-0"] a[style*="rgba(248, 250, 252"] {
-  background-color: rgba(55, 215, 223, 0.06) !important;
-}
-.terminal-shell [class*="space-y-0"] a[style*="rgba(226, 232, 240"] {
-  border-bottom-color: var(--terminal-line) !important;
-}
-
 .terminal-shell table thead tr { background: rgba(55, 215, 223, .08) !important; color: #c8d9e8 !important; }
 .terminal-shell table tbody tr { border-color: var(--terminal-line) !important; }
 .terminal-shell table tbody tr:hover { background: rgba(55, 215, 223, .055) !important; }
@@ -265,15 +192,6 @@ body {
 @keyframes terminal-rise { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes terminal-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(55,215,223,.45); } 50% { box-shadow: 0 0 0 5px rgba(55,215,223,0); } }
 .terminal-shell .animate-pulse { animation-name: terminal-pulse; animation-duration: 1.8s; }
-
-/* Smooth live-update animation for news cards */
-@keyframes news-flash {
-  0% { border-color: rgba(55,215,223,.6); box-shadow: 0 0 0 rgba(55,215,223,.25); }
-  100% { border-color: var(--terminal-line); box-shadow: none; }
-}
-.news-sidebar-card {
-  animation: terminal-rise .3s both, news-flash .6s ease-out;
-}
 
 @media (max-width: 640px) {
   .terminal-shell > div { padding: .65rem; }

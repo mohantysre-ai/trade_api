@@ -563,19 +563,17 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
   const textAccentCls = accentClass === 'emerald' ? 'text-emerald-600' : accentClass === 'red' ? 'text-red-500' : accentClass === 'indigo' ? 'text-indigo-600' : 'text-amber-600';
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 shadow-sm min-h-[160px] overflow-visible">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">{label}</span>
-        <span className="text-[12px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-          {loading ? 'LOADING' : error ? 'ERROR' : `${items.length} stocks`}
-        </span>
+    <div className="bg-white border border-slate-200 rounded-lg p-2 min-h-[160px] overflow-visible shadow-sm">
+      <div className={`text-[13px] uppercase tracking-wider ${textAccentCls} font-bold mb-2 flex items-center gap-1.5`}>
+        <span className={`w-2 h-2 rounded-full ${dotCls}`} />
+        {label}
       </div>
       {error && items.length === 0 && (
-        <div className="text-[9px] text-red-500 px-2 py-1 mb-1">{error}</div>
+        <div className="text-[11px] text-red-500 px-2 py-1 mb-1">{error}</div>
       )}
-      <div className="space-y-0.5">
+      <div className="space-y-0">
         {items.length === 0 && !loading && !error && (
-          <div className="text-[9px] text-slate-400 px-2 py-1">No data</div>
+          <div className="text-[13px] text-slate-400 px-2 py-1">No data</div>
         )}
         {items.map((item, idx) => {
           const currentPrice = item.tooltipParams.find((p) => p.key === 'currentPrice')?.value ?? '—';
@@ -585,19 +583,15 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
               href={item.stockurl}
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-center justify-between px-2 py-1 rounded-lg transition-all hover:scale-[1.02] cursor-default overflow-visible"
-              style={{
-                backgroundColor: idx % 2 === 0 ? 'rgba(248, 250, 252, 0.5)' : 'transparent',
-                borderBottom: '1px solid rgba(226, 232, 240, 0.4)',
-              }}
+              className="group flex items-center justify-between py-1.5 cursor-pointer border-b border-slate-100 last:border-b-0 hover:bg-slate-50 transition-colors"
             >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className={`w-1.5 h-1.5 rounded-full ${dotCls}`} />
+              <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${dotCls} flex-shrink-0`} />
                 <TrendlyneTickerTooltip item={item} />
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className={`text-[10px] font-bold ${textAccentCls}`}>{item.value}</span>
-                <span className="text-[10px] text-slate-500">₹{currentPrice}</span>
+                <span className={`text-[13px] font-bold ${textAccentCls}`}>{item.value}</span>
+                <span className="text-[13px] text-slate-500">₹{currentPrice}</span>
               </div>
             </a>
           );
@@ -685,17 +679,16 @@ function GainersLosersHeatmap() {
           const stocks = categories[category.key] ?? [];
           const accentClass = getCategoryAccentClass(category.key);
           const dotClass = getCategoryDotClass(category.key);
-          const rowStyle = getCategoryRowStyle(category.key);
 
           return (
-            <div key={category.key} className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 min-h-[160px] overflow-visible">
-              <div className={`text-[12px] uppercase tracking-wider ${accentClass} font-bold mb-1.5 flex items-center gap-1.5`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
+            <div key={category.key} className="bg-white border border-slate-200 rounded-lg p-2 min-h-[160px] overflow-visible shadow-sm">
+              <div className={`text-[13px] uppercase tracking-wider ${accentClass} font-bold mb-2 flex items-center gap-1.5`}>
+                <span className={`w-2 h-2 rounded-full ${dotClass}`} />
                 {category.label}
               </div>
-              <div className="space-y-0.5">
+              <div className="space-y-0">
                 {stocks.length === 0 && (
-                  <div className="text-[12px] text-slate-400 px-2 py-1">No data</div>
+                  <div className="text-[13px] text-slate-400 px-2 py-1">No data</div>
                 )}
                 {stocks.map((stock, index) => {
                   const ticker = stock.symbol ?? 'UNKNOWN';
@@ -705,16 +698,14 @@ function GainersLosersHeatmap() {
                   return (
                     <div
                       key={`${category.key}-${ticker}-${index}`}
-                      className="group flex items-center justify-between px-2 py-1 rounded-lg transition-all hover:scale-[1.02] cursor-default overflow-visible"
-                      style={{
-                        backgroundColor: index % 2 === 0 ? 'rgba(248, 250, 252, 0.5)' : 'transparent',
-                        borderBottom: '1px solid rgba(226, 232, 240, 0.4)',
-                      }}
+                      className="group flex items-center justify-between py-1.5 cursor-default border-b border-slate-100 last:border-b-0"
                     >
-                      <NseTickerTooltip stock={stock} ticker={ticker} />
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[12px] text-slate-500">{formatNseNumber(stock.lastPrice)}</span>
-                        <span className={`text-[12px] font-bold ${changeClass}`}>{changeText}</span>
+                      <div className="flex-1 min-w-0">
+                        <NseTickerTooltip stock={stock} ticker={ticker} />
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[13px] text-slate-600 font-medium tabular-nums">₹{formatNseNumber(stock.lastPrice)}</span>
+                        <span className={`text-[13px] font-bold tabular-nums min-w-[60px] text-right ${changeClass}`}>{changeText}</span>
                       </div>
                     </div>
                   );

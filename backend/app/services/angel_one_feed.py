@@ -2468,6 +2468,31 @@ def create_app() -> FastAPI:
         except Exception as exc:
             return {"alerts": [], "total": 0, "error": str(exc)}
 
+    @app.get("/api/reports/eod-intraday")
+    def eod_intraday_report(date: str | None = None) -> dict[str, Any]:
+        """Post-close reconciliation of the day's intraday scanner picks:
+        T1/T2/SL outcome per pick, realized P&L, remaining capital, and an
+        LLM miss-diagnosis for every SL hit / no-target-hit pick."""
+        try:
+            from datetime import date as _date
+            from .eod_intraday_report import generate_intraday_eod_report
+            for_date = _date.fromisoformat(date) if date else _date.today()
+            return generate_intraday_eod_report(for_date)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/reports/eod-swing")
+    def eod_swing_report(date: str | None = None) -> dict[str, Any]:
+        """Day-bucketed (1/7/15/30) P&L report for the Asset Matrix
+        swing/long-term picks in the fixed trade plan."""
+        try:
+            from datetime import date as _date
+            from .eod_swing_report import generate_swing_eod_report
+            for_date = _date.fromisoformat(date) if date else None
+            return generate_swing_eod_report(for_date)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
     @app.get("/api/news")
     def news_feed() -> dict[str, Any]:
         try:

@@ -5349,6 +5349,28 @@
       "summary_headline": "Blackstone pledges its entire Mphasis stake to refinance a loan.",
       "cached": false,
       "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
+    },
+    "BHEL": {
+      "ticker": "BHEL",
+      "company_name": "BHEL",
+      "articles_scraped": 20,
+      "articles_after_dedup": 20,
+      "generated_at": "2026-07-19T07:08:53.668306+00:00",
+      "insider_activity": "No recent news found.",
+      "institutional_activity": "UBS has downgraded BHEL shares from a 'Buy' rating to 'Neutral'. This indicates a less optimistic outlook from the institutional analyst.",
+      "order_book_block_deals": "No recent news found.",
+      "future_expansion_capex": "No recent news found.",
+      "auditor_changes": "No recent news found.",
+      "dividend_news": "No recent news found.",
+      "new_orders_contracts": "No recent news found.",
+      "earnings_results": "No recent news found.",
+      "management_changes": "No recent news found.",
+      "regulatory_filings": "BHEL is currently at risk of losing its prestigious Maharatna tag. This potential change in status could impact its operational autonomy and market perception.",
+      "sentiment_overall": "Bearish",
+      "risk_flags": "Losing Maharatna tag, Analyst downgrade",
+      "summary_headline": "BHEL faces risk of losing Maharatna status and receives a downgrade from UBS.",
+      "cached": false,
+      "generated_by": "backend.ai_ticker_news.generate_ticker_news_report"
     }
   },
   "isSnapshotFallback": false,
