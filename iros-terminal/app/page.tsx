@@ -436,7 +436,7 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
     <>
       <span
         ref={triggerRef as React.RefObject<HTMLSpanElement | null>}
-        className={`text-[12px] font-bold cursor-pointer transition-colors ${positive !== null ? (positive ? 'text-emerald-700 hover:text-emerald-500' : 'text-red-700 hover:text-red-500') : 'text-slate-800'}`}
+        className="text-[12px] font-bold cursor-pointer transition-colors text-slate-800 hover:text-indigo-600"
         onClick={handleClick}
         onKeyDown={(e) => { if (e.key === 'Enter') handleClick(); }}
         onMouseEnter={showTooltip}
@@ -580,7 +580,7 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
   const textAccentCls = accentClass === 'emerald' ? 'text-emerald-600' : accentClass === 'red' ? 'text-red-500' : accentClass === 'indigo' ? 'text-indigo-600' : 'text-amber-600';
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-2 min-h-[180px] overflow-visible shadow-sm">
+    <div className="bg-white border border-slate-200 rounded-lg p-2 min-h-[200px] overflow-visible shadow-sm">
       <div className={`text-[13px] uppercase tracking-wider ${textAccentCls} font-bold mb-2 flex items-center gap-1.5`}>
         <span className={`w-2 h-2 rounded-full ${dotCls}`} />
         {label}
@@ -600,7 +600,7 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
               href={item.stockurl}
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-center justify-between py-1 cursor-pointer border-b border-slate-100 last:border-b-0 hover:bg-slate-50 transition-colors"
+              className="group flex items-center justify-between py-2 cursor-pointer border-b border-slate-100 last:border-b-0 hover:bg-slate-50 transition-colors"
             >
               <div className="flex-1 min-w-0 flex items-center gap-1.5">
                 <span className={`w-1.5 h-1.5 rounded-full ${dotCls} flex-shrink-0`} />
@@ -695,7 +695,7 @@ function GainersLosersHeatmap() {
           const dotClass = getCategoryDotClass(category.key);
 
           return (
-            <div key={category.key} className="bg-white border border-slate-200 rounded-lg p-2 min-h-[160px] overflow-visible shadow-sm">
+            <div key={category.key} className="bg-white border border-slate-200 rounded-lg p-2 min-h-[200px] overflow-visible shadow-sm">
               <div className={`text-[13px] uppercase tracking-wider ${accentClass} font-bold mb-2 flex items-center gap-1.5`}>
                 <span className={`w-2 h-2 rounded-full ${dotClass}`} />
                 {category.label}
@@ -712,7 +712,7 @@ function GainersLosersHeatmap() {
                         return (
                           <div
                             key={`${category.key}-${ticker}-${index}`}
-                            className="group flex items-center justify-between py-1 cursor-default border-b border-slate-100 last:border-b-0"
+                            className="group flex items-center justify-between py-2 cursor-default border-b border-slate-100 last:border-b-0"
                           >
                             <div className="flex-1 min-w-0">
                               <NseTickerTooltip stock={stock} ticker={ticker} />
