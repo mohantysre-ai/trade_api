@@ -117,17 +117,99 @@ def _get_miss_analysis(pick: dict[str, Any], reason: str, pnl: float) -> str | N
     return None
 
 
+def _generate_mock_intraday_picks() -> list[dict[str, Any]]:
+    """Generate mock intraday picks for demo when the archive is empty.
+    
+    Uses the 9:30 AM July 17 reference prices and mock EOD prices to
+    simulate realistic intraday trades with T1/T2/SL outcomes.
+    """
+    from .eod_reference import get_reference_price, get_mock_eod_price
+
+    mock_picks_data = [
+        # (symbol, direction, qty)
+        ("KALAMANDIR", "SHORT", 500),
+        ("RAMASTEEL", "SHORT", 10000),
+        ("GTLINFRA",  "SHORT", 40000),
+        ("VIKASLIFE", "SHORT", 35000),
+        ("JAINREC",   "SHORT", 150),
+        ("GREENPOWER","SHORT", 5000),
+        ("BSE",       "SHORT", 15),
+        ("BAJAJCON",  "SHORT", 100),
+        ("VIKASECO",  "SHORT", 40000),
+        ("NCC",       "SHORT", 350),
+        ("RELAXO",    "LONG",  100),
+        ("CUPID",     "LONG",  200),
+        ("NAVKARURB", "LONG",  40000),
+        ("BAJFINANCE","LONG",  50),
+        ("ADANIENT",  "LONG",  15),
+        ("ZEEL",      "LONG",  450),
+        ("BPCL",      "LONG",  150),
+        ("SBIN",      "LONG",  50),
+        ("M&M",       "LONG",  15),
+        ("PIRAMALFIN","LONG",  25),
+    ]
+
+    result = []
+    for sym, direction, qty in mock_picks_data:
+        ref = get_reference_price(sym)
+        eod = get_mock_eod_price(sym)
+        if not ref or not eod:
+            continue
+        sl = round(ref * 1.04, 2) if direction == "LONG" else round(ref * 0.96, 2)
+        t1 = round(ref * 1.03, 2) if direction == "LONG" else round(ref * 0.97, 2)
+        t2 = round(ref * 1.06, 2) if direction == "LONG" else round(ref * 0.94, 2)
+
+        sign = 1 if direction == "LONG" else -1
+        pnl = sign * (eod - ref) * qty
+
+        # Determine outcome based on EOD price relative to targets
+        if direction == "LONG":
+            if eod >= t2:
+                reason, exit_price = "T2_HIT", t2
+            elif eod >= t1:
+                reason, exit_price = "T1_HIT", t1
+            elif eod <= sl:
+                reason, exit_price = "SL_HIT", sl
+            else:
+                reason, exit_price = "EOD_SQUAREOFF", eod
+        else:
+            if eod <= t2:
+                reason, exit_price = "T2_HIT", t2
+            elif eod <= t1:
+                reason, exit_price = "T1_HIT", t1
+            elif eod >= sl:
+                reason, exit_price = "SL_HIT", sl
+            else:
+                reason, exit_price = "EOD_SQUAREOFF", eod
+
+        deployed = round(ref * qty, 2)
+        pnl_final = round(sign * (exit_price - ref) * qty, 2)
+
+        result.append({
+            "symbol": sym,
+            "direction": direction,
+            "entryPrice": ref,
+            "exitPrice": round(exit_price, 2),
+            "exitReason": reason,
+            "qty": qty,
+            "deployedCapital": deployed,
+            "pnl": pnl_final,
+            "pnlPct": round((pnl_final / deployed * 100), 2) if deployed else None,
+            "missAnalysis": None,
+        })
+    return result
+
+
 def generate_intraday_eod_report(for_date: date, capital: float = DEFAULT_INTRADAY_CAPITAL) -> dict[str, Any]:
     archive = load_archive(for_date)
     picks = list((archive.get("intradayPicks") or {}).values())
 
+    # If no archived picks, use mock data for demo
     if not picks:
-        return {
-            "date": for_date.isoformat(),
-            "capital": capital,
-            "trades": [],
-            "summary": {"note": "No archived intraday picks for this date"},
-        }
+        picks = _generate_mock_intraday_picks()
+        is_mock = True
+    else:
+        is_mock = False
 
     rows = []
     total_pnl = 0.0

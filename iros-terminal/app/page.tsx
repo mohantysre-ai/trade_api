@@ -13,6 +13,7 @@ import {
 import ForensicPanel from './components/ForensicPanel';
 import RightDrawer from './components/RightDrawer';
 import IntradayMatrixPanel from './components/IntradayMatrixPanel';
+import EodAnalysisPanel from './components/EodAnalysisPanel';
 
 type DrawerContent = {
   stock?: LiveStock | LedgerStock | null;
@@ -23,7 +24,7 @@ type DrawerContent = {
   tickerNews?: AITickerNewsReport | null;
 };
 
-type TabKey = 'marketSnapshot' | 'stockHeatMap' | 'assetMatrix' | 'intradayMatrix';
+type TabKey = 'marketSnapshot' | 'stockHeatMap' | 'assetMatrix' | 'intradayMatrix' | 'eodAnalysis';
 
 const INDIA_MARKET_LABELS = new Set(['NIFTY 100', 'SENSEX', 'NIFTY BANK', 'NIFTY IT', 'NIFTY PHARMA', 'NIFTY MIDCAP', 'NIFTY SMALLCAP', 'GIFT NIFTY']);
 const GLOBAL_ONLY_LABELS = new Set(['BRENT CRUDE', 'BRENT CRUDE OIL']);
@@ -2257,6 +2258,7 @@ export default function IrosMasterAdvancedTerminal() {
             { key: 'stockHeatMap' as TabKey, label: 'STOCK HEAT MAP' },
             { key: 'assetMatrix' as TabKey, label: 'ASSET MATRIX' },
             { key: 'intradayMatrix' as TabKey, label: 'INTRA DAY MATRIX' },
+            { key: 'eodAnalysis' as TabKey, label: 'EOD ANALYSIS' },
           ]).map((tab) => (
             <button
               key={tab.key}
@@ -2328,6 +2330,12 @@ export default function IrosMasterAdvancedTerminal() {
         {activeTab === 'intradayMatrix' && (
           <div className="space-y-3">
             <IntradayMatrixPanel />
+          </div>
+        )}
+
+        {activeTab === 'eodAnalysis' && (
+          <div className="space-y-3">
+            <EodAnalysisPanel />
           </div>
         )}
       </div>
