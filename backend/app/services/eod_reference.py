@@ -80,9 +80,9 @@ def _build_mock_eod_prices() -> dict[str, float]:
 def _angel_creds_available() -> bool:
     """Quick check if Angel One API credentials are set without connecting."""
     try:
-        api_key = __import__('os').environ.get('REDACTED', '').strip()
-        client_id = __import__('os').environ.get('REDACTED', '').strip()
-        totp = __import__('os').environ.get('REDACTED', '').strip()
+        api_key = __import__('os').environ.get('ANGEL_API_KEY', '').strip()
+        client_id = __import__('os').environ.get('ANGEL_CLIENT_ID', '').strip()
+        totp = __import__('os').environ.get('ANGEL_TOTP_SECRET', '').strip()
         return bool(api_key and client_id and totp)
     except Exception:
         return False
@@ -233,7 +233,7 @@ def generate_swing_analysis(symbol: str, direction: str, entry: float, current: 
     # Try LLM first — only if env vars are present to avoid hanging on dotenv/API init
     try:
         llm_provider = os.environ.get('LLM_PROVIDER', '').strip()
-        llm_api_key = os.environ.get('REDACTED') or os.environ.get('REDACTED', '')
+        llm_api_key = os.environ.get('LLM_API_KEY') or os.environ.get('GEMINI_API_KEY', '')
         if llm_provider and llm_api_key:
             from .angel_one_feed import _llm_config_canonical, LLM_CALL_TIMEOUT_SECONDS
             config = _llm_config_canonical()

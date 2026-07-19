@@ -20,7 +20,7 @@ from typing import Any
 # Add parent path so we can import ai_ticker_news
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Load environment variables from the main backend .env (which contains REDACTED)
+# Load environment variables from the main backend .env (which contains LLM_API_KEY / GEMINI_API_KEY)
 # so the AI News server can use LLM-powered summaries instead of rule-based fallback.
 _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 if _env_path.exists():
@@ -31,7 +31,7 @@ if _env_path.exists():
         logger.info("Loaded environment from %s", _env_path)
     except ImportError:
         pass
-elif os.environ.get("REDACTED") or os.environ.get("GOOGLE_API_KEY"):
+elif os.environ.get("LLM_API_KEY") or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
     pass
 else:
     logger = logging.getLogger("ai_news_server")

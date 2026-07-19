@@ -57,9 +57,12 @@ ORCHESTRATION_DELAY = 30
 
 
 BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(BASE_DIR / ".env")
-load_dotenv(BASE_DIR.parent / ".env")
-load_dotenv(BASE_DIR.parent.parent / ".env")
+# Load the project-root .env (backend/.env) as the single source of truth,
+# overriding any values already in the environment or in the stale duplicate
+# at backend/app/services/.env. override=True ensures the intended file wins.
+load_dotenv(BASE_DIR.parent.parent / ".env", override=True)
+load_dotenv(BASE_DIR.parent / ".env", override=True)
+load_dotenv(BASE_DIR / ".env", override=True)
 
 NIFTY_500_CACHE_PATH = BASE_DIR / "nifty500_instruments.json"
 NIFTY_500_LABEL = "Nifty 500"
@@ -245,15 +248,15 @@ def _require_env(name: str) -> str:
 
 
 def _get_credential() -> str:
-    """Return Angel One credential: prefer ANGEL_MPIN (4-digit), fall back to REDACTED."""
+    """Return Angel One credential: prefer ANGEL_MPIN (4-digit), fall back to ANGEL_PASSWORD."""
     mpin = (os.getenv("ANGEL_MPIN") or "").strip()
     if mpin:
         if len(mpin) != 4 or not mpin.isdigit():
             raise RuntimeError("ANGEL_MPIN must be exactly 4 digits")
         return mpin
-    password = (os.getenv("REDACTED") or "").strip()
+    password = (os.getenv("ANGEL_PASSWORD") or "").strip()
     if not password:
-        raise RuntimeError("Missing ANGEL_MPIN or REDACTED in backend .env")
+        raise RuntimeError("Missing ANGEL_MPIN or ANGEL_PASSWORD in backend .env")
     return password
 
 
@@ -742,10 +745,10 @@ def _call_gemini_deprecated(*args, **kwargs):
 
 class AngelOneClient:
     def __init__(self) -> None:
-        self.api_key = _require_env("REDACTED")
-        self.client_id = _require_env("REDACTED")
+        self.api_key = _require_env("ANGEL_API_KEY")
+        self.client_id = _require_env("ANGEL_CLIENT_ID")
         self.credential = _get_credential()
-        self.totp_secret = _require_env("REDACTED")
+        self.totp_secret = _require_env("ANGEL_TOTP_SECRET")
         self._smart: SmartConnect | None = None
 
     def _reset_connection(self) -> None:
@@ -3040,7 +3043,7 @@ def main() -> int:
             f"[LLM-DEBUG] env_path={BASE_DIR / '.env'} "
             f"LLM_PROVIDER={os.getenv('LLM_PROVIDER','')} "
             f"LLM_MODEL={os.getenv('LLM_MODEL','')} "
-            f"REDACTED={'set' if os.getenv('REDACTED','').strip() else 'missing'} "
+            f"ANGEL_PASSWORD={'set' if os.getenv('ANGEL_PASSWORD','').strip() else 'missing'} "
             f"resolved={resolved}"
         )
     except Exception as exc:

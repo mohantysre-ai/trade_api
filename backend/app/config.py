@@ -29,14 +29,14 @@ def get_env(name: str, default: str | None = None) -> str:
 
 
 # Angel One API
-REDACTED = os.getenv("REDACTED", "")
-REDACTED = os.getenv("REDACTED", "")
-ANGEL_MPIN = os.getenv("ANGEL_MPIN") or os.getenv("REDACTED") or ""
-REDACTED = os.getenv("REDACTED", "")
+ANGEL_API_KEY = os.getenv("ANGEL_API_KEY", "")
+ANGEL_CLIENT_ID = os.getenv("ANGEL_CLIENT_ID", "")
+ANGEL_MPIN = os.getenv("ANGEL_MPIN") or os.getenv("ANGEL_PASSWORD") or ""
+ANGEL_TOTP_SECRET = os.getenv("ANGEL_TOTP_SECRET", "")
 
 # LLM Configuration
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")
-REDACTED = os.getenv("REDACTED", "") or os.getenv("REDACTED", "") or os.getenv("GOOGLE_API_KEY", "")
+LLM_API_KEY = os.getenv("LLM_API_KEY", "") or os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.5-flash")
 LLM_API_URL = os.getenv("LLM_API_URL", "")
 

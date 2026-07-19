@@ -314,6 +314,8 @@ type DhanRecommendation = {
   deliveryPct?: number;
   score?: number;
   reasons?: string[];
+  currentPrice?: number | null;
+  outcome?: TradeOutcome | null;
 };
 
 type CapitalAllocation = {
@@ -441,7 +443,7 @@ async function fetchLivePrices(): Promise<LivePricesResponse> {
 }
 
 /* ── Outcome Badge ───────────────────────────────────────────────────── */
-function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null }) {
+function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null | undefined }) {
   if (!outcome) {
     return <span className="text-[8px] text-slate-400">—</span>;
   }
@@ -990,8 +992,9 @@ export default function IntradayMatrixPanel() {
             {/* ── TRADE PLAN — from persistent picks (stable across the day) ── */}
             {(() => {
               // Monitor mode uses livePricesData (fresh every 2s, no external calls)
-              const planLong = monitorMode && livePricesData ? (livePricesData.long || []) : (outcomesData?.long || []);
-              const planShort = monitorMode && livePricesData ? (livePricesData.short || []) : (outcomesData?.short || []);
+              // Falls back to dhanData trade plan when no live/outcome picks exist
+              const planLong = monitorMode && livePricesData ? (livePricesData.long || dhanData?.tradePlan || []) : (outcomesData?.long || dhanData?.tradePlan || []);
+              const planShort = monitorMode && livePricesData ? (livePricesData.short || dhanData?.shortTradePlan || []) : (outcomesData?.short || dhanData?.shortTradePlan || []);
               const planTime = monitorMode && livePricesData?.updatedAt
                 ? new Date(livePricesData.updatedAt).toLocaleTimeString('en-IN', { hour12: false })
                 : outcomesTime;

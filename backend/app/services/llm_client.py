@@ -55,8 +55,8 @@ def _get_gemini_oauth_token(token_path: str | None = None) -> str | None:
 
 def _llm_config() -> tuple[str, str, str, str, str | None]:
     provider = os.getenv("LLM_PROVIDER", "").strip().lower()
-    api_key = os.getenv("REDACTED", "").strip()
-    gemini_key = os.getenv("REDACTED", "").strip()
+    api_key = os.getenv("LLM_API_KEY", "").strip()
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
     api_url = os.getenv("LLM_API_URL", "").strip()
     model = os.getenv("LLM_MODEL", "gpt-4o-mini").strip()
     oauth_token_path = os.getenv("GEMINI_OAUTH_TOKEN_PATH", "").strip()

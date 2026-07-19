@@ -871,9 +871,9 @@ _load_llm_cache()
 
 async def summarize_with_gemini(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:
     """Use Google Gemini to produce a structured news summary with model fallback on 429."""
-    gemini_api_key = os.environ.get("REDACTED") or os.environ.get("GOOGLE_API_KEY")
+    gemini_api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not gemini_api_key:
-        logger.warning("No REDACTED or GOOGLE_API_KEY set — falling back to rule-based summary")
+        logger.warning("No GEMINI_API_KEY or GOOGLE_API_KEY set — falling back to rule-based summary")
         return _rule_based_summary(ticker, company, articles)
 
     try:
