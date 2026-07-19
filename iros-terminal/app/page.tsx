@@ -151,13 +151,15 @@ function formatNseKey(key: string) {
 function getCategoryAccentClass(categoryKey: NseTopFiveCategoryKey) {
   if (categoryKey === 'topGainers') return 'text-emerald-600';
   if (categoryKey === 'topLoosers') return 'text-red-500';
-  return 'text-slate-600';
+  if (categoryKey === 'mostActiveValue') return 'text-indigo-600';
+  return 'text-amber-600';
 }
 
 function getCategoryDotClass(categoryKey: NseTopFiveCategoryKey) {
   if (categoryKey === 'topGainers') return 'bg-emerald-500';
   if (categoryKey === 'topLoosers') return 'bg-red-500';
-  return 'bg-slate-500';
+  if (categoryKey === 'mostActiveValue') return 'bg-indigo-500';
+  return 'bg-amber-500';
 }
 
 function getCategoryRowStyle(categoryKey: NseTopFiveCategoryKey): React.CSSProperties {
