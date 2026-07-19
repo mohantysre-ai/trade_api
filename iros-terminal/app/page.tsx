@@ -463,6 +463,23 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Format large numbers to lakh/crore/million/billion                         */
+/* -------------------------------------------------------------------------- */
+
+function formatLargeNumber(val: string): string {
+  if (!val) return val;
+  // If it's a percentage or already has a suffix, return as-is
+  if (val.includes('%') || val.includes('₹') || /[a-zA-Z]/g.test(val)) return val;
+  const num = parseFloat(val.replace(/,/g, ''));
+  if (isNaN(num)) return val;
+  const abs = Math.abs(num);
+  if (abs >= 10000000) return `${(num / 10000000).toFixed(2)} Cr`;
+  if (abs >= 100000) return `${(num / 100000).toFixed(2)} L`;
+  if (abs >= 1000) return `${(num / 1000).toFixed(2)} K`;
+  return val;
+}
+
+/* -------------------------------------------------------------------------- */
 /*  TrendlyneCategoryPanel                                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -477,7 +494,7 @@ function TrendlyneTickerTooltip({ item }: { item: TrendlyneStock }) {
     <>
       <span
         ref={triggerRef as React.RefObject<HTMLSpanElement | null>}
-        className="text-[12px] font-bold text-slate-800 truncate cursor-pointer hover:text-indigo-600 transition-colors"
+        className="text-[11px] font-semibold text-slate-800 truncate cursor-pointer hover:text-indigo-600 transition-colors"
         onMouseEnter={showTooltip}
         onMouseLeave={scheduleClose}
         onFocus={showTooltip}
@@ -515,7 +532,7 @@ function TrendlyneTickerTooltip({ item }: { item: TrendlyneStock }) {
             {item.tooltipParams.map((param) => (
               <div key={param.key} className="group flex items-center justify-between gap-3 px-2 py-1 rounded-md transition-all hover:bg-slate-50 hover:scale-[1.01]">
                 <div className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold truncate">{param.name}</div>
-                <span className="text-[9px] font-mono text-right text-slate-900 font-bold">{param.value || '—'}</span>
+                <span className="text-[9px] font-mono text-right text-slate-900 font-bold">{formatLargeNumber(param.value) || '—'}</span>
               </div>
             ))}
           </div>
@@ -563,7 +580,7 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
   const textAccentCls = accentClass === 'emerald' ? 'text-emerald-600' : accentClass === 'red' ? 'text-red-500' : accentClass === 'indigo' ? 'text-indigo-600' : 'text-amber-600';
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-2 min-h-[160px] overflow-visible shadow-sm">
+    <div className="bg-white border border-slate-200 rounded-lg p-2 min-h-[180px] overflow-visible shadow-sm">
       <div className={`text-[13px] uppercase tracking-wider ${textAccentCls} font-bold mb-2 flex items-center gap-1.5`}>
         <span className={`w-2 h-2 rounded-full ${dotCls}`} />
         {label}
@@ -583,15 +600,15 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
               href={item.stockurl}
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-center justify-between py-1.5 cursor-pointer border-b border-slate-100 last:border-b-0 hover:bg-slate-50 transition-colors"
+              className="group flex items-center justify-between py-1 cursor-pointer border-b border-slate-100 last:border-b-0 hover:bg-slate-50 transition-colors"
             >
               <div className="flex-1 min-w-0 flex items-center gap-1.5">
                 <span className={`w-1.5 h-1.5 rounded-full ${dotCls} flex-shrink-0`} />
                 <TrendlyneTickerTooltip item={item} />
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className={`text-[13px] font-bold ${textAccentCls}`}>{item.value}</span>
-                <span className="text-[13px] text-slate-500">₹{currentPrice}</span>
+                <span className={`text-[11px] font-semibold ${textAccentCls}`}>{formatLargeNumber(item.value)}</span>
+                <span className="text-[11px] text-slate-500">₹{currentPrice}</span>
               </div>
             </a>
           );
@@ -667,9 +684,6 @@ function GainersLosersHeatmap() {
     <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 shadow-sm min-h-[160px] overflow-visible">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">NIFTY TOP 5 GAINERS & LOSERS</span>
-        <span className="text-[12px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-          {loading ? 'LOADING' : error ? 'ERROR' : `${totalStocks} stocks`}
-        </span>
       </div>
       {error && totalStocks === 0 && (
         <div className="text-[9px] text-red-500 px-2 py-1 mb-1">{error}</div>
@@ -686,31 +700,31 @@ function GainersLosersHeatmap() {
                 <span className={`w-2 h-2 rounded-full ${dotClass}`} />
                 {category.label}
               </div>
-              <div className="space-y-0">
-                {stocks.length === 0 && (
-                  <div className="text-[13px] text-slate-400 px-2 py-1">No data</div>
-                )}
-                {stocks.map((stock, index) => {
-                  const ticker = stock.symbol ?? 'UNKNOWN';
-                  const changeText = typeof stock.pchange === 'number' ? `${stock.pchange > 0 ? '+' : ''}${stock.pchange.toFixed(2)}` : 'N/A';
-                  const changeClass = typeof stock.pchange === 'number' ? (stock.pchange >= 0 ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500';
+                    <div className="space-y-0">
+                      {stocks.length === 0 && (
+                        <div className="text-[13px] text-slate-400 px-2 py-1">No data</div>
+                      )}
+                      {stocks.map((stock, index) => {
+                        const ticker = stock.symbol ?? 'UNKNOWN';
+                        const changeText = typeof stock.pchange === 'number' ? `${stock.pchange > 0 ? '+' : ''}${stock.pchange.toFixed(2)}` : 'N/A';
+                        const changeClass = typeof stock.pchange === 'number' ? (stock.pchange >= 0 ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500';
 
-                  return (
-                    <div
-                      key={`${category.key}-${ticker}-${index}`}
-                      className="group flex items-center justify-between py-1.5 cursor-default border-b border-slate-100 last:border-b-0"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <NseTickerTooltip stock={stock} ticker={ticker} />
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-[13px] text-slate-600 font-medium tabular-nums">₹{formatNseNumber(stock.lastPrice)}</span>
-                        <span className={`text-[13px] font-bold tabular-nums min-w-[60px] text-right ${changeClass}`}>{changeText}</span>
-                      </div>
+                        return (
+                          <div
+                            key={`${category.key}-${ticker}-${index}`}
+                            className="group flex items-center justify-between py-1 cursor-default border-b border-slate-100 last:border-b-0"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <NseTickerTooltip stock={stock} ticker={ticker} />
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <span className="text-[11px] text-slate-600 tabular-nums">₹{formatNseNumber(stock.lastPrice)}</span>
+                              <span className={`text-[11px] font-semibold tabular-nums min-w-[50px] text-right ${changeClass}`}>{changeText}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
             </div>
           );
         })}
