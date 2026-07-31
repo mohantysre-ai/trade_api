@@ -34,6 +34,16 @@ from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from SmartApi import SmartConnect
 
+from .bulk_deals import load_bulk_deals
+from .stock_quality import (
+    MIN_PROMOTER_HOLDING_PCT,
+    MIN_RSI_PIVOT,
+    MIN_TURNOVER_CR,
+    MIN_VOLUME_MULTIPLIER,
+    attach_pivot_metrics,
+    ensure_promoter_holdings,
+    enrich_stock_quality,
+)
 from .market_feeds import (
     fetch_domestic_index_macro,
     fetch_domestic_yahoo_macro,
@@ -65,7 +75,13 @@ load_dotenv(BASE_DIR.parent / ".env", override=True)
 load_dotenv(BASE_DIR / ".env", override=True)
 
 NIFTY_500_CACHE_PATH = BASE_DIR / "nifty500_instruments.json"
+NIFTY_500_SYMBOLS_PATH = BASE_DIR.parent / "data" / "nifty500_symbols.json"
 NIFTY_500_LABEL = "Nifty 500"
+SCRIP_MASTER_URL = "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json"
+VOLUME_PRESELECT_LIMIT = int(os.getenv("VOLUME_PRESELECT_LIMIT", "50"))
+_NSE_EQ_TOKEN_MAP: dict[str, tuple[str, str]] | None = None
+_NSE_EQ_TOKEN_MAP_LOADED_AT = 0.0
+_NSE_EQ_TOKEN_MAP_TTL_SECONDS = int(os.getenv("NSE_EQ_TOKEN_MAP_TTL_SECONDS", "86400"))
 
 IST_ZONE = ZoneInfo("Asia/Kolkata")
 SNAPSHOT_PATH = BASE_DIR / "last_market_snapshot.json"
@@ -233,6 +249,13 @@ def _filter_prompt(custom_prompt: str | None = None) -> str:
     if custom_prompt and custom_prompt.strip():
         parts.append(custom_prompt.strip())
     parts.append(
+        "Short-term investment profile: exclude risky low-promoter names (YES Bank, Ola Electric, etc.). "
+        f"Require promoter holding >= {MIN_PROMOTER_HOLDING_PCT:g}%, "
+        "high liquidity (turnover + volume multiplier), price above VWAP and EMA9, "
+        "pivot R1 breakout with RSI momentum, bullish OI (long buildup / short covering), "
+        "and clean wick structure. Prefer quality compounders over speculative momentum."
+    )
+    parts.append(
         "Use the live Angel One universe below to select the top "
         f"{_TI_TOP_SELECTION_COUNT} stocks. Prefer the Nifty 100 universe; do not restrict selection to Nifty 50 only. "
         "Do not invent tickers. Return valid JSON only."
@@ -324,27 +347,371 @@ def _load_watchlist_from_cache(path: Path) -> list[Instrument]:
         return []
 
 
+def _fetch_nse_index_symbols(index: str = "NIFTY 500") -> list[str]:
+    """Fetch EQ symbols for an NSE index (e.g. Nifty 500)."""
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Referer": "https://www.nseindia.com/",
+        "Accept": "application/json, text/plain, */*",
+    })
+    try:
+        session.get("https://www.nseindia.com", timeout=20)
+        response = session.get(
+            "https://www.nseindia.com/api/equity-stock-indices",
+            params={"index": index},
+            timeout=30,
+        )
+        response.raise_for_status()
+        rows = response.json().get("data", [])
+        return sorted({
+            str(row["symbol"]).upper()
+            for row in rows
+            if row.get("series") == "EQ" and row.get("symbol")
+        })
+    except Exception as exc:
+        logging.getLogger(__name__).warning("NSE index fetch failed for %s: %s", index, exc)
+        return []
+
+
+def _load_nifty500_symbol_list() -> list[str]:
+    """Load Nifty 500 symbols from NSE, falling back to the bundled JSON seed."""
+    symbols = _fetch_nse_index_symbols("NIFTY 500")
+    if symbols:
+        return symbols
+    try:
+        raw = json.loads(NIFTY_500_SYMBOLS_PATH.read_text(encoding="utf-8"))
+        return [str(symbol).upper() for symbol in raw.get("symbols", []) if symbol]
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Failed to load Nifty 500 symbol seed: %s", exc)
+        return []
+
+
+def _persist_nifty500_symbol_seed(symbols: list[str]) -> None:
+    if not symbols:
+        return
+    try:
+        NIFTY_500_SYMBOLS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        NIFTY_500_SYMBOLS_PATH.write_text(
+            json.dumps(
+                {
+                    "label": NIFTY_500_LABEL,
+                    "source": "NSE equity-stock-indices",
+                    "refreshedAt": _ist_now().date().isoformat(),
+                    "count": len(symbols),
+                    "symbols": symbols,
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Failed to persist Nifty 500 symbol seed: %s", exc)
+
+
+def _load_nse_eq_token_map(force_refresh: bool = False) -> dict[str, tuple[str, str]]:
+    """Map NSE equity symbol -> (token, tradingsymbol) using Angel scrip master + WATCHLIST."""
+    global _NSE_EQ_TOKEN_MAP, _NSE_EQ_TOKEN_MAP_LOADED_AT
+    now = time.time()
+    if (
+        not force_refresh
+        and _NSE_EQ_TOKEN_MAP is not None
+        and (now - _NSE_EQ_TOKEN_MAP_LOADED_AT) < _NSE_EQ_TOKEN_MAP_TTL_SECONDS
+    ):
+        return _NSE_EQ_TOKEN_MAP
+
+    token_map: dict[str, tuple[str, str]] = {
+        inst.key: (inst.token, inst.tradingsymbol) for inst in WATCHLIST
+    }
+    try:
+        response = requests.get(SCRIP_MASTER_URL, timeout=120)
+        response.raise_for_status()
+        rows = response.json()
+        for row in rows:
+            if str(row.get("exch_seg", "")).upper() != "NSE":
+                continue
+            tradingsymbol = str(row.get("symbol", ""))
+            if not tradingsymbol.endswith("-EQ"):
+                continue
+            name = str(row.get("name", "")).upper()
+            token = str(row.get("token", ""))
+            if name and token:
+                token_map[name] = (token, tradingsymbol)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Angel scrip master fetch failed: %s", exc)
+
+    _NSE_EQ_TOKEN_MAP = token_map
+    _NSE_EQ_TOKEN_MAP_LOADED_AT = now
+    return token_map
+
+
+def _pick_eq_search_result(data: list[Any], symbol_key: str) -> dict[str, Any] | None:
+    """Prefer the NSE cash EQ row when searchScrip returns multiple series."""
+    if not data:
+        return None
+    symbol_key = symbol_key.upper()
+    preferred = f"{symbol_key}-EQ"
+
+    def trading_symbol(row: dict[str, Any]) -> str:
+        return str(row.get("symbol") or row.get("tradingsymbol") or "").upper()
+
+    for row in data:
+        if isinstance(row, dict) and trading_symbol(row) == preferred:
+            return row
+    for row in data:
+        if isinstance(row, dict) and trading_symbol(row).endswith("-EQ"):
+            return row
+    first = data[0]
+    return first if isinstance(first, dict) else None
+
+
+def _resolve_nse_equity(
+    symbol: str,
+    client: AngelOneClient | None = None,
+    token_map: dict[str, tuple[str, str]] | None = None,
+) -> tuple[str, str] | None:
+    """Resolve an NSE cash equity symbol to (token, tradingsymbol)."""
+    key = symbol.upper()
+    mapping = token_map if token_map is not None else _load_nse_eq_token_map()
+    if key in mapping:
+        return mapping[key]
+
+    if client is None:
+        return None
+
+    smart = client.connect()
+    for query in (f"{key}-EQ", key):
+        try:
+            search = smart.searchScrip("NSE", query)
+        except Exception:
+            continue
+        if not isinstance(search, dict) or not search.get("status"):
+            continue
+        data = search.get("data") or []
+        if not isinstance(data, list) or not data:
+            continue
+        pick = _pick_eq_search_result(data, key)
+        if not pick:
+            continue
+        token = str(pick.get("token") or pick.get("symboltoken") or "")
+        tradingsymbol = str(pick.get("symbol") or pick.get("tradingsymbol") or f"{key}-EQ")
+        if token:
+            return token, tradingsymbol
+    return None
+
+
+def _symbols_to_instruments(
+    symbols: list[str],
+    token_map: dict[str, tuple[str, str]],
+    client: AngelOneClient | None = None,
+) -> list[Instrument]:
+    instruments: list[Instrument] = []
+    missing: list[str] = []
+
+    for symbol in symbols:
+        key = symbol.upper()
+        entry = token_map.get(key)
+        if entry:
+            token, tradingsymbol = entry
+            instruments.append(Instrument(key, "NSE", tradingsymbol, token, key))
+        else:
+            missing.append(key)
+
+    if missing and client is not None:
+        for key in missing:
+            resolved = _resolve_nse_equity(key, client=client, token_map=token_map)
+            if not resolved:
+                continue
+            token, tradingsymbol = resolved
+            instruments.append(Instrument(key, "NSE", tradingsymbol, token, key))
+
+    return instruments
+
+
+def _ensure_nifty500_cache(client: AngelOneClient | None = None) -> list[Instrument]:
+    cached = _load_watchlist_from_cache(NIFTY_500_CACHE_PATH)
+    if cached:
+        return cached
+    result = refresh_nifty500_cache(client=client)
+    if result.get("success"):
+        return _load_watchlist_from_cache(NIFTY_500_CACHE_PATH)
+    return []
+
+
 def _pool_watchlist(pool_name: str | None) -> tuple[list[Instrument], str]:
     resolved = pool_name or NIFTY_100_LABEL
 
-    if resolved in ("Nifty 50", NIFTY_500_LABEL):
+    if resolved == "Nifty 50":
         resolved = NIFTY_100_LABEL
 
-    if resolved == NIFTY_100_LABEL:
-        # Prefer Nifty 500 with daily rotation so different constituents
-        # get surfaced each day instead of the same static Nifty 100 set.
-        nifty500 = _load_watchlist_from_cache(NIFTY_500_CACHE_PATH)
+    if resolved == NIFTY_500_LABEL:
+        nifty500 = _ensure_nifty500_cache()
         if nifty500:
-            window_size = 200
-            idx = _ist_now().day % max(len(nifty500) - window_size, 1)
-            rotated = nifty500[idx:] + nifty500[:idx]
-            window = rotated[:window_size]
-            return [inst for inst in window if inst.key not in NIFTY_50_KEYS], NIFTY_100_LABEL
+            return nifty500, NIFTY_500_LABEL
+        logging.getLogger(__name__).warning(
+            "Nifty 500 cache empty at %s. Falling back to static WATCHLIST (%d symbols). "
+            "Populate the cache via POST /api/refresh-instrument-cache.",
+            NIFTY_500_CACHE_PATH, len(WATCHLIST),
+        )
+
+    if resolved == NIFTY_100_LABEL:
+        # Prefer Nifty 500 with daily rotation so different constituents
+        # get surfaced each day instead of the same static Nifty 100 set.
+        nifty500 = _ensure_nifty500_cache()
+        if nifty500:
+            return _rotate_nifty500(nifty500), NIFTY_100_LABEL
         nifty100 = _load_watchlist_from_cache(NIFTY_100_CACHE_PATH)
         if nifty100:
             return [inst for inst in nifty100 if inst.key not in NIFTY_50_KEYS], NIFTY_100_LABEL
+        logging.getLogger(__name__).warning(
+            "Nifty 500 cache empty at %s and Nifty 100 cache empty. Falling back to static WATCHLIST (%d symbols). "
+            "Populate the cache via POST /api/refresh-instrument-cache to get a rotating universe.",
+            NIFTY_500_CACHE_PATH, len(WATCHLIST),
+        )
+
+    if resolved == LIVE_UNIVERSE_LABEL:
+        return [inst for inst in WATCHLIST if inst.key not in NIFTY_50_KEYS], LIVE_UNIVERSE_LABEL
 
     return [inst for inst in WATCHLIST if inst.key not in NIFTY_50_KEYS], resolved
+
+
+def _rotate_nifty500(nifty500: list[Instrument]) -> list[Instrument]:
+    """Return a day-rotated 200-stock window from the Nifty 500 cache."""
+    window_size = min(200, len(nifty500))
+    idx = _ist_now().day % max(len(nifty500) - window_size, 1)
+    rotated = nifty500[idx:] + nifty500[:idx]
+    window = rotated[:window_size]
+    return [inst for inst in window if inst.key not in NIFTY_50_KEYS]
+
+
+def refresh_nifty500_cache(client: AngelOneClient | None = None) -> dict[str, Any]:
+    """Build the Nifty 500 instrument cache from NSE constituents + Angel scrip master.
+
+    Returns a status dict with counts and any errors encountered.
+    """
+    try:
+        symbols = _load_nifty500_symbol_list()
+        if not symbols:
+            return {"success": False, "error": "No Nifty 500 symbols available from NSE or seed file", "fetched": 0}
+
+        _persist_nifty500_symbol_seed(symbols)
+        token_map = _load_nse_eq_token_map()
+        resolved = _symbols_to_instruments(symbols, token_map, client=client)
+        if not resolved:
+            return {"success": False, "error": "No instruments resolved for Nifty 500 universe", "fetched": 0}
+
+        deduped: list[dict[str, str]] = []
+        seen_tokens: set[str] = set()
+        seen_keys: set[str] = set()
+        for inst in resolved:
+            if inst.token in seen_tokens or inst.key in seen_keys:
+                continue
+            seen_tokens.add(inst.token)
+            seen_keys.add(inst.key)
+            deduped.append({
+                "key": inst.key,
+                "exchange": inst.exchange,
+                "tradingsymbol": inst.tradingsymbol,
+                "token": inst.token,
+                "label": inst.label or inst.key,
+            })
+
+        cache_blob = {
+            "label": NIFTY_500_LABEL,
+            "refreshedAt": datetime.now(timezone.utc).isoformat(),
+            "count": len(deduped),
+            "sourceSymbols": len(symbols),
+            "instruments": deduped,
+        }
+        try:
+            NIFTY_500_CACHE_PATH.write_text(json.dumps(cache_blob, indent=2), encoding="utf-8")
+        except Exception as exc_write:
+            logging.getLogger(__name__).error("Failed to write Nifty 500 cache: %s", exc_write)
+            return {"success": False, "error": f"Cache write failed: {exc_write}", "fetched": len(deduped)}
+
+        missing = len(symbols) - len(deduped)
+        if missing > 0:
+            logging.getLogger(__name__).warning(
+                "Nifty 500 cache built with %d/%d symbols resolved (%d missing tokens).",
+                len(deduped), len(symbols), missing,
+            )
+
+        return {
+            "success": True,
+            "fetched": len(deduped),
+            "sourceSymbols": len(symbols),
+            "missing": missing,
+            "cachePath": str(NIFTY_500_CACHE_PATH),
+        }
+    except Exception as exc:
+        logging.getLogger(__name__).error("Nifty 500 cache refresh failed: %s", exc)
+        return {"success": False, "error": str(exc), "fetched": 0}
+
+
+def refresh_nifty100_cache(client: AngelOneClient | None = None) -> dict[str, Any]:
+    """Fetch Nifty 100 instruments from Angel One and persist to cache."""
+    try:
+        own_client = client is None
+        if own_client:
+            client = AngelOneClient()
+
+        instruments: list[dict[str, str]] = []
+        try:
+            from ..utils.symbols import WATCHLIST
+            seed_symbols = [inst.key for inst in WATCHLIST if inst.key not in ("NIFTY 50", "NIFTY BANK", "NIFTY NXT 50")]
+        except Exception:
+            seed_symbols = []
+
+        for sym in seed_symbols:
+            resolved = _resolve_nse_equity(sym, client=client)
+            if not resolved:
+                continue
+            token, ts = resolved
+            instruments.append({
+                "key": sym,
+                "exchange": "NSE",
+                "tradingsymbol": ts,
+                "token": token,
+                "label": sym,
+            })
+
+        if not instruments:
+            return {"success": False, "error": "No instruments resolved for Nifty 100 universe", "fetched": 0}
+
+        seen_tokens: set[str] = set()
+        seen_keys: set[str] = set()
+        deduped: list[dict[str, str]] = []
+        for item in instruments:
+            tok = item["token"]
+            key = item["key"]
+            if tok in seen_tokens or key in seen_keys:
+                continue
+            seen_tokens.add(tok)
+            seen_keys.add(key)
+            deduped.append(item)
+
+        cache_blob = {
+            "label": "Nifty 100",
+            "refreshedAt": datetime.now(timezone.utc).isoformat(),
+            "count": len(deduped),
+            "instruments": deduped,
+        }
+        try:
+            NIFTY_100_CACHE_PATH.write_text(json.dumps(cache_blob, indent=2), encoding="utf-8")
+        except Exception as exc_write:
+            logging.getLogger(__name__).error("Failed to write Nifty 100 cache: %s", exc_write)
+            return {"success": False, "error": f"Cache write failed: {exc_write}", "fetched": len(deduped)}
+
+        if own_client:
+            try:
+                client._reset_connection()
+            except Exception:
+                pass
+
+        return {"success": True, "fetched": len(deduped), "cachePath": str(NIFTY_100_CACHE_PATH)}
+    except Exception as exc:
+        logging.getLogger(__name__).error("Nifty 100 cache refresh failed: %s", exc)
+        return {"success": False, "error": str(exc), "fetched": 0}
 
 
 def _payload_data_date(payload: dict[str, Any] | None = None) -> str:
@@ -455,7 +822,12 @@ def _enrich_snapshot_with_fixed_plan(payload: dict[str, Any]) -> dict[str, Any]:
             ltp = float(quote.get("ltp", 0) or 0)
             if not ltp:
                 continue
-            inst = Instrument(sym, "NSE", f"{sym}-EQ", str(quote.get("token", "0")))
+            inst = Instrument(
+                sym,
+                "NSE",
+                str(quote.get("tradingsymbol") or f"{sym}-EQ"),
+                str(quote.get("token", "0")),
+            )
             row = _build_stock_row(inst, quote, payload.get("activePool", "Fixed Plan"))
             quotes[sym] = row
             _FIXED_PLAN_QUOTE_CACHE[sym] = (now, row)
@@ -803,7 +1175,7 @@ class AngelOneClient:
             raise
 
     def fetch_symbol_quote(self, symbol: str) -> dict[str, Any] | None:
-        """Resolve an arbitrary NSE symbol's token via searchScrip and fetch its LTP.
+        """Resolve an arbitrary NSE symbol's token and fetch its LTP.
 
         Used to bring fixed-trade-plan symbols (which are not in the WATCHLIST /
         Nifty cache) into the live snapshot so the intraday monitor can show real
@@ -811,25 +1183,10 @@ class AngelOneClient:
         """
         def _try_fetch() -> dict[str, Any] | None:
             smart = self.connect()
-            sym = symbol.upper()
-            tradingsymbol = f"{sym}-EQ"
-            token: str | None = None
-            for candidate in (tradingsymbol, sym):
-                try:
-                    search = smart.searchScrip("NSE", candidate)
-                except Exception:
-                    search = None
-                if isinstance(search, dict) and search.get("status"):
-                    data = search.get("data") or []
-                    if isinstance(data, list) and data:
-                        first = data[0]
-                        resolved = str(first.get("token") or first.get("symboltoken") or "")
-                        if resolved:
-                            token = resolved
-                            tradingsymbol = str(first.get("symbol") or candidate)
-                            break
-            if not token:
+            resolved = _resolve_nse_equity(symbol, client=self)
+            if not resolved:
                 return None
+            token, tradingsymbol = resolved
             try:
                 resp = smart.ltpData("NSE", tradingsymbol, token)
             except Exception:
@@ -839,6 +1196,7 @@ class AngelOneClient:
             data = resp.get("data") or {}
             if isinstance(data, dict):
                 data.setdefault("token", token)
+                data.setdefault("tradingsymbol", tradingsymbol)
             return data if isinstance(data, dict) else None
 
         try:
@@ -1429,7 +1787,7 @@ def _intraday_metrics(
     passes_hard_filters = len(hard_filter_reasons) == 0
     trigger_point = "VWAP Bounce" if price_above_vwap else "15-min ORB" if ltp >= orb_high else "Flag Breakout"
 
-    return {
+    metrics = {
         "atr_pct": round(atr_pct, 2),
         "volume_multiplier": round(volume_multiplier, 2),
         "today_volume": round(today_volume, 0),
@@ -1454,6 +1812,7 @@ def _intraday_metrics(
         "passes_hard_filters": passes_hard_filters,
         "hard_filter_reasons": hard_filter_reasons,
     }
+    return attach_pivot_metrics(metrics, ltp, daily_candles)
 
 
 def _fetch_intraday_chunk(
@@ -1552,6 +1911,7 @@ def _calculate_alpha_score(metrics: dict[str, Any]) -> float:
     score += min(metrics.get("liquidity_score", 0.0), 20.0)
     score += min(metrics.get("breakout_quality", 0.0), 20.0)
     score += min(metrics.get("sector_strength", 0.0), 20.0)
+    score += min(float(metrics.get("bulk_deal_boost") or 0.0), 10.0)
     return round(score, 2)
 
 
@@ -1589,13 +1949,16 @@ def _compute_deterministic_pipeline(all_stocks: list[dict[str, Any]]) -> list[di
 
         passes = all([
             atr > 1.5,
-            turnover > 10.0,
+            turnover >= MIN_TURNOVER_CR,
             ltp > vwap_val,
-            oi_setup in ("LONG_BUILDUP", "SHORT_COVERING", "SHORT_BUILDUP", "LONG_UNWINDING"),
-            vol_mult >= 0.8,
-            rsi_val > 40.0,
+            oi_setup in ("LONG_BUILDUP", "SHORT_COVERING"),
+            vol_mult >= MIN_VOLUME_MULTIPLIER,
+            rsi_val >= MIN_RSI_PIVOT,
             spread < 0.50,
             wick_noise < 0.70,
+            metrics.get("price_above_ema9", False),
+            metrics.get("pivot_r1_breakout", False),
+            stock.get("passes_quality_filters", False),
         ])
 
         # Always compute alpha_score so every stock shows its quantitative signal strength
@@ -1796,6 +2159,14 @@ def _coarse_pre_rank(stocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return ranked
 
 
+def _select_top_volume_stocks(stocks: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    """Return the highest same-day volume stocks from the scanned universe."""
+    if limit <= 0 or not stocks:
+        return []
+    ranked = sorted(stocks, key=lambda row: float(row.get("volume") or 0), reverse=True)
+    return ranked[:limit]
+
+
 def _hard_screen(stock: dict[str, Any]) -> bool:
     intraday = stock.get("intraday") or {}
     return bool(intraday.get("passes_hard_filters"))
@@ -1829,8 +2200,13 @@ def _compile_selection_stream(
             f"{stock['ticker']} | {stock['name']} | LTP {stock['ltp']} | delta {stock['delta']} | "
             f"state {stock['state']} | close {stock.get('close')} | volume {stock.get('volume')} | "
             f"ATR% {intraday.get('atr_pct', 0)} | volX {intraday.get('volume_multiplier', 0)} | "
+            f"RSI {intraday.get('rsi', 0)} | pivotR1 {intraday.get('pivot_r1', 0)} | "
+            f"promoter {stock.get('promoter_holding_pct', 'n/a')}% | "
             f"VWAP {intraday.get('vwap', 0)} | EMA9 {intraday.get('ema9', 0)} | ORB {intraday.get('orb_high', 0)} | "
-            f"turnoverCr {intraday.get('turnover_cr', 0)} | screen {hard_status} | reasons {reasons}"
+            f"turnoverCr {intraday.get('turnover_cr', 0)} | OI {intraday.get('oi_setup', 'NEUTRAL')} | "
+            f"bulkDeal {intraday.get('bulk_deal_value_cr', 0)}Cr "
+            f"({'Y' if intraday.get('bulk_deal_signal') else 'N'}) | "
+            f"screen {hard_status} | quality {'PASS' if intraday.get('passes_quality_filters') else 'FAIL'} | reasons {reasons}"
         )
 
     if news_items:
@@ -2030,8 +2406,10 @@ def _build_payload_from_live_data(
         all_stocks.append(row)
         stock_quotes[inst.key] = row
 
-    candle_limit = int(os.getenv("INTRADAY_CANDIDATE_LIMIT", "20"))
-    candidate_rows = _coarse_pre_rank(all_stocks)[:candle_limit]
+    candle_limit = int(os.getenv("INTRADAY_CANDIDATE_LIMIT", str(VOLUME_PRESELECT_LIMIT)))
+    volume_limit = int(os.getenv("VOLUME_PRESELECT_LIMIT", str(VOLUME_PRESELECT_LIMIT)))
+    top_by_volume = _select_top_volume_stocks(all_stocks, volume_limit)
+    candidate_rows = top_by_volume[:candle_limit]
     candidate_keys = {row["ticker"] for row in candidate_rows}
     row_by_ticker = {row["ticker"]: row for row in all_stocks}
 
@@ -2063,6 +2441,13 @@ def _build_payload_from_live_data(
         if original is not None:
             original["intraday"] = metrics
             stock_quotes[ticker] = original
+
+    bulk_deal_map = load_bulk_deals()
+    promoter_map = ensure_promoter_holdings([row["ticker"] for row in candidate_rows])
+    for row in all_stocks:
+        if row["ticker"] in candidate_keys:
+            enrich_stock_quality(row, promoter_map, bulk_deal_map)
+            stock_quotes[row["ticker"]] = row
 
     # ─────────────────────────────────────────────────────────────────────────
     # STAGE 1: Deterministic Quant Engine
@@ -2126,10 +2511,15 @@ def _build_payload_from_live_data(
         "availablePools": [NIFTY_100_LABEL, "Nifty 500", LIVE_UNIVERSE_LABEL],
         "activePool": resolved_pool_name,
         "poolDescription": (
-            "Nifty 100 Angel One live universe ranked by your filter prompt."
+            "Nifty 500 universe: live quotes on full index, intraday filters on top "
+            f"{volume_limit} volume leaders."
+            if resolved_pool_name == NIFTY_500_LABEL
+            else "Nifty 100 Angel One live universe ranked by your filter prompt."
             if resolved_pool_name == NIFTY_100_LABEL
             else f"Dynamic live universe label applied for {resolved_pool_name}."
         ),
+        "universeSize": len(all_stocks),
+        "volumeScreenedCount": len(candidate_rows),
         "stocks": top_rows,
         "stockQuotes": stock_quotes,
         "macroDataStrip": {"morning": macro_morning, "evening": macro_evening},
@@ -2519,6 +2909,21 @@ def create_app() -> FastAPI:
                 "quote": quote,
                 "llmConfigured": _llm_config_canonical()[0] is not None,
             }
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.post("/api/refresh-instrument-cache")
+    def refresh_instrument_cache(pool: str = "Nifty 500") -> dict[str, Any]:
+        """Refresh the Nifty 500 / Nifty 100 instrument cache from Angel One.
+
+        On-demand cache population for the asset matrix pools.
+        """
+        try:
+            if pool == NIFTY_100_LABEL:
+                result = refresh_nifty100_cache()
+            else:
+                result = refresh_nifty500_cache()
+            return {"success": result.get("success"), "pool": pool, "result": result}
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 

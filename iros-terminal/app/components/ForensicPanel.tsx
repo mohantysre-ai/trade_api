@@ -287,22 +287,42 @@ type AssetRow = {
   thesis: string;
   riskFlag: string;
   state?: string;
+  promoterPct?: number;
+  bulkDealValueCr?: number;
+  bulkDealSignal?: boolean;
 };
+
+const DEFAULT_POOLS = ['Nifty 500', 'Nifty 100', 'Live Universe'] as const;
 
 export default function ForensicPanel({
   onSelect,
   liveMarket,
   refreshOnDemand,
+  selectedPool,
+  onPoolChange,
+  availablePools,
 }: {
   onSelect?: (ticker: string) => void;
   liveMarket?: MarketDataResponse | null;
   refreshOnDemand?: () => Promise<void>;
+  selectedPool?: string;
+  onPoolChange?: (pool: string) => void;
+  availablePools?: string[];
 }) {
   const [refreshing, setRefreshing] = useState(false);
 
   const live = liveMarket ?? null;
   const stocks = live?.stocks ?? [];
   const intelligence = live?.terminalIntelligence ?? null;
+  const pools = useMemo(() => {
+    const fromApi = (availablePools ?? live?.availablePools ?? []).filter(Boolean);
+    const merged = [...fromApi];
+    for (const pool of DEFAULT_POOLS) {
+      if (!merged.includes(pool)) merged.push(pool);
+    }
+    if (selectedPool && !merged.includes(selectedPool)) merged.unshift(selectedPool);
+    return merged;
+  }, [availablePools, live?.availablePools, selectedPool]);
 
   const stockPriceMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -311,6 +331,28 @@ export default function ForensicPanel({
     }
     return map;
   }, [stocks]);
+
+  const stockMetaMap = useMemo(() => {
+    const map = new Map<string, { promoterPct?: number; bulkDealValueCr?: number; bulkDealSignal?: boolean }>();
+    const quotes = live?.stockQuotes ?? {};
+    for (const stock of stocks) {
+      const quote = quotes[stock.ticker] ?? stock;
+      const promoter = typeof quote.promoter_holding_pct === 'number' ? quote.promoter_holding_pct : undefined;
+      const bulkDealValueCr = typeof quote.bulk_deal_value_cr === 'number' ? quote.bulk_deal_value_cr : undefined;
+      const bulkDealSignal = typeof quote.bulk_deal_signal === 'boolean' ? quote.bulk_deal_signal : undefined;
+      map.set(stock.ticker, { promoterPct: promoter, bulkDealValueCr, bulkDealSignal });
+    }
+    for (const [ticker, quote] of Object.entries(quotes)) {
+      if (!map.has(ticker) && typeof quote.promoter_holding_pct === 'number') {
+        map.set(ticker, {
+          promoterPct: quote.promoter_holding_pct,
+          bulkDealValueCr: quote.bulk_deal_value_cr,
+          bulkDealSignal: quote.bulk_deal_signal,
+        });
+      }
+    }
+    return map;
+  }, [live?.stockQuotes, stocks]);
 
   const assetRows: AssetRow[] = useMemo(() => {
     const rows: AssetRow[] = [];
@@ -346,6 +388,9 @@ export default function ForensicPanel({
           thesis: reason || 'Score-based selection',
           riskFlag: riskFlag,
           state: score >= 55 ? 'HIGH' : score <= 40 ? 'LOW' : undefined,
+          promoterPct: stockMetaMap.get(row.ticker)?.promoterPct,
+          bulkDealValueCr: stockMetaMap.get(row.ticker)?.bulkDealValueCr,
+          bulkDealSignal: stockMetaMap.get(row.ticker)?.bulkDealSignal,
         });
       }
     }
@@ -371,12 +416,15 @@ export default function ForensicPanel({
           thesis: s.verdict || (s.state === 'POSITIVE' ? 'Upward momentum' : 'Volatility play'),
           riskFlag: s.state === 'POSITIVE' ? 'Low Vol' : 'ATR',
           state: s.state === 'POSITIVE' ? 'LOW' : 'HIGH',
+          promoterPct: stockMetaMap.get(s.ticker)?.promoterPct,
+          bulkDealValueCr: stockMetaMap.get(s.ticker)?.bulkDealValueCr,
+          bulkDealSignal: stockMetaMap.get(s.ticker)?.bulkDealSignal,
         });
       }
     }
 
     return rows;
-  }, [intelligence, stocks]);
+  }, [intelligence, stocks, stockMetaMap]);
 
   const topReturn = useMemo(() => {
     const vals = assetRows.map((r) => r.returnPct).filter((v): v is number => typeof v === 'number');
@@ -444,18 +492,46 @@ export default function ForensicPanel({
 
   return (
     <section className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+        <div className="min-w-0">
           <h3 className="text-emerald-700 text-[12px] font-bold tracking-wider uppercase">ASSET MATRIX</h3>
-          <p className="text-slate-500 text-[12px] mt-0.5">Active Nodes {stocks.length || assetRows.length} · Avg Kelly Ratio 5.67:1 · Top Return 13.8 · Data Date {live?.updatedAt ? new Date(live.updatedAt).toISOString().slice(0, 10) : '2026-06-11'}</p>
+          <p className="text-slate-500 text-[12px] mt-0.5">
+            {live?.poolDescription || 'Nifty 500 universe ranked by volume and intraday filters'}
+            {typeof live?.universeSize === 'number' && live.universeSize > 0 && (
+              <> · Universe {live.universeSize}</>
+            )}
+            {typeof live?.volumeScreenedCount === 'number' && live.volumeScreenedCount > 0 && (
+              <> · Top {live.volumeScreenedCount} by volume screened</>
+            )}
+            {' · '}Active Nodes {stocks.length || assetRows.length}
+            {' · '}Data Date {live?.updatedAt ? new Date(live.updatedAt).toISOString().slice(0, 10) : '—'}
+          </p>
         </div>
-        <button
-          onClick={refresh}
-          disabled={refreshing}
-          className="px-3 py-1 text-[12px] rounded-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition"
-        >
-          {refreshing ? 'Refreshing...' : 'Refresh'}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {onPoolChange && (
+            <label className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Pool</span>
+              <select
+                value={selectedPool ?? pools[0] ?? 'Nifty 500'}
+                onChange={(e) => onPoolChange(e.target.value)}
+                className="px-2.5 py-1 text-[11px] rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 cursor-pointer"
+              >
+                {pools.map((pool) => (
+                  <option key={pool} value={pool}>
+                    {pool}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <button
+            onClick={refresh}
+            disabled={refreshing}
+            className="px-3 py-1 text-[12px] rounded-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition"
+          >
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
@@ -492,6 +568,17 @@ export default function ForensicPanel({
                 <div className="flex justify-between"><span className="text-slate-400">Score</span><span className={`font-bold ${scoreColor(row.score)}`}>{row.score || '-'}</span></div>
                 <div className="flex justify-between"><span className="text-slate-400">Kelly</span><span className="font-bold text-slate-700">{row.kelly || '-'}</span></div>
                 <div className="flex justify-between"><span className="text-slate-400">Return</span><span className={`font-bold ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>{returnVal}</span></div>
+                {typeof row.promoterPct === 'number' && (
+                  <div className="flex justify-between"><span className="text-slate-400">Promoter</span><span className={`font-bold ${row.promoterPct >= 60 ? 'text-emerald-600' : 'text-amber-600'}`}>{row.promoterPct.toFixed(1)}%</span></div>
+                )}
+                {typeof row.bulkDealValueCr === 'number' && row.bulkDealValueCr > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Bulk Deal</span>
+                    <span className={`font-bold ${row.bulkDealSignal ? 'text-emerald-600' : 'text-slate-500'}`}>
+                      {row.bulkDealValueCr.toFixed(1)} Cr
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           );

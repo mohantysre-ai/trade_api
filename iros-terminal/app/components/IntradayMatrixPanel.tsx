@@ -316,6 +316,9 @@ type DhanRecommendation = {
   reasons?: string[];
   currentPrice?: number | null;
   outcome?: TradeOutcome | null;
+  approxQty?: number;
+  deployedCapital?: number;
+  riskAmount?: number;
 };
 
 type CapitalAllocation = {
@@ -350,6 +353,9 @@ type OutcomePick = {
     updatedAt: string;
     riskPerShare?: number;
     rrT2?: number;
+    approxQty?: number;
+    deployedCapital?: number;
+    riskAmount?: number;
 };
 
 type DhanScannerResponse = {
@@ -991,10 +997,48 @@ export default function IntradayMatrixPanel() {
 
             {/* ── TRADE PLAN — from persistent picks (stable across the day) ── */}
             {(() => {
-              // Monitor mode uses livePricesData (fresh every 2s, no external calls)
-              // Falls back to dhanData trade plan when no live/outcome picks exist
-              const planLong = monitorMode && livePricesData ? (livePricesData.long || dhanData?.tradePlan || []) : (outcomesData?.long || dhanData?.tradePlan || []);
-              const planShort = monitorMode && livePricesData ? (livePricesData.short || dhanData?.shortTradePlan || []) : (outcomesData?.short || dhanData?.shortTradePlan || []);
+              function enrichPlan(plan: any[], outcomes?: any[]) {
+                if (!plan?.length) return plan;
+                const outcomeMap = new Map((outcomes || []).map(o => [o.symbol, o]));
+                return plan.map(item => {
+                  const entry = item.entryPrice ?? item.buyAbove ?? 0;
+                  const sl = item.stopLoss ?? 0;
+                  const t1 = item.target1 ?? 0;
+                  const t2 = item.target2 ?? 0;
+                  const direction = item.direction || 'LONG';
+                  const risk = entry - sl;
+                  const rewardToT2 = Math.abs(t2 - entry);
+                  const rrT2 = risk > 0 ? rewardToT2 / risk : 0;
+                  const currentPrice = item.currentPrice ?? outcomeMap.get(item.symbol)?.currentPrice ?? entry;
+                  const backendOutcome = item.outcome ?? outcomeMap.get(item.symbol)?.outcome;
+                  const outcome = backendOutcome != null ? backendOutcome : (() => {
+                    if (!entry || !sl || !t1 || !t2) return null;
+                    if (direction === 'LONG') {
+                      if (currentPrice >= t2) return { label: 'TARGET 2 HIT', detail: `LTP ${currentPrice.toFixed(2)} >= T2 ${t2.toFixed(2)}`, hitLevel: 't2', ltp: currentPrice, pctChange: +(((currentPrice - entry) / entry) * 100), resolvedAt: new Date().toISOString() };
+                      if (currentPrice >= t1) return { label: 'TARGET 1 HIT', detail: `LTP ${currentPrice.toFixed(2)} >= T1 ${t1.toFixed(2)}`, hitLevel: 't1', ltp: currentPrice, pctChange: +(((currentPrice - entry) / entry) * 100), resolvedAt: new Date().toISOString() };
+                      if (currentPrice <= sl) return { label: 'STOP LOSS HIT', detail: `LTP ${currentPrice.toFixed(2)} <= SL ${sl.toFixed(2)}`, hitLevel: 'sl', ltp: currentPrice, pctChange: +(((currentPrice - entry) / entry) * 100), resolvedAt: new Date().toISOString() };
+                      return { label: 'PENDING', detail: `LTP ${currentPrice.toFixed(2)} | Entry ${entry.toFixed(2)} | ${(((currentPrice - entry) / entry) * 100).toFixed(2)}%`, hitLevel: null, ltp: currentPrice, pctChange: +(((currentPrice - entry) / entry) * 100), resolvedAt: null };
+                    } else {
+                      if (currentPrice <= t2) return { label: 'TARGET 2 HIT', detail: `LTP ${currentPrice.toFixed(2)} <= T2 ${t2.toFixed(2)}`, hitLevel: 't2', ltp: currentPrice, pctChange: +(((entry - currentPrice) / entry) * 100), resolvedAt: new Date().toISOString() };
+                      if (currentPrice <= t1) return { label: 'TARGET 1 HIT', detail: `LTP ${currentPrice.toFixed(2)} <= T1 ${t1.toFixed(2)}`, hitLevel: 't1', ltp: currentPrice, pctChange: +(((entry - currentPrice) / entry) * 100), resolvedAt: new Date().toISOString() };
+                      if (currentPrice >= sl) return { label: 'STOP LOSS HIT', detail: `LTP ${currentPrice.toFixed(2)} >= SL ${sl.toFixed(2)}`, hitLevel: 'sl', ltp: currentPrice, pctChange: +(((entry - currentPrice) / entry) * 100), resolvedAt: new Date().toISOString() };
+                      return { label: 'PENDING', detail: `LTP ${currentPrice.toFixed(2)} | Entry ${entry.toFixed(2)} | ${(((entry - currentPrice) / entry) * 100).toFixed(2)}%`, hitLevel: null, ltp: currentPrice, pctChange: +(((entry - currentPrice) / entry) * 100), resolvedAt: null };
+                    }
+                  })();
+                  return {
+                    ...item,
+                    riskPerShare: item.riskPerShare ?? (risk > 0 ? risk : 0),
+                    rrT2: item.rrT2 ?? (rrT2 > 0 ? parseFloat(rrT2.toFixed(1)) : 0),
+                    currentPrice,
+                    outcome,
+                  };
+                });
+              }
+
+              const rawLong = monitorMode && livePricesData ? (livePricesData.long?.length ? livePricesData.long : (dhanData?.tradePlan || [])) : (outcomesData?.long || dhanData?.tradePlan || []);
+              const rawShort = monitorMode && livePricesData ? (livePricesData.short?.length ? livePricesData.short : (dhanData?.shortTradePlan || [])) : (outcomesData?.short || dhanData?.shortTradePlan || []);
+              const planLong = enrichPlan(rawLong, outcomesData?.long);
+              const planShort = enrichPlan(rawShort, outcomesData?.short);
               const planTime = monitorMode && livePricesData?.updatedAt
                 ? new Date(livePricesData.updatedAt).toLocaleTimeString('en-IN', { hour12: false })
                 : outcomesTime;
@@ -1063,8 +1107,8 @@ export default function IntradayMatrixPanel() {
                     </div>
                   </div>
 
-                  {/* ── LONG CAPITAL ALLOCATION TABLE ────────────────────────── */}
-                  {dhanData?.capitalAllocation && dhanData.capitalAllocation.length > 0 && (
+                  {/* ── LONG CAPITAL ALLOCATION TABLE — same source as trade plan ── */}
+                  {planLong.filter(p => (p.approxQty ?? 0) > 0).length > 0 && (
                     <div className="mb-3">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -1084,15 +1128,15 @@ export default function IntradayMatrixPanel() {
                             </tr>
                           </thead>
                           <tbody>
-                            {dhanData.capitalAllocation.map((ca, idx) => (
+                            {planLong.filter(p => (p.approxQty ?? 0) > 0).slice(0, 5).map((ca, idx) => (
                               <tr key={`lca-${ca.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-emerald-50 cursor-pointer">
                                 <td className="p-1.5 font-bold text-slate-900">
                                   <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(ca.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{ca.symbol}</a>
                                 </td>
-                                <td className="p-1.5 text-right font-mono text-slate-600">₹{ca.buyAbove?.toFixed(2) ?? '—'}</td>
-                                <td className="p-1.5 text-right font-mono text-slate-700 font-bold">{ca.approxQty?.toLocaleString('en-IN') ?? '—'}</td>
-                                <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">₹{ca.deployedCapital?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}</td>
-                                <td className="p-1.5 text-right font-mono text-red-500">₹{ca.riskAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-slate-700">₹{ca.entryPrice?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-slate-700">{ca.approxQty?.toLocaleString('en-IN') ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-slate-700">₹{(ca.deployedCapital ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                                <td className="p-1.5 text-right font-mono text-red-600">₹{(ca.riskAmount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1102,10 +1146,10 @@ export default function IntradayMatrixPanel() {
                               <td className="p-1.5"></td>
                               <td className="p-1.5"></td>
                               <td className="p-1.5 text-right font-mono text-emerald-700 text-[12px]">
-                                ≈ ₹{dhanData.capitalAllocation.reduce((s, c) => s + (c.deployedCapital ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                ≈ ₹{planLong.filter(p => (p.approxQty ?? 0) > 0).slice(0, 5).reduce((s, c) => s + (c.deployedCapital ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                               </td>
                               <td className="p-1.5 text-right font-mono text-red-600 text-[12px]">
-                                ≈ ₹{dhanData.capitalAllocation.reduce((s, c) => s + (c.riskAmount ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                ≈ ₹{planLong.filter(p => (p.approxQty ?? 0) > 0).slice(0, 5).reduce((s, c) => s + (c.riskAmount ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                               </td>
                             </tr>
                           </tfoot>

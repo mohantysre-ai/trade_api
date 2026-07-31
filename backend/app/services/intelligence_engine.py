@@ -438,6 +438,58 @@ def _json_block(text: str) -> str:
     return stripped.strip()
 
 
+def _coerce_json_field(value: Any, expected: type[list] | type[dict]) -> Any:
+    """Coerce LLM string-encoded JSON fragments into real list/dict values."""
+    if expected is list:
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return []
+            try:
+                parsed = json.loads(stripped)
+                return parsed if isinstance(parsed, list) else []
+            except json.JSONDecodeError:
+                return []
+        return []
+
+    if expected is dict:
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return {}
+            try:
+                parsed = json.loads(stripped)
+                return parsed if isinstance(parsed, dict) else {}
+            except json.JSONDecodeError:
+                start = stripped.find("{")
+                end = stripped.rfind("}")
+                if start != -1 and end > start:
+                    try:
+                        parsed = json.loads(stripped[start : end + 1])
+                        return parsed if isinstance(parsed, dict) else {}
+                    except json.JSONDecodeError:
+                        pass
+                return {}
+        return {}
+
+    return value
+
+
+def _sanitize_llm_analysis_data(data: dict[str, Any]) -> dict[str, Any]:
+    """Normalize malformed LLM payload shapes before Pydantic validation."""
+    sanitized = dict(data)
+    sanitized["ledger_stocks"] = _coerce_json_field(sanitized.get("ledger_stocks"), list)
+    sanitized["active_scoring_matrix"] = _coerce_json_field(sanitized.get("active_scoring_matrix"), dict)
+    sanitized["active_seven_ic_gates"] = _coerce_json_field(sanitized.get("active_seven_ic_gates"), dict)
+    sanitized["active_risk_calc"] = _coerce_json_field(sanitized.get("active_risk_calc"), dict)
+    sanitized["active_factor_hub"] = _coerce_json_field(sanitized.get("active_factor_hub"), dict)
+    return sanitized
+
+
 def _compile_market_context_snapshot() -> dict[str, Any]:
     snapshot = _load_snapshot() or {}
     return {
@@ -1090,7 +1142,7 @@ def _normalize_analysis_payload(
     data["active_risk_calc"] = data.get("active_risk_calc") or {}
     data["active_factor_hub"] = data.get("active_factor_hub") or {}
 
-    return CompleteSecurityAnalysisPayload.model_validate(data)
+    return CompleteSecurityAnalysisPayload.model_validate(_sanitize_llm_analysis_data(data))
 
 
 def _analyze_forensic_wl_policy(
@@ -1334,11 +1386,12 @@ def execute_terminal_intelligence_pipeline(live_unstructured_stream: str) -> Com
                     "active_risk_calc", "active_factor_hub",
                 ]
                 data = _parse_json_response(raw_clean, expected_keys)
+            data = _sanitize_llm_analysis_data(data)
             result = CompleteSecurityAnalysisPayload.model_validate(data)
             normalized = _normalize_analysis_payload(result, live_unstructured_stream, focus_ticker)
             snapshot = _compile_market_context_snapshot()
             final_data = _apply_wl_policy_from_llm(normalized.model_dump(), snapshot, focus_ticker)
-            return CompleteSecurityAnalysisPayload.model_validate(final_data)
+            return CompleteSecurityAnalysisPayload.model_validate(_sanitize_llm_analysis_data(final_data))
         except Exception as exc:
             err_str = str(exc)
             if "429" in err_str:

@@ -25,6 +25,10 @@ export type LiveStock = {
   high?: number;
   low?: number;
   close?: number;
+  promoter_holding_pct?: number;
+  passes_quality_filters?: boolean;
+  bulk_deal_value_cr?: number;
+  bulk_deal_signal?: boolean;
 };
 
 export type MarketNewsItem = {
@@ -158,6 +162,8 @@ export type MarketDataResponse = {
   availablePools?: string[];
   activePool?: string;
   poolDescription?: string;
+  universeSize?: number;
+  volumeScreenedCount?: number;
   stocks?: LiveStock[];
   stockQuotes?: Record<string, LiveStock>;
   macroDataStrip?: {
@@ -292,6 +298,28 @@ export function useMarketData(pool?: string, pollMs = 30_000) {
   }, [pool]);
 
   useEffect(() => {
+    let cancelled = false;
+    setStatus("loading");
+    (async () => {
+      try {
+        const payload = await fetchMarketData(pool);
+        if (cancelled) return;
+        setData(payload);
+        setStatus("live");
+        setError(null);
+        setLastUpdatedAt(Date.now());
+      } catch (err) {
+        if (cancelled) return;
+        setStatus("offline");
+        setError(err instanceof Error ? err.message : "Feed unavailable");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pool]);
+
+  useEffect(() => {
     const tick = async () => {
       const age = Date.now() - lastUpdatedAt;
       if (age >= STALE_AFTER_MS) {
@@ -303,7 +331,6 @@ export function useMarketData(pool?: string, pollMs = 30_000) {
         }
       }
     };
-    tick();
     const id = setInterval(tick, pollMs);
     return () => clearInterval(id);
   }, [refresh, pollMs, lastUpdatedAt]);

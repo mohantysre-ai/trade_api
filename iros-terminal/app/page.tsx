@@ -2221,7 +2221,7 @@ export default function IrosMasterAdvancedTerminal() {
                 <span className={`w-2 h-2 rounded-full ${feedStatus === 'live' ? 'bg-emerald-500 animate-pulse' : feedStatus === 'loading' ? 'bg-amber-500' : 'bg-red-500'}`} />
                 <h1 className="text-xs font-black tracking-wider text-slate-900">IROS Live Market Intelligence</h1>
               </div>
-                  <span className="text-[9px] text-slate-500 uppercase tracking-wider xl:hidden">Nifty 500</span>
+                  <span className="text-[9px] text-slate-500 uppercase tracking-wider xl:hidden">{selectedPool}</span>
             </div>
 
             <div className="flex items-center justify-between xl:justify-end gap-2">
@@ -2320,6 +2320,9 @@ export default function IrosMasterAdvancedTerminal() {
               onSelect={handleSelect}
               liveMarket={liveMarket}
               refreshOnDemand={refreshOnDemand}
+              selectedPool={selectedPool}
+              onPoolChange={setSelectedPool}
+              availablePools={liveMarket?.availablePools}
             />
             <StockDetailPanel stock={selectedQuote} />
             <LiveIntelligencePanel />

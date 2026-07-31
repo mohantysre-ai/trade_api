@@ -88,7 +88,15 @@ npm run dev
 
 Edit watchlist tokens in [`symbols.py`](symbols.py) if a symbol fails to resolve.
 Set `MARKET_FILTER_PROMPT` in `.env` to control the selection criteria for the dynamic top-20 universe.
-Set `INTRADAY_CANDIDATE_LIMIT` in `.env` if you want to change how many live symbols are candle-screened before the LLM ranking pass.
+Set `VOLUME_PRESELECT_LIMIT` (default `50`) to control how many highest-volume Nifty 500 stocks receive full intraday screening.
+Set `MIN_PROMOTER_HOLDING_PCT` (default `60`) to enforce minimum promoter holding for short-term picks.
+Set `RISKY_SYMBOL_DENYLIST` (comma-separated) to block speculative names (defaults include YESBANK, OLAELEC).
+Set `MIN_RSI_PIVOT` (default `55`), `MIN_VOLUME_MULTIPLIER` (default `1.5`), and `MIN_TURNOVER_CR` (default `50`) for liquidity/momentum gates.
+Set `REQUIRE_BULK_DEAL` (default `false`) to require an NSE bulk/block deal before a stock passes quality filters.
+Set `MIN_BULK_DEAL_VALUE_CR` (default `5`) and `BULK_DEAL_LOOKBACK_HOURS` (default `24`) for bulk/block deal detection thresholds.
+Set `BULK_DEAL_CACHE_TTL_SECONDS` (default `3600`) to control how often NSE bulk/block deals are refreshed.
+Set `INTRADAY_CANDIDATE_LIMIT` in `.env` if you want to cap how many of those volume leaders are candle-screened before the LLM ranking pass (defaults to `VOLUME_PRESELECT_LIMIT`).
+Nifty 500 symbols are stored in [`app/data/nifty500_symbols.json`](app/data/nifty500_symbols.json) and resolved to Angel One tokens in `nifty500_instruments.json` via `POST /api/refresh-instrument-cache`.
 The backend refreshes live Angel One data and LLM-selected top 20 only during the IST refresh windows around **08:00-08:30** and **16:00-16:30**. Outside those windows it serves the last saved snapshot.
 Manual refreshes are still allowed and will reuse the last saved snapshot when live or LLM refreshes are unavailable.
 

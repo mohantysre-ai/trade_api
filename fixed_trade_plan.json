@@ -57,13 +57,12 @@
       "currentPrice": 161.51,
       "priceUpdatedAt": "2026-07-19T13:35:35.300622+00:00",
       "outcome": {
-        "label": "NOT TRIGGERED",
-        "detail": "LTP 161.51 | never crossed T1/SL | +0.00%",
-        "hitLevel": null,
-        "ltp": 161.51,
-        "pctChange": 0.0,
-        "resolvedAt": "2026-07-19T13:35:35.300622+00:00",
-        "final": true
+        "label": "TARGET 1 HIT",
+        "detail": "LTP 176.02 >= T1 169.59",
+        "hitLevel": "t1",
+        "ltp": 176.02,
+        "pctChange": 8.98,
+        "resolvedAt": "2026-07-22T10:51:07.391727+00:00"
       }
     },
     {
@@ -145,13 +144,12 @@
       "currentPrice": 4085.8,
       "priceUpdatedAt": "2026-07-19T13:35:35.369619+00:00",
       "outcome": {
-        "label": "NOT TRIGGERED",
-        "detail": "LTP 4085.80 | never crossed T1/SL | +0.00%",
-        "hitLevel": null,
-        "ltp": 4085.8,
-        "pctChange": 0.0,
-        "resolvedAt": "2026-07-19T13:35:35.369619+00:00",
-        "final": true
+        "label": "TARGET 1 HIT",
+        "detail": "LTP 4469.80 >= T1 4290.09",
+        "hitLevel": "t1",
+        "ltp": 4469.8,
+        "pctChange": 9.4,
+        "resolvedAt": "2026-07-22T10:51:07.413572+00:00"
       }
     },
     {
@@ -442,5 +440,5 @@
     }
   ],
   "short": [],
-  "updatedAt": "2026-07-19T17:31:56.889266+00:00"
+  "updatedAt": "2026-07-31T18:11:23.339888+00:00"
 }

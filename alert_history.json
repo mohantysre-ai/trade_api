@@ -1,0 +1,62 @@
+[
+  {
+    "key": "EXICOM:LONG:t1",
+    "symbol": "EXICOM",
+    "direction": "LONG",
+    "hitLevel": "t1",
+    "label": "TARGET 1 HIT",
+    "ltp": 176.02,
+    "planDate": "2026-07-22",
+    "firedAt": "2026-07-22T04:53:47.331528+00:00"
+  },
+  {
+    "key": "DATAPATTNS:LONG:t1",
+    "symbol": "DATAPATTNS",
+    "direction": "LONG",
+    "hitLevel": "t1",
+    "label": "TARGET 1 HIT",
+    "ltp": 4469.8,
+    "planDate": "2026-07-22",
+    "firedAt": "2026-07-22T04:53:47.352470+00:00"
+  },
+  {
+    "key": "EXICOM:LONG:t1",
+    "symbol": "EXICOM",
+    "direction": "LONG",
+    "hitLevel": "t1",
+    "label": "TARGET 1 HIT",
+    "ltp": 176.02,
+    "planDate": "2026-07-22",
+    "firedAt": "2026-07-22T04:53:47.477894+00:00"
+  },
+  {
+    "key": "DATAPATTNS:LONG:t1",
+    "symbol": "DATAPATTNS",
+    "direction": "LONG",
+    "hitLevel": "t1",
+    "label": "TARGET 1 HIT",
+    "ltp": 4469.8,
+    "planDate": "2026-07-22",
+    "firedAt": "2026-07-22T04:53:47.521134+00:00"
+  },
+  {
+    "key": "EXICOM:LONG:t1",
+    "symbol": "EXICOM",
+    "direction": "LONG",
+    "hitLevel": "t1",
+    "label": "TARGET 1 HIT",
+    "ltp": 176.02,
+    "planDate": "2026-07-31",
+    "firedAt": "2026-07-31T18:04:38.523754+00:00"
+  },
+  {
+    "key": "DATAPATTNS:LONG:t1",
+    "symbol": "DATAPATTNS",
+    "direction": "LONG",
+    "hitLevel": "t1",
+    "label": "TARGET 1 HIT",
+    "ltp": 4469.8,
+    "planDate": "2026-07-31",
+    "firedAt": "2026-07-31T18:04:38.523754+00:00"
+  }
+]

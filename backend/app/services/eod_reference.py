@@ -104,19 +104,14 @@ def _fetch_930am_candle_from_angel(symbol: str) -> float | None:
     from_dt = ref_dt
     to_dt = ref_dt + timedelta(minutes=5)
     client = AngelOneClient()
-    ts = f"{symbol}-EQ"
     try:
-        search = client.connect().searchScrip("NSE", ts)
-        if not isinstance(search, dict) or not search.get("status"):
+        from .angel_one_feed import _resolve_nse_equity
+        resolved = _resolve_nse_equity(symbol, client=client)
+        if not resolved:
             return None
-        data_list = search.get("data") or []
-        if not data_list:
-            return None
-        first = data_list[0]
-        token = str(first.get("token") or first.get("symboltoken") or "")
-        resolved_symbol = str(first.get("symbol") or ts)
+        token, resolved_symbol = resolved
     except Exception as exc:
-        log.debug("Angel searchScrip failed for %s: %s", symbol, exc)
+        log.debug("Angel equity resolve failed for %s: %s", symbol, exc)
         return None
     if not token:
         return None

@@ -45,6 +45,9 @@ _SNAPSHOT_FILE = os.environ.get(
 _SESSION_TTL = 6 * 3600  # 6 hours — session expires at EOD
 _PRICE_TTL = 120  # seconds before we re-fetch live price
 
+_YAHOO_FINANCE_CACHE: dict[str, tuple[float, float]] = {}
+_YAHOO_FINANCE_CACHE_TTL = 30  # seconds
+
 # NSE equity cash trading session (IST)
 _MARKET_OPEN_HOUR = 9
 _MARKET_OPEN_MIN = 15
@@ -55,6 +58,28 @@ _IST_ZONE = timezone(timedelta(hours=5, minutes=30))
 
 def _ist_now() -> datetime:
     return datetime.now(tz=_IST_ZONE)
+
+
+def _fetch_yahoo_finance_price(symbol: str) -> float | None:
+    """Fallback live LTP from Yahoo Finance when Angel One snapshot is stale."""
+    now = time.time()
+    cached = _YAHOO_FINANCE_CACHE.get(symbol)
+    if cached and (now - cached[1]) < _YAHOO_FINANCE_CACHE_TTL:
+        return cached[0]
+    try:
+        import urllib.request
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}.NS"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        price = data.get("chart", {}).get("result", [{}])[0].get("meta", {}).get("regularMarketPrice")
+        if price is not None:
+            price = float(price)
+            _YAHOO_FINANCE_CACHE[symbol] = (price, now)
+            return price
+    except Exception:
+        pass
+    return None
 
 
 def _is_trading_day(now: datetime | None = None) -> bool:
@@ -465,6 +490,19 @@ def get_live_prices_for_plan() -> dict[str, Any]:
     alert_history = _load_alert_history()
     new_alerts: list[dict[str, Any]] = []
 
+    # When market is open, supplement missing snapshot quotes with live data.
+    live_quotes: dict[str, float] = {}
+    if market_open and unique_symbols:
+        now = time.time()
+        for sym in unique_symbols:
+            cached = _YAHOO_FINANCE_CACHE.get(sym)
+            if cached and (now - cached[1]) < _YAHOO_FINANCE_CACHE_TTL:
+                live_quotes[sym] = cached[0]
+                continue
+            price = _fetch_yahoo_finance_price(sym)
+            if price is not None:
+                live_quotes[sym] = price
+
     def enrich_pick(p: dict[str, Any]) -> dict[str, Any]:
         symbol = (p.get("symbol") or "").upper()
         ltp = None
@@ -477,6 +515,9 @@ def get_live_prices_for_plan() -> dict[str, Any]:
                     ltp = float(raw)
                 except (TypeError, ValueError):
                     pass
+
+        if ltp is None and symbol in live_quotes:
+            ltp = live_quotes[symbol]
 
         if ltp is None:
             raw = p.get("scanLtp")
@@ -497,7 +538,8 @@ def get_live_prices_for_plan() -> dict[str, Any]:
 
         entry = {
             "ltp": ltp,
-            "ltpSource": "snapshot" if (symbol in quotes and quotes[symbol].get("ltpRaw")) else "cached",
+            "currentPrice": ltp,
+            "ltpSource": "live" if symbol in live_quotes else ("snapshot" if (symbol in quotes and quotes[symbol].get("ltpRaw")) else "cached"),
         }
 
         if outcome:
