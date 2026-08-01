@@ -121,7 +121,7 @@ function EmptyState() {
     <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.12),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(99,102,241,0.10),transparent_36%)]" />
       <div className="relative flex min-h-[360px] flex-col items-center justify-center p-8 text-center">
-        <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-lg shadow-emerald-500/20">
+        <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl confidence-icon">
           <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </div>
         <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">Confidence Checker</h3>
@@ -188,9 +188,9 @@ export default function ConfidenceCheckerPanel({ ticker, companyName }: Confiden
           <div className="relative p-5">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-lg shadow-emerald-500/20">
+                <div className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl confidence-icon">
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  <div className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-400 animate-pulse" />
+                  <div className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 confidence-pulse animate-pulse" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-2 min-w-0">
@@ -261,7 +261,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName }: Confiden
           <div className="rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-teal-50 border border-emerald-200/50 shadow-sm p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white shadow-sm">
+                <div className="h-8 w-8 rounded-lg confidence-icon flex items-center justify-center shadow-sm">
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </div>
                 <div>

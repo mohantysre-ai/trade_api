@@ -795,11 +795,11 @@ export default function IntradayMatrixPanel() {
 
       {/* ── MONITOR MODE INDICATOR ──────────────────────────────────────── */}
       {monitorMode && (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-[9px] font-semibold uppercase tracking-wider">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 desk-panel-title">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           MONITOR MODE — Fixed plan active · Live prices every 2s · No external API calls
           {livePricesData?.snapshotUpdatedAt && (
-            <span className="text-slate-400 ml-1">
+            <span className="text-slate-500 ml-1">
               (snapshot @{new Date(livePricesData.snapshotUpdatedAt).toLocaleTimeString('en-IN', { hour12: false })})
             </span>
           )}
@@ -832,7 +832,7 @@ export default function IntradayMatrixPanel() {
           <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-400 via-cyan-400 to-transparent rounded-t-xl" />
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-lg">
+              <div className="w-7 h-7 rounded-xl lemonn-icon flex items-center justify-center shadow-lg">
                 <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                 </svg>
@@ -913,7 +913,7 @@ export default function IntradayMatrixPanel() {
           <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-t-xl" />
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center shadow-lg">
+              <div className="w-7 h-7 rounded-xl dhan-icon flex items-center justify-center shadow-lg">
                 <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M4 7h16M4 7l2-3h12l2 3" />
                 </svg>
@@ -1105,9 +1105,9 @@ export default function IntradayMatrixPanel() {
               return (
                 <>
                   {sessionClosed && (
-                    <div className="mb-3 flex items-center gap-2 rounded-md bg-slate-100 border border-slate-300 px-3 py-2">
+                    <div className="mb-3 flex items-center gap-2 rounded-md bg-slate-50 border border-slate-200 px-3 py-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                      <span className="desk-panel-title text-slate-600">
+                      <span className="desk-panel-title text-slate-900">
                         Market Closed — Session Finalized
                       </span>
                       <span className="text-[9px] text-slate-500 ml-1">
@@ -1197,8 +1197,8 @@ export default function IntradayMatrixPanel() {
                             ))}
                           </tbody>
                           <tfoot>
-                            <tr className="bg-emerald-100 font-bold text-slate-900">
-                              <td className="p-1.5 uppercase tracking-wider text-[12px]">TOTAL</td>
+                            <tr className="total-row-long font-bold">
+                              <td className="p-1.5 uppercase tracking-wider desk-panel-title">TOTAL</td>
                               <td className="p-1.5"></td>
                               <td className="p-1.5"></td>
                               <td className="p-1.5 text-right font-mono text-emerald-700 text-[12px]">
@@ -1299,8 +1299,8 @@ export default function IntradayMatrixPanel() {
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="bg-rose-100 font-bold text-slate-900">
-                        <td className="p-1.5 uppercase tracking-wider text-[12px]">TOTAL</td>
+                      <tr className="total-row-short font-bold">
+                        <td className="p-1.5 uppercase tracking-wider desk-panel-title">TOTAL</td>
                         <td className="p-1.5"></td>
                         <td className="p-1.5"></td>
                         <td className="p-1.5 text-right font-mono text-rose-700 text-[12px]">

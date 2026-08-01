@@ -132,12 +132,12 @@ function EmptyState() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.08),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(239,68,68,0.06),transparent_36%)]" />
       <div className="relative flex min-h-[400px] flex-col items-center justify-center p-8 text-center">
         <div className="mb-6 relative">
-          <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-amber-500 to-red-600 text-white shadow-xl shadow-amber-500/20 flex items-center justify-center">
+          <div className="h-20 w-20 rounded-3xl swot-icon flex items-center justify-center shadow-xl">
             <svg viewBox="0 0 24 24" fill="none" className="h-10 w-10">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-amber-400 animate-ping" />
+          <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full swot-pulse animate-ping" />
         </div>
         <h3 className="text-base font-black uppercase tracking-wider text-slate-900">SWOT Analysis</h3>
         <p className="mt-2 max-w-sm text-xs leading-relaxed text-slate-500">
@@ -280,11 +280,11 @@ export default function SwotAnalysisPanel({ ticker, companyName }: SwotAnalysisP
           <div className="relative p-5">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-red-600 text-white shadow-lg shadow-amber-500/20">
+                <div className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl swot-icon">
                   <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  <div className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-amber-400 animate-pulse" />
+                  <div className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 swot-pulse animate-pulse" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-2 min-w-0">
@@ -356,8 +356,8 @@ export default function SwotAnalysisPanel({ ticker, companyName }: SwotAnalysisP
           {/* Header card */}
           <div className="rounded-2xl bg-gradient-to-br from-amber-50 via-white to-red-50 border border-amber-200/50 shadow-sm p-4">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-400 to-red-500 flex items-center justify-center text-white shadow-sm">
+<div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg swot-icon flex items-center justify-center shadow-sm">
                   <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>

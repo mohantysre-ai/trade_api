@@ -142,7 +142,7 @@ function DrawerStructuredReasoningOutput({ analysis }: { analysis?: DrawerAnalys
         {/* Section Header */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-white border-b border-slate-100">
           <div className="flex items-center gap-2.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 shadow-sm" />
+            <div className="w-2.5 h-2.5 rounded-full reasoning-icon shadow-sm" />
             <h3 className="desk-panel-title text-slate-700">Structured Reasoning Output</h3>
           </div>
           <span className="text-[10px] bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-600 px-2.5 py-0.5 rounded-full font-medium border border-emerald-200 shadow-sm">
@@ -283,7 +283,7 @@ function DrawerStructuredReasoningOutput({ analysis }: { analysis?: DrawerAnalys
       {/* IC Gates Section */}
       <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         <div className="flex items-center gap-2 px-5 py-3.5 bg-white border-b border-slate-100">
-          <div className="w-2 h-2 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 shadow-sm" />
+          <div className="w-2 h-2 rounded-full ic-gates-icon shadow-sm" />
           <h3 className="desk-panel-title text-slate-700">IC Gates</h3>
           {Object.keys(gates).length > 0 && (
             <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">
@@ -590,7 +590,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
               <>
                 <div className="border-t border-slate-100 pt-5">
                   <div className="flex items-center gap-2 mb-4">
-                    <div className="w-2 h-2 rounded-full bg-gradient-to-br from-slate-400 to-slate-500 shadow-sm" />
+                    <div className="w-2 h-2 rounded-full payload-icon shadow-sm" />
                     <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Terminal Intelligence Payload</span>
                   </div>
 

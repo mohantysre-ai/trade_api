@@ -235,7 +235,7 @@ export default function AITickerNewsPanel({
 
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-white text-[10px] font-black tracking-wider shadow-sm flex-shrink-0">
+            <div className="w-9 h-9 rounded-lg ai-news-icon flex items-center justify-center text-white text-[10px] font-black tracking-wider flex-shrink-0">
               AI
             </div>
             <div className="min-w-0">
@@ -364,7 +364,7 @@ export default function AITickerNewsPanel({
             {activeCategories.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500" />
+                  <div className="w-1.5 h-1.5 rounded-full category-dot" />
                   <span className="desk-panel-title">Intelligence Categories</span>
                   <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-medium">
                     {activeCategories.length}

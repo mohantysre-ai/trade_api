@@ -177,12 +177,12 @@ function EmptyState() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.08),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.06),transparent_36%)]" />
       <div className="relative flex min-h-[400px] flex-col items-center justify-center p-8 text-center">
         <div className="mb-6 relative">
-          <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-emerald-500 to-blue-600 text-white shadow-xl shadow-emerald-500/20 flex items-center justify-center">
+          <div className="h-20 w-20 rounded-3xl tech-analysis-icon flex items-center justify-center shadow-xl">
             <svg viewBox="0 0 24 24" fill="none" className="h-10 w-10">
               <path d="M3 20h18M6 16l4-8 4 6 4-10" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-emerald-400 animate-ping" />
+          <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full tech-analysis-pulse animate-ping" />
         </div>
         <h3 className="text-base font-black uppercase tracking-wider text-slate-900">Technical Analysis</h3>
         <p className="mt-2 max-w-sm text-xs leading-relaxed text-slate-500">
@@ -289,11 +289,11 @@ export default function TechnicalAnalysisPanel({ ticker, companyName }: Technica
           <div className="relative p-5">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-blue-600 text-white shadow-lg shadow-emerald-500/20">
+                <div className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl tech-analysis-icon">
                   <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
                     <path d="M3 20h18M6 16l4-8 4 6 4-10" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  <div className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-400 animate-pulse" />
+                  <div className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 tech-analysis-pulse animate-pulse" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-2 min-w-0">
@@ -356,7 +356,7 @@ export default function TechnicalAnalysisPanel({ ticker, companyName }: Technica
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center text-white shadow-sm">
+                  <div className="h-8 w-8 rounded-lg tech-analysis-icon flex items-center justify-center shadow-sm">
                     <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
                       <path d="M3 20h18M6 16l4-8 4 6 4-10" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
