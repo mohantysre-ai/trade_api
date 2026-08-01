@@ -14,6 +14,7 @@ import ForensicPanel from './components/ForensicPanel';
 import RightDrawer from './components/RightDrawer';
 import IntradayMatrixPanel from './components/IntradayMatrixPanel';
 import EodAnalysisPanel from './components/EodAnalysisPanel';
+import DeskControls from './components/DeskControls';
 
 type DrawerContent = {
   stock?: LiveStock | LedgerStock | null;
@@ -165,12 +166,12 @@ function getCategoryDotClass(categoryKey: NseTopFiveCategoryKey) {
 
 function getCategoryRowStyle(categoryKey: NseTopFiveCategoryKey): React.CSSProperties {
   if (categoryKey === 'topGainers') {
-    return { backgroundColor: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)' };
+    return { backgroundColor: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.22)' };
   }
   if (categoryKey === 'topLoosers') {
-    return { backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)' };
+    return { backgroundColor: 'rgba(251, 113, 133, 0.1)', border: '1px solid rgba(251, 113, 133, 0.22)' };
   }
-  return { backgroundColor: 'rgba(15, 23, 42, 0.03)', border: '1px solid rgba(148, 163, 184, 0.2)' };
+  return { backgroundColor: 'rgba(15, 31, 51, 0.55)', border: '1px solid rgba(148, 163, 184, 0.14)' };
 }
 
 function getNseStocks(response: NseTopFiveResponse, key: NseTopFiveCategoryKey) {
@@ -301,7 +302,7 @@ function MiniSparkline({ positive }: { positive: boolean }) {
         </linearGradient>
       </defs>
       <path d={areaD} fill={fillUrl} />
-      <path d={pathD} stroke={color} strokeWidth="0.75" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={pathD} pathLength={1} stroke={color} strokeWidth="0.75" fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -389,14 +390,15 @@ function AdaptiveTooltipPortal({
         top: position.top,
         left: position.left,
         borderRadius: '10px',
-        border: '1px solid #e2e8f0',
-        background: 'white',
+        border: '1px solid var(--terminal-line)',
+        background: 'var(--terminal-panel)',
+        color: 'var(--foreground)',
         padding: '10px',
         boxShadow: positive !== null
           ? (positive
-              ? '0 8px 32px rgba(16,185,129,0.15), 0 2px 8px rgba(0,0,0,0.06)'
-              : '0 8px 32px rgba(239,68,68,0.15), 0 2px 8px rgba(0,0,0,0.06)')
-          : '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
+              ? '0 8px 32px color-mix(in srgb, var(--terminal-green) 22%, transparent), 0 2px 8px rgba(0,0,0,0.12)'
+              : '0 8px 32px color-mix(in srgb, var(--terminal-red) 22%, transparent), 0 2px 8px rgba(0,0,0,0.12)')
+          : '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
         overflowY: 'auto',
       }}
       onMouseEnter={onMouseEnter}
@@ -516,10 +518,11 @@ function TrendlyneTickerTooltip({ item }: { item: TrendlyneStock }) {
             top: position.top,
             left: position.left,
             borderRadius: '12px',
-            border: '1px solid #e2e8f0',
-            background: 'white',
+            border: '1px solid var(--terminal-line)',
+            background: 'var(--terminal-panel)',
+            color: 'var(--foreground)',
             padding: '14px',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
             overflowY: 'auto',
           }}
           onMouseEnter={() => { cancelClose(); }}
@@ -910,7 +913,7 @@ function Nifty100HeatMap() {
     <div className="bg-gradient-to-br from-white via-slate-50/30 to-white border border-slate-300 border-[0.5px] rounded-xl p-3 shadow-lg">
       {/* Header */}
       <div className="relative mb-2">
-        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-400 via-blue-400 to-purple-400 rounded-t-xl" />
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 rounded-t-xl" />
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -992,34 +995,33 @@ function Nifty100HeatMap() {
 /*  GlobalIndicesGrid                                                            */
 /* -------------------------------------------------------------------------- */
 
-function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
+function GlobalIndicesGrid({ items, staleLabel, tilesLive, tilesUpdating }: { items: MacroRow[]; staleLabel?: string; tilesLive?: boolean; tilesUpdating?: boolean }) {
   if (!items.length) {
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 text-[11px] shadow-sm">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 shadow-sm">
         Waiting for global macro data.
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+    <div className="desk-snapshot-panel bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+      <div className="desk-live-ribbon" aria-hidden />
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">GLOBAL INDICES</span>
-        {staleLabel && <span className="text-[10px] text-slate-500 uppercase">{staleLabel}</span>}
+        <div className="flex items-center gap-1.5">
+          {tilesLive && <div className="w-1.5 h-1.5 rounded-full desk-live-dot is-live" aria-hidden />}
+          <span className="desk-panel-title">GLOBAL INDICES</span>
+        </div>
+        {staleLabel && <span className="desk-panel-title">{staleLabel}</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5">
+      <div className="desk-metric-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {items.map((item) => {
           const isPositive = item.state === 'POSITIVE';
-          const gradient = getGlobalIndexGradient(item.label);
           return (
             <div
               key={item.label}
-              className="relative overflow-hidden rounded-lg p-2.5 transition-all hover:scale-105 flex items-center gap-2 cursor-pointer"
-              style={{
-                background: gradient.background,
-                border: gradient.border,
-                minHeight: '80px',
-              }}
+              className={`desk-metric-tile${tilesLive ? ' is-live-tile' : ''}${tilesUpdating ? ' is-updating' : ''}`}
+              style={{ ['--tile-accent' as string]: getGlobalAccent(item.label) }}
               onClick={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
               onKeyDown={(e) => { if (e.key === 'Enter') window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer'); }}
               tabIndex={0}
@@ -1027,9 +1029,9 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
               aria-label={`View ${item.label} details`}
             >
               <div className="flex-1 min-w-0 z-10">
-                <span className="text-[11px] text-slate-700 block uppercase tracking-wider font-semibold">{item.label}</span>
-                <span className="text-lg font-bold text-slate-900 block mt-0.5 font-mono">{item.val}</span>
-                <span className={`text-[12px] font-bold block mt-0.5 ${marketStateClass(item.state)}`}>
+                <span className="desk-metric-label block">{item.label}</span>
+                <span className="desk-metric-value block font-mono">{item.val}</span>
+                <span className={`desk-metric-delta block ${isPositive ? 'is-up' : 'is-down'}`}>
                   {isPositive ? '↑' : '↓'} {item.delta}
                 </span>
               </div>
@@ -1050,68 +1052,54 @@ function GlobalIndicesGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
   );
 }
 
-function getCommodityGradient(label: string): { background: string; border: string } {
-  const upper = label.toUpperCase();
-  if (upper.includes('GOLD')) {
-    return { background: 'linear-gradient(135deg, #FEF3C7 0%, #FCD34D 100%)', border: '1px solid #FCD34D' };
+function deskTileAccent(kind: 'gold' | 'silver' | 'energy' | 'metal' | 'crypto' | 'agri' | 'india' | 'sensex' | 'mid' | 'small' | 'fx' | 'us' | 'asia' | 'eu' | 'latam' | 'default'): string {
+  switch (kind) {
+    case 'gold': return '#f59e0b';
+    case 'silver': return '#38bdf8';
+    case 'energy': return '#f87171';
+    case 'metal': return '#818cf8';
+    case 'crypto': return '#eab308';
+    case 'agri': return '#84cc16';
+    case 'india': return '#34d399';
+    case 'sensex': return '#60a5fa';
+    case 'mid': return '#fbbf24';
+    case 'small': return '#f472b6';
+    case 'fx': return '#22d3ee';
+    case 'us': return '#60a5fa';
+    case 'asia': return '#f87171';
+    case 'eu': return '#a78bfa';
+    case 'latam': return '#34d399';
+    default: return '#22d3ee';
   }
-  if (upper.includes('SILVER')) {
-    return { background: 'linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%)', border: '1px solid #BAE6FD' };
-  }
-  if (upper.includes('BRENT')) {
-    return { background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)', border: '1px solid #FECACA' };
-  }
-  if (upper.includes('WTI')) {
-    return { background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)', border: '1px solid #FECACA' };
-  }
-  if (upper.includes('NATURAL') || upper.includes('GAS')) {
-    return { background: 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)', border: '1px solid #A7F3D0' };
-  }
-  if (upper.includes('ALUMINUM')) {
-    return { background: 'linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%)', border: '1px solid #DDD6FE' };
-  }
-  if (upper.includes('ZINC')) {
-    return { background: 'linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%)', border: '1px solid #DDD6FE' };
-  }
-  if (upper.includes('NICKEL')) {
-    return { background: 'linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%)', border: '1px solid #DDD6FE' };
-  }
-  if (upper.includes('BITCOIN')) {
-    return { background: 'linear-gradient(135deg, #FEF08A 0%, #FDE047 100%)', border: '1px solid #FDE047' };
-  }
-  if (upper.includes('COPPER')) {
-    return { background: 'linear-gradient(135deg, #FBDDD8 0%, #F7C2B5 100%)', border: '1px solid #F5A896' };
-  }
-  if (upper.includes('PLATINUM')) {
-    return { background: 'linear-gradient(135deg, #E0E7FF 0%, #C7D2FE 100%)', border: '1px solid #C7D2FE' };
-  }
-  if (upper.includes('PALLADIUM')) {
-    return { background: 'linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%)', border: '1px solid #E2E8F0' };
-  }
-  if (upper.includes('WHEAT')) {
-    return { background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', border: '1px solid #FDE68A' };
-  }
-  return { background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', border: '1px solid #E2E8F0' };
 }
 
-function getIndiaMarketGradient(label: string): { background: string; border: string } {
+function getCommodityAccent(label: string): string {
   const upper = label.toUpperCase();
-  if (upper.includes('NIFTY 50') || upper.includes('NIFTY BANK') || upper.includes('NIFTY IT') || upper.includes('NIFTY PHARMA')) {
-    return { background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', border: '1px solid #A7F3D0' };
-  }
-  if (upper.includes('SENSEX')) {
-    return { background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', border: '1px solid #BFDBFE' };
-  }
-  if (upper.includes('MIDCAP')) {
-    return { background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', border: '1px solid #FDE68A' };
-  }
-  if (upper.includes('SMALLCAP')) {
-    return { background: 'linear-gradient(135deg, #FCE7F3 0%, #FBCFE8 100%)', border: '1px solid #F9A8D4' };
-  }
-  if (upper.includes('USD') || upper.includes('VIX') || upper.includes('GIFT')) {
-    return { background: 'linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%)', border: '1px solid #DDD6FE' };
-  }
-  return { background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', border: '1px solid #E2E8F0' };
+  if (upper.includes('GOLD')) return deskTileAccent('gold');
+  if (upper.includes('SILVER')) return deskTileAccent('silver');
+  if (upper.includes('BRENT') || upper.includes('WTI') || upper.includes('NATURAL') || upper.includes('GAS')) return deskTileAccent('energy');
+  if (upper.includes('ALUMINUM') || upper.includes('ZINC') || upper.includes('NICKEL') || upper.includes('COPPER') || upper.includes('PLATINUM') || upper.includes('PALLADIUM')) return deskTileAccent('metal');
+  if (upper.includes('BITCOIN')) return deskTileAccent('crypto');
+  if (upper.includes('WHEAT')) return deskTileAccent('agri');
+  return deskTileAccent('default');
+}
+
+function getIndiaAccent(label: string): string {
+  const upper = label.toUpperCase();
+  if (upper.includes('SENSEX')) return deskTileAccent('sensex');
+  if (upper.includes('MIDCAP')) return deskTileAccent('mid');
+  if (upper.includes('SMALLCAP')) return deskTileAccent('small');
+  if (upper.includes('USD') || upper.includes('VIX') || upper.includes('GIFT')) return deskTileAccent('fx');
+  return deskTileAccent('india');
+}
+
+function getGlobalAccent(label: string): string {
+  const upper = label.toUpperCase();
+  if (upper.includes('DJI') || upper.includes('S&P 500') || upper.includes('NASDAQ') || upper.includes('DOW')) return deskTileAccent('us');
+  if (upper.includes('NIKKEI') || upper.includes('HANG SENG') || upper.includes('SHANGHAI') || upper.includes('KOSPI')) return deskTileAccent('asia');
+  if (upper.includes('DAX') || upper.includes('CAC') || upper.includes('FTSE') || upper.includes('EURO')) return deskTileAccent('eu');
+  if (upper.includes('ASX') || upper.includes('BOVESPA')) return deskTileAccent('latam');
+  return deskTileAccent('default');
 }
 
 function getIndexClickUrl(label: string): string {
@@ -1204,63 +1192,39 @@ function useIndexSparklines(items: MacroRow[]): Record<string, number[]> {
   return sparklines;
 }
 
-function getGlobalIndexGradient(label: string): { background: string; border: string } {
-  const upper = label.toUpperCase();
-  if (upper.includes('DJI') || upper.includes('S&P 500') || upper.includes('NASDAQ') || upper.includes('DOW')) {
-    return { background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', border: '1px solid #BFDBFE' };
-  }
-  if (upper.includes('NIKKEI')) {
-    return { background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', border: '1px solid #FDE68A' };
-  }
-  if (upper.includes('HANG SENG') || upper.includes('SHANGHAI')) {
-    return { background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)', border: '1px solid #FECACA' };
-  }
-  if (upper.includes('DAX') || upper.includes('CAC') || upper.includes('FTSE') || upper.includes('EURO')) {
-    return { background: 'linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%)', border: '1px solid #DDD6FE' };
-  }
-  if (upper.includes('ASX') || upper.includes('BOVESPA')) {
-    return { background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', border: '1px solid #A7F3D0' };
-  }
-  return { background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', border: '1px solid #E2E8F0' };
-}
-
 /* -------------------------------------------------------------------------- */
 /*  CommoditiesFxGrid                                                            */
 /* -------------------------------------------------------------------------- */
 
-function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
+function CommoditiesFxGrid({ items, staleLabel, tilesLive, tilesUpdating }: { items: MacroRow[]; staleLabel?: string; tilesLive?: boolean; tilesUpdating?: boolean }) {
   if (!items.length) {
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 text-[11px] shadow-sm">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 shadow-sm">
         Waiting for commodities & FX data.
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+    <div className="desk-snapshot-panel bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+      <div className="desk-live-ribbon" aria-hidden />
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-          <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">COMMODITIES & FX</span>
+          <div className="w-1.5 h-1.5 rounded-full desk-live-dot is-live" aria-hidden />
+          <span className="desk-panel-title">COMMODITIES & FX</span>
         </div>
-        {staleLabel && <span className="text-[10px] text-slate-500 uppercase">{staleLabel}</span>}
+        {staleLabel && <span className="desk-panel-title">{staleLabel}</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5">
+      <div className="desk-metric-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'BRENT CRUDE OIL') displayLabel = 'BRENT CRUDE';
-          const gradient = getCommodityGradient(displayLabel);
           const isPositive = item.state === 'POSITIVE';
           return (
             <div
               key={item.label}
-              className="relative overflow-hidden rounded-lg p-2.5 transition-all hover:scale-105 flex items-center gap-2 cursor-pointer"
-              style={{
-                background: gradient.background,
-                border: gradient.border,
-                minHeight: '80px',
-              }}
+              className={`desk-metric-tile${tilesLive ? ' is-live-tile' : ''}${tilesUpdating ? ' is-updating' : ''}`}
+              style={{ ['--tile-accent' as string]: getCommodityAccent(displayLabel) }}
               onClick={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
               onKeyDown={(e) => { if (e.key === 'Enter') window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer'); }}
               tabIndex={0}
@@ -1268,9 +1232,9 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
               aria-label={`View ${displayLabel} details`}
             >
               <div className="flex-1 min-w-0 z-10">
-                <span className="text-[11px] text-slate-700 block uppercase tracking-wider font-semibold">{displayLabel}</span>
-                <span className="text-lg font-bold text-slate-900 block mt-0.5 font-mono">{item.val}</span>
-                <span className={`text-[12px] font-bold block mt-0.5 ${marketStateClass(item.state)}`}>
+                <span className="desk-metric-label block">{displayLabel}</span>
+                <span className="desk-metric-value block font-mono">{item.val}</span>
+                <span className={`desk-metric-delta block ${isPositive ? 'is-up' : 'is-down'}`}>
                   {isPositive ? '↑' : '↓'} {item.delta}
                 </span>
               </div>
@@ -1295,36 +1259,35 @@ function CommoditiesFxGrid({ items, staleLabel }: { items: MacroRow[]; staleLabe
 /*  IndiaMarketsGrid                                                             */
 /* -------------------------------------------------------------------------- */
 
-function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel?: string }) {
+function IndiaMarketsGrid({ items, staleLabel, tilesLive, tilesUpdating }: { items: MacroRow[]; staleLabel?: string; tilesLive?: boolean; tilesUpdating?: boolean }) {
   if (!items.length) {
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 text-[11px] shadow-sm">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 shadow-sm">
         Waiting for Indian market data.
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+    <div className="desk-snapshot-panel bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+      <div className="desk-live-ribbon" aria-hidden />
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">INDIA MARKETS — TOP MOVERS</span>
-        {staleLabel && <span className="text-[10px] text-slate-500 uppercase">{staleLabel}</span>}
+        <div className="flex items-center gap-1.5">
+          {tilesLive && <div className="w-1.5 h-1.5 rounded-full desk-live-dot is-live" aria-hidden />}
+          <span className="desk-panel-title">INDIA MARKETS — TOP MOVERS</span>
+        </div>
+        {staleLabel && <span className="desk-panel-title">{staleLabel}</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5">
+      <div className="desk-metric-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'USD / INR Spot') displayLabel = 'USD / INR';
           const isPositive = item.state === 'POSITIVE';
-          const gradient = getIndiaMarketGradient(displayLabel);
           return (
             <div
               key={item.label}
-              className="relative overflow-hidden rounded-lg p-2.5 transition-all hover:scale-105 flex items-center gap-2 cursor-pointer"
-              style={{
-                background: gradient.background,
-                border: gradient.border,
-                minHeight: '80px',
-              }}
+              className={`desk-metric-tile${tilesLive ? ' is-live-tile' : ''}${tilesUpdating ? ' is-updating' : ''}`}
+              style={{ ['--tile-accent' as string]: getIndiaAccent(displayLabel) }}
               onClick={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
               onKeyDown={(e) => { if (e.key === 'Enter') window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer'); }}
               tabIndex={0}
@@ -1332,9 +1295,9 @@ function IndiaMarketsGrid({ items, staleLabel }: { items: MacroRow[]; staleLabel
               aria-label={`View ${displayLabel} details`}
             >
               <div className="flex-1 min-w-0 z-10">
-                <span className="text-[11px] text-slate-700 block uppercase tracking-wider font-semibold">{displayLabel}</span>
-                <span className="text-lg font-bold text-slate-900 block mt-0.5 font-mono">{item.val}</span>
-                <span className={`text-[12px] font-bold block mt-0.5 ${marketStateClass(item.state)}`}>
+                <span className="desk-metric-label block">{displayLabel}</span>
+                <span className="desk-metric-value block font-mono">{item.val}</span>
+                <span className={`desk-metric-delta block ${isPositive ? 'is-up' : 'is-down'}`}>
                   {isPositive ? '↑' : '↓'} {item.delta}
                 </span>
               </div>
@@ -2051,7 +2014,7 @@ function SparklineSVG({ positive, data }: { positive: boolean; data?: number[] }
       {/* Area fill */}
       <path d={areaD} fill={fillUrl} />
       {/* Smooth line with Catmull-Rom spline */}
-      <path d={pathD} stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={pathD} pathLength={1} stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       {/* End dot */}
       <circle cx={lastPoint[0]} cy={lastPoint[1]} r="2" fill={color} stroke="white" strokeWidth="1" />
     </svg>
@@ -2070,6 +2033,7 @@ export default function IrosMasterAdvancedTerminal() {
   const [drawerContent, setDrawerContent] = useState<DrawerContent | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('marketSnapshot');
   const [now, setNow] = useState(() => Date.now());
+  const [tilesUpdating, setTilesUpdating] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
@@ -2189,6 +2153,26 @@ export default function IrosMasterAdvancedTerminal() {
 
   const snapshotAgeMin = liveMarket?.updatedAt ? Math.round((now - new Date(liveMarket.updatedAt).getTime()) / 60000) : null;
   const staleMacroLabel = snapshotAgeMin == null ? "" : `STALE ${snapshotAgeMin}M`;
+  const tilesLive = feedStatus !== 'loading' && feedStatus !== 'offline' && !!liveMarket;
+
+  const macroRefreshKey = useMemo(() => {
+    const sig = (rows: MacroRow[]) => rows.map((r) => `${r.label}\0${r.val}\0${r.delta}`).join('\n');
+    return `${liveMarket?.updatedAt ?? ''}\n${sig(currentMacros)}\n${sig(globalIndices)}\n${sig(commodities)}`;
+  }, [liveMarket?.updatedAt, currentMacros, globalIndices, commodities]);
+
+  const macroRefreshKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!macroRefreshKey) return;
+    if (macroRefreshKeyRef.current === null) {
+      macroRefreshKeyRef.current = macroRefreshKey;
+      return;
+    }
+    if (macroRefreshKeyRef.current === macroRefreshKey) return;
+    macroRefreshKeyRef.current = macroRefreshKey;
+    setTilesUpdating(true);
+    const timer = window.setTimeout(() => setTilesUpdating(false), 700);
+    return () => window.clearTimeout(timer);
+  }, [macroRefreshKey]);
 
   /* Fetch sparkline data from Moneycontrol for indices that are missing sparklines */
   const mcSparklines = useIndexSparklines(currentMacros);
@@ -2212,47 +2196,57 @@ export default function IrosMasterAdvancedTerminal() {
   );
 
   return (
-    <div className="terminal-shell min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 text-slate-900 font-mono text-xs antialiased">
-      <div className="max-w-[1600px] mx-auto p-3 space-y-3">
-        <header className="terminal-header bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm">
-          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-2 p-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${feedStatus === 'live' ? 'bg-emerald-500 animate-pulse' : feedStatus === 'loading' ? 'bg-amber-500' : 'bg-red-500'}`} />
-                <h1 className="text-xs font-black tracking-wider text-slate-900">IROS Live Market Intelligence</h1>
+    <div className="terminal-shell min-h-screen antialiased">
+      <div className="max-w-[1600px] mx-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
+        <header className="terminal-header">
+            <div className="flex flex-col gap-3 p-4">
+            <div className="desk-live-ribbon" aria-hidden />
+            <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="desk-brand-mark" aria-hidden>IROS</div>
+                <div className="min-w-0">
+                  <h1 className="font-black tracking-[0.06em] uppercase">
+                    Live Market Intelligence
+                  </h1>
+                  <p className="mt-1 uppercase tracking-[0.12em]" style={{ fontSize: 'var(--desk-label)', color: 'var(--fg-muted)' }}>
+                    Institutional NSE / BSE desk · quick-read decision board
+                  </p>
+                </div>
               </div>
-                  <span className="text-[9px] text-slate-500 uppercase tracking-wider xl:hidden">{selectedPool}</span>
-            </div>
 
-            <div className="flex items-center justify-between xl:justify-end gap-2">
-              <span className="text-[9px] font-bold uppercase text-slate-500 hidden xl:inline tracking-wider">
-                {liveMarket?.rawSources?.join(' · ') ?? 'Reuters · TradingView · Moneycontrol'}
-              </span>
-              <div className="flex items-center gap-1.5 text-[9px] text-slate-500">
-                <span className="hidden sm:inline">
-                  {liveMarket?.updatedAt ? new Date(liveMarket.updatedAt).toLocaleTimeString() : '--:--'} IST
-                </span>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <DeskControls
+                  feedStatus={feedStatus}
+                  clockLabel={liveMarket?.updatedAt ? new Date(liveMarket.updatedAt).toLocaleTimeString() : '--:--'}
+                />
                 <button
                   onClick={handleRefresh}
                   disabled={feedStatus === 'loading'}
-                  className="px-2.5 py-1 rounded-full bg-teal-600 text-white text-[9px] font-black uppercase tracking-wider hover:bg-teal-500 disabled:opacity-50 transition"
+                  className="desk-btn-primary"
                 >
-                  Refresh
+                  {feedStatus === 'loading' ? 'Refreshing…' : 'Refresh'}
                 </button>
               </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2" style={{ fontSize: 'var(--desk-label)', color: 'var(--fg-muted)' }}>
+              <span className="font-bold uppercase tracking-wider truncate">
+                {liveMarket?.rawSources?.join(' · ') ?? 'Reuters · TradingView · Moneycontrol'}
+              </span>
+              <span className="uppercase tracking-wider xl:hidden">{selectedPool}</span>
             </div>
           </div>
 
           {isSnapshotFallback && (
-            <div className="px-3 pb-2">
-              <div className="bg-amber-50 text-amber-800 border border-amber-200 p-1.5 rounded text-[10px]">
+            <div className="px-4 pb-3">
+              <div className="desk-banner-warn p-2 rounded-lg">
                 Snapshot fallback active — outside scheduled IST refresh window. Showing latest saved analysis.
               </div>
             </div>
           )}
         </header>
 
-        <nav className="terminal-tabs bg-white border border-slate-300 border-[0.5px] rounded-xl flex gap-1 p-1 shadow-sm">
+        <nav className="terminal-tabs flex gap-1.5 p-1.5" role="tablist" aria-label="Desk views">
           {([
             { key: 'marketSnapshot' as TabKey, label: 'MARKET SNAPSHOT' },
             { key: 'stockHeatMap' as TabKey, label: 'STOCK HEAT MAP' },
@@ -2262,60 +2256,49 @@ export default function IrosMasterAdvancedTerminal() {
           ]).map((tab) => (
             <button
               key={tab.key}
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              data-active={activeTab === tab.key ? 'true' : 'false'}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition relative ${
-                activeTab === tab.key ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
+              className={`flex-1 py-2.5 font-bold uppercase tracking-wider relative ${
+                activeTab === tab.key ? 'is-active' : ''
               }`}
             >
-              {activeTab === tab.key && (
-                <span className="absolute inset-x-2 -bottom-0.5 h-0.5 bg-teal-600 rounded-full" />
-              )}
               {tab.label}
             </button>
           ))}
         </nav>
 
         {activeTab === 'marketSnapshot' && (
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-3 items-stretch">
-            {/* Left Column: Core Market Panels */}
+          <div key="marketSnapshot" className="desk-panel-enter grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-3 items-stretch">
             <div className="space-y-3 min-w-0">
-              {/* Row 1: India Markets — TOP MOVERS */}
               <div className="grid grid-cols-1 gap-3 items-start">
-                <IndiaMarketsGrid items={enrichedMacros} staleLabel={staleMacroLabel} />
+                <IndiaMarketsGrid items={enrichedMacros} staleLabel={staleMacroLabel} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
               </div>
-
-              {/* Row 2: Global Indices */}
               <div>
-                <GlobalIndicesGrid items={enrichedGlobalIndices} staleLabel={staleMacroLabel} />
+                <GlobalIndicesGrid items={enrichedGlobalIndices} staleLabel={staleMacroLabel} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
               </div>
-
-              {/* Row 3: Commodities & FX */}
               <div>
-                <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} />
+                <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
               </div>
-
-              {/* Row 4: Gainers/Losers + Screeners */}
               <div className="flex flex-col gap-4">
                 <GainersLosersHeatmap />
               </div>
             </div>
-
-            {/* Right Column: Live News Feed Sidebar */}
             <div className="flex flex-col">
               <NewsFeedPanel items={liveMarket?.news} now={now} sidebar={true} />
             </div>
-
           </div>
         )}
 
         {activeTab === 'stockHeatMap' && (
-          <div className="space-y-3">
+          <div key="stockHeatMap" className="desk-panel-enter space-y-3">
             <Nifty100HeatMap />
           </div>
         )}
 
         {activeTab === 'assetMatrix' && (
-          <div className="space-y-3">
+          <div key="assetMatrix" className="desk-panel-enter space-y-3">
             <ForensicPanel
               onSelect={handleSelect}
               liveMarket={liveMarket}
@@ -2331,13 +2314,13 @@ export default function IrosMasterAdvancedTerminal() {
         )}
 
         {activeTab === 'intradayMatrix' && (
-          <div className="space-y-3">
+          <div key="intradayMatrix" className="desk-panel-enter space-y-3">
             <IntradayMatrixPanel />
           </div>
         )}
 
         {activeTab === 'eodAnalysis' && (
-          <div className="space-y-3">
+          <div key="eodAnalysis" className="desk-panel-enter space-y-3">
             <EodAnalysisPanel />
           </div>
         )}

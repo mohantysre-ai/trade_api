@@ -1,0 +1,35 @@
+---
+description: Always spin up parallel subagents for independent workstreams; finish tasks with multi-agent throughput
+alwaysApply: true
+---
+
+# Parallel Multi-Agent Workflow
+
+For every non-trivial task in this repo, **maximize parallel subagents** and drive the work to completion.
+
+## When to spawn agents
+
+Spawn **2+ agents in one turn** whenever workstreams are independent, for example:
+
+| Split | Examples |
+|-------|----------|
+| Frontend vs backend | `iros-terminal/` vs `backend/` |
+| UI audit vs implement | contrast/type/motion audits in parallel, then apply fixes |
+| Panels | ForensicPanel vs RightDrawer vs Intraday vs EOD |
+| Scripts vs app | `config/startup/` vs live services |
+| Verify vs fix | one agent reproduces, another patches |
+
+## Rules
+
+1. **Default to parallel** — do not serialize independent exploration or edits.
+2. **One concern per agent** — clear scope, frontend-only or backend-only when possible.
+3. **Do not wait idle** — while agents run, continue other independent work (rules, tokens, smoke checks).
+4. **Merge findings → finish** — after agents return, apply fixes in the same session; do not stop at a report.
+5. **Respect coupling** — do not parallelize conflicting edits to the same file; use sequential patches there.
+6. **Desk standards still apply** — no invented metrics; JSON snapshots only; LLM scope stays top-10 unless asked.
+
+## Anti-patterns
+
+- Single-agent slog through a multi-panel UI or FE+BE bug
+- Asking the user to choose which agent to run when parallelism is obvious
+- Ending the turn with only audits and no implementation when the user asked to finish the task

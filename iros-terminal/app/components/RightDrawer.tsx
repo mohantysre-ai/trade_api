@@ -143,7 +143,7 @@ function DrawerStructuredReasoningOutput({ analysis }: { analysis?: DrawerAnalys
         <div className="flex items-center justify-between px-5 py-3.5 bg-white border-b border-slate-100">
           <div className="flex items-center gap-2.5">
             <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 shadow-sm" />
-            <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Structured Reasoning Output</h3>
+            <h3 className="desk-panel-title text-slate-700">Structured Reasoning Output</h3>
           </div>
           <span className="text-[10px] bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-600 px-2.5 py-0.5 rounded-full font-medium border border-emerald-200 shadow-sm">
             Live
@@ -284,7 +284,7 @@ function DrawerStructuredReasoningOutput({ analysis }: { analysis?: DrawerAnalys
       <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         <div className="flex items-center gap-2 px-5 py-3.5 bg-white border-b border-slate-100">
           <div className="w-2 h-2 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 shadow-sm" />
-          <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">IC Gates</h3>
+          <h3 className="desk-panel-title text-slate-700">IC Gates</h3>
           {Object.keys(gates).length > 0 && (
             <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">
               {Object.keys(gates).length}
@@ -383,20 +383,24 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
 
   const drawer = (
     <div
-      className={`right-drawer fixed top-0 right-0 h-full w-full lg:w-[50%] xl:w-[50%] 2xl:w-[45%] bg-white border-l border-slate-200 shadow-2xl transform ${
+      className={`right-drawer fixed top-0 right-0 h-full w-full lg:w-[50%] xl:w-[50%] 2xl:w-[45%] border-l border-slate-200 shadow-2xl transform ${
         open ? "translate-x-0" : "translate-x-full"
-      } transition-transform duration-300 ease-out z-50 overflow-y-auto`}
+      } z-50 overflow-y-auto`}
+      style={{ transition: "transform var(--dur-drawer, 280ms) var(--ease-drawer, cubic-bezier(0.32, 0.72, 0, 1))" }}
+      aria-hidden={!open}
     >
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-slate-200">
+      <div className="sticky top-0 z-20 backdrop-blur-md border-b border-slate-200">
         <div className="px-5 py-3.5 flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-bold text-slate-900 truncate">{stock?.ticker ?? "Deep Asset Analysis"}</h4>
+            <p className="desk-panel-title mb-0.5">Deep Asset Analysis</p>
+            <h4 className="desk-metric-value truncate">{stock?.ticker ?? "—"}</h4>
             <p className="text-[11px] text-slate-500 truncate">{stock?.name ?? "Analysis Payload"}</p>
           </div>
           <button
             onClick={onClose}
-            className="ml-3 w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all text-sm"
+            className="ml-3 w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-[color,background-color,transform] duration-150 text-sm"
+            aria-label="Close analysis drawer"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -521,7 +525,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
                   <div className="bg-gradient-to-br from-white to-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center gap-1.5 mb-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Market Score</span>
+                      <span className="desk-panel-title">Market Score</span>
                     </div>
                     <div className="flex items-baseline gap-1">
                       <span className={`text-3xl font-black ${getScoreColor(score)}`}>{score}</span>
@@ -540,7 +544,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
                   <div className={`p-4 rounded-xl border shadow-sm hover:shadow-md transition-all ${getRecommendationColor(recommendation)}`}>
                     <div className="flex items-center gap-1.5 mb-2">
                       <div className="w-1.5 h-1.5 rounded-full opacity-60 bg-current" />
-                      <span className="text-[10px] uppercase tracking-wider font-semibold opacity-70">Signal</span>
+                      <span className="desk-panel-title opacity-70">Signal</span>
                     </div>
                     <div className="text-2xl font-black">{recommendation}</div>
                   </div>

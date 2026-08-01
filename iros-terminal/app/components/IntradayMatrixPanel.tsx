@@ -264,10 +264,8 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag, di
             <button
               key={f}
               onClick={(e) => { e.stopPropagation(); e.preventDefault(); onFlagChange(f); }}
-              className={`px-1.5 py-0.5 rounded-md text-[7px] font-bold uppercase tracking-wider transition-all ${
-                f === currentFlag
-                  ? 'bg-slate-800 text-white shadow-sm'
-                  : 'bg-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+              className={`px-1.5 py-0.5 rounded-md desk-chip ${
+                f === currentFlag ? 'is-on' : ''
               }`}
             >
               {f}
@@ -453,6 +451,59 @@ async function fetchLivePrices(): Promise<LivePricesResponse> {
   return data;
 }
 
+function formatIstClock(iso?: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString('en-IN', { hour12: false, timeZone: 'Asia/Kolkata' });
+}
+
+function summarizePlanLtpSources(
+  data: LivePricesResponse | null
+): { live: number; snapshot: number; cached: number; total: number; label: string } {
+  const all = [...(data?.long ?? []), ...(data?.short ?? [])];
+  let live = 0;
+  let snapshot = 0;
+  let cached = 0;
+  for (const pick of all) {
+    const src = String(pick.ltpSource || '').toLowerCase();
+    if (src === 'live') live += 1;
+    else if (src === 'snapshot') snapshot += 1;
+    else cached += 1;
+  }
+  const parts: string[] = [];
+  if (live) parts.push(`yahoo ${live}`);
+  if (snapshot) parts.push(`snapshot ${snapshot}`);
+  if (cached) parts.push(`plan-cache ${cached}`);
+  return {
+    live,
+    snapshot,
+    cached,
+    total: all.length,
+    label: parts.length ? parts.join(' · ') : 'no LTPs',
+  };
+}
+
+function buildMonitorStatusLine(data: LivePricesResponse | null, sessionClosed: boolean, marketOpen: boolean): string {
+  const sources = summarizePlanLtpSources(data);
+  const evalAt = formatIstClock(data?.updatedAt);
+  const snapAt = formatIstClock(data?.snapshotUpdatedAt);
+  const pollPart = sessionClosed
+    ? 'Poll halted (session closed)'
+    : marketOpen
+      ? 'Eval poll every 2s'
+      : 'Market closed · eval poll every 2s';
+  const parts = [
+    'MONITOR MODE — Fixed plan active',
+    pollPart,
+    evalAt ? `Last eval ${evalAt} IST` : null,
+    snapAt ? `Market snapshot ${snapAt} IST` : null,
+    `LTP mix: ${sources.label}`,
+    'Scanner feeds still refresh every 2m',
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
 /* ── Outcome Badge ───────────────────────────────────────────────────── */
 function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null | undefined }) {
   if (!outcome) {
@@ -520,7 +571,7 @@ function DirectionBadge({ dir }: { dir: string }) {
 function LoadingSpinner({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-      <div className="w-10 h-10 rounded-full border-2 border-violet-300 border-t-violet-600 animate-spin mb-3" />
+      <div className="w-10 h-10 rounded-full border-2 border-cyan-400/40 border-t-cyan-400 animate-spin mb-3" />
       <span className="text-[10px] uppercase tracking-wider font-bold">{label}</span>
     </div>
   );
@@ -775,19 +826,19 @@ export default function IntradayMatrixPanel() {
       )}
 
       {/* ═══════════════════ UPPER PANEL — LEMOON ═══════════════════ */}
-      <div className="bg-gradient-to-br from-white via-purple-50/10 to-white border border-slate-300 rounded-xl p-4 shadow-lg overflow-auto">
+      <div className="bg-gradient-to-br from-white via-slate-50/10 to-white border border-slate-300 rounded-xl p-4 shadow-lg overflow-auto">
         {/* Header */}
         <div className="relative mb-3">
-          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500 rounded-t-xl" />
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-400 via-cyan-400 to-transparent rounded-t-xl" />
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center shadow-lg">
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-lg">
                 <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">LEMOON CO.IN — 10 INTRADAY PICKS</h3>
+                <h3 className="desk-panel-title text-slate-900">LEMOON CO.IN — 10 INTRADAY PICKS</h3>
                 <p className="text-[7px] text-slate-500">
                   {lemonnData?.source ?? 'lemonn.co.in'}
                   {lemonnData?.isMock && <span className="ml-1 text-amber-500 font-bold">(mock fallback)</span>}
@@ -796,8 +847,8 @@ export default function IntradayMatrixPanel() {
               </div>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="px-1.5 py-0.5 rounded-lg bg-gradient-to-r from-violet-100 to-purple-50 border border-violet-200">
-                <span className="text-[8px] text-violet-700 font-semibold">{lemonnData?.count ?? 0} picks</span>
+              <div className="px-1.5 py-0.5 rounded-lg bg-cyan-500/10 border border-cyan-400/25">
+                <span className="text-[8px] text-cyan-300 font-semibold">{lemonnData?.count ?? 0} picks</span>
               </div>
               <button onClick={loadLemonn} className="px-2 py-0.5 rounded-lg bg-slate-100 border border-slate-200 text-[8px] text-slate-600 font-semibold uppercase tracking-wider hover:bg-slate-200 transition-colors">
                 Refresh
@@ -826,7 +877,7 @@ export default function IntradayMatrixPanel() {
                   <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full opacity-15 blur-2xl"
                     style={{ backgroundColor: isBuy ? '#10b981' : '#ef4444' }} />
                   <div className="flex items-center justify-between mb-1.5 relative z-10">
-                    <span className="text-[12px] font-black text-slate-900 font-mono">{rec.symbol}</span>
+                    <span className="desk-metric-value font-mono">{rec.symbol}</span>
                     <DirectionBadge dir={rec.direction} />
                   </div>
                   <p className="text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
@@ -868,7 +919,7 @@ export default function IntradayMatrixPanel() {
                 </svg>
               </div>
               <div>
-                <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">
+                <h3 className="desk-panel-title text-slate-900">
                   DHAN ScanX → FEED SCANNER — TOP 10 + TRADE PLAN
                 </h3>
                 <p className="text-[7px] text-slate-500">
@@ -921,7 +972,7 @@ export default function IntradayMatrixPanel() {
                       <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full opacity-15 blur-2xl"
                         style={{ backgroundColor: isBuy ? '#10b981' : '#ef4444' }} />
                       <div className="flex items-center justify-between mb-1.5 relative z-10">
-                        <span className="text-[12px] font-black text-slate-900 font-mono">{rec.symbol}</span>
+                        <span className="desk-metric-value font-mono">{rec.symbol}</span>
                         {rec.score != null && (
                           <span className="text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                             {rec.score.toFixed(0)}
@@ -971,7 +1022,7 @@ export default function IntradayMatrixPanel() {
                         <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full opacity-15 blur-2xl"
                           style={{ backgroundColor: isBuy ? '#10b981' : '#ef4444' }} />
                         <div className="flex items-center justify-between mb-1.5 relative z-10">
-                          <span className="text-[12px] font-black text-slate-900 font-mono">{rec.symbol}</span>
+                          <span className="desk-metric-value font-mono">{rec.symbol}</span>
                           {rec.score != null && (
                             <span className="text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                               {rec.score.toFixed(0)}
@@ -1056,7 +1107,7 @@ export default function IntradayMatrixPanel() {
                   {sessionClosed && (
                     <div className="mb-3 flex items-center gap-2 rounded-md bg-slate-100 border border-slate-300 px-3 py-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                      <span className="text-[11px] uppercase tracking-wider text-slate-600 font-bold">
+                      <span className="desk-panel-title text-slate-600">
                         Market Closed — Session Finalized
                       </span>
                       <span className="text-[9px] text-slate-500 ml-1">
@@ -1067,7 +1118,7 @@ export default function IntradayMatrixPanel() {
                   <div className="mb-3">
                     <div className="flex items-center gap-2 mb-2">
                       <span className={`w-1.5 h-1.5 rounded-full ${monitorMode ? (sessionClosed ? 'bg-slate-500' : 'bg-emerald-500') : 'bg-amber-500'}`} />
-                      <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
+                      <span className="desk-panel-title">
                         TRADE PLAN — ₹5,00,000 DEPLOYMENT {monitorMode && '(LIVE MONITOR)'}
                       </span>
                       <span className="text-[9px] text-slate-400 ml-2">(updated @{planTime || '—'})</span>

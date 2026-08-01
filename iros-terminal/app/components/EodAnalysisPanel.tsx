@@ -158,7 +158,8 @@ export default function EodAnalysisPanel() {
   return (
     <div className="space-y-3">
       {/* Refresh controls */}
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl p-3 shadow-sm">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl p-3 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-400 via-cyan-400 to-transparent pointer-events-none" aria-hidden />
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Intraday Date</span>
@@ -182,7 +183,7 @@ export default function EodAnalysisPanel() {
           <button
             onClick={fetchReports}
             disabled={loading}
-            className="ml-auto px-3 py-1 rounded-full bg-teal-600 text-white text-[9px] font-black uppercase tracking-wider hover:bg-teal-500 disabled:opacity-50 transition"
+            className="desk-btn-primary ml-auto px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
           >
             {loading ? 'LOADING...' : 'REFRESH'}
           </button>
@@ -206,7 +207,7 @@ export default function EodAnalysisPanel() {
           {/* ── INTRADAY REPORT ── */}
           <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden">
             <div className="bg-gradient-to-r from-teal-50 to-teal-100/50 px-3 py-2 border-b border-slate-200">
-              <h3 className="text-[11px] font-black text-teal-800 uppercase tracking-wider">Intraday EOD Report</h3>
+              <h3 className="desk-panel-title text-teal-800">Intraday EOD Report</h3>
               <p className="text-[9px] text-teal-600">{intraday?.date ?? dateStr}</p>
             </div>
 
@@ -217,22 +218,22 @@ export default function EodAnalysisPanel() {
                 {/* Summary cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-50/50">
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">Total P&L</div>
-                    <div className={`text-[14px] font-black tabular-nums ${intraday.totalPnl >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                    <div className="desk-panel-title">Total P&L</div>
+                    <div className={`desk-metric-value tabular-nums ${intraday.totalPnl >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                       {intraday.totalPnl >= 0 ? '+' : ''}₹{intraday.totalPnl.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">Deployed</div>
-                    <div className="text-[14px] font-black text-slate-800 tabular-nums">₹{intraday.totalDeployed.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                    <div className="desk-panel-title">Deployed</div>
+                    <div className="desk-metric-value text-slate-800 tabular-nums">₹{intraday.totalDeployed.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">Remaining</div>
-                    <div className="text-[14px] font-black text-slate-800 tabular-nums">₹{intraday.remainingCapital.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                    <div className="desk-panel-title">Remaining</div>
+                    <div className="desk-metric-value text-slate-800 tabular-nums">₹{intraday.remainingCapital.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">Hit Rate</div>
-                    <div className="text-[14px] font-black text-slate-800 tabular-nums">{intraday.hitRatePct}%</div>
+                    <div className="desk-panel-title">Hit Rate</div>
+                    <div className="desk-metric-value text-slate-800 tabular-nums">{intraday.hitRatePct}%</div>
                   </div>
                 </div>
 
@@ -291,7 +292,7 @@ export default function EodAnalysisPanel() {
           {/* ── SWING REPORT ── */}
           <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden">
             <div className="bg-gradient-to-r from-indigo-50 to-indigo-100/50 px-3 py-2 border-b border-slate-200">
-              <h3 className="text-[11px] font-black text-indigo-800 uppercase tracking-wider">Swing EOD Report</h3>
+              <h3 className="desk-panel-title text-indigo-800">Swing EOD Report</h3>
               <p className="text-[9px] text-indigo-600">{swing?.date ?? dateStr}</p>
             </div>
 
@@ -302,28 +303,28 @@ export default function EodAnalysisPanel() {
                 {/* Summary cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-50/50">
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">Total P&L</div>
-                    <div className={`text-[14px] font-black tabular-nums ${swing.totalPnl >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                    <div className="desk-panel-title">Total P&L</div>
+                    <div className={`desk-metric-value tabular-nums ${swing.totalPnl >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                       {swing.totalPnl >= 0 ? '+' : ''}₹{swing.totalPnl.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">Win / Loss</div>
-                    <div className="text-[14px] font-black tabular-nums">
+                    <div className="desk-panel-title">Win / Loss</div>
+                    <div className="desk-metric-value tabular-nums">
                       <span className="text-emerald-700">{swing.winCount}</span>
                       <span className="text-slate-400">/</span>
                       <span className="text-red-700">{swing.lossCount}</span>
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">Total P&L %</div>
-                    <div className={`text-[14px] font-black tabular-nums ${(swing.totalPnlPct ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                    <div className="desk-panel-title">Total P&L %</div>
+                    <div className={`desk-metric-value tabular-nums ${(swing.totalPnlPct ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                       {swing.totalPnlPct != null ? `${swing.totalPnlPct >= 0 ? '+' : ''}${swing.totalPnlPct}%` : 'N/A'}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">Picks</div>
-                    <div className="text-[14px] font-black text-slate-800 tabular-nums">{swing.totalPicks}</div>
+                    <div className="desk-panel-title">Picks</div>
+                    <div className="desk-metric-value text-slate-800 tabular-nums">{swing.totalPicks}</div>
                   </div>
                 </div>
 
@@ -398,7 +399,7 @@ export default function EodAnalysisPanel() {
                 <div className="bg-gradient-to-r from-emerald-50 to-white border border-emerald-200 rounded-xl p-3 shadow-sm">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[9px] uppercase tracking-wider text-emerald-700 font-bold">Best Performer</span>
+                    <span className="desk-panel-title text-emerald-700">Best Performer</span>
                   </div>
                   <div className="flex items-end justify-between mt-1">
                     <div>
@@ -413,7 +414,7 @@ export default function EodAnalysisPanel() {
                 <div className="bg-gradient-to-r from-red-50 to-white border border-red-200 rounded-xl p-3 shadow-sm">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                    <span className="text-[9px] uppercase tracking-wider text-red-700 font-bold">Worst Performer</span>
+                    <span className="desk-panel-title text-red-700">Worst Performer</span>
                   </div>
                   <div className="flex items-end justify-between mt-1">
                     <div>
@@ -432,7 +433,7 @@ export default function EodAnalysisPanel() {
             <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 shadow-sm min-h-[160px] overflow-visible">
               <div className="flex items-center gap-1.5 mb-2">
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                <span className="text-[13px] uppercase tracking-wider text-slate-800 font-black">Miss Analysis</span>
+                <span className="desk-panel-title text-slate-800">Miss Analysis</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-1.5">
                 {intraday.trades.filter(t => t.missAnalysis).map((trade, i) => (
@@ -441,7 +442,7 @@ export default function EodAnalysisPanel() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className={`w-1.5 h-1.5 rounded-full ${trade.direction === 'LONG' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                          <span className="text-[12px] font-bold text-slate-800">{trade.symbol}</span>
+                          <span className="desk-metric-value text-slate-800">{trade.symbol}</span>
                         </div>
                       </div>
                       <span className={`text-[11px] font-semibold tabular-nums min-w-[50px] text-right ${trade.pnl >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>

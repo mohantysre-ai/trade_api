@@ -228,20 +228,18 @@ export default function AITickerNewsPanel({
   });
 
   return (
-    <div className="bg-gradient-to-br from-white to-slate-50/80 border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+    <div className="bg-gradient-to-br from-white to-slate-50/80 border border-slate-200 rounded-2xl shadow-sm overflow-hidden relative">
       {/* ── Header ── */}
       <div className="relative px-5 pt-5 pb-4 border-b border-slate-100 bg-white/90 backdrop-blur-sm">
-        {/* Decorative top gradient bar */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-400 via-teal-400 to-amber-400" />
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-400 via-cyan-400 to-transparent" />
 
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            {/* Avatar circle */}
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center text-white text-lg shadow-sm flex-shrink-0">
-              📰
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-white text-[10px] font-black tracking-wider shadow-sm flex-shrink-0">
+              AI
             </div>
             <div className="min-w-0">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider truncate">
+              <h3 className="desk-panel-title text-slate-800 truncate">
                 AI News Summary
               </h3>
               <p className="text-[10px] text-slate-500 truncate">
@@ -289,7 +287,7 @@ export default function AITickerNewsPanel({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5 mb-1">
                 <div className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-                <span className="text-[9px] uppercase tracking-wider text-teal-600 font-bold">Headline</span>
+                <span className="desk-panel-title text-teal-600">Headline</span>
               </div>
               <p className="text-[11px] text-slate-700 leading-relaxed">
                 {report.summary_headline}
@@ -333,9 +331,9 @@ export default function AITickerNewsPanel({
                 <div className="absolute -top-3 -right-3 w-12 h-12 rounded-full opacity-10 bg-current" />
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="text-sm">{sentimentCfg.icon}</span>
-                  <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold">Market Sentiment</span>
+                  <span className="desk-panel-title">Market Sentiment</span>
                 </div>
-                <div className={`text-xl font-black ${sentimentCfg.text} flex items-center gap-2`}>
+                <div className={`desk-metric-value ${sentimentCfg.text} flex items-center gap-2`}>
                   {sentimentCfg.label}
                 </div>
               </div>
@@ -347,7 +345,7 @@ export default function AITickerNewsPanel({
                   <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                   </svg>
-                  <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold">Risk Flags</span>
+                  <span className="desk-panel-title">Risk Flags</span>
                 </div>
                 <div className="text-[11px] text-slate-700 leading-relaxed">
                   {report.risk_flags && report.risk_flags !== "None"
@@ -367,7 +365,7 @@ export default function AITickerNewsPanel({
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500" />
-                  <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Intelligence Categories</span>
+                  <span className="desk-panel-title">Intelligence Categories</span>
                   <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-medium">
                     {activeCategories.length}
                   </span>

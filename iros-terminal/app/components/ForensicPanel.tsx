@@ -295,10 +295,8 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag }: 
             <button
               key={f}
               onClick={(e) => { e.stopPropagation(); onFlagChange(f); }}
-              className={`px-1.5 py-0.5 rounded-md text-[7px] font-bold uppercase tracking-wider transition-all ${
-                f === currentFlag
-                  ? 'bg-slate-800 text-white shadow-sm'
-                  : 'bg-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+              className={`px-1.5 py-0.5 rounded-md desk-chip ${
+                f === currentFlag ? 'is-on' : ''
               }`}
             >
               {f}
@@ -1056,10 +1054,11 @@ export default function ForensicPanel({
   };
 
   return (
-    <section className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+    <section className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+      <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-400 via-cyan-400 to-transparent pointer-events-none" aria-hidden />
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
         <div className="min-w-0">
-          <h3 className="text-emerald-700 text-[12px] font-bold tracking-wider uppercase">ASSET MATRIX</h3>
+          <h3 className="desk-panel-title text-emerald-700">ASSET MATRIX</h3>
           <p className="text-slate-500 text-[12px] mt-0.5">
             {institutionalMode
               ? institutionalOffHours
@@ -1155,7 +1154,7 @@ export default function ForensicPanel({
 
               {/* Header: ticker + conviction tier + win edge */}
               <div className="flex items-center justify-between gap-2 mb-1 relative z-10">
-                <span className="text-[12px] font-black text-slate-900 font-mono truncate">{row.ticker}</span>
+                <span className="desk-metric-value font-mono truncate">{row.ticker}</span>
                 <div className="flex items-center gap-1 shrink-0">
                   {winEdge && (
                     <span
@@ -1217,7 +1216,7 @@ export default function ForensicPanel({
 
               {/* Price + day/period change */}
               <div className="flex items-baseline gap-1.5 mb-1.5 relative z-10">
-                <span className="text-[14px] font-black text-slate-900 tabular-nums">{priceVal}</span>
+                <span className="desk-metric-value tabular-nums">{priceVal}</span>
                 {displayChange && (
                   <span
                     className={`text-[11px] font-bold tabular-nums ${displayChange.positive ? 'text-emerald-600' : 'text-red-500'}`}
@@ -1263,7 +1262,7 @@ export default function ForensicPanel({
                       Alloc <span className="font-semibold text-slate-600">{row.kellyPolicy}</span>
                     </span>
                   )}
-                  {showKelly && showWl && <span className="text-slate-300">·</span>}
+                  {showKelly && showWl && <span className="text-slate-500">·</span>}
                   {showWl && (
                     <span>
                       W/L <span className="font-semibold text-slate-600">{row.winLossRatio}</span>
@@ -1290,7 +1289,7 @@ export default function ForensicPanel({
                     </span>
                   )}
                   {typeof row.promoterPct === 'number' && typeof row.bulkDealValueCr === 'number' && row.bulkDealValueCr > 0 && (
-                    <span className="text-slate-300">·</span>
+                    <span className="text-slate-500">·</span>
                   )}
                   {typeof row.bulkDealValueCr === 'number' && row.bulkDealValueCr > 0 && (
                     <span>
