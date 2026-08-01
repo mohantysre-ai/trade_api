@@ -83,6 +83,35 @@ export type SelectionMeta = {
   dataDate: string;
 };
 
+/** Dhan ScanX LONG swing pick — attached to market snapshot for Asset Matrix. */
+export type DhanSwingPick = {
+  symbol: string;
+  name?: string;
+  direction?: string;
+  buyAbove?: number;
+  stopLoss?: number;
+  target1?: number;
+  target2?: number;
+  riskPerShare?: number;
+  rrT2?: number;
+  rsi?: number;
+  deliveryPct?: number;
+  score?: number;
+  reasons?: string[];
+  scanLtp?: number;
+};
+
+export type DhanSwingPicksPayload = {
+  source?: string;
+  picks?: DhanSwingPick[];
+  updatedAt?: string;
+  isMock?: boolean;
+  fromPersisted?: boolean;
+  scannedCount?: number;
+  longPassedCount?: number;
+  error?: string;
+};
+
 // ---------------------------------------------------------------------------
 // AI Ticker News types
 // ---------------------------------------------------------------------------
@@ -182,6 +211,7 @@ export type MarketDataResponse = {
   tickerNewsByTicker?: Record<string, AITickerNewsReport>;
   isSnapshotFallback?: boolean;
   selectionMeta?: SelectionMeta;
+  dhanSwingPicks?: DhanSwingPicksPayload;
 };
 
 export type FeedStatus = "idle" | "loading" | "live" | "offline";
@@ -227,6 +257,7 @@ export async function fetchRefreshDataOnDemand(pool?: string): Promise<MarketDat
     cache: "no-store",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ pool, refreshTickerNews: false }),
+    signal: AbortSignal.timeout(15 * 60 * 1_000),
   });
 
   if (!res.ok) {

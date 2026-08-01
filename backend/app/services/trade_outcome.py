@@ -195,6 +195,14 @@ def _persist_picks(picks: list[dict[str, Any]], direction: str, scan_ltp: float 
     _save_snapshot(snapshot)
 
 
+def load_persisted_long_scanner_picks() -> list[dict[str, Any]]:
+    """Public accessor: non-expired LONG scanner picks from trade_api_snapshot.json."""
+    return [
+        p for p in _load_persisted_picks()
+        if str(p.get("direction") or "LONG").upper() == "LONG" and p.get("symbol")
+    ]
+
+
 def _load_persisted_picks() -> list[dict[str, Any]]:
     """Load picks from snapshot, archive + prune expired sessions, return flat list.
 

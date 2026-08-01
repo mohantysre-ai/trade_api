@@ -1,0 +1,34 @@
+---
+description: Hedge-fund terminal standards — data integrity, stack layout, Asset Matrix pipeline
+alwaysApply: true
+---
+
+# Hedge-Fund Terminal Standards
+
+Professional Bloomberg-like desk: **facts from data only**. Never invent metrics, verdicts, or narrative without a source field in the API response.
+
+## Stack
+
+| Layer | Location | Notes |
+|-------|----------|-------|
+| Frontend | `iros-terminal/` | TypeScript, modern Next.js UI |
+| Backend | `backend/` | Python API integrations |
+| Persistence | JSON snapshots only | No database — read/write cached JSON under `backend/app/data/` etc. |
+
+## Asset Matrix pipeline
+
+Display funnel: **500 → 200 → 50 → ≥10 BUY** candidates. LLM enrichment (verdict + news) runs on the **top 10 only** — do not expand LLM scope without explicit request.
+
+## Agent workflow
+
+- **Parallel subagents** for independent workstreams (frontend vs backend, unrelated APIs) to fix faster.
+- **Test artifacts**: follow `.cursor/rules/cleanup-test-artifacts.mdc` — delete screenshots, `tmp_*`, and session-only logs before finishing.
+
+## Data integrity
+
+- Surface missing/stale data explicitly (`—`, loading state, or error) — never backfill with guesses.
+- Verdicts and scores must trace to computed fields or LLM output stored in the snapshot, not hardcoded labels.
+
+## NSE trading skills
+
+For swing/TA/risk workflows on Indian equities, apply skills from `.cursor/skills/` (9 NSE + 7 supplemental — see `iros-hedge-fund-terminal-standards`); data from `last_market_snapshot.json` + live APIs only.

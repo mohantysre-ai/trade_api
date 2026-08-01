@@ -1,0 +1,27 @@
+---
+description: Delete screenshots, temp files, and test logs after browser or diagnostic runs
+alwaysApply: true
+---
+
+# Clean Up Test Artifacts
+
+After browser testing, screenshots, automated test runs, or diagnostic logging, delete temporary artifacts before finishing the task.
+
+## Delete when done
+
+- Screenshots and captures (`*.png`, `*.jpg`, `*.webp`) saved for verification — e.g. `asset-matrix*`, `screenshot*`, `browser*`, `verified*`
+- Temporary dumps (`tmp_*.json`, `tmp_*.py`, curl/API capture files)
+- Agent-browser output files (use explicit paths or temp paths printed by the CLI)
+- Test-only log files created during the session
+
+## Do not delete
+
+- Source code, configs, lockfiles, or `.git`
+- Intentional product assets (e.g. `**/public/**` images used by the app)
+- Operational application logs unless they were created solely for the current test
+
+## Workflow
+
+1. Prefer writing test artifacts outside the repo or to clearly temporary names/paths.
+2. When verification is complete, delete every artifact you created.
+3. Before ending the task, scan the workspace root, `tmp/`, `.tmp/`, and agent output dirs for leftovers.

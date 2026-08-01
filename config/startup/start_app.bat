@@ -67,6 +67,7 @@ if exist "%VENV_PYTHON%" (
 )
 
 REM Start Market API Backend in background
+REM NOTE: Do not use uvicorn --reload for refresh jobs; in-memory task state is lost on reload.
 echo [*] Starting Market API Backend on port 8000...
 powershell -NoProfile -Command "Start-Process -FilePath \"%PYTHON_EXE%\" -ArgumentList \"-m\", \"uvicorn\", \"app.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\" -WorkingDirectory \"%BACKEND_DIR%\" -NoNewWindow -PassThru | Out-Null"
 

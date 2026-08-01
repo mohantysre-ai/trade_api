@@ -47,9 +47,9 @@ function StockSparklineSVG({ data, direction }: { data: number[]; direction?: st
     ? (last <= first ? '#10b981' : '#ef4444')
     : (positive ? '#10b981' : '#ef4444');
 
-  const W = 120;
-  const H = 40;
-  const pad = 3;
+  const W = 200;
+  const H = 56;
+  const pad = 8;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
@@ -70,10 +70,9 @@ function StockSparklineSVG({ data, direction }: { data: number[]; direction?: st
 
   return (
     <svg
-      className="w-full h-10"
+      className="w-full h-14"
       viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none"
-      style={{ filter: `drop-shadow(0 1px 2px ${color}20)` }}
+      preserveAspectRatio="xMidYMid meet"
     >
       <defs>
         {/* Rich multi-stop gradient for area fill */}
@@ -82,8 +81,8 @@ function StockSparklineSVG({ data, direction }: { data: number[]; direction?: st
           <stop offset="50%" stopColor={color} stopOpacity="0.15" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
-        {/* Glow filter for the stroke */}
-        <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
+        {/* Glow filter for the stroke — expanded region so pulse/glow aren't cropped */}
+        <filter id={glowId} x="-40%" y="-40%" width="180%" height="180%">
           <feGaussianBlur stdDeviation="1.2" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
@@ -217,6 +216,7 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag, di
 
   let changeLabel = '';
   let changeColor = 'text-slate-400';
+  let favorable = true;
   if (hasData) {
     const first = data![0];
     const last = data![data!.length - 1];
@@ -225,26 +225,31 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag, di
     // For SHORT picks, a falling price (negative pct) is favorable
     const isShort = direction === 'SHORT';
     if (isShort) {
-      changeColor = pct <= 0 ? 'text-emerald-600' : 'text-red-500';
+      favorable = pct <= 0;
+      changeColor = favorable ? 'text-emerald-600' : 'text-red-500';
     } else {
-      changeColor = pct >= 0 ? 'text-emerald-600' : 'text-red-500';
+      favorable = pct >= 0;
+      changeColor = favorable ? 'text-emerald-600' : 'text-red-500';
     }
   }
 
   return (
     <div className="mb-1.5 relative z-10">
+      {/* Chart band — no overflow-hidden so glow / pulse ring are not clipped */}
       <div
-        className="rounded-lg overflow-hidden transition-all"
+        className="rounded-lg transition-all px-0.5 py-0.5"
         style={{
           background: hasData
-            ? 'linear-gradient(135deg, rgba(100,116,139,0.03) 0%, rgba(100,116,139,0.06) 100%)'
+            ? favorable
+              ? 'linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(16,185,129,0.12) 100%)'
+              : 'linear-gradient(135deg, rgba(239,68,68,0.06) 0%, rgba(239,68,68,0.12) 100%)'
             : 'transparent',
         }}
       >
         {hasData ? (
           <StockSparklineSVG data={data!} direction={direction} />
         ) : (
-          <div className="h-10 flex items-center justify-center">
+          <div className="h-14 flex items-center justify-center">
             <div className="flex items-center gap-1">
               <div className="w-1 h-1 rounded-full bg-slate-300 animate-pulse" />
               <div className="w-1 h-1 rounded-full bg-slate-300 animate-pulse" style={{ animationDelay: '0.2s' }} />

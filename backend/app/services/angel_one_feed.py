@@ -19,11 +19,13 @@ import re
 import sys
 import threading
 import time
+import uuid
+from urllib.parse import quote
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import httpx # Added for internal API calls
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from xml.etree import ElementTree as ET
 from zoneinfo import ZoneInfo
 
@@ -32,6 +34,7 @@ import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from SmartApi import SmartConnect
 
 from .bulk_deals import load_bulk_deals
@@ -55,6 +58,7 @@ from .llm_client import _llm_config as _llm_config_canonical, _get_gemini_oauth_
 from .intelligence_engine import (
     CompleteSecurityAnalysisPayload,
     TOP_SELECTION_COUNT,
+    LLM_DISPLAY_COUNT,
     _on_demand_ticker_selection_reason,
     build_ticker_intelligence_map,
     build_ticker_intelligence_report,
@@ -78,21 +82,32 @@ NIFTY_500_CACHE_PATH = BASE_DIR / "nifty500_instruments.json"
 NIFTY_500_SYMBOLS_PATH = BASE_DIR.parent / "data" / "nifty500_symbols.json"
 NIFTY_500_LABEL = "Nifty 500"
 SCRIP_MASTER_URL = "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json"
-VOLUME_PRESELECT_LIMIT = int(os.getenv("VOLUME_PRESELECT_LIMIT", "50"))
+# Funnel: full Nifty 500 quotes → top N by volume for intraday screen (env: VOLUME_PRESELECT_LIMIT).
+VOLUME_PRESELECT_LIMIT = int(os.getenv("VOLUME_PRESELECT_LIMIT", "200"))
 _NSE_EQ_TOKEN_MAP: dict[str, tuple[str, str]] | None = None
 _NSE_EQ_TOKEN_MAP_LOADED_AT = 0.0
 _NSE_EQ_TOKEN_MAP_TTL_SECONDS = int(os.getenv("NSE_EQ_TOKEN_MAP_TTL_SECONDS", "86400"))
 
 IST_ZONE = ZoneInfo("Asia/Kolkata")
 SNAPSHOT_PATH = BASE_DIR / "last_market_snapshot.json"
+REFRESH_TASKS_PATH = BASE_DIR.parent / "data" / "refresh_tasks.json"
 MORNING_REFRESH_START = (8, 0)
 MORNING_REFRESH_END = (8, 30)
 EVENING_REFRESH_START = (16, 0)
 EVENING_REFRESH_END = (16, 30)
-REFRESH_TASK_TTL_SECONDS = 600
+REFRESH_TASK_TTL_SECONDS = int(os.getenv("REFRESH_TASK_TTL_SECONDS", "1200"))
+REFRESH_TASK_RUNNING_MAX_IDLE_SECONDS = int(
+    os.getenv("REFRESH_TASK_RUNNING_MAX_IDLE_SECONDS", str(max(REFRESH_TASK_TTL_SECONDS, 1200)))
+)
 _REFRESH_TASKS: dict[str, dict[str, Any]] = {}
+_ONDEMAND_ACTIVE_BY_KEY: dict[str, str] = {}
 _REFRESH_TASK_LOCK = threading.Lock()
 LLM_UNIVERSE_LIMIT = int(os.getenv("LLM_UNIVERSE_LIMIT", "30"))
+# last_market_snapshot.json: persisted market payload for GET /api/market-data (prefer_cache=True).
+# Reused during on-demand refresh for fresh intraday metrics (INTRADAY_METRICS_TTL) and AI output (AI_CACHE_TTL).
+INTRADAY_METRICS_TTL_SECONDS = int(os.getenv("INTRADAY_METRICS_TTL_SECONDS", "600"))
+AI_CACHE_TTL_SECONDS = int(os.getenv("AI_CACHE_TTL_SECONDS", "900"))
+INTRADAY_FETCH_WORKERS = int(os.getenv("INTRADAY_FETCH_WORKERS", "8"))
 NIFTY_100_LABEL = "Nifty 100"
 NIFTY_100_CACHE_PATH = BASE_DIR / "nifty100_instruments.json"
 ANGEL_API_TIMEOUT_SECONDS = int(os.getenv("ANGEL_API_TIMEOUT_SECONDS", "24"))
@@ -152,21 +167,162 @@ def _refresh_task_key(pool_name: str | None, custom_prompt: str | None) -> str:
     return f"refresh:{pool_name or '__all__'}:{(custom_prompt or '').strip()[:64]}"
 
 
+def _ondemand_refresh_task_key(pool_name: str | None, custom_prompt: str | None) -> str:
+    return f"ondemand:{pool_name or '__all__'}:{(custom_prompt or '').strip()[:64]}"
+
+
 def _refresh_task_status(task_id: str) -> dict[str, Any] | None:
+    now = time.time()
+    task = _get_refresh_task_record(task_id)
+    if not task:
+        return None
+
     with _REFRESH_TASK_LOCK:
         task = _REFRESH_TASKS.get(task_id)
         if not task:
             return None
-        if time.time() - task.get("created_at", 0) > REFRESH_TASK_TTL_SECONDS:
+
+        created_at = float(task.get("created_at") or 0)
+        updated_at = float(task.get("updated_at") or created_at)
+        status = str(task.get("status") or "running")
+        age = now - created_at
+        idle = now - updated_at
+
+        expired = False
+        if status == "running":
+            expired = idle > REFRESH_TASK_RUNNING_MAX_IDLE_SECONDS
+        elif status in ("done", "error"):
+            expired = age > REFRESH_TASK_TTL_SECONDS
+        else:
+            expired = age > REFRESH_TASK_TTL_SECONDS
+
+        if expired:
+            dedup_key = task.get("dedup_key")
+            if dedup_key and _ONDEMAND_ACTIVE_BY_KEY.get(dedup_key) == task_id:
+                del _ONDEMAND_ACTIVE_BY_KEY[dedup_key]
             del _REFRESH_TASKS[task_id]
+            _persist_refresh_tasks()
             return None
+
+        result = task.get("result")
+        if status == "done" and not result:
+            result = _refresh_result_from_snapshot()
+
         return {
             "status": task["status"],
             "progress": task.get("progress"),
             "error": task.get("error"),
             "created_at": task.get("created_at"),
-            "result": task.get("result"),
+            "updated_at": task.get("updated_at"),
+            "result": result,
         }
+
+
+def _refresh_task_touch(task_id: str, progress: str | None = None) -> None:
+    with _REFRESH_TASK_LOCK:
+        task = _REFRESH_TASKS.get(task_id)
+        if not task:
+            return
+        task["updated_at"] = time.time()
+        if progress is not None:
+            task["progress"] = progress
+    _persist_refresh_tasks()
+
+
+def _ondemand_status_url(task_id: str) -> str:
+    return f"/api/refresh-data-on-demand/status?taskId={quote(task_id, safe='')}"
+
+
+def _refresh_result_from_snapshot() -> dict[str, Any] | None:
+    snapshot = _load_last_snapshot()
+    if not snapshot or not snapshot.get("stocks"):
+        return None
+    return {
+        "success": True,
+        "payload": snapshot,
+        "selectionMeta": snapshot.get("selectionMeta"),
+        "isSnapshotFallback": bool(snapshot.get("isSnapshotFallback", False)),
+    }
+
+
+def _serialize_refresh_tasks_for_disk() -> dict[str, Any]:
+    with _REFRESH_TASK_LOCK:
+        tasks: dict[str, Any] = {}
+        for task_id, task in _REFRESH_TASKS.items():
+            row = {k: v for k, v in task.items() if k != "result"}
+            tasks[task_id] = row
+        return {
+            "tasks": tasks,
+            "activeByKey": dict(_ONDEMAND_ACTIVE_BY_KEY),
+        }
+
+
+def _persist_refresh_tasks() -> None:
+    try:
+        REFRESH_TASKS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        payload = _serialize_refresh_tasks_for_disk()
+        tmp_path = REFRESH_TASKS_PATH.with_suffix(".json.tmp")
+        tmp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        tmp_path.replace(REFRESH_TASKS_PATH)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Failed to persist refresh tasks: %s", exc)
+
+
+def _reconcile_loaded_refresh_task(task_id: str, task: dict[str, Any]) -> dict[str, Any]:
+    if str(task.get("status")) != "running":
+        return task
+    snapshot = _load_last_snapshot()
+    snap_updated = snapshot.get("updatedAt") if snapshot else None
+    snap_ts = 0.0
+    if snap_updated:
+        try:
+            snap_ts = datetime.fromisoformat(str(snap_updated).replace("Z", "+00:00")).timestamp()
+        except Exception:
+            snap_ts = 0.0
+    created_at = float(task.get("created_at") or 0)
+    if snap_ts > created_at and snapshot and snapshot.get("stocks"):
+        task = dict(task)
+        task["status"] = "done"
+        task["progress"] = "Completed (recovered from snapshot after restart)"
+        task["updated_at"] = time.time()
+        return task
+    task = dict(task)
+    task["status"] = "error"
+    task["error"] = "Refresh interrupted by server restart; POST /api/refresh-data-on-demand to retry."
+    task["updated_at"] = time.time()
+    return task
+
+
+def _load_refresh_tasks_from_disk() -> None:
+    if not REFRESH_TASKS_PATH.exists():
+        return
+    try:
+        raw = json.loads(REFRESH_TASKS_PATH.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Failed to load refresh tasks: %s", exc)
+        return
+    if not isinstance(raw, dict):
+        return
+    loaded_tasks = raw.get("tasks") if isinstance(raw.get("tasks"), dict) else {}
+    loaded_active = raw.get("activeByKey") if isinstance(raw.get("activeByKey"), dict) else {}
+    with _REFRESH_TASK_LOCK:
+        for task_id, task in loaded_tasks.items():
+            if not isinstance(task, dict):
+                continue
+            _REFRESH_TASKS[str(task_id)] = _reconcile_loaded_refresh_task(str(task_id), task)
+        for dedup_key, active_id in loaded_active.items():
+            if active_id in _REFRESH_TASKS:
+                _ONDEMAND_ACTIVE_BY_KEY[str(dedup_key)] = str(active_id)
+
+
+def _get_refresh_task_record(task_id: str) -> dict[str, Any] | None:
+    with _REFRESH_TASK_LOCK:
+        task = _REFRESH_TASKS.get(task_id)
+    if task is not None:
+        return task
+    _load_refresh_tasks_from_disk()
+    with _REFRESH_TASK_LOCK:
+        return _REFRESH_TASKS.get(task_id)
 
 
 def _refresh_task_set_done(task_id: str, result: dict[str, Any]) -> None:
@@ -174,6 +330,8 @@ def _refresh_task_set_done(task_id: str, result: dict[str, Any]) -> None:
         if task_id in _REFRESH_TASKS:
             _REFRESH_TASKS[task_id]["status"] = "done"
             _REFRESH_TASKS[task_id]["result"] = result
+            _REFRESH_TASKS[task_id]["updated_at"] = time.time()
+    _persist_refresh_tasks()
 
 
 def _refresh_task_set_error(task_id: str, error: str) -> None:
@@ -181,6 +339,70 @@ def _refresh_task_set_error(task_id: str, error: str) -> None:
         if task_id in _REFRESH_TASKS:
             _REFRESH_TASKS[task_id]["status"] = "error"
             _REFRESH_TASKS[task_id]["error"] = error
+            _REFRESH_TASKS[task_id]["updated_at"] = time.time()
+    _persist_refresh_tasks()
+
+
+def _snapshot_age_seconds(snapshot: dict[str, Any] | None) -> float | None:
+    if not snapshot:
+        return None
+    updated_at = snapshot.get("updatedAt")
+    if not updated_at:
+        return None
+    try:
+        snap_time = datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
+        return (datetime.now(timezone.utc) - snap_time).total_seconds()
+    except Exception:
+        return None
+
+
+def _snapshot_intraday_cache(snapshot: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    """Reuse intraday candle metrics from last_market_snapshot when still within TTL."""
+    age = _snapshot_age_seconds(snapshot)
+    if age is None or age > INTRADAY_METRICS_TTL_SECONDS:
+        return {}
+    cache: dict[str, dict[str, Any]] = {}
+    for ticker, row in (snapshot.get("stockQuotes") or {}).items():
+        if not isinstance(row, dict):
+            continue
+        intraday = row.get("intraday")
+        if isinstance(intraday, dict) and intraday.get("vwap") is not None:
+            cache[str(ticker)] = intraday
+    return cache
+
+
+def _top_ledger_tickers(snapshot: dict[str, Any] | None, limit: int = LLM_DISPLAY_COUNT) -> list[str]:
+    if not snapshot:
+        return []
+    ledger = (snapshot.get("terminalIntelligence") or {}).get("ledger_stocks") or []
+    return [str(row.get("ticker")).upper() for row in ledger[:limit] if row.get("ticker")]
+
+
+def _ai_cache_fresh(snapshot: dict[str, Any] | None, top_tickers: list[str]) -> bool:
+    """True when snapshot terminal intelligence + news summary can be reused for the same top-N set."""
+    if not snapshot:
+        return False
+    existing_ti = snapshot.get("terminalIntelligence")
+    existing_summary = snapshot.get("newsSummary")
+    if not existing_ti or existing_ti.get("llmError") or not existing_summary:
+        return False
+    age = _snapshot_age_seconds(snapshot)
+    if age is None or age > AI_CACHE_TTL_SECONDS:
+        return False
+    cached = _top_ledger_tickers(snapshot, LLM_DISPLAY_COUNT)
+    wanted = [str(t).upper() for t in top_tickers[:LLM_DISPLAY_COUNT]]
+    return bool(cached) and cached == wanted
+
+
+_thread_local_angel_client = threading.local()
+
+
+def _get_thread_angel_client() -> AngelOneClient:
+    client = getattr(_thread_local_angel_client, "client", None)
+    if client is None:
+        client = AngelOneClient()
+        _thread_local_angel_client.client = client
+    return client
 
 
 # -----------------------------------------------------------------------------
@@ -742,6 +964,158 @@ def _hydrate_ticker_intelligence_map(payload: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
+_DHAN_SWING_TTL_SECONDS = 300
+
+
+def _normalize_dhan_swing_pick(rec: dict[str, Any]) -> dict[str, Any]:
+    sym = str(rec.get("symbol") or rec.get("ticker") or "").upper()
+    entry = rec.get("buyAbove") or rec.get("entryPrice") or rec.get("entry")
+    return {
+        "symbol": sym,
+        "name": rec.get("name") or sym,
+        "direction": str(rec.get("direction") or "LONG").upper(),
+        "buyAbove": entry,
+        "stopLoss": rec.get("stopLoss"),
+        "target1": rec.get("target1"),
+        "target2": rec.get("target2"),
+        "riskPerShare": rec.get("riskPerShare"),
+        "rrT2": rec.get("rrT2"),
+        "rsi": rec.get("rsi"),
+        "deliveryPct": rec.get("deliveryPct"),
+        "score": rec.get("score"),
+        "reasons": rec.get("reasons"),
+        "scanLtp": rec.get("scanLtp"),
+    }
+
+
+def _fetch_dhan_swing_picks_for_market() -> dict[str, Any]:
+    """Dhan LONG swing/scanner picks for Asset Matrix — facts only, no mock fallback."""
+    out: dict[str, Any] = {
+        "source": "dhan-scanx",
+        "picks": [],
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "isMock": False,
+    }
+    try:
+        from .dhan_scanner_service import fetch_dhan_scan_results
+        from .trade_outcome import load_persisted_long_scanner_picks
+
+        result = fetch_dhan_scan_results(min_volume=1_000_000, top_n=10)
+        if result.get("isMock"):
+            persisted = load_persisted_long_scanner_picks()
+            out["picks"] = [_normalize_dhan_swing_pick(p) for p in persisted]
+            out["fromPersisted"] = bool(out["picks"])
+            out["error"] = result.get("error") or "Dhan API unreachable (mock skipped for desk)"
+            return out
+
+        picks: list[dict[str, Any]] = []
+        for rec in result.get("recommendations") or []:
+            if str(rec.get("direction") or "LONG").upper() != "LONG":
+                continue
+            picks.append(_normalize_dhan_swing_pick(rec))
+        out["picks"] = picks
+        out["scannedCount"] = result.get("scannedCount")
+        out["longPassedCount"] = result.get("longPassedCount")
+        return out
+    except Exception as exc:
+        from .trade_outcome import load_persisted_long_scanner_picks
+
+        persisted = load_persisted_long_scanner_picks()
+        out["error"] = str(exc)
+        out["picks"] = [_normalize_dhan_swing_pick(p) for p in persisted]
+        out["fromPersisted"] = bool(out["picks"])
+        return out
+
+
+def _picks_from_scanner_map(scanner_map: Any) -> list[dict[str, Any]]:
+    if not isinstance(scanner_map, dict):
+        return []
+    picks: list[dict[str, Any]] = []
+    for rec in scanner_map.values():
+        if not isinstance(rec, dict):
+            continue
+        if str(rec.get("direction") or "LONG").upper() != "LONG":
+            continue
+        sym = rec.get("symbol") or rec.get("ticker")
+        if sym:
+            picks.append(_normalize_dhan_swing_pick(rec))
+    return picks
+
+
+def _dhan_swing_picks_has_data(block: Any) -> bool:
+    if not isinstance(block, dict):
+        return False
+    return bool(block.get("picks")) or bool(block.get("fromPersisted"))
+
+
+def _dhan_swing_picks_is_fresh(block: Any) -> bool:
+    if not _dhan_swing_picks_has_data(block):
+        return False
+    updated = block.get("updatedAt")
+    if not isinstance(updated, str):
+        return False
+    try:
+        ts = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+        age = (datetime.now(timezone.utc) - ts).total_seconds()
+        return age < _DHAN_SWING_TTL_SECONDS
+    except Exception:
+        return False
+
+
+def _build_dhan_swing_picks_from_persisted(
+    payload: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Fast path: trade_api_snapshot scannerPicks or inline scannerPicks on payload."""
+    from .trade_outcome import load_persisted_long_scanner_picks
+
+    persisted = load_persisted_long_scanner_picks()
+    if persisted:
+        return {
+            "source": "scannerPicks-persisted",
+            "picks": [_normalize_dhan_swing_pick(p) for p in persisted],
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+            "isMock": False,
+            "fromPersisted": True,
+        }
+
+    inline = _picks_from_scanner_map((payload or {}).get("scannerPicks"))
+    if inline:
+        return {
+            "source": "scannerPicks-inline",
+            "picks": inline,
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+            "isMock": False,
+            "fromPersisted": True,
+        }
+    return None
+
+
+def _hydrate_dhan_swing_picks(
+    payload: dict[str, Any],
+    *,
+    force: bool = False,
+    prefer_persisted: bool = False,
+) -> dict[str, Any]:
+    existing = payload.get("dhanSwingPicks")
+    if existing and not force and _dhan_swing_picks_is_fresh(existing):
+        return payload
+
+    if prefer_persisted or (not force and payload.get("isSnapshotFallback")):
+        fast = _build_dhan_swing_picks_from_persisted(payload)
+        if fast:
+            payload["dhanSwingPicks"] = fast
+            return payload
+
+    fetched = _fetch_dhan_swing_picks_for_market()
+    if not fetched.get("picks"):
+        fast = _build_dhan_swing_picks_from_persisted(payload)
+        if fast:
+            fetched = fast
+
+    payload["dhanSwingPicks"] = fetched
+    return payload
+
+
 def _load_last_snapshot() -> dict[str, Any] | None:
     try:
         payload = json.loads(_snapshot_path().read_text(encoding="utf-8"))
@@ -757,6 +1131,14 @@ def _save_last_snapshot(payload: dict[str, Any]) -> None:
         payload = _enrich_snapshot_with_fixed_plan(payload)
     except Exception as exc:
         log.warning("Fixed-plan snapshot enrichment failed: %s", exc)
+    try:
+        existing = payload.get("dhanSwingPicks")
+        if not _dhan_swing_picks_has_data(existing):
+            payload = _hydrate_dhan_swing_picks(payload, prefer_persisted=True)
+        elif not _dhan_swing_picks_is_fresh(existing):
+            payload = _hydrate_dhan_swing_picks(payload, prefer_persisted=True)
+    except Exception as exc:
+        log.warning("dhanSwingPicks snapshot hydration failed: %s", exc)
     try:
         _snapshot_path().write_text(json.dumps(_normalize_snapshot(payload), indent=2), encoding="utf-8")
     except Exception:
@@ -1857,16 +2239,42 @@ def _fetch_all_intraday_chunked(
     candidate_rows: list[dict[str, Any]],
     stock_universe_by_key: dict[str, Instrument],
     now: datetime,
+    on_progress: Callable[[str], None] | None = None,
 ) -> dict[str, dict[str, Any]]:
     chunks = [
         candidate_rows[i : i + INTRADAY_CHUNK_SIZE]
         for i in range(0, len(candidate_rows), INTRADAY_CHUNK_SIZE)
     ]
+    if not chunks:
+        return {}
+
     all_metrics: dict[str, dict[str, Any]] = {}
+    workers = min(INTRADAY_FETCH_WORKERS, max(1, len(chunks)))
+    total_chunks = len(chunks)
+    completed_chunks = 0
 
-    for chunk in chunks:
-        all_metrics.update(_fetch_intraday_chunk(client, chunk, stock_universe_by_key, now))
+    def fetch_chunk(chunk: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        # Thread-local Angel clients avoid sharing SmartConnect state across workers.
+        chunk_client = _get_thread_angel_client() if workers > 1 else client
+        return _fetch_intraday_chunk(chunk_client, chunk, stock_universe_by_key, now)
 
+    def report_chunk_progress() -> None:
+        nonlocal completed_chunks
+        completed_chunks += 1
+        if on_progress:
+            on_progress(f"Fetching intraday candles ({completed_chunks}/{total_chunks})...")
+
+    if workers <= 1:
+        for chunk in chunks:
+            all_metrics.update(fetch_chunk(chunk))
+            report_chunk_progress()
+        return all_metrics
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(fetch_chunk, chunk) for chunk in chunks]
+        for future in as_completed(futures):
+            all_metrics.update(future.result())
+            report_chunk_progress()
     return all_metrics
 
 
@@ -1972,17 +2380,17 @@ def _compute_deterministic_pipeline(all_stocks: list[dict[str, Any]]) -> list[di
     # Deterministic sort: Alpha Score desc, ticker asc (stable tie-break)
     ranked_universe.sort(key=lambda x: (-x["alpha_score"], x["ticker"]))
 
-    # Pad to 20 with highest-volume non-qualifiers when fewer than 20 pass
-    if len(ranked_universe) < 20:
+    # Pad to TOP_SELECTION_COUNT with highest-volume non-qualifiers when too few pass hard filters
+    if len(ranked_universe) < _TI_TOP_SELECTION_COUNT:
         non_qualifiers = [s for s in all_stocks if not s.get("passes_hard_filters", False)]
         non_qualifiers.sort(key=lambda x: -(x.get("volume") or 0))
         for stock in non_qualifiers:
-            if len(ranked_universe) >= 20:
+            if len(ranked_universe) >= _TI_TOP_SELECTION_COUNT:
                 break
             stock.setdefault("alpha_score", 0.0)
             ranked_universe.append(stock)
 
-    return ranked_universe[:20]
+    return ranked_universe[:_TI_TOP_SELECTION_COUNT]
 
 
 # =============================================================================
@@ -1990,28 +2398,33 @@ def _compute_deterministic_pipeline(all_stocks: list[dict[str, Any]]) -> list[di
 # =============================================================================
 
 def _execute_llm_risk_audit(
-    top_20: list[dict[str, Any]],
+    ranked_stocks: list[dict[str, Any]],
     news_items: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """
     Stage 2: LLM Safety Audit.
 
-    The LLM acts ONLY as a risk auditor -- it audits non-technical domains
-    (news risk, earnings risk, regulatory/governance/corporate-action risk).
-    It NEVER receives technical indicators (ATR, VWAP, RSI, Volume, OI, EMA).
-    Only ticker + alpha_score are forwarded.
-
-    Gracefully degrades to APPROVE + warning flag when LLM is unavailable.
+    Audits ONLY the top LLM_DISPLAY_COUNT ranked candidates (BUY display list).
+    Remaining ranked stocks keep quant scores with default APPROVE verdicts.
     """
+    if not ranked_stocks:
+        return []
+
+    audit_targets = ranked_stocks[:LLM_DISPLAY_COUNT]
+    audited_by_ticker = {row["ticker"]: dict(row) for row in audit_targets}
+
     config = _llm_config_canonical()
     provider, api_key, api_url, model, oauth_token_path = config or (None, None, None, None, None)
 
     if not provider or not api_key:
-        for stock in top_20:
+        for stock in audit_targets:
             stock["risk_flags"] = ["LLM unavailable -- news risk not audited"]
             stock["verdict"] = "APPROVE"
-        return top_20
-
+            audited_by_ticker[stock["ticker"]] = stock
+        return [
+            audited_by_ticker.get(row["ticker"], {**row, "risk_flags": ["Not in top LLM audit set"], "verdict": "APPROVE"})
+            for row in ranked_stocks
+        ]
     news_context = "\n".join([
         f"Source: {n.get('source','')} | Title: {n.get('title','')} | "
         f"Summary: {n.get('summary','')} | Link: {n.get('link','')}"
@@ -2021,12 +2434,12 @@ def _execute_llm_risk_audit(
     # ONLY ticker + alpha_score -- NO technical data sent to LLM
     ticker_context = [
         {"ticker": s["ticker"], "alpha_score": s.get("alpha_score", 0.0)}
-        for s in top_20
+        for s in audit_targets
     ]
     ticker_json = json.dumps(ticker_context, indent=2)
 
     prompt = (
-        f"Tickers to audit:\n{ticker_json}\n\n"
+        f"Tickers to audit (top {LLM_DISPLAY_COUNT} BUY candidates):\n{ticker_json}\n\n"
         f"News/Event context:\n{news_context}\n\n"
         "Return a valid JSON object matching this structure exactly:\n"
         "{\"audits\": {\"TICKER_SYMBOL\": {\"risk_flags\": [\"Reason text (Source: name, Timestamp: iso)\"], \"verdict\": \"APPROVE or REJECT\"}}}"
@@ -2083,11 +2496,7 @@ def _execute_llm_risk_audit(
             from .ai_ticker_news import _parse_json_response
             parsed = _parse_json_response(_clean_text, ["audits"])
             audits = parsed.get("audits", {})
-            # Guard: _parse_json_response regex fallback (Strategy 5)
-            # may extract the audits value as a plain string instead of
-            # a nested dict when the LLM response is malformed JSON.
             if isinstance(audits, str):
-                # Attempt to re-parse the audits blob as a JSON object
                 try:
                     audits = json.loads(audits)
                     if not isinstance(audits, dict):
@@ -2097,12 +2506,13 @@ def _execute_llm_risk_audit(
             if not isinstance(audits, dict):
                 audits = {}
 
-            for stock in top_20:
+            for stock in audit_targets:
                 ticker = stock["ticker"]
                 audit = audits.get(ticker, {"risk_flags": [], "verdict": "APPROVE"})
                 stock["risk_flags"] = audit.get("risk_flags", []) or ["None"]
                 stock["verdict"] = audit.get("verdict", "APPROVE")
-            break  # success, skip retry
+                audited_by_ticker[ticker] = stock
+            break
 
         except Exception as exc:
             last_exc = exc
@@ -2111,18 +2521,25 @@ def _execute_llm_risk_audit(
                 attempt + 1, len(audit_timeouts), timeout, exc,
             )
     else:
-        # All attempts exhausted
         is_timeout = "timeout" in str(last_exc).lower() or "timed out" in str(last_exc).lower()
         flag_msg = (
             f"LLM audit timed out after {sum(audit_timeouts)}s -- news risk not audited"
             if is_timeout
             else f"LLM Audit Error ({last_exc}) -- news risk not audited"
         )
-        for stock in top_20:
+        for stock in audit_targets:
             stock["risk_flags"] = [flag_msg]
             stock["verdict"] = "APPROVE"
+            audited_by_ticker[stock["ticker"]] = stock
 
-    return top_20
+    merged: list[dict[str, Any]] = []
+    for row in ranked_stocks:
+        ticker = row["ticker"]
+        if ticker in audited_by_ticker:
+            merged.append(audited_by_ticker[ticker])
+        else:
+            merged.append({**row, "risk_flags": ["Not in top LLM audit set"], "verdict": "APPROVE"})
+    return merged
 
 
 # =============================================================================
@@ -2182,7 +2599,8 @@ def _compile_selection_stream(
     custom_prompt: str | None = None,
 ) -> str:
     lines = [
-        f"TOP_N: {_TI_TOP_SELECTION_COUNT}",
+        f"TOP_N: {LLM_DISPLAY_COUNT}",
+        f"RANKED_POOL_SIZE: {_TI_TOP_SELECTION_COUNT}",
         f"ACTIVE_POOL: {pool_name}",
         f"FILTER_PROMPT: {_filter_prompt(custom_prompt)}",
         f"HARD_SCREEN_PASS_COUNT: {hard_screen_count}/{len(all_stocks)}",
@@ -2244,7 +2662,7 @@ def _select_dynamic_top_stocks(
     try:
         screened = [row for row in all_stocks if _hard_screen(row)]
         selection_universe = screened if len(screened) >= _TI_TOP_SELECTION_COUNT else all_stocks
-        llm_universe = selection_universe[:LLM_UNIVERSE_LIMIT]
+        llm_universe = selection_universe[:LLM_DISPLAY_COUNT]
         compiled = _compile_selection_stream(
             llm_universe,
             pool_name=pool_name,
@@ -2289,8 +2707,12 @@ def _select_dynamic_top_stocks(
             selected_rows = _heuristic_rank(selection_universe)
         else:
             if len(selected_rows) < _TI_TOP_SELECTION_COUNT:
-                remaining = [row for row in _heuristic_rank(selection_universe) if row["ticker"] not in {r["ticker"] for r in selected_rows}]
-                selected_rows.extend(remaining[: _TI_TOP_SELECTION_COUNT - len(selected_rows)])
+                selected_set = {r["ticker"] for r in selected_rows}
+                hard_passers = [
+                    row for row in _heuristic_rank(selection_universe)
+                    if row["ticker"] not in selected_set and _hard_screen(row)
+                ]
+                selected_rows.extend(hard_passers[: _TI_TOP_SELECTION_COUNT - len(selected_rows)])
 
         news_summary = (
             ti_payload.get("news_catalysts_card") or ti_payload.get("forensic_screen_card") or ti_payload.get("why_interested")
@@ -2386,10 +2808,20 @@ def _build_payload_from_live_data(
     pool_name: str | None = None,
     custom_prompt: str | None = None,
     force_llm_refresh: bool = False,
+    prior_snapshot: dict[str, Any] | None = None,
+    on_progress: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
+    def progress(msg: str) -> None:
+        if on_progress:
+            on_progress(msg)
+
     llm_config = _llm_config_canonical()
     now = _ist_now()
     resolved_pool_name = pool_name or NIFTY_100_LABEL
+    snapshot = prior_snapshot if prior_snapshot is not None else _load_last_snapshot()
+    intraday_cache = _snapshot_intraday_cache(snapshot)
+
+    progress("Fetching live quotes...")
     stock_universe, active_pool_label = _pool_watchlist(resolved_pool_name)
 
     stock_quotes_raw = client.fetch_batch_quotes(stock_universe)
@@ -2435,12 +2867,29 @@ def _build_payload_from_live_data(
                 "hard_filter_reasons": ["not in intraday candidate set"],
             }
 
-    all_metrics = _fetch_all_intraday_chunked(client, candidate_rows, stock_universe_by_key, now)
-    for ticker, metrics in all_metrics.items():
-        original = row_by_ticker.get(ticker)
-        if original is not None:
-            original["intraday"] = metrics
-            stock_quotes[ticker] = original
+    rows_to_fetch: list[dict[str, Any]] = []
+    for row in candidate_rows:
+        cached_intraday = intraday_cache.get(row["ticker"])
+        if cached_intraday:
+            row["intraday"] = cached_intraday
+            stock_quotes[row["ticker"]] = row
+        else:
+            rows_to_fetch.append(row)
+
+    if rows_to_fetch:
+        progress(f"Fetching intraday metrics for {len(rows_to_fetch)} symbols...")
+        fetched_metrics = _fetch_all_intraday_chunked(
+            client,
+            rows_to_fetch,
+            stock_universe_by_key,
+            now,
+            on_progress=on_progress,
+        )
+        for ticker, metrics in fetched_metrics.items():
+            original = row_by_ticker.get(ticker)
+            if original is not None:
+                original["intraday"] = metrics
+                stock_quotes[ticker] = original
 
     bulk_deal_map = load_bulk_deals()
     promoter_map = ensure_promoter_holdings([row["ticker"] for row in candidate_rows])
@@ -2452,47 +2901,57 @@ def _build_payload_from_live_data(
     # ─────────────────────────────────────────────────────────────────────────
     # STAGE 1: Deterministic Quant Engine
     # Applies hard filters and computes Alpha Scores with no LLM involvement.
-    # Returns top 20 sorted by Alpha Score; pads with volume leaders if needed.
+    # Returns top TOP_SELECTION_COUNT by Alpha Score; pads with volume leaders if needed.
     # ─────────────────────────────────────────────────────────────────────────
-    top_20_quant = _compute_deterministic_pipeline(all_stocks)
+    progress("Running quant pipeline...")
+    top_ranked = _compute_deterministic_pipeline(all_stocks)
 
     macro_morning, macro_evening = _build_macro_strips(macro_raw)
     global_macro = fetch_global_macro()
     news_items = fetch_live_news()
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # STAGE 2: LLM Safety Auditor
-    # Audits ONLY non-technical risk domains using news context.
-    # Attaches risk_flags + verdict to each stock; never re-ranks technically.
-    # ─────────────────────────────────────────────────────────────────────────
-    final_audited = _execute_llm_risk_audit(top_20_quant, news_items)
-
-    # Print institutional audit ledger to server log
-    ledger_rows = build_audit_ledger(final_audited)
-    _log = logging.getLogger(__name__)
-    _log.info("\n" + "=" * 40 + " INSTITUTIONAL RISK AUDIT LEDGER " + "=" * 40)
-    for ledger_row in ledger_rows:
-        _log.info(ledger_row)
-    _log.info("=" * 113)
-
-    # AI NEWS ANALYSIS: Call once completely & subsequent from cache unless forced or data missing
-    snapshot = _load_last_snapshot()
     existing_ti = snapshot.get("terminalIntelligence") if snapshot else None
     existing_summary = snapshot.get("newsSummary") if snapshot else None
     existing_ticker_news = snapshot.get("tickerNewsByTicker") if snapshot else {}
 
-    # Logic: If we have valid AI data and aren't forcing a refresh, reuse it to avoid timeouts.
-    # If existing data is an error message or missing, we trigger the LLM.
-    can_reuse_ai = (
-        not force_llm_refresh and
-        existing_ti and
-        not existing_ti.get("llmError") and
-        existing_summary
-    )
+    top_llm_tickers = [row["ticker"] for row in top_ranked[:LLM_DISPLAY_COUNT]]
+    can_reuse_ai = not force_llm_refresh and _ai_cache_fresh(snapshot, top_llm_tickers)
 
     if can_reuse_ai:
-        top_rows, terminal_intel, news_summary = (snapshot.get("stocks") or [], existing_ti, existing_summary)
+        verdict_by_ticker = {
+            str(row.get("ticker")).upper(): row
+            for row in ((existing_ti or {}).get("ledger_stocks") or [])
+            if row.get("ticker")
+        }
+        final_audited: list[dict[str, Any]] = []
+        for row in top_ranked:
+            enriched = dict(row)
+            ledger = verdict_by_ticker.get(str(row["ticker"]).upper())
+            if ledger:
+                enriched.setdefault("verdict", ledger.get("action") or "APPROVE")
+                enriched.setdefault("risk_flags", ["Reused snapshot AI verdict"])
+            elif row["ticker"] in top_llm_tickers:
+                enriched.setdefault("verdict", "APPROVE")
+                enriched.setdefault("risk_flags", ["Reused snapshot AI cache"])
+            else:
+                enriched.setdefault("verdict", "APPROVE")
+                enriched.setdefault("risk_flags", ["Not in top LLM audit set"])
+            final_audited.append(enriched)
+        top_rows = final_audited[:_TI_TOP_SELECTION_COUNT]
+        terminal_intel = existing_ti
+        news_summary = existing_summary
+        _log = logging.getLogger(__name__)
+        _log.info("Reusing snapshot terminalIntelligence/newsSummary for unchanged top-%d set", LLM_DISPLAY_COUNT)
     else:
+        progress(f"Running LLM risk audit on top {LLM_DISPLAY_COUNT}...")
+        final_audited = _execute_llm_risk_audit(top_ranked, news_items)
+        progress("Building terminal intelligence...")
+        ledger_rows = build_audit_ledger([s for s in final_audited if s.get("ticker") in top_llm_tickers])
+        _log = logging.getLogger(__name__)
+        _log.info("\n" + "=" * 40 + " INSTITUTIONAL RISK AUDIT LEDGER " + "=" * 40)
+        for ledger_row in ledger_rows:
+            _log.info(ledger_row)
+        _log.info("=" * 113)
         top_rows, terminal_intel, news_summary = _build_terminal_payload(
             all_stocks=final_audited,
             news_items=news_items,
@@ -2504,7 +2963,7 @@ def _build_payload_from_live_data(
 
     payload = {
         "success": True,
-        "source": "angel_one+news+llm_dynamic_top20",
+        "source": f"angel_one+news+llm_dynamic_top{_TI_TOP_SELECTION_COUNT}",
         "rawSources": _news_feed_sources(),
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "mockTickers": sorted(MOCK_TICKERS),
@@ -2535,6 +2994,8 @@ def _build_payload_from_live_data(
         "isSnapshotFallback": False,
     }
 
+    progress("Fetching Dhan swing picks...")
+    payload = _hydrate_dhan_swing_picks(payload, force=True)
     payload = _hydrate_ticker_intelligence_map(payload)
     _apply_selection_meta(
         payload,
@@ -2553,6 +3014,8 @@ def build_market_payload(
     custom_prompt: str | None = None,
     allow_fallback: bool = True, # If live fetch fails, allow falling back to snapshot
     prefer_cache: bool = False, # If true, try cache first, then live if cache is empty/stale
+    force_llm_refresh: bool = False, # When false, reuse snapshot AI if top-10 set unchanged
+    on_progress: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     snapshot = _load_last_snapshot()
 
@@ -2579,15 +3042,19 @@ def build_market_payload(
             reason="Cache preferred. Serving the latest saved snapshot with fresh news.",
             data_date=_payload_data_date(snapshot),
         )
-        return _hydrate_ticker_intelligence_map(snapshot)
+        return _hydrate_ticker_intelligence_map(
+            _hydrate_dhan_swing_picks(snapshot, prefer_persisted=True)
+        )
 
     # Attempt live data fetch
     try:
         payload = _build_payload_from_live_data(
-            client, 
-            pool_name=pool_name, 
+            client,
+            pool_name=pool_name,
             custom_prompt=custom_prompt,
-            force_llm_refresh=force_refresh # Only refresh LLM if explicitly forced (on-demand)
+            force_llm_refresh=force_llm_refresh,
+            prior_snapshot=snapshot,
+            on_progress=on_progress,
         )
         _save_last_snapshot(payload)
         return payload
@@ -2615,7 +3082,9 @@ def build_market_payload(
                 reason=f"Live refresh failed ({exc}). Serving the latest saved snapshot with fresh news.",
                 data_date=_payload_data_date(snapshot),
             )
-            return _hydrate_ticker_intelligence_map(snapshot)
+            return _hydrate_ticker_intelligence_map(
+                _hydrate_dhan_swing_picks(snapshot, prefer_persisted=True)
+            )
         if not allow_fallback:
             return {
                 "success": False,
@@ -2696,6 +3165,7 @@ def _compile_market_analysis_stream(payload: dict[str, Any], custom_prompt: str 
 
 
 def create_app() -> FastAPI:
+    _load_refresh_tasks_from_disk()
     app = FastAPI(title="IROS Angel One Market Feed", version="2.0.0")
 
     app.add_middleware(
@@ -3038,7 +3508,7 @@ def create_app() -> FastAPI:
         return response
 
     @app.post("/api/refresh-data-on-demand")
-    async def refresh_data_on_demand(request: Request, pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
+    async def refresh_data_on_demand(request: Request, pool: str | None = None, prompt: str | None = None):
         try:
             body: dict[str, Any] = {}
             try:
@@ -3050,73 +3520,88 @@ def create_app() -> FastAPI:
 
             resolved_pool = pool or body.get("pool")
             resolved_prompt = prompt or body.get("prompt")
-            client = AngelOneClient()
-            payload = build_market_payload(
-                client,
-                pool_name=resolved_pool,
-                force_refresh=True,
-                prefer_cache=False, # Explicitly do not prefer cache for on-demand refresh
-                custom_prompt=resolved_prompt,
-                allow_fallback=True,
-            )
-            if not payload.get("success", False):
-                raise RuntimeError(payload.get("error") or "Live refresh produced no payload.")
-            payload.setdefault("isSnapshotFallback", False)
-            if payload.get("selectionMeta", {}).get("mode") != "live":
-                payload["selectionMeta"] = {
-                    "mode": "live",
-                    "reason": payload.get("selectionMeta", {}).get("reason") or "Live refresh explicitly requested by frontend.",
-                    "dataDate": payload.get("selectionMeta", {}).get("dataDate") or _payload_data_date(payload),
-                }
-
             refresh_ticker_news = bool(
                 body.get("refreshTickerNews", body.get("refresh_ticker_news", False))
             )
+            force_llm_refresh = bool(
+                body.get("forceLlmRefresh", body.get("force_llm_refresh", False))
+            )
 
-            stocks_to_refresh_news = [s for s in (payload.get("stocks") or []) if isinstance(s, dict) and s.get("ticker")]
+            dedup_key = _ondemand_refresh_task_key(resolved_pool, resolved_prompt)
+            now = time.time()
+            with _REFRESH_TASK_LOCK:
+                active_task_id = _ONDEMAND_ACTIVE_BY_KEY.get(dedup_key)
+                task = _REFRESH_TASKS.get(active_task_id) if active_task_id else None
+                start_new = True
+                if task is not None:
+                    status = str(task.get("status") or "running")
+                    updated_at = float(task.get("updated_at") or task.get("created_at") or 0)
+                    if status == "running" and (now - updated_at) <= REFRESH_TASK_RUNNING_MAX_IDLE_SECONDS:
+                        start_new = False
+                        task_id = active_task_id
+                    elif status in ("done", "error") and (now - float(task.get("created_at") or 0)) <= REFRESH_TASK_TTL_SECONDS:
+                        start_new = False
+                        task_id = active_task_id
 
-            if refresh_ticker_news and stocks_to_refresh_news:
-                tickers = [s["ticker"] for s in stocks_to_refresh_news]
-                try:
-                    semaphore = asyncio.Semaphore(5)
-                    async with httpx.AsyncClient() as http_client:
-                        async def _fetch_one(t: str) -> tuple[str, dict[str, Any]]:
-                            async with semaphore:
-                                try:
-                                    resp = await http_client.get(
-                                        f"{AI_NEWS_API_URL}/api/ticker-news",
-                                        params={"ticker": t, "max_articles": 15, "include_raw": False},
-                                        timeout=60,
-                                    )
-                                    resp.raise_for_status()
-                                    data = resp.json()
-                                    return t, data
-                                except Exception as e:
-                                    logger = logging.getLogger("angel_one_feed")
-                                    logger.warning("Per-ticker news fetch failed for %s: %s", t, e)
-                                    return t, {"error": True, "ticker": t, "message": str(e)}
+                if start_new:
+                    task_id = f"ondemand-{uuid.uuid4().hex}"
+                    _REFRESH_TASKS[task_id] = {
+                        "status": "running",
+                        "progress": "queued",
+                        "error": None,
+                        "result": None,
+                        "created_at": now,
+                        "updated_at": now,
+                        "pool": resolved_pool,
+                        "prompt": resolved_prompt,
+                        "force_llm_refresh": force_llm_refresh,
+                        "dedup_key": dedup_key,
+                    }
+                    _ONDEMAND_ACTIVE_BY_KEY[dedup_key] = task_id
+                    thread = threading.Thread(
+                        target=_run_ondemand_refresh_task,
+                        args=(task_id, resolved_pool, resolved_prompt, refresh_ticker_news, force_llm_refresh),
+                        daemon=True,
+                    )
+                    thread.start()
 
-                        results = dict(await asyncio.gather(*[_fetch_one(t) for t in tickers]))
-                        ticker_news_map = {}
-                        for t, data in results.items():
-                            if not data.get("error") and data.get("ticker"):
-                                ticker_news_map[t] = data
-                        payload["tickerNewsByTicker"] = ticker_news_map
-                        updated = len(ticker_news_map)
-                        print(f"INFO: Stored {updated} ticker news reports out of {len(tickers)} into snapshot.")
-                except Exception as exc:
-                    print(f"WARNING: Batch ticker-news refresh failed: {exc}")
-            # --- End new logic ---
+            _persist_refresh_tasks()
 
-            _save_last_snapshot(payload)
-            return {
-                "success": True,
-                "payload": payload,
-                "selectionMeta": payload.get("selectionMeta"),
-                "isSnapshotFallback": False,
-            }
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "success": True,
+                    "accepted": True,
+                    "taskId": task_id,
+                    "status": "running",
+                    "statusUrl": _ondemand_status_url(task_id),
+                    "pool": resolved_pool or LIVE_UNIVERSE_LABEL,
+                },
+            )
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.get("/api/refresh-data-on-demand/status")
+    def refresh_data_on_demand_status(taskId: str) -> dict[str, Any]:
+        status = _refresh_task_status(taskId)
+        if status is None:
+            return {
+                "success": False,
+                "taskId": taskId,
+                "status": "expired",
+                "error": "Task not found or expired.",
+            }
+        response: dict[str, Any] = {
+            "success": True,
+            "taskId": taskId,
+            "status": status["status"],
+            "progress": status.get("progress"),
+            "error": status.get("error"),
+            "created_at": status.get("created_at"),
+        }
+        if status["status"] == "done" and status.get("result"):
+            response["result"] = status["result"]
+        return response
 
     @app.post("/api/refresh-ticker-reason")
     async def refresh_ticker_reason(request: Request, ticker: str | None = None, pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
@@ -3247,6 +3732,100 @@ def create_app() -> FastAPI:
     return app
 
 
+async def _refresh_ticker_news_for_payload(payload: dict[str, Any]) -> None:
+    stocks_to_refresh_news = [
+        s for s in (payload.get("stocks") or []) if isinstance(s, dict) and s.get("ticker")
+    ]
+    if not stocks_to_refresh_news:
+        return
+
+    tickers = [s["ticker"] for s in stocks_to_refresh_news]
+    logger = logging.getLogger("angel_one_feed")
+    try:
+        semaphore = asyncio.Semaphore(5)
+        async with httpx.AsyncClient() as http_client:
+            async def _fetch_one(t: str) -> tuple[str, dict[str, Any]]:
+                async with semaphore:
+                    try:
+                        resp = await http_client.get(
+                            f"{AI_NEWS_API_URL}/api/ticker-news",
+                            params={"ticker": t, "max_articles": 15, "include_raw": False},
+                            timeout=60,
+                        )
+                        resp.raise_for_status()
+                        return t, resp.json()
+                    except Exception as exc:
+                        logger.warning("Per-ticker news fetch failed for %s: %s", t, exc)
+                        return t, {"error": True, "ticker": t, "message": str(exc)}
+
+            results = dict(await asyncio.gather(*[_fetch_one(t) for t in tickers]))
+            ticker_news_map = {
+                t: data for t, data in results.items()
+                if not data.get("error") and data.get("ticker")
+            }
+            payload["tickerNewsByTicker"] = ticker_news_map
+            print(
+                f"INFO: Stored {len(ticker_news_map)} ticker news reports out of {len(tickers)} into snapshot."
+            )
+    except Exception as exc:
+        print(f"WARNING: Batch ticker-news refresh failed: {exc}")
+
+
+def _run_ondemand_refresh_task(
+    task_id: str,
+    pool_name: str | None,
+    custom_prompt: str | None,
+    refresh_ticker_news: bool,
+    force_llm_refresh: bool = False,
+) -> None:
+    def update_progress(msg: str) -> None:
+        _refresh_task_touch(task_id, msg)
+
+    try:
+        update_progress("Starting live market refresh...")
+        client = AngelOneClient()
+        payload = build_market_payload(
+            client,
+            pool_name=pool_name,
+            force_refresh=True,
+            prefer_cache=False,
+            custom_prompt=custom_prompt,
+            allow_fallback=True,
+            force_llm_refresh=force_llm_refresh,
+            on_progress=update_progress,
+        )
+        if not payload.get("success", False):
+            _refresh_task_set_error(task_id, payload.get("error") or "Live refresh produced no payload.")
+            return
+
+        payload.setdefault("isSnapshotFallback", False)
+        if payload.get("selectionMeta", {}).get("mode") != "live":
+            payload["selectionMeta"] = {
+                "mode": "live",
+                "reason": payload.get("selectionMeta", {}).get("reason")
+                or "Live refresh explicitly requested by frontend.",
+                "dataDate": payload.get("selectionMeta", {}).get("dataDate") or _payload_data_date(payload),
+            }
+
+        if refresh_ticker_news:
+            update_progress("Refreshing ticker news...")
+            asyncio.run(_refresh_ticker_news_for_payload(payload))
+
+        update_progress("Saving snapshot...")
+        _save_last_snapshot(payload)
+        _refresh_task_set_done(
+            task_id,
+            {
+                "success": True,
+                "payload": payload,
+                "selectionMeta": payload.get("selectionMeta"),
+                "isSnapshotFallback": False,
+            },
+        )
+    except Exception as exc:
+        _refresh_task_set_error(task_id, str(exc))
+
+
 def _run_refresh_task(task_id: str, pool_name: str | None, custom_prompt: str | None) -> None:
     try:
         payload = build_market_payload(
@@ -3336,7 +3915,7 @@ def _run_orchestrated_sequence(task_id: str, pool_name: str | None, custom_promp
         # ─────────────────────────────────────────────────────────────────────────
         # STAGE 1: Deterministic Quant Engine
         # Applies hard filters and computes Alpha Scores with no LLM involvement.
-        # Returns top 20 sorted by Alpha Score; pads with volume leaders if needed.
+        # Returns top TOP_SELECTION_COUNT by Alpha Score; pads with volume leaders if needed.
         # ─────────────────────────────────────────────────────────────────────────
         update_progress("Running deterministic quant pipeline (hard filters + alpha scores)...", payload)
         top_20_quant = _compute_deterministic_pipeline(all_stocks)
@@ -3346,7 +3925,7 @@ def _run_orchestrated_sequence(task_id: str, pool_name: str | None, custom_promp
         # Audits ONLY non-technical risk domains using news context.
         # Attaches risk_flags + verdict to each stock; never re-ranks technically.
         # ─────────────────────────────────────────────────────────────────────────
-        update_progress("Running LLM risk audit on top 20 stocks...", payload)
+        update_progress(f"Running LLM risk audit on top {_TI_TOP_SELECTION_COUNT} stocks...", payload)
         final_audited = _execute_llm_risk_audit(top_20_quant, payload.get("news", []))
 
         # Print institutional audit ledger to server log
@@ -3411,6 +3990,7 @@ def _run_orchestrated_sequence(task_id: str, pool_name: str | None, custom_promp
 
         # Step 8: Update TERMINAL ANALYSIS section
         update_progress("Updating final TERMINAL ANALYSIS section...", payload)
+        payload = _hydrate_dhan_swing_picks(payload, force=True)
         payload = _hydrate_ticker_intelligence_map(payload)
         _apply_selection_meta(
             payload, 

@@ -34,7 +34,10 @@ class CompleteSecurityAnalysisPayload(BaseModel):
 
 
 _llm_not_before: float = 0.0
-TOP_SELECTION_COUNT = 20
+# Asset Matrix funnel: 500 quotes → volume screen → ranked UI list (env: TOP_SELECTION_COUNT).
+TOP_SELECTION_COUNT = int(os.getenv("TOP_SELECTION_COUNT", "50"))
+# LLM scope: verdict + terminal intelligence + news summary only for top BUY display set.
+LLM_DISPLAY_COUNT = int(os.getenv("LLM_DISPLAY_COUNT", "10"))
 
 
 KNOWN_FUNDAMENTALS: dict[str, dict[str, str]] = {
@@ -1358,7 +1361,8 @@ def execute_terminal_intelligence_pipeline(live_unstructured_stream: str) -> Com
                 "You are an elite institutional financial terminal compiler. "
                 "Analyze the provided market intelligence and return a single valid JSON object "
                 "matching the CompleteSecurityAnalysisPayload schema exactly. "
-                f"Select the top {TOP_SELECTION_COUNT} stocks for ledger_stocks. "
+                f"Select the top {LLM_DISPLAY_COUNT} stocks for ledger_stocks (the mandatory BUY display list). "
+                f"Rank up to {TOP_SELECTION_COUNT} stocks in the stream for context, but ledger_stocks must contain exactly the top {LLM_DISPLAY_COUNT} actionable BUY candidates with verdict and news-relevant summaries. "
                 "Each ledger_stocks entry MUST include: ticker, name, score, action, ltp, delta. "
                 "All fields must be present. Numeric scores should be numbers, percentages as '4.50%'. "
                 "Include ALL of these forensic scoring fields in active_scoring_matrix: "
@@ -1407,4 +1411,5 @@ __all__ = [
     "execute_terminal_intelligence_pipeline",
     "_on_demand_ticker_selection_reason",
     "TOP_SELECTION_COUNT",
+    "LLM_DISPLAY_COUNT",
 ]

@@ -5,6 +5,7 @@
 param(
     [switch]$SkipNews,
     [string]$Pool,
+    [string]$Prompt,
     [switch]$Quiet
 )
 
@@ -72,6 +73,58 @@ function Invoke-PostJson {
     return $response.Content | ConvertFrom-Json
 }
 
+function Invoke-RefreshOnDemandAsync {
+    param(
+        [string]$Uri,
+        [object]$Body,
+        [int]$MaxWaitSec = 900,
+        [int]$PollIntervalSec = 3
+    )
+
+    $init = Invoke-PostJson -Uri $Uri -Body $Body -TimeoutSec 60
+    if ($init.payload) {
+        return $init
+    }
+
+    $isAsync = ($init.accepted -eq $true) -or $init.statusUrl -or $init.taskId
+    if (-not $isAsync) {
+        throw "Backend refresh did not return payload or async task handles"
+    }
+
+    $statusPath = [string]$init.statusUrl
+    if (-not $statusPath) {
+        if ($init.taskId) {
+            $encodedTaskId = [System.Uri]::EscapeDataString([string]$init.taskId)
+            $statusPath = "/api/refresh-data-on-demand/status?taskId=$encodedTaskId"
+        } else {
+            throw "Backend refresh did not return statusUrl or taskId"
+        }
+    }
+
+    $statusUrl = if ($statusPath -like "http*") { $statusPath } else { "$MarketApi$statusPath" }
+    $deadline = (Get-Date).AddSeconds($MaxWaitSec)
+    while ((Get-Date) -lt $deadline) {
+        $status = Invoke-GetJson -Uri $statusUrl -TimeoutSec 60
+        if ($status.status -eq "done") {
+            if (-not $status.result) {
+                throw "Refresh task completed without a result payload"
+            }
+            return $status.result
+        }
+        if ($status.status -eq "error" -or $status.status -eq "failed") {
+            throw "Refresh failed: $($status.error)"
+        }
+        if ($status.status -eq "expired") {
+            throw "Refresh task expired"
+        }
+        $progress = if ($status.progress) { $status.progress } else { $status.status }
+        Write-Host "  [..] $progress" -ForegroundColor Gray
+        Start-Sleep -Seconds $PollIntervalSec
+    }
+
+    throw "Refresh timed out after ${MaxWaitSec}s"
+}
+
 function Assert-Success {
     param([object]$Json, [string]$Label)
     if ($Json.success -ne $true) {
@@ -96,6 +149,7 @@ if (-not $Quiet) {
     Write-Host "  - AI News API:      $AiNewsApi  (port 8001)" -ForegroundColor Gray
     Write-Host ""
     if ($Pool) { Write-Host "Pool: $Pool" -ForegroundColor Cyan }
+    if ($Prompt) { Write-Host "Prompt: $Prompt" -ForegroundColor Cyan }
     if ($SkipNews) { Write-Host "AI News refresh: SKIPPED" -ForegroundColor Yellow }
     Write-Host ("=" * 64) -ForegroundColor Yellow
 }
@@ -138,22 +192,20 @@ Write-Host "[PASS] Pre-flight checks complete." -ForegroundColor Green
 # STEP 1b: Clear stale snapshots before refresh
 # ============================================================================
 Write-Host ""
-Write-Host "[PRE-CLEAR] Removing stale snapshot files..." -ForegroundColor Yellow
+Write-Host "[PRE-CLEAR] Clearing export snapshot only (keeping last_market_snapshot.json for reuse)..." -ForegroundColor Yellow
 $snapPath = "$ProjectRoot\backend\app\services\last_market_snapshot.json"
 $altSnapPath = "$ProjectRoot\trade_api_snapshot.json"
 $cleared = $false
-if (Test-Path $snapPath) {
-    Remove-Item -LiteralPath $snapPath -Force -ErrorAction SilentlyContinue
-    $cleared = $true
-    Write-Host "  [OK] Removed: $snapPath" -ForegroundColor Green
-}
 if (Test-Path $altSnapPath) {
     Remove-Item -LiteralPath $altSnapPath -Force -ErrorAction SilentlyContinue
     $cleared = $true
     Write-Host "  [OK] Removed: $altSnapPath" -ForegroundColor Green
 }
 if (-not $cleared) {
-    Write-Host "  [OK] No stale snapshot files found." -ForegroundColor Green
+    Write-Host "  [OK] No export snapshot to clear." -ForegroundColor Green
+}
+if (Test-Path $snapPath) {
+    Write-Host "  [OK] Preserved: $snapPath (backend reuses for intraday + AI cache)" -ForegroundColor Green
 }
 
 # ============================================================================
@@ -165,13 +217,13 @@ $TotalCount++
 try {
     $body = @{
         pool = if ($Pool) { $Pool } else { $null }
-        prompt = $null
+        prompt = if ($Prompt) { $Prompt } else { $null }
         refreshTickerNews = $false
     }
     Write-Host "  This performs a FORCED live Angel One refresh and saves to snapshot." -ForegroundColor Gray
     Write-Host "  Request: POST $MarketApi/api/refresh-data-on-demand" -ForegroundColor Gray
 
-    $json = Invoke-PostJson -Uri "$MarketApi/api/refresh-data-on-demand" -Body $body -TimeoutSec 300
+    $json = Invoke-RefreshOnDemandAsync -Uri "$MarketApi/api/refresh-data-on-demand" -Body $body -MaxWaitSec 900
 
     $stocks = @($json.payload.stocks)
     $quotes = $json.payload.stockQuotes
@@ -301,10 +353,10 @@ try {
     # This avoids competing GET that would trigger another Angel One connection
     $body = @{
         pool = if ($Pool) { $Pool } else { $null }
-        prompt = $null
+        prompt = if ($Prompt) { $Prompt } else { $null }
         refreshTickerNews = $false
     }
-    $json = Invoke-PostJson -Uri "$MarketApi/api/refresh-data-on-demand" -Body $body -TimeoutSec 300
+    $json = Invoke-RefreshOnDemandAsync -Uri "$MarketApi/api/refresh-data-on-demand" -Body $body -MaxWaitSec 900
     $miPayload = $json.payload
 
     $stocks = @($miPayload.stocks)
@@ -339,8 +391,8 @@ try {
         Write-Host "  [OK] Using terminal intelligence from the refresh response." -ForegroundColor Green
     } else {
         Write-Host "  [WARN] No terminal intelligence in refresh payload. Fetching via POST..." -ForegroundColor Yellow
-        $body = @{ pool = if ($Pool) { $Pool } else { $null }; prompt = $null; refreshTickerNews = $false }
-        $json = Invoke-PostJson -Uri "$MarketApi/api/refresh-data-on-demand" -Body $body -TimeoutSec 300
+        $body = @{ pool = if ($Pool) { $Pool } else { $null }; prompt = if ($Prompt) { $Prompt } else { $null }; refreshTickerNews = $false }
+        $json = Invoke-RefreshOnDemandAsync -Uri "$MarketApi/api/refresh-data-on-demand" -Body $body -MaxWaitSec 900
         $tiPayload = $json.payload.terminalIntelligence
         $ledger = @($tiPayload.ledger_stocks)
         $narrative = $tiPayload.narrative
@@ -496,7 +548,7 @@ try {
         try {
             # First, call the backend directly again to make sure snapshot is 100% fresh
             Start-Sleep -Milliseconds 500
-            $refreshResult = Invoke-PostJson -Uri "$MarketApi/api/refresh-data-on-demand" -Body @{} -TimeoutSec 300
+            $refreshResult = Invoke-RefreshOnDemandAsync -Uri "$MarketApi/api/refresh-data-on-demand" -Body @{} -MaxWaitSec 900
             $success = $refreshResult.success
             if ($success) {
                 Write-Host "  [OK] Backend snapshot confirmed fresh." -ForegroundColor Green
@@ -506,7 +558,7 @@ try {
 
             # Now force frontend to re-read by calling its proxy
             Start-Sleep -Milliseconds 500
-            $frontendRefresh = Invoke-PostJson -Uri "$FrontendApi/api/refresh-data-on-demand" -Body @{} -TimeoutSec 300
+            $frontendRefresh = Invoke-RefreshOnDemandAsync -Uri "$FrontendApi/api/refresh-data-on-demand" -Body @{} -MaxWaitSec 900
             if ($frontendRefresh -and $frontendRefresh.success) {
                 Write-Host "  [OK] Frontend cache invalidated via proxy." -ForegroundColor Green
                 Write-Host "       Frontend will pick up fresh data immediately." -ForegroundColor Green

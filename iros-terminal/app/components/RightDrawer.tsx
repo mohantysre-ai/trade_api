@@ -7,6 +7,7 @@ import AITickerNewsPanel from "./AITickerNewsPanel";
 import ConfidenceCheckerPanel from "./ConfidenceCheckerPanel";
 import TechnicalAnalysisPanel from "./TechnicalAnalysisPanel";
 import SwotAnalysisPanel from "./SwotAnalysisPanel";
+import { parseNewsCatalystsCard } from "@/lib/intelligence-summary";
 
 type DrawerAnalysis = TerminalIntelligence & {
   error?: string;
@@ -346,51 +347,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
     return () => window.cancelAnimationFrame(id);
   }, [ticker]);
 
-  const parseNewsSummary = (text: string | undefined) => {
-    if (!text) return null;
-    const sections: Record<string, string> = {};
-    const lines = text.split("\n");
-    let currentSection = "";
-    let sectionContent: string[] = [];
-
-    for (const line of lines) {
-      if (line.includes("KEY CATALYSTS:")) {
-        currentSection = "catalysts";
-      } else if (line.includes("ACTIONABLE OUTLOOK:")) {
-        if (currentSection && sectionContent.length) {
-          sections[currentSection] = sectionContent.join("\n").trim();
-        }
-        currentSection = "outlook";
-        sectionContent = [];
-      } else if (line.includes("SECTOR WATCH:")) {
-        if (currentSection && sectionContent.length) {
-          sections[currentSection] = sectionContent.join("\n").trim();
-        }
-        currentSection = "sector";
-        sectionContent = [];
-      } else if (line.includes("MARKET SCORE:")) {
-        if (currentSection && sectionContent.length) {
-          sections[currentSection] = sectionContent.join("\n").trim();
-        }
-        currentSection = "score";
-        sectionContent = [];
-      } else if (line.includes("RECOMMENDATION:")) {
-        if (currentSection && sectionContent.length) {
-          sections[currentSection] = sectionContent.join("\n").trim();
-        }
-        currentSection = "recommendation";
-        sectionContent = [];
-      } else if (line.trim()) {
-        sectionContent.push(line);
-      }
-    }
-
-    if (currentSection && sectionContent.length) {
-      sections[currentSection] = sectionContent.join("\n").trim();
-    }
-
-    return sections;
-  };
+  const parseNewsSummary = (text: string | undefined) => parseNewsCatalystsCard(text);
 
   const newsSummary = parseNewsSummary(analysis?.news_catalysts_card);
   const score = newsSummary?.score?.match(/\d+/)?.[0];

@@ -58,5 +58,25 @@
     "ltp": 4469.8,
     "planDate": "2026-07-31",
     "firedAt": "2026-07-31T18:04:38.523754+00:00"
+  },
+  {
+    "key": "EXICOM:LONG:t1",
+    "symbol": "EXICOM",
+    "direction": "LONG",
+    "hitLevel": "t1",
+    "label": "TARGET 1 HIT",
+    "ltp": 158.37,
+    "planDate": "2026-08-01",
+    "firedAt": "2026-08-01T15:36:26.539106+00:00"
+  },
+  {
+    "key": "DATAPATTNS:LONG:t1",
+    "symbol": "DATAPATTNS",
+    "direction": "LONG",
+    "hitLevel": "t1",
+    "label": "TARGET 1 HIT",
+    "ltp": 4281.0,
+    "planDate": "2026-08-01",
+    "firedAt": "2026-08-01T15:36:26.539106+00:00"
   }
 ]

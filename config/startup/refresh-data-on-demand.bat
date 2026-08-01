@@ -78,6 +78,7 @@ if /i "%~1"=="--orchestrate" (
 ) else if /i "%~1"=="--no-ticker-news" (
     set PS_ARGS=!PS_ARGS! -NoTickerNews
 ) else if /i "%~1"=="--prompt" (
+    set PS_ARGS=!PS_ARGS! -Prompt "%~2"
     set PYTHON_ARGS=!PYTHON_ARGS! --prompt "%~2"
     shift
 )

@@ -102,15 +102,51 @@ if ($IncludeRefreshSmokeTest) {
         refreshTickerNews = $false
     } | ConvertTo-Json -Depth 8
 
-    $refreshResponse = Invoke-WebRequest `
+    $initResponse = Invoke-WebRequest `
         -Uri "http://127.0.0.1:8000/api/refresh-data-on-demand" `
         -Method POST `
         -ContentType "application/json" `
         -Body $body `
         -UseBasicParsing `
-        -TimeoutSec 180
+        -TimeoutSec 60
 
-    $refreshJson = $refreshResponse.Content | ConvertFrom-Json
+    $initJson = $initResponse.Content | ConvertFrom-Json
+    Assert-True ($initJson.success -eq $true) "refresh-data-on-demand POST returned success=false"
+
+    $refreshJson = $null
+    if ($initJson.payload) {
+        $refreshJson = $initJson
+    } else {
+        Assert-True ($null -ne $initJson.statusUrl -or $null -ne $initJson.taskId) "refresh-data-on-demand returned no statusUrl or taskId"
+        $statusUrl = if ([string]$initJson.statusUrl -like "http*") {
+            [string]$initJson.statusUrl
+        } elseif ($initJson.statusUrl) {
+            "http://127.0.0.1:8000$($initJson.statusUrl)"
+        } else {
+            $encodedTaskId = [System.Uri]::EscapeDataString([string]$initJson.taskId)
+            "http://127.0.0.1:8000/api/refresh-data-on-demand/status?taskId=$encodedTaskId"
+        }
+        $deadline = (Get-Date).AddSeconds(900)
+        while ((Get-Date) -lt $deadline) {
+            $statusResponse = Invoke-WebRequest -Uri $statusUrl -UseBasicParsing -TimeoutSec 60
+            $statusJson = $statusResponse.Content | ConvertFrom-Json
+            if ($statusJson.status -eq "done") {
+                $refreshJson = $statusJson.result
+                break
+            }
+            if ($statusJson.status -eq "error" -or $statusJson.status -eq "failed") {
+                throw "refresh-data-on-demand failed: $($statusJson.error)"
+            }
+            if ($statusJson.status -eq "expired") {
+                throw "refresh-data-on-demand task expired"
+            }
+            Start-Sleep -Seconds 3
+        }
+        if ($null -eq $refreshJson) {
+            throw "refresh-data-on-demand timed out after 900s"
+        }
+    }
+
     Assert-True ($refreshJson.success -eq $true) "refresh-data-on-demand returned success=false"
     Assert-True ($null -ne $refreshJson.payload) "refresh-data-on-demand returned no payload"
     Assert-True ((@($refreshJson.payload.stocks) | Measure-Object).Count -gt 0) "refresh-data-on-demand returned no stocks"

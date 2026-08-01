@@ -3,6 +3,37 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MarketDataResponse, TerminalIntelligence, LiveStock, SparkFlag } from '@/lib/market-api';
 import { fetchNseSparkline } from '@/lib/market-api';
+import {
+  chipToneClass,
+  buildMatrixSourceChips,
+  computeInstitutionalSizingHint,
+  convictionTierBadgeLabel,
+  convictionTierStyles,
+  dhanRrValue,
+  evaluateMatrixBuyCandidate,
+  estimateStructuralRr,
+  isInstitutionalMatrixMode,
+  isInstitutionalOffHoursContext,
+  MATRIX_BUY_MIN_DISPLAY,
+  MATRIX_BUY_MIN_SCORE,
+  MATRIX_BUY_TOP_N,
+  INSTITUTIONAL_MATRIX_TOP_N,
+  mergeIntelligenceSummary,
+  matrixSourceChipClass,
+  SCORE_STRONG,
+  selectMatrixDisplayRows,
+  SCORE_MODERATE,
+  SCORE_WEAK,
+  type ConvictionTier,
+  type DhanSwingPick,
+  type MergedIntelligenceSummary,
+  type TrendlyneCardSummary,
+  type WinEdgeResult,
+} from '@/lib/intelligence-summary';
+import type { DhanSwingPicksPayload } from '@/lib/market-api';
+
+const MAX_TRENDLYNE_CARDS = 12;
+const TRENDLYNE_BATCH_SIZE = 4;
 
 /* ── Smooth sparkline SVG with Catmull-Rom spline ─────────────────────── */
 const SPARK_FLAGS: SparkFlag[] = ['1D', '1M', '1Y'];
@@ -44,9 +75,9 @@ function StockSparklineSVG({ data }: { data: number[] }) {
   const positive = last >= first;
   const color = positive ? '#10b981' : '#ef4444';
 
-  const W = 120;
-  const H = 40;
-  const pad = 3;
+  const W = 200;
+  const H = 56;
+  const pad = 8;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
@@ -71,10 +102,9 @@ function StockSparklineSVG({ data }: { data: number[] }) {
 
   return (
     <svg
-      className="w-full h-10"
+      className="w-full h-14"
       viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none"
-      style={{ filter: `drop-shadow(0 1px 2px ${color}20)` }}
+      preserveAspectRatio="xMidYMid meet"
     >
       <defs>
         {/* Rich multi-stop gradient for area fill */}
@@ -83,8 +113,8 @@ function StockSparklineSVG({ data }: { data: number[] }) {
           <stop offset="50%" stopColor={color} stopOpacity="0.15" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
-        {/* Glow filter for the stroke */}
-        <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
+        {/* Glow filter for the stroke — expanded region so pulse/glow aren't cropped */}
+        <filter id={glowId} x="-40%" y="-40%" width="180%" height="180%">
           <feGaussianBlur stdDeviation="1.2" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
@@ -210,6 +240,18 @@ function useStockSparklines(tickers: string[], flag: SparkFlag): Record<string, 
   return sparklines;
 }
 
+function sparkPeriodChange(data: number[] | undefined): { label: string; pct: number; positive: boolean } | null {
+  if (!data || data.length < 2 || !data[0]) return null;
+  const first = data[0];
+  const last = data[data.length - 1];
+  const pct = ((last - first) / first) * 100;
+  return {
+    pct,
+    positive: pct >= 0,
+    label: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`,
+  };
+}
+
 function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag }: {
   ticker: string;
   sparklines: Record<SparkFlag, number[]>;
@@ -218,33 +260,26 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag }: 
 }) {
   const data = sparklines?.[currentFlag];
   const hasData = data && data.length >= 2;
-
-  /* Calculate change for badge */
-  let changeLabel = '';
-  let changeColor = 'text-slate-400';
-  if (hasData) {
-    const first = data![0];
-    const last = data![data!.length - 1];
-    const pct = ((last - first) / first) * 100;
-    changeLabel = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
-    changeColor = pct >= 0 ? 'text-emerald-600' : 'text-red-500';
-  }
+  const change = sparkPeriodChange(data);
+  const positive = change?.positive ?? true;
 
   return (
     <div className="mb-1.5 relative z-10">
-      {/* Chart area */}
+      {/* Chart band — no overflow-hidden so glow / pulse ring are not clipped */}
       <div
-        className="rounded-lg overflow-hidden transition-all"
+        className="rounded-lg transition-all px-0.5 py-0.5"
         style={{
           background: hasData
-            ? 'linear-gradient(135deg, rgba(100,116,139,0.03) 0%, rgba(100,116,139,0.06) 100%)'
+            ? positive
+              ? 'linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(16,185,129,0.12) 100%)'
+              : 'linear-gradient(135deg, rgba(239,68,68,0.06) 0%, rgba(239,68,68,0.12) 100%)'
             : 'transparent',
         }}
       >
         {hasData ? (
           <StockSparklineSVG data={data!} />
         ) : (
-          <div className="h-10 flex items-center justify-center">
+          <div className="h-14 flex items-center justify-center">
             <div className="flex items-center gap-1">
               <div className="w-1 h-1 rounded-full bg-slate-300 animate-pulse" />
               <div className="w-1 h-1 rounded-full bg-slate-300 animate-pulse" style={{ animationDelay: '0.2s' }} />
@@ -270,27 +305,310 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag }: 
             </button>
           ))}
         </div>
-        {hasData && (
-          <span className={`text-[7px] font-bold tabular-nums ${changeColor}`}>{changeLabel}</span>
+        {change && (
+          <span className={`text-[7px] font-bold tabular-nums ${change.positive ? 'text-emerald-600' : 'text-red-500'}`}>
+            {change.label}
+          </span>
         )}
       </div>
     </div>
   );
 }
 
+type StockIntraday = {
+  atr_pct?: number;
+  orb_velocity_pct?: number;
+  volume_multiplier?: number;
+  turnover_cr?: number;
+  passes_hard_filters?: boolean;
+  passes_quality_filters?: boolean;
+  hard_filter_reasons?: string[];
+};
+
+type StockWithIntraday = LiveStock & {
+  intraday?: StockIntraday;
+  passes_hard_filters?: boolean;
+};
+
+type LedgerStockRow = {
+  ticker: string;
+  score?: number;
+  action?: string;
+  selection_reason?: string;
+  live_price?: string;
+  delta?: string;
+  day_change_pct?: string;
+  risk_flag?: string;
+  policy_allocation_pct?: string;
+};
+
+function parsePercent(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const text = String(value ?? '').trim();
+  const match = text.match(/^([+-]?[0-9]+(?:\.[0-9]+)?)\s*%?$/);
+  return match ? parseFloat(match[1]) : 0;
+}
+
+function parseWinLossRatio(value: unknown): number | null {
+  const text = String(value ?? '').trim();
+  const match = text.match(/^([0-9]+(?:\.[0-9]+)?)\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*$/);
+  if (!match) return null;
+  const left = parseFloat(match[1]);
+  const right = parseFloat(match[2]);
+  if (!Number.isFinite(left) || !Number.isFinite(right) || right <= 0) return null;
+  return left / right;
+}
+
+function parsePercentValue(value: unknown): number | null {
+  const text = String(value ?? '').trim();
+  const match = text.match(/^([0-9]+(?:\.[0-9]+)?)\s*%$/);
+  return match ? parseFloat(match[1]) : null;
+}
+
+/** Mirrors backend intelligence_engine._risk_flag_from_metrics thresholds. */
+function riskFlagFromMetrics(
+  score: number,
+  delta: number,
+  atr: number,
+  volumeMultiplier: number,
+  winLossRatioText?: unknown,
+  kellyPolicyText?: unknown,
+): string {
+  let riskScore = 50;
+
+  // Intraday engine scores span ~0–25 (bands: 8 weak, 12 moderate, 18 strong).
+  if (score >= SCORE_STRONG) riskScore -= 18;
+  else if (score >= 15) riskScore -= 10;
+  else if (score >= SCORE_MODERATE) riskScore -= 2;
+  else riskScore += 10;
+
+  const absDelta = Math.abs(delta);
+  if (absDelta >= 6) riskScore += 12;
+  else if (absDelta >= 3) riskScore += 6;
+  else if (absDelta < 1) riskScore -= 2;
+
+  if (atr >= 4) riskScore += 18;
+  else if (atr >= 3) riskScore += 10;
+  else if (atr >= 2) riskScore += 4;
+  else riskScore -= 4;
+
+  if (volumeMultiplier >= 2.0) riskScore -= 8;
+  else if (volumeMultiplier >= 1.0) riskScore -= 4;
+  else if (volumeMultiplier < 0.5) riskScore += 8;
+
+  const wlRatio = parseWinLossRatio(winLossRatioText);
+  if (wlRatio !== null) {
+    if (wlRatio >= 3.0) riskScore -= 10;
+    else if (wlRatio >= 1.8) riskScore -= 5;
+    else if (wlRatio < 1.0) riskScore += 8;
+  }
+
+  const kellyPct = parsePercentValue(kellyPolicyText);
+  if (kellyPct !== null) {
+    if (kellyPct >= 12) riskScore -= 8;
+    else if (kellyPct >= 6) riskScore -= 4;
+    else if (kellyPct <= 2) riskScore += 4;
+  }
+
+  riskScore = Math.max(0, Math.min(100, riskScore));
+
+  if (riskScore < 30) return 'LOW_RISK';
+  if (riskScore < 55) return 'MODERATE_RISK';
+  if (riskScore < 75) return 'HIGH_RISK';
+  return 'EXTREME_RISK';
+}
+
+function normalizeRiskFlag(value: unknown): string {
+  const text = String(value ?? '').trim().toUpperCase().replace(/\s+/g, '_');
+  if (!text || text === 'N/A' || text === 'NA' || text === 'NONE' || text === '-') return '';
+  return text;
+}
+
+function isVolumePadStock(stock: StockWithIntraday | undefined): boolean {
+  if (!stock) return false;
+  const reasons = stock.intraday?.hard_filter_reasons ?? [];
+  return reasons.some((reason) => /not in intraday candidate|volume pad|non-qualifier/i.test(reason));
+}
+
+function resolveRiskFlag(opts: {
+  ledgerRiskFlag?: string;
+  tickerRiskCalc?: Record<string, unknown>;
+  stock?: StockWithIntraday;
+  quote?: StockWithIntraday;
+  score: number;
+  deltaText?: string;
+  kellyPolicy?: string;
+  marketRisk?: Record<string, unknown>;
+  allowVolumeFill?: boolean;
+}): string {
+  const fromLedger = normalizeRiskFlag(opts.ledgerRiskFlag);
+  if (fromLedger) return fromLedger;
+
+  const stock = opts.stock;
+  const quote = opts.quote ?? stock;
+  const intraday = stock?.intraday ?? quote?.intraday;
+  const atr = typeof intraday?.atr_pct === 'number' ? intraday.atr_pct : 0;
+  const volumeMultiplier = typeof intraday?.volume_multiplier === 'number' ? intraday.volume_multiplier : 0;
+  const delta = parsePercent(opts.deltaText ?? quote?.delta ?? stock?.delta);
+  const hasMetrics = atr > 0 || volumeMultiplier > 0 || opts.score > 0;
+
+  // Intraday scores are ~0–25; prefer live metrics over stale ticker-intel EXTREME flags.
+  if (hasMetrics && opts.score <= 30) {
+    return riskFlagFromMetrics(
+      opts.score,
+      delta,
+      atr,
+      volumeMultiplier,
+      opts.marketRisk?.win_loss_ratio,
+      opts.kellyPolicy ?? opts.marketRisk?.kelly_policy_max,
+    );
+  }
+
+  const fromTicker = normalizeRiskFlag(opts.tickerRiskCalc?.risk_flag);
+  if (fromTicker) return fromTicker;
+
+  // Volume-pad names are tracked via isVolumePad on the row — no VOLUME_FILL badge on cards.
+  if (opts.allowVolumeFill && isVolumePadStock(opts.stock)) {
+    return '';
+  }
+
+  if (hasMetrics) {
+    return riskFlagFromMetrics(
+      opts.score,
+      delta,
+      atr,
+      volumeMultiplier,
+      opts.marketRisk?.win_loss_ratio,
+      opts.kellyPolicy ?? opts.marketRisk?.kelly_policy_max,
+    );
+  }
+
+  return 'UNRATED';
+}
+
 type AssetRow = {
   ticker: string;
   price: string;
   score: number;
-  kelly: string;
-  returnPct: number;
+  scoreScale: 'angel' | 'dhan' | 'unknown';
+  kellyPolicy?: string;
+  winLossRatio?: string;
+  dayChangePct: number | null;
   thesis: string;
+  action?: string;
   riskFlag: string;
+  passesHardFilters?: boolean;
+  passesQualityFilters?: boolean;
+  hardFilterReasons?: string[];
+  isVolumePad: boolean;
+  isMetaRow: boolean;
   state?: string;
   promoterPct?: number;
   bulkDealValueCr?: number;
   bulkDealSignal?: boolean;
+  dhanPick?: DhanSwingPick;
+  hasQuantSource: boolean;
+  atrPct?: number;
 };
+
+type MatrixCardRow = {
+  row: AssetRow;
+  tier: ConvictionTier;
+  reason: string;
+  winEdge: WinEdgeResult | null;
+  intelligence: MergedIntelligenceSummary;
+};
+
+function scoreToStrengthBars(score: number): number {
+  if (score <= 0) return 0;
+  if (score < SCORE_WEAK) return 1;
+  if (score < 12) return 2;
+  if (score < 15) return 3;
+  if (score < SCORE_STRONG) return 4;
+  return 5;
+}
+
+function useTrendlyneSummaries(tickers: string[], maxCards = MAX_TRENDLYNE_CARDS) {
+  const [summaries, setSummaries] = useState<Record<string, TrendlyneCardSummary>>({});
+  const fetchedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const eligible = tickers
+      .filter((ticker) => ticker && !/\s/.test(ticker) && !fetchedRef.current.has(ticker))
+      .slice(0, maxCards);
+
+    if (!eligible.length) return;
+
+    let cancelled = false;
+
+    const fetchBatches = async () => {
+      for (let i = 0; i < eligible.length; i += TRENDLYNE_BATCH_SIZE) {
+        if (cancelled) return;
+        const batch = eligible.slice(i, i + TRENDLYNE_BATCH_SIZE);
+        try {
+          const res = await fetch(
+            `/api/trendlyne-summary?tickers=${encodeURIComponent(batch.join(','))}`,
+            { cache: 'no-store' },
+          );
+          if (!res.ok) continue;
+          const body = await res.json();
+          const batchSummaries = (body.summaries ?? {}) as Record<string, TrendlyneCardSummary>;
+          if (cancelled) return;
+
+          const updates: Record<string, TrendlyneCardSummary> = {};
+          for (const ticker of batch) {
+            const summary = batchSummaries[ticker];
+            if (summary) {
+              updates[ticker] = summary;
+              fetchedRef.current.add(ticker);
+            }
+          }
+
+          if (Object.keys(updates).length > 0) {
+            setSummaries((prev) => ({ ...prev, ...updates }));
+          }
+        } catch {
+          // Keep card usable with drawer / terminal intelligence only.
+        }
+      }
+    };
+
+    void fetchBatches();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tickers, maxCards]);
+
+  return summaries;
+}
+
+function StrengthMeter({ score }: { score: number }) {
+  const bars = scoreToStrengthBars(score);
+  const label = bars === 0 ? '—' : `${bars}/5`;
+  return (
+    <div className="flex items-center gap-1.5" title={`Setup strength ${label} (score ${score.toFixed(1)})`}>
+      <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400">Strength</span>
+      <div className="flex items-center gap-0.5">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div
+            key={i}
+            className={`w-2 h-2.5 rounded-sm ${
+              i <= bars
+                ? bars >= 4
+                  ? 'bg-emerald-500'
+                  : bars >= 3
+                    ? 'bg-amber-400'
+                    : 'bg-slate-400'
+                : 'bg-slate-200'
+            }`}
+          />
+        ))}
+      </div>
+      <span className="text-[8px] font-bold tabular-nums text-slate-500">{score > 0 ? score.toFixed(1) : '—'}</span>
+    </div>
+  );
+}
 
 const DEFAULT_POOLS = ['Nifty 500', 'Nifty 100', 'Live Universe'] as const;
 
@@ -354,9 +672,38 @@ export default function ForensicPanel({
     return map;
   }, [live?.stockQuotes, stocks]);
 
+  const stockByTicker = useMemo(() => {
+    const map = new Map<string, StockWithIntraday>();
+    const quotes = live?.stockQuotes ?? {};
+    for (const stock of stocks) {
+      map.set(stock.ticker, { ...stock, ...(quotes[stock.ticker] as StockWithIntraday | undefined) });
+    }
+    for (const [ticker, quote] of Object.entries(quotes)) {
+      if (!map.has(ticker)) {
+        map.set(ticker, quote as StockWithIntraday);
+      }
+    }
+    return map;
+  }, [live?.stockQuotes, stocks]);
+
+  const dhanPickMap = useMemo(() => {
+    const map = new Map<string, DhanSwingPick>();
+    const payload = live?.dhanSwingPicks as DhanSwingPicksPayload | undefined;
+    for (const p of payload?.picks ?? []) {
+      const sym = (p.symbol || '').toUpperCase();
+      if (sym) map.set(sym, p);
+    }
+    return map;
+  }, [live?.dhanSwingPicks]);
+
+  const institutionalMode = isInstitutionalMatrixMode();
+
   const assetRows: AssetRow[] = useMemo(() => {
     const rows: AssetRow[] = [];
     const seen = new Set<string>();
+    const marketRisk = intelligence?.active_risk_calc as Record<string, unknown> | undefined;
+    const tickerIntelMap = live?.tickerIntelligenceByTicker ?? {};
+
     const push = (row: AssetRow) => {
       if (!seen.has(row.ticker)) {
         seen.add(row.ticker);
@@ -364,73 +711,214 @@ export default function ForensicPanel({
       }
     };
 
+    const enrichFromStock = (
+      ticker: string,
+      stock: StockWithIntraday | undefined,
+      quote: StockWithIntraday | undefined,
+    ) => {
+      const intraday = stock?.intraday ?? quote?.intraday;
+      const passesHardFilters =
+        typeof intraday?.passes_hard_filters === 'boolean'
+          ? intraday.passes_hard_filters
+          : typeof stock?.passes_hard_filters === 'boolean'
+            ? stock.passes_hard_filters
+            : undefined;
+      const passesQualityFilters =
+        typeof intraday?.passes_quality_filters === 'boolean'
+          ? intraday.passes_quality_filters
+          : typeof stock?.passes_quality_filters === 'boolean'
+            ? stock.passes_quality_filters
+            : undefined;
+      return {
+        passesHardFilters,
+        passesQualityFilters,
+        hardFilterReasons: intraday?.hard_filter_reasons ?? [],
+        atrPct: typeof intraday?.atr_pct === 'number' ? intraday.atr_pct : undefined,
+        dhanPick: dhanPickMap.get(ticker),
+      };
+    };
+
     if (intelligence?.ledger_stocks?.length) {
       const sorted = [...intelligence.ledger_stocks].sort(
         (a, b) => (typeof b.score === 'number' ? b.score : 0) - (typeof a.score === 'number' ? a.score : 0)
       );
-      const total = sorted.length;
-      for (let i = 0; i < sorted.length; i++) {
-        const row = sorted[i];
+      for (const rawRow of sorted) {
+        const row = rawRow as LedgerStockRow;
         const action = row.action || '';
         const reason = row.selection_reason || action;
         const score = typeof row.score === 'number' ? row.score : 0;
-        const tertile = total > 0 ? Math.floor((i / total) * 3) : 0;
-        let riskFlag: string;
-        if (tertile === 0) riskFlag = 'LOW_RISK';
-        else if (tertile === 1) riskFlag = 'MODERATE_RISK';
-        else riskFlag = 'HIGH_RISK';
+        const stock = stockByTicker.get(row.ticker);
+        const quote = live?.stockQuotes?.[row.ticker] as StockWithIntraday | undefined;
+        const tickerRiskCalc = tickerIntelMap[row.ticker]?.active_risk_calc as Record<string, unknown> | undefined;
+        const riskFlag = resolveRiskFlag({
+          ledgerRiskFlag: row.risk_flag,
+          tickerRiskCalc,
+          stock,
+          quote,
+          score,
+          deltaText: row.delta || row.day_change_pct,
+          kellyPolicy: row.policy_allocation_pct,
+          marketRisk,
+        });
+        const enriched = enrichFromStock(row.ticker, stock, quote);
+        const rawDayChange = parsePercent(row.delta || row.day_change_pct) || parsePercent(quote?.delta ?? stock?.delta);
+        const hasDayChangeField = Boolean(row.delta || row.day_change_pct || quote?.delta || stock?.delta);
+        const kellyPolicy = row.policy_allocation_pct?.trim() || undefined;
+        const wlFromTicker = tickerRiskCalc?.win_loss_ratio as string | undefined;
+        const wlFromMarket = marketRisk?.win_loss_ratio as string | undefined;
+        const winLossRatio =
+          wlFromTicker && parseWinLossRatio(wlFromTicker) !== null
+            ? wlFromTicker
+            : wlFromMarket && parseWinLossRatio(wlFromMarket) !== null
+              ? wlFromMarket
+              : undefined;
         push({
           ticker: row.ticker,
           price: row.live_price || stockPriceMap.get(row.ticker) || '',
-          score: score,
-          kelly: '5.67 : 1',
-          returnPct: score / 6,
+          score,
+          scoreScale: 'angel',
+          kellyPolicy,
+          winLossRatio,
+          dayChangePct: hasDayChangeField ? rawDayChange : null,
           thesis: reason || 'Score-based selection',
-          riskFlag: riskFlag,
-          state: score >= 55 ? 'HIGH' : score <= 40 ? 'LOW' : undefined,
+          action: action || undefined,
+          riskFlag,
+          passesHardFilters: enriched.passesHardFilters,
+          passesQualityFilters: enriched.passesQualityFilters,
+          hardFilterReasons: enriched.hardFilterReasons,
+          isVolumePad: isVolumePadStock(stock),
+          isMetaRow: false,
+          state: score >= SCORE_STRONG ? 'HIGH' : score <= SCORE_WEAK ? 'LOW' : undefined,
           promoterPct: stockMetaMap.get(row.ticker)?.promoterPct,
           bulkDealValueCr: stockMetaMap.get(row.ticker)?.bulkDealValueCr,
           bulkDealSignal: stockMetaMap.get(row.ticker)?.bulkDealSignal,
+          dhanPick: enriched.dhanPick,
+          hasQuantSource: true,
+          atrPct: enriched.atrPct,
         });
       }
+    }
+
+    if (!intelligence?.ledger_stocks?.length && stocks.length) {
+      const sortedStocks = [...stocks].sort(
+        (a, b) => (typeof b.score === 'number' ? b.score : 0) - (typeof a.score === 'number' ? a.score : 0),
+      );
+      for (const stock of sortedStocks) {
+        const quote = live?.stockQuotes?.[stock.ticker] as StockWithIntraday | undefined;
+        const merged = stockByTicker.get(stock.ticker) ?? ({ ...stock, ...quote } as StockWithIntraday);
+        const score = typeof stock.score === 'number' ? stock.score : 0;
+        const enriched = enrichFromStock(stock.ticker, merged, quote);
+        const riskFlag = resolveRiskFlag({
+          stock: merged,
+          quote,
+          score,
+          deltaText: stock.delta,
+          marketRisk,
+        });
+        push({
+          ticker: stock.ticker,
+          price: stock.ltp || stockPriceMap.get(stock.ticker) || '',
+          score,
+          scoreScale: 'angel',
+          dayChangePct: parsePercent(stock.delta),
+          thesis: 'Quant-ranked from live universe',
+          riskFlag,
+          passesHardFilters: enriched.passesHardFilters,
+          passesQualityFilters: enriched.passesQualityFilters,
+          hardFilterReasons: enriched.hardFilterReasons,
+          isVolumePad: isVolumePadStock(merged),
+          isMetaRow: false,
+          state: score >= SCORE_STRONG ? 'HIGH' : score <= SCORE_WEAK ? 'LOW' : undefined,
+          promoterPct: stockMetaMap.get(stock.ticker)?.promoterPct,
+          bulkDealValueCr: stockMetaMap.get(stock.ticker)?.bulkDealValueCr,
+          bulkDealSignal: stockMetaMap.get(stock.ticker)?.bulkDealSignal,
+          dhanPick: enriched.dhanPick,
+          hasQuantSource: true,
+          atrPct: enriched.atrPct,
+        });
+      }
+    }
+
+    for (const [sym, pick] of dhanPickMap) {
+      if (seen.has(sym)) {
+        const existing = rows.find((r) => r.ticker === sym);
+        if (existing && !existing.dhanPick) existing.dhanPick = pick;
+        continue;
+      }
+      const stock = stockByTicker.get(sym);
+      const score = typeof stock?.score === 'number' ? stock.score : 0;
+      if (score < SCORE_STRONG) continue;
+      const quote = live?.stockQuotes?.[sym] as StockWithIntraday | undefined;
+      const merged = stock ?? quote;
+      const enriched = enrichFromStock(sym, merged, quote);
+      push({
+        ticker: sym,
+        price: String(pick.scanLtp ?? pick.buyAbove ?? stock?.ltp ?? stockPriceMap.get(sym) ?? ''),
+        score,
+        scoreScale: 'angel',
+        dayChangePct: merged ? parsePercent(merged.delta) : null,
+        thesis: pick.reasons?.join(' · ') || 'Dhan ScanX swing confluence',
+        action: 'BUY',
+        riskFlag: resolveRiskFlag({ stock: merged, quote, score, marketRisk }),
+        passesHardFilters: enriched.passesHardFilters,
+        passesQualityFilters: enriched.passesQualityFilters,
+        hardFilterReasons: enriched.hardFilterReasons,
+        isVolumePad: isVolumePadStock(merged),
+        isMetaRow: false,
+        state: score >= SCORE_STRONG ? 'HIGH' : undefined,
+        promoterPct: stockMetaMap.get(sym)?.promoterPct,
+        bulkDealValueCr: stockMetaMap.get(sym)?.bulkDealValueCr,
+        bulkDealSignal: stockMetaMap.get(sym)?.bulkDealSignal,
+        dhanPick: pick,
+        hasQuantSource: true,
+        atrPct: enriched.atrPct,
+      });
     }
 
     if (intelligence?.active_factor_hub) {
       const hub = intelligence.active_factor_hub;
       if (hub.thesis) {
-        push({ ticker: 'Ledger Thesis', price: '', score: 0, kelly: '', returnPct: 0, thesis: hub.thesis, riskFlag: '' });
+        push({
+          ticker: 'Ledger Thesis',
+          price: '',
+          score: 0,
+          scoreScale: 'unknown',
+          dayChangePct: null,
+          thesis: hub.thesis,
+          riskFlag: '',
+          isVolumePad: false,
+          isMetaRow: true,
+          hasQuantSource: false,
+        });
       }
       if (hub.risk_flag) {
-        push({ ticker: 'Ledger Risk', price: '', score: 0, kelly: '', returnPct: 0, thesis: '', riskFlag: hub.risk_flag, state: 'HIGH' });
-      }
-    }
-
-    if (rows.length < stocks.length) {
-      for (const s of stocks.slice(rows.length, 20)) {
         push({
-          ticker: s.ticker,
-          price: s.ltp,
-          score: typeof s.score === 'number' ? s.score : 0,
-          kelly: '5.67 : 1',
-          returnPct: typeof s.score === 'number' ? s.score / 6 : 2.4,
-          thesis: s.verdict || (s.state === 'POSITIVE' ? 'Upward momentum' : 'Volatility play'),
-          riskFlag: s.state === 'POSITIVE' ? 'Low Vol' : 'ATR',
-          state: s.state === 'POSITIVE' ? 'LOW' : 'HIGH',
-          promoterPct: stockMetaMap.get(s.ticker)?.promoterPct,
-          bulkDealValueCr: stockMetaMap.get(s.ticker)?.bulkDealValueCr,
-          bulkDealSignal: stockMetaMap.get(s.ticker)?.bulkDealSignal,
+          ticker: 'Ledger Risk',
+          price: '',
+          score: 0,
+          scoreScale: 'unknown',
+          dayChangePct: null,
+          thesis: '',
+          riskFlag: hub.risk_flag,
+          state: 'HIGH',
+          isVolumePad: false,
+          isMetaRow: true,
+          hasQuantSource: false,
         });
       }
     }
 
     return rows;
-  }, [intelligence, stocks, stockMetaMap]);
-
-  const topReturn = useMemo(() => {
-    const vals = assetRows.map((r) => r.returnPct).filter((v): v is number => typeof v === 'number');
-    if (!vals.length) return {};
-    return { value: Math.max(...vals) };
-  }, [assetRows]);
+  }, [
+    intelligence,
+    stocks,
+    stockMetaMap,
+    stockByTicker,
+    stockPriceMap,
+    live?.stockQuotes,
+    live?.tickerIntelligenceByTicker,
+    dhanPickMap,
+  ]);
 
   /* Per-ticker flag state (default 1M) */
   const [tickerFlags, setTickerFlags] = useState<Record<string, SparkFlag>>({});
@@ -445,7 +933,88 @@ export default function ForensicPanel({
   }, [assetRows, tickerFlags]);
 
   /* Fetch sparkline data for all tickers x all active flags */
-  const tickerList = useMemo(() => assetRows.map((r) => r.ticker), [assetRows]);
+  const candidateTickerList = useMemo(
+    () => assetRows.filter((row) => !row.isMetaRow).map((r) => r.ticker),
+    [assetRows],
+  );
+
+  const poolHasHardFilterPasses = useMemo(
+    () =>
+      assetRows.some(
+        (row) => !row.isMetaRow && row.passesHardFilters === true,
+      ),
+    [assetRows],
+  );
+
+  const isSnapshotFallback = live?.isSnapshotFallback ?? false;
+  const selectionMetaMode = live?.selectionMeta?.mode;
+  const institutionalOffHours = isInstitutionalOffHoursContext({
+    isSnapshotFallback,
+    poolHasHardFilterPasses,
+    selectionMetaMode,
+  });
+
+  const trendlyneTickerList = useMemo(() => {
+    const stockRows = assetRows.filter((row) => !row.isMetaRow);
+    const byScore = [...stockRows].sort((a, b) => b.score - a.score);
+    if (!institutionalMode) return byScore.map((row) => row.ticker);
+    const strong = byScore.filter((row) => row.score >= SCORE_STRONG);
+    const rest = byScore.filter((row) => row.score < SCORE_STRONG);
+    return [...strong, ...rest].map((row) => row.ticker);
+  }, [assetRows, institutionalMode]);
+
+  const trendlyneMaxCards = useMemo(() => {
+    if (!institutionalMode) return MAX_TRENDLYNE_CARDS;
+    const strongCount = assetRows.filter(
+      (row) => !row.isMetaRow && row.score >= SCORE_STRONG,
+    ).length;
+    return Math.min(assetRows.length, Math.max(MAX_TRENDLYNE_CARDS, strongCount + 4));
+  }, [assetRows, institutionalMode]);
+
+  const trendlyneSummaries = useTrendlyneSummaries(trendlyneTickerList, trendlyneMaxCards);
+  const tickerNewsMap = live?.tickerNewsByTicker ?? {};
+  const tickerIntelMap = live?.tickerIntelligenceByTicker ?? {};
+
+  const displayRows: MatrixCardRow[] = useMemo(() => {
+    const stockRows = assetRows.filter((row) => !row.isMetaRow);
+
+    const evaluated = stockRows.map((row) => {
+      const convictionInput = {
+        score: row.score,
+        riskFlag: row.riskFlag,
+        action: row.action,
+        passesHardFilters: row.passesHardFilters,
+        passesQualityFilters: row.passesQualityFilters,
+        isVolumePad: row.isVolumePad,
+        winLossRatio: row.winLossRatio,
+        scoreScale: row.scoreScale,
+        hasDhanSignal: Boolean(row.dhanPick),
+      };
+      const intelligence = mergeIntelligenceSummary(
+        tickerIntelMap[row.ticker],
+        tickerNewsMap[row.ticker],
+        trendlyneSummaries[row.ticker],
+      );
+      const evaluation = evaluateMatrixBuyCandidate(convictionInput, intelligence, {
+        dhanPick: row.dhanPick,
+        atrPct: row.atrPct,
+        institutional: institutionalMode,
+        isSnapshotFallback,
+        poolHasHardFilterPasses,
+        selectionMetaMode,
+        hardFilterReasons: row.hardFilterReasons,
+      });
+      return { row, ...evaluation, intelligence };
+    });
+
+    return selectMatrixDisplayRows(evaluated, stockRows.length, institutionalMode);
+  }, [assetRows, tickerIntelMap, tickerNewsMap, trendlyneSummaries, institutionalMode, isSnapshotFallback, poolHasHardFilterPasses, selectionMetaMode]);
+
+  const tickerList = useMemo(
+    () => displayRows.map((item) => item.row.ticker),
+    [displayRows],
+  );
+
   const stockSparklines1M = useStockSparklines(tickerList, '1M');
   const stockSparklines1D = useStockSparklines(tickerList, '1D');
   const stockSparklines1Y = useStockSparklines(tickerList, '1Y');
@@ -474,20 +1043,16 @@ export default function ForensicPanel({
     }
   };
 
-  const scoreColor = (s: number) => {
-    if (s >= 60) return 'text-emerald-600';
-    if (s >= 40) return 'text-amber-600';
-    return 'text-slate-500';
-  };
-
   const flagClass = (flag: string) => {
     const v = flag.toLowerCase();
     if (v.includes('extreme')) return 'text-white border-red-700 bg-red-600 animate-pulse font-black';
-    if (v.includes('low_risk') || v.includes('low vol') || v === 'low') return 'text-teal-700 border-teal-200 bg-teal-50';
+    if (v.includes('low_risk') || v === 'low') return 'text-teal-700 border-teal-200 bg-teal-50';
     if (v.includes('moderate_risk') || v.includes('moderate')) return 'text-amber-700 border-amber-200 bg-amber-50';
-    if (v.includes('high_risk') || v.includes('structural') || v.includes('atr')) return 'text-red-700 border-red-200 bg-red-50';
+    if (v.includes('high_risk') || v.includes('structural')) return 'text-red-700 border-red-200 bg-red-50';
+    if (v.includes('volume_fill')) return 'text-slate-600 border-slate-300 bg-slate-100';
+    if (v.includes('unrated')) return 'text-slate-500 border-slate-200 bg-slate-50';
     if (v.includes('selected') || v === 'buy') return 'text-slate-400 border-slate-200 bg-slate-50';
-    return 'text-slate-600 border-red-200 bg-red-50';
+    return 'text-slate-600 border-slate-200 bg-slate-50';
   };
 
   return (
@@ -496,14 +1061,22 @@ export default function ForensicPanel({
         <div className="min-w-0">
           <h3 className="text-emerald-700 text-[12px] font-bold tracking-wider uppercase">ASSET MATRIX</h3>
           <p className="text-slate-500 text-[12px] mt-0.5">
-            {live?.poolDescription || 'Nifty 500 universe ranked by volume and intraday filters'}
+            {institutionalMode
+              ? institutionalOffHours
+                ? `Institutional ₹1cr+ book — off-hours snapshot: score ≥ ${SCORE_STRONG}, Trendlyne confirm, LOW/MODERATE risk (volume gates rank-penalized)`
+                : `Institutional ₹1cr+ book — score ≥ ${SCORE_STRONG}, Trendlyne confirm, Dhan R:R ≥2 when live`
+              : live?.poolDescription || `Top ${MATRIX_BUY_MIN_DISPLAY}+ high-probability BUY setups — score ≥ ${MATRIX_BUY_MIN_SCORE}, CORE preferred`}
             {typeof live?.universeSize === 'number' && live.universeSize > 0 && (
               <> · Universe {live.universeSize}</>
             )}
             {typeof live?.volumeScreenedCount === 'number' && live.volumeScreenedCount > 0 && (
               <> · Top {live.volumeScreenedCount} by volume screened</>
             )}
-            {' · '}Active Nodes {stocks.length || assetRows.length}
+            {dhanPickMap.size > 0 && (
+              <> · Dhan LONG {dhanPickMap.size}</>
+            )}
+            {' · '}BUY Picks {displayRows.length}
+            {institutionalMode && <> · max {INSTITUTIONAL_MATRIX_TOP_N}</>}
             {' · '}Data Date {live?.updatedAt ? new Date(live.updatedAt).toISOString().slice(0, 10) : '—'}
           </p>
         </div>
@@ -534,58 +1107,220 @@ export default function ForensicPanel({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
-        {assetRows.map((row) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+        {displayRows.map((item) => {
+          const row = item.row;
           const priceVal = row.price ? `₹${String(row.price).replace(/[₹]+/g, '')}` : '-';
-          const returnVal = row.returnPct >= 0 ? `+${row.returnPct.toFixed(1)}` : row.returnPct.toFixed(1);
-          const isPositive = row.returnPct >= 0;
+          const flag = getFlag(row.ticker);
+          const sparkData = allSparklines[row.ticker]?.[flag];
+          const period = sparkPeriodChange(sparkData);
+          const dayPct =
+            row.dayChangePct !== null
+              ? { pct: row.dayChangePct, positive: row.dayChangePct >= 0, label: `${row.dayChangePct >= 0 ? '+' : ''}${row.dayChangePct.toFixed(1)}%` }
+              : null;
+          const displayChange = period ?? dayPct;
+          const intelligence = item.intelligence;
+          const { tier, reason } = item;
+          const styles = convictionTierStyles(tier);
+          const winEdge = item.winEdge;
+          const badgeLabel = convictionTierBadgeLabel(tier);
+          const showKelly = row.kellyPolicy && parsePercentValue(row.kellyPolicy) !== null;
+          const showWl = row.winLossRatio && parseWinLossRatio(row.winLossRatio) !== null;
+          const showTrendlyneHint = !intelligence.hasTrendlyneData;
+          const sourceChips = buildMatrixSourceChips(
+            row.hasQuantSource && row.scoreScale === 'angel',
+            Boolean(row.dhanPick),
+            intelligence.hasTrendlyneData,
+          );
+          const dhanRr = row.dhanPick ? dhanRrValue(row.dhanPick) : null;
+          const rrEstimate = !dhanRr ? estimateStructuralRr(row.atrPct) : null;
+          const entryPx = row.dhanPick?.buyAbove ?? parseFloat(String(row.price).replace(/[^\d.]/g, ''));
+          const stopPx = row.dhanPick?.stopLoss;
+          const sizingHint =
+            institutionalMode && entryPx > 0
+              ? computeInstitutionalSizingHint(entryPx, stopPx, row.kellyPolicy)
+              : null;
+
           return (
             <div
               key={row.ticker}
               onClick={() => onSelect?.(row.ticker)}
               className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm hover:shadow-md transition-all group cursor-pointer"
-              style={{ borderLeft: isPositive ? '3px solid #10b981' : '3px solid #ef4444' }}
+              style={{ borderLeft: `3px solid ${styles.border}` }}
             >
-              <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full opacity-15 blur-2xl"
-                style={{ backgroundColor: isPositive ? '#10b981' : '#ef4444' }} />
-              <div className="flex items-center justify-between mb-1.5 relative z-10">
-                <span className="text-[12px] font-black text-slate-900 font-mono">{row.ticker}</span>
-                {row.riskFlag && (
-                  <span className={`inline-block border px-1.5 py-0.5 rounded text-[12px] whitespace-nowrap font-black uppercase ${flagClass(row.riskFlag)}`}>
+              <div
+                className="absolute -top-4 -right-4 w-12 h-12 rounded-full opacity-15 blur-2xl"
+                style={{ backgroundColor: styles.glow }}
+              />
+
+              {/* Header: ticker + conviction tier + win edge */}
+              <div className="flex items-center justify-between gap-2 mb-1 relative z-10">
+                <span className="text-[12px] font-black text-slate-900 font-mono truncate">{row.ticker}</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  {winEdge && (
+                    <span
+                      className={`inline-block border px-1.5 py-0.5 rounded-md text-[8px] whitespace-nowrap font-bold tabular-nums ${
+                        winEdge.kind === 'win_edge'
+                          ? 'text-indigo-700 bg-indigo-50 border-indigo-200'
+                          : 'text-slate-600 bg-slate-50 border-slate-200'
+                      }`}
+                      title={winEdge.source}
+                    >
+                      {winEdge.display}
+                    </span>
+                  )}
+                  <span
+                    className={`inline-block border px-2 py-0.5 rounded-md text-[10px] whitespace-nowrap font-black uppercase tracking-wide ${styles.badge}`}
+                  >
+                    {badgeLabel}
+                  </span>
+                </div>
+              </div>
+
+              {/* Portfolio guidance reason */}
+              <p className="text-[10px] leading-snug text-slate-600 mb-1 relative z-10 line-clamp-2">
+                {reason}
+              </p>
+
+              {/* Source chips: QUANT / DHAN / TRENDLYNE */}
+              {sourceChips.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-1 relative z-10">
+                  {sourceChips.map((chip) => (
+                    <span
+                      key={`${row.ticker}-src-${chip.label}`}
+                      className={`inline-flex items-center border px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-wider ${matrixSourceChipClass(chip.label, chip.active)}`}
+                    >
+                      {chip.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Trendlyne / drawer intelligence chips */}
+              {intelligence.chips.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-1.5 relative z-10">
+                  {intelligence.chips.map((chip) => (
+                    <span
+                      key={`${row.ticker}-${chip.label}`}
+                      className={`inline-flex items-center border px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide ${chipToneClass(chip.tone)}`}
+                    >
+                      {chip.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {showTrendlyneHint && intelligence.chips.length === 0 && (
+                <p className="text-[8px] text-slate-400 mb-1.5 relative z-10">
+                  Open card for full Trendlyne analysis
+                </p>
+              )}
+
+              {/* Price + day/period change */}
+              <div className="flex items-baseline gap-1.5 mb-1.5 relative z-10">
+                <span className="text-[14px] font-black text-slate-900 tabular-nums">{priceVal}</span>
+                {displayChange && (
+                  <span
+                    className={`text-[11px] font-bold tabular-nums ${displayChange.positive ? 'text-emerald-600' : 'text-red-500'}`}
+                  >
+                    {displayChange.label}
+                    {!period && dayPct ? ' today' : ''}
+                  </span>
+                )}
+              </div>
+
+              {/* Full-width chart band + timeframe pills */}
+              <SparklineFlagSlider
+                ticker={row.ticker}
+                sparklines={allSparklines[row.ticker] ?? ({} as Record<SparkFlag, number[]>)}
+                currentFlag={flag}
+                onFlagChange={(f) => setFlag(row.ticker, f)}
+              />
+
+              {/* Secondary: strength meter + risk badge */}
+              <div className="flex items-center justify-between gap-2 mt-1 relative z-10 flex-wrap">
+                <StrengthMeter score={row.score} />
+                {row.riskFlag && !row.isVolumePad && !row.riskFlag.toUpperCase().includes('VOLUME_FILL') && (
+                  <span className={`inline-block border px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap font-black uppercase ${flagClass(row.riskFlag)}`}>
                     {row.riskFlag}
                   </span>
                 )}
               </div>
-              <p className="text-[12px] text-slate-500 mb-1 truncate relative z-10">{row.thesis}</p>
-              <SparklineFlagSlider
-                ticker={row.ticker}
-                sparklines={allSparklines[row.ticker] ?? ({} as Record<SparkFlag, number[]>)}
-                currentFlag={getFlag(row.ticker)}
-                onFlagChange={(f) => setFlag(row.ticker, f)}
-              />
-              <div className="space-y-1 text-[12px] relative z-10">
-                <div className="flex justify-between"><span className="text-slate-400">Price</span><span className="font-bold text-slate-700">{priceVal}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Score</span><span className={`font-bold ${scoreColor(row.score)}`}>{row.score || '-'}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Kelly</span><span className="font-bold text-slate-700">{row.kelly || '-'}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Return</span><span className={`font-bold ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>{returnVal}</span></div>
-                {typeof row.promoterPct === 'number' && (
-                  <div className="flex justify-between"><span className="text-slate-400">Promoter</span><span className={`font-bold ${row.promoterPct >= 60 ? 'text-emerald-600' : 'text-amber-600'}`}>{row.promoterPct.toFixed(1)}%</span></div>
-                )}
-                {typeof row.bulkDealValueCr === 'number' && row.bulkDealValueCr > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Bulk Deal</span>
-                    <span className={`font-bold ${row.bulkDealSignal ? 'text-emerald-600' : 'text-slate-500'}`}>
-                      {row.bulkDealValueCr.toFixed(1)} Cr
+
+              {/* Optional real allocation / W/L / R:R — facts only */}
+              {(showKelly || showWl || dhanRr !== null || rrEstimate) && (
+                <div className="flex items-center gap-1.5 mt-1 text-[9px] text-slate-400 relative z-10 tabular-nums flex-wrap">
+                  {dhanRr !== null && (
+                    <span>
+                      R:R <span className="font-semibold text-violet-700">{dhanRr.toFixed(1)}:1</span>
+                      <span className="text-violet-400"> DHAN</span>
                     </span>
-                  </div>
-                )}
-              </div>
+                  )}
+                  {dhanRr === null && rrEstimate && (
+                    <span className="text-slate-500">{rrEstimate.display}</span>
+                  )}
+                  {showKelly && (
+                    <span>
+                      Alloc <span className="font-semibold text-slate-600">{row.kellyPolicy}</span>
+                    </span>
+                  )}
+                  {showKelly && showWl && <span className="text-slate-300">·</span>}
+                  {showWl && (
+                    <span>
+                      W/L <span className="font-semibold text-slate-600">{row.winLossRatio}</span>
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {sizingHint && (
+                <p className="text-[9px] text-slate-500 mt-0.5 relative z-10 tabular-nums" title={sizingHint.source}>
+                  {sizingHint.display}
+                </p>
+              )}
+
+              {/* Promoter / Bulk Deal — quiet secondary row when present */}
+              {(typeof row.promoterPct === 'number' || (typeof row.bulkDealValueCr === 'number' && row.bulkDealValueCr > 0)) && (
+                <div className="flex items-center gap-1.5 mt-1 text-[9px] text-slate-400 relative z-10 tabular-nums flex-wrap">
+                  {typeof row.promoterPct === 'number' && (
+                    <span>
+                      Promoter{' '}
+                      <span className={`font-semibold ${row.promoterPct >= 60 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {row.promoterPct.toFixed(1)}%
+                      </span>
+                    </span>
+                  )}
+                  {typeof row.promoterPct === 'number' && typeof row.bulkDealValueCr === 'number' && row.bulkDealValueCr > 0 && (
+                    <span className="text-slate-300">·</span>
+                  )}
+                  {typeof row.bulkDealValueCr === 'number' && row.bulkDealValueCr > 0 && (
+                    <span>
+                      Bulk{' '}
+                      <span className={`font-semibold ${row.bulkDealSignal ? 'text-emerald-600' : 'text-slate-500'}`}>
+                        {row.bulkDealValueCr.toFixed(1)} Cr
+                      </span>
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
-        {!assetRows.length && (
-          <div className="col-span-full py-6 text-center text-slate-500">
-            No live market data for Nifty 500.
+        {!displayRows.length && (
+          <div className="col-span-full py-8 text-center">
+            <p className="text-slate-700 text-[13px] font-semibold">
+              {institutionalMode
+                ? institutionalOffHours
+                  ? 'No off-hours institutional BUY setups pass quant + Trendlyne gates'
+                  : 'No institutional-grade BUY setups pass all gates'
+                : 'No high-probability BUY setups right now'}
+            </p>
+            <p className="text-slate-500 text-[11px] mt-1">
+              {institutionalMode
+                ? institutionalOffHours
+                  ? `Off-hours / snapshot mode: intraday volume gates are rank-penalized (0/${assetRows.filter((r) => !r.isMetaRow).length} hard-filter passers in pool). Still requires quant score ≥ ${SCORE_STRONG}, Trendlyne confirm, LOW/MODERATE risk, and Dhan R:R ≥2 or ATR-based estimate. No filler names — refresh after market open for live volume confirms.`
+                  : `₹1cr+ book requires quant score ≥ ${SCORE_STRONG}, hard+quality filters, Trendlyne confirm (checklist ≥70% preferred), LOW/MODERATE risk, and Dhan R:R ≥2 when in Dhan LONG set. No filler names — refresh after market open.`
+                : `Up to ${MATRIX_BUY_TOP_N} picks from the ranked pool. At least ${MATRIX_BUY_MIN_DISPLAY} shown when enough CORE setups exist; otherwise best hard-filter passers (score ≥ ${SCORE_MODERATE}) fill the floor. Refresh after market open for live confirms.`}
+            </p>
           </div>
         )}
       </div>
