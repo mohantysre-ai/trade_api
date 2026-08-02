@@ -1,0 +1,113 @@
+# Alphix / IROS Terminal — production compose stack
+# Usage:
+#   1. Ensure backend/.env exists (Angel + LLM secrets)
+#   2. docker compose up -d --build
+#   3. Open http://localhost:3000
+
+services:
+  market-api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: iros-market-api:latest
+    container_name: iros-market-api
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      MARKET_API_HOST: "0.0.0.0"
+      MARKET_API_PORT: "8000"
+      AI_NEWS_API_URL: "http://ai-news:8001"
+      FRONTEND_URL: "http://localhost:3000"
+      BACKEND_URL: "http://localhost:8000"
+      HEALTH_PORT: "8000"
+      TZ: Asia/Kolkata
+      SNAPSHOT_FILE: /app/state/trade_api_snapshot.json
+      FIXED_PLAN_FILE: /app/state/fixed_trade_plan.json
+      ALERT_HISTORY_FILE: /app/state/alert_history.json
+      INTRADAY_SESSION_FILE: /app/state/intraday_session.json
+    ports:
+      - "8000:8000"
+    volumes:
+      - iros-backend-data:/app/backend/app/data
+      - iros-eod-archive:/app/backend/app/services/eod_archive
+      - iros-desk-state:/app/state
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+    depends_on:
+      ai-news:
+        condition: service_healthy
+
+  ai-news:
+    image: iros-market-api:latest
+    container_name: iros-ai-news
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      AI_NEWS_PORT: "8001"
+      HEALTH_PORT: "8001"
+      TZ: Asia/Kolkata
+      SNAPSHOT_FILE: /app/state/trade_api_snapshot.json
+      FIXED_PLAN_FILE: /app/state/fixed_trade_plan.json
+      ALERT_HISTORY_FILE: /app/state/alert_history.json
+      INTRADAY_SESSION_FILE: /app/state/intraday_session.json
+    command:
+      [
+        "uvicorn",
+        "app.services.ai_news_server:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8001",
+      ]
+    ports:
+      - "8001:8001"
+    volumes:
+      - iros-backend-data:/app/backend/app/data
+      - iros-eod-archive:/app/backend/app/services/eod_archive
+      - iros-desk-state:/app/state
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8001/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./iros-terminal
+      dockerfile: Dockerfile
+    image: iros-frontend:latest
+    container_name: iros-frontend
+    restart: unless-stopped
+    environment:
+      MARKET_API_URL: "http://market-api:8000"
+      NEXT_PUBLIC_BACKEND_URL: "http://localhost:8000"
+      NEXT_PUBLIC_MARKET_API_URL: ""
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      TZ: Asia/Kolkata
+    ports:
+      - "3000:3000"
+    depends_on:
+      market-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 45s
+      retries: 3
+
+volumes:
+  iros-backend-data:
+  iros-eod-archive:
+  iros-desk-state:

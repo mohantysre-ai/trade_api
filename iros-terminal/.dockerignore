@@ -1,0 +1,11 @@
+.git
+.next
+node_modules
+.sparkline-cache
+*.log
+.env
+.env.*
+!.env.example
+README.md
+AGENTS.md
+CLAUDE.md

@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Slim production image via `node server.js` (see iros-terminal/Dockerfile)
+  output: "standalone",
   // Hide the floating Next.js Dev Tools "N" badge in development
   devIndicators: false,
   allowedDevOrigins: [
