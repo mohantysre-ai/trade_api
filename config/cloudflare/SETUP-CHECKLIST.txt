@@ -1,0 +1,39 @@
+# Cloudflare / GoDaddy checklist for IROS (iros.sigq.in)
+# Domain registration stays at GoDaddy. DNS moves to Cloudflare.
+
+## Status
+- Public primary URL: https://sigq.in (also www.sigq.in, iros.sigq.in)
+- start_app.bat starts backends + frontend + cloudflared and opens https://sigq.in
+- Logo: iros-terminal/public/iros-logo.svg (+ png favicon)
+
+## A. Cloudflare (browser) — once
+1. https://dash.cloudflare.com → Add a site → sigq.in → Free plan
+2. Nameservers for this zone (confirmed):
+   - nicolas.ns.cloudflare.com
+   - stephane.ns.cloudflare.com
+3. Wait until Cloudflare status = Active (after GoDaddy step below)
+
+## B. GoDaddy (browser) — once
+1. My Products → sigq.in → DNS → Nameservers tab
+2. Change nameservers → Enter my own (advanced) / I'll use my own nameservers
+3. Set exactly:
+   - Nameserver 1: nicolas.ns.cloudflare.com
+   - Nameserver 2: stephane.ns.cloudflare.com
+4. Save (remove any trailing dots if GoDaddy adds them — both forms usually work)
+5. Keep MX records later in Cloudflare if you use email on this domain
+
+## C. This PC — after Cloudflare shows Active
+1. Double-click: config\startup\setup-cloudflare-tunnel.bat
+   - Browser opens for Cloudflare login — authorize zone sigq.in
+   - Creates tunnel iros-desk + DNS for iros.sigq.in
+2. Start app: config\startup\start_app.bat
+3. Start tunnel: config\startup\start-tunnel.bat
+4. Open https://iros.sigq.in
+
+## D. Security (recommended)
+Cloudflare Zero Trust → Access → Application → protect iros.sigq.in (email login)
+
+## Notes
+- cloudflared is installed (winget: Cloudflare.cloudflared)
+- Only port 3000 is exposed; backends stay on localhost 8000/8001
+- PC must stay awake while the tunnel runs

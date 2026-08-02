@@ -14,8 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "IROS Terminal | Live Market Intelligence",
+  title: "Alphix Terminal | sigq.in",
   description: "Institutional NSE/BSE trading desk — market snapshot, asset matrix, and forensic intelligence.",
+  metadataBase: new URL("https://sigq.in"),
+  icons: {
+    icon: [{ url: "/alphix-logo.png", type: "image/png" }, { url: "/alphix-logo.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/alphix-logo.png" }],
+  },
 };
 
 const themeBootScript = `

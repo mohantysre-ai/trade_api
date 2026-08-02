@@ -1,0 +1,803 @@
+{
+  "success": true,
+  "locked": true,
+  "sessionDate": "2026-08-02",
+  "committedAt": "2026-08-02T07:33:44.857969+00:00",
+  "updatedAt": "2026-08-02T07:33:44.857969+00:00",
+  "snapshotUpdatedAt": "2026-08-01T16:17:14.474607+00:00",
+  "dataStale": true,
+  "regime": {
+    "label": "NEUTRAL",
+    "bias": "NEUTRAL",
+    "niftyChangePct": 0.27,
+    "bankNiftyChangePct": 0.21,
+    "indiaVix": 11.76,
+    "nifty": "24,383.60",
+    "bankNifty": "57,264.85",
+    "indiaVixDisplay": "11.76",
+    "reasons": [
+      "mixed index tape"
+    ],
+    "longGate": 0.75,
+    "shortGate": 0.75
+  },
+  "capital": {
+    "longCapital": 500000.0,
+    "shortCapital": 500000.0,
+    "riskFraction": 0.01,
+    "basketSize": 5
+  },
+  "executionPolicy": "MANUAL_ONLY",
+  "long": [
+    {
+      "rank": 1,
+      "symbol": "CONCORDBIO",
+      "name": "CONCORDBIO",
+      "direction": "LONG",
+      "sector": "OTHER",
+      "score": 71.1,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 91.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "vwap": {
+          "score": 68.9,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volume": {
+          "score": 20.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "breakout": {
+          "score": 27.8,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volatility": {
+          "score": 36.2,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 91.1,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 1420.8,
+      "scanLtp": 1420.8,
+      "atrPct": 7.25,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 1420.8,
+      "stopLoss": 1297.19,
+      "target1": 1606.21,
+      "target2": 1791.63,
+      "riskPerShare": 123.61,
+      "rewardRisk": 1.5,
+      "approxQty": 40,
+      "deployedCapital": 56832.0,
+      "maxLoss": 4944.4
+    },
+    {
+      "rank": 2,
+      "symbol": "BALKRISIND",
+      "name": "BALKRISIND",
+      "direction": "LONG",
+      "sector": "OTHER",
+      "score": 69.2,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 93.3,
+          "weight": 10.0,
+          "rated": true
+        },
+        "vwap": {
+          "score": 65.7,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volume": {
+          "score": 20.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "breakout": {
+          "score": 21.7,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volatility": {
+          "score": 21.4,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 80.2,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 2473.5,
+      "scanLtp": 2473.5,
+      "atrPct": 8.24,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 2473.5,
+      "stopLoss": 2228.92,
+      "target1": 2840.37,
+      "target2": 3207.24,
+      "riskPerShare": 244.58,
+      "rewardRisk": 1.5,
+      "approxQty": 20,
+      "deployedCapital": 49470.0,
+      "maxLoss": 4891.6
+    },
+    {
+      "rank": 3,
+      "symbol": "DIVISLAB",
+      "name": "DIVISLAB",
+      "direction": "LONG",
+      "sector": "PHARMA",
+      "score": 64.8,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 72.6,
+          "weight": 15.0,
+          "rated": true
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 66.9,
+          "weight": 10.0,
+          "rated": true
+        },
+        "vwap": {
+          "score": 56.3,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volume": {
+          "score": 20.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "breakout": {
+          "score": 15.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volatility": {
+          "score": 97.0,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 84.5,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 8056.0,
+      "scanLtp": 8056.0,
+      "atrPct": 2.8,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 8056.0,
+      "stopLoss": 7785.32,
+      "target1": 8462.02,
+      "target2": 8868.04,
+      "riskPerShare": 270.68,
+      "rewardRisk": 1.5,
+      "approxQty": 12,
+      "deployedCapital": 96672.0,
+      "maxLoss": 3248.16
+    },
+    {
+      "rank": 4,
+      "symbol": "ADANIGREEN",
+      "name": "ADANIGREEN",
+      "direction": "LONG",
+      "sector": "POWER",
+      "score": 61.9,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 64.3,
+          "weight": 15.0,
+          "rated": true
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 60.7,
+          "weight": 10.0,
+          "rated": true
+        },
+        "vwap": {
+          "score": 53.9,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volume": {
+          "score": 20.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "breakout": {
+          "score": 15.3,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volatility": {
+          "score": 96.4,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 68.2,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 1383.0,
+      "scanLtp": 1383.0,
+      "atrPct": 3.24,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 1383.0,
+      "stopLoss": 1329.23,
+      "target1": 1463.66,
+      "target2": 1544.31,
+      "riskPerShare": 53.77,
+      "rewardRisk": 1.5,
+      "approxQty": 72,
+      "deployedCapital": 99576.0,
+      "maxLoss": 3871.44
+    },
+    {
+      "rank": 5,
+      "symbol": "BPCL",
+      "name": "BPCL",
+      "direction": "LONG",
+      "sector": "ENERGY",
+      "score": 60.6,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 60.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 57.5,
+          "weight": 10.0,
+          "rated": true
+        },
+        "vwap": {
+          "score": 54.9,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volume": {
+          "score": 20.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "breakout": {
+          "score": 7.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volatility": {
+          "score": 83.5,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 89.2,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 319.75,
+      "scanLtp": 319.75,
+      "atrPct": 1.9,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 319.75,
+      "stopLoss": 312.46,
+      "target1": 330.69,
+      "target2": 341.62,
+      "riskPerShare": 7.29,
+      "rewardRisk": 1.5,
+      "approxQty": 312,
+      "deployedCapital": 99762.0,
+      "maxLoss": 2274.48
+    }
+  ],
+  "short": [
+    {
+      "rank": 1,
+      "symbol": "ACC",
+      "name": "ACC",
+      "direction": "SHORT",
+      "sector": "CEMENT",
+      "score": 78.3,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 49.5,
+          "weight": 15.0,
+          "rated": true
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 50.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "vwap": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volume": {
+          "score": 99.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "breakout": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volatility": {
+          "score": 89.0,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 51.3,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 1357.4,
+      "scanLtp": 1357.4,
+      "atrPct": 2.27,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 1357.4,
+      "stopLoss": 1394.38,
+      "target1": 1301.94,
+      "target2": 1264.96,
+      "riskPerShare": 36.98,
+      "rewardRisk": 1.5,
+      "approxQty": 73,
+      "deployedCapital": 99090.2,
+      "maxLoss": 2699.54
+    },
+    {
+      "rank": 2,
+      "symbol": "APTUS",
+      "name": "APTUS",
+      "direction": "SHORT",
+      "sector": "OTHER",
+      "score": 75.8,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 96.2,
+          "weight": 15.0,
+          "rated": true
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 84.6,
+          "weight": 10.0,
+          "rated": true
+        },
+        "vwap": {
+          "score": 77.3,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volume": {
+          "score": 20.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "breakout": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volatility": {
+          "score": 0.0,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 84.0,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 261.2,
+      "scanLtp": 261.2,
+      "atrPct": 11.69,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 261.2,
+      "stopLoss": 297.84,
+      "target1": 206.24,
+      "target2": 169.6,
+      "riskPerShare": 36.64,
+      "rewardRisk": 1.5,
+      "approxQty": 136,
+      "deployedCapital": 35523.2,
+      "maxLoss": 4983.04
+    },
+    {
+      "rank": 3,
+      "symbol": "CUB",
+      "name": "CUB",
+      "direction": "SHORT",
+      "sector": "OTHER",
+      "score": 75.4,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 83.3,
+          "weight": 15.0,
+          "rated": true
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 75.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "vwap": {
+          "score": 64.9,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volume": {
+          "score": 20.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "breakout": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volatility": {
+          "score": 66.1,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 91.3,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 206.5,
+      "scanLtp": 206.5,
+      "atrPct": 5.26,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 206.5,
+      "stopLoss": 219.53,
+      "target1": 186.95,
+      "target2": 173.91,
+      "riskPerShare": 13.03,
+      "rewardRisk": 1.5,
+      "approxQty": 383,
+      "deployedCapital": 79089.5,
+      "maxLoss": 4990.49
+    },
+    {
+      "rank": 4,
+      "symbol": "AMBUJACEM",
+      "name": "AMBUJACEM",
+      "direction": "SHORT",
+      "sector": "CEMENT",
+      "score": 67.8,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 53.7,
+          "weight": 15.0,
+          "rated": true
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 52.8,
+          "weight": 10.0,
+          "rated": true
+        },
+        "vwap": {
+          "score": 53.7,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volume": {
+          "score": 20.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "breakout": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volatility": {
+          "score": 85.0,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 77.6,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 432.2,
+      "scanLtp": 432.2,
+      "atrPct": 2.0,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 432.2,
+      "stopLoss": 442.57,
+      "target1": 416.64,
+      "target2": 406.27,
+      "riskPerShare": 10.37,
+      "rewardRisk": 1.5,
+      "approxQty": 231,
+      "deployedCapital": 99838.2,
+      "maxLoss": 2395.47
+    },
+    {
+      "rank": 5,
+      "symbol": "DLF",
+      "name": "DLF",
+      "direction": "SHORT",
+      "sector": "REALTY",
+      "score": 61.8,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 44.6,
+          "weight": 15.0,
+          "rated": true
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 45.3,
+          "weight": 10.0,
+          "rated": true
+        },
+        "vwap": {
+          "score": 70.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volume": {
+          "score": 1.6,
+          "weight": 10.0,
+          "rated": true
+        },
+        "breakout": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true
+        },
+        "volatility": {
+          "score": 93.8,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 42.2,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 51.4,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 659.3,
+      "scanLtp": 659.3,
+      "atrPct": 2.59,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 659.3,
+      "stopLoss": 679.79,
+      "target1": 628.56,
+      "target2": 608.07,
+      "riskPerShare": 20.49,
+      "rewardRisk": 1.5,
+      "approxQty": 151,
+      "deployedCapital": 99554.3,
+      "maxLoss": 3093.99
+    }
+  ],
+  "events": [
+    {
+      "type": "SESSION_COMMIT",
+      "at": "2026-08-02T07:33:44.857969+00:00",
+      "long": [
+        "CONCORDBIO",
+        "BALKRISIND",
+        "DIVISLAB",
+        "ADANIGREEN",
+        "BPCL"
+      ],
+      "short": [
+        "ACC",
+        "APTUS",
+        "CUB",
+        "AMBUJACEM",
+        "DLF"
+      ],
+      "executionPolicy": "MANUAL_ONLY"
+    }
+  ],
+  "funnel": {
+    "universe": 202,
+    "filterReject": 103,
+    "longScored": 99,
+    "shortScored": 99,
+    "unratedComponents": 0
+  }
+}

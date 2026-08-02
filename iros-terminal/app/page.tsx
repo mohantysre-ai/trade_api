@@ -2198,13 +2198,21 @@ export default function IrosMasterAdvancedTerminal() {
             <div className="desk-live-ribbon" aria-hidden />
             <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="desk-brand-mark" aria-hidden>IROS</div>
+                <div className="desk-brand-mark" aria-hidden>
+                  <img
+                    src="/alphix-logo.svg"
+                    alt=""
+                    width={44}
+                    height={44}
+                    className="desk-brand-logo"
+                  />
+                </div>
                 <div className="min-w-0">
                   <h1 className="font-black tracking-[0.06em] uppercase">
-                    Live Market Intelligence
+                    Alphix Terminal
                   </h1>
                   <p className="mt-1 uppercase tracking-[0.12em]" style={{ fontSize: 'var(--desk-label)', color: 'var(--fg-muted)' }}>
-                    Institutional NSE / BSE desk · quick-read decision board
+                    Institutional NSE / BSE desk · live market intelligence
                   </p>
                 </div>
               </div>

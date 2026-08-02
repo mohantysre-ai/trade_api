@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   IROS Live Desk — theme tokens, readable type, live motion
+   Alphix Terminal — theme tokens, readable type, live motion
    Dark = light foreground · Light = dark foreground
    data-theme / data-font on <html>
 ═══════════════════════════════════════════════════════════════════════════ */
@@ -506,13 +506,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 900;
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  color: var(--accent-ink);
-  background: linear-gradient(145deg, var(--terminal-cyan), #38bdf8);
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #06101c;
   box-shadow: 0 0 24px color-mix(in srgb, var(--terminal-cyan) 40%, transparent);
   animation: desk-brand-breathe 3.2s ease-in-out infinite;
+}
+.desk-brand-logo {
+  width: 44px;
+  height: 44px;
+  display: block;
+  object-fit: cover;
 }
 
 .desk-btn-primary {

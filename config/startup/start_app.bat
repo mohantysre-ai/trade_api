@@ -1,32 +1,35 @@
 @echo off
-REM IROS Trade API - One-command Launcher (Backend + AI News + Frontend)
-REM Starts services as background processes with pre-flight and post-flight validation.
+REM Alphix Terminal - One-command Launcher
+REM Backend + AI News + Frontend + Cloudflare Tunnel (https://sigq.in)
 
 setlocal enabledelayedexpansion
 
 set SCRIPT_DIR=%~dp0
 set PROJECT_ROOT=%SCRIPT_DIR%..\..
-REM Normalize PROJECT_ROOT (remove trailing backslash)
 if "%PROJECT_ROOT:~-1%"=="\" set "PROJECT_ROOT=%PROJECT_ROOT:~0,-1%"
 
 set BACKEND_DIR=%PROJECT_ROOT%\backend
-set AI_NEWS_BACKEND_DIR=%PROJECT_ROOT%\iros-terminal\backend
 set FRONTEND_DIR=%PROJECT_ROOT%\iros-terminal
 set VENV_PYTHON=%PROJECT_ROOT%\.venv\Scripts\python.exe
+set CLOUDFLARED_EXE=%ProgramFiles(x86)%\cloudflared\cloudflared.exe
+if not exist "%CLOUDFLARED_EXE%" set "CLOUDFLARED_EXE=%ProgramFiles%\cloudflared\cloudflared.exe"
+set CF_CONFIG=%USERPROFILE%\.cloudflared\config.yml
+set PUBLIC_URL=https://sigq.in
 
 cls
 echo ================================================
-echo IROS Trade API - Start App (Background Mode)
+echo Alphix Terminal - Start App + Cloudflare Tunnel
 echo ================================================
 echo.
 echo [*] Target services:
 echo     Market API:   http://localhost:8000
 echo     AI News API:  http://localhost:8001
 echo     Frontend:     http://localhost:3000
+echo     Public URL:   %PUBLIC_URL%
 echo.
 
 REM =========================================================
-REM PRE-FLIGHT VALIDATION: Check if ports are already in use
+REM PRE-FLIGHT: free ports 8000 / 8001 / 3000 if busy
 REM =========================================================
 echo [PRE-FLIGHT] Verifying ports 8000, 8001, 3000 are free...
 echo.
@@ -52,32 +55,27 @@ if %PORT_BUSY% equ 1 (
     echo [OK] Ports freed. Proceeding...
 )
 echo [PASS] All ports are free. Proceeding...
-
 echo.
+
+REM Stop previous cloudflared for clean reconnect
+echo [*] Stopping any existing cloudflared tunnel...
+powershell -NoProfile -Command "Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue"
 
 REM =========================================================
 REM LAUNCH SERVICES
 REM =========================================================
-
-REM Pick python executable
 if exist "%VENV_PYTHON%" (
   set PYTHON_EXE=%VENV_PYTHON%
 ) else (
   set PYTHON_EXE=python
 )
 
-REM Start Market API Backend in background
-REM NOTE: Do not use uvicorn --reload for refresh jobs; in-memory task state is lost on reload.
 echo [*] Starting Market API Backend on port 8000...
 powershell -NoProfile -Command "Start-Process -FilePath \"%PYTHON_EXE%\" -ArgumentList \"-m\", \"uvicorn\", \"app.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\" -WorkingDirectory \"%BACKEND_DIR%\" -NoNewWindow -PassThru | Out-Null"
 
-REM Start AI News Backend in background
 echo [*] Starting AI News Backend on port 8001...
 powershell -NoProfile -Command "Start-Process -FilePath \"%PYTHON_EXE%\" -ArgumentList \"-m\", \"uvicorn\", \"app.services.ai_news_server:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8001\" -WorkingDirectory \"%BACKEND_DIR%\" -NoNewWindow -PassThru | Out-Null"
 
-REM =========================================================
-REM FRONTEND PREPARATION: Clear Next.js cache to fix SWC errors
-REM =========================================================
 if exist "%FRONTEND_DIR%\.next" (
     echo [*] Clearing Next.js build cache...
     rd /s /q "%FRONTEND_DIR%\.next"
@@ -85,15 +83,10 @@ if exist "%FRONTEND_DIR%\.next" (
 
 powershell -NoProfile -Command "Start-Sleep -Seconds 5"
 
-REM Start Frontend in background
 echo [*] Starting Frontend on port 3000...
 powershell -NoProfile -Command "Start-Process -FilePath \"cmd.exe\" -ArgumentList \"/c\", \"npx next dev --turbo --hostname 0.0.0.0 --port 3000\" -WorkingDirectory \"%FRONTEND_DIR%\" -NoNewWindow -PassThru | Out-Null"
 
 echo.
-
-REM =========================================================
-REM POST-FLIGHT VALIDATION: Health + data smoke tests
-REM =========================================================
 echo [POST-FLIGHT] Running startup smoke tests...
 echo [*] Giving Next.js Turbopack 20 seconds to stabilize...
 powershell -NoProfile -Command "Start-Sleep -Seconds 20"
@@ -111,17 +104,48 @@ if errorlevel 1 (
     exit /b 1
 )
 echo [PASS] Startup smoke tests passed.
+echo.
+
+REM =========================================================
+REM CLOUDFLARE TUNNEL (hidden background — no extra terminal)
+REM =========================================================
+if not exist "%CLOUDFLARED_EXE%" (
+  echo [WARN] cloudflared not found. Install: winget install Cloudflare.cloudflared
+  echo [WARN] Public URL will not start. Local: http://localhost:3000
+) else if not exist "%CF_CONFIG%" (
+  echo [WARN] Missing %CF_CONFIG%
+  echo [WARN] Run config\startup\setup-cloudflare-tunnel.bat once first.
+) else (
+  echo [*] Starting Cloudflare Tunnel in background ^(no extra window^)...
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%start-cloudflared-background.ps1"
+  if errorlevel 1 (
+    echo [WARN] Tunnel failed to start. App is still on http://localhost:3000
+  ) else (
+    echo [OK] Tunnel attached to this launcher flow ^(process is hidden^).
+    echo [*] Opening %PUBLIC_URL% ...
+    start "" "%PUBLIC_URL%"
+  )
+)
 
 echo.
 echo ================================================
 set HEALTHY_COUNT=3
 set TOTAL_COUNT=3
-echo Result: ALL %TOTAL_COUNT%/%TOTAL_COUNT% services healthy and data verified -- ^> ^> ALL OK ^< ^<
+echo Result: ALL %TOTAL_COUNT%/%TOTAL_COUNT% services healthy -- ^> ^> ALL OK ^< ^<
 echo ================================================
 echo.
 echo Market API:   http://localhost:8000
 echo AI News API:  http://localhost:8001
 echo Frontend:     http://localhost:3000
+echo Public:       %PUBLIC_URL%
+echo www:          https://www.sigq.in
+echo.
+echo Tunnel: hidden background process ^(no second terminal^)
+echo Logs:   %PROJECT_ROOT%\logs\cloudflared.err.log
+echo Tip:    always open https://sigq.in  ^(not http://^)
+echo Note:   "context canceled" lines = browser closed a request; usually harmless
+echo.
+echo Keep this PC awake. Close cloudflared later with: taskkill /IM cloudflared.exe /F
 echo.
 
 if "%IROS_NO_PAUSE%"=="1" exit /b %HEALTHY_COUNT%
