@@ -15,6 +15,9 @@ REM         refresh-data-on-demand.bat --pool Nifty 500
 REM         refresh-data-on-demand.bat --ticker RELIANCE
 REM         refresh-data-on-demand.bat --orchestrate (run sequential orchestrated refresh)
 REM         refresh-data-on-demand.bat --orchestrate --pool "Nifty 100" --prompt "high volume"
+REM
+REM Docker stack: prefer config\startup\docker-refresh.bat
+REM   (checks containers healthy, then calls this same script)
 REM ============================================================
 
 setlocal enabledelayedexpansion

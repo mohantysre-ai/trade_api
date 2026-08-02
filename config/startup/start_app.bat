@@ -21,6 +21,11 @@ echo ================================================
 echo Alphix Terminal - Start App + Cloudflare Tunnel
 echo ================================================
 echo.
+echo [*] Mode: NATIVE (Python venv + Next.js)
+echo     Docker alternative:  config\startup\start_docker.bat
+echo     Docker refresh:      config\startup\docker-refresh.bat
+echo     Do not run native + Docker together ^(same ports^).
+echo.
 echo [*] Target services:
 echo     Market API:   http://localhost:8000
 echo     AI News API:  http://localhost:8001

@@ -11,3 +11,11 @@ venv
 !.env.example
 *.log
 logs
+**/eod_archive/**
+**/*.md
+!README.md
+.git
+.cursor
+**/__pycache__
+**/tests
+**/test_*.py

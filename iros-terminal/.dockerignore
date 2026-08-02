@@ -9,3 +9,10 @@ node_modules
 README.md
 AGENTS.md
 CLAUDE.md
+**/*.md
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+eslint.config.*
+.next/cache

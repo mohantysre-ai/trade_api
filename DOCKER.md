@@ -14,6 +14,18 @@ cp backend/.env.example backend/.env
 docker compose up -d --build
 ```
 
+**Windows BAT wrappers** (same ports as native `start_app.bat` — do not run both):
+
+| Script | Role |
+|--------|------|
+| `config\startup\start_docker.bat` | `docker compose up -d --build` |
+| `config\startup\start_docker.bat --no-build` | start without rebuild |
+| `config\startup\docker-refresh.bat` | on-demand live refresh (HTTP → `:8000`) |
+| `config\startup\stop_docker.bat` | `docker compose down` |
+| `config\startup\start_app.bat` | native (non-Docker) launcher |
+| `config\startup\start_k8s.bat` | 3 pods on local K8s (Docker Desktop / kind) |
+| `config\startup\stop_k8s.bat` | delete `iros` namespace |
+
 | Service    | URL                      |
 |------------|--------------------------|
 | Frontend   | http://localhost:3000    |
@@ -27,6 +39,17 @@ curl -fsS http://localhost:8001/health
 curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:3000/
 ```
 
+### On-demand data refresh (Docker)
+
+Refresh is **not** baked into the image — it is a runtime API call.
+
+```bat
+config\startup\docker-refresh.bat
+config\startup\docker-refresh.bat --skip-news
+config\startup\docker-refresh.bat --pool "Nifty 500"
+```
+
+Or use the UI **Refresh** button at http://localhost:3000.
 ## Ship to a cloud VM
 
 1. Install Docker on the VM (`curl -fsSL https://get.docker.com | sh`).
@@ -57,9 +80,31 @@ Named volumes keep JSON state across restarts (source code is not mounted):
 - `iros-eod-archive` → `/app/backend/app/services/eod_archive`
 - `iros-desk-state` → `/app/state` (`trade_api_snapshot.json`, plan, alerts, session)
 
-## Stop / logs
+## Image size notes
 
-```bash
-docker compose logs -f --tail=100
-docker compose down
+Optimized Dockerfiles use:
+
+- **Backend:** multi-stage build → venv copied into slim runtime; no `curl`; pip BuildKit cache
+- **Frontend:** `node:20-alpine` + Next `standalone`; health via Node `fetch`; npm BuildKit cache
+
+Rebuild: `docker compose build --no-cache` or `config\startup\start_docker.bat`
+
+## Kubernetes (kind cluster `iros`)
+
+Manifests in `k8s/`. Three pods in namespace `iros`:
+
+| Pod | Image | Host port |
+|-----|-------|-----------|
+| `market-api` | `iros-market-api:latest` | 8000 |
+| `ai-news` | `iros-market-api:latest` | 8001 |
+| `frontend` | `iros-frontend:latest` | 3000 |
+
+```bat
+config\startup\start_k8s.bat              # create kind cluster + load images + deploy
+config\startup\start_k8s.bat --rebuild    # rebuild images first
+config\startup\stop_k8s.bat               # delete namespace
+config\startup\stop_k8s.bat --cluster     # also delete kind cluster
 ```
+
+Requires `kind` (`winget install Kubernetes.kind`). Uses `imagePullPolicy: Never` after `kind load docker-image`. NodePorts mapped via `k8s/kind-config.yaml`.
+Do not run compose/native and kind together on the same ports.
