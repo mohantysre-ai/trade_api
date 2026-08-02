@@ -64,6 +64,7 @@ from .intelligence_engine import (
     build_ticker_intelligence_report,
     execute_terminal_intelligence_pipeline,
 )
+from .eod_engine.api import wire_eod_into_app
 
 _TI_TOP_SELECTION_COUNT = TOP_SELECTION_COUNT
 
@@ -3311,16 +3312,64 @@ def create_app() -> FastAPI:
 
     @app.get("/api/live-prices")
     def live_prices() -> dict[str, Any]:
-        """Return live prices + evaluated outcomes for today's fixed plan symbols only.
-        
-        No external API calls — reads from last_market_snapshot.json (Angel One batch).
-        Designed for monitor-mode polling.
+        """Prices + outcomes for fixed-plan symbols (monitor poll).
+
+        Primary source: last_market_snapshot.json (Angel One batch).
+        When the NSE session is open, missing/stale LTPs may be supplemented via
+        Yahoo Finance — see response.ltpSourceMix / priceSourcesNote. Never claims
+        tick-live or "no external APIs".
         """
         try:
             from .trade_outcome import get_live_prices_for_plan
             return get_live_prices_for_plan()
         except Exception as exc:
-            return {"long": [], "short": [], "updatedAt": None, "error": str(exc)}
+            return {
+                "long": [],
+                "short": [],
+                "updatedAt": None,
+                "snapshotUpdatedAt": None,
+                "error": str(exc),
+                "dataStale": True,
+                "marketOpen": False,
+                "sessionClosed": True,
+                "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0},
+                "priceSourcesNote": "Error path — external Yahoo may have been attempted before failure",
+            }
+
+    @app.get("/api/intraday-session/candidates")
+    def intraday_session_candidates() -> dict[str, Any]:
+        """Score universe and propose a 5 LONG + 5 SHORT basket (not locked)."""
+        try:
+            from .intraday_session_engine import generate_candidates
+            return generate_candidates()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.post("/api/intraday-session/commit")
+    def intraday_session_commit(force: bool = False) -> dict[str, Any]:
+        """Lock exactly 5+5 into intraday_session.json + fixed_trade_plan.json.
+
+        Manual execution only — no broker orders. Symbols immutable until force unlock.
+        """
+        try:
+            from .intraday_session_engine import commit_session
+            result = commit_session(force=force)
+            if not result.get("success") and result.get("error"):
+                raise HTTPException(status_code=409, detail=result.get("error"))
+            return result
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/intraday-session")
+    def intraday_session() -> dict[str, Any]:
+        """Return locked session state + mark-to-market (JSON snapshots only)."""
+        try:
+            from .intraday_session_engine import get_session
+            return get_session(include_live=True)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.get("/api/alert-history")
     def alert_history(since: str | None = None) -> dict[str, Any]:
@@ -3332,27 +3381,33 @@ def create_app() -> FastAPI:
             return {"alerts": [], "total": 0, "error": str(exc)}
 
     @app.get("/api/reports/eod-intraday")
-    def eod_intraday_report(date: str | None = None) -> dict[str, Any]:
-        """Post-close reconciliation of the day's intraday scanner picks:
-        T1/T2/SL outcome per pick, realized P&L, remaining capital, and an
-        LLM miss-diagnosis for every SL hit / no-target-hit pick."""
+    def eod_intraday_report(
+        date: str | None = None,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        """Post-close reconciliation of the day's intraday scanner picks.
+
+        Serves ``data/eod/{date}/book_intraday.json`` when present unless force=true.
+        """
         try:
             from datetime import date as _date
             from .eod_intraday_report import generate_intraday_eod_report
             for_date = _date.fromisoformat(date) if date else _date.today()
-            return generate_intraday_eod_report(for_date)
+            return generate_intraday_eod_report(for_date, force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.get("/api/reports/eod-swing")
-    def eod_swing_report(date: str | None = None) -> dict[str, Any]:
-        """Day-bucketed (1/7/15/30) P&L report for the Asset Matrix
-        swing/long-term picks in the fixed trade plan."""
+    def eod_swing_report(
+        date: str | None = None,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        """Day-bucketed swing P&L. Cached under book_swing.json unless force=true."""
         try:
             from datetime import date as _date
             from .eod_swing_report import generate_swing_eod_report
             for_date = _date.fromisoformat(date) if date else None
-            return generate_swing_eod_report(for_date)
+            return generate_swing_eod_report(for_date, force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -3728,6 +3783,8 @@ def create_app() -> FastAPI:
             logger = logging.getLogger("angel_one_feed")
             logger.error("ticker-news fetch failed for %s: %s", ticker, exc)
             raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    wire_eod_into_app(app)
 
     return app
 

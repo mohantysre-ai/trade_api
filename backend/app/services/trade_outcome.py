@@ -474,22 +474,64 @@ def _record_alert(alert: dict[str, Any]) -> None:
 
 
 def get_live_prices_for_plan() -> dict[str, Any]:
-    """Return live prices + evaluated outcomes for symbols in the fixed plan."""
+    """Return prices + evaluated outcomes for symbols in the fixed plan.
+
+    Honesty contract:
+    - Prefer Angel One snapshot LTP; during market hours may supplement via Yahoo.
+    - Never claim tick-live or "no external APIs" — sources are reported per symbol.
+    - Cached/entry fallbacks set dataStale=True. Missing price → ltp null, not invented.
+    """
+    snapshot_prefetch = _get_market_snapshot() or {}
+    snapshot_updated_prefetch = snapshot_prefetch.get("updatedAt", "")
+
     fixed = load_fixed_trade_plan()
     if not fixed:
-        return {"long": [], "short": [], "updatedAt": _utc_now(), "source": "none"}
-    
+        return {
+            "long": [],
+            "short": [],
+            "updatedAt": _utc_now(),
+            "snapshotUpdatedAt": snapshot_updated_prefetch,
+            "source": "none",
+            "priceSourcesNote": "No fixed plan; Yahoo not attempted",
+            "marketOpen": _is_market_open(),
+            "sessionClosed": _is_after_market_close(),
+            "dataStale": True,
+            "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0},
+        }
+
     long_plan = fixed.get("long") or []
     short_plan = fixed.get("short") or []
     if not long_plan and not short_plan:
-        return {"long": [], "short": [], "updatedAt": _utc_now(), "source": "none"}
-    
+        return {
+            "long": [],
+            "short": [],
+            "updatedAt": _utc_now(),
+            "snapshotUpdatedAt": snapshot_updated_prefetch,
+            "source": "none",
+            "priceSourcesNote": "Empty fixed plan; Yahoo not attempted",
+            "marketOpen": _is_market_open(),
+            "sessionClosed": _is_after_market_close(),
+            "dataStale": True,
+            "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0},
+        }
+
     all_plan_symbols = [p.get("symbol", "").upper() for p in long_plan + short_plan if p.get("symbol")]
     unique_symbols = list(dict.fromkeys(all_plan_symbols))
-    
-    snapshot = _get_market_snapshot() or {}
+
+    snapshot = snapshot_prefetch
     quotes = snapshot.get("stockQuotes") or {}
-    snapshot_updated = snapshot.get("updatedAt", "")
+    snapshot_updated = snapshot_updated_prefetch
+
+    snapshot_age_sec: int | None = None
+    if snapshot_updated:
+        try:
+            snap_dt = datetime.fromisoformat(str(snapshot_updated).replace("Z", "+00:00"))
+            snapshot_age_sec = max(
+                0,
+                int((datetime.now(tz=timezone.utc) - snap_dt.astimezone(timezone.utc)).total_seconds()),
+            )
+        except Exception:
+            snapshot_age_sec = None
 
     market_open = _is_market_open()
     after_close = _is_after_market_close()
@@ -497,10 +539,13 @@ def get_live_prices_for_plan() -> dict[str, Any]:
 
     alert_history = _load_alert_history()
     new_alerts: list[dict[str, Any]] = []
+    source_mix = {"live": 0, "snapshot": 0, "cached": 0, "none": 0}
 
-    # When market is open, supplement missing snapshot quotes with live data.
+    # During market hours, supplement missing/stale snapshot quotes via Yahoo (external).
     live_quotes: dict[str, float] = {}
+    yahoo_attempted = False
     if market_open and unique_symbols:
+        yahoo_attempted = True
         now = time.time()
         for sym in unique_symbols:
             cached = _YAHOO_FINANCE_CACHE.get(sym)
@@ -514,6 +559,8 @@ def get_live_prices_for_plan() -> dict[str, Any]:
     def enrich_pick(p: dict[str, Any]) -> dict[str, Any]:
         symbol = (p.get("symbol") or "").upper()
         ltp = None
+        ltp_source = "none"
+        from_snapshot = False
 
         if symbol in quotes:
             q = quotes[symbol]
@@ -521,34 +568,56 @@ def get_live_prices_for_plan() -> dict[str, Any]:
             if raw is not None:
                 try:
                     ltp = float(raw)
+                    from_snapshot = True
+                    ltp_source = "snapshot"
                 except (TypeError, ValueError):
                     pass
 
-        if ltp is None and symbol in live_quotes:
+        # Prefer fresh Yahoo when market is open and we have a live quote
+        if symbol in live_quotes:
             ltp = live_quotes[symbol]
+            ltp_source = "live"
+            from_snapshot = False
 
         if ltp is None:
-            raw = p.get("scanLtp")
-            if raw is not None:
-                try:
-                    ltp = float(raw)
-                except (TypeError, ValueError):
-                    pass
+            for key in ("scanLtp", "currentPrice", "entryPrice"):
+                raw = p.get(key)
+                if raw is not None:
+                    try:
+                        ltp = float(raw)
+                        ltp_source = "cached"
+                        break
+                    except (TypeError, ValueError):
+                        pass
+
+        data_stale = ltp_source in ("cached", "none") or (
+            ltp_source == "snapshot"
+            and snapshot_age_sec is not None
+            and snapshot_age_sec > max(_PRICE_TTL, 300)
+        )
+        source_mix[ltp_source] = source_mix.get(ltp_source, 0) + 1
+
+        entry: dict[str, Any] = {
+            "ltp": round(ltp, 2) if ltp is not None else None,
+            "currentPrice": round(ltp, 2) if ltp is not None else None,
+            "ltpSource": ltp_source,
+            "dataStale": data_stale,
+            "priceUpdatedAt": _utc_now(),
+        }
 
         if ltp is None:
-            ltp = p.get("currentPrice")
+            entry["outcome"] = None
+            entry["status"] = "DATA STALE"
+            return {**p, **entry}
 
-        if ltp is None:
-            ltp = float(p.get("entryPrice") or 0)
-        ltp = float(ltp)
+        # CLOSED positions stay CLOSED — do not re-open via price refresh
+        if p.get("closed") or str(p.get("status") or "").upper() == "CLOSED":
+            entry["status"] = "CLOSED"
+            entry["closed"] = True
+            entry["outcome"] = p.get("outcome")
+            return {**p, **entry}
 
         outcome = evaluate_outcome({**p, "currentPrice": ltp, "scanLtp": None}, finalize_if_closed=after_close)
-
-        entry = {
-            "ltp": ltp,
-            "currentPrice": ltp,
-            "ltpSource": "live" if symbol in live_quotes else ("snapshot" if (symbol in quotes and quotes[symbol].get("ltpRaw")) else "cached"),
-        }
 
         if outcome:
             hit_level = (outcome.get("hitLevel") if isinstance(outcome, dict) else None)
@@ -570,37 +639,63 @@ def get_live_prices_for_plan() -> dict[str, Any]:
                         "firedAt": _utc_now(),
                     })
             entry["outcome"] = outcome
-            entry["priceUpdatedAt"] = _utc_now()
             if hit_level or outcome.get("final"):
                 p["outcome"] = outcome
                 plan_changed.append(True)
+                if hit_level == "sl" or outcome.get("final"):
+                    entry["closed"] = True
+                    entry["status"] = "CLOSED" if hit_level == "sl" or after_close else str(outcome.get("label") or "RUNNING")
         else:
             entry["outcome"] = None
-            entry["priceUpdatedAt"] = _utc_now()
 
-        merged = {**p, **entry}
-        return merged
+        if data_stale and not entry.get("closed"):
+            entry["status"] = "DATA STALE"
+        elif from_snapshot and after_close:
+            entry.setdefault("status", "SESSION CLOSED")
+
+        return {**p, **entry}
 
     enriched_long = [enrich_pick(p) for p in long_plan]
     enriched_short = [enrich_pick(p) for p in short_plan]
 
     if plan_changed:
-        save_fixed_trade_plan({"long": long_plan, "short": short_plan, "updatedAt": _utc_now()})
+        # Preserve lock metadata when rewriting plan after outcomes
+        merged_plan = {
+            **{k: v for k, v in fixed.items() if k not in ("long", "short")},
+            "long": long_plan,
+            "short": short_plan,
+            "updatedAt": _utc_now(),
+        }
+        save_fixed_trade_plan(merged_plan)
 
     if new_alerts:
         _record_alert(new_alerts[0])
         for a in new_alerts[1:]:
             _record_alert(a)
 
+    any_stale = any(r.get("dataStale") for r in enriched_long + enriched_short) or (
+        snapshot_age_sec is not None and snapshot_age_sec > max(_PRICE_TTL, 300)
+    )
+
     return {
         "long": enriched_long,
         "short": enriched_short,
         "updatedAt": _utc_now(),
         "snapshotUpdatedAt": snapshot_updated,
+        "snapshotAgeSec": snapshot_age_sec,
         "source": "fixed_plan",
+        "priceSourcesNote": (
+            "Angel One snapshot primary; Yahoo Finance supplement when market open"
+            if yahoo_attempted
+            else "Angel One snapshot / plan cache only (market closed or no Yahoo needed)"
+        ),
         "newAlerts": new_alerts,
         "marketOpen": market_open,
         "sessionClosed": after_close,
+        "dataStale": bool(any_stale),
+        "ltpSourceMix": source_mix,
+        "locked": bool(fixed.get("locked")),
+        "executionPolicy": fixed.get("executionPolicy") or "MANUAL_ONLY",
     }
 
 

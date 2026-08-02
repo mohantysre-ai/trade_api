@@ -1058,7 +1058,7 @@ export default function ForensicPanel({
       <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-400 via-cyan-400 to-transparent pointer-events-none" aria-hidden />
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
         <div className="min-w-0">
-          <h3 className="desk-panel-title text-emerald-700">ASSET MATRIX</h3>
+          <h3 className="desk-panel-title text-emerald-700">SWING PORTFOLIO</h3>
           <p className="text-slate-500 text-[12px] mt-0.5">
             {institutionalMode
               ? institutionalOffHours

@@ -1,0 +1,53 @@
+# Node & Dependencies
+node_modules/
+bower_components/
+.npm/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Build & Output Directories
+dist/
+build/
+out/
+.next/
+.nuxt/
+target/
+bin/
+obj/
+
+# Logs and Databases
+*.log
+*.sqlite
+.env*
+!.env.example
+
+# Version Control & IDEs
+.git/
+.svn/
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Media & Heavy Files
+*.mp4
+*.mp3
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.pdf
+*.zip
+*.tar.gz
+
+# trade_api - heavy / non-source paths (do not ignore source code)
+backend/.venv/
+.venv/
+.tmp/
+tmp/
+*.pack
+trade_api_snapshot.json
+backend/app/services/last_market_snapshot.json

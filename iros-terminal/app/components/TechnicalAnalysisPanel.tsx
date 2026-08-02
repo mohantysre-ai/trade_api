@@ -186,7 +186,7 @@ function EmptyState() {
         </div>
         <h3 className="text-base font-black uppercase tracking-wider text-slate-900">Technical Analysis</h3>
         <p className="mt-2 max-w-sm text-xs leading-relaxed text-slate-500">
-          Select a stock from the Asset Matrix to view live technical indicators, oscillators, and trend signals.
+          Select a stock from the Swing Portfolio to view live technical indicators, oscillators, and trend signals.
         </p>
         <div className="mt-6 flex gap-3">
           <div className="h-2 w-12 rounded-full bg-emerald-200 animate-pulse" />

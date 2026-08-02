@@ -141,7 +141,7 @@ function EmptyState() {
         </div>
         <h3 className="text-base font-black uppercase tracking-wider text-slate-900">SWOT Analysis</h3>
         <p className="mt-2 max-w-sm text-xs leading-relaxed text-slate-500">
-          Select a stock from the Asset Matrix to view its Strengths, Weaknesses, Opportunities & Threats.
+          Select a stock from the Swing Portfolio to view its Strengths, Weaknesses, Opportunities & Threats.
         </p>
       </div>
     </div>

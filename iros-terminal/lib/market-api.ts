@@ -469,3 +469,389 @@ export async function fetchNseSparkline(
 
    return sparkline;
 }
+
+// ---------------------------------------------------------------------------
+// Institutional EOD Review (GET/POST /api/eod/*)
+// ---------------------------------------------------------------------------
+
+export type EodMarketRegime =
+  | "BULL_TRENDING"
+  | "BEAR_TRENDING"
+  | "HIGH_VOLATILITY_SIDEWAYS"
+  | "LOW_VOLATILITY_COMPRESSION"
+  | "SECTOR_ROTATION_SELECTIVE"
+  | string;
+
+export type EodTradeOutcome =
+  | "TARGET_HIT"
+  | "STOP_HIT"
+  | "NO_ENTRY"
+  | "TRAILED_EXIT"
+  | "EOD_SQUAREOFF"
+  | string;
+
+export type EodProposalStatus =
+  | "PENDING_REVIEW"
+  | "APPROVED"
+  | "REJECTED"
+  | "INSUFFICIENT_SAMPLES"
+  | string;
+
+export type EodTcaBasis = "MODELED" | "OBSERVED" | string;
+
+export type EodTcaNode = {
+  basis?: EodTcaBasis | null;
+  implementation_shortfall_bps?: number | null;
+  delay_cost_bps?: number | null;
+  spread_cost_bps?: number | null;
+  market_impact_bps?: number | null;
+  opportunity_cost_bps?: number | null;
+} | null;
+
+export type EodEfficiencyNode = {
+  mae_pct?: number | null;
+  mfe_pct?: number | null;
+  realized_return_ratio?: number | null;
+  stop_efficiency_index?: number | null;
+} | null;
+
+export type EodAttributionNode = {
+  alpha_score?: number | null;
+  volume_expansion_contrib?: number | null;
+  vwap_alignment_contrib?: number | null;
+  momentum_velocity_contrib?: number | null;
+  sector_relative_strength_contrib?: number | null;
+  open_interest_buildup_contrib?: number | null;
+  news_sentiment_contrib?: number | null;
+  allocation_effect?: number | null;
+  selection_effect?: number | null;
+  interaction_effect?: number | null;
+} | null;
+
+export type EodCounterfactual = {
+  scenario_name: string;
+  simulated_outcome?: string | null;
+  simulated_pnl_pct?: number | null;
+  pnl_delta_vs_actual_pct?: number | null;
+  max_drawdown_during_trade_pct?: number | null;
+};
+
+export type EodProposalReviewAction = "APPROVE" | "REJECT";
+
+export type EodTimelineCandle = {
+  ts?: string | null;
+  time?: string | null;
+  timestamp?: string | null;
+  open?: number | null;
+  high?: number | null;
+  low?: number | null;
+  close?: number | null;
+  volume?: number | null;
+};
+
+export type EodTimelineEvent = {
+  ts?: string | null;
+  time?: string | null;
+  timestamp?: string | null;
+  type?: string | null;
+  event?: string | null;
+  price?: number | null;
+  label?: string | null;
+};
+
+export type EodTradeScorecard = {
+  trade_id: string;
+  ticker: string;
+  direction: "LONG" | "SHORT" | string;
+  confidence_score?: number | null;
+  confidence_basis?: "FACTOR_SCORE" | string | null;
+  entry_price?: number | null;
+  exit_price?: number | null;
+  stop_loss?: number | null;
+  target_price?: number | null;
+  signal_entry_price?: number | null;
+  outcome?: EodTradeOutcome | null;
+  realized_pnl_pct?: number | null;
+  realized_pnl_abs?: number | null;
+  holding_duration_mins?: number | null;
+  sector?: string | null;
+  score?: number | null;
+  qty?: number | null;
+  deployed_capital?: number | null;
+  risk_per_share?: number | null;
+  tca?: EodTcaNode;
+  efficiency?: EodEfficiencyNode;
+  attribution?: EodAttributionNode;
+  counterfactuals?: EodCounterfactual[];
+  success_factors?: string[];
+  failure_factors?: string[];
+  root_cause?: string | null;
+  false_positive?: boolean | null;
+  timeline_events?: EodTimelineEvent[];
+  factor_breakdown?: Record<string, unknown> | null;
+};
+
+export type EodExecutiveSummary = {
+  overall_institutional_score?: number | null;
+  total_trades?: number | null;
+  win_trades?: number | null;
+  loss_trades?: number | null;
+  no_entry_trades?: number | null;
+  win_rate_pct?: number | null;
+  average_risk_reward?: number | null;
+  net_strategy_return_pct?: number | null;
+  capital_efficiency_pct?: number | null;
+  expected_calibration_error?: number | null;
+  brier_score?: number | null;
+  market_regime?: EodMarketRegime | null;
+  false_positive_count?: number | null;
+};
+
+export type EodStrategyProposal = {
+  proposal_id: string;
+  parameter_name: string;
+  current_value?: string | null;
+  proposed_value?: string | null;
+  expected_pnl_uplift_pct?: number | null;
+  confidence_interval?: string | null;
+  supporting_evidence?: Record<string, unknown> | null;
+  sample_count?: number | null;
+  status: EodProposalStatus;
+  audit_trail?: Array<{
+    action: EodProposalReviewAction;
+    reviewed_at: string;
+    reviewer?: string | null;
+    note?: string | null;
+  }>;
+};
+
+export type EodPmCommentary = {
+  executive_summary?: string | null;
+  attribution_narrative?: string | null;
+  execution_and_slippage_review?: string | null;
+  actionable_directives?: string[] | null;
+  source?: "LLM" | "DETERMINISTIC_FALLBACK" | string | null;
+} | null;
+
+export type EodMasterPayload = {
+  analysis_date: string;
+  generated_at?: string | null;
+  status?: "OK" | "NO_PICKS" | "PARTIAL" | string;
+  notes?: string[];
+  schema_version?: string;
+  executive_summary?: EodExecutiveSummary | null;
+  scorecards?: EodTradeScorecard[];
+  learning_proposals?: EodStrategyProposal[];
+  pm_commentary?: EodPmCommentary;
+  error?: string;
+};
+
+export type EodTimelinePayload = {
+  ticker?: string;
+  date?: string;
+  interval?: string;
+  candle_count?: number;
+  candles?: EodTimelineCandle[];
+  bars?: EodTimelineCandle[];
+  ticks?: EodTimelineCandle[];
+  events?: EodTimelineEvent[];
+  error?: string | null;
+};
+
+async function readEodJson<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.error) detail = String(body.error);
+      else if (body?.detail) detail = String(body.detail);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  return (await res.json()) as T;
+}
+
+function unwrapList<T>(raw: unknown, keys: string[]): T[] {
+  if (Array.isArray(raw)) return raw as T[];
+  if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    for (const key of keys) {
+      if (Array.isArray(obj[key])) return obj[key] as T[];
+    }
+  }
+  return [];
+}
+
+export async function fetchEodDates(): Promise<string[]> {
+  const res = await fetch("/api/eod/dates", { cache: "no-store" });
+  const raw = await readEodJson<unknown>(res);
+  if (Array.isArray(raw)) {
+    return raw.map(String).filter(Boolean);
+  }
+  if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    for (const key of ["dates", "available_dates", "days"]) {
+      if (Array.isArray(obj[key])) return (obj[key] as unknown[]).map(String).filter(Boolean);
+    }
+  }
+  return [];
+}
+
+export async function fetchEodSummary(date: string): Promise<EodMasterPayload> {
+  const res = await fetch(`/api/eod/summary/${encodeURIComponent(date)}`, { cache: "no-store" });
+  return readEodJson<EodMasterPayload>(res);
+}
+
+export async function fetchEodScorecards(date: string): Promise<EodTradeScorecard[]> {
+  const res = await fetch(`/api/eod/scorecards/${encodeURIComponent(date)}`, { cache: "no-store" });
+  const raw = await readEodJson<unknown>(res);
+  return unwrapList<EodTradeScorecard>(raw, ["scorecards", "items", "data"]);
+}
+
+export async function fetchEodProposals(date: string): Promise<EodStrategyProposal[]> {
+  const res = await fetch(`/api/eod/proposals/${encodeURIComponent(date)}`, { cache: "no-store" });
+  const raw = await readEodJson<unknown>(res);
+  return unwrapList<EodStrategyProposal>(raw, [
+    "learning_proposals",
+    "proposals",
+    "items",
+    "data",
+  ]);
+}
+
+export async function fetchEodTimeline(
+  date: string,
+  ticker: string
+): Promise<EodTimelinePayload> {
+  const res = await fetch(
+    `/api/eod/timeline/${encodeURIComponent(date)}/${encodeURIComponent(ticker)}`,
+    { cache: "no-store" }
+  );
+  return readEodJson<EodTimelinePayload>(res);
+}
+
+export async function fetchEodCounterfactuals(
+  date: string,
+  tradeId: string
+): Promise<EodCounterfactual[]> {
+  const res = await fetch(
+    `/api/eod/counterfactuals/${encodeURIComponent(date)}/${encodeURIComponent(tradeId)}`,
+    { cache: "no-store" }
+  );
+  const raw = await readEodJson<unknown>(res);
+  return unwrapList<EodCounterfactual>(raw, ["counterfactuals", "items", "data", "scenarios"]);
+}
+
+export async function reviewEodProposal(
+  date: string,
+  proposalId: string,
+  action: EodProposalReviewAction
+): Promise<unknown> {
+  const res = await fetch(
+    `/api/eod/proposals/${encodeURIComponent(date)}/${encodeURIComponent(proposalId)}/review`,
+    {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    }
+  );
+  return readEodJson<unknown>(res);
+}
+
+export async function runEodAnalysis(
+  date?: string,
+  opts?: { force?: boolean; useLlm?: boolean }
+): Promise<unknown> {
+  const params = new URLSearchParams();
+  if (date) params.set("date", date);
+  if (opts?.force) params.set("force", "true");
+  if (opts?.useLlm) params.set("use_llm", "true");
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  const res = await fetch(`/api/eod/run${qs}`, {
+    method: "POST",
+    cache: "no-store",
+    signal: AbortSignal.timeout(10 * 60 * 1_000),
+  });
+  return readEodJson<unknown>(res);
+}
+
+export type EodLlmStatus = {
+  date: string;
+  has_artifacts: boolean;
+  pm_source?: string | null;
+  llm_done: boolean;
+  llm_available: boolean;
+};
+
+export async function fetchEodLlmStatus(date: string): Promise<EodLlmStatus> {
+  const res = await fetch(`/api/eod/llm-status/${encodeURIComponent(date)}`, {
+    cache: "no-store",
+  });
+  if (res.ok) {
+    return readEodJson<EodLlmStatus>(res);
+  }
+  // Fallback when backend hasn't loaded llm-status yet — derive from summary cache
+  try {
+    const summary = await fetchEodSummary(date);
+    const source = summary?.pm_commentary?.source ?? null;
+    const llmDone = String(source || "").toUpperCase() === "LLM";
+    return {
+      date,
+      has_artifacts: true,
+      pm_source: source,
+      llm_done: llmDone,
+      llm_available: !llmDone,
+    };
+  } catch {
+    return {
+      date,
+      has_artifacts: false,
+      pm_source: null,
+      llm_done: false,
+      llm_available: false,
+    };
+  }
+}
+
+/** Once-per-day PM LLM. Safe to call again — returns cache if already done. */
+export async function runEodPmLlmOnce(date?: string): Promise<{
+  success?: boolean;
+  skipped?: boolean;
+  reason?: string;
+  llm_used?: boolean;
+  llm_done?: boolean;
+  pm_source?: string | null;
+  date?: string;
+  detail?: string;
+  commentary?: EodPmCommentary | null;
+}> {
+  const qs = date ? `?date=${encodeURIComponent(date)}` : "";
+  const res = await fetch(`/api/eod/pm-llm${qs}`, {
+    method: "POST",
+    cache: "no-store",
+    signal: AbortSignal.timeout(10 * 60 * 1_000),
+  });
+  if (res.status === 404) {
+    // Older backend without /pm-llm — use run?use_llm=true (still respects day cache)
+    const fallback = (await runEodAnalysis(date, { useLlm: true, force: true })) as {
+      skipped?: boolean;
+      reason?: string;
+      llm_used?: boolean;
+      payload?: { pm_commentary?: { source?: string } };
+    };
+    const source = fallback?.payload?.pm_commentary?.source ?? null;
+    return {
+      success: true,
+      skipped: Boolean(fallback?.skipped),
+      reason: fallback?.reason || "run_use_llm_fallback",
+      llm_used: Boolean(fallback?.llm_used),
+      llm_done: String(source || "").toUpperCase() === "LLM",
+      pm_source: source,
+      date,
+    };
+  }
+  return readEodJson(res);
+}

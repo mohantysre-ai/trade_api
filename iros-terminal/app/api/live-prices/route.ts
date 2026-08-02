@@ -5,18 +5,22 @@ export const runtime = "nodejs";
 /**
  * GET /api/live-prices
  *
- * Returns live prices + evaluated outcomes for today's fixed-plan symbols only.
- * Proxies to the FastAPI backend, which reads from last_market_snapshot.json
- * (no external API calls). Designed for monitor-mode polling.
+ * Proxies FastAPI fixed-plan price evaluation.
+ * Backend may use Angel One snapshot and (when market open) Yahoo Finance —
+ * see response.ltpSourceMix / priceSourcesNote / dataStale. Do not assume
+ * "no external API calls" or tick-live freshness.
  */
 export async function GET() {
   try {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+    const backendUrl =
+      process.env.MARKET_API_URL ??
+      process.env.NEXT_PUBLIC_BACKEND_URL ??
+      "http://127.0.0.1:8000";
 
     const res = await fetch(`${backendUrl}/api/live-prices`, {
       cache: "no-store",
       headers: {
-        "Accept": "application/json",
+        Accept: "application/json",
       },
     });
 
@@ -26,6 +30,11 @@ export async function GET() {
         short: [],
         updatedAt: new Date().toISOString(),
         source: "none",
+        dataStale: true,
+        marketOpen: false,
+        sessionClosed: true,
+        ltpSourceMix: { live: 0, snapshot: 0, cached: 0, none: 0 },
+        priceSourcesNote: "Backend live-prices unavailable",
       });
     }
 
@@ -37,7 +46,12 @@ export async function GET() {
       short: [],
       updatedAt: new Date().toISOString(),
       source: "none",
+      dataStale: true,
+      marketOpen: false,
+      sessionClosed: true,
       error: err instanceof Error ? err.message : "Failed to fetch live prices",
+      ltpSourceMix: { live: 0, snapshot: 0, cached: 0, none: 0 },
+      priceSourcesNote: "Proxy error — no LTP sources available",
     });
   }
 }

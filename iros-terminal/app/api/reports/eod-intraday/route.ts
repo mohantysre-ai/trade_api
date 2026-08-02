@@ -3,24 +3,24 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 /**
- * GET /api/reports/eod-intraday?date=2026-07-19
- *
- * Returns post-close reconciliation of the day's intraday scanner picks:
- * T1/T2/SL outcome per pick, realized P&L, remaining capital, and LLM miss-diagnosis.
+ * GET /api/reports/eod-intraday?date=&force=
+ * Cached under data/eod/{date}/book_intraday.json unless force=true.
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date");
-    const queryString = date ? `?date=${encodeURIComponent(date)}` : "";
+    const force = searchParams.get("force");
+    const params = new URLSearchParams();
+    if (date) params.set("date", date);
+    if (force) params.set("force", force);
+    const qs = params.toString() ? `?${params.toString()}` : "";
 
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
-    const res = await fetch(`${backendUrl}/api/reports/eod-intraday${queryString}`, {
+    const res = await fetch(`${backendUrl}/api/reports/eod-intraday${qs}`, {
       cache: "no-store",
-      headers: {
-        "Accept": "application/json",
-      },
+      headers: { Accept: "application/json" },
     });
 
     if (!res.ok) {
@@ -31,14 +31,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const data = await res.json();
-    return NextResponse.json(data);
+    return NextResponse.json(await res.json());
   } catch (err) {
     return NextResponse.json(
       {
         error: err instanceof Error ? err.message : "Failed to fetch intraday EOD report",
         trades: [],
-        summary: { note: "Backend unavailable" },
       },
       { status: 502 }
     );

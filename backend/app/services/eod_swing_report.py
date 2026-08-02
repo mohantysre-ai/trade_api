@@ -88,7 +88,7 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
     t1 = float(pick.get("target1") or 0)
     t2 = float(pick.get("target2") or 0)
 
-    ref_price = get_reference_price(symbol)
+    ref_price = get_reference_price(symbol, allow_network=False)
     eod_price = get_mock_eod_price(symbol)
     base_entry = entry if entry else ref_price
 
@@ -147,15 +147,43 @@ def _ensure_mock_plan() -> dict[str, Any]:
     return {"long": long_picks, "short": short_picks, "updatedAt": datetime.utcnow().isoformat() + "Z", "isMock": True}
 
 
-def generate_swing_eod_report(for_date: date | None = None) -> dict[str, Any]:
+def generate_swing_eod_report(
+    for_date: date | None = None,
+    *,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Build swing Book P&L. Serves per-day JSON cache unless force=True."""
+    from .eod_book_cache import load_book_cache, save_book_cache
+
     as_of = for_date or date.fromisoformat(_today_ist())
+
+    if not force:
+        cached = load_book_cache(as_of, "swing")
+        if cached is not None:
+            return cached
+
     plan = _ensure_mock_plan()
     all_picks = (plan.get("long") or []) + (plan.get("short") or [])
 
     if not all_picks:
-        return {"date": as_of.isoformat(), "picks": [], "summary": {"note": "No picks in fixed trade plan"}}
+        empty = {
+            "date": as_of.isoformat(),
+            "picks": [],
+            "summary": {"note": "No picks in fixed trade plan"},
+            "totalPicks": 0,
+            "totalDeployed": 0,
+            "totalPnl": 0,
+            "totalPnlPct": None,
+            "winCount": 0,
+            "lossCount": 0,
+            "bestPerformer": None,
+            "worstPerformer": None,
+            "pnlByDayBucket": {},
+            "isMock": True,
+        }
+        return save_book_cache(as_of, "swing", empty)
 
-    alerts = get_alert_history(since="2000-01-01", limit=5000)
+    alerts = get_alert_history(since=as_of.isoformat(), limit=200)
 
     rows = []
     total_pnl = 0.0
@@ -187,7 +215,7 @@ def generate_swing_eod_report(for_date: date | None = None) -> dict[str, Any]:
     winners = [r for r in rows if r["pnl"] > 0]
     losers = [r for r in rows if r["pnl"] < 0]
 
-    return {
+    report = {
         "date": as_of.isoformat(),
         "totalPicks": len(rows),
         "totalDeployed": round(total_deployed, 2),
@@ -203,3 +231,4 @@ def generate_swing_eod_report(for_date: date | None = None) -> dict[str, Any]:
         "referenceDate": "2026-07-17",
         "referenceLabel": "9:30 AM IST July 17 open (Friday session reference)",
     }
+    return save_book_cache(as_of, "swing", report)

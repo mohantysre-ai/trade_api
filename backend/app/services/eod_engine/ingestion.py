@@ -1,0 +1,321 @@
+"""EOD ingestion: load day's picks and persist 1-min candle timelines."""
+from __future__ import annotations
+
+import json
+import logging
+import os
+from datetime import date, datetime, time, timedelta
+from typing import Any
+from zoneinfo import ZoneInfo
+
+from ..eod_archive import load_archive
+
+log = logging.getLogger(__name__)
+
+IST = ZoneInfo("Asia/Kolkata")
+
+_SERVICES_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_APP_DIR = os.path.dirname(_SERVICES_DIR)
+_BACKEND_DIR = os.path.dirname(_APP_DIR)
+_REPO_ROOT = os.path.dirname(_BACKEND_DIR)
+
+EOD_DATA_ROOT = os.path.join(_APP_DIR, "data", "eod")
+_FIXED_PLAN_PATH = os.path.join(_REPO_ROOT, "fixed_trade_plan.json")
+_INTRADAY_SESSION_PATH = os.path.join(_REPO_ROOT, "intraday_session.json")
+_LAST_SNAPSHOT_PATH = os.path.join(_SERVICES_DIR, "last_market_snapshot.json")
+
+
+def eod_day_dir(for_date: date) -> str:
+    path = os.path.join(EOD_DATA_ROOT, for_date.isoformat())
+    os.makedirs(path, exist_ok=True)
+    os.makedirs(os.path.join(path, "timeline_ticks"), exist_ok=True)
+    return path
+
+
+def atomic_write_json(path: str, payload: Any) -> None:
+    """Atomic JSON write via .tmp + os.replace (fallback to overwrite)."""
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2, default=str)
+    try:
+        os.replace(tmp, path)
+    except OSError:
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2, default=str)
+
+
+def _read_json(path: str) -> dict[str, Any]:
+    try:
+        with open(path, "r", encoding="utf-8-sig") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def load_market_snapshot() -> dict[str, Any]:
+    return _read_json(_LAST_SNAPSHOT_PATH)
+
+
+def load_fixed_trade_plan(for_date: date | None = None) -> dict[str, Any]:
+    plan = _read_json(_FIXED_PLAN_PATH)
+    if for_date is None:
+        return plan
+    session = str(plan.get("sessionDate") or "")
+    if session and session != for_date.isoformat():
+        # Plan is for a different day — still usable if archive empty; caller notes it.
+        return plan
+    return plan
+
+
+def load_intraday_session(for_date: date | None = None) -> dict[str, Any]:
+    session = _read_json(_INTRADAY_SESSION_PATH)
+    if for_date is None:
+        return session
+    return session
+
+
+def _normalize_pick(raw: dict[str, Any], source: str) -> dict[str, Any] | None:
+    symbol = str(raw.get("symbol") or raw.get("ticker") or "").upper().strip()
+    if not symbol:
+        return None
+    direction = str(raw.get("direction") or "LONG").upper()
+    if direction not in ("LONG", "SHORT"):
+        direction = "LONG"
+    entry = _f(raw.get("entryPrice") or raw.get("entry") or raw.get("ltp") or raw.get("scanLtp"))
+    stop = _f(raw.get("stopLoss"))
+    t1 = _f(raw.get("target1") or raw.get("target_price") or raw.get("sellPrice"))
+    t2 = _f(raw.get("target2"))
+    if entry is None or stop is None or t1 is None:
+        return None
+    score = _f(raw.get("score") or raw.get("alpha_score") or raw.get("confidence"))
+    risk = _f(raw.get("riskPerShare") or raw.get("risk_per_share"))
+    if risk is None and entry is not None and stop is not None:
+        risk = abs(entry - stop)
+    qty = int(raw.get("approxQty") or raw.get("approx_qty") or 0)
+    deployed = _f(raw.get("deployedCapital") or raw.get("deployed_capital")) or 0.0
+    return {
+        "symbol": symbol,
+        "name": raw.get("name") or symbol,
+        "direction": direction,
+        "entryPrice": entry,
+        "stopLoss": stop,
+        "target1": t1,
+        "target2": t2,
+        "score": score,
+        "sector": raw.get("sector"),
+        "rewardRisk": _f(raw.get("rewardRisk") or raw.get("rrT2")),
+        "approxQty": qty,
+        "deployedCapital": deployed,
+        "riskPerShare": risk,
+        "factorBreakdown": raw.get("factorBreakdown") or raw.get("components"),
+        "outcome": raw.get("outcome"),
+        "atrPct": _f(raw.get("atrPct") or raw.get("atr_pct")),
+        "vwap": _f(raw.get("vwap")),
+        "source": source,
+        "raw": raw,
+    }
+
+
+def _f(v: Any) -> float | None:
+    if v is None or v == "":
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def load_day_picks(for_date: date) -> dict[str, Any]:
+    """Merge fixed_trade_plan + intraday_session + eod_archive into canonical picks."""
+    plan = load_fixed_trade_plan(for_date)
+    session = load_intraday_session(for_date)
+    archive = load_archive(for_date)
+    snapshot = load_market_snapshot()
+
+    by_key: dict[str, dict[str, Any]] = {}
+
+    def _ingest(items: list[Any], source: str) -> None:
+        for item in items or []:
+            if not isinstance(item, dict):
+                continue
+            pick = _normalize_pick(item, source)
+            if not pick:
+                continue
+            key = f"{pick['symbol']}:{pick['direction']}"
+            existing = by_key.get(key)
+            if existing is None:
+                by_key[key] = pick
+                continue
+            # Prefer richer factor breakdown / score from session
+            if pick.get("factorBreakdown") and not existing.get("factorBreakdown"):
+                existing["factorBreakdown"] = pick["factorBreakdown"]
+            if existing.get("score") is None and pick.get("score") is not None:
+                existing["score"] = pick["score"]
+            if pick.get("outcome") and not existing.get("outcome"):
+                existing["outcome"] = pick["outcome"]
+            if pick.get("approxQty") and not existing.get("approxQty"):
+                existing["approxQty"] = pick["approxQty"]
+                existing["deployedCapital"] = pick.get("deployedCapital")
+
+    _ingest(list(plan.get("long") or []), "fixed_trade_plan")
+    _ingest(list(plan.get("short") or []), "fixed_trade_plan")
+    _ingest(list(session.get("long") or []), "intraday_session")
+    _ingest(list(session.get("short") or []), "intraday_session")
+
+    archived = archive.get("intradayPicks") or {}
+    if isinstance(archived, dict):
+        _ingest(list(archived.values()), "eod_archive")
+
+    regime = plan.get("regime") or session.get("regime") or {}
+    capital = plan.get("capital") or session.get("capital") or {}
+
+    return {
+        "date": for_date.isoformat(),
+        "picks": list(by_key.values()),
+        "regime": regime,
+        "capital": capital,
+        "plan": plan,
+        "session": session,
+        "archive": archive,
+        "snapshot": snapshot,
+        "sources": {
+            "planSessionDate": plan.get("sessionDate"),
+            "sessionDate": session.get("sessionDate"),
+            "archiveDate": archive.get("date"),
+            "pickCount": len(by_key),
+        },
+    }
+
+
+def _session_bounds(for_date: date) -> tuple[datetime, datetime]:
+    open_dt = datetime.combine(for_date, time(9, 15), tzinfo=IST)
+    close_dt = datetime.combine(for_date, time(15, 30), tzinfo=IST)
+    return open_dt, close_dt
+
+
+def fetch_and_persist_candles(
+    for_date: date,
+    symbols: list[str],
+    client: Any | None = None,
+) -> dict[str, list[dict[str, Any]]]:
+    """Fetch ONE_MINUTE candles per ticker; persist to timeline_ticks/{TICKER}.json."""
+    day_dir = eod_day_dir(for_date)
+    ticks_dir = os.path.join(day_dir, "timeline_ticks")
+    open_dt, close_dt = _session_bounds(for_date)
+    results: dict[str, list[dict[str, Any]]] = {}
+
+    # Prefer existing persisted candles (idempotent re-runs)
+    unique_syms = sorted({s.upper() for s in symbols if s})
+    pending: list[str] = []
+    for sym in unique_syms:
+        path = os.path.join(ticks_dir, f"{sym}.json")
+        if os.path.isfile(path):
+            try:
+                with open(path, "r", encoding="utf-8-sig") as fh:
+                    payload = json.load(fh)
+                candles = payload.get("candles") if isinstance(payload, dict) else None
+                if isinstance(candles, list) and candles:
+                    results[sym] = candles
+                    continue
+            except Exception:
+                pass
+        pending.append(sym)
+
+    if not pending:
+        return results
+
+    ao_client = client
+    token_map: dict[str, tuple[str, str]] = {}
+    resolve_fn = None
+    parse_fn = None
+    # Deferred import: angel_one_feed imports eod_engine at app startup (circular).
+    try:
+        from ..angel_one_feed import (
+            AngelOneClient,
+            _load_nse_eq_token_map,
+            _parse_candle_rows,
+            _resolve_nse_equity,
+        )
+
+        parse_fn = _parse_candle_rows
+        resolve_fn = _resolve_nse_equity
+        token_map = _load_nse_eq_token_map()
+        if ao_client is None:
+            ao_client = AngelOneClient()
+    except Exception as exc:
+        log.warning("Candle client unavailable: %s", exc)
+        for sym in pending:
+            empty = {
+                "ticker": sym,
+                "date": for_date.isoformat(),
+                "interval": "ONE_MINUTE",
+                "candles": [],
+                "error": "candle_client_unavailable",
+            }
+            atomic_write_json(os.path.join(ticks_dir, f"{sym}.json"), empty)
+            results[sym] = []
+        return results
+
+    for sym in pending:
+        candles: list[dict[str, Any]] = []
+        err: str | None = None
+        try:
+            resolved = resolve_fn(sym, client=ao_client, token_map=token_map) if resolve_fn else None
+            if not resolved:
+                err = "token_unresolved"
+            else:
+                token, _tsym = resolved
+                raw = ao_client.fetch_candles(
+                    "NSE",
+                    token,
+                    "ONE_MINUTE",
+                    open_dt,
+                    close_dt + timedelta(minutes=1),
+                )
+                parsed = parse_fn(raw) if parse_fn else []
+                candles = parsed or []
+                if not candles:
+                    err = "empty_candles"
+        except Exception as exc:
+            err = str(exc)
+            log.warning("Candle fetch failed for %s: %s", sym, exc)
+
+        payload = {
+            "ticker": sym,
+            "date": for_date.isoformat(),
+            "interval": "ONE_MINUTE",
+            "from": open_dt.isoformat(),
+            "to": close_dt.isoformat(),
+            "candle_count": len(candles),
+            "candles": candles,
+            "error": err,
+        }
+        atomic_write_json(os.path.join(ticks_dir, f"{sym}.json"), payload)
+        results[sym] = candles
+
+    return results
+
+
+def load_persisted_candles(for_date: date, ticker: str) -> dict[str, Any]:
+    path = os.path.join(
+        eod_day_dir(for_date), "timeline_ticks", f"{ticker.upper()}.json"
+    )
+    return _read_json(path)
+
+
+def list_eod_dates() -> list[str]:
+    if not os.path.isdir(EOD_DATA_ROOT):
+        return []
+    dates: list[str] = []
+    for name in os.listdir(EOD_DATA_ROOT):
+        day_path = os.path.join(EOD_DATA_ROOT, name)
+        if not os.path.isdir(day_path):
+            continue
+        master = os.path.join(day_path, "master_eod_payload.json")
+        if os.path.isfile(master):
+            dates.append(name)
+    return sorted(dates)

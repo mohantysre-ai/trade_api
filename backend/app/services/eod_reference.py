@@ -137,13 +137,13 @@ def _fetch_930am_candle_from_angel(symbol: str) -> float | None:
     return None
 
 
-def get_reference_price(symbol: str) -> float:
+def get_reference_price(symbol: str, *, allow_network: bool = True) -> float:
     """Return the 9:30 AM IST reference price on July 17, 2026.
 
     Priority:
       1. In-memory cache.
-      2. Angel One 5-minute candle API (9:30 AM Friday open).
-      3. Seed price table fallback.
+      2. Seed price table (fast — preferred for Book P&L rebuilds).
+      3. Angel One 5-minute candle API when allow_network=True.
       4. Return 0.0 (caller handles gracefully).
     """
     upper = symbol.upper().strip()
@@ -151,19 +151,17 @@ def get_reference_price(symbol: str) -> float:
     if cached is not None:
         return cached
 
-    # Try Angel One 5-minute candle for the exact 9:30 AM Friday timestamp
-    angel_price = _fetch_930am_candle_from_angel(upper)
-    if angel_price is not None and angel_price > 0:
-        log.debug("Angel One candle gave 9:30 AM price for %s: %.2f", upper, angel_price)
-        _REFERENCE_CACHE[upper] = angel_price
-        return angel_price
-
-    # Seed table fallback (curated reference prices)
+    # Seed first so Book P&L rebuilds never block on Angel candles
     seed = _SEED_REFERENCE_PRICES.get(upper)
     if seed is not None:
         _REFERENCE_CACHE[upper] = seed
-        log.debug("Seed table fallback for %s: %.2f", upper, seed)
         return seed
+
+    if allow_network:
+        angel_price = _fetch_930am_candle_from_angel(upper)
+        if angel_price is not None and angel_price > 0:
+            _REFERENCE_CACHE[upper] = angel_price
+            return angel_price
 
     return 0.0
 
@@ -216,61 +214,10 @@ _HEDGE_FUND_ANALYSIS_PROMPT = """You are an elite hedge fund analyst. Given one 
 
 def generate_swing_analysis(symbol: str, direction: str, entry: float, current: float,
                              pnl: float, pnl_pct: float, status: str) -> str | None:
-    """Generate hedge-fund-style analysis for a swing pick.
-
-    If LLM_PROVIDER is set, calls the real LLM. Otherwise returns a rich
-    per-stock template analysis with sector context.
-    """
+    """Deterministic swing note only — never call LLM (Book P&L must stay fast/cached)."""
     sector = _SECTOR_BY_SYMBOL.get(symbol.upper(), "Diversified")
-    pct_str = f"{pnl_pct:+.2f}%"
     direction_label = "bullish" if direction == "LONG" else "bearish"
 
-    # Try LLM first — only if env vars are present to avoid hanging on dotenv/API init
-    try:
-        llm_provider = os.environ.get('LLM_PROVIDER', '').strip()
-        llm_api_key = os.environ.get('LLM_API_KEY') or os.environ.get('GEMINI_API_KEY', '')
-        if llm_provider and llm_api_key:
-            from .angel_one_feed import _llm_config_canonical, LLM_CALL_TIMEOUT_SECONDS
-            config = _llm_config_canonical()
-            provider, api_key, api_url, model, oauth_token_path = config or (None, None, None, None, None)
-            if provider and api_key:
-                prompt = (
-                    f"Symbol: {symbol} ({sector})\nDirection: {direction}\n"
-                    f"Entry (9:30 AM Jul 17): {entry} | Current: {current} | Status: {status}\n"
-                    f"P&L: {pnl:.2f} ({pct_str})\n\n"
-                    f"Sector context: {sector}. "
-                    "Explain the performance in 3-4 sentences as an elite hedge fund analyst. "
-                    "Reference sector dynamics, relative strength, volatility regime, and positioning."
-                )
-                if provider == "gemini":
-                    from .llm_client import _call_gemini
-                    return _call_gemini(
-                        prompt=prompt,
-                        api_key=api_key,
-                        model=model,
-                        system_instruction=_HEDGE_FUND_ANALYSIS_PROMPT,
-                        timeout=min(20, LLM_CALL_TIMEOUT_SECONDS),
-                        oauth_token_path=oauth_token_path,
-                    )
-                elif provider == "openai":
-                    import requests
-                    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-                    body = {
-                        "model": model,
-                        "messages": [
-                            {"role": "system", "content": _HEDGE_FUND_ANALYSIS_PROMPT},
-                            {"role": "user", "content": prompt},
-                        ],
-                        "temperature": 0.3,
-                        "max_tokens": 250,
-                    }
-                    resp = requests.post(api_url, json=body, headers=headers, timeout=20)
-                    resp.raise_for_status()
-                    return resp.json()["choices"][0]["message"]["content"]
-    except Exception as exc:
-        log.debug("LLM analysis failed for %s: %s", symbol, exc)
-
-    # Fallback: generate unique per-symbol analysis
     change_dir = "gained" if pnl >= 0 else "declined"
     perf = "outperformed" if pnl_pct >= 0 else "underperformed"
     volatility = "elevated" if abs(pnl_pct) > 3 else "moderate" if abs(pnl_pct) > 1.5 else "low"
@@ -298,7 +245,6 @@ def generate_swing_analysis(symbol: str, direction: str, entry: float, current: 
         "PIRAMALFIN": f"Piramal Finance {change_dir} {abs(pnl_pct):.1f}% amid {volatility} NBFC sector dynamics. The {direction_label} position accounts for wholesale book resolution progress and retail franchise buildout. Funding cost trajectory and credit costs are primary risks.",
     }
 
-    # For stocks not in the detailed list, generate a template
     template = analyses.get(symbol.upper())
     if template:
         return template
@@ -306,7 +252,5 @@ def generate_swing_analysis(symbol: str, direction: str, entry: float, current: 
     return (
         f"{symbol} ({sector}) {perf} in this {volatility}-volatility session with a "
         f"{abs(pnl_pct):.1f}% {change_dir} against its 9:30 AM reference. The {direction_label} "
-        f"position remains active within the planned risk framework. The next key catalyst for the "
-        f"{sector} sector will determine the near-term trajectory. Position sizing was calibrated "
-        f"for the prevailing volatility regime."
+        f"position remains active within the planned risk framework. Status={status}."
     )

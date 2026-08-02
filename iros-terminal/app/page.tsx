@@ -11,9 +11,10 @@ import {
   type AITickerNewsReport,
 } from '@/lib/market-api';
 import ForensicPanel from './components/ForensicPanel';
+import DhanRecommendedPanel from './components/DhanRecommendedPanel';
 import RightDrawer from './components/RightDrawer';
-import IntradayMatrixPanel from './components/IntradayMatrixPanel';
-import EodAnalysisPanel from './components/EodAnalysisPanel';
+import AssetMetricsPanel from './components/AssetMetricsPanel';
+import EodDeskPanel from './components/EodDeskPanel';
 import DeskControls from './components/DeskControls';
 
 type DrawerContent = {
@@ -25,7 +26,7 @@ type DrawerContent = {
   tickerNews?: AITickerNewsReport | null;
 };
 
-type TabKey = 'marketSnapshot' | 'stockHeatMap' | 'assetMatrix' | 'intradayMatrix' | 'eodAnalysis';
+type TabKey = 'marketSnapshot' | 'stockHeatMap' | 'assetMatrix' | 'intradayMatrix' | 'eod';
 
 const INDIA_MARKET_LABELS = new Set(['NIFTY 100', 'SENSEX', 'NIFTY BANK', 'NIFTY IT', 'NIFTY PHARMA', 'NIFTY MIDCAP', 'NIFTY SMALLCAP', 'GIFT NIFTY']);
 const GLOBAL_ONLY_LABELS = new Set(['BRENT CRUDE', 'BRENT CRUDE OIL']);
@@ -1810,12 +1811,6 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
   );
 }
 
-function LiveIntelligencePanel() {
-  return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 shadow-sm" />
-  );
-}
-
 function formatSnakeKey(key: string) {
   return key
     .split('_')
@@ -2250,9 +2245,9 @@ export default function IrosMasterAdvancedTerminal() {
           {([
             { key: 'marketSnapshot' as TabKey, label: 'MARKET SNAPSHOT' },
             { key: 'stockHeatMap' as TabKey, label: 'STOCK HEAT MAP' },
-            { key: 'assetMatrix' as TabKey, label: 'ASSET MATRIX' },
-            { key: 'intradayMatrix' as TabKey, label: 'INTRA DAY MATRIX' },
-            { key: 'eodAnalysis' as TabKey, label: 'EOD ANALYSIS' },
+            { key: 'assetMatrix' as TabKey, label: 'SWING PORTFOLIO' },
+            { key: 'intradayMatrix' as TabKey, label: 'INTRADAY' },
+            { key: 'eod' as TabKey, label: 'EOD' },
           ]).map((tab) => (
             <button
               key={tab.key}
@@ -2308,20 +2303,20 @@ export default function IrosMasterAdvancedTerminal() {
               availablePools={liveMarket?.availablePools}
             />
             <StockDetailPanel stock={selectedQuote} />
-            <LiveIntelligencePanel />
+            <DhanRecommendedPanel liveMarket={liveMarket} onSelect={handleSelect} />
             <RightDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} content={drawerContent} />
           </div>
         )}
 
         {activeTab === 'intradayMatrix' && (
           <div key="intradayMatrix" className="desk-panel-enter space-y-3">
-            <IntradayMatrixPanel />
+            <AssetMetricsPanel />
           </div>
         )}
 
-        {activeTab === 'eodAnalysis' && (
-          <div key="eodAnalysis" className="desk-panel-enter space-y-3">
-            <EodAnalysisPanel />
+        {activeTab === 'eod' && (
+          <div key="eod" className="desk-panel-enter space-y-3">
+            <EodDeskPanel />
           </div>
         )}
       </div>

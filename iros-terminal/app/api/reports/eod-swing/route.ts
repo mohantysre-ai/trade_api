@@ -3,24 +3,24 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 /**
- * GET /api/reports/eod-swing?date=2026-07-19
- *
- * Returns day-bucketed (1/7/15/30) P&L report for the Asset Matrix
- * swing/long-term picks in the fixed trade plan.
+ * GET /api/reports/eod-swing?date=&force=
+ * Cached under data/eod/{date}/book_swing.json unless force=true.
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date");
-    const queryString = date ? `?date=${encodeURIComponent(date)}` : "";
+    const force = searchParams.get("force");
+    const params = new URLSearchParams();
+    if (date) params.set("date", date);
+    if (force) params.set("force", force);
+    const qs = params.toString() ? `?${params.toString()}` : "";
 
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
-    const res = await fetch(`${backendUrl}/api/reports/eod-swing${queryString}`, {
+    const res = await fetch(`${backendUrl}/api/reports/eod-swing${qs}`, {
       cache: "no-store",
-      headers: {
-        "Accept": "application/json",
-      },
+      headers: { Accept: "application/json" },
     });
 
     if (!res.ok) {
@@ -31,14 +31,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const data = await res.json();
-    return NextResponse.json(data);
+    return NextResponse.json(await res.json());
   } catch (err) {
     return NextResponse.json(
       {
         error: err instanceof Error ? err.message : "Failed to fetch swing EOD report",
         picks: [],
-        summary: { note: "Backend unavailable" },
       },
       { status: 502 }
     );

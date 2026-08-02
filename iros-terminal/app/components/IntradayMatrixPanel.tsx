@@ -440,6 +440,9 @@ type LivePricesResponse = {
   error?: string;
   marketOpen?: boolean;
   sessionClosed?: boolean;
+  dataStale?: boolean;
+  ltpSourceMix?: Record<string, number>;
+  priceSourcesNote?: string;
 };
 
 async function fetchLivePrices(): Promise<LivePricesResponse> {
@@ -489,17 +492,25 @@ function buildMonitorStatusLine(data: LivePricesResponse | null, sessionClosed: 
   const evalAt = formatIstClock(data?.updatedAt);
   const snapAt = formatIstClock(data?.snapshotUpdatedAt);
   const pollPart = sessionClosed
-    ? 'Poll halted (session closed)'
+    ? 'Session closed · polling halted'
     : marketOpen
-      ? 'Eval poll every 2s'
-      : 'Market closed · eval poll every 2s';
+      ? 'Eval poll ~2s'
+      : 'Market closed · polling halted';
+  const mixFromApi = data?.ltpSourceMix
+    ? Object.entries(data.ltpSourceMix)
+        .filter(([, n]) => typeof n === 'number' && n > 0)
+        .map(([k, n]) => `${k}:${n}`)
+        .join(' · ')
+    : '';
   const parts = [
-    'MONITOR MODE — Fixed plan active',
+    'MONITOR · MANUAL EXECUTION',
     pollPart,
-    evalAt ? `Last eval ${evalAt} IST` : null,
-    snapAt ? `Market snapshot ${snapAt} IST` : null,
-    `LTP mix: ${sources.label}`,
-    'Scanner feeds still refresh every 2m',
+    evalAt ? `eval@ ${evalAt} IST` : 'eval@ —',
+    snapAt ? `snapshot@ ${snapAt} IST` : 'snapshot@ —',
+    data?.priceSourcesNote || null,
+    `sources ${mixFromApi || sources.label || '—'}`,
+    marketOpen ? 'session OPEN' : sessionClosed ? 'session CLOSED' : 'session —',
+    data?.dataStale ? 'DATA STALE' : null,
   ].filter(Boolean);
   return parts.join(' · ');
 }
@@ -709,7 +720,7 @@ export default function IntradayMatrixPanel() {
       }
     }, 120_000);
 
-    // Fast monitor-mode poll (only reads local snapshot, no external calls).
+    // Fast monitor-mode poll (proxies /api/live-prices — snapshot + optional Yahoo when open).
     // Halt once the session has closed so we stop recalculating on stale prices.
     const fastId = window.setInterval(() => {
       if (!cancelled && !sessionClosedRef.current) {
@@ -796,13 +807,16 @@ export default function IntradayMatrixPanel() {
       {/* ── MONITOR MODE INDICATOR ──────────────────────────────────────── */}
       {monitorMode && (
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 desk-panel-title">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          MONITOR MODE — Fixed plan active · Live prices every 2s · No external API calls
-          {livePricesData?.snapshotUpdatedAt && (
-            <span className="text-slate-500 ml-1">
-              (snapshot @{new Date(livePricesData.snapshotUpdatedAt).toLocaleTimeString('en-IN', { hour12: false })})
-            </span>
-          )}
+          <span
+            className={`w-2 h-2 rounded-full ${
+              livePricesData?.dataStale
+                ? 'bg-amber-500'
+                : sessionClosed
+                  ? 'bg-slate-500'
+                  : 'bg-emerald-500'
+            } ${sessionClosed || livePricesData?.dataStale ? '' : 'animate-pulse'}`}
+          />
+          {buildMonitorStatusLine(livePricesData, !!sessionClosed, !!marketOpen)}
         </div>
       )}
 
@@ -1119,7 +1133,13 @@ export default function IntradayMatrixPanel() {
                     <div className="flex items-center gap-2 mb-2">
                       <span className={`w-1.5 h-1.5 rounded-full ${monitorMode ? (sessionClosed ? 'bg-slate-500' : 'bg-emerald-500') : 'bg-amber-500'}`} />
                       <span className="desk-panel-title">
-                        TRADE PLAN — ₹5,00,000 DEPLOYMENT {monitorMode && '(LIVE MONITOR)'}
+                        TRADE PLAN — CONFIGURED SLEEVE{' '}
+                        {monitorMode &&
+                          (sessionClosed
+                            ? '(MONITOR · POLL HALTED)'
+                            : marketOpen
+                              ? '(LIVE MONITOR)'
+                              : '(MONITOR · MARKET CLOSED)')}
                       </span>
                       <span className="text-[9px] text-slate-400 ml-2">(updated @{planTime || '—'})</span>
                     </div>
@@ -1218,9 +1238,23 @@ export default function IntradayMatrixPanel() {
                   {planShort.length > 0 && (
                     <div className="mb-3">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className={`w-1.5 h-1.5 rounded-full ${monitorMode ? 'bg-emerald-500' : 'bg-rose-500'} animate-pulse`} />
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            monitorMode
+                              ? sessionClosed
+                                ? 'bg-slate-500'
+                                : 'bg-emerald-500'
+                              : 'bg-rose-500'
+                          } ${monitorMode && !sessionClosed ? 'animate-pulse' : ''}`}
+                        />
                         <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
-                          SHORT TRADE PLAN — SELL BOOK (₹5,00,000 DEPLOYMENT) {monitorMode && '(LIVE MONITOR)'}
+                          SHORT TRADE PLAN — SELL BOOK (CONFIGURED SLEEVE){' '}
+                          {monitorMode &&
+                            (sessionClosed
+                              ? '(MONITOR · POLL HALTED)'
+                              : marketOpen
+                                ? '(LIVE MONITOR)'
+                                : '(MONITOR · MARKET CLOSED)')}
                         </span>
                       </div>
                       <div className="overflow-x-auto">
@@ -1329,8 +1363,8 @@ export default function IntradayMatrixPanel() {
       {/* Footer */}
       <div className="text-center text-[7px] text-slate-400 pt-1">
         {monitorMode
-          ? 'FIXED PLAN ACTIVE · Monitor mode · Live prices every 2s · No external API calls'
-          : 'lemonn.co.in · Dhan ScanX + feed_scanner · Data refreshes every 2 minutes'}
+          ? buildMonitorStatusLine(livePricesData, !!sessionClosed, !!marketOpen)
+          : 'lemonn.co.in · Dhan ScanX + feed_scanner · Research refresh ~2 minutes'}
       </div>
 
       <style>{`

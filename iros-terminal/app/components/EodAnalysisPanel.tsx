@@ -6,17 +6,43 @@ import React, { useEffect, useState, useCallback } from 'react';
 /*  Types for EOD report responses from the backend                          */
 /* -------------------------------------------------------------------------- */
 
+type MissDiagnostic = {
+  isMiss: boolean;
+  isHit?: boolean;
+  exitReason: string;
+  rootCause: string | null;
+  factors: string[];
+  rMultiple: number | null;
+  movePct: number | null;
+  gapToT1Pct: number | null;
+  gapToT2Pct: number | null;
+  stopUtilization: number | null;
+  plannedRr: number | null;
+  riskPerShare: number | null;
+  maePct: number | null;
+  mfePct: number | null;
+  stopEff: number | null;
+  falsePositive: boolean;
+  holdingMins: number | null;
+  source: 'LEVELS' | 'SCORECARD' | string;
+  exitSource?: string;
+};
+
 type IntradayTrade = {
   symbol: string;
   direction: string;
   entryPrice: number;
   exitPrice: number;
+  stopLoss?: number | null;
+  target1?: number | null;
+  target2?: number | null;
   exitReason: string;
   qty: number;
   deployedCapital: number;
   pnl: number;
   pnlPct: number | null;
   missAnalysis: string | null;
+  missDiagnostic?: MissDiagnostic | null;
 };
 
 type IntradayReport = {
@@ -27,6 +53,11 @@ type IntradayReport = {
   remainingCapital: number;
   hitBreakdown: { T1_HIT: number; T2_HIT: number; SL_HIT: number; EOD_SQUAREOFF: number };
   hitRatePct: number;
+  missCount?: number;
+  missScorecardCoverage?: number;
+  isMock?: boolean;
+  fromCache?: boolean;
+  cachedAt?: string;
   trades: IntradayTrade[];
 };
 
@@ -65,6 +96,8 @@ type SwingReport = {
   isMock?: boolean;
   referenceDate?: string;
   referenceLabel?: string;
+  fromCache?: boolean;
+  cachedAt?: string;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -91,6 +124,169 @@ function statusBadge(status: string) {
   }
 }
 
+function fmtMissNum(v: number | null | undefined, digits = 2, suffix = ''): string {
+  if (v == null || Number.isNaN(Number(v))) return '—';
+  return `${Number(v).toFixed(digits)}${suffix}`;
+}
+
+function fmtMissSigned(v: number | null | undefined, digits = 2, suffix = ''): string {
+  if (v == null || Number.isNaN(Number(v))) return '—';
+  const n = Number(v);
+  const sign = n > 0 ? '+' : '';
+  return `${sign}${n.toFixed(digits)}${suffix}`;
+}
+
+function rootCauseTone(root: string | null | undefined): string {
+  const r = String(root || '').toUpperCase();
+  switch (r) {
+    case 'ADVERSE_TRAJECTORY':
+    case 'FAKE_BREAKOUT':
+    case 'STOP_BEFORE_FOLLOWTHROUGH':
+      return 'desk-pill--danger';
+    case 'STALLED_TRADE':
+      return 'desk-pill--warn';
+    case 'PARTIAL_FOLLOWTHROUGH':
+      return 'desk-pill--info';
+    default:
+      return 'desk-pill--muted';
+  }
+}
+
+function OutcomeRow({ trade }: { trade: IntradayTrade }) {
+  const d = trade.missDiagnostic!;
+  const rBad = (d.rMultiple ?? 0) < 0;
+  const exitTone =
+    trade.exitReason === 'SL_HIT'
+      ? 'desk-pill--danger'
+      : trade.exitReason === 'EOD_SQUAREOFF'
+        ? 'desk-pill--warn'
+        : 'desk-pill--ok';
+  return (
+    <tr className="border-t border-slate-100 hover:bg-slate-50/80">
+      <td className="px-2 py-1.5 font-bold text-slate-900">{trade.symbol}</td>
+      <td className={`px-2 py-1.5 font-semibold ${trade.direction === 'LONG' ? 'text-emerald-700' : 'text-red-600'}`}>
+        {trade.direction}
+      </td>
+      <td className="px-2 py-1.5">
+        <span className={`desk-pill ${exitTone}`}>{trade.exitReason}</span>
+      </td>
+      <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${rBad ? 'text-red-600' : 'text-emerald-700'}`}>
+        {fmtMissSigned(d.rMultiple, 2, 'R')}
+      </td>
+      <td className={`px-2 py-1.5 text-right tabular-nums ${rBad ? 'text-red-600' : 'text-slate-700'}`}>
+        {fmtMissSigned(d.movePct, 2, '%')}
+      </td>
+      <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{fmtMissNum(d.maePct, 2)}</td>
+      <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{fmtMissNum(d.mfePct, 2)}</td>
+      <td className="px-2 py-1.5">
+        <span className={`desk-pill ${rootCauseTone(d.rootCause)}`}>
+          {(d.rootCause || '—').replace(/_/g, ' ')}
+        </span>
+      </td>
+      <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${trade.pnl >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+        {Math.abs(trade.pnl) < 1e-6 && trade.pnlPct != null
+          ? fmtMissSigned(trade.pnlPct, 2, '%')
+          : `${trade.pnl >= 0 ? '+' : ''}₹${trade.pnl.toFixed(0)}`}
+      </td>
+      <td className="px-2 py-1.5">
+        <div className="flex max-w-[220px] flex-wrap gap-1">
+          {d.falsePositive && <span className="desk-pill desk-pill--danger">FP</span>}
+          {(d.factors || []).slice(0, 3).map((f) => (
+            <span key={f} className="desk-pill desk-pill--muted" title={f}>
+              {f.replace(/_/g, ' ').slice(0, 18)}
+            </span>
+          ))}
+        </div>
+      </td>
+      <td className="px-2 py-1.5 font-bold text-slate-500">{d.source === 'SCORECARD' ? 'SC' : 'LVL'}</td>
+    </tr>
+  );
+}
+
+function OutcomeTable({ rows }: { rows: IntradayTrade[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-[10px]">
+        <thead className="sticky top-0 bg-slate-50 text-slate-500 uppercase tracking-wider">
+          <tr>
+            <th className="px-2 py-2 text-left font-bold">Ticker</th>
+            <th className="px-2 py-2 text-left font-bold">Side</th>
+            <th className="px-2 py-2 text-left font-bold">Exit</th>
+            <th className="px-2 py-2 text-right font-bold">R</th>
+            <th className="px-2 py-2 text-right font-bold">Move%</th>
+            <th className="px-2 py-2 text-right font-bold">MAE</th>
+            <th className="px-2 py-2 text-right font-bold">MFE</th>
+            <th className="px-2 py-2 text-left font-bold">Why (root)</th>
+            <th className="px-2 py-2 text-right font-bold">P&L</th>
+            <th className="px-2 py-2 text-left font-bold">Flags</th>
+            <th className="px-2 py-2 text-left font-bold">Src</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((trade) => (
+            <OutcomeRow key={`${trade.symbol}-${trade.exitReason}`} trade={trade} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Replaces old Miss Analysis / target-hit prose cards with dense outcome tables. */
+function OutcomeDesk({ trades, coverage, isMock }: {
+  trades: IntradayTrade[];
+  coverage?: number;
+  isMock?: boolean;
+}) {
+  const misses = trades
+    .filter((t) => t.missDiagnostic?.isMiss)
+    .slice()
+    .sort((a, b) => (a.missDiagnostic?.rMultiple ?? 0) - (b.missDiagnostic?.rMultiple ?? 0));
+  const hits = trades
+    .filter((t) => Boolean(t.missDiagnostic?.isHit) || (Boolean(t.missDiagnostic) && ['T1_HIT', 'T2_HIT'].includes(t.exitReason)))
+    .slice()
+    .sort((a, b) => (b.missDiagnostic?.rMultiple ?? 0) - (a.missDiagnostic?.rMultiple ?? 0));
+
+  if (!misses.length && !hits.length) return null;
+
+  return (
+    <div className="eod-panel-card space-y-0 overflow-hidden rounded-xl border border-slate-300 border-[0.5px] bg-white shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-2">
+        <span className="desk-panel-title text-slate-900">Outcome Desk</span>
+        <span className="desk-pill desk-pill--danger">{misses.length} miss</span>
+        <span className="desk-pill desk-pill--ok">{hits.length} target hit</span>
+        {coverage != null && (
+          <span className="desk-pill desk-pill--info" title="Scorecard-enriched legs">
+            SC {coverage}
+          </span>
+        )}
+        {isMock && <span className="desk-pill desk-pill--warn">MOCK</span>}
+        <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-slate-400">
+          Replaces Miss / Hit cards · Why = Root column
+        </span>
+      </div>
+
+      {misses.length > 0 && (
+        <div>
+          <div className="border-b border-slate-100 bg-red-50/40 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-red-700">
+            Why miss · SL / EOD square-off
+          </div>
+          <OutcomeTable rows={misses} />
+        </div>
+      )}
+
+      {hits.length > 0 && (
+        <div>
+          <div className="border-b border-slate-100 bg-emerald-50/40 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-emerald-700">
+            Why target hit · T1 / T2
+          </div>
+          <OutcomeTable rows={hits} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Single-number Sparkline (mini bar chart)                                  */
 /* -------------------------------------------------------------------------- */
@@ -107,57 +303,109 @@ function MiniSparklineBar({ positive, width = 100 }: { positive: boolean; width?
   );
 }
 
+export type EodAnalysisPanelProps = {
+  embedded?: boolean;
+  date?: string;
+  swingDate?: string;
+  onDateChange?: (date: string) => void;
+  onSwingDateChange?: (date: string) => void;
+  refreshToken?: number;
+  /** When true, rebuild book reports (bypass cache). Default refresh uses cache. */
+  forceBookRebuild?: boolean;
+};
+
 /* -------------------------------------------------------------------------- */
 /*  EOD Analysis Panel — fetches both reports and renders a dashboard         */
 /* -------------------------------------------------------------------------- */
-export default function EodAnalysisPanel() {
+export default function EodAnalysisPanel({
+  embedded = false,
+  date: controlledDate,
+  swingDate: controlledSwingDate,
+  onDateChange,
+  onSwingDateChange,
+  refreshToken = 0,
+  forceBookRebuild = false,
+}: EodAnalysisPanelProps = {}) {
   const [intraday, setIntraday] = useState<IntradayReport | null>(null);
   const [swing, setSwing] = useState<SwingReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dateStr, setDateStr] = useState(() => new Date().toISOString().slice(0, 10));
-  const [swingDateStr, setSwingDateStr] = useState(() => '');
+  const [localDate, setLocalDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [localSwingDate, setLocalSwingDate] = useState('');
 
-  const fetchReports = useCallback(async () => {
+  const dateStr = controlledDate ?? localDate;
+  const swingDateStr = controlledSwingDate ?? localSwingDate;
+
+  const setDateStr = (v: string) => {
+    onDateChange?.(v);
+    if (controlledDate === undefined) setLocalDate(v);
+  };
+  const setSwingDateStr = (v: string) => {
+    onSwingDateChange?.(v);
+    if (controlledSwingDate === undefined) setLocalSwingDate(v);
+  };
+
+  const fetchReports = useCallback(async (opts?: { force?: boolean }) => {
     setLoading(true);
     setError(null);
+    const force = opts?.force ?? forceBookRebuild;
+    const buildQs = (d: string) => {
+      const p = new URLSearchParams();
+      if (d) p.set('date', d);
+      if (force) p.set('force', 'true');
+      const s = p.toString();
+      return s ? `?${s}` : '';
+    };
+    const swingDate = swingDateStr || dateStr;
+    const ctrl = new AbortController();
+    const timer = window.setTimeout(() => ctrl.abort(), 20_000);
+
+    const loadOne = async <T,>(url: string, label: string): Promise<T | null> => {
+      try {
+        const res = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          throw new Error(`${label} ${res.status}: ${text.slice(0, 160)}`);
+        }
+        return (await res.json()) as T;
+      } catch (err) {
+        const msg =
+          err instanceof Error
+            ? err.name === 'AbortError'
+              ? `${label} timed out (20s)`
+              : err.message
+            : `${label} failed`;
+        setError((prev) => (prev ? `${prev} · ${msg}` : msg));
+        return null;
+      }
+    };
+
     try {
-      const intradayParam = dateStr ? `?date=${dateStr}` : '';
-      const swingParam = swingDateStr ? `?date=${swingDateStr}` : '';
-
-      const [intraRes, swingRes] = await Promise.all([
-        fetch(`/api/reports/eod-intraday${intradayParam}`, { cache: 'no-store' }),
-        fetch(`/api/reports/eod-swing${swingParam}`, { cache: 'no-store' }),
+      const [intraData, swingData] = await Promise.all([
+        loadOne<IntradayReport>(`/api/reports/eod-intraday${buildQs(dateStr)}`, 'Intraday'),
+        loadOne<SwingReport>(`/api/reports/eod-swing${buildQs(swingDate)}`, 'Swing'),
       ]);
-
-      if (!intraRes.ok) {
-        const text = await intraRes.text().catch(() => '');
-        throw new Error(`Intraday API ${intraRes.status}: ${text}`);
+      if (intraData) setIntraday(intraData);
+      if (swingData) setSwing(swingData);
+      if (!intraData && !swingData) {
+        setError((prev) => prev || 'Book P&L failed to load');
       }
-      if (!swingRes.ok) {
-        const text = await swingRes.text().catch(() => '');
-        throw new Error(`Swing API ${swingRes.status}: ${text}`);
-      }
-
-      const intraData: IntradayReport = await intraRes.json();
-      const swingData: SwingReport = await swingRes.json();
-      setIntraday(intraData);
-      setSwing(swingData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch EOD reports');
     } finally {
+      window.clearTimeout(timer);
       setLoading(false);
     }
-  }, [dateStr, swingDateStr]);
+  }, [dateStr, swingDateStr, forceBookRebuild]);
 
-  useEffect(() => { fetchReports(); }, [fetchReports]);
+  useEffect(() => { void fetchReports(); }, [fetchReports, refreshToken]);
 
   const noIntraday = intraday && (!intraday.trades || intraday.trades.length === 0);
   const noSwing = swing && (!swing.picks || swing.picks.length === 0);
+  const fromCache = Boolean(intraday?.fromCache || swing?.fromCache);
+  const showBody = Boolean(intraday || swing || error);
 
   return (
-    <div className="space-y-3">
-      {/* Refresh controls */}
+    <div className={`space-y-3 ${embedded ? 'eod-book-surface' : ''}`}>
+      {!embedded && (
       <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl p-3 shadow-sm relative overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-400 via-cyan-400 to-transparent pointer-events-none" aria-hidden />
         <div className="flex flex-wrap items-center gap-3">
@@ -178,21 +426,56 @@ export default function EodAnalysisPanel() {
               onChange={(e) => setSwingDateStr(e.target.value)}
               className="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-teal-300"
             />
-            <span className="text-[9px] text-slate-400">(default: today)</span>
           </div>
+          {fromCache && <span className="desk-pill desk-pill--ok">BOOK · CACHED</span>}
           <button
-            onClick={fetchReports}
+            onClick={() => void fetchReports({ force: false })}
             disabled={loading}
-            className="desk-btn-primary ml-auto px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
+            className="desk-btn-ghost ml-auto px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
           >
             {loading ? 'LOADING...' : 'REFRESH'}
           </button>
+          <button
+            onClick={() => void fetchReports({ force: true })}
+            disabled={loading}
+            className="desk-btn-primary px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
+            title="Rebuild book reports and overwrite cache"
+          >
+            REBUILD
+          </button>
         </div>
       </div>
+      )}
 
-      {loading && (
+      {embedded && (
+        <div className="flex flex-wrap items-center gap-2 px-0.5">
+          {fromCache && <span className="desk-pill desk-pill--ok">BOOK · CACHED</span>}
+          {loading && <span className="text-[9px] text-slate-400">Loading book…</span>}
+          <span className="text-[9px] text-slate-400">
+            Swing date follows EOD date unless changed
+          </span>
+          <button
+            type="button"
+            onClick={() => void fetchReports({ force: false })}
+            disabled={loading}
+            className="desk-btn-ghost ml-auto rounded-md px-2 py-1 text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
+          >
+            Refresh book
+          </button>
+          <button
+            type="button"
+            onClick={() => void fetchReports({ force: true })}
+            disabled={loading}
+            className="desk-btn-ghost rounded-md px-2 py-1 text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
+          >
+            Rebuild book
+          </button>
+        </div>
+      )}
+
+      {loading && !showBody && (
         <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl p-6 text-center text-[11px] text-slate-400 shadow-sm">
-          Loading EOD reports...
+          Loading EOD reports…
         </div>
       )}
 
@@ -202,10 +485,19 @@ export default function EodAnalysisPanel() {
         </div>
       )}
 
-      {!loading && !error && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      {(intraday || swing) && (
+        <>
+          {intraday && (
+            <OutcomeDesk
+              trades={intraday.trades}
+              coverage={intraday.missScorecardCoverage}
+              isMock={intraday.isMock}
+            />
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 eod-dynamic-grid">
           {/* ── INTRADAY REPORT ── */}
-          <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden">
+          <div className="eod-panel-card bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden">
             <div className="bg-gradient-to-r from-teal-50 to-teal-100/50 px-3 py-2 border-b border-slate-200">
               <h3 className="desk-panel-title text-teal-800">Intraday EOD Report</h3>
               <p className="text-[9px] text-teal-600">{intraday?.date ?? dateStr}</p>
@@ -290,7 +582,7 @@ export default function EodAnalysisPanel() {
           </div>
 
           {/* ── SWING REPORT ── */}
-          <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden">
+          <div className="eod-panel-card bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden" style={{ animationDelay: '70ms' }}>
             <div className="bg-gradient-to-r from-indigo-50 to-indigo-100/50 px-3 py-2 border-b border-slate-200">
               <h3 className="desk-panel-title text-indigo-800">Swing EOD Report</h3>
               <p className="text-[9px] text-indigo-600">{swing?.date ?? dateStr}</p>
@@ -388,9 +680,10 @@ export default function EodAnalysisPanel() {
             )}
           </div>
         </div>
+        </>
       )}
 
-      {!loading && !error && (
+      {(intraday || swing) && (
         <>
           {/* Best / Worst performer cards */}
           {swing && (swing.bestPerformer || swing.worstPerformer) && (
@@ -425,34 +718,6 @@ export default function EodAnalysisPanel() {
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Intraday miss analysis section — same card design as NIFTY TOP 5 GAINERS & LOSERS */}
-          {intraday && intraday.trades.filter(t => t.missAnalysis).length > 0 && (
-            <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 shadow-sm min-h-[160px] overflow-visible">
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                <span className="desk-panel-title text-slate-800">Miss Analysis</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-1.5">
-                {intraday.trades.filter(t => t.missAnalysis).map((trade, i) => (
-                  <div key={i} className="bg-white border border-slate-200 rounded-lg p-2 min-h-[160px] overflow-visible shadow-sm">
-                    <div className="flex items-center justify-between py-2 cursor-default border-b border-slate-100 last:border-b-0">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`w-1.5 h-1.5 rounded-full ${trade.direction === 'LONG' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                          <span className="desk-metric-value text-slate-800">{trade.symbol}</span>
-                        </div>
-                      </div>
-                      <span className={`text-[11px] font-semibold tabular-nums min-w-[50px] text-right ${trade.pnl >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {trade.pnl >= 0 ? '+' : ''}₹{trade.pnl.toFixed(2)}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-700 leading-relaxed mt-1 px-1">{trade.missAnalysis || 'No analysis available.'}</p>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
         </>
