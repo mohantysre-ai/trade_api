@@ -205,7 +205,7 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
 
 function OutcomeTable({ rows }: { rows: IntradayTrade[] }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto desk-scroll-x">
       <table className="w-full text-[10px]">
         <thead className="sticky top-0 bg-slate-50 text-slate-500 uppercase tracking-wider">
           <tr>
@@ -539,7 +539,7 @@ export default function EodAnalysisPanel({
                 </div>
 
                 {/* Trades table */}
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto desk-scroll-x">
                   <table className="w-full text-[10px]">
                     <thead>
                       <tr className="text-slate-500 uppercase tracking-wider border-b border-slate-100">
@@ -633,7 +633,7 @@ export default function EodAnalysisPanel({
                 )}
 
                 {/* Picks table */}
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto desk-scroll-x">
                   <table className="w-full text-[10px]">
                     <thead>
                       <tr className="text-slate-500 uppercase tracking-wider border-b border-slate-100">

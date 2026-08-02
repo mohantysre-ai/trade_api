@@ -695,7 +695,7 @@ function GainersLosersHeatmap() {
       {error && totalStocks === 0 && (
         <div className="text-[9px] text-red-500 px-2 py-1 mb-1">{error}</div>
       )}
-      <div className="grid grid-cols-5 gap-1.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
         {NSE_TOP_FIVE_CATEGORIES.map((category) => {
           const stocks = categories[category.key] ?? [];
           const accentClass = getCategoryAccentClass(category.key);
@@ -744,7 +744,7 @@ function GainersLosersHeatmap() {
         <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">NIFTY SCREENERS</span>
       </div>
       {/* Remaining 5 Trendlyne screens in one row */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-1.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
         {TRENDLYNE_SCREENS.slice(1).map((screen) => (
           <TrendlyneCategoryPanel key={screen.key} screenKey={screen.key} label={screen.label} accentClass={screen.accent} />
         ))}
@@ -900,7 +900,7 @@ function Nifty100HeatMap() {
 
   if (loading || (error && heatMapStocks.length === 0)) {
     return (
-      <div className="bg-gradient-to-br from-white to-slate-50 border border-slate-300 border-[0.5px] rounded-xl p-4 shadow-lg min-h-[400px]">
+      <div className="bg-gradient-to-br from-white to-slate-50 border border-slate-300 border-[0.5px] rounded-xl p-4 shadow-lg min-h-[240px] sm:min-h-[320px] md:min-h-[400px]">
         <div className="flex flex-col items-center justify-center h-full">
           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-teal-400 to-blue-500 animate-spin mb-3 shadow-lg" />
           <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">NIFTY 100 HEAT MAP</div>
@@ -952,7 +952,7 @@ function Nifty100HeatMap() {
       {/* Heat Map Grid */}
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-br from-teal-50/30 via-blue-50/20 to-purple-50/30 rounded-lg blur-2xl opacity-60" />
-        <div className="relative grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-1">
+        <div className="relative grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12 gap-1.5">
           {heatMapStocks.map((stock, index) => {
             const colors = getHeatColor(stock.changePct);
             return (
@@ -1015,7 +1015,7 @@ function GlobalIndicesGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
         </div>
         {staleLabel && <span className="desk-panel-title">{staleLabel}</span>}
       </div>
-      <div className="desk-metric-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      <div className="desk-metric-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
         {items.map((item) => {
           const isPositive = item.state === 'POSITIVE';
           return (
@@ -1036,7 +1036,7 @@ function GlobalIndicesGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
                   {isPositive ? '↑' : '↓'} {item.delta}
                 </span>
               </div>
-              <div className="w-16 h-14 flex-shrink-0 relative">
+              <div className="w-12 h-10 sm:w-16 sm:h-14 flex-shrink-0 relative max-[380px]:hidden">
                 {item.sparkline && item.sparkline.length >= 2 ? (
                   <SparklineSVG positive={isPositive} data={item.sparkline} />
                 ) : (
@@ -1239,7 +1239,7 @@ function CommoditiesFxGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
                   {isPositive ? '↑' : '↓'} {item.delta}
                 </span>
               </div>
-              <div className="w-16 h-14 flex-shrink-0 relative">
+              <div className="w-12 h-10 sm:w-16 sm:h-14 flex-shrink-0 relative max-[380px]:hidden">
                 {item.sparkline && item.sparkline.length >= 2 ? (
                   <SparklineSVG positive={isPositive} data={item.sparkline} />
                 ) : (
@@ -1302,7 +1302,7 @@ function IndiaMarketsGrid({ items, staleLabel, tilesLive, tilesUpdating }: { ite
                   {isPositive ? '↑' : '↓'} {item.delta}
                 </span>
               </div>
-              <div className="w-16 h-14 flex-shrink-0 relative">
+              <div className="w-12 h-10 sm:w-16 sm:h-14 flex-shrink-0 relative max-[380px]:hidden">
                 {item.sparkline && item.sparkline.length >= 2 ? (
                   <SparklineSVG positive={isPositive} data={item.sparkline} />
                 ) : (
@@ -1580,7 +1580,7 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
   // Sidebar mode: compact, vertically scrollable news list
   if (sidebar) {
     return (
-      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 shadow-sm h-[1270px] overflow-hidden news-sidebar flex flex-col">
+      <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 shadow-sm h-auto max-h-[min(55dvh,520px)] xl:max-h-none xl:h-[1270px] overflow-hidden news-sidebar flex flex-col">
         {/* Compact Header */}
         <div className="flex items-center justify-between px-1 py-1.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white">
           <div className="flex items-center gap-2">
@@ -2191,13 +2191,13 @@ export default function IrosMasterAdvancedTerminal() {
   );
 
   return (
-    <div className="terminal-shell min-h-screen antialiased">
-      <div className="max-w-[1600px] mx-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
+    <div className="terminal-shell app-shell min-h-screen antialiased overflow-x-hidden">
+      <div className="app-shell-inner max-w-[1600px] mx-auto w-full min-w-0 p-2 sm:p-3 md:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-2 sm:space-y-3 md:space-y-4">
         <header className="terminal-header">
-            <div className="flex flex-col gap-3 p-4">
+            <div className="flex flex-col gap-2 sm:gap-3 p-3 sm:p-4">
             <div className="desk-live-ribbon" aria-hidden />
-            <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
+            <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-2 sm:gap-3">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                 <div className="desk-brand-mark" aria-hidden>
                   <img
                     src="/alphix-logo.svg"
@@ -2207,32 +2207,39 @@ export default function IrosMasterAdvancedTerminal() {
                     className="desk-brand-logo"
                   />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <h1 className="font-black tracking-[0.06em] uppercase">
                     Alphix Terminal
                   </h1>
-                  <p className="mt-1 uppercase tracking-[0.12em]" style={{ fontSize: 'var(--desk-label)', color: 'var(--fg-muted)' }}>
-                    Institutional NSE / BSE desk · live market intelligence
+                  <p className="mt-0.5 sm:mt-1 uppercase tracking-[0.12em] truncate" style={{ fontSize: 'var(--desk-label)', color: 'var(--fg-muted)' }} suppressHydrationWarning>
+                    NSE / BSE · live desk
                   </p>
                 </div>
+                <button
+                  onClick={handleRefresh}
+                  disabled={feedStatus === 'loading'}
+                  className="desk-btn-primary sm:hidden shrink-0 !min-h-10 !px-3"
+                >
+                  {feedStatus === 'loading' ? '…' : '↻'}
+                </button>
               </div>
 
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                 <DeskControls
                   feedStatus={feedStatus}
-                  clockLabel={liveMarket?.updatedAt ? new Date(liveMarket.updatedAt).toLocaleTimeString() : '--:--'}
+                  clockLabel={liveMarket?.updatedAt ? new Date(liveMarket.updatedAt).toLocaleTimeString('en-IN', { hour12: false }) : '--:--'}
                 />
                 <button
                   onClick={handleRefresh}
                   disabled={feedStatus === 'loading'}
-                  className="desk-btn-primary"
+                  className="desk-btn-primary hidden sm:inline-flex w-full sm:w-auto"
                 >
                   {feedStatus === 'loading' ? 'Refreshing…' : 'Refresh'}
                 </button>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2" style={{ fontSize: 'var(--desk-label)', color: 'var(--fg-muted)' }}>
+            <div className="hidden sm:flex flex-wrap items-center justify-between gap-2" style={{ fontSize: 'var(--desk-label)', color: 'var(--fg-muted)' }}>
               <span className="font-bold uppercase tracking-wider truncate">
                 {liveMarket?.rawSources?.join(' · ') ?? 'Reuters · TradingView · Moneycontrol'}
               </span>
@@ -2241,19 +2248,19 @@ export default function IrosMasterAdvancedTerminal() {
           </div>
 
           {isSnapshotFallback && (
-            <div className="px-4 pb-3">
-              <div className="desk-banner-warn p-2 rounded-lg">
-                Snapshot fallback active — outside scheduled IST refresh window. Showing latest saved analysis.
+            <div className="px-3 sm:px-4 pb-3">
+              <div className="desk-banner-warn p-2 rounded-lg text-[11px] leading-snug">
+                Snapshot fallback — showing latest saved analysis.
               </div>
             </div>
           )}
         </header>
 
-        <nav className="terminal-tabs flex gap-1.5 p-1.5" role="tablist" aria-label="Desk views">
+        <nav className="terminal-tabs app-tabbar sticky top-0 z-30 flex gap-1.5 p-1.5 overflow-x-auto desk-scroll-x" role="tablist" aria-label="Desk views">
           {([
-            { key: 'marketSnapshot' as TabKey, label: 'MARKET SNAPSHOT' },
-            { key: 'stockHeatMap' as TabKey, label: 'STOCK HEAT MAP' },
-            { key: 'assetMatrix' as TabKey, label: 'SWING PORTFOLIO' },
+            { key: 'marketSnapshot' as TabKey, label: 'SNAPSHOT' },
+            { key: 'stockHeatMap' as TabKey, label: 'HEATMAP' },
+            { key: 'assetMatrix' as TabKey, label: 'SWING' },
             { key: 'intradayMatrix' as TabKey, label: 'INTRADAY' },
             { key: 'eod' as TabKey, label: 'EOD' },
           ]).map((tab) => (
@@ -2263,7 +2270,7 @@ export default function IrosMasterAdvancedTerminal() {
               aria-selected={activeTab === tab.key}
               data-active={activeTab === tab.key ? 'true' : 'false'}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 py-2.5 font-bold uppercase tracking-wider relative ${
+              className={`flex-1 py-2.5 font-bold uppercase tracking-wider relative whitespace-nowrap ${
                 activeTab === tab.key ? 'is-active' : ''
               }`}
             >
@@ -2272,6 +2279,7 @@ export default function IrosMasterAdvancedTerminal() {
           ))}
         </nav>
 
+        <main className="app-main min-w-0">
         {activeTab === 'marketSnapshot' && (
           <div key="marketSnapshot" className="desk-panel-enter grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-3 items-stretch">
             <div className="space-y-3 min-w-0">
@@ -2288,20 +2296,20 @@ export default function IrosMasterAdvancedTerminal() {
                 <GainersLosersHeatmap />
               </div>
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <NewsFeedPanel items={liveMarket?.news} now={now} sidebar={true} />
             </div>
           </div>
         )}
 
         {activeTab === 'stockHeatMap' && (
-          <div key="stockHeatMap" className="desk-panel-enter space-y-3">
+          <div key="stockHeatMap" className="desk-panel-enter space-y-3 min-w-0">
             <Nifty100HeatMap />
           </div>
         )}
 
         {activeTab === 'assetMatrix' && (
-          <div key="assetMatrix" className="desk-panel-enter space-y-3">
+          <div key="assetMatrix" className="desk-panel-enter space-y-3 min-w-0">
             <ForensicPanel
               onSelect={handleSelect}
               liveMarket={liveMarket}
@@ -2317,16 +2325,17 @@ export default function IrosMasterAdvancedTerminal() {
         )}
 
         {activeTab === 'intradayMatrix' && (
-          <div key="intradayMatrix" className="desk-panel-enter space-y-3">
+          <div key="intradayMatrix" className="desk-panel-enter space-y-3 min-w-0">
             <AssetMetricsPanel />
           </div>
         )}
 
         {activeTab === 'eod' && (
-          <div key="eod" className="desk-panel-enter space-y-3">
+          <div key="eod" className="desk-panel-enter space-y-3 min-w-0">
             <EodDeskPanel />
           </div>
         )}
+        </main>
       </div>
     </div>
   );

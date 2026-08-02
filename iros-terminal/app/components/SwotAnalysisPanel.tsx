@@ -130,7 +130,7 @@ function EmptyState() {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.08),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(239,68,68,0.06),transparent_36%)]" />
-      <div className="relative flex min-h-[400px] flex-col items-center justify-center p-8 text-center">
+      <div className="relative flex min-h-[240px] sm:min-h-[320px] md:min-h-[400px] flex-col items-center justify-center p-8 text-center">
         <div className="mb-6 relative">
           <div className="h-20 w-20 rounded-3xl swot-icon flex items-center justify-center shadow-xl">
             <svg viewBox="0 0 24 24" fill="none" className="h-10 w-10">
@@ -309,7 +309,7 @@ export default function SwotAnalysisPanel({ ticker, companyName }: SwotAnalysisP
 
             <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner">
               {!loaded && !errored && (
-                <div className="flex flex-col items-center justify-center gap-4 bg-white min-h-[400px]">
+                <div className="flex flex-col items-center justify-center gap-4 bg-white min-h-[240px] sm:min-h-[320px] md:min-h-[400px]">
                   <div className="relative h-14 w-14 rounded-2xl border border-amber-200 bg-amber-50/80 shadow-lg flex items-center justify-center">
                     <svg className="h-7 w-7 text-amber-500 animate-pulse" viewBox="0 0 24 24" fill="none">
                       <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -322,7 +322,7 @@ export default function SwotAnalysisPanel({ ticker, companyName }: SwotAnalysisP
                 </div>
               )}
               {errored && (
-                <div className="relative z-10 flex flex-col items-center justify-center gap-3 p-6 text-center min-h-[400px]">
+                <div className="relative z-10 flex flex-col items-center justify-center gap-3 p-6 text-center min-h-[240px] sm:min-h-[320px] md:min-h-[400px]">
                   <div className="h-12 w-12 rounded-2xl border border-amber-200 bg-amber-50 text-amber-500 flex items-center justify-center">
                     <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
                       <path d="M12 9v4M12 17h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -343,7 +343,7 @@ export default function SwotAnalysisPanel({ ticker, companyName }: SwotAnalysisP
                 referrerPolicy="strict-origin-when-cross-origin"
                 onLoad={() => setLoaded(true)}
                 onError={() => setErrored(true)}
-                className="h-[500px] w-full bg-white"
+                className="min-h-[240px] sm:min-h-[320px] md:min-h-[400px] h-[min(70dvh,500px)] md:h-[500px] w-full bg-white"
               />
             </div>
           </div>

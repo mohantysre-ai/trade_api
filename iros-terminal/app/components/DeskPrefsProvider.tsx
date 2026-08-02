@@ -4,7 +4,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
-  useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
 } from "react";
@@ -51,15 +51,13 @@ function applyDomPrefs(theme: DeskTheme, fontSize: DeskFontSize) {
 export function DeskPrefsProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<DeskTheme>("dark");
   const [fontSize, setFontState] = useState<DeskFontSize>("md");
-  const [ready, setReady] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const nextTheme = readStoredTheme();
     const nextFont = readStoredFont();
     setThemeState(nextTheme);
     setFontState(nextFont);
     applyDomPrefs(nextTheme, nextFont);
-    setReady(true);
   }, []);
 
   const setTheme = useCallback((next: DeskTheme) => {
@@ -100,11 +98,7 @@ export function DeskPrefsProvider({ children }: { children: React.ReactNode }) {
     [theme, fontSize, setTheme, toggleTheme, setFontSize, bumpFont]
   );
 
-  return (
-    <DeskPrefsContext.Provider value={value}>
-      <div className={ready ? "desk-prefs-ready" : "desk-prefs-boot"}>{children}</div>
-    </DeskPrefsContext.Provider>
-  );
+  return <DeskPrefsContext.Provider value={value}>{children}</DeskPrefsContext.Provider>;
 }
 
 export function useDeskPrefs() {

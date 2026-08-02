@@ -264,7 +264,17 @@ def _persist_refresh_tasks() -> None:
         payload = _serialize_refresh_tasks_for_disk()
         tmp_path = REFRESH_TASKS_PATH.with_suffix(".json.tmp")
         tmp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        tmp_path.replace(REFRESH_TASKS_PATH)
+        # Windows can briefly lock the destination during concurrent reads/writes.
+        last_exc: Exception | None = None
+        for attempt in range(5):
+            try:
+                os.replace(tmp_path, REFRESH_TASKS_PATH)
+                return
+            except OSError as exc:
+                last_exc = exc
+                time.sleep(0.05 * (attempt + 1))
+        if last_exc is not None:
+            raise last_exc
     except Exception as exc:
         logging.getLogger(__name__).warning("Failed to persist refresh tasks: %s", exc)
 

@@ -32,14 +32,16 @@ export default function DeskControls({
   }, []);
 
   return (
-    <div className="desk-controls flex flex-wrap items-center gap-1.5" role="group" aria-label="Display controls">
-      <div className="desk-live-chip" title={`Feed ${feedStatus}`}>
+    <div className="desk-controls flex flex-nowrap items-center gap-1.5 overflow-x-auto desk-scroll-x max-w-full" role="group" aria-label="Display controls">
+      <div className="desk-live-chip shrink-0" title={`Feed ${feedStatus}`} suppressHydrationWarning>
         <span className={`desk-live-dot ${feedStatus === "live" ? "is-live" : feedStatus === "loading" ? "is-loading" : "is-error"}`} />
         <span className="desk-live-label">{feedStatus === "live" ? "LIVE" : feedStatus.toUpperCase()}</span>
-        <span className="desk-live-clock tabular-nums">{liveClock} IST</span>
+        <span className="desk-live-clock tabular-nums hidden min-[400px]:inline" suppressHydrationWarning>
+          {liveClock} IST
+        </span>
       </div>
 
-      <div className="desk-seg" role="group" aria-label="Theme">
+      <div className="desk-seg shrink-0" role="group" aria-label="Theme">
         <button
           type="button"
           className={theme === "dark" ? "is-on" : undefined}
@@ -60,7 +62,7 @@ export default function DeskControls({
         </button>
       </div>
 
-      <div className="desk-seg" role="group" aria-label="Font size">
+      <div className="desk-seg shrink-0" role="group" aria-label="Font size">
         <button type="button" onClick={() => bumpFont(-1)} title="Smaller text" aria-label="Decrease font size">
           −
         </button>

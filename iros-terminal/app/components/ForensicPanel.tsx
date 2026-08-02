@@ -1054,7 +1054,7 @@ export default function ForensicPanel({
   };
 
   return (
-    <section className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+    <section className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm relative overflow-hidden min-w-0">
       <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-400 via-cyan-400 to-transparent pointer-events-none" aria-hidden />
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
         <div className="min-w-0">
@@ -1079,14 +1079,14 @@ export default function ForensicPanel({
             {' · '}Data Date {live?.updatedAt ? new Date(live.updatedAt).toISOString().slice(0, 10) : '—'}
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           {onPoolChange && (
-            <label className="flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 min-w-0">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Pool</span>
               <select
                 value={selectedPool ?? pools[0] ?? 'Nifty 500'}
                 onChange={(e) => onPoolChange(e.target.value)}
-                className="px-2.5 py-1 text-[11px] rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 cursor-pointer"
+                className="min-h-11 max-w-[min(100%,14rem)] px-2.5 py-2 text-[11px] rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 cursor-pointer"
               >
                 {pools.map((pool) => (
                   <option key={pool} value={pool}>
@@ -1099,7 +1099,7 @@ export default function ForensicPanel({
           <button
             onClick={refresh}
             disabled={refreshing}
-            className="px-3 py-1 text-[12px] rounded-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition"
+            className="min-h-11 px-3 py-2 text-[12px] rounded-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition"
           >
             {refreshing ? 'Refreshing...' : 'Refresh'}
           </button>

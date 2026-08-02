@@ -529,7 +529,7 @@ function PositionTable({
         <h3 className="desk-panel-title text-slate-900">{title}</h3>
         <span className="text-[9px] text-slate-500 tabular-nums">{rows.length} names</span>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto desk-scroll-x">
         <table className="w-full text-left text-[10px]">
           <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[8px]">
             <tr>
@@ -857,7 +857,7 @@ export default function AssetMetricsPanel() {
       </div>
 
       {/* Portfolio summary */}
-      <div className="bg-white/80 border border-slate-200 rounded-xl p-3 shadow-sm grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-3">
+      <div className="bg-white/80 border border-slate-200 rounded-xl p-3 shadow-sm grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-2 sm:gap-3 min-w-0">
         <Kpi label="Long exposure" value={inr(session?.portfolio?.longExposure ?? null)} />
         <Kpi label="Short exposure" value={inr(session?.portfolio?.shortExposure ?? null)} />
         <Kpi label="Gross" value={inr(session?.portfolio?.grossExposure ?? null)} />
@@ -1111,7 +1111,7 @@ export default function AssetMetricsPanel() {
           {allRows.length === 0 ? (
             <p className="text-[10px] text-slate-400">No positions —</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto desk-scroll-x">
               <table className="w-full text-[10px]">
                 <thead className="text-[8px] uppercase text-slate-500">
                   <tr>

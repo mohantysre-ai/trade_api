@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
     const res = await fetch(backendUrl.toString(), {
       cache: "no-store",
-      signal: AbortSignal.timeout(45_000),
+      signal: AbortSignal.timeout(20_000),
     });
 
     if (!res.ok) {
@@ -113,9 +113,17 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    const timedOut = /timeout|aborted|AbortError/i.test(message);
     return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
+      {
+        success: false,
+        error: timedOut ? "News feed timed out — retry shortly" : message,
+        payload: [],
+        offset: 0,
+        limit: 50,
+        hasMore: false,
+      },
+      { status: timedOut ? 504 : 500 }
     );
   }
 }

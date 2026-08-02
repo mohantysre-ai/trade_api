@@ -1145,7 +1145,7 @@ export default function IntradayMatrixPanel() {
                     </div>
 
                     {/* Trade plan table — LONG */}
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto desk-scroll-x">
                       <table className="w-full text-[12px] border-collapse">
                         <thead>
                           <tr className="bg-slate-100 text-slate-600">
@@ -1192,7 +1192,7 @@ export default function IntradayMatrixPanel() {
                           LONG CAPITAL ALLOCATION (~₹1,00,000 per stock)
                         </span>
                       </div>
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto desk-scroll-x">
                         <table className="w-full text-[12px] border-collapse">
                           <thead>
                             <tr className="bg-emerald-50 text-slate-600">
@@ -1257,7 +1257,7 @@ export default function IntradayMatrixPanel() {
                                 : '(MONITOR · MARKET CLOSED)')}
                         </span>
                       </div>
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto desk-scroll-x">
                         <table className="w-full text-[12px] border-collapse">
                           <thead>
                             <tr className="bg-rose-50 text-slate-600">
@@ -1308,7 +1308,7 @@ export default function IntradayMatrixPanel() {
                     SHORT CAPITAL ALLOCATION (~₹1,00,000 per stock)
                   </span>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto desk-scroll-x">
                   <table className="w-full text-[12px] border-collapse">
                     <thead>
                       <tr className="bg-rose-50 text-slate-600">

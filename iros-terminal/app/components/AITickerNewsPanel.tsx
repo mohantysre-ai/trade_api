@@ -324,7 +324,7 @@ export default function AITickerNewsPanel({
         {hasNews && (
           <div className="space-y-4">
             {/* ── Sentiment + Risk row ── */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Sentiment */}
               <div className={`relative overflow-hidden rounded-xl border ${sentimentCfg.border} ${sentimentCfg.gradient} p-3.5 shadow-sm hover:shadow-md transition-all`}>
                 {/* Decorative corner accent */}

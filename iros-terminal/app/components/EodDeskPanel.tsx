@@ -403,11 +403,11 @@ export default function EodDeskPanel() {
               role="tab"
               aria-selected={active}
               onClick={() => setMode(m.key)}
-              className={`eod-desk__mode-btn relative z-[1] rounded-lg px-2 py-2 text-left transition-colors ${
+              className={`eod-desk__mode-btn relative z-[1] rounded-lg px-1.5 sm:px-2 py-2 min-h-11 text-left transition-colors ${
                 active ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              <div className="text-[10px] font-black uppercase tracking-[0.12em]">{m.label}</div>
+              <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.12em] truncate">{m.label}</div>
               <div className="mt-0.5 hidden text-[9px] text-slate-400 sm:block">{m.hint}</div>
             </button>
           );

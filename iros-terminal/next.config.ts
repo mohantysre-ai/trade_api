@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Hide the floating Next.js Dev Tools "N" badge in development
+  devIndicators: false,
   allowedDevOrigins: [
     "localhost",
     "127.0.0.1",

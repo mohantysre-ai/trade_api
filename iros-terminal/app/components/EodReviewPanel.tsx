@@ -150,7 +150,7 @@ function ReplayChart({
   const closes = candles.map(candleClose).filter((v): v is number => v != null);
   if (closes.length < 2) {
     return (
-      <div className="flex h-48 items-center justify-center text-[11px] text-slate-500">
+      <div className="flex min-h-[240px] sm:min-h-[320px] md:min-h-[400px] items-center justify-center text-[11px] text-slate-500">
         No 1-min replay series for this ticker
       </div>
     );
@@ -614,7 +614,7 @@ export default function EodReviewPanel({
               {scorecards.length === 0 ? (
                 <div className="p-6 text-center text-[11px] text-slate-400">No scorecards</div>
               ) : (
-                <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+                <div className="overflow-x-auto desk-scroll-x max-h-[420px] overflow-y-auto">
                   <table className="w-full text-[10px]">
                     <thead className="sticky top-0 bg-slate-50 text-slate-500 uppercase tracking-wider">
                       <tr>

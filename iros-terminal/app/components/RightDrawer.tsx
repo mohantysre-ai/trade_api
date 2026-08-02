@@ -347,6 +347,20 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
     return () => window.cancelAnimationFrame(id);
   }, [ticker]);
 
+  React.useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
   const parseNewsSummary = (text: string | undefined) => parseNewsCatalystsCard(text);
 
   const newsSummary = parseNewsSummary(analysis?.news_catalysts_card);
@@ -382,16 +396,27 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
 
 
   const drawer = (
+    <>
+    {open && (
+      <button
+        type="button"
+        className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px] lg:bg-black/25"
+        aria-label="Close analysis drawer overlay"
+        onClick={onClose}
+      />
+    )}
     <div
-      className={`right-drawer fixed top-0 right-0 h-full w-full lg:w-[50%] xl:w-[50%] 2xl:w-[45%] border-l border-slate-200 shadow-2xl transform ${
+      className={`right-drawer fixed top-0 right-0 h-[100dvh] w-full sm:w-[min(100%,32rem)] lg:w-[50%] xl:w-[50%] 2xl:w-[45%] border-l border-slate-200 shadow-2xl transform ${
         open ? "translate-x-0" : "translate-x-full"
-      } z-50 overflow-y-auto`}
+      } z-50 overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]`}
       style={{ transition: "transform var(--dur-drawer, 280ms) var(--ease-drawer, cubic-bezier(0.32, 0.72, 0, 1))" }}
       aria-hidden={!open}
+      role="dialog"
+      aria-modal={open}
     >
       {/* Header */}
       <div className="sticky top-0 z-20 backdrop-blur-md border-b border-slate-200">
-        <div className="px-5 py-3.5 flex items-center justify-between">
+        <div className="px-3 sm:px-5 py-3.5 flex items-center justify-between">
           <div className="min-w-0 flex-1">
             <p className="desk-panel-title mb-0.5">Deep Asset Analysis</p>
             <h4 className="desk-metric-value truncate">{stock?.ticker ?? "—"}</h4>
@@ -399,7 +424,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           </div>
           <button
             onClick={onClose}
-            className="ml-3 w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-[color,background-color,transform] duration-150 text-sm"
+            className="ml-3 min-w-[44px] min-h-[44px] w-11 h-11 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-[color,background-color,transform] duration-150 text-sm"
             aria-label="Close analysis drawer"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -409,10 +434,10 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
         </div>
 
         {/* Tab navigation */}
-        <div className="flex px-5">
+        <div className="flex px-3 sm:px-5 overflow-x-auto desk-scroll-x flex-nowrap">
           <button
             onClick={() => setActiveTab("aiNews")}
-            className={`relative py-2.5 px-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 mr-6 ${
+            className={`relative py-2.5 px-1 min-h-11 shrink-0 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 mr-6 ${
               activeTab === "aiNews"
                 ? "text-teal-700"
                 : "text-slate-400 hover:text-slate-600"
@@ -425,7 +450,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           </button>
           <button
             onClick={() => setActiveTab("analysis")}
-            className={`relative py-2.5 px-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 mr-6 ${
+            className={`relative py-2.5 px-1 min-h-11 shrink-0 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 mr-6 ${
               activeTab === "analysis"
                 ? "text-teal-700"
                 : "text-slate-400 hover:text-slate-600"
@@ -438,7 +463,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           </button>
           <button
             onClick={() => setActiveTab("confidenceChecker")}
-            className={`relative py-2.5 px-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 mr-6 ${
+            className={`relative py-2.5 px-1 min-h-11 shrink-0 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 mr-6 ${
               activeTab === "confidenceChecker"
                 ? "text-teal-700"
                 : "text-slate-400 hover:text-slate-600"
@@ -451,7 +476,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           </button>
           <button
             onClick={() => setActiveTab("technicalAnalysis")}
-            className={`relative py-2.5 px-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 mr-6 ${
+            className={`relative py-2.5 px-1 min-h-11 shrink-0 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 mr-6 ${
               activeTab === "technicalAnalysis"
                 ? "text-teal-700"
                 : "text-slate-400 hover:text-slate-600"
@@ -464,7 +489,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           </button>
           <button
             onClick={() => setActiveTab("swotAnalysis")}
-            className={`relative py-2.5 px-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
+            className={`relative py-2.5 px-1 min-h-11 shrink-0 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
               activeTab === "swotAnalysis"
                 ? "text-teal-700"
                 : "text-slate-400 hover:text-slate-600"
@@ -479,7 +504,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
       </div>
 
       {/* Tab content */}
-      <div className="p-5">
+      <div className="p-3 sm:p-5">
          {/* AI News Tab */}
          {activeTab === "aiNews" && (
            ticker ? (
@@ -646,6 +671,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
 
       </div>
     </div>
+    </>
   );
 
   return typeof window !== 'undefined' ? createPortal(drawer, document.body) : null;

@@ -120,7 +120,7 @@ function EmptyState() {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.12),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(99,102,241,0.10),transparent_36%)]" />
-      <div className="relative flex min-h-[360px] flex-col items-center justify-center p-8 text-center">
+      <div className="relative flex min-h-[240px] sm:min-h-[320px] md:min-h-[360px] flex-col items-center justify-center p-8 text-center">
         <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl confidence-icon">
           <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </div>
@@ -215,7 +215,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName }: Confiden
 
             <div className="relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner">
               {!loaded && !errored && (
-                <div className="flex flex-col items-center justify-center gap-4 bg-white min-h-[400px]">
+                <div className="flex flex-col items-center justify-center gap-4 bg-white min-h-[240px] sm:min-h-[320px] md:min-h-[400px]">
                   <div className="relative h-14 w-14 rounded-2xl border border-emerald-200 bg-emerald-50/80 shadow-lg flex items-center justify-center">
                     <div className="absolute inset-2 rounded-xl border border-emerald-400/40" />
                     <div className="absolute inset-0 animate-ping rounded-2xl bg-emerald-400/20" />
@@ -228,7 +228,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName }: Confiden
                 </div>
               )}
               {errored && (
-                <div className="relative z-10 flex flex-col items-center justify-center gap-3 p-6 text-center min-h-[400px]">
+                <div className="relative z-10 flex flex-col items-center justify-center gap-3 p-6 text-center min-h-[240px] sm:min-h-[320px] md:min-h-[400px]">
                   <div className="h-12 w-12 rounded-2xl border border-amber-200 bg-amber-50 text-amber-500 flex items-center justify-center">
                     <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none"><path d="M12 9v4M12 17h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
                   </div>
@@ -247,7 +247,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName }: Confiden
                 referrerPolicy="strict-origin-when-cross-origin"
                 onLoad={() => setLoaded(true)}
                 onError={() => setErrored(true)}
-                className="h-[500px] w-full bg-white"
+                className="min-h-[240px] sm:min-h-[320px] md:min-h-[400px] h-[min(70dvh,500px)] md:h-[500px] w-full bg-white"
               />
             </div>
           </div>
