@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-const MAIN_API_URL = process.env.NEXT_PUBLIC_MARKET_API_URL ?? "http://127.0.0.1:8000";
+
+const MAIN_API_URL =
+  process.env.MARKET_API_URL ||
+  process.env.NEXT_PUBLIC_MARKET_API_URL ||
+  "http://127.0.0.1:8000";
 
 function generateMockReport(ticker: string, companyName: string) {
   const company = companyName || ticker;

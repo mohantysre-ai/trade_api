@@ -1462,6 +1462,7 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
   const [infiniteOffset, setInfiniteOffset] = useState(0);
   const [infiniteHasMore, setInfiniteHasMore] = useState(true);
   const [infiniteLoading, setInfiniteLoading] = useState(false);
+  const [infiniteError, setInfiniteError] = useState<string | null>(null);
   const pageSize = 50;
 
 
@@ -1475,7 +1476,10 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
     return `${Math.floor(hrs / 24)}d ago`;
   };
 
-  const baseItems = sidebar ? infiniteItems : (items ?? []);
+  // Sidebar prefers /api/live-news; fall back to snapshot news if BFF fails.
+  const baseItems = sidebar
+    ? (infiniteItems.length > 0 ? infiniteItems : (items ?? []))
+    : (items ?? []);
 
   const sources = useMemo(() => {
     const set = new Set<string>();
@@ -1506,9 +1510,12 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
     setInfiniteLoading(true);
     try {
       const res = await fetch(`/api/live-news?offset=${infiniteOffset}&limit=${pageSize}`, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const body = await res.json();
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof body?.error === 'string' ? body.error : `HTTP ${res.status}`);
+      }
       const next: NewsItem[] = Array.isArray(body?.payload) ? body.payload : [];
+      setInfiniteError(null);
       setInfiniteItems((prev) => {
         const seen = new Set(prev.map((p) => `${p.title}::${p.link}`));
         const merged = [...prev];
@@ -1523,8 +1530,9 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
       });
       setInfiniteOffset((prev) => prev + next.length);
       setInfiniteHasMore(Boolean(body?.hasMore) && next.length > 0);
-    } catch {
+    } catch (err) {
       setInfiniteHasMore(false);
+      setInfiniteError(err instanceof Error ? err.message : 'News feed unavailable');
     } finally {
       setInfiniteLoading(false);
     }
@@ -1566,7 +1574,9 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
           <span className="text-[10px] uppercase tracking-widest text-slate-700 font-black">Live News Feed</span>
           <span className="ml-auto text-[9px] text-slate-400 uppercase tracking-wider">Waiting for data</span>
         </div>
-        <div className="p-6 text-center text-slate-400 text-[11px]">No news stories available.</div>
+        <div className="p-6 text-center text-slate-400 text-[11px]">
+          {infiniteError ? `News feed error: ${infiniteError}` : 'No news stories available.'}
+        </div>
       </div>
     );
   }

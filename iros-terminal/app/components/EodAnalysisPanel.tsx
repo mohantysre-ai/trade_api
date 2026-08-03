@@ -57,6 +57,7 @@ type IntradayReport = {
   missScorecardCoverage?: number;
   isMock?: boolean;
   symbolSource?: string;
+  deskCounts?: { swing?: number; intradayLong?: number; intradayShort?: number; total?: number };
   fromCache?: boolean;
   cachedAt?: string;
   trades: IntradayTrade[];
@@ -96,6 +97,7 @@ type SwingReport = {
   picks: SwingPick[];
   isMock?: boolean;
   symbolSource?: string;
+  deskCounts?: { swing?: number; intradayLong?: number; intradayShort?: number; total?: number };
   referenceDate?: string;
   referenceLabel?: string;
   fromCache?: boolean;
@@ -495,6 +497,29 @@ export default function EodAnalysisPanel({
 
       {(intraday || swing) && (
         <>
+          {(() => {
+            const counts = intraday?.deskCounts || swing?.deskCounts;
+            if (!counts) return null;
+            const total = counts.total ?? 0;
+            const expectOk = total >= 20;
+            return (
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-300 border-[0.5px] bg-slate-50 px-3 py-2 text-[10px]">
+                <span className="font-black uppercase tracking-wider text-slate-600">Locked desk for EOD</span>
+                <span className="desk-pill desk-pill--info">Swing {counts.swing ?? 0}</span>
+                <span className="desk-pill desk-pill--ok">Intra L {counts.intradayLong ?? 0}</span>
+                <span className="desk-pill desk-pill--danger">Intra S {counts.intradayShort ?? 0}</span>
+                <span className={`desk-pill ${expectOk ? 'desk-pill--ok' : 'desk-pill--warn'}`}>
+                  Total {total}{expectOk ? '' : ' / expect 20'}
+                </span>
+                {!expectOk && (
+                  <span className="text-amber-700">
+                    Expect Swing 10 + Intra 5 buy / 5 sell after adopt.
+                  </span>
+                )}
+              </div>
+            );
+          })()}
+
           {intraday && (
             <OutcomeDesk
               trades={intraday.trades}

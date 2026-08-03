@@ -129,6 +129,8 @@ type SessionResponse = {
     shortCapital?: number;
     riskFraction?: number;
     basketSize?: number;
+    candidatePoolSize?: number;
+    lockSize?: number;
     momentumSlots?: number;
     meanRevSlots?: number;
     riskScaleLong?: number;
@@ -166,7 +168,9 @@ type CandidatesResponse = {
   meanRevGate?: SessionResponse['meanRevGate'];
   proposedLong?: PositionRow[];
   proposedShort?: PositionRow[];
-  funnel?: Record<string, number>;
+  adoptLong?: PositionRow[];
+  adoptShort?: PositionRow[];
+  funnel?: Record<string, number | string>;
   locked?: boolean;
 };
 
@@ -747,7 +751,11 @@ export default function AssetMetricsPanel() {
   const attentionItems = session?.attention || [];
   const meanRevGate = session?.meanRevGate || candidates?.meanRevGate;
   const mrGatedOff = meanRevGate?.open === false;
-  const basketSize = session?.capital?.basketSize ?? candidates?.capital?.basketSize ?? 10;
+  const basketSize = session?.capital?.basketSize ?? candidates?.capital?.basketSize ?? 5;
+  const candidatePoolSize =
+    session?.capital?.candidatePoolSize ?? candidates?.capital?.candidatePoolSize ?? 10;
+  const adoptLong = candidates?.adoptLong || [];
+  const adoptShort = candidates?.adoptShort || [];
   const showAttention = attentionItems.length > 0 || dataStale || mrGatedOff;
 
   const emptyHint = locked
@@ -808,7 +816,9 @@ export default function AssetMetricsPanel() {
                 onClick={() => onCommit(false)}
                 className="desk-btn-primary"
               >
-                {committing ? 'Locking…' : `Commit ${basketSize}+${basketSize} Basket`}
+                {committing
+                  ? 'Locking…'
+                  : `Adopt ${basketSize}+${basketSize} from ${candidatePoolSize}+${candidatePoolSize}`}
               </button>
             )}
             <button
@@ -824,6 +834,19 @@ export default function AssetMetricsPanel() {
             </button>
           </div>
         </div>
+
+        {!locked && (adoptLong.length > 0 || adoptShort.length > 0) && (
+          <p className="mt-2 text-[9px] text-slate-600">
+            High-prob adopt (score / in-play):{' '}
+            <span className="font-bold text-emerald-700">
+              BUY {adoptLong.map((r) => r.symbol).join(', ') || '—'}
+            </span>
+            {' · '}
+            <span className="font-bold text-red-700">
+              SELL {adoptShort.map((r) => r.symbol).join(', ') || '—'}
+            </span>
+          </p>
+        )}
 
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <Kpi

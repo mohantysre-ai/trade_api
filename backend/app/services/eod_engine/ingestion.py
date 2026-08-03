@@ -78,14 +78,20 @@ def load_intraday_session(for_date: date | None = None) -> dict[str, Any]:
     return session
 
 
-def _normalize_pick(raw: dict[str, Any], source: str) -> dict[str, Any] | None:
+def _normalize_pick(raw: dict[str, Any], source: str, *, book: str | None = None) -> dict[str, Any] | None:
     symbol = str(raw.get("symbol") or raw.get("ticker") or "").upper().strip()
     if not symbol:
         return None
     direction = str(raw.get("direction") or "LONG").upper()
     if direction not in ("LONG", "SHORT"):
         direction = "LONG"
-    entry = _f(raw.get("entryPrice") or raw.get("entry") or raw.get("ltp") or raw.get("scanLtp"))
+    entry = _f(
+        raw.get("entryPrice")
+        or raw.get("entry")
+        or raw.get("buyAbove")
+        or raw.get("ltp")
+        or raw.get("scanLtp")
+    )
     stop = _f(raw.get("stopLoss"))
     t1 = _f(raw.get("target1") or raw.get("target_price") or raw.get("sellPrice"))
     t2 = _f(raw.get("target2"))
@@ -97,10 +103,18 @@ def _normalize_pick(raw: dict[str, Any], source: str) -> dict[str, Any] | None:
         risk = abs(entry - stop)
     qty = int(raw.get("approxQty") or raw.get("approx_qty") or 0)
     deployed = _f(raw.get("deployedCapital") or raw.get("deployed_capital")) or 0.0
+    resolved_book = str(
+        book
+        or raw.get("book")
+        or ("SWING" if "swing" in source.lower() else "INTRADAY")
+    ).upper()
+    if resolved_book not in ("SWING", "INTRADAY"):
+        resolved_book = "INTRADAY"
     return {
         "symbol": symbol,
         "name": raw.get("name") or symbol,
         "direction": direction,
+        "book": resolved_book,
         "entryPrice": entry,
         "stopLoss": stop,
         "target1": t1,
@@ -130,27 +144,38 @@ def _f(v: Any) -> float | None:
 
 
 def load_day_picks(for_date: date) -> dict[str, Any]:
-    """Merge fixed_trade_plan + intraday_session + eod_archive into canonical picks."""
+    """Union locked Swing + Intraday baskets for EOD (target ~10 + 10 + 10 = 30).
+
+    Sources (facts only, no invented symbols):
+      - swing_session.json (or auto-lock from dhanSwingPicks) -> book=SWING
+      - intradAy_session.json long/short -> book=INTRADAY
+      - fixed_trade_plan.json only if intradAy session empty (legacy mirror)
+      - eod_archive fills gaps for missing keys only
+    """
+    from ..swing_session import ensure_swing_session_locked, load_swing_session
+
     plan = load_fixed_trade_plan(for_date)
     session = load_intraday_session(for_date)
     archive = load_archive(for_date)
     snapshot = load_market_snapshot()
 
+    ensure_swing_session_locked()
+    swing = load_swing_session()
+
     by_key: dict[str, dict[str, Any]] = {}
 
-    def _ingest(items: list[Any], source: str) -> None:
+    def _ingest(items: list[Any], source: str, *, book: str) -> None:
         for item in items or []:
             if not isinstance(item, dict):
                 continue
-            pick = _normalize_pick(item, source)
+            pick = _normalize_pick(item, source, book=book)
             if not pick:
                 continue
-            key = f"{pick['symbol']}:{pick['direction']}"
+            key = f"{pick['symbol']}:{pick['direction']}:{pick['book']}"
             existing = by_key.get(key)
             if existing is None:
                 by_key[key] = pick
                 continue
-            # Prefer richer factor breakdown / score from session
             if pick.get("factorBreakdown") and not existing.get("factorBreakdown"):
                 existing["factorBreakdown"] = pick["factorBreakdown"]
             if existing.get("score") is None and pick.get("score") is not None:
@@ -161,32 +186,69 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
                 existing["approxQty"] = pick["approxQty"]
                 existing["deployedCapital"] = pick.get("deployedCapital")
 
-    _ingest(list(plan.get("long") or []), "fixed_trade_plan")
-    _ingest(list(plan.get("short") or []), "fixed_trade_plan")
-    _ingest(list(session.get("long") or []), "intraday_session")
-    _ingest(list(session.get("short") or []), "intraday_session")
+    _ingest(list(swing.get("long") or []), "swing_session", book="SWING")
+    _ingest(list(swing.get("short") or []), "swing_session", book="SWING")
+
+    if not any(p.get("book") == "SWING" for p in by_key.values()):
+        block = snapshot.get("dhanSwingPicks") if isinstance(snapshot.get("dhanSwingPicks"), dict) else {}
+        _ingest(list(block.get("picks") or []), "dhanSwingPicks", book="SWING")
+
+    session_long = list(session.get("long") or [])
+    session_short = list(session.get("short") or [])
+    if session_long or session_short:
+        _ingest(session_long, "intraday_session", book="INTRADAY")
+        _ingest(session_short, "intraday_session", book="INTRADAY")
+    else:
+        _ingest(list(plan.get("long") or []), "fixed_trade_plan", book="INTRADAY")
+        _ingest(list(plan.get("short") or []), "fixed_trade_plan", book="INTRADAY")
 
     archived = archive.get("intradayPicks") or {}
     if isinstance(archived, dict):
-        _ingest(list(archived.values()), "eod_archive")
+        for item in archived.values():
+            if not isinstance(item, dict):
+                continue
+            book = str(item.get("book") or "INTRADAY").upper()
+            if book not in ("SWING", "INTRADAY"):
+                book = "INTRADAY"
+            pick = _normalize_pick(item, "eod_archive", book=book)
+            if not pick:
+                continue
+            key = f"{pick['symbol']}:{pick['direction']}:{pick['book']}"
+            if key not in by_key:
+                by_key[key] = pick
 
-    regime = plan.get("regime") or session.get("regime") or {}
+    picks = list(by_key.values())
+    swing_n = sum(1 for p in picks if p.get("book") == "SWING")
+    intra_long = sum(1 for p in picks if p.get("book") == "INTRADAY" and p.get("direction") == "LONG")
+    intra_short = sum(1 for p in picks if p.get("book") == "INTRADAY" and p.get("direction") == "SHORT")
+
+    regime = plan.get("regime") or session.get("regime") or swing.get("regime") or {}
     capital = plan.get("capital") or session.get("capital") or {}
 
     return {
         "date": for_date.isoformat(),
-        "picks": list(by_key.values()),
+        "picks": picks,
         "regime": regime,
         "capital": capital,
         "plan": plan,
         "session": session,
+        "swingSession": swing,
         "archive": archive,
         "snapshot": snapshot,
+        "deskCounts": {
+            "swing": swing_n,
+            "intradayLong": intra_long,
+            "intradayShort": intra_short,
+            "total": len(picks),
+        },
         "sources": {
             "planSessionDate": plan.get("sessionDate"),
             "sessionDate": session.get("sessionDate"),
+            "swingSessionDate": swing.get("sessionDate"),
             "archiveDate": archive.get("date"),
-            "pickCount": len(by_key),
+            "pickCount": len(picks),
+            "swingLocked": bool(swing.get("locked")),
+            "intradayLocked": bool(session.get("locked")),
         },
     }
 

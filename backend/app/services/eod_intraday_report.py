@@ -373,38 +373,39 @@ def _pick_from_canonical(normalized: dict[str, Any]) -> dict[str, Any]:
         "outcome": outcome,
         "currentPrice": current,
         "source": normalized.get("source") or raw.get("source"),
+        "book": normalized.get("book") or raw.get("book") or "INTRADAY",
     }
 
 
-def _load_canonical_intraday_picks(for_date: date) -> tuple[list[dict[str, Any]], bool, str]:
-    """Same symbol universe as Swing Book / forensic / live trade-outcomes.
+def _load_canonical_intraday_picks(for_date: date) -> tuple[list[dict[str, Any]], bool, str, dict[str, int]]:
+    """Intraday Book only — locked intradAy long/short (not swing).
 
-    Returns (picks, is_mock, symbol_source).
+    Returns (picks, is_mock, symbol_source, desk_counts).
     """
     from .eod_engine.ingestion import load_day_picks
 
     day = load_day_picks(for_date)
-    canonical = [
-        _pick_from_canonical(p)
-        for p in (day.get("picks") or [])
-        if isinstance(p, dict) and p.get("symbol")
+    desk_counts = dict(day.get("deskCounts") or {})
+    intra_rows = [
+        p for p in (day.get("picks") or [])
+        if isinstance(p, dict) and p.get("symbol") and str(p.get("book") or "INTRADAY").upper() == "INTRADAY"
     ]
+    canonical = [_pick_from_canonical(p) for p in intra_rows]
     if canonical:
         sources = sorted({
             str(p.get("source") or "desk")
-            for p in (day.get("picks") or [])
-            if isinstance(p, dict) and p.get("source")
-        }) or ["desk"]
-        return canonical, False, "+".join(sources)
+            for p in intra_rows
+            if p.get("source")
+        }) or ["intraday_session"]
+        return canonical, False, "+".join(sources), desk_counts
 
-    # Legacy: archive map only (already covered by load_day_picks, but keep explicit fallback)
     archive = load_archive(for_date)
     archived = list((archive.get("intradayPicks") or {}).values())
     archived = [p for p in archived if isinstance(p, dict) and p.get("symbol")]
     if archived:
-        return archived, False, "eod_archive"
+        return archived, False, "eod_archive", desk_counts
 
-    return _generate_mock_intraday_picks(), True, "mock"
+    return _generate_mock_intraday_picks(), True, "mock", desk_counts
 
 
 def _apply_scorecard_to_leg(
@@ -461,7 +462,7 @@ def generate_intraday_eod_report(
     """Build intraday Book P&L. Serves per-day JSON cache unless force=True."""
     from .eod_book_cache import load_book_cache, save_book_cache
 
-    picks, is_mock, symbol_source = _load_canonical_intraday_picks(for_date)
+    picks, is_mock, symbol_source, desk_counts = _load_canonical_intraday_picks(for_date)
 
     if not force:
         cached = load_book_cache(for_date, "intraday")
@@ -556,6 +557,7 @@ def generate_intraday_eod_report(
         "missScorecardCoverage": scored,
         "isMock": is_mock,
         "symbolSource": symbol_source,
+        "deskCounts": desk_counts,
         "trades": rows,
     }
     return save_book_cache(for_date, "intraday", report)

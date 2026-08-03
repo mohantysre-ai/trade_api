@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-const MAIN_API_URL = process.env.NEXT_PUBLIC_MARKET_API_URL ?? "http://127.0.0.1:8000";
+
+/** Prefer server-side MARKET_API_URL (Docker: http://market-api:8000). Empty NEXT_PUBLIC_ must not win. */
+const MAIN_API_URL =
+  process.env.MARKET_API_URL ||
+  process.env.NEXT_PUBLIC_MARKET_API_URL ||
+  "http://127.0.0.1:8000";
 
 export async function GET(request: Request) {
   try {

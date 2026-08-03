@@ -1,7 +1,8 @@
 """Intraday session engine — Asset Metrics command center (manual execution only).
 
-Funnel: Nifty 500 quotes + intraday metrics → regime → multi-factor score →
-exactly 5 LONG + 5 SHORT → immutable session lock (JSON).
+Funnel: Nifty 500 → regime → multi-factor score →
+  10 LONG + 10 SHORT candidate pool (20) →
+  adopt highest-probability 5 BUY + 5 SELL (10) → immutable JSON lock.
 
 No broker order placement. Missing inputs → UNRATED / omitted, never invented.
 """
@@ -63,12 +64,14 @@ W_VOLATILITY = float(os.environ.get("INTRADAY_W_VOLATILITY", "5"))
 W_SECTOR = float(os.environ.get("INTRADAY_W_SECTOR", "5"))
 W_LIQUIDITY = float(os.environ.get("INTRADAY_W_LIQUIDITY", "5"))
 
-# Sleeve split (aggressive default: 6 momentum + 4 mean-reversion per side)
+# Candidate pool per side (20 total = 10 LONG + 10 SHORT), then adopt top LOCK_SIZE.
 MOMENTUM_SLOTS = int(os.environ.get("INTRADAY_MOMENTUM_SLOTS", "6"))
 MEANREV_SLOTS = int(os.environ.get("INTRADAY_MEANREV_SLOTS", "4"))
-# Recompute basket size from sleeve slots when env BASKET_SIZE not explicitly forced
 _BASKET_ENV = os.environ.get("INTRADAY_BASKET_SIZE")
+# Candidate pool size per side (default 10 = 6 MOM + 4 MR)
 BASKET_SIZE = int(_BASKET_ENV) if _BASKET_ENV else max(1, MOMENTUM_SLOTS + MEANREV_SLOTS)
+# Locked desk: high-probability adoption from the 20 → 5 BUY + 5 SELL
+LOCK_SIZE = int(os.environ.get("INTRADAY_LOCK_SIZE", "5"))
 
 # Stocks-in-Play / ORB / overextension (starting params — not proven optimal)
 INPLAY_RVOL = float(os.environ.get("INTRADAY_INPLAY_RVOL", "2.0"))
@@ -992,13 +995,16 @@ def _size_position(
     risk_per_share: float,
     sleeve: float,
     risk_scale: float = 1.0,
+    *,
+    basket_slots: int | None = None,
 ) -> dict[str, Any]:
     if entry <= 0 or risk_per_share <= 0:
         return {"approxQty": 0, "deployedCapital": 0.0, "maxLoss": 0.0, "riskScale": risk_scale}
+    slots = max(1, int(basket_slots if basket_slots is not None else BASKET_SIZE))
     effective_frac = RISK_FRACTION * max(0.40, min(1.10, risk_scale))
     risk_budget = sleeve * effective_frac
     qty_by_risk = int(risk_budget // risk_per_share)
-    qty_by_notional = int((sleeve / BASKET_SIZE) // entry)
+    qty_by_notional = int((sleeve / slots) // entry)
     qty = max(0, min(qty_by_risk, qty_by_notional))
     if qty <= 0 and entry <= sleeve:
         qty = 1
@@ -1010,6 +1016,53 @@ def _size_position(
         "riskScale": round(risk_scale, 3),
         "effectiveRiskFraction": round(effective_frac, 4),
     }
+
+
+def _adopt_high_probability(
+    rows: list[dict[str, Any]],
+    n: int,
+    *,
+    direction: str,
+    capital: float,
+    regime: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """From candidate pool (≈10/side), keep top-n by score / in-play / RR — facts only."""
+    if n <= 0 or not rows:
+        return []
+    ranked = sorted(
+        rows,
+        key=lambda r: (
+            float(r.get("score") or 0.0),
+            1.0 if r.get("inPlay") else 0.0,
+            float(r.get("scorePctRank") or 0.0),
+            float(r.get("rewardRisk") or 0.0),
+        ),
+        reverse=True,
+    )
+    adopted = ranked[:n]
+    risk_scale = _regime_risk_scale(regime, direction)
+    out: list[dict[str, Any]] = []
+    for i, row in enumerate(adopted):
+        entry = float(row.get("entryPrice") or row.get("ltp") or 0)
+        risk = float(row.get("riskPerShare") or 0)
+        if entry <= 0:
+            continue
+        if risk <= 0:
+            levels = _build_levels(entry, float(row.get("atrPct") or 1.5) or 1.5, direction)
+            risk = float(levels.get("riskPerShare") or 0)
+            row = {**row, **levels}
+        sizing = _size_position(
+            entry, risk, capital, risk_scale=risk_scale, basket_slots=LOCK_SIZE
+        )
+        out.append({
+            **row,
+            **sizing,
+            "rank": i + 1,
+            "adopted": True,
+            "adoptReason": "HIGH_PROBABILITY_SCORE",
+            "candidatePoolSize": len(rows),
+        })
+    return out
 
 
 def _construct_side(
@@ -1256,6 +1309,14 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
         exclude_symbols=long_syms,
     )
 
+    # High-probability adoption: 20 candidates → 5 BUY + 5 SELL
+    adopt_long = _adopt_high_probability(
+        long_basket, LOCK_SIZE, direction="LONG", capital=LONG_CAPITAL, regime=regime
+    )
+    adopt_short = _adopt_high_probability(
+        short_basket, LOCK_SIZE, direction="SHORT", capital=SHORT_CAPITAL, regime=regime
+    )
+
     return {
         "success": True,
         "updatedAt": _utc_now_iso(),
@@ -1272,7 +1333,9 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
             "longCapital": LONG_CAPITAL,
             "shortCapital": SHORT_CAPITAL,
             "riskFraction": RISK_FRACTION,
-            "basketSize": BASKET_SIZE,
+            "basketSize": LOCK_SIZE,
+            "candidatePoolSize": BASKET_SIZE,
+            "lockSize": LOCK_SIZE,
             "momentumSlots": MOMENTUM_SLOTS,
             "meanRevSlots": MEANREV_SLOTS if mr_gate_open else 0,
             "riskScaleLong": round(_regime_risk_scale(regime, "LONG"), 3),
@@ -1286,6 +1349,9 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
             "longMeanRevScored": len(long_mr),
             "shortMeanRevScored": len(short_mr),
             "unratedComponents": unrated,
+            "candidatePool": len(long_basket) + len(short_basket),
+            "adopted": len(adopt_long) + len(adopt_short),
+            "funnelNote": f"{BASKET_SIZE}+{BASKET_SIZE} candidates -> adopt top {LOCK_SIZE}+{LOCK_SIZE} by score",
         },
         "longCandidates": [
             {
@@ -1315,8 +1381,12 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
             }
             for c in short_scored[:20]
         ],
+        # Full 10+10 research pool (not yet locked)
         "proposedLong": long_basket,
         "proposedShort": short_basket,
+        # High-probability 5+5 that commit will lock
+        "adoptLong": adopt_long,
+        "adoptShort": adopt_short,
         "weights": {
             "regime": W_REGIME,
             "relativeStrength": W_RS,
@@ -1342,7 +1412,7 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
 
 
 def commit_session(force: bool = False) -> dict[str, Any]:
-    """Lock basket (default 6 MOM + 4 MR per side) into intraday_session.json + fixed_trade_plan.json."""
+    """Lock high-probability 5 BUY + 5 SELL from the 10+10 candidate pool."""
     existing = load_session()
     if existing.get("locked") and not force:
         return {
@@ -1352,13 +1422,35 @@ def commit_session(force: bool = False) -> dict[str, Any]:
         }
 
     candidates = generate_candidates()
-    long_rows = candidates.get("proposedLong") or []
-    short_rows = candidates.get("proposedShort") or []
-    if len(long_rows) < BASKET_SIZE or len(short_rows) < BASKET_SIZE:
+    pool_long = candidates.get("proposedLong") or []
+    pool_short = candidates.get("proposedShort") or []
+    long_rows = candidates.get("adoptLong") or []
+    short_rows = candidates.get("adoptShort") or []
+    if len(pool_long) < LOCK_SIZE or len(pool_short) < LOCK_SIZE:
         return {
             "success": False,
-            "error": f"Insufficient candidates for {BASKET_SIZE}+{BASKET_SIZE} basket "
-                     f"(got {len(long_rows)}L / {len(short_rows)}S). Refresh market snapshot.",
+            "error": (
+                f"Insufficient candidate pool for {LOCK_SIZE}+{LOCK_SIZE} adopt "
+                f"(got {len(pool_long)}L / {len(pool_short)}S of {BASKET_SIZE}+{BASKET_SIZE}). "
+                f"Refresh market snapshot."
+            ),
+            "candidates": candidates,
+        }
+    if len(long_rows) < LOCK_SIZE or len(short_rows) < LOCK_SIZE:
+        regime = candidates.get("regime") or {}
+        long_rows = _adopt_high_probability(
+            pool_long, LOCK_SIZE, direction="LONG", capital=LONG_CAPITAL, regime=regime
+        )
+        short_rows = _adopt_high_probability(
+            pool_short, LOCK_SIZE, direction="SHORT", capital=SHORT_CAPITAL, regime=regime
+        )
+    if len(long_rows) < LOCK_SIZE or len(short_rows) < LOCK_SIZE:
+        return {
+            "success": False,
+            "error": (
+                f"Could not adopt {LOCK_SIZE}+{LOCK_SIZE} high-probability picks "
+                f"(got {len(long_rows)}L / {len(short_rows)}S)."
+            ),
             "candidates": candidates,
         }
 
@@ -1370,13 +1462,23 @@ def commit_session(force: bool = False) -> dict[str, Any]:
             "at": committed_at,
             "long": [r["symbol"] for r in long_rows],
             "short": [r["symbol"] for r in short_rows],
+            "candidatePoolLong": [r["symbol"] for r in pool_long],
+            "candidatePoolShort": [r["symbol"] for r in pool_short],
+            "funnel": f"{len(pool_long)}+{len(pool_short)} → adopt {len(long_rows)}+{len(short_rows)}",
             "sleeves": {
                 "momentumSlots": MOMENTUM_SLOTS,
                 "meanRevSlots": (candidates.get("capital") or {}).get("meanRevSlots"),
+                "lockSize": LOCK_SIZE,
+                "candidatePoolSize": BASKET_SIZE,
             },
             "executionPolicy": "MANUAL_ONLY",
         }
     ]
+
+    capital = dict(candidates.get("capital") or {})
+    capital["basketSize"] = LOCK_SIZE
+    capital["candidatePoolSize"] = BASKET_SIZE
+    capital["lockSize"] = LOCK_SIZE
 
     session = {
         "success": True,
@@ -1388,10 +1490,12 @@ def commit_session(force: bool = False) -> dict[str, Any]:
         "dataStale": candidates.get("dataStale"),
         "regime": candidates.get("regime"),
         "meanRevGate": candidates.get("meanRevGate"),
-        "capital": candidates.get("capital"),
+        "capital": capital,
         "executionPolicy": "MANUAL_ONLY",
         "long": long_rows,
         "short": short_rows,
+        "candidatePoolLong": pool_long,
+        "candidatePoolShort": pool_short,
         "events": events,
         "funnel": candidates.get("funnel"),
         "weights": candidates.get("weights"),
@@ -1399,7 +1503,12 @@ def commit_session(force: bool = False) -> dict[str, Any]:
     }
     save_session(session)
 
-    # Mirror into fixed_trade_plan for live-prices monitor compatibility
+    try:
+        from .swing_session import ensure_swing_session_locked
+        ensure_swing_session_locked()
+    except Exception as exc:
+        log.warning("Swing session auto-lock failed: %s", exc)
+
     plan = {
         "long": [
             {
@@ -1419,6 +1528,7 @@ def commit_session(force: bool = False) -> dict[str, Any]:
                 "rewardRisk": r.get("rewardRisk"),
                 "status": "RUNNING",
                 "sessionLocked": True,
+                "adopted": True,
             }
             for r in long_rows
         ],
@@ -1440,6 +1550,7 @@ def commit_session(force: bool = False) -> dict[str, Any]:
                 "rewardRisk": r.get("rewardRisk"),
                 "status": "RUNNING",
                 "sessionLocked": True,
+                "adopted": True,
             }
             for r in short_rows
         ],
@@ -1447,14 +1558,14 @@ def commit_session(force: bool = False) -> dict[str, Any]:
         "sessionDate": session_date,
         "locked": True,
         "executionPolicy": "MANUAL_ONLY",
-        "capital": candidates.get("capital"),
+        "capital": capital,
         "regime": candidates.get("regime"),
         "source": "intraday_session_engine",
+        "funnel": f"{BASKET_SIZE}+{BASKET_SIZE} candidates → {LOCK_SIZE}+{LOCK_SIZE} locked",
     }
     _atomic_write(_FIXED_PLAN_FILE, plan)
     session["fixedPlanSynced"] = True
     return session
-
 
 def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict[str, Any] | None = None) -> dict[str, Any]:
     """Update LTP/PnL/distances; never mutate symbol or CLOSED→open."""
