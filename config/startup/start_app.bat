@@ -22,8 +22,7 @@ echo Alphix Terminal - Start App + Cloudflare Tunnel
 echo ================================================
 echo.
 echo [*] Mode: NATIVE (Python venv + Next.js)
-echo     Docker alternative:  config\startup\start_docker.bat
-echo     Docker refresh:      config\startup\docker-refresh.bat
+echo     Root launchers:  start-app.bat / start-docker.bat / docker-refresh.bat / refresh-data.bat
 echo     Do not run native + Docker together ^(same ports^).
 echo.
 echo [*] Target services:

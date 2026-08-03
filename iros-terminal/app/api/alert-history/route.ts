@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { backendBase } from "../eod/_proxy";
 
 export const runtime = "nodejs";
 
@@ -10,13 +11,13 @@ export const runtime = "nodejs";
  */
 export async function GET(request: Request) {
   try {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
     const { searchParams } = new URL(request.url);
     const since = searchParams.get("since");
+    const base = backendBase();
 
     const url = since
-      ? `${backendUrl}/api/alert-history?since=${encodeURIComponent(since)}`
-      : `${backendUrl}/api/alert-history`;
+      ? `${base}/api/alert-history?since=${encodeURIComponent(since)}`
+      : `${base}/api/alert-history`;
 
     const res = await fetch(url, {
       cache: "no-store",

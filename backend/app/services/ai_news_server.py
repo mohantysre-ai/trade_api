@@ -158,7 +158,7 @@ async def ticker_news_batch_check(payload: dict[str, Any]):  # type: ignore[misc
 
     fetched: dict[str, Any] = {}
     if missing:
-        semaphore = asyncio.Semaphore(5)
+        semaphore = asyncio.Semaphore(2)
 
         async def _fetch_one(t: str) -> tuple[str, dict[str, Any]]:
             async with semaphore:

@@ -64,7 +64,7 @@ Never invent prices, scores, win rates, Kelly, verdicts, news, or risk flags. If
 | Promoter holdings | `backend/app/data/promoter_holdings.json` | Promoter % cache |
 | App state | `trade_api_snapshot.json` (repo root) | `scannerPicks`, `tickerNewsByTicker`, EOD/trade-outcome state |
 
-TTL-gated reuse and on-demand refresh: `angel_one_feed.py`, `config/startup/refresh-data-on-demand.bat|.ps1`.
+TTL-gated reuse and on-demand refresh: `angel_one_feed.py`, `config/startup/refresh-data-on-demand.bat` → `.kilo/scripts/refresh-data-on-demand.ps1`.
 
 **Do not introduce SQLite, Postgres, Redis, or ORMs unless explicitly requested.**
 

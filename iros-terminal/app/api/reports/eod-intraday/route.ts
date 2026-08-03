@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { backendBase } from "../../eod/_proxy";
 
 export const runtime = "nodejs";
 
@@ -16,9 +17,7 @@ export async function GET(request: NextRequest) {
     if (force) params.set("force", force);
     const qs = params.toString() ? `?${params.toString()}` : "";
 
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-
-    const res = await fetch(`${backendUrl}/api/reports/eod-intraday${qs}`, {
+    const res = await fetch(`${backendBase()}/api/reports/eod-intraday${qs}`, {
       cache: "no-store",
       headers: { Accept: "application/json" },
     });

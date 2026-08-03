@@ -1,0 +1,38 @@
+---
+description: After Docker-affecting code changes, rebuild images via rebuild-docker.bat and prune old images.
+alwaysApply: true
+---
+
+# Docker rebuild after code changes
+
+When you change code that runs **inside Docker containers**, you must rebuild images — source is not bind-mounted.
+
+## Trigger paths (rebuild required)
+
+- `backend/**` (market-api / ai-news image)
+- `iros-terminal/**` (frontend image)
+- `docker-compose.yml`, `backend/Dockerfile`, `iros-terminal/Dockerfile`
+- `config/cloudflare/**` used by the cloudflared service (credentials prepare still runs at start)
+
+## Command (always)
+
+From repo root after finishing those edits:
+
+```bat
+rebuild-docker.bat
+```
+
+What it does: stop stack → `docker compose build --no-cache` → up with tunnel profile → `docker image prune` (delete old/dangling images) → health wait.
+
+Faster iteration only when user asks: `rebuild-docker.bat --cached`
+
+## Do not
+
+- Assume `start-docker.bat --no-build` picks up code edits
+- Leave dangling `<none>` images after a rebuild without pruning (the bat handles prune)
+- Tell the user to rebuild manually without offering/running `rebuild-docker.bat` when you changed container code in-session
+
+## Native vs Docker
+
+- Native (`start-app.bat`): no image rebuild
+- Docker desk: use `rebuild-docker.bat` after container code changes; use `start-docker.bat` only for start without rebuild

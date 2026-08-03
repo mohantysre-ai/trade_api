@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { backendBase } from "../eod/_proxy";
 
 export const runtime = "nodejs";
 
@@ -12,9 +13,7 @@ export async function GET() {
   try {
     // Import backend service — in Next.js this runs on the server side
     // We proxy to the backend API that has access to market_feeds
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-    
-    const res = await fetch(`${backendUrl}/api/trade-outcomes`, {
+    const res = await fetch(`${backendBase()}/api/trade-outcomes`, {
       cache: "no-store",
       headers: {
         "Accept": "application/json",

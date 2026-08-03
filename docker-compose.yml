@@ -125,6 +125,21 @@ services:
       start_period: 45s
       retries: 3
 
+  # Cloudflare Tunnel inside the stack (sigq.in → frontend:3000 on the compose network).
+  # Enabled via --profile tunnel after prepare-docker-tunnel.ps1 writes credentials.
+  cloudflared:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    container_name: iros-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./config/cloudflare/config.docker.yml:/etc/cloudflared/config.yml:ro
+      - ./config/cloudflare/credentials.json:/etc/cloudflared/credentials.json:ro
+    depends_on:
+      frontend:
+        condition: service_healthy
+
 volumes:
   iros-backend-data:
   iros-eod-archive:

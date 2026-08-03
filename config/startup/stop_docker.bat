@@ -18,7 +18,7 @@ if errorlevel 1 (
 
 echo [*] Stopping Docker stack...
 pushd "%PROJECT_ROOT%"
-docker compose down
+docker compose --profile tunnel down
 set EXIT_CODE=%ERRORLEVEL%
 popd
 

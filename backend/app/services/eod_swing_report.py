@@ -228,6 +228,7 @@ def generate_swing_eod_report(
         "pnlByDayBucket": {str(k): round(v, 2) for k, v in bucket_totals.items()},
         "picks": rows,
         "isMock": plan.get("isMock", False),
+        "symbolSource": "mock" if plan.get("isMock") else "fixed_trade_plan",
         "referenceDate": "2026-07-17",
         "referenceLabel": "9:30 AM IST July 17 open (Friday session reference)",
     }

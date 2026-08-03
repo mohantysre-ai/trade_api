@@ -56,6 +56,7 @@ type IntradayReport = {
   missCount?: number;
   missScorecardCoverage?: number;
   isMock?: boolean;
+  symbolSource?: string;
   fromCache?: boolean;
   cachedAt?: string;
   trades: IntradayTrade[];
@@ -94,6 +95,7 @@ type SwingReport = {
   pnlByDayBucket: Record<string, number>;
   picks: SwingPick[];
   isMock?: boolean;
+  symbolSource?: string;
   referenceDate?: string;
   referenceLabel?: string;
   fromCache?: boolean;
@@ -233,10 +235,11 @@ function OutcomeTable({ rows }: { rows: IntradayTrade[] }) {
 }
 
 /** Replaces old Miss Analysis / target-hit prose cards with dense outcome tables. */
-function OutcomeDesk({ trades, coverage, isMock }: {
+function OutcomeDesk({ trades, coverage, isMock, symbolSource }: {
   trades: IntradayTrade[];
   coverage?: number;
   isMock?: boolean;
+  symbolSource?: string;
 }) {
   const misses = trades
     .filter((t) => t.missDiagnostic?.isMiss)
@@ -260,9 +263,14 @@ function OutcomeDesk({ trades, coverage, isMock }: {
             SC {coverage}
           </span>
         )}
+        {symbolSource && !isMock && (
+          <span className="desk-pill desk-pill--info" title="Locked desk symbol source">
+            {symbolSource}
+          </span>
+        )}
         {isMock && <span className="desk-pill desk-pill--warn">MOCK</span>}
         <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-slate-400">
-          Replaces Miss / Hit cards · Why = Root column
+          Locked session symbols · Why = Root column
         </span>
       </div>
 
@@ -492,6 +500,7 @@ export default function EodAnalysisPanel({
               trades={intraday.trades}
               coverage={intraday.missScorecardCoverage}
               isMock={intraday.isMock}
+              symbolSource={intraday.symbolSource}
             />
           )}
 
@@ -500,7 +509,11 @@ export default function EodAnalysisPanel({
           <div className="eod-panel-card bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden">
             <div className="bg-gradient-to-r from-teal-50 to-teal-100/50 px-3 py-2 border-b border-slate-200">
               <h3 className="desk-panel-title text-teal-800">Intraday EOD Report</h3>
-              <p className="text-[9px] text-teal-600">{intraday?.date ?? dateStr}</p>
+              <p className="text-[9px] text-teal-600">
+                {intraday?.date ?? dateStr}
+                {intraday?.symbolSource ? ` · ${intraday.symbolSource}` : ''}
+                {intraday?.isMock ? ' · MOCK' : ''}
+              </p>
             </div>
 
             {noIntraday ? (
@@ -585,7 +598,11 @@ export default function EodAnalysisPanel({
           <div className="eod-panel-card bg-white border border-slate-300 border-[0.5px] rounded-xl shadow-sm overflow-hidden" style={{ animationDelay: '70ms' }}>
             <div className="bg-gradient-to-r from-indigo-50 to-indigo-100/50 px-3 py-2 border-b border-slate-200">
               <h3 className="desk-panel-title text-indigo-800">Swing EOD Report</h3>
-              <p className="text-[9px] text-indigo-600">{swing?.date ?? dateStr}</p>
+              <p className="text-[9px] text-indigo-600">
+                {swing?.date ?? dateStr}
+                {swing?.symbolSource ? ` · ${swing.symbolSource}` : ''}
+                {swing?.isMock ? ' · MOCK' : ''}
+              </p>
             </div>
 
             {noSwing ? (

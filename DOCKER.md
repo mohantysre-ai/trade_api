@@ -14,23 +14,36 @@ cp backend/.env.example backend/.env
 docker compose up -d --build
 ```
 
-**Windows BAT wrappers** (same ports as native `start_app.bat` — do not run both):
+**Repo-root launchers** (run from `d:\trade_api` — do not run native + Docker together):
 
 | Script | Role |
 |--------|------|
-| `config\startup\start_docker.bat` | `docker compose up -d --build` |
-| `config\startup\start_docker.bat --no-build` | start without rebuild |
-| `config\startup\docker-refresh.bat` | on-demand live refresh (HTTP → `:8000`) |
-| `config\startup\stop_docker.bat` | `docker compose down` |
-| `config\startup\start_app.bat` | native (non-Docker) launcher |
-| `config\startup\start_k8s.bat` | 3 pods on local K8s (Docker Desktop / kind) |
-| `config\startup\stop_k8s.bat` | delete `iros` namespace |
+| `start-app.bat` | manual / native start (venv + Next) |
+| `start-docker.bat` | Docker start (build if needed + healthy + tunnel) |
+| `rebuild-docker.bat` | **after code changes** — no-cache rebuild, recreate, delete old images |
+| `docker-refresh.bat` | Docker on-demand data refresh |
+| `refresh-data.bat` | manual on-demand refresh (native or Docker on `:8000`) |
+
+Flags: `start-docker.bat --no-build` / `--no-open`. `rebuild-docker.bat --cached` (faster). Stop: `config\startup\stop_docker.bat`.
+
+### After every code change (Docker)
+
+Container code is **not** live-mounted. Any change under `backend/` or `iros-terminal/` (or Dockerfiles/compose) requires:
+
+```bat
+rebuild-docker.bat
+```
+
+That builds new images, recreates containers, and prunes old/dangling images.
 
 | Service    | URL                      |
 |------------|--------------------------|
 | Frontend   | http://localhost:3000    |
 | Market API | http://localhost:8000/health |
 | AI News    | http://localhost:8001/health |
+| Public     | https://sigq.in (cloudflared container) |
+
+**Cloudflare Tunnel (Docker):** `start-docker.bat` prepares credentials from `%USERPROFILE%\.cloudflared\` (one-time: `config\startup\setup-cloudflare-tunnel.bat`), kills any host `cloudflared`, then starts `iros-cloudflared` with `--profile tunnel`. Tunnel ingress targets `http://frontend:3000` on the compose network — not localhost.
 
 ```bash
 docker compose ps
@@ -44,9 +57,9 @@ curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:3000/
 Refresh is **not** baked into the image — it is a runtime API call.
 
 ```bat
-config\startup\docker-refresh.bat
-config\startup\docker-refresh.bat --skip-news
-config\startup\docker-refresh.bat --pool "Nifty 500"
+docker-refresh.bat
+docker-refresh.bat --skip-news
+docker-refresh.bat --pool "Nifty 500"
 ```
 
 Or use the UI **Refresh** button at http://localhost:3000.
@@ -87,7 +100,7 @@ Optimized Dockerfiles use:
 - **Backend:** multi-stage build → venv copied into slim runtime; no `curl`; pip BuildKit cache
 - **Frontend:** `node:20-alpine` + Next `standalone`; health via Node `fetch`; npm BuildKit cache
 
-Rebuild: `docker compose build --no-cache` or `config\startup\start_docker.bat`
+Rebuild: `rebuild-docker.bat` (or `docker compose build --no-cache` then up)
 
 ## Kubernetes (kind cluster `iros`)
 
@@ -99,12 +112,14 @@ Manifests in `k8s/`. Three pods in namespace `iros`:
 | `ai-news` | `iros-market-api:latest` | 8001 |
 | `frontend` | `iros-frontend:latest` | 3000 |
 
-```bat
-config\startup\start_k8s.bat              # create kind cluster + load images + deploy
-config\startup\start_k8s.bat --rebuild    # rebuild images first
-config\startup\stop_k8s.bat               # delete namespace
-config\startup\stop_k8s.bat --cluster     # also delete kind cluster
+```bash
+# Requires kind (winget install Kubernetes.kind)
+kind create cluster --name iros --config k8s/kind-config.yaml
+kind load docker-image iros-market-api:latest iros-frontend:latest --name iros
+kubectl apply -f k8s/
+# teardown: kubectl delete namespace iros
+# optional: kind delete cluster --name iros
 ```
 
-Requires `kind` (`winget install Kubernetes.kind`). Uses `imagePullPolicy: Never` after `kind load docker-image`. NodePorts mapped via `k8s/kind-config.yaml`.
+Uses `imagePullPolicy: Never` after `kind load docker-image`. NodePorts mapped via `k8s/kind-config.yaml`.
 Do not run compose/native and kind together on the same ports.

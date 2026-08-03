@@ -35,6 +35,104 @@ from bs4 import BeautifulSoup
 _llm_not_before: float = 0.0
 _LLM_COOLDOWN_SECONDS = 60
 
+# Cap concurrent outbound scrapes (batch × 7 sources was melting DNS).
+_SCRAPE_CONCURRENCY = int(os.getenv("NEWS_SCRAPE_CONCURRENCY", "3"))
+_SCRAPE_SEMAPHORE: asyncio.Semaphore | None = None
+_DNS_CIRCUIT_UNTIL = 0.0
+_DNS_CIRCUIT_SECONDS = float(os.getenv("NEWS_DNS_CIRCUIT_SECONDS", "45"))
+_DNS_FAIL_STREAK = 0
+_DNS_FAIL_THRESHOLD = int(os.getenv("NEWS_DNS_FAIL_THRESHOLD", "4"))
+_LAST_DNS_WARN_MONO = 0.0
+
+
+def _scrape_semaphore() -> asyncio.Semaphore:
+    global _SCRAPE_SEMAPHORE
+    if _SCRAPE_SEMAPHORE is None:
+        _SCRAPE_SEMAPHORE = asyncio.Semaphore(_SCRAPE_CONCURRENCY)
+    return _SCRAPE_SEMAPHORE
+
+
+def _is_dns_or_connect_error(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    return any(
+        k in msg
+        for k in (
+            "getaddrinfo",
+            "name or service not known",
+            "nodename nor servname",
+            "temporary failure in name resolution",
+            "all connection attempts failed",
+            "connecterror",
+            "network is unreachable",
+        )
+    )
+
+
+def _trip_dns_circuit(exc: BaseException) -> None:
+    global _DNS_CIRCUIT_UNTIL, _DNS_FAIL_STREAK, _LAST_DNS_WARN_MONO
+    if not _is_dns_or_connect_error(exc):
+        _DNS_FAIL_STREAK = 0
+        return
+    _DNS_FAIL_STREAK += 1
+    if _DNS_FAIL_STREAK < _DNS_FAIL_THRESHOLD:
+        return
+    now = _time.monotonic()
+    _DNS_CIRCUIT_UNTIL = now + _DNS_CIRCUIT_SECONDS
+    if now - _LAST_DNS_WARN_MONO >= 15:
+        _LAST_DNS_WARN_MONO = now
+        logger.warning(
+            "News scrape DNS/connect circuit open for %.0fs after %d failures (%s)",
+            _DNS_CIRCUIT_SECONDS,
+            _DNS_FAIL_STREAK,
+            str(exc)[:120],
+        )
+
+
+def _dns_circuit_open() -> bool:
+    return _time.monotonic() < _DNS_CIRCUIT_UNTIL
+
+
+def _note_scrape_success() -> None:
+    global _DNS_FAIL_STREAK
+    _DNS_FAIL_STREAK = 0
+
+
+def _warn_scrape_failure(source: str, exc: BaseException, ticker: str | None = None) -> None:
+    """Log scrape failure once per burst; trip DNS circuit on connect errors."""
+    global _LAST_DNS_WARN_MONO
+    _trip_dns_circuit(exc)
+    if _is_dns_or_connect_error(exc):
+        now = _time.monotonic()
+        if now - _LAST_DNS_WARN_MONO < 15 and _dns_circuit_open():
+            return
+        _LAST_DNS_WARN_MONO = now
+    if ticker:
+        logger.warning("%s scrape failed for %s: %s", source, ticker, exc)
+    else:
+        logger.warning("%s scrape failed: %s", source, exc)
+
+
+def _reraise_if_dns(exc: BaseException) -> None:
+    """Let _guarded_scrape own DNS circuit + logging after inner scrapers trip once."""
+    if _is_dns_or_connect_error(exc):
+        raise exc
+
+
+async def _guarded_scrape(name: str, coro):
+    """Limit concurrency + skip when DNS circuit is open."""
+    if _dns_circuit_open():
+        return []
+    async with _scrape_semaphore():
+        if _dns_circuit_open():
+            return []
+        try:
+            result = await coro
+            _note_scrape_success()
+            return result
+        except Exception as exc:
+            _warn_scrape_failure(name, exc)
+            return []
+
 
 def _llm_quota_available() -> bool:
     return _time.monotonic() >= _llm_not_before
@@ -377,7 +475,8 @@ async def scrape_moneycontrol(ticker: str, session: httpx.AsyncClient) -> list[T
                 ))
                 count += 1
         except Exception as e:
-            logger.warning("Moneycontrol scrape failed for %s: %s", ticker, e)
+            _reraise_if_dns(e)
+            _warn_scrape_failure("Moneycontrol", e, ticker)
 
     return articles
 
@@ -427,7 +526,8 @@ async def scrape_economic_times(ticker: str, session: httpx.AsyncClient) -> list
             if len(articles) >= 15:
                 break
     except Exception as e:
-        logger.warning("ET scrape failed for %s: %s", ticker, e)
+        _reraise_if_dns(e)
+        _warn_scrape_failure("ET", e, ticker)
 
     return articles
 
@@ -471,7 +571,8 @@ async def scrape_yahoo_finance(ticker: str, session: httpx.AsyncClient) -> list[
             if len(articles) >= 10:
                 break
     except Exception as e:
-        logger.warning("Yahoo Finance scrape failed for %s: %s", ticker, e)
+        _reraise_if_dns(e)
+        _warn_scrape_failure("Yahoo Finance", e, ticker)
 
     return articles
 
@@ -511,7 +612,8 @@ async def scrape_nse_nifty100(ticker: str, session: httpx.AsyncClient) -> list[T
             if len(articles) >= 12:
                 break
     except Exception as e:
-        logger.warning("NSE NIFTY 100 scrape failed: %s", e)
+        _reraise_if_dns(e)
+        _warn_scrape_failure("NSE NIFTY 100", e)
 
     return articles
 
@@ -586,7 +688,8 @@ class PulseNewsCollector:
             self.cache[cache_key] = (now, articles)
             return articles
         except Exception as e:
-            logger.warning("Zerodha Pulse scrape failed: %s", e)
+            _reraise_if_dns(e)
+            _warn_scrape_failure("Zerodha Pulse", e)
             return []
         finally:
             if should_close_client:
@@ -634,7 +737,8 @@ async def _scrape_trendlyne(ticker: str, session: httpx.AsyncClient) -> list[Tic
                 if len(articles) >= 30:
                     break
         except Exception as e:
-            logger.warning("Trendlyne scrape failed: %s", e)
+            _reraise_if_dns(e)
+            _warn_scrape_failure("Trendlyne", e)
 
     return articles
 
@@ -673,7 +777,8 @@ async def _scrape_finshots(ticker: str, session: httpx.AsyncClient) -> list[Tick
             if len(articles) >= 30:
                 break
     except Exception as e:
-        logger.warning("Finshots scrape failed: %s", e)
+        _reraise_if_dns(e)
+        _warn_scrape_failure("Finshots", e)
 
     return articles
 
@@ -718,16 +823,21 @@ async def scrape_nse_announcements(ticker: str, session: httpx.AsyncClient) -> l
                 if len(articles) >= 15:
                     break
     except Exception as e:
-        logger.warning("NSE announcements scrape failed: %s", e)
+        _reraise_if_dns(e)
+        _warn_scrape_failure("NSE announcements", e)
 
     return articles
 
 
 async def scrape_all_sources(ticker: str) -> list[TickerNewsArticle]:
-    """Run all scrapers concurrently and return deduplicated articles."""
+    """Run scrapers with shared concurrency limit; skip when DNS circuit is open."""
+    if _dns_circuit_open():
+        logger.warning("Skipping news scrapers for %s — DNS/connect circuit open", ticker)
+        return []
+
     async with httpx.AsyncClient(
         verify=False,
-        timeout=30.0,
+        timeout=20.0,
         follow_redirects=True,
         headers={
             "User-Agent": HEADERS["User-Agent"],
@@ -737,13 +847,13 @@ async def scrape_all_sources(ticker: str) -> list[TickerNewsArticle]:
         },
     ) as session:
         tasks = [
-            scrape_moneycontrol(ticker, session),
-            scrape_economic_times(ticker, session),
-            scrape_nse_announcements(ticker, session),
-            scrape_nse_nifty100(ticker, session),
-            _scrape_zerodha_pulse(ticker, session),
-            _scrape_trendlyne(ticker, session),
-            _scrape_finshots(ticker, session),
+            _guarded_scrape("Moneycontrol", scrape_moneycontrol(ticker, session)),
+            _guarded_scrape("ET", scrape_economic_times(ticker, session)),
+            _guarded_scrape("NSE announcements", scrape_nse_announcements(ticker, session)),
+            _guarded_scrape("NSE NIFTY 100", scrape_nse_nifty100(ticker, session)),
+            _guarded_scrape("Zerodha Pulse", _scrape_zerodha_pulse(ticker, session)),
+            _guarded_scrape("Trendlyne", _scrape_trendlyne(ticker, session)),
+            _guarded_scrape("Finshots", _scrape_finshots(ticker, session)),
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -752,6 +862,7 @@ async def scrape_all_sources(ticker: str) -> list[TickerNewsArticle]:
         if isinstance(r, list):
             all_articles.extend(r)
         elif isinstance(r, Exception):
+            _trip_dns_circuit(r)
             logger.error("Scraper error: %s", r)
 
     # Deduplicate by title similarity

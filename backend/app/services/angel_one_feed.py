@@ -108,13 +108,19 @@ LLM_UNIVERSE_LIMIT = int(os.getenv("LLM_UNIVERSE_LIMIT", "30"))
 # Reused during on-demand refresh for fresh intraday metrics (INTRADAY_METRICS_TTL) and AI output (AI_CACHE_TTL).
 INTRADAY_METRICS_TTL_SECONDS = int(os.getenv("INTRADAY_METRICS_TTL_SECONDS", "600"))
 AI_CACHE_TTL_SECONDS = int(os.getenv("AI_CACHE_TTL_SECONDS", "900"))
-INTRADAY_FETCH_WORKERS = int(os.getenv("INTRADAY_FETCH_WORKERS", "8"))
+# Angel historical (getCandleData) rate-limits hard (AB1021). Keep workers low.
+INTRADAY_FETCH_WORKERS = int(os.getenv("INTRADAY_FETCH_WORKERS", "2"))
 NIFTY_100_LABEL = "Nifty 100"
 NIFTY_100_CACHE_PATH = BASE_DIR / "nifty100_instruments.json"
 ANGEL_API_TIMEOUT_SECONDS = int(os.getenv("ANGEL_API_TIMEOUT_SECONDS", "24"))
 LLM_CALL_TIMEOUT_SECONDS = min(max(1, int(os.getenv("LLM_CALL_TIMEOUT_SECONDS", "180"))), 300)
 QUOTE_CHUNK_SIZE = int(os.getenv("QUOTE_CHUNK_SIZE", "10"))
-INTRADAY_CHUNK_SIZE = int(os.getenv("INTRADAY_CHUNK_SIZE", "10"))
+INTRADAY_CHUNK_SIZE = int(os.getenv("INTRADAY_CHUNK_SIZE", "5"))
+# Global candle throttle across all threads (Angel AB1021 / ~3–5 req/s soft limit).
+CANDLE_MIN_INTERVAL_SECONDS = float(os.getenv("CANDLE_MIN_INTERVAL_SECONDS", "0.35"))
+CANDLE_RATE_LIMIT_RETRIES = int(os.getenv("CANDLE_RATE_LIMIT_RETRIES", "3"))
+_CANDLE_THROTTLE_LOCK = threading.Lock()
+_CANDLE_LAST_CALL_MONO = 0.0
 
 AI_NEWS_API_URL = os.getenv("AI_NEWS_API_URL", "http://127.0.0.1:8001")
 
@@ -406,6 +412,28 @@ def _ai_cache_fresh(snapshot: dict[str, Any] | None, top_tickers: list[str]) -> 
 
 
 _thread_local_angel_client = threading.local()
+
+
+def _throttle_candle_api() -> None:
+    """Serialize getCandleData calls with a minimum gap across worker threads."""
+    global _CANDLE_LAST_CALL_MONO
+    with _CANDLE_THROTTLE_LOCK:
+        now = time.monotonic()
+        wait = CANDLE_MIN_INTERVAL_SECONDS - (now - _CANDLE_LAST_CALL_MONO)
+        if wait > 0:
+            time.sleep(wait)
+        _CANDLE_LAST_CALL_MONO = time.monotonic()
+
+
+def _is_candle_rate_limited(response_or_exc: Any) -> bool:
+    if isinstance(response_or_exc, dict):
+        msg = str(response_or_exc.get("message") or "")
+        code = str(response_or_exc.get("errorcode") or response_or_exc.get("errorCode") or "")
+    else:
+        msg = str(response_or_exc or "")
+        code = ""
+    blob = f"{code} {msg}".lower()
+    return "ab1021" in blob or "too many requests" in blob or "rate limit" in blob
 
 
 def _get_thread_angel_client() -> AngelOneClient:
@@ -1608,28 +1636,50 @@ class AngelOneClient:
         fromdate: datetime,
         todate: datetime,
     ) -> list[list[Any]]:
-        def _fetch():
-            smart = self.connect()
-            params = {
-                "exchange": exchange,
-                "symboltoken": symboltoken,
-                "interval": interval,
-                "fromdate": fromdate.astimezone(IST_ZONE).strftime("%Y-%m-%d %H:%M"),
-                "todate": todate.astimezone(IST_ZONE).strftime("%Y-%m-%d %H:%M"),
-            }
-            response = smart.getCandleData(params)
-            if not response.get("status"):
+        log = logging.getLogger(__name__)
+        params = {
+            "exchange": exchange,
+            "symboltoken": symboltoken,
+            "interval": interval,
+            "fromdate": fromdate.astimezone(IST_ZONE).strftime("%Y-%m-%d %H:%M"),
+            "todate": todate.astimezone(IST_ZONE).strftime("%Y-%m-%d %H:%M"),
+        }
+        auth_retried = False
+        for attempt in range(CANDLE_RATE_LIMIT_RETRIES + 1):
+            _throttle_candle_api()
+            try:
+                smart = self.connect()
+                response = smart.getCandleData(params)
+            except Exception as exc:
+                if self._is_auth_error(exc) and not auth_retried:
+                    auth_retried = True
+                    self._reset_connection()
+                    continue
+                if _is_candle_rate_limited(exc) and attempt < CANDLE_RATE_LIMIT_RETRIES:
+                    delay = min(8.0, (2 ** attempt) + (0.1 * attempt))
+                    log.warning(
+                        "Angel candle rate-limited (token=%s interval=%s); retry in %.1fs (%d/%d)",
+                        symboltoken, interval, delay, attempt + 1, CANDLE_RATE_LIMIT_RETRIES,
+                    )
+                    time.sleep(delay)
+                    continue
                 return []
-            data = response.get("data") or []
-            return data if isinstance(data, list) else []
 
-        try:
-            return _fetch()
-        except Exception as exc:
-            if self._is_auth_error(exc):
-                self._reset_connection()
-                return _fetch()
+            if not isinstance(response, dict):
+                return []
+            if response.get("status"):
+                data = response.get("data") or []
+                return data if isinstance(data, list) else []
+            if _is_candle_rate_limited(response) and attempt < CANDLE_RATE_LIMIT_RETRIES:
+                delay = min(8.0, (2 ** attempt) + (0.1 * attempt))
+                log.warning(
+                    "Angel candle AB1021 (token=%s interval=%s); backoff %.1fs (%d/%d)",
+                    symboltoken, interval, delay, attempt + 1, CANDLE_RATE_LIMIT_RETRIES,
+                )
+                time.sleep(delay)
+                continue
             return []
+        return []
 
     def fetch_batch_quotes(self, instruments: list[Instrument]) -> dict[str, dict[str, Any]]:
         smart = self.connect()
@@ -3809,7 +3859,7 @@ async def _refresh_ticker_news_for_payload(payload: dict[str, Any]) -> None:
     tickers = [s["ticker"] for s in stocks_to_refresh_news]
     logger = logging.getLogger("angel_one_feed")
     try:
-        semaphore = asyncio.Semaphore(5)
+        semaphore = asyncio.Semaphore(2)
         async with httpx.AsyncClient() as http_client:
             async def _fetch_one(t: str) -> tuple[str, dict[str, Any]]:
                 async with semaphore:

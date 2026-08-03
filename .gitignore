@@ -3,3 +3,4 @@ backend/app/services/last_market_snapshot.json
 *.log
 logs/
 *.log.*
+config/cloudflare/credentials.json

@@ -1,9 +1,12 @@
-"""Post-market-close reconciliation for the day's intraday scanner picks.
+"""Post-market-close reconciliation for the day's locked desk symbols.
 
-Reads the day's archived intraday picks (see eod_archive.py), reconciles each
-against T1/T2/SL, computes P&L vs capital, and builds structured miss
-diagnostics for SL / EOD-squareoff legs from plan levels + institutional
-scorecards when present (no LLM prose).
+Canonical symbol source (same as forensic / live trade-outcomes):
+  fixed_trade_plan + intraday_session + eod_archive via ``load_day_picks``.
+
+Reconciles each leg against T1/T2/SL, computes P&L vs capital, and builds
+structured miss diagnostics from plan levels + institutional scorecards
+when present (no LLM prose). Mock picks are last-resort only when no plan,
+session, or archive symbols exist.
 """
 from __future__ import annotations
 
@@ -349,6 +352,61 @@ def _outcome_unresolved(pick: dict[str, Any]) -> bool:
     return outcome.get("hitLevel") is None and pick.get("currentPrice") is None
 
 
+def _pick_from_canonical(normalized: dict[str, Any]) -> dict[str, Any]:
+    """Flatten load_day_picks row into the shape Book / Outcome Desk expect."""
+    raw = normalized.get("raw") if isinstance(normalized.get("raw"), dict) else {}
+    outcome = normalized.get("outcome") or raw.get("outcome")
+    current = raw.get("currentPrice")
+    if current is None and isinstance(outcome, dict):
+        current = outcome.get("ltp")
+    return {
+        **raw,
+        "symbol": normalized.get("symbol") or raw.get("symbol"),
+        "direction": normalized.get("direction") or raw.get("direction") or "LONG",
+        "entryPrice": normalized.get("entryPrice") if normalized.get("entryPrice") is not None else raw.get("entryPrice"),
+        "stopLoss": normalized.get("stopLoss") if normalized.get("stopLoss") is not None else raw.get("stopLoss"),
+        "target1": normalized.get("target1") if normalized.get("target1") is not None else raw.get("target1"),
+        "target2": normalized.get("target2") if normalized.get("target2") is not None else raw.get("target2"),
+        "approxQty": normalized.get("approxQty") or raw.get("approxQty") or 0,
+        "deployedCapital": normalized.get("deployedCapital") or raw.get("deployedCapital") or 0,
+        "riskPerShare": normalized.get("riskPerShare") or raw.get("riskPerShare"),
+        "outcome": outcome,
+        "currentPrice": current,
+        "source": normalized.get("source") or raw.get("source"),
+    }
+
+
+def _load_canonical_intraday_picks(for_date: date) -> tuple[list[dict[str, Any]], bool, str]:
+    """Same symbol universe as Swing Book / forensic / live trade-outcomes.
+
+    Returns (picks, is_mock, symbol_source).
+    """
+    from .eod_engine.ingestion import load_day_picks
+
+    day = load_day_picks(for_date)
+    canonical = [
+        _pick_from_canonical(p)
+        for p in (day.get("picks") or [])
+        if isinstance(p, dict) and p.get("symbol")
+    ]
+    if canonical:
+        sources = sorted({
+            str(p.get("source") or "desk")
+            for p in (day.get("picks") or [])
+            if isinstance(p, dict) and p.get("source")
+        }) or ["desk"]
+        return canonical, False, "+".join(sources)
+
+    # Legacy: archive map only (already covered by load_day_picks, but keep explicit fallback)
+    archive = load_archive(for_date)
+    archived = list((archive.get("intradayPicks") or {}).values())
+    archived = [p for p in archived if isinstance(p, dict) and p.get("symbol")]
+    if archived:
+        return archived, False, "eod_archive"
+
+    return _generate_mock_intraday_picks(), True, "mock"
+
+
 def _apply_scorecard_to_leg(
     pick: dict[str, Any],
     card: dict[str, Any],
@@ -403,19 +461,22 @@ def generate_intraday_eod_report(
     """Build intraday Book P&L. Serves per-day JSON cache unless force=True."""
     from .eod_book_cache import load_book_cache, save_book_cache
 
+    picks, is_mock, symbol_source = _load_canonical_intraday_picks(for_date)
+
     if not force:
         cached = load_book_cache(for_date, "intraday")
         if cached is not None:
-            return cached
+            # Stale mock cache must not hide a real locked basket.
+            if cached.get("isMock") and picks and not is_mock:
+                log.info(
+                    "Ignoring mock book_intraday cache for %s — real desk picks present (%s)",
+                    for_date.isoformat(),
+                    symbol_source,
+                )
+            else:
+                return cached
 
-    archive = load_archive(for_date)
-    picks = list((archive.get("intradayPicks") or {}).values())
     scorecards = _load_scorecard_by_ticker(for_date)
-
-    is_mock = False
-    if not picks:
-        picks = _generate_mock_intraday_picks()
-        is_mock = True
 
     rows = []
     total_pnl = 0.0
@@ -475,6 +536,7 @@ def generate_intraday_eod_report(
             "pnlPct": pnl_pct,
             "missAnalysis": None,
             "missDiagnostic": diagnostic,
+            "pickSource": pick.get("source") or symbol_source,
         })
 
     remaining_capital = capital + total_pnl
@@ -493,6 +555,7 @@ def generate_intraday_eod_report(
         "hitCount": hit_rows,
         "missScorecardCoverage": scored,
         "isMock": is_mock,
+        "symbolSource": symbol_source,
         "trades": rows,
     }
     return save_book_cache(for_date, "intraday", report)
