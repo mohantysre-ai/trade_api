@@ -1,4 +1,7 @@
-"""Intraday session engine — Asset Metrics command center (manual execution only).
+"""Intraday session engine — Asset Metrics command center.
+
+Desk automation may auto-commit after morning pre-work. Broker orders are never
+placed by this module (executionPolicy remains advisory / manual-broker).
 
 Funnel: Nifty 500 → regime → multi-factor score →
   10 LONG + 10 SHORT candidate pool (20) →
@@ -1412,13 +1415,33 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
 
 
 def commit_session(force: bool = False) -> dict[str, Any]:
-    """Lock high-probability 5 BUY + 5 SELL from the 10+10 candidate pool."""
+    """Lock high-probability 5 BUY + 5 SELL from the 10+10 candidate pool.
+
+    Daily rotation: a locked basket from a prior IST sessionDate is stale and
+    force-rebuilt irrespective of P&L (mirrors swing_session).
+    """
     existing = load_session()
+    today = _ist_now().strftime("%Y-%m-%d")
+    existing_date = str(existing.get("sessionDate") or "").strip()[:10]
+    stale_day = bool(
+        existing.get("locked")
+        and existing_date
+        and existing_date != today
+    )
+    if stale_day and not force:
+        log.info(
+            "Intraday sessionDate %s != today %s — forcing daily rotate",
+            existing_date,
+            today,
+        )
+        force = True
+
     if existing.get("locked") and not force:
         return {
             "success": False,
             "error": "SESSION BASKET LOCKED — symbols immutable. Pass force=true only to rebuild after explicit unlock.",
             "session": existing,
+            "alreadyLocked": True,
         }
 
     candidates = generate_candidates()
@@ -1565,7 +1588,22 @@ def commit_session(force: bool = False) -> dict[str, Any]:
     }
     _atomic_write(_FIXED_PLAN_FILE, plan)
     session["fixedPlanSynced"] = True
+    session["rotation"] = "DAILY"
+    if stale_day:
+        session["priorSessionDate"] = existing_date
+        session["rotated"] = True
     return session
+
+
+def ensure_intraday_session_locked() -> dict[str, Any]:
+    """Idempotent lock — rotates automatically when sessionDate != IST today."""
+    existing = load_session()
+    today = _ist_now().strftime("%Y-%m-%d")
+    existing_date = str(existing.get("sessionDate") or "").strip()[:10]
+    if existing.get("locked") and existing_date == today and (existing.get("long") or []):
+        return existing
+    return commit_session(force=bool(existing.get("locked") and existing_date != today))
+
 
 def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict[str, Any] | None = None) -> dict[str, Any]:
     """Update LTP/PnL/distances; never mutate symbol or CLOSED→open."""
@@ -1639,14 +1677,41 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
             status = "TARGET 2 HIT"
         elif hit == "t1":
             status = "TARGET 1 HIT"
-    # Approaching flags (attention strip) — factual distance only
+    # Prefer authoritative live-prices close flags (do not re-open)
+    if live_row:
+        live_st = str(live_row.get("status") or "").upper()
+        if live_row.get("closed") or live_st == "CLOSED":
+            out["closed"] = True
+            status = "CLOSED" if status == "RUNNING" else status
+        elif live_st == "SESSION CLOSED":
+            status = "SESSION CLOSED"
+        elif live_st == "STOP LOSS HIT":
+            status = "STOP LOSS HIT"
+            out["closed"] = True
+    # Approaching flags (attention strip) — factual distance only; session hours only
     if status == "RUNNING" and out.get("distToSlPct") is not None and out["distToSlPct"] <= 0.4:
         status = "SL APPROACHING"
     elif status == "RUNNING" and out.get("distToT1Pct") is not None and out["distToT1Pct"] <= 0.4:
         status = "TARGET APPROACHING"
 
+    # After 15:30 IST: open names are session-closed (close mark), not still RUNNING
+    try:
+        from .trade_outcome import _is_after_market_close
+
+        session_closed = _is_after_market_close()
+    except Exception:
+        session_closed = False
+    if session_closed and status in (
+        "RUNNING",
+        "SL APPROACHING",
+        "TARGET APPROACHING",
+    ):
+        status = "SESSION CLOSED"
+    elif session_closed and status == "DATA STALE" and ltp is not None:
+        status = "SESSION CLOSED"
+
     if out.get("closed"):
-        status = "CLOSED"
+        status = "CLOSED" if status not in ("STOP LOSS HIT", "TARGET 1 HIT", "TARGET 2 HIT") else status
     out["status"] = status
     return out
 
@@ -1735,7 +1800,15 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
     attention: list[dict[str, Any]] = []
     for r in long_rows + short_rows:
         st = str(r.get("status") or "")
-        if st in ("SL APPROACHING", "TARGET APPROACHING", "DATA STALE", "STOP LOSS HIT", "TARGET 1 HIT", "TARGET 2 HIT"):
+        if st in (
+            "SL APPROACHING",
+            "TARGET APPROACHING",
+            "DATA STALE",
+            "STOP LOSS HIT",
+            "TARGET 1 HIT",
+            "TARGET 2 HIT",
+            "SESSION CLOSED",
+        ):
             attention.append({
                 "symbol": r.get("symbol"),
                 "direction": r.get("direction"),

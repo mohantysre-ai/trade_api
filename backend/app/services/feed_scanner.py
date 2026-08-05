@@ -36,7 +36,10 @@ STOP / TARGET / BREAKEVEN ("cost to cost"):
   see the bottom of this file for how they connect.
 """
 
+from __future__ import annotations
+
 import json
+import os
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -48,6 +51,24 @@ BREAKOUT_TOLERANCE = 0.999        # allow LTP within 0.1% of the 15m high (not j
 BREAKDOWN_TOLERANCE = 0.999       # LTP must be at least 0.1% BELOW 15m EMA50 for a real breakdown
 TARGET_R_MULTIPLE = 2.0
 TARGET_R_MULTIPLE_SHORT = 2.5    # shorts tend to move faster — wider target for better R:R
+# Desk floor — align with intradAy INTRADAY_MIN_PRICE; blocks pennies / DVRs on ScanX swing path
+SWING_MIN_PRICE = float(os.environ.get("SWING_MIN_PRICE", "50"))
+
+
+def is_swing_desk_eligible(symbol: str, ltp: float | None) -> bool:
+    """Hard gates for swing / ScanX: min price + reject differential voting rights."""
+    sym = (symbol or "").upper().strip()
+    if not sym:
+        return False
+    if sym.endswith("DVR"):
+        return False
+    if ltp is None:
+        return False
+    try:
+        price = float(ltp)
+    except (TypeError, ValueError):
+        return False
+    return price >= SWING_MIN_PRICE
 
 
 @dataclass
@@ -84,12 +105,15 @@ def _safe(stock, *keys):
 
 
 def evaluate_stock(stock: dict, direction: str = "LONG") -> Optional[ScanResult]:
+    symbol = str(stock.get("Sym") or "").upper().strip()
     req = _safe(stock, "Ltp", "Open", "DayRSI14CurrentCandle", "DaySMA50CurrentCandle",
                 "Min15HighCurrentCandle", "Min15EMA50CurrentCandle",
                 "Min5EMA50CurrentCandle", "DayATR14CurrentCandleMul_2")
     if req is None:
         return None
     ltp, open_, rsi, sma50, m15_high, m15_ema50, m5_ema50, atr2 = req
+    if not is_swing_desk_eligible(symbol, ltp):
+        return None
     atr = atr2 / 2
     if atr <= 0:
         return None
@@ -114,6 +138,7 @@ def evaluate_stock(stock: dict, direction: str = "LONG") -> Optional[ScanResult]
             f"LTP {ltp:.2f} at/above 15m high {m15_high:.2f}",
             f"Above 5m EMA50 ({m5_ema50:.2f}) and 15m EMA50 ({m15_ema50:.2f})",
             f"Above daily SMA50 ({sma50:.2f})",
+            f"LTP >= desk floor {SWING_MIN_PRICE:.0f}",
         ]
         if delivery_pct is not None:
             reasons.append(f"Delivery {delivery_pct:.1f}% >= {MIN_DELIVERY_PCT}%")
@@ -148,6 +173,7 @@ def evaluate_stock(stock: dict, direction: str = "LONG") -> Optional[ScanResult]
             f"Below 5m EMA50 ({m5_ema50:.2f}) and 15m EMA50",
             f"Below daily SMA50 ({sma50:.2f})",
             f"Down {price_chg:.2f}% on the day (confirmed selling)",
+            f"LTP >= desk floor {SWING_MIN_PRICE:.0f}",
         ]
         if delivery_pct is not None:
             reasons.append(f"Delivery {delivery_pct:.1f}% >= {MIN_DELIVERY_PCT}%")
@@ -164,7 +190,7 @@ def evaluate_stock(stock: dict, direction: str = "LONG") -> Optional[ScanResult]
         return None
 
     return ScanResult(
-        symbol=stock.get("Sym", "?"),
+        symbol=symbol or stock.get("Sym", "?"),
         name=stock.get("DispSym", "?"),
         direction=direction,
         entry=round(entry, 2),

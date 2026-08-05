@@ -348,6 +348,7 @@ function statusTone(status?: string): string {
   if (s.includes('STOP') || s === 'CLOSED') return 'desk-pill--danger';
   if (s.includes('DATA STALE')) return 'desk-pill--warn';
   if (s.includes('SL APPROACHING')) return 'desk-pill--warn';
+  if (s.includes('SESSION CLOSED') || s.includes('NOT TRIGGERED')) return 'desk-pill--muted';
   if (s.includes('TARGET')) return 'desk-pill--ok';
   if (s === 'RUNNING') return 'desk-pill--strong';
   return 'desk-pill--muted';
@@ -370,7 +371,7 @@ function buildLivePricesBanner(lp: LivePricesResponse | null, clock: string): st
 
   const parts: string[] = ['MONITOR'];
 
-  if (lp.sessionClosed === true) parts.push('poll halted (session closed)');
+  if (lp.sessionClosed === true) parts.push('poll ~10s (market closed · close marks)');
   else if (lp.marketOpen === true) parts.push('poll active (market open)');
   else if (lp.marketOpen === false) parts.push('poll active (market closed)');
   else parts.push('poll —');
@@ -615,7 +616,12 @@ function PositionTable({
 
 /* ── Main panel ─────────────────────────────────────────────────────── */
 
-export default function AssetMetricsPanel() {
+export default function AssetMetricsPanel({
+  refreshToken = 0,
+}: {
+  /** Bumped by top desk Refresh — reloads session / candidates / prices. */
+  refreshToken?: number;
+}) {
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [candidates, setCandidates] = useState<CandidatesResponse | null>(null);
   const [livePrices, setLivePrices] = useState<LivePricesResponse | null>(null);
@@ -692,9 +698,17 @@ export default function AssetMetricsPanel() {
   }, [loadSession, loadCandidates, loadLivePrices]);
 
   useEffect(() => {
+    if (!refreshToken) return;
+    void loadSession();
+    void loadCandidates();
+    void loadLivePrices();
+    void loadResearch();
+  }, [refreshToken, loadSession, loadCandidates, loadLivePrices, loadResearch]);
+
+  useEffect(() => {
     const marketOpen = livePrices?.marketOpen ?? session?.marketOpen;
     const closed = livePrices?.sessionClosed ?? session?.sessionClosed;
-    const ms = closed === true ? 15_000 : marketOpen === true ? 2_000 : 5_000;
+    const ms = closed === true ? 10_000 : marketOpen === true ? 2_000 : 5_000;
     const id = window.setInterval(() => {
       void loadSession();
       void loadLivePrices();
@@ -821,17 +835,6 @@ export default function AssetMetricsPanel() {
                   : `Adopt ${basketSize}+${basketSize} from ${candidatePoolSize}+${candidatePoolSize}`}
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => {
-                void loadSession();
-                void loadCandidates();
-                void loadLivePrices();
-              }}
-              className="desk-btn-ghost"
-            >
-              Refresh
-            </button>
           </div>
         </div>
 

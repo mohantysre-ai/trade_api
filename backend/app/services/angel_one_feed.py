@@ -108,6 +108,9 @@ LLM_UNIVERSE_LIMIT = int(os.getenv("LLM_UNIVERSE_LIMIT", "30"))
 # Reused during on-demand refresh for fresh intraday metrics (INTRADAY_METRICS_TTL) and AI output (AI_CACHE_TTL).
 INTRADAY_METRICS_TTL_SECONDS = int(os.getenv("INTRADAY_METRICS_TTL_SECONDS", "600"))
 AI_CACHE_TTL_SECONDS = int(os.getenv("AI_CACHE_TTL_SECONDS", "900"))
+# After morning pre-work (or any successful LLM pass), reuse TI for the IST day
+# unless forceLlmRefresh=true. Live Angel/Yahoo/RSS still refresh every cycle.
+MARKET_PREWORK_STAMP_PATH = BASE_DIR.parent / "data" / "morning_prework_stamp.json"
 # Angel historical (getCandleData) rate-limits hard (AB1021). Keep workers low.
 INTRADAY_FETCH_WORKERS = int(os.getenv("INTRADAY_FETCH_WORKERS", "2"))
 NIFTY_100_LABEL = "Nifty 100"
@@ -130,14 +133,15 @@ AI_NEWS_API_URL = os.getenv("AI_NEWS_API_URL", "http://127.0.0.1:8001")
 # =============================================================================
 
 SYSTEM_PROMPT = """
-You are a Safety Risk Auditor.
+You are a senior investment banking / sell-side risk auditor and large-portfolio PM
+with 20+ years managing institutional books. Capital preservation first.
 
-You are NOT a stock selector.
+You are NOT a stock selector / ranker.
 
 You must never:
 
 - rank stocks
-- score stocks
+- score stocks for alpha
 - evaluate technical indicators
 - analyze momentum
 - infer chart patterns
@@ -165,6 +169,8 @@ REJECT only for:
 - regulatory actions
 - court decisions
 - corporate actions causing binary gaps
+
+Also return deskDecision APPROVE|REJECT matching verdict, plus a one-line deskIcNote.
 
 Return JSON only.
 """
@@ -395,20 +401,229 @@ def _top_ledger_tickers(snapshot: dict[str, Any] | None, limit: int = LLM_DISPLA
     return [str(row.get("ticker")).upper() for row in ledger[:limit] if row.get("ticker")]
 
 
-def _ai_cache_fresh(snapshot: dict[str, Any] | None, top_tickers: list[str]) -> bool:
-    """True when snapshot terminal intelligence + news summary can be reused for the same top-N set."""
+def _ist_today() -> str:
+    return _ist_now().date().isoformat()
+
+
+def _llm_locked_for_today(snapshot: dict[str, Any] | None) -> bool:
+    """True when terminal intelligence was locked for today's IST session."""
+    if not snapshot:
+        return False
+    locked = str(snapshot.get("llmLockedForDate") or "").strip()[:10]
+    return bool(locked) and locked == _ist_today()
+
+
+def _ai_payload_reusable(snapshot: dict[str, Any] | None) -> bool:
     if not snapshot:
         return False
     existing_ti = snapshot.get("terminalIntelligence")
     existing_summary = snapshot.get("newsSummary")
-    if not existing_ti or existing_ti.get("llmError") or not existing_summary:
+    return bool(existing_ti) and not existing_ti.get("llmError") and bool(existing_summary)
+
+
+def _ai_cache_fresh(snapshot: dict[str, Any] | None, top_tickers: list[str]) -> bool:
+    """True when snapshot terminal intelligence + news summary can be reused.
+
+    Day-lock: once llmLockedForDate == today IST, skip LLM for the rest of the session
+    (external quotes/candles/macro/news still refresh). Override with forceLlmRefresh.
+    Pre-lock fallback: 15m TTL + identical top-N set.
+    """
+    if not _ai_payload_reusable(snapshot):
         return False
+    if _llm_locked_for_today(snapshot):
+        return True
     age = _snapshot_age_seconds(snapshot)
     if age is None or age > AI_CACHE_TTL_SECONDS:
         return False
     cached = _top_ledger_tickers(snapshot, LLM_DISPLAY_COUNT)
     wanted = [str(t).upper() for t in top_tickers[:LLM_DISPLAY_COUNT]]
     return bool(cached) and cached == wanted
+
+
+def _stamp_llm_lock(payload: dict[str, Any], *, locked: bool = True) -> dict[str, Any]:
+    if locked:
+        payload["llmLockedForDate"] = _ist_today()
+    return payload
+
+
+def _load_morning_prework_stamp() -> dict[str, Any]:
+    try:
+        raw = json.loads(MARKET_PREWORK_STAMP_PATH.read_text(encoding="utf-8"))
+        return raw if isinstance(raw, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_morning_prework_stamp(stamp: dict[str, Any]) -> None:
+    try:
+        MARKET_PREWORK_STAMP_PATH.parent.mkdir(parents=True, exist_ok=True)
+        MARKET_PREWORK_STAMP_PATH.write_text(json.dumps(stamp, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def morning_prework_done_today() -> bool:
+    today = _ist_today()
+    stamp = _load_morning_prework_stamp()
+    if str(stamp.get("date") or "") == today and str(stamp.get("status") or "") == "done":
+        return True
+    snapshot = _load_last_snapshot()
+    return _llm_locked_for_today(snapshot) and _ai_payload_reusable(snapshot)
+
+
+def run_scheduled_morning_prework(*, force: bool = False) -> dict[str, Any]:
+    """Once-per-day post-10:00 IST pre-work: live Angel refresh + LLM, then day-lock AI.
+
+    Subsequent on-demand refreshes keep external API calls live but reuse LLM output
+    unless forceLlmRefresh=true.
+    """
+    today = _ist_today()
+    if not force and morning_prework_done_today():
+        return {
+            "success": True,
+            "skipped": True,
+            "reason": "morning_prework_already_done",
+            "date": today,
+            "llm_locked": True,
+        }
+
+    _save_morning_prework_stamp(
+        {
+            "date": today,
+            "status": "running",
+            "startedAt": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    log = logging.getLogger(__name__)
+    pool = (os.getenv("MARKET_PREWORK_POOL") or NIFTY_500_LABEL).strip() or NIFTY_500_LABEL
+    refresh_ticker_news = os.getenv("MARKET_PREWORK_TICKER_NEWS", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+    try:
+        client = AngelOneClient()
+        payload = build_market_payload(
+            client,
+            pool_name=pool,
+            force_refresh=True,
+            prefer_cache=False,
+            allow_fallback=True,
+            force_llm_refresh=True,
+        )
+        if not payload.get("success", False):
+            err = str(payload.get("error") or "Morning pre-work produced no payload.")
+            _save_morning_prework_stamp(
+                {
+                    "date": today,
+                    "status": "error",
+                    "error": err,
+                    "finishedAt": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            return {"success": False, "date": today, "error": err, "llm_locked": False}
+
+        if refresh_ticker_news:
+            try:
+                asyncio.run(_refresh_ticker_news_for_payload(payload))
+            except Exception as news_exc:
+                log.warning("Morning pre-work ticker news failed: %s", news_exc)
+
+        ti = payload.get("terminalIntelligence") or {}
+        llm_ok = bool(ti) and not ti.get("llmError") and bool(payload.get("newsSummary"))
+        if llm_ok:
+            _stamp_llm_lock(payload, locked=True)
+        payload.setdefault("selectionMeta", {})
+        if isinstance(payload.get("selectionMeta"), dict):
+            payload["selectionMeta"]["mode"] = "live"
+            payload["selectionMeta"]["reason"] = (
+                "Scheduled morning pre-work after 10:00 IST; LLM locked for the session."
+            )
+            payload["selectionMeta"]["dataDate"] = today
+        _save_last_snapshot(payload)
+        _save_morning_prework_stamp(
+            {
+                "date": today,
+                "status": "done" if llm_ok else "partial",
+                "pool": pool,
+                "llm_locked": llm_ok,
+                "finishedAt": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        log.info(
+            "Morning pre-work finished: date=%s pool=%s llm_locked=%s",
+            today,
+            pool,
+            llm_ok,
+        )
+        return {
+            "success": True,
+            "skipped": False,
+            "date": today,
+            "pool": pool,
+            "llm_locked": llm_ok,
+            "universeSize": payload.get("universeSize"),
+            "volumeScreenedCount": payload.get("volumeScreenedCount"),
+        }
+    except Exception as exc:
+        log.exception("Morning pre-work failed: %s", exc)
+        _save_morning_prework_stamp(
+            {
+                "date": today,
+                "status": "error",
+                "error": str(exc),
+                "finishedAt": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        return {"success": False, "date": today, "error": str(exc), "llm_locked": False}
+
+
+def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dict[str, Any]:
+    """Live Angel/Yahoo/RSS refresh with LLM day-lock reuse (no force LLM)."""
+    log = logging.getLogger(__name__)
+    pool = (os.getenv("MARKET_PREWORK_POOL") or NIFTY_500_LABEL).strip() or NIFTY_500_LABEL
+    try:
+        prior = _load_last_snapshot()
+        client = AngelOneClient()
+        payload = build_market_payload(
+            client,
+            pool_name=pool,
+            force_refresh=True,
+            prefer_cache=False,
+            allow_fallback=True,
+            force_llm_refresh=False,
+        )
+        if not payload.get("success", False):
+            return {
+                "success": False,
+                "error": payload.get("error") or "Live refresh produced no payload.",
+                "reason": reason,
+            }
+        if prior and prior.get("llmLockedForDate") and not payload.get("llmLockedForDate"):
+            payload["llmLockedForDate"] = prior.get("llmLockedForDate")
+        payload.setdefault("selectionMeta", {})
+        if isinstance(payload.get("selectionMeta"), dict):
+            payload["selectionMeta"]["mode"] = "live"
+            payload["selectionMeta"]["reason"] = f"Scheduled live refresh ({reason}); LLM day-locked."
+        _save_last_snapshot(payload)
+        reused = _llm_locked_for_today(payload) or (
+            bool(prior)
+            and _ai_payload_reusable(prior)
+            and str(payload.get("llmLockedForDate") or "") == _ist_today()
+        )
+        log.info("Scheduled live refresh done reason=%s llm_reused=%s", reason, reused)
+        return {
+            "success": True,
+            "reason": reason,
+            "pool": pool,
+            "llm_reused": reused,
+            "llmLockedForDate": payload.get("llmLockedForDate"),
+            "universeSize": payload.get("universeSize"),
+        }
+    except Exception as exc:
+        log.exception("Scheduled live refresh failed: %s", exc)
+        return {"success": False, "error": str(exc), "reason": reason}
 
 
 _thread_local_angel_client = threading.local()
@@ -1184,10 +1399,37 @@ def _save_last_snapshot(payload: dict[str, Any]) -> None:
         pass
 
 
+def refresh_fixed_plan_close_marks(*, force: bool = True) -> dict[str, Any]:
+    """Rewrite last_market_snapshot.json with fresh Angel LTPs for every plan ticker.
+
+    Used post-close (and on demand) so INTRADAY/EOD polls see closing prints
+    instead of a frozen pre-15:30 snapshot. Does not invent prices.
+    """
+    global _FIXED_PLAN_QUOTE_CACHE
+    if force:
+        _FIXED_PLAN_QUOTE_CACHE = {}
+    payload = _load_last_snapshot() or {
+        "stockQuotes": {},
+        "updatedAt": datetime.now(tz=timezone.utc).isoformat(),
+        "activePool": "Fixed Plan",
+    }
+    payload = _enrich_snapshot_with_fixed_plan(payload)
+    payload["updatedAt"] = datetime.now(tz=timezone.utc).isoformat()
+    payload["closeMarksRefreshedAt"] = payload["updatedAt"]
+    try:
+        _snapshot_path().write_text(json.dumps(_normalize_snapshot(payload), indent=2), encoding="utf-8")
+    except Exception as exc:
+        log.warning("close-marks snapshot write failed: %s", exc)
+        return {"ok": False, "error": str(exc)}
+    n = len(payload.get("stockQuotes") or {})
+    log.info("Fixed-plan close marks refreshed · stockQuotes=%s", n)
+    return {"ok": True, "quoteCount": n, "updatedAt": payload["updatedAt"]}
+
+
 # Cache so a single refresh (which may call _save_last_snapshot multiple times)
 # only resolves fixed-plan quotes once; TTL also caps background saves.
 _FIXED_PLAN_QUOTE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
-_FIXED_PLAN_QUOTE_TTL = 300  # seconds
+_FIXED_PLAN_QUOTE_TTL = 60  # seconds — keep plan LTPs fresh for INTRADAY/EOD polls
 _FIXED_PLAN_CLIENT: "AngelOneClient | None" = None
 
 
@@ -2503,7 +2745,7 @@ def _execute_llm_risk_audit(
         f"Tickers to audit (top {LLM_DISPLAY_COUNT} BUY candidates):\n{ticker_json}\n\n"
         f"News/Event context:\n{news_context}\n\n"
         "Return a valid JSON object matching this structure exactly:\n"
-        "{\"audits\": {\"TICKER_SYMBOL\": {\"risk_flags\": [\"Reason text (Source: name, Timestamp: iso)\"], \"verdict\": \"APPROVE or REJECT\"}}}"
+        "{\"audits\": {\"TICKER_SYMBOL\": {\"risk_flags\": [\"Reason text (Source: name, Timestamp: iso)\"], \"verdict\": \"APPROVE or REJECT\", \"deskDecision\": \"APPROVE or REJECT\", \"deskIcNote\": \"one terse desk sentence\"}}}"
     )
 
     # Retry logic: try full timeout first (up to 5 mins), then a quick retry
@@ -2572,6 +2814,15 @@ def _execute_llm_risk_audit(
                 audit = audits.get(ticker, {"risk_flags": [], "verdict": "APPROVE"})
                 stock["risk_flags"] = audit.get("risk_flags", []) or ["None"]
                 stock["verdict"] = audit.get("verdict", "APPROVE")
+                desk_decision = str(audit.get("deskDecision") or stock["verdict"] or "APPROVE").upper()
+                if desk_decision not in ("APPROVE", "REJECT", "HOLD_FOR_DATA"):
+                    desk_decision = str(stock["verdict"] or "APPROVE").upper()
+                stock["deskIcSummary"] = {
+                    "deskDecision": desk_decision,
+                    "conviction": None,
+                    "oneLiner": str(audit.get("deskIcNote") or "")[:280] or None,
+                    "source": "risk_audit",
+                }
                 audited_by_ticker[ticker] = stock
             break
 
@@ -2978,6 +3229,7 @@ def _build_payload_from_live_data(
     top_llm_tickers = [row["ticker"] for row in top_ranked[:LLM_DISPLAY_COUNT]]
     can_reuse_ai = not force_llm_refresh and _ai_cache_fresh(snapshot, top_llm_tickers)
 
+    reused_llm = False
     if can_reuse_ai:
         verdict_by_ticker = {
             str(row.get("ticker")).upper(): row
@@ -3001,11 +3253,35 @@ def _build_payload_from_live_data(
         top_rows = final_audited[:_TI_TOP_SELECTION_COUNT]
         terminal_intel = existing_ti
         news_summary = existing_summary
+        reused_llm = True
+        desk_ic_map = (
+            snapshot.get("deskIcByTicker")
+            if isinstance(snapshot.get("deskIcByTicker"), dict)
+            else {}
+        )
         _log = logging.getLogger(__name__)
-        _log.info("Reusing snapshot terminalIntelligence/newsSummary for unchanged top-%d set", LLM_DISPLAY_COUNT)
+        _log.info(
+            "Reusing snapshot terminalIntelligence/newsSummary (day-lock=%s top-%d)",
+            _llm_locked_for_today(snapshot),
+            LLM_DISPLAY_COUNT,
+        )
     else:
         progress(f"Running LLM risk audit on top {LLM_DISPLAY_COUNT}...")
         final_audited = _execute_llm_risk_audit(top_ranked, news_items)
+        try:
+            from .desk_ic_criteria import batch_desk_ic_for_stocks
+
+            progress(f"Running Desk IC criteria on top {LLM_DISPLAY_COUNT}...")
+            desk_ic_map = batch_desk_ic_for_stocks(
+                final_audited[:LLM_DISPLAY_COUNT],
+                news_by_ticker=existing_ticker_news or {},
+                # Refresh path: deterministic FactPack (incl. risk verdict). Drawer /api/desk-ic uses LLM.
+                use_llm=False,
+                limit=LLM_DISPLAY_COUNT,
+            )
+        except Exception as desk_exc:
+            logging.getLogger(__name__).warning("Desk IC batch failed: %s", desk_exc)
+            desk_ic_map = {}
         progress("Building terminal intelligence...")
         ledger_rows = build_audit_ledger([s for s in final_audited if s.get("ticker") in top_llm_tickers])
         _log = logging.getLogger(__name__)
@@ -3052,8 +3328,14 @@ def _build_payload_from_live_data(
         "terminalIntelligence": terminal_intel,
         "tickerIntelligenceByTicker": {},
         "tickerNewsByTicker": existing_ticker_news or {},
+        "deskIcByTicker": desk_ic_map if isinstance(desk_ic_map, dict) else {},
         "isSnapshotFallback": False,
     }
+    # Day-lock: carry prior lock on reuse; stamp lock after a successful fresh LLM pass.
+    if reused_llm and snapshot and snapshot.get("llmLockedForDate"):
+        payload["llmLockedForDate"] = snapshot.get("llmLockedForDate")
+    elif not reused_llm and terminal_intel and not terminal_intel.get("llmError") and news_summary:
+        _stamp_llm_lock(payload, locked=True)
 
     progress("Fetching Dhan swing picks...")
     payload = _hydrate_dhan_swing_picks(payload, force=True)
@@ -3075,7 +3357,7 @@ def build_market_payload(
     custom_prompt: str | None = None,
     allow_fallback: bool = True, # If live fetch fails, allow falling back to snapshot
     prefer_cache: bool = False, # If true, try cache first, then live if cache is empty/stale
-    force_llm_refresh: bool = False, # When false, reuse snapshot AI if top-10 set unchanged
+    force_llm_refresh: bool = False,  # When false, reuse day-locked / TTL-fresh snapshot AI
     on_progress: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     snapshot = _load_last_snapshot()
@@ -3265,7 +3547,8 @@ def create_app() -> FastAPI:
                 "name": stock.get("name"),
                 "alpha_score": stock.get("alpha_score", 0.0),
                 "verdict": stock.get("verdict", "APPROVE"),
-                "risk_flags": stock.get("risk_flags", ["None"])
+                "risk_flags": stock.get("risk_flags", ["None"]),
+                "deskIcSummary": stock.get("deskIcSummary"),
             })
             
         return {
@@ -3274,6 +3557,32 @@ def create_app() -> FastAPI:
             "count": len(verdicts),
             "verdicts": verdicts
         }
+
+    @app.get("/api/desk-ic")
+    def desk_ic(ticker: str = "", force: bool = False) -> dict[str, Any]:
+        """Fact-grounded Desk IC criteria (senior IB checklist) for one ticker."""
+        sym = (ticker or "").strip().upper()
+        if not sym:
+            raise HTTPException(status_code=400, detail="Missing required parameter: ticker")
+        snapshot = _load_last_snapshot() or {}
+        try:
+            from .desk_ic_criteria import evaluate_and_cache_ticker
+
+            result = evaluate_and_cache_ticker(
+                snapshot,
+                sym,
+                use_llm=True,
+                force=force,
+            )
+            # Persist cache when we evaluated fresh
+            if snapshot:
+                try:
+                    _save_last_snapshot(snapshot)
+                except Exception:
+                    pass
+            return {"success": True, "ticker": sym, "deskIc": result}
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     @app.get("/api/intraday-matrix")
     def intraday_matrix() -> dict[str, Any]:
@@ -3374,10 +3683,9 @@ def create_app() -> FastAPI:
     def live_prices() -> dict[str, Any]:
         """Prices + outcomes for fixed-plan symbols (monitor poll).
 
-        Primary source: last_market_snapshot.json (Angel One batch).
-        When the NSE session is open, missing/stale LTPs may be supplemented via
-        Yahoo Finance — see response.ltpSourceMix / priceSourcesNote. Never claims
-        tick-live or "no external APIs".
+        On trading days (session + post-close), every plan ticker is refreshed via
+        Angel One ltpData and/or Yahoo last print; snapshot fills the rest.
+        See response.ltpSourceMix / priceSourcesNote. Never claims tick-live.
         """
         try:
             from .trade_outcome import get_live_prices_for_plan
@@ -3409,7 +3717,8 @@ def create_app() -> FastAPI:
     def intraday_session_commit(force: bool = False) -> dict[str, Any]:
         """Lock intradAy basket (default 10L+10S) + auto-lock swing portfolio for EOD.
 
-        Manual execution only — no broker orders. Symbols immutable until force unlock.
+        Manual-broker only — no broker orders. Desk automation may auto-commit after pre-work.
+        Symbols immutable until force unlock.
         """
         try:
             from .intraday_session_engine import commit_session
@@ -3423,18 +3732,17 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.get("/api/swing-session")
-    def swing_session_get() -> dict[str, Any]:
-        """Return locked swing portfolio used by Swing Book / EOD."""
+    def swing_session_get(live: bool = False) -> dict[str, Any]:
+        """Return locked swing portfolio; live=1 enriches LTP/Δ only (symbols fixed)."""
         try:
-            from .swing_session import load_swing_session
-            session = load_swing_session()
-            return session or {"locked": False, "long": [], "short": [], "counts": {"total": 0}}
+            from .swing_session import get_swing_session
+            return get_swing_session(live=live)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.post("/api/swing-session/lock")
     def swing_session_lock(force: bool = False) -> dict[str, Any]:
-        """Lock current dhanSwingPicks into swing_session.json for EOD."""
+        """Lock Asset Matrix BUY set into swing_session.json for EOD."""
         try:
             from .swing_session import lock_swing_session
             result = lock_swing_session(force=force)
@@ -3476,7 +3784,12 @@ def create_app() -> FastAPI:
         try:
             from datetime import date as _date
             from .eod_intraday_report import generate_intraday_eod_report
-            for_date = _date.fromisoformat(date) if date else _date.today()
+            from datetime import datetime as _dt
+            for_date = (
+                _date.fromisoformat(date)
+                if date
+                else _dt.now(tz=IST_ZONE).date()
+            )
             return generate_intraday_eod_report(for_date, force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -3645,6 +3958,54 @@ def create_app() -> FastAPI:
         if status["status"] == "done" and status.get("result"):
             response["result"] = status["result"]
         return response
+
+    @app.get("/api/morning-prework/status")
+    def morning_prework_status() -> dict[str, Any]:
+        """IST morning pre-work stamp + whether LLM is day-locked."""
+        stamp = _load_morning_prework_stamp()
+        snapshot = _load_last_snapshot()
+        today = _ist_today()
+        scheduler_started = False
+        desk = {}
+        try:
+            from .eod_engine import scheduler as _desk_sched
+
+            scheduler_started = bool(_desk_sched._STARTED)
+            desk = _desk_sched.desk_automation_status()
+        except Exception:
+            scheduler_started = False
+        return {
+            "success": True,
+            "date": today,
+            "enabled": os.getenv("MARKET_PREWORK_ENABLED", "1").strip().lower()
+            not in ("0", "false", "no", "off"),
+            "preworkHour": int(os.getenv("MARKET_PREWORK_HOUR", "10")),
+            "preworkMinute": int(os.getenv("MARKET_PREWORK_MINUTE", "0")),
+            "doneToday": morning_prework_done_today(),
+            "llmLockedForDate": (snapshot or {}).get("llmLockedForDate"),
+            "llmLockedToday": _llm_locked_for_today(snapshot),
+            "schedulerStarted": scheduler_started,
+            "stamp": stamp,
+            "deskAutomation": desk,
+        }
+
+    @app.get("/api/desk-automation/status")
+    def desk_automation_status_route() -> dict[str, Any]:
+        """Full weekday automation pipeline status."""
+        try:
+            from .eod_engine.scheduler import desk_automation_status
+
+            return desk_automation_status()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.post("/api/morning-prework/run")
+    def morning_prework_run(force: bool = False) -> dict[str, Any]:
+        """Manual morning pre-work (same path as the 10:00 IST scheduler)."""
+        try:
+            return run_scheduled_morning_prework(force=force)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     @app.post("/api/refresh-data-on-demand")
     async def refresh_data_on_demand(request: Request, pool: str | None = None, prompt: str | None = None):

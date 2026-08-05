@@ -20,8 +20,14 @@ _BACKEND_DIR = os.path.dirname(_APP_DIR)
 _REPO_ROOT = os.path.dirname(_BACKEND_DIR)
 
 EOD_DATA_ROOT = os.path.join(_APP_DIR, "data", "eod")
-_FIXED_PLAN_PATH = os.path.join(_REPO_ROOT, "fixed_trade_plan.json")
-_INTRADAY_SESSION_PATH = os.path.join(_REPO_ROOT, "intraday_session.json")
+_FIXED_PLAN_PATH = os.environ.get(
+    "FIXED_PLAN_FILE",
+    os.path.join(_REPO_ROOT, "fixed_trade_plan.json"),
+)
+_INTRADAY_SESSION_PATH = os.environ.get(
+    "INTRADAY_SESSION_FILE",
+    os.path.join(_REPO_ROOT, "intraday_session.json"),
+)
 _LAST_SNAPSHOT_PATH = os.path.join(_SERVICES_DIR, "last_market_snapshot.json")
 
 
@@ -147,10 +153,11 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
     """Union locked Swing + Intraday baskets for EOD (target ~10 + 10 + 10 = 30).
 
     Sources (facts only, no invented symbols):
-      - swing_session.json (or auto-lock from dhanSwingPicks) -> book=SWING
-      - intradAy_session.json long/short -> book=INTRADAY
+      - swing_session.json (Asset Matrix BUY lock) -> book=SWING when sessionDate matches
+      - intradAy_session.json long/short -> book=INTRADAY when sessionDate matches
       - fixed_trade_plan.json only if intradAy session empty (legacy mirror)
       - eod_archive fills gaps for missing keys only
+    Stale cross-day session files are rejected for Book symbol parity.
     """
     from ..swing_session import ensure_swing_session_locked, load_swing_session
 
@@ -161,6 +168,11 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
 
     ensure_swing_session_locked()
     swing = load_swing_session()
+    day_key = for_date.isoformat()
+    swing_date = str(swing.get("sessionDate") or "").strip()[:10]
+    session_date = str(session.get("sessionDate") or "").strip()[:10]
+    swing_ok = bool(swing.get("locked") and swing_date == day_key)
+    session_ok = bool(session.get("locked") and session_date == day_key)
 
     by_key: dict[str, dict[str, Any]] = {}
 
@@ -186,15 +198,26 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
                 existing["approxQty"] = pick["approxQty"]
                 existing["deployedCapital"] = pick.get("deployedCapital")
 
-    _ingest(list(swing.get("long") or []), "swing_session", book="SWING")
-    _ingest(list(swing.get("short") or []), "swing_session", book="SWING")
+    if swing_ok:
+        _ingest(list(swing.get("long") or []), "swing_session", book="SWING")
+        _ingest(list(swing.get("short") or []), "swing_session", book="SWING")
+    elif swing.get("locked") and swing_date and swing_date != day_key:
+        log.info(
+            "Rejecting stale swing_session for Book (%s != %s) — date parity",
+            swing_date,
+            day_key,
+        )
 
-    if not any(p.get("book") == "SWING" for p in by_key.values()):
-        block = snapshot.get("dhanSwingPicks") if isinstance(snapshot.get("dhanSwingPicks"), dict) else {}
-        _ingest(list(block.get("picks") or []), "dhanSwingPicks", book="SWING")
+    # No dhanSwingPicks fallback — swing lock source is Asset Matrix only.
 
-    session_long = list(session.get("long") or [])
-    session_short = list(session.get("short") or [])
+    session_long = list(session.get("long") or []) if session_ok else []
+    session_short = list(session.get("short") or []) if session_ok else []
+    if not session_ok and session.get("locked") and session_date and session_date != day_key:
+        log.info(
+            "Rejecting stale intradAy_session for Book (%s != %s) — date parity",
+            session_date,
+            day_key,
+        )
     if session_long or session_short:
         _ingest(session_long, "intraday_session", book="INTRADAY")
         _ingest(session_short, "intraday_session", book="INTRADAY")
@@ -202,14 +225,22 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
         _ingest(list(plan.get("long") or []), "fixed_trade_plan", book="INTRADAY")
         _ingest(list(plan.get("short") or []), "fixed_trade_plan", book="INTRADAY")
 
+    # Archive fills gaps for forensic engines only — Book P&L uses locked desks.
+    # Keep archive merge for scorecards / missed-opportunity scan via load_day_picks.
     archived = archive.get("intradayPicks") or {}
     if isinstance(archived, dict):
+        locked_intra = any(p.get("book") == "INTRADAY" for p in by_key.values())
         for item in archived.values():
             if not isinstance(item, dict):
                 continue
             book = str(item.get("book") or "INTRADAY").upper()
             if book not in ("SWING", "INTRADAY"):
                 book = "INTRADAY"
+            # Do not dilute a locked intraday desk with older archive names
+            if book == "INTRADAY" and locked_intra:
+                continue
+            if book == "SWING" and swing_ok:
+                continue
             pick = _normalize_pick(item, "eod_archive", book=book)
             if not pick:
                 continue
@@ -249,6 +280,8 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
             "pickCount": len(picks),
             "swingLocked": bool(swing.get("locked")),
             "intradayLocked": bool(session.get("locked")),
+            "swingDateParity": swing_ok,
+            "intradayDateParity": session_ok,
         },
     }
 

@@ -378,26 +378,117 @@ def _pick_from_canonical(normalized: dict[str, Any]) -> dict[str, Any]:
 
 
 def _load_canonical_intraday_picks(for_date: date) -> tuple[list[dict[str, Any]], bool, str, dict[str, int]]:
-    """Intraday Book only — locked intradAy long/short (not swing).
+    """Intraday Book — locked desk for matching IST sessionDate only.
 
-    Returns (picks, is_mock, symbol_source, desk_counts).
+    Prefer intradAy_session long/short when locked + date parity; else fixed_trade_plan
+    for that date; else archive; else empty (no invented mock when a live lock exists
+    for another day).
     """
-    from .eod_engine.ingestion import load_day_picks
+    from .eod_engine.ingestion import load_day_picks, load_fixed_trade_plan, load_intraday_session
 
-    day = load_day_picks(for_date)
-    desk_counts = dict(day.get("deskCounts") or {})
-    intra_rows = [
-        p for p in (day.get("picks") or [])
-        if isinstance(p, dict) and p.get("symbol") and str(p.get("book") or "INTRADAY").upper() == "INTRADAY"
-    ]
-    canonical = [_pick_from_canonical(p) for p in intra_rows]
-    if canonical:
-        sources = sorted({
-            str(p.get("source") or "desk")
-            for p in intra_rows
-            if p.get("source")
-        }) or ["intraday_session"]
-        return canonical, False, "+".join(sources), desk_counts
+    day_key = for_date.isoformat()
+    session = load_intraday_session(for_date)
+    session_date = str(session.get("sessionDate") or "").strip()[:10]
+    session_ok = bool(session.get("locked") and session_date == day_key)
+
+    # Prefer unified loader (also supplies truthful deskCounts incl. swing)
+    try:
+        day = load_day_picks(for_date)
+        desk_counts = dict(day.get("deskCounts") or {})
+        sources = day.get("sources") or {}
+        if sources.get("intradayDateParity") or session_ok:
+            intra_rows = [
+                p
+                for p in (day.get("picks") or [])
+                if isinstance(p, dict)
+                and p.get("symbol")
+                and str(p.get("book") or "").upper() == "INTRADAY"
+            ]
+            if intra_rows:
+                rows: list[dict[str, Any]] = []
+                for p in intra_rows:
+                    raw = p.get("raw") if isinstance(p.get("raw"), dict) else {}
+                    rows.append({
+                        **raw,
+                        **{k: v for k, v in p.items() if k != "raw"},
+                        "symbol": str(p.get("symbol") or "").upper(),
+                        "direction": str(p.get("direction") or "LONG").upper(),
+                        "book": "INTRADAY",
+                        "source": "intraday_session",
+                        "approxQty": p.get("approxQty") or raw.get("approxQty") or 0,
+                        "deployedCapital": p.get("deployedCapital") or raw.get("deployedCapital") or 0,
+                        "currentPrice": raw.get("currentPrice") or p.get("entryPrice"),
+                        "outcome": p.get("outcome") or raw.get("outcome"),
+                    })
+                return rows, False, "intraday_session", desk_counts
+    except Exception as exc:
+        log.warning("load_day_picks for intradAy book failed: %s", exc)
+        desk_counts = {"swing": 0, "intradayLong": 0, "intradayShort": 0, "total": 0}
+
+    if session.get("locked") and session_date and session_date != day_key:
+        log.info(
+            "Rejecting stale intradAy_session for Book (%s != %s) — date parity",
+            session_date,
+            day_key,
+        )
+        return [], False, "intraday_session_stale", {
+            "swing": 0,
+            "intradayLong": 0,
+            "intradayShort": 0,
+            "total": 0,
+        }
+
+    session_long = [p for p in (session.get("long") or []) if isinstance(p, dict) and p.get("symbol")] if session_ok else []
+    session_short = [p for p in (session.get("short") or []) if isinstance(p, dict) and p.get("symbol")] if session_ok else []
+    desk_counts = {
+        "swing": 0,
+        "intradayLong": len(session_long),
+        "intradayShort": len(session_short),
+        "total": len(session_long) + len(session_short),
+    }
+
+    if session_long or session_short:
+        rows = []
+        for p in session_long + session_short:
+            rows.append({
+                **p,
+                "symbol": str(p.get("symbol") or "").upper(),
+                "direction": str(p.get("direction") or "LONG").upper(),
+                "book": "INTRADAY",
+                "source": "intraday_session",
+                "approxQty": p.get("approxQty") or 0,
+                "deployedCapital": p.get("deployedCapital") or 0,
+                "currentPrice": p.get("currentPrice") or p.get("ltp") or p.get("entryPrice"),
+                "outcome": p.get("outcome"),
+            })
+        return rows, False, "intraday_session", desk_counts
+
+    plan = load_fixed_trade_plan(for_date)
+    plan_date = str(plan.get("sessionDate") or "").strip()[:10]
+    plan_ok = (not plan_date) or plan_date == day_key
+    plan_long = [p for p in (plan.get("long") or []) if isinstance(p, dict) and p.get("symbol")] if plan_ok else []
+    plan_short = [p for p in (plan.get("short") or []) if isinstance(p, dict) and p.get("symbol")] if plan_ok else []
+    if plan_long or plan_short:
+        rows = []
+        for p in plan_long + plan_short:
+            rows.append({
+                **p,
+                "symbol": str(p.get("symbol") or "").upper(),
+                "direction": str(p.get("direction") or "LONG").upper(),
+                "book": "INTRADAY",
+                "source": "fixed_trade_plan",
+                "approxQty": p.get("approxQty") or 0,
+                "deployedCapital": p.get("deployedCapital") or 0,
+                "currentPrice": p.get("currentPrice") or p.get("ltp") or p.get("entryPrice"),
+                "outcome": p.get("outcome"),
+            })
+        desk_counts = {
+            "swing": 0,
+            "intradayLong": len(plan_long),
+            "intradayShort": len(plan_short),
+            "total": len(plan_long) + len(plan_short),
+        }
+        return rows, False, "fixed_trade_plan", desk_counts
 
     archive = load_archive(for_date)
     archived = list((archive.get("intradayPicks") or {}).values())
@@ -405,7 +496,8 @@ def _load_canonical_intraday_picks(for_date: date) -> tuple[list[dict[str, Any]]
     if archived:
         return archived, False, "eod_archive", desk_counts
 
-    return _generate_mock_intraday_picks(), True, "mock", desk_counts
+    # Empty — do not invent mock symbols when requesting a real desk date
+    return [], False, "empty", desk_counts
 
 
 def _apply_scorecard_to_leg(
@@ -467,15 +559,42 @@ def generate_intraday_eod_report(
     if not force:
         cached = load_book_cache(for_date, "intraday")
         if cached is not None:
-            # Stale mock cache must not hide a real locked basket.
-            if cached.get("isMock") and picks and not is_mock:
+            cached_syms = {
+                str(t.get("symbol") or "").upper()
+                for t in (cached.get("trades") or [])
+                if t.get("symbol")
+            }
+            live_syms = {
+                str(p.get("symbol") or "").upper()
+                for p in picks
+                if p.get("symbol")
+            }
+            stale_mock = bool(cached.get("isMock") and picks and not is_mock)
+            stale_set = bool(live_syms) and cached_syms != live_syms
+            if stale_mock or stale_set:
                 log.info(
-                    "Ignoring mock book_intraday cache for %s — real desk picks present (%s)",
+                    "Rebuilding intraday book for %s (mock=%s set_mismatch=%s live=%s cached=%s)",
                     for_date.isoformat(),
-                    symbol_source,
+                    stale_mock,
+                    stale_set,
+                    sorted(live_syms),
+                    sorted(cached_syms),
                 )
             else:
                 return cached
+
+    # Prefetch close marks in parallel (cached) so Book UI does not hang
+    from .eod_reference import prefetch_close_marks
+
+    marks = prefetch_close_marks([str(p.get("symbol") or "") for p in picks])
+    for pick in picks:
+        if not isinstance(pick, dict):
+            continue
+        sym = str(pick.get("symbol") or "").upper()
+        mark = marks.get(sym)
+        if mark:
+            pick["currentPrice"] = mark
+            pick["ltp"] = mark
 
     scorecards = _load_scorecard_by_ticker(for_date)
 
@@ -519,8 +638,13 @@ def generate_intraday_eod_report(
         pnl_pct = None
         if deployed:
             pnl_pct = round((pnl / deployed * 100), 2)
-        elif card and _f(card.get("realized_pnl_pct")) is not None:
-            pnl_pct = _round(_f(card.get("realized_pnl_pct")), 2)
+        else:
+            entry_px = float(pick.get("entryPrice") or 0)
+            if entry_px > 0:
+                sign = 1 if str(pick.get("direction") or "LONG").upper() == "LONG" else -1
+                pnl_pct = round(sign * (exit_price - entry_px) / entry_px * 100, 2)
+            elif card and _f(card.get("realized_pnl_pct")) is not None:
+                pnl_pct = _round(_f(card.get("realized_pnl_pct")), 2)
 
         rows.append({
             "symbol": pick.get("symbol"),
@@ -540,9 +664,13 @@ def generate_intraday_eod_report(
             "pickSource": pick.get("source") or symbol_source,
         })
 
+    from .outcome_narrative import attach_outcome_narratives, build_day_lessons
+
+    rows = attach_outcome_narratives(rows, force=force)
     remaining_capital = capital + total_pnl
     scored = sum(1 for r in rows if r.get("missDiagnostic") and r["missDiagnostic"].get("source") == "SCORECARD")
     hit_rows = sum(1 for r in rows if r.get("missDiagnostic") and r["missDiagnostic"].get("isHit"))
+    lessons = build_day_lessons(rows, force=force)
 
     report = {
         "date": for_date.isoformat(),
@@ -558,6 +686,15 @@ def generate_intraday_eod_report(
         "isMock": is_mock,
         "symbolSource": symbol_source,
         "deskCounts": desk_counts,
+        "attribution": {
+            "locked": len(rows),
+            "triggered": len(rows),
+            "skipped": 0,
+            "wins": hit_rows,
+            "losses": miss_rows,
+            "deployed": round(total_deployed, 2),
+        },
+        "dayLessons": lessons,
         "trades": rows,
     }
     return save_book_cache(for_date, "intraday", report)

@@ -492,10 +492,10 @@ function buildMonitorStatusLine(data: LivePricesResponse | null, sessionClosed: 
   const evalAt = formatIstClock(data?.updatedAt);
   const snapAt = formatIstClock(data?.snapshotUpdatedAt);
   const pollPart = sessionClosed
-    ? 'Session closed · polling halted'
+    ? 'poll ~2s (market closed · close marks)'
     : marketOpen
       ? 'Eval poll ~2s'
-      : 'Market closed · polling halted';
+      : 'Market closed · poll ~2s';
   const mixFromApi = data?.ltpSourceMix
     ? Object.entries(data.ltpSourceMix)
         .filter(([, n]) => typeof n === 'number' && n > 0)
@@ -613,7 +613,6 @@ export default function IntradayMatrixPanel() {
   const [alertBanner, setAlertBanner] = useState<AlertRecord | null>(null);
   const [marketOpen, setMarketOpen] = useState(true);
   const [sessionClosed, setSessionClosed] = useState(false);
-  const sessionClosedRef = useRef(false);
   const prevOutcomeRef = useRef<Record<string, string | null>>({});
 
   /* last fetch times */
@@ -670,12 +669,11 @@ export default function IntradayMatrixPanel() {
       setMonitorMode(true);
       setLivePricesData(data);
 
-      // Track market session state (used to halt polling after close)
+      // Track market session state for banner / UI
       const closed = Boolean(data.sessionClosed);
       const open = data.marketOpen !== false;
       setMarketOpen(open);
       setSessionClosed(closed);
-      sessionClosedRef.current = closed;
       // Detect new alerts (transition from PENDING → t1/t2/sl)
       const newAlerts = data.newAlerts ?? [];
       if (newAlerts.length > 0) {
@@ -720,10 +718,9 @@ export default function IntradayMatrixPanel() {
       }
     }, 120_000);
 
-    // Fast monitor-mode poll (proxies /api/live-prices — snapshot + optional Yahoo when open).
-    // Halt once the session has closed so we stop recalculating on stale prices.
+    // Fast monitor-mode poll (proxies /api/live-prices — continues after close for close marks).
     const fastId = window.setInterval(() => {
-      if (!cancelled && !sessionClosedRef.current) {
+      if (!cancelled) {
         loadLivePrices();
       }
     }, 2000);
@@ -864,9 +861,6 @@ export default function IntradayMatrixPanel() {
               <div className="px-1.5 py-0.5 rounded-lg bg-cyan-500/10 border border-cyan-400/25">
                 <span className="text-[8px] text-cyan-300 font-semibold">{lemonnData?.count ?? 0} picks</span>
               </div>
-              <button onClick={loadLemonn} className="px-2 py-0.5 rounded-lg bg-slate-100 border border-slate-200 text-[8px] text-slate-600 font-semibold uppercase tracking-wider hover:bg-slate-200 transition-colors">
-                Refresh
-              </button>
             </div>
           </div>
         </div>
@@ -950,9 +944,6 @@ export default function IntradayMatrixPanel() {
               <div className="px-1.5 py-0.5 rounded-lg bg-gradient-to-r from-emerald-100 to-teal-50 border border-emerald-200">
                 <span className="text-[8px] text-emerald-700 font-semibold">{dhanData?.recommendations?.length ?? 0} stocks</span>
               </div>
-              <button onClick={loadDhan} className="px-2 py-0.5 rounded-lg bg-slate-100 border border-slate-200 text-[8px] text-slate-600 font-semibold uppercase tracking-wider hover:bg-slate-200 transition-colors">
-                Refresh
-              </button>
             </div>
           </div>
         </div>

@@ -10,6 +10,13 @@ export type MacroRow = {
   sparkline?: number[];
 };
 
+export type DeskIcSummary = {
+  deskDecision?: string;
+  conviction?: number | null;
+  oneLiner?: string | null;
+  source?: string;
+};
+
 export type LiveStock = {
   ticker: string;
   name: string;
@@ -29,6 +36,7 @@ export type LiveStock = {
   passes_quality_filters?: boolean;
   bulk_deal_value_cr?: number;
   bulk_deal_signal?: boolean;
+  deskIcSummary?: DeskIcSummary;
 };
 
 export type MarketNewsItem = {
@@ -209,6 +217,12 @@ export type MarketDataResponse = {
   terminalIntelligence?: TerminalIntelligence;
   tickerIntelligenceByTicker?: Record<string, TerminalIntelligence>;
   tickerNewsByTicker?: Record<string, AITickerNewsReport>;
+  deskIcByTicker?: Record<string, DeskIcSummary & {
+    criteria?: unknown[];
+    categoryScores?: Record<string, number>;
+    llmUsed?: boolean;
+    conviction?: number;
+  }>;
   isSnapshotFallback?: boolean;
   selectionMeta?: SelectionMeta;
   dhanSwingPicks?: DhanSwingPicksPayload;

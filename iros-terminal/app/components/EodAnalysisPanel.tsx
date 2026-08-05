@@ -9,6 +9,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 type MissDiagnostic = {
   isMiss: boolean;
   isHit?: boolean;
+  isSkip?: boolean;
   exitReason: string;
   rootCause: string | null;
   factors: string[];
@@ -24,7 +25,7 @@ type MissDiagnostic = {
   stopEff: number | null;
   falsePositive: boolean;
   holdingMins: number | null;
-  source: 'LEVELS' | 'SCORECARD' | string;
+  source: 'LEVELS' | 'SCORECARD' | 'SKIP' | string;
   exitSource?: string;
 };
 
@@ -39,10 +40,12 @@ type IntradayTrade = {
   exitReason: string;
   qty: number;
   deployedCapital: number;
-  pnl: number;
+  pnl: number | null;
   pnlPct: number | null;
   missAnalysis: string | null;
   missDiagnostic?: MissDiagnostic | null;
+  outcomeNarrative?: string | null;
+  deskIcSummary?: { decision?: string; conviction?: number; oneLiner?: string } | null;
 };
 
 type IntradayReport = {
@@ -54,12 +57,22 @@ type IntradayReport = {
   hitBreakdown: { T1_HIT: number; T2_HIT: number; SL_HIT: number; EOD_SQUAREOFF: number };
   hitRatePct: number;
   missCount?: number;
+  hitCount?: number;
   missScorecardCoverage?: number;
   isMock?: boolean;
   symbolSource?: string;
   deskCounts?: { swing?: number; intradayLong?: number; intradayShort?: number; total?: number };
   fromCache?: boolean;
   cachedAt?: string;
+  attribution?: {
+    locked?: number;
+    triggered?: number;
+    skipped?: number;
+    wins?: number;
+    losses?: number;
+    deployed?: number;
+  };
+  dayLessons?: string[];
   trades: IntradayTrade[];
 };
 
@@ -70,22 +83,30 @@ type SwingPick = {
   daysHeld: number | null;
   dayBucket: number | null;
   status: string;
+  exitReason?: string;
   entryPrice: number;
   refPrice930: number;
-  currentPrice: number;
+  currentPrice: number | null;
   stopLoss: number;
   target1: number;
   target2: number;
   qty: number;
   deployedCapital: number;
-  pnl: number;
-  pnlPct: number;
+  pnl: number | null;
+  pnlPct: number | null;
   alertsFired: unknown[];
+  skipped?: boolean;
+  missDiagnostic?: MissDiagnostic | null;
+  outcomeNarrative?: string | null;
+  deskIcSummary?: { decision?: string; conviction?: number; oneLiner?: string } | null;
+  analysis?: string | null;
 };
 
 type SwingReport = {
   date: string;
   totalPicks: number;
+  activePicks?: number;
+  skippedNotTriggered?: number;
   totalDeployed: number;
   totalPnl: number;
   totalPnlPct: number | null;
@@ -102,6 +123,17 @@ type SwingReport = {
   referenceLabel?: string;
   fromCache?: boolean;
   cachedAt?: string;
+  attribution?: {
+    locked?: number;
+    triggered?: number;
+    skipped?: number;
+    wins?: number;
+    losses?: number;
+    deployed?: number;
+  };
+  dayLessons?: string[];
+  rotation?: string;
+  source?: string;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -124,8 +156,22 @@ function statusBadge(status: string) {
     case 'SL_HIT': return { bg: 'bg-red-100', txt: 'text-red-800', label: 'SL ✗' };
     case 'NOT_TRIGGERED': return { bg: 'bg-slate-200', txt: 'text-slate-600', label: 'Not Triggered' };
     case 'OPEN': return { bg: 'bg-blue-100', txt: 'text-blue-800', label: 'Open ◇' };
+    case 'NO_MARK': return { bg: 'bg-slate-200', txt: 'text-slate-600', label: 'No mark' };
+    case 'SESSION CLOSED': return { bg: 'bg-slate-200', txt: 'text-slate-700', label: 'Closed' };
     default: return { bg: 'bg-slate-100', txt: 'text-slate-600', label: status };
   }
+}
+
+function fmtInr(v: number | null | undefined, digits = 2): string {
+  if (v == null || Number.isNaN(Number(v))) return '—';
+  const n = Number(v);
+  const sign = n > 0 ? '+' : '';
+  return `${sign}₹${n.toFixed(digits)}`;
+}
+
+function pnlTone(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(Number(v))) return 'text-slate-500';
+  return Number(v) >= 0 ? 'text-emerald-600' : 'text-red-500';
 }
 
 function fmtMissNum(v: number | null | undefined, digits = 2, suffix = ''): string {
@@ -165,45 +211,71 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
       : trade.exitReason === 'EOD_SQUAREOFF'
         ? 'desk-pill--warn'
         : 'desk-pill--ok';
+  const ic = trade.deskIcSummary?.decision;
   return (
-    <tr className="border-t border-slate-100 hover:bg-slate-50/80">
-      <td className="px-2 py-1.5 font-bold text-slate-900">{trade.symbol}</td>
-      <td className={`px-2 py-1.5 font-semibold ${trade.direction === 'LONG' ? 'text-emerald-700' : 'text-red-600'}`}>
-        {trade.direction}
-      </td>
-      <td className="px-2 py-1.5">
-        <span className={`desk-pill ${exitTone}`}>{trade.exitReason}</span>
-      </td>
-      <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${rBad ? 'text-red-600' : 'text-emerald-700'}`}>
-        {fmtMissSigned(d.rMultiple, 2, 'R')}
-      </td>
-      <td className={`px-2 py-1.5 text-right tabular-nums ${rBad ? 'text-red-600' : 'text-slate-700'}`}>
-        {fmtMissSigned(d.movePct, 2, '%')}
-      </td>
-      <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{fmtMissNum(d.maePct, 2)}</td>
-      <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{fmtMissNum(d.mfePct, 2)}</td>
-      <td className="px-2 py-1.5">
-        <span className={`desk-pill ${rootCauseTone(d.rootCause)}`}>
-          {(d.rootCause || '—').replace(/_/g, ' ')}
-        </span>
-      </td>
-      <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${trade.pnl >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-        {Math.abs(trade.pnl) < 1e-6 && trade.pnlPct != null
-          ? fmtMissSigned(trade.pnlPct, 2, '%')
-          : `${trade.pnl >= 0 ? '+' : ''}₹${trade.pnl.toFixed(0)}`}
-      </td>
-      <td className="px-2 py-1.5">
-        <div className="flex max-w-[220px] flex-wrap gap-1">
-          {d.falsePositive && <span className="desk-pill desk-pill--danger">FP</span>}
-          {(d.factors || []).slice(0, 3).map((f) => (
-            <span key={f} className="desk-pill desk-pill--muted" title={f}>
-              {f.replace(/_/g, ' ').slice(0, 18)}
+    <>
+      <tr className="border-t border-slate-100 hover:bg-slate-50/80">
+        <td className="px-2 py-1.5 font-bold text-slate-900">
+          {trade.symbol}
+          {ic && (
+            <span
+              className={`ml-1 desk-pill ${
+                ic === 'APPROVE' ? 'desk-pill--ok' : ic === 'REJECT' ? 'desk-pill--danger' : 'desk-pill--warn'
+              }`}
+              title={trade.deskIcSummary?.oneLiner || ic}
+            >
+              IC {ic}
             </span>
-          ))}
-        </div>
-      </td>
-      <td className="px-2 py-1.5 font-bold text-slate-500">{d.source === 'SCORECARD' ? 'SC' : 'LVL'}</td>
-    </tr>
+          )}
+        </td>
+        <td className={`px-2 py-1.5 font-semibold ${trade.direction === 'LONG' ? 'text-emerald-700' : 'text-red-600'}`}>
+          {trade.direction}
+        </td>
+        <td className="px-2 py-1.5 text-right tabular-nums text-slate-700">{trade.qty ?? '—'}</td>
+        <td className="px-2 py-1.5">
+          <span className={`desk-pill ${exitTone}`}>{trade.exitReason}</span>
+        </td>
+        <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${rBad ? 'text-red-600' : 'text-emerald-700'}`}>
+          {fmtMissSigned(d.rMultiple, 2, 'R')}
+        </td>
+        <td className={`px-2 py-1.5 text-right tabular-nums ${rBad ? 'text-red-600' : 'text-slate-700'}`}>
+          {fmtMissSigned(d.movePct, 2, '%')}
+        </td>
+        <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{fmtMissNum(d.maePct, 2)}</td>
+        <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{fmtMissNum(d.mfePct, 2)}</td>
+        <td className="px-2 py-1.5">
+          <span className={`desk-pill ${rootCauseTone(d.rootCause)}`}>
+            {(d.rootCause || '—').replace(/_/g, ' ')}
+          </span>
+        </td>
+        <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${pnlTone(trade.pnl ?? trade.pnlPct)}`}>
+          {trade.pnl == null
+            ? fmtMissSigned(trade.pnlPct, 2, '%')
+            : Math.abs(trade.pnl) < 1e-6 && trade.pnlPct != null
+              ? fmtMissSigned(trade.pnlPct, 2, '%')
+              : fmtInr(trade.pnl, 0)}
+        </td>
+        <td className="px-2 py-1.5">
+          <div className="flex max-w-[220px] flex-wrap gap-1">
+            {d.falsePositive && <span className="desk-pill desk-pill--danger">FP</span>}
+            {(d.factors || []).slice(0, 3).map((f) => (
+              <span key={f} className="desk-pill desk-pill--muted" title={f}>
+                {f.replace(/_/g, ' ').slice(0, 18)}
+              </span>
+            ))}
+          </div>
+        </td>
+        <td className="px-2 py-1.5 font-bold text-slate-500">{d.source === 'SCORECARD' ? 'SC' : 'LVL'}</td>
+      </tr>
+      {trade.outcomeNarrative && (
+        <tr className="bg-slate-50/60">
+          <td colSpan={12} className="px-3 py-1.5 text-[10px] leading-snug text-slate-600">
+            <span className="font-black uppercase tracking-wider text-slate-400 mr-1">Why</span>
+            {trade.outcomeNarrative}
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -215,6 +287,7 @@ function OutcomeTable({ rows }: { rows: IntradayTrade[] }) {
           <tr>
             <th className="px-2 py-2 text-left font-bold">Ticker</th>
             <th className="px-2 py-2 text-left font-bold">Side</th>
+            <th className="px-2 py-2 text-right font-bold">Qty</th>
             <th className="px-2 py-2 text-left font-bold">Exit</th>
             <th className="px-2 py-2 text-right font-bold">R</th>
             <th className="px-2 py-2 text-right font-bold">Move%</th>
@@ -237,11 +310,12 @@ function OutcomeTable({ rows }: { rows: IntradayTrade[] }) {
 }
 
 /** Replaces old Miss Analysis / target-hit prose cards with dense outcome tables. */
-function OutcomeDesk({ trades, coverage, isMock, symbolSource }: {
+function OutcomeDesk({ trades, coverage, isMock, symbolSource, bookLabel = 'Intraday' }: {
   trades: IntradayTrade[];
   coverage?: number;
   isMock?: boolean;
   symbolSource?: string;
+  bookLabel?: string;
 }) {
   const misses = trades
     .filter((t) => t.missDiagnostic?.isMiss)
@@ -251,15 +325,22 @@ function OutcomeDesk({ trades, coverage, isMock, symbolSource }: {
     .filter((t) => Boolean(t.missDiagnostic?.isHit) || (Boolean(t.missDiagnostic) && ['T1_HIT', 'T2_HIT'].includes(t.exitReason)))
     .slice()
     .sort((a, b) => (b.missDiagnostic?.rMultiple ?? 0) - (a.missDiagnostic?.rMultiple ?? 0));
+  const skips = trades
+    .filter((t) => Boolean(t.missDiagnostic?.isSkip) || ['NOT_TRIGGERED', 'NO_MARK'].includes(t.exitReason))
+    .slice()
+    .sort((a, b) => a.symbol.localeCompare(b.symbol));
 
-  if (!misses.length && !hits.length) return null;
+  if (!misses.length && !hits.length && !skips.length) return null;
 
   return (
     <div className="eod-panel-card space-y-0 overflow-hidden rounded-xl border border-slate-300 border-[0.5px] bg-white shadow-sm">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-2">
-        <span className="desk-panel-title text-slate-900">Outcome Desk</span>
+        <span className="desk-panel-title text-slate-900">Outcome Desk · {bookLabel}</span>
         <span className="desk-pill desk-pill--danger">{misses.length} miss</span>
         <span className="desk-pill desk-pill--ok">{hits.length} target hit</span>
+        {skips.length > 0 && (
+          <span className="desk-pill desk-pill--muted">{skips.length} skip</span>
+        )}
         {coverage != null && (
           <span className="desk-pill desk-pill--info" title="Scorecard-enriched legs">
             SC {coverage}
@@ -272,7 +353,7 @@ function OutcomeDesk({ trades, coverage, isMock, symbolSource }: {
         )}
         {isMock && <span className="desk-pill desk-pill--warn">MOCK</span>}
         <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-slate-400">
-          Locked session symbols · Why = Root column
+          {bookLabel} lock · diagnostics first · narrative on rebuild
         </span>
       </div>
 
@@ -293,23 +374,113 @@ function OutcomeDesk({ trades, coverage, isMock, symbolSource }: {
           <OutcomeTable rows={hits} />
         </div>
       )}
+
+      {skips.length > 0 && (
+        <div>
+          <div className="border-b border-slate-100 bg-slate-100/80 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-slate-600">
+            Skipped · not triggered (excluded from P&L)
+          </div>
+          <OutcomeTable rows={skips} />
+        </div>
+      )}
     </div>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Single-number Sparkline (mini bar chart)                                  */
-/* -------------------------------------------------------------------------- */
-function MiniSparklineBar({ positive, width = 100 }: { positive: boolean; width?: number }) {
-  const color = positive ? '#10b981' : '#ef4444';
+function AttributionStrip({
+  attribution,
+  label,
+}: {
+  attribution?: SwingReport['attribution'] | IntradayReport['attribution'];
+  label: string;
+}) {
+  if (!attribution) return null;
   return (
-    <svg className="w-full h-6" viewBox={`0 0 ${width} 20`} preserveAspectRatio="none">
-      <rect x="0" y="8" width="20%" height="10" rx="1.5" fill={color} opacity="0.6" />
-      <rect x="22%" y="5" width="20%" height="13" rx="1.5" fill={color} opacity="0.8" />
-      <rect x="44%" y="2" width="20%" height="16" rx="1.5" fill={color} opacity="0.9" />
-      <rect x="66%" y="6" width="20%" height="12" rx="1.5" fill={color} />
-      <rect x="88%" y="0" width="12%" height="18" rx="1.5" fill={color} />
-    </svg>
+    <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b border-slate-100 text-[9px]">
+      <span className="font-black uppercase tracking-wider text-slate-500">{label}</span>
+      <span className="desk-pill desk-pill--info">Locked {attribution.locked ?? '—'}</span>
+      <span className="desk-pill desk-pill--ok">Triggered {attribution.triggered ?? '—'}</span>
+      <span className="desk-pill desk-pill--muted">Skipped {attribution.skipped ?? 0}</span>
+      <span className="desk-pill desk-pill--ok">Wins {attribution.wins ?? '—'}</span>
+      <span className="desk-pill desk-pill--danger">Losses {attribution.losses ?? '—'}</span>
+      <span className="desk-pill desk-pill--info">
+        Deployed{' '}
+        {attribution.deployed != null
+          ? `₹${Number(attribution.deployed).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+          : '—'}
+      </span>
+    </div>
+  );
+}
+
+function DayLessonsStrip({ lessons }: { lessons?: string[] }) {
+  if (!lessons?.length) return null;
+  return (
+    <div className="mx-3 mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+      <div className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1">Day lessons</div>
+      <ul className="list-disc pl-4 space-y-0.5 text-[10px] text-slate-700">
+        {lessons.slice(0, 5).map((l, i) => (
+          <li key={i}>{l}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function PortfolioDist({
+  title,
+  rows,
+  totalDeployed,
+}: {
+  title: string;
+  rows: { symbol: string; deployed: number; qty: number; pnl: number | null; pnlPct: number | null }[];
+  totalDeployed: number;
+}) {
+  if (!rows.length) return null;
+  const total = totalDeployed > 0 ? totalDeployed : rows.reduce((s, r) => s + (r.deployed || 0), 0);
+  return (
+    <div className="border-t border-slate-100 px-3 py-2">
+      <div className="mb-1.5 flex flex-wrap items-center gap-2">
+        <span className="text-[9px] font-black uppercase tracking-wider text-slate-500">{title}</span>
+        <span className="desk-pill desk-pill--info">
+          Deployed {total > 0 ? `₹${total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '—'}
+        </span>
+        <span className="text-[9px] text-slate-400">{rows.length} names</span>
+      </div>
+      <div className="overflow-x-auto desk-scroll-x">
+        <table className="w-full text-[10px]">
+          <thead>
+            <tr className="text-slate-500 uppercase tracking-wider border-b border-slate-100">
+              <th className="text-left px-1 py-1 font-bold">Symbol</th>
+              <th className="text-right px-1 py-1 font-bold">Qty</th>
+              <th className="text-right px-1 py-1 font-bold">Deployed</th>
+              <th className="text-right px-1 py-1 font-bold">Weight</th>
+              <th className="text-right px-1 py-1 font-bold">P&L</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const w = total > 0 && r.deployed > 0 ? (r.deployed / total) * 100 : null;
+              return (
+                <tr key={r.symbol} className="border-b border-slate-50">
+                  <td className="px-1 py-1 font-bold text-slate-800">{r.symbol}</td>
+                  <td className="px-1 py-1 text-right tabular-nums text-slate-700">{r.qty || '—'}</td>
+                  <td className="px-1 py-1 text-right tabular-nums text-slate-700">
+                    {r.deployed > 0 ? `₹${r.deployed.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '—'}
+                  </td>
+                  <td className="px-1 py-1 text-right tabular-nums text-slate-500">
+                    {w != null ? `${w.toFixed(1)}%` : '—'}
+                  </td>
+                  <td className={`px-1 py-1 text-right tabular-nums font-bold ${pnlTone(r.pnl ?? r.pnlPct)}`}>
+                    {r.pnl != null ? fmtInr(r.pnl, 0) : fmtMissSigned(r.pnlPct, 2, '%')}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
@@ -358,7 +529,8 @@ export default function EodAnalysisPanel({
   const fetchReports = useCallback(async (opts?: { force?: boolean }) => {
     setLoading(true);
     setError(null);
-    const force = opts?.force ?? forceBookRebuild;
+    // Prefer explicit opts.force — parent may clear forceBookRebuild without re-fetching
+    const force = Boolean(opts?.force);
     const buildQs = (d: string) => {
       const p = new URLSearchParams();
       if (d) p.set('date', d);
@@ -368,7 +540,8 @@ export default function EodAnalysisPanel({
     };
     const swingDate = swingDateStr || dateStr;
     const ctrl = new AbortController();
-    const timer = window.setTimeout(() => ctrl.abort(), 20_000);
+    // Cache loads are fast; force rebuild may fetch close marks — allow up to 60s
+    const timer = window.setTimeout(() => ctrl.abort(), force ? 60_000 : 20_000);
 
     const loadOne = async <T,>(url: string, label: string): Promise<T | null> => {
       try {
@@ -382,7 +555,7 @@ export default function EodAnalysisPanel({
         const msg =
           err instanceof Error
             ? err.name === 'AbortError'
-              ? `${label} timed out (20s)`
+              ? `${label} timed out (${force ? '60s' : '20s'})`
               : err.message
             : `${label} failed`;
         setError((prev) => (prev ? `${prev} · ${msg}` : msg));
@@ -404,9 +577,13 @@ export default function EodAnalysisPanel({
       window.clearTimeout(timer);
       setLoading(false);
     }
-  }, [dateStr, swingDateStr, forceBookRebuild]);
+  }, [dateStr, swingDateStr]);
 
-  useEffect(() => { void fetchReports(); }, [fetchReports, refreshToken]);
+  // forceBookRebuild is read only when refreshToken/date triggers — parent may clear it without a second fetch
+  useEffect(() => {
+    void fetchReports({ force: forceBookRebuild });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot force paired with refreshToken
+  }, [fetchReports, refreshToken]);
 
   const noIntraday = intraday && (!intraday.trades || intraday.trades.length === 0);
   const noSwing = swing && (!swing.picks || swing.picks.length === 0);
@@ -498,22 +675,26 @@ export default function EodAnalysisPanel({
       {(intraday || swing) && (
         <>
           {(() => {
-            const counts = intraday?.deskCounts || swing?.deskCounts;
-            if (!counts) return null;
-            const total = counts.total ?? 0;
+            const i = intraday?.deskCounts;
+            const s = swing?.deskCounts;
+            if (!i && !s) return null;
+            const swingN = Math.max(s?.swing ?? 0, i?.swing ?? 0);
+            const intraL = Math.max(i?.intradayLong ?? 0, s?.intradayLong ?? 0);
+            const intraS = Math.max(i?.intradayShort ?? 0, s?.intradayShort ?? 0);
+            const total = swingN + intraL + intraS;
             const expectOk = total >= 20;
             return (
               <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-300 border-[0.5px] bg-slate-50 px-3 py-2 text-[10px]">
                 <span className="font-black uppercase tracking-wider text-slate-600">Locked desk for EOD</span>
-                <span className="desk-pill desk-pill--info">Swing {counts.swing ?? 0}</span>
-                <span className="desk-pill desk-pill--ok">Intra L {counts.intradayLong ?? 0}</span>
-                <span className="desk-pill desk-pill--danger">Intra S {counts.intradayShort ?? 0}</span>
+                <span className="desk-pill desk-pill--info">Swing {swingN}</span>
+                <span className="desk-pill desk-pill--ok">Intra L {intraL}</span>
+                <span className="desk-pill desk-pill--danger">Intra S {intraS}</span>
                 <span className={`desk-pill ${expectOk ? 'desk-pill--ok' : 'desk-pill--warn'}`}>
-                  Total {total}{expectOk ? '' : ' / expect 20'}
+                  Total {total}{expectOk ? '' : ' / expect ~20+'}
                 </span>
                 {!expectOk && (
                   <span className="text-amber-700">
-                    Expect Swing 10 + Intra 5 buy / 5 sell after adopt.
+                    Expect Matrix swing lock + Intra 5 buy / 5 sell after adopt.
                   </span>
                 )}
               </div>
@@ -526,6 +707,35 @@ export default function EodAnalysisPanel({
               coverage={intraday.missScorecardCoverage}
               isMock={intraday.isMock}
               symbolSource={intraday.symbolSource}
+              bookLabel="Intraday"
+            />
+          )}
+
+          {swing && (
+            <OutcomeDesk
+              trades={(swing.picks || [])
+                .filter((p) => p.missDiagnostic)
+                .map((p) => ({
+                  symbol: p.symbol,
+                  direction: p.direction,
+                  entryPrice: p.entryPrice,
+                  exitPrice: p.currentPrice ?? p.entryPrice,
+                  stopLoss: p.stopLoss,
+                  target1: p.target1,
+                  target2: p.target2,
+                  exitReason: p.exitReason || p.status,
+                  qty: p.qty,
+                  deployedCapital: p.deployedCapital,
+                  pnl: p.pnl,
+                  pnlPct: p.pnlPct,
+                  missAnalysis: null,
+                  missDiagnostic: p.missDiagnostic,
+                  outcomeNarrative: p.outcomeNarrative,
+                  deskIcSummary: p.deskIcSummary,
+                }))}
+              isMock={swing.isMock}
+              symbolSource={swing.symbolSource}
+              bookLabel="Swing"
             />
           )}
 
@@ -545,12 +755,14 @@ export default function EodAnalysisPanel({
               <div className="p-4 text-[11px] text-slate-400 text-center">No archived intraday picks for this date.</div>
             ) : intraday ? (
               <>
+                <AttributionStrip attribution={intraday.attribution} label="Fill / skip" />
+                <DayLessonsStrip lessons={intraday.dayLessons} />
                 {/* Summary cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-50/50">
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
                     <div className="desk-panel-title">Total P&L</div>
-                    <div className={`desk-metric-value tabular-nums ${intraday.totalPnl >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                      {intraday.totalPnl >= 0 ? '+' : ''}₹{intraday.totalPnl.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    <div className={`desk-metric-value tabular-nums ${pnlTone(intraday.totalPnl)}`}>
+                      {fmtInr(intraday.totalPnl, 2)}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
@@ -567,13 +779,25 @@ export default function EodAnalysisPanel({
                   </div>
                 </div>
 
+                <PortfolioDist
+                  title="Intraday portfolio balance"
+                  totalDeployed={intraday.totalDeployed || 0}
+                  rows={(intraday.trades || []).map((t) => ({
+                    symbol: String(t.symbol || ''),
+                    qty: t.qty || 0,
+                    deployed: t.deployedCapital || 0,
+                    pnl: t.pnl,
+                    pnlPct: t.pnlPct,
+                  }))}
+                />
+
                 {/* Hit breakdown */}
                 <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 text-[9px]">
                   <span className="text-slate-500 uppercase tracking-wider font-bold">Breakdown:</span>
-                  <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">T2 {intraday.hitBreakdown.T2_HIT}</span>
-                  <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold">T1 {intraday.hitBreakdown.T1_HIT}</span>
-                  <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold">SL {intraday.hitBreakdown.SL_HIT}</span>
-                  <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">EOD {intraday.hitBreakdown.EOD_SQUAREOFF}</span>
+                  <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">T2 {intraday.hitBreakdown?.T2_HIT ?? 0}</span>
+                  <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold">T1 {intraday.hitBreakdown?.T1_HIT ?? 0}</span>
+                  <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold">SL {intraday.hitBreakdown?.SL_HIT ?? 0}</span>
+                  <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">EOD {intraday.hitBreakdown?.EOD_SQUAREOFF ?? 0}</span>
                 </div>
 
                 {/* Trades table */}
@@ -582,6 +806,7 @@ export default function EodAnalysisPanel({
                     <thead>
                       <tr className="text-slate-500 uppercase tracking-wider border-b border-slate-100">
                         <th className="text-left px-2 py-1.5 font-bold">Symbol</th>
+                        <th className="text-right px-2 py-1.5 font-bold">Qty</th>
                         <th className="text-right px-2 py-1.5 font-bold">Entry</th>
                         <th className="text-right px-2 py-1.5 font-bold">Exit</th>
                         <th className="text-center px-2 py-1.5 font-bold">Result</th>
@@ -599,13 +824,16 @@ export default function EodAnalysisPanel({
                               </span>
                               <span className="text-[8px] text-slate-400 ml-1">{trade.direction}</span>
                             </td>
+                            <td className="text-right px-2 py-1.5 tabular-nums text-slate-700">{trade.qty ?? '—'}</td>
                             <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">{trade.entryPrice}</td>
                             <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">{trade.exitPrice}</td>
                             <td className="text-center px-2 py-1.5">
                               <span className={`${badge.bg} ${badge.txt} px-1 py-0.5 rounded text-[9px] font-bold`}>{badge.label}</span>
                             </td>
-                            <td className={`text-right px-2 py-1.5 font-bold tabular-nums ${trade.pnl >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                              {trade.pnl >= 0 ? '+' : ''}₹{trade.pnl.toFixed(2)}
+                            <td className={`text-right px-2 py-1.5 font-bold tabular-nums ${pnlTone(trade.pnl)}`}>
+                              {trade.pnl == null
+                                ? (trade.pnlPct != null ? fmtMissSigned(trade.pnlPct, 2, '%') : '—')
+                                : fmtInr(trade.pnl, 2)}
                             </td>
                           </tr>
                         );
@@ -627,19 +855,27 @@ export default function EodAnalysisPanel({
                 {swing?.date ?? dateStr}
                 {swing?.symbolSource ? ` · ${swing.symbolSource}` : ''}
                 {swing?.isMock ? ' · MOCK' : ''}
+                {' · Asset Matrix swing lock (not intradAy)'}
               </p>
             </div>
 
             {noSwing ? (
-              <div className="p-4 text-[11px] text-slate-400 text-center">No picks in the fixed trade plan.</div>
+              <div className="p-4 text-[11px] text-slate-400 text-center">
+                No locked swing portfolio. Lock swing from Asset Matrix BUY set first.
+              </div>
             ) : swing ? (
               <>
+                <AttributionStrip attribution={swing.attribution} label="Fill / skip" />
                 {/* Summary cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-50/50">
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
                     <div className="desk-panel-title">Total P&L</div>
-                    <div className={`desk-metric-value tabular-nums ${swing.totalPnl >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                      {swing.totalPnl >= 0 ? '+' : ''}₹{swing.totalPnl.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    <div className={`desk-metric-value tabular-nums ${pnlTone(swing.totalPnl || swing.totalPnlPct)}`}>
+                      {swing.totalPnl != null && Math.abs(Number(swing.totalPnl)) >= 0.005
+                        ? fmtInr(swing.totalPnl, 2)
+                        : swing.totalPnlPct != null
+                          ? fmtMissSigned(swing.totalPnlPct, 2, '%')
+                          : '—'}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
@@ -651,24 +887,41 @@ export default function EodAnalysisPanel({
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="desk-panel-title">Total P&L %</div>
-                    <div className={`desk-metric-value tabular-nums ${(swing.totalPnlPct ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                      {swing.totalPnlPct != null ? `${swing.totalPnlPct >= 0 ? '+' : ''}${swing.totalPnlPct}%` : 'N/A'}
+                    <div className="desk-panel-title">Triggered / Skip</div>
+                    <div className="desk-metric-value tabular-nums text-slate-800">
+                      {swing.activePicks ?? swing.attribution?.triggered ?? '—'}
+                      <span className="text-slate-400">/</span>
+                      {swing.skippedNotTriggered ?? swing.attribution?.skipped ?? 0}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="desk-panel-title">Picks</div>
+                    <div className="desk-panel-title">Picks / Sleeve</div>
                     <div className="desk-metric-value text-slate-800 tabular-nums">{swing.totalPicks}</div>
+                    <div className="text-[8px] text-slate-400">₹10L swing · daily</div>
                   </div>
                 </div>
 
+                <DayLessonsStrip lessons={swing.dayLessons} />
+
+                <PortfolioDist
+                  title="Swing portfolio balance"
+                  totalDeployed={swing.totalDeployed || 0}
+                  rows={(swing.picks || []).map((p) => ({
+                    symbol: p.symbol,
+                    qty: p.qty || 0,
+                    deployed: p.deployedCapital || 0,
+                    pnl: p.pnl,
+                    pnlPct: p.pnlPct,
+                  }))}
+                />
+
                 {/* P&L by day bucket */}
-                {Object.keys(swing.pnlByDayBucket).length > 0 && (
+                {swing.pnlByDayBucket && Object.keys(swing.pnlByDayBucket).length > 0 && (
                   <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 text-[9px] flex-wrap">
                     <span className="text-slate-500 uppercase tracking-wider font-bold">P&L by Day:</span>
                     {Object.entries(swing.pnlByDayBucket).map(([bucket, pnl]) => (
-                      <span key={bucket} className={`px-1.5 py-0.5 rounded font-bold ${pnl >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                        Day {bucket}: {pnl >= 0 ? '+' : ''}₹{pnl.toFixed(0)}
+                      <span key={bucket} className={`px-1.5 py-0.5 rounded font-bold ${Number(pnl) >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                        Day {bucket}: {fmtInr(Number(pnl), 0)}
                       </span>
                     ))}
                   </div>
@@ -681,10 +934,12 @@ export default function EodAnalysisPanel({
                       <tr className="text-slate-500 uppercase tracking-wider border-b border-slate-100">
                         <th className="text-left px-2 py-1.5 font-bold">Symbol</th>
                         <th className="text-center px-2 py-1.5 font-bold">Status</th>
+                        <th className="text-right px-2 py-1.5 font-bold">Qty</th>
                         <th className="text-right px-2 py-1.5 font-bold">Entry</th>
-                        <th className="text-right px-2 py-1.5 font-bold">Current</th>
-                        <th className="text-center px-2 py-1.5 font-bold">Held</th>
+                        <th className="text-right px-2 py-1.5 font-bold">Mark</th>
+                        <th className="text-right px-2 py-1.5 font-bold">Deployed</th>
                         <th className="text-right px-2 py-1.5 font-bold">P&L</th>
+                        <th className="text-right px-2 py-1.5 font-bold">%</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -701,14 +956,19 @@ export default function EodAnalysisPanel({
                             <td className="text-center px-2 py-1.5">
                               <span className={`${badge.bg} ${badge.txt} px-1 py-0.5 rounded text-[9px] font-bold`}>{badge.label}</span>
                             </td>
+                            <td className="text-right px-2 py-1.5 tabular-nums text-slate-700">{pick.qty || '—'}</td>
                             <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">{pick.entryPrice}</td>
-                            <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">{pick.currentPrice}</td>
-                            <td className="text-center px-2 py-1.5 text-slate-500">
-                              {pick.daysHeld != null ? `${pick.daysHeld}d` : '-'}
-                              {pick.dayBucket != null && <span className="text-[8px] text-slate-400 ml-1">(D{pick.dayBucket})</span>}
+                            <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">{pick.currentPrice ?? '—'}</td>
+                            <td className="text-right px-2 py-1.5 tabular-nums text-slate-600">
+                              {pick.deployedCapital
+                                ? `₹${Number(pick.deployedCapital).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+                                : '—'}
                             </td>
-                            <td className={`text-right px-2 py-1.5 font-bold tabular-nums ${pick.pnl >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                              {pick.pnl >= 0 ? '+' : ''}₹{pick.pnl.toFixed(2)}
+                            <td className={`text-right px-2 py-1.5 font-bold tabular-nums ${pnlTone(pick.pnl ?? pick.pnlPct)}`}>
+                              {pick.pnl != null ? fmtInr(pick.pnl, 2) : '—'}
+                            </td>
+                            <td className={`text-right px-2 py-1.5 font-bold tabular-nums ${pnlTone(pick.pnlPct)}`}>
+                              {fmtMissSigned(pick.pnlPct, 2, '%')}
                             </td>
                           </tr>
                         );
@@ -734,14 +994,29 @@ export default function EodAnalysisPanel({
                 <div className="bg-gradient-to-r from-emerald-50 to-white border border-emerald-200 rounded-xl p-3 shadow-sm">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="desk-panel-title text-emerald-700">Best Performer</span>
+                    <span className="desk-panel-title text-emerald-700">Best Performer · Swing</span>
                   </div>
                   <div className="flex items-end justify-between mt-1">
                     <div>
                       <span className="text-[16px] font-black text-slate-900">{swing.bestPerformer.symbol}</span>
                       <span className="text-[10px] text-slate-500 ml-1">{swing.bestPerformer.direction}</span>
+                      <div className="text-[9px] text-slate-500 tabular-nums">
+                        Qty {swing.bestPerformer.qty || '—'}
+                        {swing.bestPerformer.deployedCapital
+                          ? ` · ₹${Number(swing.bestPerformer.deployedCapital).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+                          : ''}
+                      </div>
                     </div>
-                    <span className="text-[16px] font-black text-emerald-600 tabular-nums">+₹{swing.bestPerformer.pnl.toFixed(2)}</span>
+                    <div className="text-right">
+                      <div className={`text-[16px] font-black tabular-nums ${pnlTone(swing.bestPerformer.pnl ?? swing.bestPerformer.pnlPct)}`}>
+                        {swing.bestPerformer.pnl != null
+                          ? fmtInr(swing.bestPerformer.pnl, 2)
+                          : fmtMissSigned(swing.bestPerformer.pnlPct, 2, '%')}
+                      </div>
+                      <div className={`text-[10px] font-bold tabular-nums ${pnlTone(swing.bestPerformer.pnlPct)}`}>
+                        {fmtMissSigned(swing.bestPerformer.pnlPct, 2, '%')}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -749,14 +1024,29 @@ export default function EodAnalysisPanel({
                 <div className="bg-gradient-to-r from-red-50 to-white border border-red-200 rounded-xl p-3 shadow-sm">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                    <span className="desk-panel-title text-red-700">Worst Performer</span>
+                    <span className="desk-panel-title text-red-700">Worst Performer · Swing</span>
                   </div>
                   <div className="flex items-end justify-between mt-1">
                     <div>
                       <span className="text-[16px] font-black text-slate-900">{swing.worstPerformer.symbol}</span>
                       <span className="text-[10px] text-slate-500 ml-1">{swing.worstPerformer.direction}</span>
+                      <div className="text-[9px] text-slate-500 tabular-nums">
+                        Qty {swing.worstPerformer.qty || '—'}
+                        {swing.worstPerformer.deployedCapital
+                          ? ` · ₹${Number(swing.worstPerformer.deployedCapital).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+                          : ''}
+                      </div>
                     </div>
-                    <span className="text-[16px] font-black text-red-600 tabular-nums">₹{swing.worstPerformer.pnl.toFixed(2)}</span>
+                    <div className="text-right">
+                      <div className={`text-[16px] font-black tabular-nums ${pnlTone(swing.worstPerformer.pnl ?? swing.worstPerformer.pnlPct)}`}>
+                        {swing.worstPerformer.pnl != null
+                          ? fmtInr(swing.worstPerformer.pnl, 2)
+                          : fmtMissSigned(swing.worstPerformer.pnlPct, 2, '%')}
+                      </div>
+                      <div className={`text-[10px] font-bold tabular-nums ${pnlTone(swing.worstPerformer.pnlPct)}`}>
+                        {fmtMissSigned(swing.worstPerformer.pnlPct, 2, '%')}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

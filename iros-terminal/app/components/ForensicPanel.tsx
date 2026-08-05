@@ -507,6 +507,7 @@ type AssetRow = {
   dhanPick?: DhanSwingPick;
   hasQuantSource: boolean;
   atrPct?: number;
+  deskIcDecision?: string;
 };
 
 type MatrixCardRow = {
@@ -613,19 +614,35 @@ const DEFAULT_POOLS = ['Nifty 500', 'Nifty 100', 'Live Universe'] as const;
 export default function ForensicPanel({
   onSelect,
   liveMarket,
-  refreshOnDemand,
   selectedPool,
   onPoolChange,
   availablePools,
 }: {
   onSelect?: (ticker: string) => void;
   liveMarket?: MarketDataResponse | null;
-  refreshOnDemand?: () => Promise<void>;
   selectedPool?: string;
   onPoolChange?: (pool: string) => void;
   availablePools?: string[];
 }) {
-  const [refreshing, setRefreshing] = useState(false);
+  const [swingSession, setSwingSession] = useState<{
+    locked?: boolean;
+    sessionDate?: string;
+    source?: string;
+    long?: Array<{
+      symbol?: string;
+      entryPrice?: number;
+      ltp?: number | null;
+      currentPrice?: number | null;
+      dayChangePct?: number | null;
+      unrealizedPnlPct?: number | null;
+      score?: number | null;
+      stopLoss?: number;
+      target1?: number;
+      target2?: number;
+      selectionReason?: string | null;
+    }>;
+    portfolio?: { unrealizedPnl?: number; lockedCount?: number };
+  } | null>(null);
 
   const live = liveMarket ?? null;
   const stocks = live?.stocks ?? [];
@@ -770,6 +787,10 @@ export default function ForensicPanel({
             : wlFromMarket && parseWinLossRatio(wlFromMarket) !== null
               ? wlFromMarket
               : undefined;
+        const deskIcDecision =
+          stock?.deskIcSummary?.deskDecision ||
+          live?.deskIcByTicker?.[row.ticker]?.deskDecision ||
+          undefined;
         push({
           ticker: row.ticker,
           price: row.live_price || stockPriceMap.get(row.ticker) || '',
@@ -793,6 +814,7 @@ export default function ForensicPanel({
           dhanPick: enriched.dhanPick,
           hasQuantSource: true,
           atrPct: enriched.atrPct,
+          deskIcDecision,
         });
       }
     }
@@ -833,6 +855,10 @@ export default function ForensicPanel({
           dhanPick: enriched.dhanPick,
           hasQuantSource: true,
           atrPct: enriched.atrPct,
+          deskIcDecision:
+            stock.deskIcSummary?.deskDecision ||
+            live?.deskIcByTicker?.[stock.ticker]?.deskDecision ||
+            undefined,
         });
       }
     }
@@ -1008,9 +1034,101 @@ export default function ForensicPanel({
     return selectMatrixDisplayRows(evaluated, stockRows.length, institutionalMode);
   }, [assetRows, tickerIntelMap, tickerNewsMap, trendlyneSummaries, institutionalMode, isSnapshotFallback, poolHasHardFilterPasses, selectionMetaMode]);
 
+  const istToday = useMemo(
+    () =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date()),
+    [live?.updatedAt],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/swing-session?live=1', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setSwingSession(data);
+      } catch {
+        /* keep discovery mode */
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [live?.updatedAt]);
+
+  const lockedSwingMode = Boolean(
+    swingSession?.locked &&
+      String(swingSession?.sessionDate || '').slice(0, 10) === istToday &&
+      (swingSession?.long?.length ?? 0) > 0,
+  );
+
+  const portfolioDisplayRows: MatrixCardRow[] = useMemo(() => {
+    if (!lockedSwingMode || !swingSession?.long?.length) return displayRows;
+    const byTicker = new Map(displayRows.map((item) => [item.row.ticker.toUpperCase(), item]));
+    return swingSession.long
+      .map((pos) => {
+        const sym = String(pos.symbol || '').toUpperCase();
+        if (!sym) return null;
+        const existing = byTicker.get(sym);
+        const ltp = pos.ltp ?? pos.currentPrice ?? pos.entryPrice;
+        const dayPct =
+          typeof pos.dayChangePct === 'number'
+            ? pos.dayChangePct
+            : typeof pos.unrealizedPnlPct === 'number'
+              ? pos.unrealizedPnlPct
+              : existing?.row.dayChangePct ?? null;
+        const row: AssetRow = existing
+          ? {
+              ...existing.row,
+              price: ltp != null ? String(ltp) : existing.row.price,
+              dayChangePct: dayPct,
+              thesis: existing.row.thesis || pos.selectionReason || 'Locked swing book',
+            }
+          : {
+              ticker: sym,
+              price: ltp != null ? String(ltp) : '',
+              score: Number(pos.score || 0),
+              scoreScale: 'angel',
+              dayChangePct: dayPct,
+              thesis: pos.selectionReason || 'Locked Asset Matrix swing',
+              action: 'BUY',
+              riskFlag: 'SELECTED',
+              isVolumePad: false,
+              isMetaRow: false,
+              hasQuantSource: true,
+              dhanPick: {
+                symbol: sym,
+                buyAbove: pos.entryPrice,
+                stopLoss: pos.stopLoss,
+                target1: pos.target1,
+                target2: pos.target2,
+              } as DhanSwingPick,
+            };
+        return {
+          row,
+          tier: existing?.tier ?? ('CORE' as ConvictionTier),
+          reason: existing?.reason ?? 'LOCKED · price-only MTM',
+          winEdge: existing?.winEdge ?? null,
+          intelligence: existing?.intelligence ?? mergeIntelligenceSummary(
+            tickerIntelMap[sym],
+            tickerNewsMap[sym],
+            trendlyneSummaries[sym],
+          ),
+        } satisfies MatrixCardRow;
+      })
+      .filter((x): x is MatrixCardRow => x != null);
+  }, [displayRows, lockedSwingMode, swingSession, tickerIntelMap, tickerNewsMap, trendlyneSummaries]);
+
   const tickerList = useMemo(
-    () => displayRows.map((item) => item.row.ticker),
-    [displayRows],
+    () => portfolioDisplayRows.map((item) => item.row.ticker),
+    [portfolioDisplayRows],
   );
 
   const stockSparklines1M = useStockSparklines(tickerList, '1M');
@@ -1029,17 +1147,6 @@ export default function ForensicPanel({
     }
     return merged;
   }, [tickerList, stockSparklines1D, stockSparklines1M, stockSparklines1Y]);
-
-  const refresh = async () => {
-    setRefreshing(true);
-    try {
-      if (refreshOnDemand) {
-        await refreshOnDemand();
-      }
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   const flagClass = (flag: string) => {
     const v = flag.toLowerCase();
@@ -1060,22 +1167,43 @@ export default function ForensicPanel({
         <div className="min-w-0">
           <h3 className="desk-panel-title text-emerald-700">SWING PORTFOLIO</h3>
           <p className="text-slate-500 text-[12px] mt-0.5">
-            {institutionalMode
+            {lockedSwingMode ? (
+              <>
+                <span className="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-800">
+                  LOCKED · {swingSession?.sessionDate}
+                </span>
+                {' · '}price-only MTM · {swingSession?.source || 'asset_matrix_buy'} ·{' '}
+                {portfolioDisplayRows.length} names
+                {typeof swingSession?.portfolio?.unrealizedPnl === 'number' && (
+                  <>
+                    {' · '}MTM{' '}
+                    <span className={swingSession.portfolio.unrealizedPnl >= 0 ? 'text-emerald-600 font-bold' : 'text-red-600 font-bold'}>
+                      {swingSession.portfolio.unrealizedPnl >= 0 ? '+' : ''}
+                      ₹{swingSession.portfolio.unrealizedPnl.toFixed(0)}
+                    </span>
+                  </>
+                )}
+              </>
+            ) : institutionalMode
               ? institutionalOffHours
                 ? `Institutional ₹1cr+ book — off-hours snapshot: score ≥ ${SCORE_STRONG}, Trendlyne confirm, LOW/MODERATE risk (volume gates rank-penalized)`
                 : `Institutional ₹1cr+ book — score ≥ ${SCORE_STRONG}, Trendlyne confirm, Dhan R:R ≥2 when live`
               : live?.poolDescription || `Top ${MATRIX_BUY_MIN_DISPLAY}+ high-probability BUY setups — score ≥ ${MATRIX_BUY_MIN_SCORE}, CORE preferred`}
-            {typeof live?.universeSize === 'number' && live.universeSize > 0 && (
+            {!lockedSwingMode && typeof live?.universeSize === 'number' && live.universeSize > 0 && (
               <> · Universe {live.universeSize}</>
             )}
-            {typeof live?.volumeScreenedCount === 'number' && live.volumeScreenedCount > 0 && (
+            {!lockedSwingMode && typeof live?.volumeScreenedCount === 'number' && live.volumeScreenedCount > 0 && (
               <> · Top {live.volumeScreenedCount} by volume screened</>
             )}
-            {dhanPickMap.size > 0 && (
+            {!lockedSwingMode && dhanPickMap.size > 0 && (
               <> · Dhan LONG {dhanPickMap.size}</>
             )}
-            {' · '}BUY Picks {displayRows.length}
-            {institutionalMode && <> · max {INSTITUTIONAL_MATRIX_TOP_N}</>}
+            {!lockedSwingMode && (
+              <>
+                {' · '}BUY Picks {displayRows.length}
+                {institutionalMode && <> · max {INSTITUTIONAL_MATRIX_TOP_N}</>}
+              </>
+            )}
             {' · '}Data Date {live?.updatedAt ? new Date(live.updatedAt).toISOString().slice(0, 10) : '—'}
           </p>
         </div>
@@ -1096,18 +1224,11 @@ export default function ForensicPanel({
               </select>
             </label>
           )}
-          <button
-            onClick={refresh}
-            disabled={refreshing}
-            className="min-h-11 px-3 py-2 text-[12px] rounded-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition"
-          >
-            {refreshing ? 'Refreshing...' : 'Refresh'}
-          </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-        {displayRows.map((item) => {
+        {portfolioDisplayRows.map((item) => {
           const row = item.row;
           const priceVal = row.price ? `₹${String(row.price).replace(/[₹]+/g, '')}` : '-';
           const flag = getFlag(row.ticker);
@@ -1238,11 +1359,23 @@ export default function ForensicPanel({
               {/* Secondary: strength meter + risk badge */}
               <div className="flex items-center justify-between gap-2 mt-1 relative z-10 flex-wrap">
                 <StrengthMeter score={row.score} />
-                {row.riskFlag && !row.isVolumePad && !row.riskFlag.toUpperCase().includes('VOLUME_FILL') && (
-                  <span className={`inline-block border px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap font-black uppercase ${flagClass(row.riskFlag)}`}>
-                    {row.riskFlag}
-                  </span>
-                )}
+                <div className="flex items-center gap-1 flex-wrap justify-end">
+                  {row.deskIcDecision && String(row.deskIcDecision).toUpperCase() === 'REJECT' && (
+                    <span className="inline-block border border-red-200 bg-red-50 text-red-700 px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap font-black uppercase">
+                      Desk IC REJECT
+                    </span>
+                  )}
+                  {row.deskIcDecision && String(row.deskIcDecision).toUpperCase() === 'HOLD_FOR_DATA' && (
+                    <span className="inline-block border border-amber-200 bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap font-black uppercase">
+                      Desk IC HOLD
+                    </span>
+                  )}
+                  {row.riskFlag && !row.isVolumePad && !row.riskFlag.toUpperCase().includes('VOLUME_FILL') && (
+                    <span className={`inline-block border px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap font-black uppercase ${flagClass(row.riskFlag)}`}>
+                      {row.riskFlag}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Optional real allocation / W/L / R:R — facts only */}
@@ -1304,7 +1437,7 @@ export default function ForensicPanel({
             </div>
           );
         })}
-        {!displayRows.length && (
+        {!portfolioDisplayRows.length && (
           <div className="col-span-full py-8 text-center">
             <p className="text-slate-700 text-[13px] font-semibold">
               {institutionalMode

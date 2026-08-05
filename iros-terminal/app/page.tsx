@@ -2039,6 +2039,7 @@ export default function IrosMasterAdvancedTerminal() {
   const [activeTab, setActiveTab] = useState<TabKey>('marketSnapshot');
   const [now, setNow] = useState(() => Date.now());
   const [tilesUpdating, setTilesUpdating] = useState(false);
+  const [deskRefreshKey, setDeskRefreshKey] = useState(0);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
@@ -2154,6 +2155,7 @@ export default function IrosMasterAdvancedTerminal() {
 
   const handleRefresh = async () => {
     await refreshOnDemand();
+    setDeskRefreshKey((k) => k + 1);
   };
 
   const snapshotAgeMin = liveMarket?.updatedAt ? Math.round((now - new Date(liveMarket.updatedAt).getTime()) / 60000) : null;
@@ -2323,7 +2325,6 @@ export default function IrosMasterAdvancedTerminal() {
             <ForensicPanel
               onSelect={handleSelect}
               liveMarket={liveMarket}
-              refreshOnDemand={refreshOnDemand}
               selectedPool={selectedPool}
               onPoolChange={setSelectedPool}
               availablePools={liveMarket?.availablePools}
@@ -2336,7 +2337,7 @@ export default function IrosMasterAdvancedTerminal() {
 
         {activeTab === 'intradayMatrix' && (
           <div key="intradayMatrix" className="desk-panel-enter space-y-3 min-w-0">
-            <AssetMetricsPanel />
+            <AssetMetricsPanel refreshToken={deskRefreshKey} />
           </div>
         )}
 

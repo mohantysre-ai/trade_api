@@ -22,6 +22,20 @@ services:
       BACKEND_URL: "http://localhost:8000"
       HEALTH_PORT: "8000"
       TZ: Asia/Kolkata
+      MARKET_PREWORK_ENABLED: "1"
+      MARKET_PREWORK_HOUR: "10"
+      MARKET_PREWORK_MINUTE: "0"
+      MARKET_PREWORK_POOL: "Nifty 500"
+      DESK_AUTO_ENABLED: "1"
+      DESK_AUTO_COMMIT: "1"
+      DESK_COMMIT_DELAY_MIN: "15"
+      DESK_AUTO_MIDDAY_REFRESH: "1"
+      DESK_MIDDAY_REFRESH_TIMES: "12:00,14:00"
+      DESK_AUTO_PM_LLM: "1"
+      DESK_PM_LLM_HOUR: "16"
+      DESK_PM_LLM_MINUTE: "0"
+      SWING_CAPITAL: "1000000"
+      SWING_SESSION_FILE: /app/state/swing_session.json
       SNAPSHOT_FILE: /app/state/trade_api_snapshot.json
       FIXED_PLAN_FILE: /app/state/fixed_trade_plan.json
       ALERT_HISTORY_FILE: /app/state/alert_history.json
@@ -32,6 +46,11 @@ services:
       - iros-backend-data:/app/backend/app/data
       - iros-eod-archive:/app/backend/app/services/eod_archive
       - iros-desk-state:/app/state
+      # Host desk lock — same files native start-app uses (overrides empty volume stubs)
+      - ./fixed_trade_plan.json:/app/state/fixed_trade_plan.json
+      - ./intraday_session.json:/app/state/intraday_session.json
+      - ./swing_session.json:/app/state/swing_session.json
+      - ./trade_api_snapshot.json:/app/state/trade_api_snapshot.json
     healthcheck:
       test:
         [
@@ -61,6 +80,7 @@ services:
       AI_NEWS_PORT: "8001"
       HEALTH_PORT: "8001"
       TZ: Asia/Kolkata
+      SWING_SESSION_FILE: /app/state/swing_session.json
       SNAPSHOT_FILE: /app/state/trade_api_snapshot.json
       FIXED_PLAN_FILE: /app/state/fixed_trade_plan.json
       ALERT_HISTORY_FILE: /app/state/alert_history.json
@@ -80,6 +100,10 @@ services:
       - iros-backend-data:/app/backend/app/data
       - iros-eod-archive:/app/backend/app/services/eod_archive
       - iros-desk-state:/app/state
+      - ./fixed_trade_plan.json:/app/state/fixed_trade_plan.json
+      - ./intraday_session.json:/app/state/intraday_session.json
+      - ./swing_session.json:/app/state/swing_session.json
+      - ./trade_api_snapshot.json:/app/state/trade_api_snapshot.json
     healthcheck:
       test:
         [

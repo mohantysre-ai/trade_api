@@ -1,9 +1,9 @@
 {
   "success": true,
   "locked": true,
-  "sessionDate": "2026-08-03",
-  "committedAt": "2026-08-03T06:26:03.820756+00:00",
-  "updatedAt": "2026-08-03T06:26:03.820756+00:00",
+  "sessionDate": "2026-08-05",
+  "committedAt": "2026-08-05T16:53:10.410180+00:00",
+  "updatedAt": "2026-08-05T16:53:10.410180+00:00",
   "snapshotUpdatedAt": "2026-08-03T04:57:17.954482+00:00",
   "dataStale": true,
   "regime": {
@@ -48,14 +48,14 @@
       "direction": "LONG",
       "sector": "OTHER",
       "sleeve": "MOMENTUM",
-      "score": 79.9,
+      "score": 75.0,
       "scorePctRank": 100.0,
       "intradayRetPctRank": 98.8,
       "meanrevScore": null,
       "gapPct": 1.41,
       "intradayRet": 3.89,
       "inPlay": true,
-      "inPlayReason": "rvolTime 3.19\u00d7 \u2265 2.0",
+      "inPlayReason": "|gap| 1.41% \u2265 0.5\u00d7ATR",
       "rsVsIndexPct": 3.0902439024390214,
       "overextended": true,
       "vwapMode": "TREND",
@@ -99,15 +99,15 @@
           "vwap": 422.38
         },
         "volume": {
-          "score": 63.8,
+          "score": 29.6,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 3.192,
+          "rvolTime": 1.479,
           "rvolRaw": 1.48,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 64.3,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 424.6,
@@ -115,8 +115,8 @@
           "orbVelocityPct": 0.32,
           "orbPosPct": 100.0,
           "inPlay": true,
-          "inPlayReason": "rvolTime 3.19\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlayReason": "|gap| 1.41% \u2265 0.5\u00d7ATR",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 93.0,
@@ -161,14 +161,14 @@
       "direction": "LONG",
       "sector": "OTHER",
       "sleeve": "MOMENTUM",
-      "score": 76.1,
+      "score": 73.6,
       "scorePctRank": 98.8,
       "intradayRetPctRank": 100.0,
       "meanrevScore": null,
       "gapPct": 0.534,
       "intradayRet": 4.63,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
+      "inPlay": false,
+      "inPlayReason": "not in play",
       "rsVsIndexPct": 3.8298023125699237,
       "overextended": false,
       "vwapMode": "TREND",
@@ -212,24 +212,24 @@
           "vwap": 2216.07
         },
         "volume": {
-          "score": 43.2,
+          "score": 20.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 2.158,
+          "rvolTime": 1.0,
           "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 52.0,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 2244.1,
           "orbLow": 2144.8,
           "orbVelocityPct": 0.0,
           "orbPosPct": 100.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 49.6,
@@ -269,132 +269,19 @@
     },
     {
       "rank": 3,
-      "symbol": "GABRIEL",
-      "name": "GABRIEL",
-      "direction": "LONG",
-      "sector": "OTHER",
-      "sleeve": "MOMENTUM",
-      "score": 75.0,
-      "scorePctRank": 97.6,
-      "intradayRetPctRank": 92.7,
-      "meanrevScore": null,
-      "gapPct": 1.63,
-      "intradayRet": 2.846,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-      "rsVsIndexPct": 2.0458336176892136,
-      "overextended": false,
-      "vwapMode": "TREND",
-      "vwap": 1494.0,
-      "orbHigh": 1507.0,
-      "orbLow": 1465.3,
-      "orbPosPct": 100.0,
-      "factorBreakdown": {
-        "regime": {
-          "score": 100.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "relativeStrength": {
-          "score": 70.5,
-          "weight": 15.0,
-          "rated": true,
-          "rsVsIndexPct": 2.046,
-          "niftyChangePct": 0.8,
-          "gapPct": 1.63,
-          "intradayRet": 2.846
-        },
-        "trend": {
-          "score": 85.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "momentum": {
-          "score": 67.1,
-          "weight": 10.0,
-          "rated": true,
-          "overextended": false
-        },
-        "vwap": {
-          "score": 58.7,
-          "weight": 10.0,
-          "rated": true,
-          "vwapMode": "TREND",
-          "vwapZ": null,
-          "vwapSource": "snapshot",
-          "vwap": 1494.0
-        },
-        "volume": {
-          "score": 43.2,
-          "weight": 10.0,
-          "rated": true,
-          "rvolTime": 2.158,
-          "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
-        },
-        "breakout": {
-          "score": 59.9,
-          "weight": 10.0,
-          "rated": true,
-          "orbHigh": 1507.0,
-          "orbLow": 1465.3,
-          "orbVelocityPct": 0.0,
-          "orbPosPct": 100.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
-        },
-        "volatility": {
-          "score": 89.8,
-          "weight": 5.0,
-          "rated": true
-        },
-        "sector": {
-          "score": 86.8,
-          "weight": 5.0,
-          "rated": true
-        },
-        "liquidity": {
-          "score": 100.0,
-          "weight": 5.0,
-          "rated": true
-        }
-      },
-      "ltp": 1507.0,
-      "scanLtp": 1507.0,
-      "atrPct": 3.68,
-      "status": "RUNNING",
-      "closed": false,
-      "entryPrice": 1507.0,
-      "stopLoss": 1440.45,
-      "target1": 1606.82,
-      "target2": 1706.65,
-      "riskPerShare": 66.55,
-      "rewardRisk": 1.5,
-      "approxQty": 66,
-      "deployedCapital": 99462.0,
-      "maxLoss": 4392.3,
-      "riskScale": 1.0,
-      "effectiveRiskFraction": 0.01,
-      "adopted": true,
-      "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
-    },
-    {
-      "rank": 4,
       "symbol": "ARE&M",
       "name": "ARE&M",
       "direction": "LONG",
       "sector": "OTHER",
       "sleeve": "MOMENTUM",
-      "score": 74.8,
-      "scorePctRank": 96.3,
+      "score": 72.1,
+      "scorePctRank": 97.6,
       "intradayRetPctRank": 89.0,
       "meanrevScore": null,
       "gapPct": 0.632,
       "intradayRet": 2.478,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
+      "inPlay": false,
+      "inPlayReason": "not in play",
       "rsVsIndexPct": 1.6776249727133739,
       "overextended": false,
       "vwapMode": "TREND",
@@ -438,24 +325,24 @@
           "vwap": 930.1
         },
         "volume": {
-          "score": 43.2,
+          "score": 20.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 2.158,
+          "rvolTime": 1.0,
           "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 53.7,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 938.9,
           "orbLow": 916.2,
           "orbVelocityPct": 0.0,
           "orbPosPct": 100.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 99.9,
@@ -494,26 +381,26 @@
       "candidatePoolSize": 10
     },
     {
-      "rank": 5,
-      "symbol": "BALRAMCHIN",
-      "name": "BALRAMCHIN",
+      "rank": 4,
+      "symbol": "GABRIEL",
+      "name": "GABRIEL",
       "direction": "LONG",
       "sector": "OTHER",
       "sleeve": "MOMENTUM",
-      "score": 73.9,
-      "scorePctRank": 95.1,
-      "intradayRetPctRank": 97.6,
+      "score": 71.7,
+      "scorePctRank": 96.3,
+      "intradayRetPctRank": 92.7,
       "meanrevScore": null,
-      "gapPct": 1.51,
-      "intradayRet": 3.655,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-      "rsVsIndexPct": 2.8551550289891603,
+      "gapPct": 1.63,
+      "intradayRet": 2.846,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": 2.0458336176892136,
       "overextended": false,
       "vwapMode": "TREND",
-      "vwap": 609.93,
-      "orbHigh": 616.8,
-      "orbLow": 595.05,
+      "vwap": 1494.0,
+      "orbHigh": 1507.0,
+      "orbLow": 1465.3,
       "orbPosPct": 100.0,
       "factorBreakdown": {
         "regime": {
@@ -522,13 +409,13 @@
           "rated": true
         },
         "relativeStrength": {
-          "score": 78.6,
+          "score": 70.5,
           "weight": 15.0,
           "rated": true,
-          "rsVsIndexPct": 2.855,
+          "rsVsIndexPct": 2.046,
           "niftyChangePct": 0.8,
-          "gapPct": 1.51,
-          "intradayRet": 3.655
+          "gapPct": 1.63,
+          "intradayRet": 2.846
         },
         "trend": {
           "score": 85.0,
@@ -536,70 +423,183 @@
           "rated": true
         },
         "momentum": {
-          "score": 71.9,
+          "score": 67.1,
           "weight": 10.0,
           "rated": true,
           "overextended": false
         },
         "vwap": {
-          "score": 61.3,
+          "score": 58.7,
           "weight": 10.0,
           "rated": true,
           "vwapMode": "TREND",
           "vwapZ": null,
           "vwapSource": "snapshot",
-          "vwap": 609.93
+          "vwap": 1494.0
         },
         "volume": {
-          "score": 43.2,
+          "score": 20.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 2.158,
+          "rvolTime": 1.0,
           "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 58.8,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
-          "orbHigh": 616.8,
-          "orbLow": 595.05,
+          "orbHigh": 1507.0,
+          "orbLow": 1465.3,
           "orbVelocityPct": 0.0,
           "orbPosPct": 100.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
         },
         "volatility": {
-          "score": 81.1,
+          "score": 89.8,
           "weight": 5.0,
           "rated": true
         },
         "sector": {
-          "score": 91.2,
+          "score": 86.8,
           "weight": 5.0,
           "rated": true
         },
         "liquidity": {
-          "score": 44.5,
+          "score": 100.0,
           "weight": 5.0,
           "rated": true
         }
       },
-      "ltp": 616.8,
-      "scanLtp": 616.8,
-      "atrPct": 4.26,
+      "ltp": 1507.0,
+      "scanLtp": 1507.0,
+      "atrPct": 3.68,
       "status": "RUNNING",
       "closed": false,
-      "entryPrice": 616.8,
-      "stopLoss": 585.27,
-      "target1": 664.1,
-      "target2": 711.39,
-      "riskPerShare": 31.53,
+      "entryPrice": 1507.0,
+      "stopLoss": 1440.45,
+      "target1": 1606.82,
+      "target2": 1706.65,
+      "riskPerShare": 66.55,
       "rewardRisk": 1.5,
-      "approxQty": 158,
-      "deployedCapital": 97454.4,
-      "maxLoss": 4981.74,
+      "approxQty": 66,
+      "deployedCapital": 99462.0,
+      "maxLoss": 4392.3,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "adopted": true,
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10
+    },
+    {
+      "rank": 5,
+      "symbol": "CHENNPETRO",
+      "name": "CHENNPETRO",
+      "direction": "LONG",
+      "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "score": 71.0,
+      "scorePctRank": 95.1,
+      "intradayRetPctRank": 96.3,
+      "meanrevScore": null,
+      "gapPct": 0.484,
+      "intradayRet": 3.624,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": 2.823588852924912,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 1311.54,
+      "orbHigh": 1330.9,
+      "orbLow": 1266.0,
+      "orbPosPct": 71.8027734976885,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 78.2,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 2.824,
+          "niftyChangePct": 0.8,
+          "gapPct": 0.484,
+          "intradayRet": 3.624
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 77.3,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 50.8,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 1311.54
+        },
+        "volume": {
+          "score": 11.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 0.548,
+          "rvolRaw": 0.55,
+          "cumVolFracHeuristic": 1.0
+        },
+        "breakout": {
+          "score": 50.0,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1330.9,
+          "orbLow": 1266.0,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 71.8,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
+        },
+        "volatility": {
+          "score": 61.3,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 89.9,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 1312.6,
+      "scanLtp": 1312.6,
+      "atrPct": 5.58,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 1312.6,
+      "stopLoss": 1224.71,
+      "target1": 1444.44,
+      "target2": 1576.28,
+      "riskPerShare": 87.89,
+      "rewardRisk": 1.5,
+      "approxQty": 56,
+      "deployedCapital": 73505.6,
+      "maxLoss": 4921.84,
       "riskScale": 1.0,
       "effectiveRiskFraction": 0.01,
       "adopted": true,
@@ -615,14 +615,14 @@
       "direction": "SHORT",
       "sector": "ENERGY",
       "sleeve": "MOMENTUM",
-      "score": 80.4,
+      "score": 71.4,
       "scorePctRank": 100.0,
       "intradayRetPctRank": 0.0,
       "meanrevScore": null,
       "gapPct": 0.364,
       "intradayRet": -5.135,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 3.72\u00d7 \u2265 2.0",
+      "inPlay": false,
+      "inPlayReason": "not in play",
       "rsVsIndexPct": -5.934541460735856,
       "overextended": true,
       "vwapMode": "TREND",
@@ -666,24 +666,24 @@
           "vwap": 175.05
         },
         "volume": {
-          "score": 74.4,
+          "score": 34.5,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 3.722,
+          "rvolTime": 1.725,
           "rvolRaw": 1.72,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 100.0,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 182.38,
           "orbLow": 174.0,
           "orbVelocityPct": 0.0,
           "orbPosPct": 0.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 3.72\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 93.7,
@@ -728,14 +728,14 @@
       "direction": "SHORT",
       "sector": "OTHER",
       "sleeve": "MOMENTUM",
-      "score": 71.3,
+      "score": 68.4,
       "scorePctRank": 98.8,
       "intradayRetPctRank": 4.9,
       "meanrevScore": null,
       "gapPct": 7.746,
       "intradayRet": -1.079,
       "inPlay": true,
-      "inPlayReason": "rvolTime 26.51\u00d7 \u2265 2.0",
+      "inPlayReason": "rvolTime 12.29\u00d7 \u2265 2.0",
       "rsVsIndexPct": -1.879136690647482,
       "overextended": false,
       "vwapMode": "TREND",
@@ -782,12 +782,12 @@
           "score": 100.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 26.515,
+          "rvolTime": 12.285,
           "rvolRaw": 12.29,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 79.0,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 5745.0,
@@ -795,8 +795,8 @@
           "orbVelocityPct": 0.0,
           "orbPosPct": 18.9,
           "inPlay": true,
-          "inPlayReason": "rvolTime 26.51\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlayReason": "rvolTime 12.29\u00d7 \u2265 2.0",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 95.2,
@@ -836,19 +836,132 @@
     },
     {
       "rank": 3,
+      "symbol": "CLEAN",
+      "name": "CLEAN",
+      "direction": "SHORT",
+      "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "score": 62.6,
+      "scorePctRank": 97.6,
+      "intradayRetPctRank": 39.0,
+      "meanrevScore": null,
+      "gapPct": 3.201,
+      "intradayRet": 0.086,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 6.46\u00d7 \u2265 2.0",
+      "rsVsIndexPct": -0.7141970827007998,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 759.68,
+      "orbHigh": 799.8,
+      "orbLow": 755.0,
+      "orbPosPct": 7.1428571428572525,
+      "factorBreakdown": {
+        "regime": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 57.1,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": -0.714,
+          "niftyChangePct": 0.8,
+          "gapPct": 3.201,
+          "intradayRet": 0.086
+        },
+        "trend": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 50.5,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 51.9,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 759.68
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 6.46,
+          "rvolRaw": 6.46,
+          "cumVolFracHeuristic": 1.0
+        },
+        "breakout": {
+          "score": 50.0,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 799.8,
+          "orbLow": 755.0,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 7.1,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 6.46\u00d7 \u2265 2.0",
+          "orbDecay": 0.0
+        },
+        "volatility": {
+          "score": 93.7,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 52.4,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 758.2,
+      "scanLtp": 758.2,
+      "atrPct": 3.42,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 758.2,
+      "stopLoss": 789.32,
+      "target1": 711.53,
+      "target2": 680.41,
+      "riskPerShare": 31.12,
+      "rewardRisk": 1.5,
+      "approxQty": 131,
+      "deployedCapital": 99324.2,
+      "maxLoss": 4076.72,
+      "riskScale": 0.85,
+      "effectiveRiskFraction": 0.0085,
+      "adopted": true,
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10
+    },
+    {
+      "rank": 4,
       "symbol": "ASTRAL",
       "name": "ASTRAL",
       "direction": "SHORT",
       "sector": "OTHER",
       "sleeve": "MOMENTUM",
-      "score": 69.2,
-      "scorePctRank": 97.6,
+      "score": 62.0,
+      "scorePctRank": 96.3,
       "intradayRetPctRank": 1.2,
       "meanrevScore": null,
       "gapPct": 1.132,
       "intradayRet": -1.734,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
+      "inPlay": false,
+      "inPlayReason": "not in play",
       "rsVsIndexPct": -2.533788395904443,
       "overextended": false,
       "vwapMode": "TREND",
@@ -892,24 +1005,24 @@
           "vwap": 1443.5
         },
         "volume": {
-          "score": 43.2,
+          "score": 20.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 2.158,
+          "rvolTime": 1.0,
           "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 98.8,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 1465.0,
           "orbLow": 1439.6,
           "orbVelocityPct": 0.0,
           "orbPosPct": 0.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 97.0,
@@ -948,20 +1061,20 @@
       "candidatePoolSize": 10
     },
     {
-      "rank": 4,
+      "rank": 5,
       "symbol": "HDFCAMC",
       "name": "HDFCAMC",
       "direction": "SHORT",
       "sector": "OTHER",
       "sleeve": "MOMENTUM",
-      "score": 68.9,
-      "scorePctRank": 96.3,
+      "score": 61.7,
+      "scorePctRank": 95.1,
       "intradayRetPctRank": 3.7,
       "meanrevScore": null,
       "gapPct": 0.925,
       "intradayRet": -1.284,
       "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
+      "inPlayReason": "|gap| 0.93% \u2265 0.5\u00d7ATR",
       "rsVsIndexPct": -2.0840909090909125,
       "overextended": false,
       "vwapMode": "TREND",
@@ -1005,15 +1118,15 @@
           "vwap": 2616.53
         },
         "volume": {
-          "score": 43.2,
+          "score": 20.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 2.158,
+          "rvolTime": 1.0,
           "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 98.8,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 2640.0,
@@ -1021,8 +1134,8 @@
           "orbVelocityPct": 0.0,
           "orbPosPct": 0.0,
           "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlayReason": "|gap| 0.93% \u2265 0.5\u00d7ATR",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 81.4,
@@ -1059,119 +1172,6 @@
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
       "candidatePoolSize": 10
-    },
-    {
-      "rank": 5,
-      "symbol": "AUBANK",
-      "name": "AUBANK",
-      "direction": "SHORT",
-      "sector": "OTHER",
-      "sleeve": "MOMENTUM",
-      "score": 68.1,
-      "scorePctRank": 95.1,
-      "intradayRetPctRank": 7.3,
-      "meanrevScore": null,
-      "gapPct": 0.649,
-      "intradayRet": -0.968,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-      "rsVsIndexPct": -1.7676501280713233,
-      "overextended": false,
-      "vwapMode": "TREND",
-      "vwap": 1048.93,
-      "orbHigh": 1054.1,
-      "orbLow": 1043.9,
-      "orbPosPct": 0.0,
-      "factorBreakdown": {
-        "regime": {
-          "score": 55.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "relativeStrength": {
-          "score": 67.7,
-          "weight": 15.0,
-          "rated": true,
-          "rsVsIndexPct": -1.768,
-          "niftyChangePct": 0.8,
-          "gapPct": 0.649,
-          "intradayRet": -0.968
-        },
-        "trend": {
-          "score": 85.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "momentum": {
-          "score": 55.8,
-          "weight": 10.0,
-          "rated": true,
-          "overextended": false
-        },
-        "vwap": {
-          "score": 54.8,
-          "weight": 10.0,
-          "rated": true,
-          "vwapMode": "TREND",
-          "vwapZ": null,
-          "vwapSource": "snapshot",
-          "vwap": 1048.93
-        },
-        "volume": {
-          "score": 43.2,
-          "weight": 10.0,
-          "rated": true,
-          "rvolTime": 2.158,
-          "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
-        },
-        "breakout": {
-          "score": 98.8,
-          "weight": 10.0,
-          "rated": true,
-          "orbHigh": 1054.1,
-          "orbLow": 1043.9,
-          "orbVelocityPct": 0.0,
-          "orbPosPct": 0.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
-        },
-        "volatility": {
-          "score": 78.7,
-          "weight": 5.0,
-          "rated": true
-        },
-        "sector": {
-          "score": 95.8,
-          "weight": 5.0,
-          "rated": true
-        },
-        "liquidity": {
-          "score": 58.3,
-          "weight": 5.0,
-          "rated": true
-        }
-      },
-      "ltp": 1043.9,
-      "scanLtp": 1043.9,
-      "atrPct": 1.58,
-      "status": "RUNNING",
-      "closed": false,
-      "entryPrice": 1043.9,
-      "stopLoss": 1063.69,
-      "target1": 1014.21,
-      "target2": 994.42,
-      "riskPerShare": 19.79,
-      "rewardRisk": 1.5,
-      "approxQty": 95,
-      "deployedCapital": 99170.5,
-      "maxLoss": 1880.05,
-      "riskScale": 0.85,
-      "effectiveRiskFraction": 0.0085,
-      "adopted": true,
-      "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
     }
   ],
   "candidatePoolLong": [
@@ -1182,14 +1182,14 @@
       "direction": "LONG",
       "sector": "OTHER",
       "sleeve": "MOMENTUM",
-      "score": 79.9,
+      "score": 75.0,
       "scorePctRank": 100.0,
       "intradayRetPctRank": 98.8,
       "meanrevScore": null,
       "gapPct": 1.41,
       "intradayRet": 3.89,
       "inPlay": true,
-      "inPlayReason": "rvolTime 3.19\u00d7 \u2265 2.0",
+      "inPlayReason": "|gap| 1.41% \u2265 0.5\u00d7ATR",
       "rsVsIndexPct": 3.0902439024390214,
       "overextended": true,
       "vwapMode": "TREND",
@@ -1233,15 +1233,15 @@
           "vwap": 422.38
         },
         "volume": {
-          "score": 63.8,
+          "score": 29.6,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 3.192,
+          "rvolTime": 1.479,
           "rvolRaw": 1.48,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 64.3,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 424.6,
@@ -1249,8 +1249,8 @@
           "orbVelocityPct": 0.32,
           "orbPosPct": 100.0,
           "inPlay": true,
-          "inPlayReason": "rvolTime 3.19\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlayReason": "|gap| 1.41% \u2265 0.5\u00d7ATR",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 93.0,
@@ -1292,14 +1292,14 @@
       "direction": "LONG",
       "sector": "OTHER",
       "sleeve": "MOMENTUM",
-      "score": 76.1,
+      "score": 73.6,
       "scorePctRank": 98.8,
       "intradayRetPctRank": 100.0,
       "meanrevScore": null,
       "gapPct": 0.534,
       "intradayRet": 4.63,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
+      "inPlay": false,
+      "inPlayReason": "not in play",
       "rsVsIndexPct": 3.8298023125699237,
       "overextended": false,
       "vwapMode": "TREND",
@@ -1343,24 +1343,24 @@
           "vwap": 2216.07
         },
         "volume": {
-          "score": 43.2,
+          "score": 20.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 2.158,
+          "rvolTime": 1.0,
           "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 52.0,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 2244.1,
           "orbLow": 2144.8,
           "orbVelocityPct": 0.0,
           "orbPosPct": 100.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 49.6,
@@ -1397,459 +1397,19 @@
     },
     {
       "rank": 3,
-      "symbol": "GABRIEL",
-      "name": "GABRIEL",
-      "direction": "LONG",
-      "sector": "OTHER",
-      "sleeve": "MOMENTUM",
-      "score": 75.0,
-      "scorePctRank": 97.6,
-      "intradayRetPctRank": 92.7,
-      "meanrevScore": null,
-      "gapPct": 1.63,
-      "intradayRet": 2.846,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-      "rsVsIndexPct": 2.0458336176892136,
-      "overextended": false,
-      "vwapMode": "TREND",
-      "vwap": 1494.0,
-      "orbHigh": 1507.0,
-      "orbLow": 1465.3,
-      "orbPosPct": 100.0,
-      "factorBreakdown": {
-        "regime": {
-          "score": 100.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "relativeStrength": {
-          "score": 70.5,
-          "weight": 15.0,
-          "rated": true,
-          "rsVsIndexPct": 2.046,
-          "niftyChangePct": 0.8,
-          "gapPct": 1.63,
-          "intradayRet": 2.846
-        },
-        "trend": {
-          "score": 85.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "momentum": {
-          "score": 67.1,
-          "weight": 10.0,
-          "rated": true,
-          "overextended": false
-        },
-        "vwap": {
-          "score": 58.7,
-          "weight": 10.0,
-          "rated": true,
-          "vwapMode": "TREND",
-          "vwapZ": null,
-          "vwapSource": "snapshot",
-          "vwap": 1494.0
-        },
-        "volume": {
-          "score": 43.2,
-          "weight": 10.0,
-          "rated": true,
-          "rvolTime": 2.158,
-          "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
-        },
-        "breakout": {
-          "score": 59.9,
-          "weight": 10.0,
-          "rated": true,
-          "orbHigh": 1507.0,
-          "orbLow": 1465.3,
-          "orbVelocityPct": 0.0,
-          "orbPosPct": 100.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
-        },
-        "volatility": {
-          "score": 89.8,
-          "weight": 5.0,
-          "rated": true
-        },
-        "sector": {
-          "score": 86.8,
-          "weight": 5.0,
-          "rated": true
-        },
-        "liquidity": {
-          "score": 100.0,
-          "weight": 5.0,
-          "rated": true
-        }
-      },
-      "ltp": 1507.0,
-      "scanLtp": 1507.0,
-      "atrPct": 3.68,
-      "status": "RUNNING",
-      "closed": false,
-      "entryPrice": 1507.0,
-      "stopLoss": 1440.45,
-      "target1": 1606.82,
-      "target2": 1706.65,
-      "riskPerShare": 66.55,
-      "rewardRisk": 1.5,
-      "approxQty": 33,
-      "deployedCapital": 49731.0,
-      "maxLoss": 2196.15,
-      "riskScale": 1.0,
-      "effectiveRiskFraction": 0.01
-    },
-    {
-      "rank": 4,
-      "symbol": "ADANIGREEN",
-      "name": "ADANIGREEN",
-      "direction": "LONG",
-      "sector": "POWER",
-      "sleeve": "MOMENTUM",
-      "score": 70.1,
-      "scorePctRank": 84.1,
-      "intradayRetPctRank": 79.3,
-      "meanrevScore": null,
-      "gapPct": 0.506,
-      "intradayRet": 1.662,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-      "rsVsIndexPct": 0.8618705035971157,
-      "overextended": false,
-      "vwapMode": "TREND",
-      "vwap": 1409.27,
-      "orbHigh": 1413.1,
-      "orbLow": 1390.0,
-      "orbPosPct": 100.0,
-      "factorBreakdown": {
-        "regime": {
-          "score": 100.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "relativeStrength": {
-          "score": 58.6,
-          "weight": 15.0,
-          "rated": true,
-          "rsVsIndexPct": 0.862,
-          "niftyChangePct": 0.8,
-          "gapPct": 0.506,
-          "intradayRet": 1.662
-        },
-        "trend": {
-          "score": 85.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "momentum": {
-          "score": 60.0,
-          "weight": 10.0,
-          "rated": true,
-          "overextended": false
-        },
-        "vwap": {
-          "score": 52.7,
-          "weight": 10.0,
-          "rated": true,
-          "vwapMode": "TREND",
-          "vwapZ": null,
-          "vwapSource": "snapshot",
-          "vwap": 1409.27
-        },
-        "volume": {
-          "score": 43.2,
-          "weight": 10.0,
-          "rated": true,
-          "rvolTime": 2.158,
-          "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
-        },
-        "breakout": {
-          "score": 49.0,
-          "weight": 10.0,
-          "rated": true,
-          "orbHigh": 1413.1,
-          "orbLow": 1390.0,
-          "orbVelocityPct": 0.0,
-          "orbPosPct": 100.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
-        },
-        "volatility": {
-          "score": 97.6,
-          "weight": 5.0,
-          "rated": true
-        },
-        "sector": {
-          "score": 64.6,
-          "weight": 5.0,
-          "rated": true
-        },
-        "liquidity": {
-          "score": 100.0,
-          "weight": 5.0,
-          "rated": true
-        }
-      },
-      "ltp": 1413.1,
-      "scanLtp": 1413.1,
-      "atrPct": 2.84,
-      "status": "RUNNING",
-      "closed": false,
-      "entryPrice": 1413.1,
-      "stopLoss": 1364.94,
-      "target1": 1485.34,
-      "target2": 1557.58,
-      "riskPerShare": 48.16,
-      "rewardRisk": 1.5,
-      "approxQty": 35,
-      "deployedCapital": 49458.5,
-      "maxLoss": 1685.6,
-      "riskScale": 1.0,
-      "effectiveRiskFraction": 0.01
-    },
-    {
-      "rank": 5,
-      "symbol": "DIVISLAB",
-      "name": "DIVISLAB",
-      "direction": "LONG",
-      "sector": "PHARMA",
-      "sleeve": "MOMENTUM",
-      "score": 69.9,
-      "scorePctRank": 80.5,
-      "intradayRetPctRank": 51.2,
-      "meanrevScore": null,
-      "gapPct": 4.022,
-      "intradayRet": 0.465,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-      "rsVsIndexPct": -0.3346062052505967,
-      "overextended": false,
-      "vwapMode": "TREND",
-      "vwap": 8341.33,
-      "orbHigh": 8419.0,
-      "orbLow": 8380.0,
-      "orbPosPct": 100.0,
-      "factorBreakdown": {
-        "regime": {
-          "score": 100.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "relativeStrength": {
-          "score": 46.7,
-          "weight": 15.0,
-          "rated": true,
-          "rsVsIndexPct": -0.335,
-          "niftyChangePct": 0.8,
-          "gapPct": 4.022,
-          "intradayRet": 0.465
-        },
-        "trend": {
-          "score": 85.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "momentum": {
-          "score": 52.8,
-          "weight": 10.0,
-          "rated": true,
-          "overextended": false
-        },
-        "vwap": {
-          "score": 59.3,
-          "weight": 10.0,
-          "rated": true,
-          "vwapMode": "TREND",
-          "vwapZ": null,
-          "vwapSource": "snapshot",
-          "vwap": 8341.33
-        },
-        "volume": {
-          "score": 43.2,
-          "weight": 10.0,
-          "rated": true,
-          "rvolTime": 2.158,
-          "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
-        },
-        "breakout": {
-          "score": 70.8,
-          "weight": 10.0,
-          "rated": true,
-          "orbHigh": 8419.0,
-          "orbLow": 8380.0,
-          "orbVelocityPct": 0.0,
-          "orbPosPct": 100.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
-        },
-        "volatility": {
-          "score": 71.5,
-          "weight": 5.0,
-          "rated": true
-        },
-        "sector": {
-          "score": 79.5,
-          "weight": 5.0,
-          "rated": true
-        },
-        "liquidity": {
-          "score": 100.0,
-          "weight": 5.0,
-          "rated": true
-        }
-      },
-      "ltp": 8419.0,
-      "scanLtp": 8419.0,
-      "atrPct": 4.9,
-      "status": "RUNNING",
-      "closed": false,
-      "entryPrice": 8419.0,
-      "stopLoss": 7923.96,
-      "target1": 9161.56,
-      "target2": 9904.11,
-      "riskPerShare": 495.04,
-      "rewardRisk": 1.5,
-      "approxQty": 5,
-      "deployedCapital": 42095.0,
-      "maxLoss": 2475.2,
-      "riskScale": 1.0,
-      "effectiveRiskFraction": 0.01
-    },
-    {
-      "rank": 6,
-      "symbol": "EICHERMOT",
-      "name": "EICHERMOT",
-      "direction": "LONG",
-      "sector": "AUTO",
-      "sleeve": "MOMENTUM",
-      "score": 67.7,
-      "scorePctRank": 67.1,
-      "intradayRetPctRank": 56.1,
-      "meanrevScore": null,
-      "gapPct": 0.849,
-      "intradayRet": 0.582,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-      "rsVsIndexPct": -0.21772151898734182,
-      "overextended": false,
-      "vwapMode": "TREND",
-      "vwap": 7932.67,
-      "orbHigh": 7946.0,
-      "orbLow": 7900.0,
-      "orbPosPct": 100.0,
-      "factorBreakdown": {
-        "regime": {
-          "score": 100.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "relativeStrength": {
-          "score": 47.8,
-          "weight": 15.0,
-          "rated": true,
-          "rsVsIndexPct": -0.218,
-          "niftyChangePct": 0.8,
-          "gapPct": 0.849,
-          "intradayRet": 0.582
-        },
-        "trend": {
-          "score": 85.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "momentum": {
-          "score": 53.5,
-          "weight": 10.0,
-          "rated": true,
-          "overextended": false
-        },
-        "vwap": {
-          "score": 51.7,
-          "weight": 10.0,
-          "rated": true,
-          "vwapMode": "TREND",
-          "vwapZ": null,
-          "vwapSource": "snapshot",
-          "vwap": 7932.67
-        },
-        "volume": {
-          "score": 43.2,
-          "weight": 10.0,
-          "rated": true,
-          "rvolTime": 2.158,
-          "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
-        },
-        "breakout": {
-          "score": 56.1,
-          "weight": 10.0,
-          "rated": true,
-          "orbHigh": 7946.0,
-          "orbLow": 7900.0,
-          "orbVelocityPct": 0.0,
-          "orbPosPct": 100.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
-        },
-        "volatility": {
-          "score": 83.3,
-          "weight": 5.0,
-          "rated": true
-        },
-        "sector": {
-          "score": 63.5,
-          "weight": 5.0,
-          "rated": true
-        },
-        "liquidity": {
-          "score": 100.0,
-          "weight": 5.0,
-          "rated": true
-        }
-      },
-      "ltp": 7946.0,
-      "scanLtp": 7946.0,
-      "atrPct": 1.89,
-      "status": "RUNNING",
-      "closed": false,
-      "entryPrice": 7946.0,
-      "stopLoss": 7765.78,
-      "target1": 8216.32,
-      "target2": 8486.65,
-      "riskPerShare": 180.22,
-      "rewardRisk": 1.5,
-      "approxQty": 6,
-      "deployedCapital": 47676.0,
-      "maxLoss": 1081.32,
-      "riskScale": 1.0,
-      "effectiveRiskFraction": 0.01
-    },
-    {
-      "rank": 7,
       "symbol": "ARE&M",
       "name": "ARE&M",
       "direction": "LONG",
       "sector": "OTHER",
       "sleeve": "MOMENTUM",
-      "score": 74.8,
-      "scorePctRank": 96.3,
+      "score": 72.1,
+      "scorePctRank": 97.6,
       "intradayRetPctRank": 89.0,
       "meanrevScore": null,
       "gapPct": 0.632,
       "intradayRet": 2.478,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
+      "inPlay": false,
+      "inPlayReason": "not in play",
       "rsVsIndexPct": 1.6776249727133739,
       "overextended": false,
       "vwapMode": "TREND",
@@ -1893,24 +1453,24 @@
           "vwap": 930.1
         },
         "volume": {
-          "score": 43.2,
+          "score": 20.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 2.158,
+          "rvolTime": 1.0,
           "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 53.7,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 938.9,
           "orbLow": 916.2,
           "orbVelocityPct": 0.0,
           "orbPosPct": 100.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 99.9,
@@ -1946,26 +1506,26 @@
       "effectiveRiskFraction": 0.01
     },
     {
-      "rank": 8,
-      "symbol": "BALRAMCHIN",
-      "name": "BALRAMCHIN",
+      "rank": 4,
+      "symbol": "ADANIGREEN",
+      "name": "ADANIGREEN",
       "direction": "LONG",
-      "sector": "OTHER",
+      "sector": "POWER",
       "sleeve": "MOMENTUM",
-      "score": 73.9,
-      "scorePctRank": 95.1,
-      "intradayRetPctRank": 97.6,
+      "score": 67.9,
+      "scorePctRank": 84.1,
+      "intradayRetPctRank": 79.3,
       "meanrevScore": null,
-      "gapPct": 1.51,
-      "intradayRet": 3.655,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-      "rsVsIndexPct": 2.8551550289891603,
+      "gapPct": 0.506,
+      "intradayRet": 1.662,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": 0.8618705035971157,
       "overextended": false,
       "vwapMode": "TREND",
-      "vwap": 609.93,
-      "orbHigh": 616.8,
-      "orbLow": 595.05,
+      "vwap": 1409.27,
+      "orbHigh": 1413.1,
+      "orbLow": 1390.0,
       "orbPosPct": 100.0,
       "factorBreakdown": {
         "regime": {
@@ -1974,13 +1534,13 @@
           "rated": true
         },
         "relativeStrength": {
-          "score": 78.6,
+          "score": 58.6,
           "weight": 15.0,
           "rated": true,
-          "rsVsIndexPct": 2.855,
+          "rsVsIndexPct": 0.862,
           "niftyChangePct": 0.8,
-          "gapPct": 1.51,
-          "intradayRet": 3.655
+          "gapPct": 0.506,
+          "intradayRet": 1.662
         },
         "trend": {
           "score": 85.0,
@@ -1988,192 +1548,82 @@
           "rated": true
         },
         "momentum": {
-          "score": 71.9,
+          "score": 60.0,
           "weight": 10.0,
           "rated": true,
           "overextended": false
         },
         "vwap": {
-          "score": 61.3,
+          "score": 52.7,
           "weight": 10.0,
           "rated": true,
           "vwapMode": "TREND",
           "vwapZ": null,
           "vwapSource": "snapshot",
-          "vwap": 609.93
+          "vwap": 1409.27
         },
         "volume": {
-          "score": 43.2,
+          "score": 20.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 2.158,
+          "rvolTime": 1.0,
           "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 58.8,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
-          "orbHigh": 616.8,
-          "orbLow": 595.05,
+          "orbHigh": 1413.1,
+          "orbLow": 1390.0,
           "orbVelocityPct": 0.0,
           "orbPosPct": 100.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
         },
         "volatility": {
-          "score": 81.1,
+          "score": 97.6,
           "weight": 5.0,
           "rated": true
         },
         "sector": {
-          "score": 91.2,
+          "score": 64.6,
           "weight": 5.0,
           "rated": true
         },
         "liquidity": {
-          "score": 44.5,
-          "weight": 5.0,
-          "rated": true
-        }
-      },
-      "ltp": 616.8,
-      "scanLtp": 616.8,
-      "atrPct": 4.26,
-      "status": "RUNNING",
-      "closed": false,
-      "entryPrice": 616.8,
-      "stopLoss": 585.27,
-      "target1": 664.1,
-      "target2": 711.39,
-      "riskPerShare": 31.53,
-      "rewardRisk": 1.5,
-      "approxQty": 81,
-      "deployedCapital": 49960.8,
-      "maxLoss": 2553.93,
-      "riskScale": 1.0,
-      "effectiveRiskFraction": 0.01
-    },
-    {
-      "rank": 9,
-      "symbol": "AMBUJACEM",
-      "name": "AMBUJACEM",
-      "direction": "LONG",
-      "sector": "CEMENT",
-      "sleeve": "MOMENTUM",
-      "score": 66.2,
-      "scorePctRank": 56.1,
-      "intradayRetPctRank": 65.9,
-      "meanrevScore": null,
-      "gapPct": 0.463,
-      "intradayRet": 0.921,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-      "rsVsIndexPct": 0.12123445416858591,
-      "overextended": false,
-      "vwapMode": "TREND",
-      "vwap": 437.3,
-      "orbHigh": 438.2,
-      "orbLow": 434.2,
-      "orbPosPct": 100.0,
-      "factorBreakdown": {
-        "regime": {
           "score": 100.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "relativeStrength": {
-          "score": 51.2,
-          "weight": 15.0,
-          "rated": true,
-          "rsVsIndexPct": 0.121,
-          "niftyChangePct": 0.8,
-          "gapPct": 0.463,
-          "intradayRet": 0.921
-        },
-        "trend": {
-          "score": 85.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "momentum": {
-          "score": 55.5,
-          "weight": 10.0,
-          "rated": true,
-          "overextended": false
-        },
-        "vwap": {
-          "score": 52.1,
-          "weight": 10.0,
-          "rated": true,
-          "vwapMode": "TREND",
-          "vwapZ": null,
-          "vwapSource": "snapshot",
-          "vwap": 437.3
-        },
-        "volume": {
-          "score": 43.2,
-          "weight": 10.0,
-          "rated": true,
-          "rvolTime": 2.158,
-          "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
-        },
-        "breakout": {
-          "score": 54.3,
-          "weight": 10.0,
-          "rated": true,
-          "orbHigh": 438.2,
-          "orbLow": 434.2,
-          "orbVelocityPct": 0.0,
-          "orbPosPct": 100.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
-        },
-        "volatility": {
-          "score": 73.5,
-          "weight": 5.0,
-          "rated": true
-        },
-        "sector": {
-          "score": 75.5,
-          "weight": 5.0,
-          "rated": true
-        },
-        "liquidity": {
-          "score": 55.6,
           "weight": 5.0,
           "rated": true
         }
       },
-      "ltp": 438.2,
-      "scanLtp": 438.2,
-      "atrPct": 1.23,
+      "ltp": 1413.1,
+      "scanLtp": 1413.1,
+      "atrPct": 2.84,
       "status": "RUNNING",
       "closed": false,
-      "entryPrice": 438.2,
-      "stopLoss": 431.73,
-      "target1": 447.9,
-      "target2": 457.6,
-      "riskPerShare": 6.47,
+      "entryPrice": 1413.1,
+      "stopLoss": 1364.94,
+      "target1": 1485.34,
+      "target2": 1557.58,
+      "riskPerShare": 48.16,
       "rewardRisk": 1.5,
-      "approxQty": 114,
-      "deployedCapital": 49954.8,
-      "maxLoss": 737.58,
+      "approxQty": 35,
+      "deployedCapital": 49458.5,
+      "maxLoss": 1685.6,
       "riskScale": 1.0,
       "effectiveRiskFraction": 0.01
     },
     {
-      "rank": 10,
+      "rank": 5,
       "symbol": "GODREJCP",
       "name": "GODREJCP",
       "direction": "LONG",
       "sector": "FMCG",
       "sleeve": "MOMENTUM",
-      "score": 66.2,
-      "scorePctRank": 57.3,
+      "score": 65.6,
+      "scorePctRank": 69.5,
       "intradayRetPctRank": 81.7,
       "meanrevScore": null,
       "gapPct": 0.159,
@@ -2223,15 +1673,15 @@
           "vwap": 1090.88
         },
         "volume": {
-          "score": 18.5,
+          "score": 8.5,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 0.923,
+          "rvolTime": 0.427,
           "rvolRaw": 0.43,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 46.6,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 1087.1,
@@ -2240,7 +1690,7 @@
           "orbPosPct": 100.0,
           "inPlay": false,
           "inPlayReason": "not in play",
-          "orbDecay": 1.0
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 86.2,
@@ -2274,6 +1724,556 @@
       "maxLoss": 1228.05,
       "riskScale": 1.0,
       "effectiveRiskFraction": 0.01
+    },
+    {
+      "rank": 6,
+      "symbol": "DIVISLAB",
+      "name": "DIVISLAB",
+      "direction": "LONG",
+      "sector": "PHARMA",
+      "sleeve": "MOMENTUM",
+      "score": 65.5,
+      "scorePctRank": 68.3,
+      "intradayRetPctRank": 51.2,
+      "meanrevScore": null,
+      "gapPct": 4.022,
+      "intradayRet": 0.465,
+      "inPlay": true,
+      "inPlayReason": "|gap| 4.02% \u2265 0.5\u00d7ATR",
+      "rsVsIndexPct": -0.3346062052505967,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 8341.33,
+      "orbHigh": 8419.0,
+      "orbLow": 8380.0,
+      "orbPosPct": 100.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 46.7,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": -0.335,
+          "niftyChangePct": 0.8,
+          "gapPct": 4.022,
+          "intradayRet": 0.465
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 52.8,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 59.3,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 8341.33
+        },
+        "volume": {
+          "score": 20.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 1.0,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 1.0
+        },
+        "breakout": {
+          "score": 50.0,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 8419.0,
+          "orbLow": 8380.0,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 100.0,
+          "inPlay": true,
+          "inPlayReason": "|gap| 4.02% \u2265 0.5\u00d7ATR",
+          "orbDecay": 0.0
+        },
+        "volatility": {
+          "score": 71.5,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 79.5,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 8419.0,
+      "scanLtp": 8419.0,
+      "atrPct": 4.9,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 8419.0,
+      "stopLoss": 7923.96,
+      "target1": 9161.56,
+      "target2": 9904.11,
+      "riskPerShare": 495.04,
+      "rewardRisk": 1.5,
+      "approxQty": 5,
+      "deployedCapital": 42095.0,
+      "maxLoss": 2475.2,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01
+    },
+    {
+      "rank": 7,
+      "symbol": "GABRIEL",
+      "name": "GABRIEL",
+      "direction": "LONG",
+      "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "score": 71.7,
+      "scorePctRank": 96.3,
+      "intradayRetPctRank": 92.7,
+      "meanrevScore": null,
+      "gapPct": 1.63,
+      "intradayRet": 2.846,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": 2.0458336176892136,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 1494.0,
+      "orbHigh": 1507.0,
+      "orbLow": 1465.3,
+      "orbPosPct": 100.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 70.5,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 2.046,
+          "niftyChangePct": 0.8,
+          "gapPct": 1.63,
+          "intradayRet": 2.846
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 67.1,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 58.7,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 1494.0
+        },
+        "volume": {
+          "score": 20.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 1.0,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 1.0
+        },
+        "breakout": {
+          "score": 50.0,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1507.0,
+          "orbLow": 1465.3,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 100.0,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
+        },
+        "volatility": {
+          "score": 89.8,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 86.8,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 1507.0,
+      "scanLtp": 1507.0,
+      "atrPct": 3.68,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 1507.0,
+      "stopLoss": 1440.45,
+      "target1": 1606.82,
+      "target2": 1706.65,
+      "riskPerShare": 66.55,
+      "rewardRisk": 1.5,
+      "approxQty": 33,
+      "deployedCapital": 49731.0,
+      "maxLoss": 2196.15,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01
+    },
+    {
+      "rank": 8,
+      "symbol": "CHENNPETRO",
+      "name": "CHENNPETRO",
+      "direction": "LONG",
+      "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "score": 71.0,
+      "scorePctRank": 95.1,
+      "intradayRetPctRank": 96.3,
+      "meanrevScore": null,
+      "gapPct": 0.484,
+      "intradayRet": 3.624,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": 2.823588852924912,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 1311.54,
+      "orbHigh": 1330.9,
+      "orbLow": 1266.0,
+      "orbPosPct": 71.8027734976885,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 78.2,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 2.824,
+          "niftyChangePct": 0.8,
+          "gapPct": 0.484,
+          "intradayRet": 3.624
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 77.3,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 50.8,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 1311.54
+        },
+        "volume": {
+          "score": 11.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 0.548,
+          "rvolRaw": 0.55,
+          "cumVolFracHeuristic": 1.0
+        },
+        "breakout": {
+          "score": 50.0,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1330.9,
+          "orbLow": 1266.0,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 71.8,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
+        },
+        "volatility": {
+          "score": 61.3,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 89.9,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 1312.6,
+      "scanLtp": 1312.6,
+      "atrPct": 5.58,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 1312.6,
+      "stopLoss": 1224.71,
+      "target1": 1444.44,
+      "target2": 1576.28,
+      "riskPerShare": 87.89,
+      "rewardRisk": 1.5,
+      "approxQty": 38,
+      "deployedCapital": 49878.8,
+      "maxLoss": 3339.82,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01
+    },
+    {
+      "rank": 9,
+      "symbol": "BANKBARODA",
+      "name": "BANKBARODA",
+      "direction": "LONG",
+      "sector": "BANKING",
+      "sleeve": "MOMENTUM",
+      "score": 65.1,
+      "scorePctRank": 64.6,
+      "intradayRetPctRank": 68.3,
+      "meanrevScore": null,
+      "gapPct": 0.598,
+      "intradayRet": 0.963,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": 0.16291743495185174,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 245.87,
+      "orbHigh": 245.56,
+      "orbLow": 244.0,
+      "orbPosPct": 100.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 51.6,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 0.163,
+          "niftyChangePct": 0.8,
+          "gapPct": 0.598,
+          "intradayRet": 0.963
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 50.9,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 52.2,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 245.87
+        },
+        "volume": {
+          "score": 4.8,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 0.242,
+          "rvolRaw": 0.24,
+          "cumVolFracHeuristic": 1.0
+        },
+        "breakout": {
+          "score": 50.0,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 245.56,
+          "orbLow": 244.0,
+          "orbVelocityPct": 0.34,
+          "orbPosPct": 100.0,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
+        },
+        "volatility": {
+          "score": 86.8,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 90.4,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 246.4,
+      "scanLtp": 246.4,
+      "atrPct": 2.12,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 246.4,
+      "stopLoss": 240.13,
+      "target1": 255.8,
+      "target2": 265.21,
+      "riskPerShare": 6.27,
+      "rewardRisk": 1.5,
+      "approxQty": 202,
+      "deployedCapital": 49772.8,
+      "maxLoss": 1266.54,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01
+    },
+    {
+      "rank": 10,
+      "symbol": "EICHERMOT",
+      "name": "EICHERMOT",
+      "direction": "LONG",
+      "sector": "AUTO",
+      "sleeve": "MOMENTUM",
+      "score": 64.8,
+      "scorePctRank": 61.0,
+      "intradayRetPctRank": 56.1,
+      "meanrevScore": null,
+      "gapPct": 0.849,
+      "intradayRet": 0.582,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": -0.21772151898734182,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 7932.67,
+      "orbHigh": 7946.0,
+      "orbLow": 7900.0,
+      "orbPosPct": 100.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 47.8,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": -0.218,
+          "niftyChangePct": 0.8,
+          "gapPct": 0.849,
+          "intradayRet": 0.582
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 53.5,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 51.7,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 7932.67
+        },
+        "volume": {
+          "score": 20.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 1.0,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 1.0
+        },
+        "breakout": {
+          "score": 50.0,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 7946.0,
+          "orbLow": 7900.0,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 100.0,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
+        },
+        "volatility": {
+          "score": 83.3,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 63.5,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 7946.0,
+      "scanLtp": 7946.0,
+      "atrPct": 1.89,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 7946.0,
+      "stopLoss": 7765.78,
+      "target1": 8216.32,
+      "target2": 8486.65,
+      "riskPerShare": 180.22,
+      "rewardRisk": 1.5,
+      "approxQty": 6,
+      "deployedCapital": 47676.0,
+      "maxLoss": 1081.32,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01
     }
   ],
   "candidatePoolShort": [
@@ -2284,14 +2284,14 @@
       "direction": "SHORT",
       "sector": "ENERGY",
       "sleeve": "MOMENTUM",
-      "score": 80.4,
+      "score": 71.4,
       "scorePctRank": 100.0,
       "intradayRetPctRank": 0.0,
       "meanrevScore": null,
       "gapPct": 0.364,
       "intradayRet": -5.135,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 3.72\u00d7 \u2265 2.0",
+      "inPlay": false,
+      "inPlayReason": "not in play",
       "rsVsIndexPct": -5.934541460735856,
       "overextended": true,
       "vwapMode": "TREND",
@@ -2335,24 +2335,24 @@
           "vwap": 175.05
         },
         "volume": {
-          "score": 74.4,
+          "score": 34.5,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 3.722,
+          "rvolTime": 1.725,
           "rvolRaw": 1.72,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 100.0,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 182.38,
           "orbLow": 174.0,
           "orbVelocityPct": 0.0,
           "orbPosPct": 0.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 3.72\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 93.7,
@@ -2394,14 +2394,14 @@
       "direction": "SHORT",
       "sector": "OTHER",
       "sleeve": "MOMENTUM",
-      "score": 71.3,
+      "score": 68.4,
       "scorePctRank": 98.8,
       "intradayRetPctRank": 4.9,
       "meanrevScore": null,
       "gapPct": 7.746,
       "intradayRet": -1.079,
       "inPlay": true,
-      "inPlayReason": "rvolTime 26.51\u00d7 \u2265 2.0",
+      "inPlayReason": "rvolTime 12.29\u00d7 \u2265 2.0",
       "rsVsIndexPct": -1.879136690647482,
       "overextended": false,
       "vwapMode": "TREND",
@@ -2448,12 +2448,12 @@
           "score": 100.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 26.515,
+          "rvolTime": 12.285,
           "rvolRaw": 12.29,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 79.0,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 5745.0,
@@ -2461,8 +2461,8 @@
           "orbVelocityPct": 0.0,
           "orbPosPct": 18.9,
           "inPlay": true,
-          "inPlayReason": "rvolTime 26.51\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlayReason": "rvolTime 12.29\u00d7 \u2265 2.0",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 95.2,
@@ -2499,19 +2499,129 @@
     },
     {
       "rank": 3,
+      "symbol": "CLEAN",
+      "name": "CLEAN",
+      "direction": "SHORT",
+      "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "score": 62.6,
+      "scorePctRank": 97.6,
+      "intradayRetPctRank": 39.0,
+      "meanrevScore": null,
+      "gapPct": 3.201,
+      "intradayRet": 0.086,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 6.46\u00d7 \u2265 2.0",
+      "rsVsIndexPct": -0.7141970827007998,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 759.68,
+      "orbHigh": 799.8,
+      "orbLow": 755.0,
+      "orbPosPct": 7.1428571428572525,
+      "factorBreakdown": {
+        "regime": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 57.1,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": -0.714,
+          "niftyChangePct": 0.8,
+          "gapPct": 3.201,
+          "intradayRet": 0.086
+        },
+        "trend": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 50.5,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 51.9,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 759.68
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 6.46,
+          "rvolRaw": 6.46,
+          "cumVolFracHeuristic": 1.0
+        },
+        "breakout": {
+          "score": 50.0,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 799.8,
+          "orbLow": 755.0,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 7.1,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 6.46\u00d7 \u2265 2.0",
+          "orbDecay": 0.0
+        },
+        "volatility": {
+          "score": 93.7,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 52.4,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 758.2,
+      "scanLtp": 758.2,
+      "atrPct": 3.42,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 758.2,
+      "stopLoss": 789.32,
+      "target1": 711.53,
+      "target2": 680.41,
+      "riskPerShare": 31.12,
+      "rewardRisk": 1.5,
+      "approxQty": 65,
+      "deployedCapital": 49283.0,
+      "maxLoss": 2022.8,
+      "riskScale": 0.85,
+      "effectiveRiskFraction": 0.0085
+    },
+    {
+      "rank": 4,
       "symbol": "ASTRAL",
       "name": "ASTRAL",
       "direction": "SHORT",
       "sector": "OTHER",
       "sleeve": "MOMENTUM",
-      "score": 69.2,
-      "scorePctRank": 97.6,
+      "score": 62.0,
+      "scorePctRank": 96.3,
       "intradayRetPctRank": 1.2,
       "meanrevScore": null,
       "gapPct": 1.132,
       "intradayRet": -1.734,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
+      "inPlay": false,
+      "inPlayReason": "not in play",
       "rsVsIndexPct": -2.533788395904443,
       "overextended": false,
       "vwapMode": "TREND",
@@ -2555,24 +2665,24 @@
           "vwap": 1443.5
         },
         "volume": {
-          "score": 43.2,
+          "score": 20.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 2.158,
+          "rvolTime": 1.0,
           "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 98.8,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 1465.0,
           "orbLow": 1439.6,
           "orbVelocityPct": 0.0,
           "orbPosPct": 0.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 97.0,
@@ -2608,130 +2718,20 @@
       "effectiveRiskFraction": 0.0085
     },
     {
-      "rank": 4,
-      "symbol": "HDFCAMC",
-      "name": "HDFCAMC",
-      "direction": "SHORT",
-      "sector": "OTHER",
-      "sleeve": "MOMENTUM",
-      "score": 68.9,
-      "scorePctRank": 96.3,
-      "intradayRetPctRank": 3.7,
-      "meanrevScore": null,
-      "gapPct": 0.925,
-      "intradayRet": -1.284,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-      "rsVsIndexPct": -2.0840909090909125,
-      "overextended": false,
-      "vwapMode": "TREND",
-      "vwap": 2616.53,
-      "orbHigh": 2640.0,
-      "orbLow": 2606.1,
-      "orbPosPct": 0.0,
-      "factorBreakdown": {
-        "regime": {
-          "score": 55.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "relativeStrength": {
-          "score": 70.8,
-          "weight": 15.0,
-          "rated": true,
-          "rsVsIndexPct": -2.084,
-          "niftyChangePct": 0.8,
-          "gapPct": 0.925,
-          "intradayRet": -1.284
-        },
-        "trend": {
-          "score": 85.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "momentum": {
-          "score": 57.7,
-          "weight": 10.0,
-          "rated": true,
-          "overextended": false
-        },
-        "vwap": {
-          "score": 54.0,
-          "weight": 10.0,
-          "rated": true,
-          "vwapMode": "TREND",
-          "vwapZ": null,
-          "vwapSource": "snapshot",
-          "vwap": 2616.53
-        },
-        "volume": {
-          "score": 43.2,
-          "weight": 10.0,
-          "rated": true,
-          "rvolTime": 2.158,
-          "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
-        },
-        "breakout": {
-          "score": 98.8,
-          "weight": 10.0,
-          "rated": true,
-          "orbHigh": 2640.0,
-          "orbLow": 2606.1,
-          "orbVelocityPct": 0.0,
-          "orbPosPct": 0.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
-        },
-        "volatility": {
-          "score": 81.4,
-          "weight": 5.0,
-          "rated": true
-        },
-        "sector": {
-          "score": 83.9,
-          "weight": 5.0,
-          "rated": true
-        },
-        "liquidity": {
-          "score": 72.2,
-          "weight": 5.0,
-          "rated": true
-        }
-      },
-      "ltp": 2606.1,
-      "scanLtp": 2606.1,
-      "atrPct": 1.76,
-      "status": "RUNNING",
-      "closed": false,
-      "entryPrice": 2606.1,
-      "stopLoss": 2661.14,
-      "target1": 2523.54,
-      "target2": 2468.5,
-      "riskPerShare": 55.04,
-      "rewardRisk": 1.5,
-      "approxQty": 19,
-      "deployedCapital": 49515.9,
-      "maxLoss": 1045.76,
-      "riskScale": 0.85,
-      "effectiveRiskFraction": 0.0085
-    },
-    {
       "rank": 5,
       "symbol": "BPCL",
       "name": "BPCL",
       "direction": "SHORT",
       "sector": "ENERGY",
       "sleeve": "MOMENTUM",
-      "score": 63.1,
-      "scorePctRank": 85.4,
+      "score": 55.9,
+      "scorePctRank": 84.1,
       "intradayRetPctRank": 20.7,
       "meanrevScore": null,
       "gapPct": 1.564,
       "intradayRet": -0.4,
       "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
+      "inPlayReason": "|gap| 1.56% \u2265 0.5\u00d7ATR",
       "rsVsIndexPct": -1.200307929176293,
       "overextended": false,
       "vwapMode": "TREND",
@@ -2775,15 +2775,15 @@
           "vwap": 324.27
         },
         "volume": {
-          "score": 43.2,
+          "score": 20.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 2.158,
+          "rvolTime": 1.0,
           "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 98.8,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 324.75,
@@ -2791,8 +2791,8 @@
           "orbVelocityPct": 0.0,
           "orbPosPct": 0.0,
           "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlayReason": "|gap| 1.56% \u2265 0.5\u00d7ATR",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 76.8,
@@ -2834,14 +2834,14 @@
       "direction": "SHORT",
       "sector": "IT",
       "sleeve": "MOMENTUM",
-      "score": 62.2,
-      "scorePctRank": 81.7,
+      "score": 55.0,
+      "scorePctRank": 79.3,
       "intradayRetPctRank": 14.6,
       "meanrevScore": null,
       "gapPct": 1.046,
       "intradayRet": -0.477,
       "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
+      "inPlayReason": "|gap| 1.05% \u2265 0.5\u00d7ATR",
       "rsVsIndexPct": -1.2772857964347302,
       "overextended": false,
       "vwapMode": "TREND",
@@ -2885,15 +2885,15 @@
           "vwap": 1731.9
         },
         "volume": {
-          "score": 43.2,
+          "score": 20.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 2.158,
+          "rvolTime": 1.0,
           "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 98.8,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 1739.0,
@@ -2901,8 +2901,8 @@
           "orbVelocityPct": 0.0,
           "orbPosPct": 0.0,
           "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlayReason": "|gap| 1.05% \u2265 0.5\u00d7ATR",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 78.5,
@@ -2939,19 +2939,129 @@
     },
     {
       "rank": 7,
+      "symbol": "HDFCAMC",
+      "name": "HDFCAMC",
+      "direction": "SHORT",
+      "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "score": 61.7,
+      "scorePctRank": 95.1,
+      "intradayRetPctRank": 3.7,
+      "meanrevScore": null,
+      "gapPct": 0.925,
+      "intradayRet": -1.284,
+      "inPlay": true,
+      "inPlayReason": "|gap| 0.93% \u2265 0.5\u00d7ATR",
+      "rsVsIndexPct": -2.0840909090909125,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 2616.53,
+      "orbHigh": 2640.0,
+      "orbLow": 2606.1,
+      "orbPosPct": 0.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 70.8,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": -2.084,
+          "niftyChangePct": 0.8,
+          "gapPct": 0.925,
+          "intradayRet": -1.284
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 57.7,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 54.0,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 2616.53
+        },
+        "volume": {
+          "score": 20.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 1.0,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 1.0
+        },
+        "breakout": {
+          "score": 50.0,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 2640.0,
+          "orbLow": 2606.1,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 0.0,
+          "inPlay": true,
+          "inPlayReason": "|gap| 0.93% \u2265 0.5\u00d7ATR",
+          "orbDecay": 0.0
+        },
+        "volatility": {
+          "score": 81.4,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 83.9,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 72.2,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 2606.1,
+      "scanLtp": 2606.1,
+      "atrPct": 1.76,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 2606.1,
+      "stopLoss": 2661.14,
+      "target1": 2523.54,
+      "target2": 2468.5,
+      "riskPerShare": 55.04,
+      "rewardRisk": 1.5,
+      "approxQty": 19,
+      "deployedCapital": 49515.9,
+      "maxLoss": 1045.76,
+      "riskScale": 0.85,
+      "effectiveRiskFraction": 0.0085
+    },
+    {
+      "rank": 8,
       "symbol": "AUBANK",
       "name": "AUBANK",
       "direction": "SHORT",
       "sector": "OTHER",
       "sleeve": "MOMENTUM",
-      "score": 68.1,
-      "scorePctRank": 95.1,
+      "score": 60.9,
+      "scorePctRank": 93.9,
       "intradayRetPctRank": 7.3,
       "meanrevScore": null,
       "gapPct": 0.649,
       "intradayRet": -0.968,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
+      "inPlay": false,
+      "inPlayReason": "not in play",
       "rsVsIndexPct": -1.7676501280713233,
       "overextended": false,
       "vwapMode": "TREND",
@@ -2995,24 +3105,24 @@
           "vwap": 1048.93
         },
         "volume": {
-          "score": 43.2,
+          "score": 20.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 2.158,
+          "rvolTime": 1.0,
           "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 98.8,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 1054.1,
           "orbLow": 1043.9,
           "orbVelocityPct": 0.0,
           "orbPosPct": 0.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 78.7,
@@ -3048,27 +3158,27 @@
       "effectiveRiskFraction": 0.0085
     },
     {
-      "rank": 8,
-      "symbol": "GROWW",
-      "name": "GROWW",
+      "rank": 9,
+      "symbol": "HEROMOTOCO",
+      "name": "HEROMOTOCO",
       "direction": "SHORT",
-      "sector": "OTHER",
+      "sector": "AUTO",
       "sleeve": "MOMENTUM",
-      "score": 67.3,
-      "scorePctRank": 93.9,
-      "intradayRetPctRank": 8.5,
+      "score": 47.0,
+      "scorePctRank": 59.8,
+      "intradayRetPctRank": 37.8,
       "meanrevScore": null,
-      "gapPct": 0.504,
-      "intradayRet": -0.809,
+      "gapPct": 0.724,
+      "intradayRet": 0.065,
       "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-      "rsVsIndexPct": -1.6088047094957687,
+      "inPlayReason": "|gap| 0.72% \u2265 0.5\u00d7ATR",
+      "rsVsIndexPct": -0.735483870967742,
       "overextended": false,
       "vwapMode": "TREND",
-      "vwap": 193.87,
-      "orbHigh": 195.35,
-      "orbLow": 193.77,
-      "orbPosPct": 0.0,
+      "vwap": 5425.67,
+      "orbHigh": 5428.5,
+      "orbLow": 5425.0,
+      "orbPosPct": 100.0,
       "factorBreakdown": {
         "regime": {
           "score": 55.0,
@@ -3076,61 +3186,61 @@
           "rated": true
         },
         "relativeStrength": {
-          "score": 66.1,
+          "score": 57.4,
           "weight": 15.0,
           "rated": true,
-          "rsVsIndexPct": -1.609,
+          "rsVsIndexPct": -0.735,
           "niftyChangePct": 0.8,
-          "gapPct": 0.504,
-          "intradayRet": -0.809
+          "gapPct": 0.724,
+          "intradayRet": 0.065
         },
         "trend": {
-          "score": 85.0,
+          "score": 15.0,
           "weight": 15.0,
           "rated": true
         },
         "momentum": {
-          "score": 54.9,
+          "score": 49.6,
           "weight": 10.0,
           "rated": true,
           "overextended": false
         },
         "vwap": {
-          "score": 50.5,
+          "score": 49.5,
           "weight": 10.0,
           "rated": true,
           "vwapMode": "TREND",
           "vwapZ": null,
           "vwapSource": "snapshot",
-          "vwap": 193.87
+          "vwap": 5425.67
         },
         "volume": {
-          "score": 43.2,
+          "score": 20.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 2.158,
+          "rvolTime": 1.0,
           "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 98.8,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
-          "orbHigh": 195.35,
-          "orbLow": 193.77,
+          "orbHigh": 5428.5,
+          "orbLow": 5425.0,
           "orbVelocityPct": 0.0,
-          "orbPosPct": 0.0,
+          "orbPosPct": 100.0,
           "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlayReason": "|gap| 0.72% \u2265 0.5\u00d7ATR",
+          "orbDecay": 0.0
         },
         "volatility": {
-          "score": 77.0,
+          "score": 75.2,
           "weight": 5.0,
           "rated": true
         },
         "sector": {
-          "score": 55.4,
+          "score": 44.1,
           "weight": 5.0,
           "rated": true
         },
@@ -3140,38 +3250,38 @@
           "rated": true
         }
       },
-      "ltp": 193.77,
-      "scanLtp": 193.77,
-      "atrPct": 1.47,
+      "ltp": 5428.5,
+      "scanLtp": 5428.5,
+      "atrPct": 1.35,
       "status": "RUNNING",
       "closed": false,
-      "entryPrice": 193.77,
-      "stopLoss": 197.19,
-      "target1": 188.64,
-      "target2": 185.22,
-      "riskPerShare": 3.42,
+      "entryPrice": 5428.5,
+      "stopLoss": 5516.44,
+      "target1": 5296.59,
+      "target2": 5208.65,
+      "riskPerShare": 87.94,
       "rewardRisk": 1.5,
-      "approxQty": 258,
-      "deployedCapital": 49992.66,
-      "maxLoss": 882.36,
+      "approxQty": 9,
+      "deployedCapital": 48856.5,
+      "maxLoss": 791.46,
       "riskScale": 0.85,
       "effectiveRiskFraction": 0.0085
     },
     {
-      "rank": 9,
+      "rank": 10,
       "symbol": "BIOCON",
       "name": "BIOCON",
       "direction": "SHORT",
       "sector": "PHARMA",
       "sleeve": "MOMENTUM",
-      "score": 49.6,
-      "scorePctRank": 57.3,
+      "score": 45.2,
+      "scorePctRank": 50.0,
       "intradayRetPctRank": 19.5,
       "meanrevScore": null,
       "gapPct": 0.775,
       "intradayRet": -0.431,
       "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
+      "inPlayReason": "|gap| 0.78% \u2265 0.5\u00d7ATR",
       "rsVsIndexPct": -1.2312354312354366,
       "overextended": false,
       "vwapMode": "TREND",
@@ -3215,15 +3325,15 @@
           "vwap": 426.48
         },
         "volume": {
-          "score": 43.2,
+          "score": 20.0,
           "weight": 10.0,
           "rated": true,
-          "rvolTime": 2.158,
+          "rvolTime": 1.0,
           "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
+          "cumVolFracHeuristic": 1.0
         },
         "breakout": {
-          "score": 71.3,
+          "score": 50.0,
           "weight": 10.0,
           "rated": true,
           "orbHigh": 429.0,
@@ -3231,8 +3341,8 @@
           "orbVelocityPct": 0.0,
           "orbPosPct": 0.0,
           "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
+          "inPlayReason": "|gap| 0.78% \u2265 0.5\u00d7ATR",
+          "orbDecay": 0.0
         },
         "volatility": {
           "score": 75.1,
@@ -3266,159 +3376,49 @@
       "maxLoss": 803.79,
       "riskScale": 0.85,
       "effectiveRiskFraction": 0.0085
-    },
-    {
-      "rank": 10,
-      "symbol": "AUROPHARMA",
-      "name": "AUROPHARMA",
-      "direction": "SHORT",
-      "sector": "PHARMA",
-      "sleeve": "MOMENTUM",
-      "score": 49.1,
-      "scorePctRank": 54.9,
-      "intradayRetPctRank": 28.0,
-      "meanrevScore": null,
-      "gapPct": 0.424,
-      "intradayRet": -0.321,
-      "inPlay": true,
-      "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-      "rsVsIndexPct": -1.1213813094713048,
-      "overextended": false,
-      "vwapMode": "TREND",
-      "vwap": 1579.07,
-      "orbHigh": 1586.9,
-      "orbLow": 1581.8,
-      "orbPosPct": 0.0,
-      "factorBreakdown": {
-        "regime": {
-          "score": 55.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "relativeStrength": {
-          "score": 61.2,
-          "weight": 15.0,
-          "rated": true,
-          "rsVsIndexPct": -1.121,
-          "niftyChangePct": 0.8,
-          "gapPct": 0.424,
-          "intradayRet": -0.321
-        },
-        "trend": {
-          "score": 15.0,
-          "weight": 15.0,
-          "rated": true
-        },
-        "momentum": {
-          "score": 51.9,
-          "weight": 10.0,
-          "rated": true,
-          "overextended": false
-        },
-        "vwap": {
-          "score": 48.3,
-          "weight": 10.0,
-          "rated": true,
-          "vwapMode": "TREND",
-          "vwapZ": null,
-          "vwapSource": "snapshot",
-          "vwap": 1579.07
-        },
-        "volume": {
-          "score": 43.2,
-          "weight": 10.0,
-          "rated": true,
-          "rvolTime": 2.158,
-          "rvolRaw": 1.0,
-          "cumVolFracHeuristic": 0.463
-        },
-        "breakout": {
-          "score": 78.2,
-          "weight": 10.0,
-          "rated": true,
-          "orbHigh": 1586.9,
-          "orbLow": 1581.8,
-          "orbVelocityPct": 0.0,
-          "orbPosPct": 0.0,
-          "inPlay": true,
-          "inPlayReason": "rvolTime 2.16\u00d7 \u2265 2.0",
-          "orbDecay": 1.0
-        },
-        "volatility": {
-          "score": 74.3,
-          "weight": 5.0,
-          "rated": true
-        },
-        "sector": {
-          "score": 29.9,
-          "weight": 5.0,
-          "rated": true
-        },
-        "liquidity": {
-          "score": 40.4,
-          "weight": 5.0,
-          "rated": true
-        }
-      },
-      "ltp": 1581.8,
-      "scanLtp": 1581.8,
-      "atrPct": 1.29,
-      "status": "RUNNING",
-      "closed": false,
-      "entryPrice": 1581.8,
-      "stopLoss": 1606.29,
-      "target1": 1545.07,
-      "target2": 1520.58,
-      "riskPerShare": 24.49,
-      "rewardRisk": 1.5,
-      "approxQty": 31,
-      "deployedCapital": 49035.8,
-      "maxLoss": 759.19,
-      "riskScale": 0.85,
-      "effectiveRiskFraction": 0.0085
     }
   ],
   "events": [
     {
       "type": "SESSION_COMMIT",
-      "at": "2026-08-03T06:26:03.820756+00:00",
+      "at": "2026-08-05T16:53:10.410180+00:00",
       "long": [
         "ABCAPITAL",
         "GODFRYPHLP",
-        "GABRIEL",
         "ARE&M",
-        "BALRAMCHIN"
+        "GABRIEL",
+        "CHENNPETRO"
       ],
       "short": [
         "GAIL",
         "BLUEDART",
+        "CLEAN",
         "ASTRAL",
-        "HDFCAMC",
-        "AUBANK"
+        "HDFCAMC"
       ],
       "candidatePoolLong": [
         "ABCAPITAL",
         "GODFRYPHLP",
-        "GABRIEL",
-        "ADANIGREEN",
-        "DIVISLAB",
-        "EICHERMOT",
         "ARE&M",
-        "BALRAMCHIN",
-        "AMBUJACEM",
-        "GODREJCP"
+        "ADANIGREEN",
+        "GODREJCP",
+        "DIVISLAB",
+        "GABRIEL",
+        "CHENNPETRO",
+        "BANKBARODA",
+        "EICHERMOT"
       ],
       "candidatePoolShort": [
         "GAIL",
         "BLUEDART",
+        "CLEAN",
         "ASTRAL",
-        "HDFCAMC",
         "BPCL",
         "COFORGE",
+        "HDFCAMC",
         "AUBANK",
-        "GROWW",
-        "BIOCON",
-        "AUROPHARMA"
+        "HEROMOTOCO",
+        "BIOCON"
       ],
       "funnel": "10+10 \u2192 adopt 5+5",
       "sleeves": {
@@ -3440,7 +3440,7 @@
     "unratedComponents": 0,
     "candidatePool": 20,
     "adopted": 10,
-    "funnelNote": "10+10 candidates \u2192 adopt top 5+5 by score"
+    "funnelNote": "10+10 candidates -> adopt top 5+5 by score"
   },
   "weights": {
     "regime": 15.0,

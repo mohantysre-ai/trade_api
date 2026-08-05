@@ -238,16 +238,20 @@ def run_eod_analysis(
 
 
 def _ensure_book_reports_cached(for_date: date, *, force: bool = False) -> None:
-    """Warm Book P&L JSON caches so Book tab refresh is instant."""
-    try:
-        from ..eod_book_cache import load_book_cache, warm_book_caches
+    """Warm Book P&L JSON caches so Book tab refresh is instant.
 
-        need = force or (
-            load_book_cache(for_date, "intraday") is None
-            or load_book_cache(for_date, "swing") is None
-        )
-        if need:
+    force=False still rebuilds when locked pick set ≠ cached trades (stale morning book).
+    """
+    try:
+        from ..eod_book_cache import warm_book_caches
+        from ..eod_intraday_report import generate_intraday_eod_report
+        from ..eod_swing_report import generate_swing_eod_report
+
+        if force:
             warm_book_caches(for_date)
+        else:
+            generate_intraday_eod_report(for_date, force=False)
+            generate_swing_eod_report(for_date, force=False)
     except Exception as exc:
         log.warning("book cache warm failed for %s: %s", for_date, exc)
 

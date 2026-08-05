@@ -167,22 +167,119 @@ def get_reference_price(symbol: str, *, allow_network: bool = True) -> float:
 
 
 def get_mock_eod_price(symbol: str) -> float:
-    """Return mock EOD price for July 19."""
+    """Return mock EOD price for July 19 demo seeds. Unknown → 0.0 (do not use for live desk)."""
     global _MOCK_EOD_PRICES
     if _MOCK_EOD_PRICES is None:
         _MOCK_EOD_PRICES = _build_mock_eod_prices()
     return _MOCK_EOD_PRICES.get(symbol.upper().strip(), 0.0)
 
 
+_CLOSE_MARK_CACHE: dict[str, tuple[float, float]] = {}
+_CLOSE_MARK_TTL_SEC = 120.0
+
+
+def _yahoo_last_print(symbol: str, *, timeout: float = 2.5) -> float | None:
+    try:
+        import urllib.request
+
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}.NS"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        meta = (data.get("chart") or {}).get("result", [{}])[0].get("meta") or {}
+        for key in ("regularMarketPrice", "postMarketPrice", "chartPreviousClose", "previousClose"):
+            raw = meta.get(key)
+            if raw is not None:
+                px = float(raw)
+                if px > 0:
+                    return px
+    except Exception:
+        return None
+    return None
+
+
+def _snapshot_ltp(symbol: str) -> float | None:
+    snap_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "last_market_snapshot.json")
+    try:
+        with open(snap_path, "r", encoding="utf-8-sig") as fh:
+            snap = json.load(fh)
+        quotes = snap.get("stockQuotes") or {}
+        q = quotes.get(symbol)
+        if isinstance(q, dict):
+            raw = q.get("ltpRaw") or q.get("ltp") or q.get("lastPrice") or q.get("close")
+            if raw is not None:
+                px = float(raw)
+                if px > 0:
+                    return px
+    except Exception:
+        pass
+    return None
+
+
+def get_close_mark_price(symbol: str) -> float | None:
+    """Real last/close mark for Book P&L — never invents; never returns 0 as a fake mark.
+
+    Prefer Yahoo last print (cached) over snapshot LTP. Fast timeout so Book UI does not hang.
+    """
+    import time as _time
+
+    sym = (symbol or "").upper().strip()
+    if not sym:
+        return None
+
+    now = _time.time()
+    cached = _CLOSE_MARK_CACHE.get(sym)
+    if cached and (now - cached[1]) < _CLOSE_MARK_TTL_SEC:
+        return cached[0]
+
+    yahoo_px = _yahoo_last_print(sym)
+    if yahoo_px is not None:
+        _CLOSE_MARK_CACHE[sym] = (yahoo_px, now)
+        return yahoo_px
+
+    snap_px = _snapshot_ltp(sym)
+    if snap_px is not None:
+        _CLOSE_MARK_CACHE[sym] = (snap_px, now)
+        return snap_px
+    return None
+
+
+def prefetch_close_marks(symbols: list[str]) -> dict[str, float]:
+    """Parallel Yahoo/snapshot marks for a book rebuild (keeps EOD UI responsive)."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    out: dict[str, float] = {}
+    uniq = list(dict.fromkeys((s or "").upper().strip() for s in symbols if s))
+    if not uniq:
+        return out
+
+    def _one(sym: str) -> tuple[str, float | None]:
+        return sym, get_close_mark_price(sym)
+
+    workers = min(8, max(1, len(uniq)))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futs = [pool.submit(_one, s) for s in uniq]
+        for fut in as_completed(futs):
+            try:
+                sym, px = fut.result()
+                if px is not None:
+                    out[sym] = px
+            except Exception:
+                continue
+    return out
+
+
 def get_reference_and_eod(symbol: str) -> dict[str, Any]:
     ref = get_reference_price(symbol)
-    eod = get_mock_eod_price(symbol)
+    eod = get_close_mark_price(symbol)
+    if eod is None:
+        eod = get_mock_eod_price(symbol) or None
     return {
         "symbol": symbol,
         "refPrice930": ref,
         "eodPrice": eod,
-        "changePct": round((eod - ref) / ref * 100, 2) if ref else 0.0,
-        "changeAbs": round(eod - ref, 2),
+        "changePct": round((eod - ref) / ref * 100, 2) if ref and eod else None,
+        "changeAbs": round(eod - ref, 2) if ref and eod else None,
     }
 
 
@@ -215,6 +312,11 @@ _HEDGE_FUND_ANALYSIS_PROMPT = """You are an elite hedge fund analyst. Given one 
 def generate_swing_analysis(symbol: str, direction: str, entry: float, current: float,
                              pnl: float, pnl_pct: float, status: str) -> str | None:
     """Deterministic swing note only — never call LLM (Book P&L must stay fast/cached)."""
+    if status == "NOT_TRIGGERED":
+        return (
+            f"{symbol}: entry signal not triggered (price never crossed "
+            f"{entry:.2f}). Skipped from swing Book P&L for the session."
+        )
     sector = _SECTOR_BY_SYMBOL.get(symbol.upper(), "Diversified")
     direction_label = "bullish" if direction == "LONG" else "bearish"
 

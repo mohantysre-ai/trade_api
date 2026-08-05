@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
-import type { AITickerNewsReport, TerminalIntelligence } from "@/lib/market-api";
+import type { AITickerNewsReport, DeskIcSummary, TerminalIntelligence } from "@/lib/market-api";
 import AITickerNewsPanel from "./AITickerNewsPanel";
 import ConfidenceCheckerPanel from "./ConfidenceCheckerPanel";
 import TechnicalAnalysisPanel from "./TechnicalAnalysisPanel";
@@ -326,6 +326,7 @@ type DrawerContent = {
   stock?: {
     ticker?: string;
     name?: string;
+    deskIcSummary?: DeskIcSummary;
   } | null;
   analysis?: DrawerAnalysis | null;
   tickerNews?: AITickerNewsReport | null;
@@ -421,6 +422,19 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
             <p className="desk-panel-title mb-0.5">Deep Asset Analysis</p>
             <h4 className="desk-metric-value truncate">{stock?.ticker ?? "—"}</h4>
             <p className="text-[11px] text-slate-500 truncate">{stock?.name ?? "Analysis Payload"}</p>
+            {stock?.deskIcSummary?.deskDecision && (
+              <span
+                className={`mt-1 inline-flex text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
+                  String(stock.deskIcSummary.deskDecision).toUpperCase() === "APPROVE"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : String(stock.deskIcSummary.deskDecision).toUpperCase() === "REJECT"
+                      ? "bg-red-50 text-red-700 border-red-200"
+                      : "bg-amber-50 text-amber-800 border-amber-200"
+                }`}
+              >
+                Desk IC {String(stock.deskIcSummary.deskDecision).toUpperCase()}
+              </span>
+            )}
           </div>
           <button
             onClick={onClose}

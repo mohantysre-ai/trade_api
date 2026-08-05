@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   fetchEodDates,
   fetchEodLlmStatus,
@@ -20,6 +20,63 @@ const MODES: { key: EodMode; label: string; hint: string }[] = [
   { key: 'forensic', label: 'Forensic', hint: 'Scorecards · replay · proposals' },
   { key: 'full', label: 'Full Desk', hint: 'Single pane — both layers' },
 ];
+
+class EodPaneErrorBoundary extends Component<
+  { title: string; children: ReactNode },
+  { error: string | null }
+> {
+  state: { error: string | null } = { error: null };
+
+  static getDerivedStateFromError(err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Pane failed to render' };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[11px] text-red-800">
+          <div className="font-black uppercase tracking-wider">{this.props.title} failed</div>
+          <p className="mt-1 text-red-700">{this.state.error}</p>
+          <button
+            type="button"
+            className="desk-btn-ghost mt-2 rounded-lg px-2 py-1 text-[9px] font-black uppercase"
+            onClick={() => this.setState({ error: null })}
+          >
+            Retry pane
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/** IST calendar + simple NSE close: weekday Mon–Fri and local minutes > 15:30. */
+function getIstMarketState(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? '';
+  const weekday = get('weekday'); // Sun Mon …
+  let hour = Number(get('hour'));
+  if (hour === 24) hour = 0;
+  const minute = Number(get('minute'));
+  const today = `${get('year')}-${get('month')}-${get('day')}`;
+  const isWeekday = weekday !== 'Sat' && weekday !== 'Sun';
+  const mins = hour * 60 + minute;
+  const marketClosed = isWeekday && mins > 15 * 60 + 30;
+  return { today, marketClosed, isWeekday };
+}
+
+const POST_CLOSE_POLL_MS = 45_000;
 
 function PmMemoStrip({
   commentary,
@@ -111,16 +168,19 @@ function PmMemoStrip({
 }
 
 export default function EodDeskPanel() {
-  const [mode, setMode] = useState<EodMode>('full');
+  const [mode, setMode] = useState<EodMode>('book');
   const [dates, setDates] = useState<string[]>([]);
-  const [dateStr, setDateStr] = useState(() => new Date().toISOString().slice(0, 10));
-  const [swingDateStr, setSwingDateStr] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dateStr, setDateStr] = useState(() => getIstMarketState().today);
+  const [swingDateStr, setSwingDateStr] = useState(() => getIstMarketState().today);
   const [runBusy, setRunBusy] = useState(false);
   const [llmBusy, setLlmBusy] = useState(false);
   const [runMsg, setRunMsg] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [forceBookRebuild, setForceBookRebuild] = useState(false);
+  const [postCloseAuto, setPostCloseAuto] = useState(false);
   const [llmStatus, setLlmStatus] = useState<EodLlmStatus | null>(null);
   const [pmCommentary, setPmCommentary] = useState<EodPmCommentary | null>(null);
+  const forcedForDateRef = useRef<string | null>(null);
 
   const loadLlmStatus = useCallback(async (date: string) => {
     if (!date) {
@@ -184,9 +244,64 @@ export default function EodDeskPanel() {
     void loadLlmStatus(dateStr);
   }, [dateStr, refreshKey, loadLlmStatus]);
 
+  // After 15:30 IST on weekdays: one force rebuild, then poll book/forensic every ~45s (no PM LLM).
+  useEffect(() => {
+    let pollId: number | undefined;
+
+    const stopPoll = () => {
+      if (pollId != null) {
+        window.clearInterval(pollId);
+        pollId = undefined;
+      }
+    };
+
+    const startPoll = () => {
+      if (pollId != null) return;
+      pollId = window.setInterval(() => {
+        const { today, marketClosed } = getIstMarketState();
+        if (!(marketClosed && dateStr === today)) {
+          setPostCloseAuto(false);
+          stopPoll();
+          return;
+        }
+        // Cache polls only — never force, never PM LLM
+        setForceBookRebuild(false);
+        setRefreshKey((k) => k + 1);
+      }, POST_CLOSE_POLL_MS);
+    };
+
+    const evaluate = () => {
+      const { today, marketClosed } = getIstMarketState();
+      const active = marketClosed && dateStr === today;
+      setPostCloseAuto(active);
+      if (!active) {
+        stopPoll();
+        return;
+      }
+      // Serve cached book immediately. Symbol-mismatch rebuild happens server-side
+      // on force=false. Avoid auto force=true (Yahoo marks) — it hung the UI at 20s.
+      if (forcedForDateRef.current !== today) {
+        forcedForDateRef.current = today;
+        setForceBookRebuild(false);
+        setRefreshKey((k) => k + 1);
+      }
+      startPoll();
+    };
+
+    evaluate();
+    // Detect crossing 15:30 while the desk stays open
+    const watchId = window.setInterval(evaluate, 60_000);
+
+    return () => {
+      stopPoll();
+      window.clearInterval(watchId);
+    };
+  }, [dateStr]);
+
   const onRefresh = useCallback(() => {
     // Read-only reload — never triggers LLM
     setRunMsg(null);
+    setForceBookRebuild(false);
     setRefreshKey((k) => k + 1);
   }, []);
 
@@ -195,7 +310,11 @@ export default function EodDeskPanel() {
     setRunBusy(true);
     setRunMsg(null);
     try {
-      const result = (await runEodAnalysis(dateStr)) as {
+      // After close (or viewing today), force rebuild so locked INTRADAY/SWING
+      // baskets replace any stale morning book cache — never invents picks.
+      const { today, marketClosed } = getIstMarketState();
+      const force = marketClosed && dateStr === today;
+      const result = (await runEodAnalysis(dateStr, { force })) as {
         skipped?: boolean;
         reason?: string;
         llm_used?: boolean;
@@ -204,11 +323,15 @@ export default function EodDeskPanel() {
       const list = await fetchEodDates().catch(() => [] as string[]);
       const sorted = [...list].sort((a, b) => b.localeCompare(a));
       setDates(sorted);
+      setForceBookRebuild(true);
       setRefreshKey((k) => k + 1);
-      if (result?.skipped) {
+      window.setTimeout(() => setForceBookRebuild(false), 500);
+      if (result?.skipped && !force) {
         setRunMsg(`Cached artifacts · ${dateStr} · no LLM`);
       } else {
-        setRunMsg(`Engine ${result?.status || 'done'} · ${dateStr} · deterministic`);
+        setRunMsg(
+          `Engine ${result?.status || (force ? 'rebuilt' : 'done')} · ${dateStr} · ${force ? 'force book' : 'deterministic'}`
+        );
       }
     } catch (err) {
       setRunMsg(err instanceof Error ? err.message : 'EOD run failed');
@@ -274,9 +397,19 @@ export default function EodDeskPanel() {
                   PM LLM · OFF
                 </span>
               )}
+              {postCloseAuto && (
+                <span
+                  className="desk-pill desk-pill--info"
+                  title="Weekday after 15:30 IST — Book P&L auto-refetches ~45s (no PM LLM)"
+                >
+                  POST-CLOSE · AUTO
+                </span>
+              )}
             </div>
             <p className="mt-0.5 text-[10px] text-slate-500">
-              Refresh never calls LLM · PM LLM at most 1× per day then cache
+              {postCloseAuto
+                ? 'After close: Book auto-polls ~45s — no manual refresh needed. Rebuild only if you re-lock. LLM never on Refresh.'
+                : 'Refresh never calls LLM · PM LLM at most 1× per day then cache'}
             </p>
           </div>
 
@@ -414,7 +547,7 @@ export default function EodDeskPanel() {
         })}
       </div>
 
-      <div className="eod-desk__stage space-y-3" key={`${mode}-${refreshKey}`}>
+      <div className="eod-desk__stage space-y-3" key={mode}>
         {(mode === 'book' || mode === 'full') && (
           <section
             className="eod-desk__pane eod-desk__pane--book"
@@ -428,14 +561,17 @@ export default function EodDeskPanel() {
                 <span className="h-px flex-1 bg-gradient-to-r from-teal-300/60 to-transparent" />
               </div>
             )}
-            <EodAnalysisPanel
-              embedded
-              date={dateStr}
-              swingDate={swingDateStr}
-              onDateChange={setDateStr}
-              onSwingDateChange={setSwingDateStr}
-              refreshToken={refreshKey}
-            />
+            <EodPaneErrorBoundary title="Book P&L">
+              <EodAnalysisPanel
+                embedded
+                date={dateStr}
+                swingDate={swingDateStr}
+                onDateChange={setDateStr}
+                onSwingDateChange={setSwingDateStr}
+                refreshToken={refreshKey}
+                forceBookRebuild={forceBookRebuild}
+              />
+            </EodPaneErrorBoundary>
           </section>
         )}
 
@@ -452,12 +588,14 @@ export default function EodDeskPanel() {
                 <span className="h-px flex-1 bg-gradient-to-r from-cyan-300/60 to-transparent" />
               </div>
             )}
-            <EodReviewPanel
-              embedded
-              date={dateStr}
-              onDateChange={setDateStr}
-              refreshToken={refreshKey}
-            />
+            <EodPaneErrorBoundary title="Forensic Review">
+              <EodReviewPanel
+                embedded
+                date={dateStr}
+                onDateChange={setDateStr}
+                refreshToken={refreshKey}
+              />
+            </EodPaneErrorBoundary>
           </section>
         )}
       </div>

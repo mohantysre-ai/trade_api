@@ -61,7 +61,7 @@ def _ist_now() -> datetime:
 
 
 def _fetch_yahoo_finance_price(symbol: str) -> float | None:
-    """Fallback live LTP from Yahoo Finance when Angel One snapshot is stale."""
+    """LTP / last print from Yahoo Finance (works session + post-close)."""
     now = time.time()
     cached = _YAHOO_FINANCE_CACHE.get(symbol)
     if cached and (now - cached[1]) < _YAHOO_FINANCE_CACHE_TTL:
@@ -72,7 +72,10 @@ def _fetch_yahoo_finance_price(symbol: str) -> float | None:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-        price = data.get("chart", {}).get("result", [{}])[0].get("meta", {}).get("regularMarketPrice")
+        meta = data.get("chart", {}).get("result", [{}])[0].get("meta") or {}
+        price = meta.get("regularMarketPrice")
+        if price is None:
+            price = meta.get("postMarketPrice") or meta.get("previousClose")
         if price is not None:
             price = float(price)
             _YAHOO_FINANCE_CACHE[symbol] = (price, now)
@@ -80,6 +83,42 @@ def _fetch_yahoo_finance_price(symbol: str) -> float | None:
     except Exception:
         pass
     return None
+
+
+def _fetch_angel_plan_prices(symbols: list[str]) -> dict[str, float]:
+    """Angel One ltpData for fixed-plan symbols (last traded print after close too)."""
+    out: dict[str, float] = {}
+    if not symbols:
+        return out
+    try:
+        from . import angel_one_feed as aof
+    except Exception:
+        return out
+    client = None
+    try:
+        client = aof._get_fixed_plan_client()
+    except Exception:
+        return out
+    if client is None:
+        return out
+    for sym in symbols:
+        try:
+            quote = client.fetch_symbol_quote(sym)
+            if not quote:
+                continue
+            ltp = float(quote.get("ltp", 0) or 0)
+            if ltp > 0:
+                out[sym] = ltp
+        except Exception:
+            continue
+    return out
+
+
+def _should_refresh_plan_ltps(market_open: bool, after_close: bool) -> bool:
+    """Refresh every plan ticker on trading days — session open and post-close."""
+    if not _is_trading_day():
+        return False
+    return bool(market_open or after_close)
 
 
 def _is_trading_day(now: datetime | None = None) -> bool:
@@ -477,7 +516,8 @@ def get_live_prices_for_plan() -> dict[str, Any]:
     """Return prices + evaluated outcomes for symbols in the fixed plan.
 
     Honesty contract:
-    - Prefer Angel One snapshot LTP; during market hours may supplement via Yahoo.
+    - Prefer Angel One ltpData / snapshot; Yahoo fills gaps on trading days
+      (session open and after 15:30 close marks) for every plan ticker.
     - Never claim tick-live or "no external APIs" — sources are reported per symbol.
     - Cached/entry fallbacks set dataStale=True. Missing price → ltp null, not invented.
     """
@@ -541,13 +581,20 @@ def get_live_prices_for_plan() -> dict[str, Any]:
     new_alerts: list[dict[str, Any]] = []
     source_mix = {"live": 0, "snapshot": 0, "cached": 0, "none": 0}
 
-    # During market hours, supplement missing/stale snapshot quotes via Yahoo (external).
+    # Trading-day refresh for every plan ticker (session + post-close close marks).
+    # Session: Angel first, Yahoo fills gaps. Post-close: Yahoo only (fast close marks;
+    # Angel searchScrip can hang DNS and block the desk).
     live_quotes: dict[str, float] = {}
-    yahoo_attempted = False
-    if market_open and unique_symbols:
-        yahoo_attempted = True
+    live_attempted = False
+    if _should_refresh_plan_ltps(market_open, after_close) and unique_symbols:
+        live_attempted = True
+        if market_open:
+            angel_quotes = _fetch_angel_plan_prices(unique_symbols)
+            live_quotes.update(angel_quotes)
         now = time.time()
         for sym in unique_symbols:
+            if sym in live_quotes:
+                continue
             cached = _YAHOO_FINANCE_CACHE.get(sym)
             if cached and (now - cached[1]) < _YAHOO_FINANCE_CACHE_TTL:
                 live_quotes[sym] = cached[0]
@@ -573,7 +620,7 @@ def get_live_prices_for_plan() -> dict[str, Any]:
                 except (TypeError, ValueError):
                     pass
 
-        # Prefer fresh Yahoo when market is open and we have a live quote
+        # Prefer fresh Angel/Yahoo last print over stale snapshot (incl. after close)
         if symbol in live_quotes:
             ltp = live_quotes[symbol]
             ltp_source = "live"
@@ -642,16 +689,25 @@ def get_live_prices_for_plan() -> dict[str, Any]:
             if hit_level or outcome.get("final"):
                 p["outcome"] = outcome
                 plan_changed.append(True)
-                if hit_level == "sl" or outcome.get("final"):
+                if hit_level == "sl":
                     entry["closed"] = True
-                    entry["status"] = "CLOSED" if hit_level == "sl" or after_close else str(outcome.get("label") or "RUNNING")
+                    entry["status"] = "CLOSED"
+                elif hit_level in ("t1", "t2"):
+                    entry["status"] = (
+                        "TARGET 2 HIT" if hit_level == "t2" else "TARGET 1 HIT"
+                    )
+                elif after_close or outcome.get("final"):
+                    # Market closed with no SL — close mark, not a stop-out
+                    entry["status"] = "SESSION CLOSED"
         else:
             entry["outcome"] = None
 
-        if data_stale and not entry.get("closed"):
+        if data_stale and not entry.get("closed") and not after_close:
             entry["status"] = "DATA STALE"
-        elif from_snapshot and after_close:
-            entry.setdefault("status", "SESSION CLOSED")
+        elif after_close and not entry.get("closed") and not entry.get("status"):
+            entry["status"] = "SESSION CLOSED"
+        elif from_snapshot and after_close and not entry.get("status"):
+            entry["status"] = "SESSION CLOSED"
 
         return {**p, **entry}
 
@@ -685,9 +741,13 @@ def get_live_prices_for_plan() -> dict[str, Any]:
         "snapshotAgeSec": snapshot_age_sec,
         "source": "fixed_plan",
         "priceSourcesNote": (
-            "Angel One snapshot primary; Yahoo Finance supplement when market open"
-            if yahoo_attempted
-            else "Angel One snapshot / plan cache only (market closed or no Yahoo needed)"
+            (
+                "Angel One ltpData + Yahoo last print for every plan ticker"
+                if market_open
+                else "Yahoo close marks for every plan ticker (post-close)"
+            )
+            if live_attempted
+            else "Angel One snapshot / plan cache only (weekend or no plan symbols)"
         ),
         "newAlerts": new_alerts,
         "marketOpen": market_open,
