@@ -3,7 +3,7 @@
   "locked": true,
   "sessionDate": "2026-08-05",
   "committedAt": "2026-08-05T16:53:10.410180+00:00",
-  "updatedAt": "2026-08-05T16:53:10.410180+00:00",
+  "updatedAt": "2026-08-05T19:23:28.763130+00:00",
   "snapshotUpdatedAt": "2026-08-03T04:57:17.954482+00:00",
   "dataStale": true,
   "regime": {
@@ -137,7 +137,7 @@
       "ltp": 425.95,
       "scanLtp": 425.95,
       "atrPct": 2.53,
-      "status": "RUNNING",
+      "status": "SESSION CLOSED",
       "closed": false,
       "entryPrice": 425.95,
       "stopLoss": 413.02,
@@ -152,7 +152,9 @@
       "effectiveRiskFraction": 0.01,
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 0.0
     },
     {
       "rank": 2,
@@ -250,7 +252,7 @@
       "ltp": 2244.1,
       "scanLtp": 2244.1,
       "atrPct": 6.36,
-      "status": "RUNNING",
+      "status": "SESSION CLOSED",
       "closed": false,
       "entryPrice": 2244.1,
       "stopLoss": 2072.83,
@@ -265,7 +267,9 @@
       "effectiveRiskFraction": 0.01,
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 0.0
     },
     {
       "rank": 3,
@@ -363,7 +367,7 @@
       "ltp": 938.9,
       "scanLtp": 938.9,
       "atrPct": 3.01,
-      "status": "RUNNING",
+      "status": "SESSION CLOSED",
       "closed": false,
       "entryPrice": 938.9,
       "stopLoss": 904.99,
@@ -378,7 +382,9 @@
       "effectiveRiskFraction": 0.01,
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 0.0
     },
     {
       "rank": 4,
@@ -476,7 +482,7 @@
       "ltp": 1507.0,
       "scanLtp": 1507.0,
       "atrPct": 3.68,
-      "status": "RUNNING",
+      "status": "SESSION CLOSED",
       "closed": false,
       "entryPrice": 1507.0,
       "stopLoss": 1440.45,
@@ -491,7 +497,9 @@
       "effectiveRiskFraction": 0.01,
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 0.0
     },
     {
       "rank": 5,
@@ -589,7 +597,7 @@
       "ltp": 1312.6,
       "scanLtp": 1312.6,
       "atrPct": 5.58,
-      "status": "RUNNING",
+      "status": "SESSION CLOSED",
       "closed": false,
       "entryPrice": 1312.6,
       "stopLoss": 1224.71,
@@ -604,7 +612,9 @@
       "effectiveRiskFraction": 0.01,
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 0.0
     }
   ],
   "short": [
@@ -704,7 +714,7 @@
       "ltp": 172.75,
       "scanLtp": 172.75,
       "atrPct": 2.58,
-      "status": "RUNNING",
+      "status": "SESSION CLOSED",
       "closed": false,
       "entryPrice": 172.75,
       "stopLoss": 178.1,
@@ -719,7 +729,9 @@
       "effectiveRiskFraction": 0.0085,
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 0.0
     },
     {
       "rank": 2,
@@ -817,7 +829,7 @@
       "ltp": 5500.0,
       "scanLtp": 5500.0,
       "atrPct": 2.68,
-      "status": "RUNNING",
+      "status": "SESSION CLOSED",
       "closed": false,
       "entryPrice": 5500.0,
       "stopLoss": 5676.88,
@@ -832,7 +844,9 @@
       "effectiveRiskFraction": 0.0085,
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 0.0
     },
     {
       "rank": 3,
@@ -930,7 +944,7 @@
       "ltp": 758.2,
       "scanLtp": 758.2,
       "atrPct": 3.42,
-      "status": "RUNNING",
+      "status": "SESSION CLOSED",
       "closed": false,
       "entryPrice": 758.2,
       "stopLoss": 789.32,
@@ -945,7 +959,9 @@
       "effectiveRiskFraction": 0.0085,
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 0.0
     },
     {
       "rank": 4,
@@ -1043,7 +1059,7 @@
       "ltp": 1439.6,
       "scanLtp": 1439.6,
       "atrPct": 2.8,
-      "status": "RUNNING",
+      "status": "SESSION CLOSED",
       "closed": false,
       "entryPrice": 1439.6,
       "stopLoss": 1487.97,
@@ -1058,7 +1074,9 @@
       "effectiveRiskFraction": 0.0085,
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 0.0
     },
     {
       "rank": 5,
@@ -1156,7 +1174,7 @@
       "ltp": 2606.1,
       "scanLtp": 2606.1,
       "atrPct": 1.76,
-      "status": "RUNNING",
+      "status": "SESSION CLOSED",
       "closed": false,
       "entryPrice": 2606.1,
       "stopLoss": 2661.14,
@@ -1171,7 +1189,9 @@
       "effectiveRiskFraction": 0.0085,
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 0.0
     }
   ],
   "candidatePoolLong": [
@@ -3460,5 +3480,6 @@
     "rsiFade": 30.0,
     "gapFade": 30.0,
     "note": "starting params \u2014 not proven optimal"
-  }
+  },
+  "closeMarksFrozenAt": "2026-08-05T19:23:28.763130+00:00"
 }

@@ -15,6 +15,8 @@ import json
 import logging
 import os
 import re
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -23,6 +25,7 @@ log = logging.getLogger(__name__)
 
 _IST = timezone(timedelta(hours=5, minutes=30))
 _BASE = Path(__file__).resolve().parent
+_CLOSE_FREEZE_LOCK = threading.Lock()
 
 _LAST_MARKET_SNAPSHOT = _BASE / "last_market_snapshot.json"
 _SESSION_FILE = Path(
@@ -153,10 +156,32 @@ def _clamp(x: float, lo: float = 0.0, hi: float = 100.0) -> float:
 
 
 def _atomic_write(path: Path, payload: dict[str, Any]) -> None:
+    """Atomic JSON write. Docker/Windows bind mounts often reject os.replace (EBUSY);
+    retry with a unique tmp, then fall back to in-place overwrite.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
-    os.replace(tmp, path)
+    text = json.dumps(payload, indent=2, default=str)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    last_err: OSError | None = None
+    for attempt in range(4):
+        try:
+            os.replace(tmp, path)
+            return
+        except OSError as exc:
+            last_err = exc
+            time.sleep(0.05 * (attempt + 1))
+    try:
+        path.write_text(text, encoding="utf-8")
+    except OSError:
+        if last_err is not None:
+            raise last_err
+        raise
+    finally:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def load_market_snapshot() -> dict[str, Any]:
@@ -1853,38 +1878,46 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
     live_meta["marketOpen"] = market_open
     live_meta["sessionClosed"] = session_closed
 
-    # Freeze last LTP + SESSION CLOSED onto disk when market is closed so EOD / overnight
-    # UI read the same close marks (symbols stay immutable).
-    if session.get("locked") and market_open is False:
-        try:
-            frozen_changed = False
-            for side_key, rows in (("long", long_rows), ("short", short_rows)):
-                orig = list(session.get(side_key) or [])
-                for i, row in enumerate(rows):
-                    if i >= len(orig):
-                        break
-                    patch: dict[str, Any] = {}
-                    if row.get("ltp") is not None and orig[i].get("ltp") != row.get("ltp"):
-                        patch["ltp"] = row.get("ltp")
-                        patch["currentPrice"] = row.get("ltp")
-                        patch["ltpSource"] = row.get("ltpSource") or orig[i].get("ltpSource")
-                    st = str(row.get("status") or "")
-                    if st and st != "RUNNING" and orig[i].get("status") != st:
-                        patch["status"] = st
-                    if row.get("unrealizedPnl") is not None:
-                        patch["unrealizedPnl"] = row.get("unrealizedPnl")
-                    if row.get("pnlPct") is not None:
-                        patch["pnlPct"] = row.get("pnlPct")
-                    if patch:
-                        orig[i] = {**orig[i], **patch}
-                        frozen_changed = True
-                session[side_key] = orig
-            if frozen_changed:
-                session["closeMarksFrozenAt"] = _utc_now_iso()
-                session["updatedAt"] = session["closeMarksFrozenAt"]
-                save_session(session)
-        except Exception as exc:
-            log.warning("close-mark freeze failed: %s", exc)
+    # Freeze last LTP + SESSION CLOSED onto disk once per closed session.
+    # Skip when already frozen — concurrent GET polls must not fight over the file.
+    if session.get("locked") and market_open is False and not session.get("closeMarksFrozenAt"):
+        if _CLOSE_FREEZE_LOCK.acquire(blocking=False):
+            try:
+                # Re-check under lock (another request may have just frozen)
+                latest = load_session()
+                if latest.get("closeMarksFrozenAt"):
+                    session["closeMarksFrozenAt"] = latest.get("closeMarksFrozenAt")
+                else:
+                    frozen_changed = False
+                    for side_key, rows in (("long", long_rows), ("short", short_rows)):
+                        orig = list(session.get(side_key) or [])
+                        for i, row in enumerate(rows):
+                            if i >= len(orig):
+                                break
+                            patch: dict[str, Any] = {}
+                            if row.get("ltp") is not None and orig[i].get("ltp") != row.get("ltp"):
+                                patch["ltp"] = row.get("ltp")
+                                patch["currentPrice"] = row.get("ltp")
+                                patch["ltpSource"] = row.get("ltpSource") or orig[i].get("ltpSource")
+                            st = str(row.get("status") or "")
+                            if st and st != "RUNNING" and orig[i].get("status") != st:
+                                patch["status"] = st
+                            if row.get("unrealizedPnl") is not None:
+                                patch["unrealizedPnl"] = row.get("unrealizedPnl")
+                            if row.get("pnlPct") is not None:
+                                patch["pnlPct"] = row.get("pnlPct")
+                            if patch:
+                                orig[i] = {**orig[i], **patch}
+                                frozen_changed = True
+                        session[side_key] = orig
+                    # Always stamp so subsequent polls skip write even if prices unchanged
+                    session["closeMarksFrozenAt"] = _utc_now_iso()
+                    session["updatedAt"] = session["closeMarksFrozenAt"]
+                    save_session(session)
+            except Exception as exc:
+                log.warning("close-mark freeze failed: %s", exc)
+            finally:
+                _CLOSE_FREEZE_LOCK.release()
 
     return {
         "success": True,
@@ -1895,6 +1928,7 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
         "snapshotUpdatedAt": live_meta.get("snapshotUpdatedAt") or session.get("snapshotUpdatedAt") or snap.get("updatedAt"),
         "marketOpen": market_open,
         "sessionClosed": session_closed,
+        "closeMarksFrozenAt": session.get("closeMarksFrozenAt"),
         "dataStale": live_meta.get("dataStale") if "dataStale" in live_meta else session.get("dataStale"),
         "ltpSourceMix": live_meta.get("ltpSourceMix"),
         "priceSourcesNote": live_meta.get("priceSourcesNote"),
