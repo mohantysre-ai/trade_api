@@ -108,9 +108,14 @@ def attach_outcome_narratives(
     rows: list[dict[str, Any]],
     *,
     force: bool = False,
+    refresh_existing: bool = False,
     max_rows: int = 24,
 ) -> list[dict[str, Any]]:
-    """Attach outcomeNarrative from diagnostic FactPack. Skip when not force (keep rebuild snappy)."""
+    """Attach outcomeNarrative from diagnostic FactPack.
+
+    force=False → skip LLM (keep rebuild snappy).
+    force=True → fill missing narratives only unless refresh_existing=True.
+    """
     if not force:
         return rows
     out: list[dict[str, Any]] = []
@@ -125,7 +130,7 @@ def attach_outcome_narratives(
         if diag.get("isSkip") and not diag.get("isMiss") and not diag.get("isHit"):
             out.append(r)
             continue
-        if r.get("outcomeNarrative") and not force:
+        if r.get("outcomeNarrative") and not refresh_existing:
             out.append(r)
             continue
         if done >= max_rows:
@@ -139,10 +144,19 @@ def attach_outcome_narratives(
     return out
 
 
-def build_day_lessons(rows: list[dict[str, Any]], *, force: bool = False, max_bullets: int = 5) -> list[str]:
+def build_day_lessons(
+    rows: list[dict[str, Any]],
+    *,
+    force: bool = False,
+    refresh_existing: bool = False,
+    existing: list[str] | None = None,
+    max_bullets: int = 5,
+) -> list[str]:
     """Day-level lessons from aggregated diagnostics — LLM only on force rebuild."""
     if not force:
-        return []
+        return list(existing or [])[:max_bullets]
+    if existing and not refresh_existing:
+        return list(existing)[:max_bullets]
     packs = []
     for row in rows:
         diag = row.get("missDiagnostic")

@@ -167,7 +167,12 @@ function PmMemoStrip({
   );
 }
 
-export default function EodDeskPanel() {
+export default function EodDeskPanel({
+  refreshToken = 0,
+}: {
+  /** Bumped by top desk Refresh — reloads Book / LLM status without force. */
+  refreshToken?: number;
+}) {
   const [mode, setMode] = useState<EodMode>('book');
   const [dates, setDates] = useState<string[]>([]);
   const [dateStr, setDateStr] = useState(() => getIstMarketState().today);
@@ -243,6 +248,14 @@ export default function EodDeskPanel() {
   useEffect(() => {
     void loadLlmStatus(dateStr);
   }, [dateStr, refreshKey, loadLlmStatus]);
+
+  // Top desk Refresh — bump local key so Book / status reload without force rebuild.
+  useEffect(() => {
+    if (refreshToken > 0) {
+      setForceBookRebuild(false);
+      setRefreshKey((k) => k + 1);
+    }
+  }, [refreshToken]);
 
   // After 15:30 IST on weekdays: one force rebuild, then poll book/forensic every ~45s (no PM LLM).
   useEffect(() => {
@@ -408,8 +421,8 @@ export default function EodDeskPanel() {
             </div>
             <p className="mt-0.5 text-[10px] text-slate-500">
               {postCloseAuto
-                ? 'After close: Book auto-polls ~45s — no manual refresh needed. Rebuild only if you re-lock. LLM never on Refresh.'
-                : 'Refresh never calls LLM · PM LLM at most 1× per day then cache'}
+                ? 'After close: Book auto-polls ~45s. Rebuild refreshes marks + fills missing outcome narratives (no full LLM reburn). PM LLM never on Refresh.'
+                : 'Refresh never calls LLM · Rebuild fills missing narratives · PM LLM at most 1×/day then cache · Rotate locks via Swing/Intraday panels'}
             </p>
           </div>
 

@@ -1523,6 +1523,9 @@ def commit_session(force: bool = False) -> dict[str, Any]:
         "funnel": candidates.get("funnel"),
         "weights": candidates.get("weights"),
         "meanRevWeights": candidates.get("meanRevWeights"),
+        "rotation": "DAILY",
+        "priorSessionDate": existing_date if stale_day else None,
+        "rotated": bool(stale_day),
     }
     save_session(session)
 
@@ -1585,24 +1588,42 @@ def commit_session(force: bool = False) -> dict[str, Any]:
         "regime": candidates.get("regime"),
         "source": "intraday_session_engine",
         "funnel": f"{BASKET_SIZE}+{BASKET_SIZE} candidates → {LOCK_SIZE}+{LOCK_SIZE} locked",
+        "rotation": "DAILY",
+        "priorSessionDate": existing_date if stale_day else None,
     }
     _atomic_write(_FIXED_PLAN_FILE, plan)
     session["fixedPlanSynced"] = True
-    session["rotation"] = "DAILY"
-    if stale_day:
-        session["priorSessionDate"] = existing_date
-        session["rotated"] = True
+    save_session(session)  # persist fixedPlanSynced after plan write
     return session
 
 
 def ensure_intraday_session_locked() -> dict[str, Any]:
-    """Idempotent lock — rotates automatically when sessionDate != IST today."""
+    """Idempotent lock — rotates automatically when sessionDate != IST today.
+
+    Always returns a session-shaped dict (locked/sessionDate) for scheduler consumers.
+    """
     existing = load_session()
     today = _ist_now().strftime("%Y-%m-%d")
     existing_date = str(existing.get("sessionDate") or "").strip()[:10]
     if existing.get("locked") and existing_date == today and (existing.get("long") or []):
         return existing
-    return commit_session(force=bool(existing.get("locked") and existing_date != today))
+    result = commit_session(force=bool(existing.get("locked") and existing_date != today))
+    if isinstance(result, dict) and result.get("locked") and result.get("sessionDate"):
+        return result
+    nested = result.get("session") if isinstance(result, dict) else None
+    if isinstance(nested, dict) and nested.get("locked"):
+        out = dict(nested)
+        if result.get("error"):
+            out["commitError"] = result.get("error")
+        if result.get("alreadyLocked"):
+            out["alreadyLocked"] = True
+        return out
+    # Commit failed — return current disk session so callers still see shape
+    failed = dict(existing) if isinstance(existing, dict) else {}
+    failed.setdefault("locked", False)
+    if isinstance(result, dict) and result.get("error"):
+        failed["commitError"] = result.get("error")
+    return failed
 
 
 def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1694,20 +1715,19 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
     elif status == "RUNNING" and out.get("distToT1Pct") is not None and out["distToT1Pct"] <= 0.4:
         status = "TARGET APPROACHING"
 
-    # After 15:30 IST: open names are session-closed (close mark), not still RUNNING
+    # Outside NSE RTH: open names are session-closed (close mark), not RUNNING / DATA STALE
     try:
-        from .trade_outcome import _is_after_market_close
+        from .trade_outcome import _is_market_open
 
-        session_closed = _is_after_market_close()
+        session_closed = not _is_market_open()
     except Exception:
         session_closed = False
     if session_closed and status in (
         "RUNNING",
         "SL APPROACHING",
         "TARGET APPROACHING",
+        "DATA STALE",
     ):
-        status = "SESSION CLOSED"
-    elif session_closed and status == "DATA STALE" and ltp is not None:
         status = "SESSION CLOSED"
 
     if out.get("closed"):
@@ -1822,18 +1842,49 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
     feed_status = "STALE" if (live_meta.get("dataStale") or session.get("dataStale")) else ("OK" if session.get("locked") else "IDLE")
 
     # Always emit session clock honesty — even when unlocked / live enrich skipped
-    if "marketOpen" not in live_meta or live_meta.get("marketOpen") is None:
+    try:
+        from .trade_outcome import _is_market_open
+
+        market_open = _is_market_open()
+    except Exception:
+        market_open = live_meta.get("marketOpen")
+    # Desk: sessionClosed means "not in RTH" (overnight + weekends), not only post-15:30
+    session_closed = (market_open is False) if market_open is not None else live_meta.get("sessionClosed")
+    live_meta["marketOpen"] = market_open
+    live_meta["sessionClosed"] = session_closed
+
+    # Freeze last LTP + SESSION CLOSED onto disk when market is closed so EOD / overnight
+    # UI read the same close marks (symbols stay immutable).
+    if session.get("locked") and market_open is False:
         try:
-            from .trade_outcome import _is_market_open
-            live_meta["marketOpen"] = _is_market_open()
-        except Exception:
-            live_meta["marketOpen"] = None
-    if "sessionClosed" not in live_meta or live_meta.get("sessionClosed") is None:
-        try:
-            from .trade_outcome import _is_after_market_close
-            live_meta["sessionClosed"] = _is_after_market_close()
-        except Exception:
-            live_meta["sessionClosed"] = None
+            frozen_changed = False
+            for side_key, rows in (("long", long_rows), ("short", short_rows)):
+                orig = list(session.get(side_key) or [])
+                for i, row in enumerate(rows):
+                    if i >= len(orig):
+                        break
+                    patch: dict[str, Any] = {}
+                    if row.get("ltp") is not None and orig[i].get("ltp") != row.get("ltp"):
+                        patch["ltp"] = row.get("ltp")
+                        patch["currentPrice"] = row.get("ltp")
+                        patch["ltpSource"] = row.get("ltpSource") or orig[i].get("ltpSource")
+                    st = str(row.get("status") or "")
+                    if st and st != "RUNNING" and orig[i].get("status") != st:
+                        patch["status"] = st
+                    if row.get("unrealizedPnl") is not None:
+                        patch["unrealizedPnl"] = row.get("unrealizedPnl")
+                    if row.get("pnlPct") is not None:
+                        patch["pnlPct"] = row.get("pnlPct")
+                    if patch:
+                        orig[i] = {**orig[i], **patch}
+                        frozen_changed = True
+                session[side_key] = orig
+            if frozen_changed:
+                session["closeMarksFrozenAt"] = _utc_now_iso()
+                session["updatedAt"] = session["closeMarksFrozenAt"]
+                save_session(session)
+        except Exception as exc:
+            log.warning("close-mark freeze failed: %s", exc)
 
     return {
         "success": True,
@@ -1842,8 +1893,8 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
         "committedAt": session.get("committedAt"),
         "updatedAt": live_meta.get("updatedAt") or session.get("updatedAt") or _utc_now_iso(),
         "snapshotUpdatedAt": live_meta.get("snapshotUpdatedAt") or session.get("snapshotUpdatedAt") or snap.get("updatedAt"),
-        "marketOpen": live_meta.get("marketOpen"),
-        "sessionClosed": live_meta.get("sessionClosed"),
+        "marketOpen": market_open,
+        "sessionClosed": session_closed,
         "dataStale": live_meta.get("dataStale") if "dataStale" in live_meta else session.get("dataStale"),
         "ltpSourceMix": live_meta.get("ltpSourceMix"),
         "priceSourcesNote": live_meta.get("priceSourcesNote"),

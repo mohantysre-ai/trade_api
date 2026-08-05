@@ -606,6 +606,16 @@ def _enrich_swing_row_prices(row: dict[str, Any], quotes: dict[str, Any], stocks
     out["dayChangePct"] = delta if delta is not None else out.get("dayChangePct")
     out["unrealizedPnl"] = unrealized
     out["unrealizedPnlPct"] = unrealized_pct
+    # Outside RTH: open swing rows are session-closed (price-only MTM still applies)
+    try:
+        from .trade_outcome import _is_market_open
+
+        if not _is_market_open():
+            st = str(out.get("status") or "").upper()
+            if st in ("", "RUNNING", "DATA STALE") or out.get("status") is None:
+                out["status"] = "SESSION CLOSED"
+    except Exception:
+        pass
     # Symbols / levels stay immutable
     return out
 

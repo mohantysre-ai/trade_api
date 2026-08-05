@@ -427,25 +427,21 @@ def _load_canonical_intraday_picks(for_date: date) -> tuple[list[dict[str, Any]]
 
     if session.get("locked") and session_date and session_date != day_key:
         log.info(
-            "Rejecting stale intradAy_session for Book (%s != %s) — date parity",
+            "Stale intradAy_session (%s != %s) — skip live lock, try plan/archive for date",
             session_date,
             day_key,
         )
-        return [], False, "intraday_session_stale", {
-            "swing": 0,
-            "intradayLong": 0,
-            "intradayShort": 0,
-            "total": 0,
-        }
+        # Fall through — do not hard-empty the Book
 
     session_long = [p for p in (session.get("long") or []) if isinstance(p, dict) and p.get("symbol")] if session_ok else []
     session_short = [p for p in (session.get("short") or []) if isinstance(p, dict) and p.get("symbol")] if session_ok else []
     desk_counts = {
-        "swing": 0,
+        "swing": int(desk_counts.get("swing") or 0) if isinstance(desk_counts, dict) else 0,
         "intradayLong": len(session_long),
         "intradayShort": len(session_short),
-        "total": len(session_long) + len(session_short),
+        "total": 0,
     }
+    desk_counts["total"] = desk_counts["swing"] + desk_counts["intradayLong"] + desk_counts["intradayShort"]
 
     if session_long or session_short:
         rows = []
@@ -571,12 +567,17 @@ def generate_intraday_eod_report(
             }
             stale_mock = bool(cached.get("isMock") and picks and not is_mock)
             stale_set = bool(live_syms) and cached_syms != live_syms
-            if stale_mock or stale_set:
+            ghost_cache = bool(cached_syms) and not live_syms and symbol_source in (
+                "empty",
+                "intraday_session_stale",
+            )
+            if stale_mock or stale_set or ghost_cache:
                 log.info(
-                    "Rebuilding intraday book for %s (mock=%s set_mismatch=%s live=%s cached=%s)",
+                    "Rebuilding intraday book for %s (mock=%s set_mismatch=%s ghost=%s live=%s cached=%s)",
                     for_date.isoformat(),
                     stale_mock,
                     stale_set,
+                    ghost_cache,
                     sorted(live_syms),
                     sorted(cached_syms),
                 )
@@ -666,11 +667,25 @@ def generate_intraday_eod_report(
 
     from .outcome_narrative import attach_outcome_narratives, build_day_lessons
 
-    rows = attach_outcome_narratives(rows, force=force)
+    prior_lessons: list[str] = []
+    if force:
+        prior = load_book_cache(for_date, "intraday") or {}
+        prior_lessons = list(prior.get("dayLessons") or []) if isinstance(prior.get("dayLessons"), list) else []
+        prior_narr = {
+            str(t.get("symbol") or "").upper(): t.get("outcomeNarrative")
+            for t in (prior.get("trades") or [])
+            if isinstance(t, dict) and t.get("outcomeNarrative")
+        }
+        for r in rows:
+            sym = str(r.get("symbol") or "").upper()
+            if sym in prior_narr and not r.get("outcomeNarrative"):
+                r["outcomeNarrative"] = prior_narr[sym]
+
+    rows = attach_outcome_narratives(rows, force=force, refresh_existing=False)
     remaining_capital = capital + total_pnl
     scored = sum(1 for r in rows if r.get("missDiagnostic") and r["missDiagnostic"].get("source") == "SCORECARD")
     hit_rows = sum(1 for r in rows if r.get("missDiagnostic") and r["missDiagnostic"].get("isHit"))
-    lessons = build_day_lessons(rows, force=force)
+    lessons = build_day_lessons(rows, force=force, refresh_existing=False, existing=prior_lessons)
 
     report = {
         "date": for_date.isoformat(),

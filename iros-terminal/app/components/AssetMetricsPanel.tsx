@@ -755,12 +755,31 @@ export default function AssetMetricsPanel({
   const marketOpen = livePrices?.marketOpen ?? session?.marketOpen;
   const dataStale = Boolean(livePrices?.dataStale || session?.dataStale);
 
-  const locked = Boolean(session?.locked);
-  const displayLong = locked ? (session?.long || []) : (candidates?.proposedLong || []);
-  const displayShort = locked ? (session?.short || []) : (candidates?.proposedShort || []);
+  const istToday = useMemo(
+    () =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date()),
+    [clock],
+  );
+  const sessionDate = String(session?.sessionDate || '').slice(0, 10);
+  const lockedToday = Boolean(session?.locked && sessionDate === istToday);
+  const staleLocked = Boolean(session?.locked && sessionDate && sessionDate !== istToday);
+  // After close / overnight: keep showing the locked basket (SESSION CLOSED + last LTP).
+  // Never fall back to candidates while a lock exists — candidates hardcode RUNNING.
+  const showLockedBasket = Boolean(
+    session?.locked && ((session?.long?.length ?? 0) > 0 || (session?.short?.length ?? 0) > 0),
+  );
+  const locked = lockedToday;
+  const displayLong = showLockedBasket ? (session?.long || []) : (candidates?.proposedLong || []);
+  const displayShort = showLockedBasket ? (session?.short || []) : (candidates?.proposedShort || []);
   const hasCandidates =
     (candidates?.proposedLong?.length ?? 0) > 0 || (candidates?.proposedShort?.length ?? 0) > 0;
-  const canCommit = !locked && hasCandidates && !committing;
+  const canCommit = !lockedToday && !staleLocked && hasCandidates && !committing;
+  const canForceRotate = staleLocked && hasCandidates && !committing;
 
   const attentionItems = session?.attention || [];
   const meanRevGate = session?.meanRevGate || candidates?.meanRevGate;
@@ -770,10 +789,12 @@ export default function AssetMetricsPanel({
     session?.capital?.candidatePoolSize ?? candidates?.capital?.candidatePoolSize ?? 10;
   const adoptLong = candidates?.adoptLong || [];
   const adoptShort = candidates?.adoptShort || [];
-  const showAttention = attentionItems.length > 0 || dataStale || mrGatedOff;
+  const showAttention = attentionItems.length > 0 && lockedToday;
 
-  const emptyHint = locked
-    ? 'No locked positions —'
+  const emptyHint = showLockedBasket
+    ? lockedToday
+      ? 'No locked positions —'
+      : `Locked ${sessionDate} · close marks (rotate next session for a new basket)`
     : candidates?.error
       ? `Candidates unavailable — ${candidates.error}`
       : 'No candidates yet — commit unavailable until API returns names';
@@ -783,7 +804,7 @@ export default function AssetMetricsPanel({
       {/* Honest monitor banner — live-prices fields only */}
       <div
         className={`desk-monitor-banner ${
-          dataStale ? 'is-stale' : locked ? 'is-locked' : ''
+          dataStale ? 'is-stale' : showLockedBasket ? 'is-locked' : ''
         }`}
         role="status"
       >
@@ -802,8 +823,12 @@ export default function AssetMetricsPanel({
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="desk-panel-title text-slate-900">INTRADAY</h2>
               <StatusPill tone="desk-pill--strong">MANUAL EXECUTION</StatusPill>
-              {locked ? (
-                <StatusPill tone="desk-pill--info">SESSION BASKET LOCKED</StatusPill>
+              {lockedToday ? (
+                <StatusPill tone="desk-pill--info">SESSION BASKET LOCKED · {sessionDate}</StatusPill>
+              ) : staleLocked ? (
+                <StatusPill tone="desk-pill--warn">
+                  LOCKED CLOSE · {sessionDate} → EOD
+                </StatusPill>
               ) : (
                 <StatusPill>UNLOCKED</StatusPill>
               )}
@@ -835,10 +860,21 @@ export default function AssetMetricsPanel({
                   : `Adopt ${basketSize}+${basketSize} from ${candidatePoolSize}+${candidatePoolSize}`}
               </button>
             )}
+            {canForceRotate && (
+              <button
+                type="button"
+                disabled={committing}
+                onClick={() => onCommit(true)}
+                className="desk-btn-primary"
+                title="Force rotate stale-day basket to today"
+              >
+                {committing ? 'Rotating…' : 'Rotate today'}
+              </button>
+            )}
           </div>
         </div>
 
-        {!locked && (adoptLong.length > 0 || adoptShort.length > 0) && (
+        {!showLockedBasket && (adoptLong.length > 0 || adoptShort.length > 0) && (
           <p className="mt-2 text-[9px] text-slate-600">
             High-prob adopt (score / in-play):{' '}
             <span className="font-bold text-emerald-700">

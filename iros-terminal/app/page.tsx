@@ -2328,6 +2328,7 @@ export default function IrosMasterAdvancedTerminal() {
               selectedPool={selectedPool}
               onPoolChange={setSelectedPool}
               availablePools={liveMarket?.availablePools}
+              refreshToken={deskRefreshKey}
             />
             <StockDetailPanel stock={selectedQuote} />
             <DhanRecommendedPanel liveMarket={liveMarket} onSelect={handleSelect} />
@@ -2343,7 +2344,7 @@ export default function IrosMasterAdvancedTerminal() {
 
         {activeTab === 'eod' && (
           <div key="eod" className="desk-panel-enter space-y-3 min-w-0">
-            <EodDeskPanel />
+            <EodDeskPanel refreshToken={deskRefreshKey} />
           </div>
         )}
         </main>

@@ -377,15 +377,22 @@ def _ensure_mock_plan() -> dict[str, Any]:
 
 
 def _load_swing_book_picks(as_of: date) -> tuple[list[dict[str, Any]], bool, str, dict[str, int]]:
-    """Swing Book — locked Asset Matrix BUY portfolio for matching IST date only."""
-    from .eod_engine.ingestion import load_day_picks
-    from .swing_session import apply_swing_sizing, ensure_swing_session_locked
+    """Swing Book — locked Asset Matrix BUY portfolio for matching IST date only.
 
-    ensure_swing_session_locked()
-    apply_swing_sizing(persist=True, force=True)
+    Read-only: does not call ensure_swing_session_locked (avoids wiping prior-day lock).
+    Sizing applied in-memory only when sessionDate matches as_of.
+    """
+    from .eod_engine.ingestion import load_day_picks
+    from .swing_session import apply_swing_sizing, load_swing_session
 
     day = load_day_picks(as_of)
     desk_counts = dict(day.get("deskCounts") or {})
+    swing = day.get("swingSession") if isinstance(day.get("swingSession"), dict) else load_swing_session()
+    swing_date = str(swing.get("sessionDate") or "").strip()[:10]
+    if swing.get("locked") and swing_date == as_of.isoformat() and (swing.get("long") or []):
+        # In-memory sizing for Book math — do not persist (read path)
+        apply_swing_sizing(swing, persist=False, force=False)
+
     swing_rows = [
         p for p in (day.get("picks") or [])
         if isinstance(p, dict) and p.get("symbol") and str(p.get("book") or "").upper() == "SWING"
@@ -476,13 +483,19 @@ def generate_swing_eod_report(
                 and symbol_source == "swing_session"
             )
             stale_set = bool(live_syms) and cached_syms != live_syms
-            if stale_mock or stale_source or stale_set:
+            ghost_cache = bool(cached_syms) and not live_syms and symbol_source in (
+                "swing_session_empty",
+                "empty",
+                "intraday_session_stale",
+            )
+            if stale_mock or stale_source or stale_set or ghost_cache:
                 log.info(
-                    "Rebuilding swing book for %s (mock=%s source=%s set_mismatch=%s)",
+                    "Rebuilding swing book for %s (mock=%s source=%s set_mismatch=%s ghost=%s)",
                     as_of.isoformat(),
                     stale_mock,
                     stale_source,
                     stale_set,
+                    ghost_cache,
                 )
             else:
                 return cached
@@ -503,8 +516,8 @@ def generate_swing_eod_report(
             "bestPerformer": None,
             "worstPerformer": None,
             "pnlByDayBucket": {},
-            "isMock": True,
-            "symbolSource": symbol_source,
+            "isMock": False,
+            "symbolSource": symbol_source or "swing_session_empty",
             "deskCounts": desk_counts,
             "attribution": {
                 "locked": 0,
@@ -566,12 +579,25 @@ def generate_swing_eod_report(
 
     from .outcome_narrative import attach_outcome_narratives, build_day_lessons
 
-    rows = attach_outcome_narratives(rows, force=force)
+    prior_lessons: list[str] = []
+    if force:
+        prior = load_book_cache(as_of, "swing") or {}
+        prior_lessons = list(prior.get("dayLessons") or []) if isinstance(prior.get("dayLessons"), list) else []
+        prior_narr = {
+            str(t.get("symbol") or "").upper(): t.get("outcomeNarrative")
+            for t in (prior.get("picks") or [])
+            if isinstance(t, dict) and t.get("outcomeNarrative")
+        }
+        for r in rows:
+            sym = str(r.get("symbol") or "").upper()
+            if sym in prior_narr and not r.get("outcomeNarrative"):
+                r["outcomeNarrative"] = prior_narr[sym]
 
+    rows = attach_outcome_narratives(rows, force=force, refresh_existing=False)
     active_rows = [r for r in rows if not r.get("skipped") and r.get("status") != "NOT_TRIGGERED"]
     winners = [r for r in active_rows if (r.get("pnl") or 0) > 0 or ((r.get("pnlPct") or 0) > 0 and r.get("pnl") is None)]
     losers = [r for r in active_rows if (r.get("pnl") or 0) < 0 or ((r.get("pnlPct") or 0) < 0 and r.get("pnl") is None)]
-    lessons = build_day_lessons(rows, force=force)
+    lessons = build_day_lessons(rows, force=force, refresh_existing=False, existing=prior_lessons)
 
     report = {
         "date": as_of.isoformat(),
@@ -609,7 +635,5 @@ def generate_swing_eod_report(
             "deployed": round(total_deployed, 2),
         },
         "dayLessons": lessons,
-        "referenceDate": "2026-07-17",
-        "referenceLabel": "9:30 AM IST July 17 open (Friday session reference)",
     }
     return save_book_cache(as_of, "swing", report)

@@ -617,12 +617,15 @@ export default function ForensicPanel({
   selectedPool,
   onPoolChange,
   availablePools,
+  refreshToken = 0,
 }: {
   onSelect?: (ticker: string) => void;
   liveMarket?: MarketDataResponse | null;
   selectedPool?: string;
   onPoolChange?: (pool: string) => void;
   availablePools?: string[];
+  /** Bumped by top desk Refresh — reloads swing session MTM. */
+  refreshToken?: number;
 }) {
   const [swingSession, setSwingSession] = useState<{
     locked?: boolean;
@@ -643,6 +646,30 @@ export default function ForensicPanel({
     }>;
     portfolio?: { unrealizedPnl?: number; lockedCount?: number };
   } | null>(null);
+  const [locking, setLocking] = useState(false);
+  const [lockError, setLockError] = useState<string | null>(null);
+  const [istClock, setIstClock] = useState(() =>
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date()),
+  );
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setIstClock(
+        new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Kolkata',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(new Date()),
+      );
+    }, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const live = liveMarket ?? null;
   const stocks = live?.stocks ?? [];
@@ -1034,16 +1061,7 @@ export default function ForensicPanel({
     return selectMatrixDisplayRows(evaluated, stockRows.length, institutionalMode);
   }, [assetRows, tickerIntelMap, tickerNewsMap, trendlyneSummaries, institutionalMode, isSnapshotFallback, poolHasHardFilterPasses, selectionMetaMode]);
 
-  const istToday = useMemo(
-    () =>
-      new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Kolkata',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date()),
-    [live?.updatedAt],
-  );
+  const istToday = istClock;
 
   useEffect(() => {
     let cancelled = false;
@@ -1061,13 +1079,42 @@ export default function ForensicPanel({
     return () => {
       cancelled = true;
     };
-  }, [live?.updatedAt]);
+  }, [live?.updatedAt, refreshToken, istToday]);
 
   const lockedSwingMode = Boolean(
     swingSession?.locked &&
       String(swingSession?.sessionDate || '').slice(0, 10) === istToday &&
       (swingSession?.long?.length ?? 0) > 0,
   );
+  const staleSwingLock = Boolean(
+    swingSession?.locked &&
+      String(swingSession?.sessionDate || '').slice(0, 10) &&
+      String(swingSession?.sessionDate || '').slice(0, 10) !== istToday,
+  );
+
+  const onLockSwing = async (force: boolean) => {
+    setLocking(true);
+    setLockError(null);
+    try {
+      const res = await fetch(`/api/swing-session/lock?force=${force ? 'true' : 'false'}`, {
+        method: 'POST',
+        cache: 'no-store',
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body?.success === false) {
+        setLockError(String(body?.error || body?.detail || `Lock failed (${res.status})`));
+      } else if (body?.session) {
+        setSwingSession(body.session);
+      } else {
+        const reload = await fetch('/api/swing-session?live=1', { cache: 'no-store' });
+        if (reload.ok) setSwingSession(await reload.json());
+      }
+    } catch (err) {
+      setLockError(err instanceof Error ? err.message : 'Lock failed');
+    } finally {
+      setLocking(false);
+    }
+  };
 
   const portfolioDisplayRows: MatrixCardRow[] = useMemo(() => {
     if (!lockedSwingMode || !swingSession?.long?.length) return displayRows;
@@ -1184,21 +1231,28 @@ export default function ForensicPanel({
                   </>
                 )}
               </>
+            ) : staleSwingLock ? (
+              <>
+                <span className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-800">
+                  STALE · {swingSession?.sessionDate}
+                </span>
+                {' · '}prior-day lock — rotate to today Matrix BUY
+              </>
             ) : institutionalMode
               ? institutionalOffHours
                 ? `Institutional ₹1cr+ book — off-hours snapshot: score ≥ ${SCORE_STRONG}, Trendlyne confirm, LOW/MODERATE risk (volume gates rank-penalized)`
                 : `Institutional ₹1cr+ book — score ≥ ${SCORE_STRONG}, Trendlyne confirm, Dhan R:R ≥2 when live`
               : live?.poolDescription || `Top ${MATRIX_BUY_MIN_DISPLAY}+ high-probability BUY setups — score ≥ ${MATRIX_BUY_MIN_SCORE}, CORE preferred`}
-            {!lockedSwingMode && typeof live?.universeSize === 'number' && live.universeSize > 0 && (
+            {!lockedSwingMode && !staleSwingLock && typeof live?.universeSize === 'number' && live.universeSize > 0 && (
               <> · Universe {live.universeSize}</>
             )}
-            {!lockedSwingMode && typeof live?.volumeScreenedCount === 'number' && live.volumeScreenedCount > 0 && (
+            {!lockedSwingMode && !staleSwingLock && typeof live?.volumeScreenedCount === 'number' && live.volumeScreenedCount > 0 && (
               <> · Top {live.volumeScreenedCount} by volume screened</>
             )}
-            {!lockedSwingMode && dhanPickMap.size > 0 && (
+            {!lockedSwingMode && !staleSwingLock && dhanPickMap.size > 0 && (
               <> · Dhan LONG {dhanPickMap.size}</>
             )}
-            {!lockedSwingMode && (
+            {!lockedSwingMode && !staleSwingLock && (
               <>
                 {' · '}BUY Picks {displayRows.length}
                 {institutionalMode && <> · max {INSTITUTIONAL_MATRIX_TOP_N}</>}
@@ -1224,8 +1278,22 @@ export default function ForensicPanel({
               </select>
             </label>
           )}
+          {!lockedSwingMode && (
+            <button
+              type="button"
+              disabled={locking}
+              onClick={() => void onLockSwing(staleSwingLock)}
+              className="min-h-11 px-3 py-2 text-[11px] rounded-lg bg-emerald-600 text-white font-bold uppercase tracking-wider hover:bg-emerald-700 disabled:opacity-50"
+              title={staleSwingLock ? 'Force rotate stale swing lock to today Matrix BUY' : 'Lock today Asset Matrix BUY set'}
+            >
+              {locking ? 'Locking…' : staleSwingLock ? 'Rotate swing today' : 'Lock swing today'}
+            </button>
+          )}
         </div>
       </div>
+      {lockError && (
+        <p className="mb-2 text-[10px] text-red-600">{lockError}</p>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
         {portfolioDisplayRows.map((item) => {

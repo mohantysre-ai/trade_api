@@ -626,7 +626,7 @@ export default function EodAnalysisPanel({
             onClick={() => void fetchReports({ force: true })}
             disabled={loading}
             className="desk-btn-primary px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
-            title="Rebuild book reports and overwrite cache"
+            title="Rebuild marks/cache; fills missing outcome narratives only (does not reburn existing LLM text)"
           >
             REBUILD
           </button>
@@ -654,6 +654,7 @@ export default function EodAnalysisPanel({
             onClick={() => void fetchReports({ force: true })}
             disabled={loading}
             className="desk-btn-ghost rounded-md px-2 py-1 text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
+            title="Rebuild marks/cache; fills missing outcome narratives only"
           >
             Rebuild book
           </button>

@@ -139,7 +139,11 @@ def _is_market_open(now: datetime | None = None) -> bool:
 
 
 def _is_after_market_close(now: datetime | None = None) -> bool:
-    """True once the session for the day has ended (or it's a non-trading day)."""
+    """True once today's NSE session has ended (after 15:30 IST), or non-trading day.
+
+    Pre-open (before 09:15) is *not* after-close — use ``not _is_market_open()`` for
+    overnight SESSION CLOSED display so we do not spam Yahoo refresh all night.
+    """
     now = now or _ist_now()
     if not _is_trading_day(now):
         return True
@@ -534,7 +538,7 @@ def get_live_prices_for_plan() -> dict[str, Any]:
             "source": "none",
             "priceSourcesNote": "No fixed plan; Yahoo not attempted",
             "marketOpen": _is_market_open(),
-            "sessionClosed": _is_after_market_close(),
+            "sessionClosed": not _is_market_open(),
             "dataStale": True,
             "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0},
         }
@@ -550,7 +554,7 @@ def get_live_prices_for_plan() -> dict[str, Any]:
             "source": "none",
             "priceSourcesNote": "Empty fixed plan; Yahoo not attempted",
             "marketOpen": _is_market_open(),
-            "sessionClosed": _is_after_market_close(),
+            "sessionClosed": not _is_market_open(),
             "dataStale": True,
             "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0},
         }
@@ -702,11 +706,20 @@ def get_live_prices_for_plan() -> dict[str, Any]:
         else:
             entry["outcome"] = None
 
-        if data_stale and not entry.get("closed") and not after_close:
+        if data_stale and not entry.get("closed") and market_open:
             entry["status"] = "DATA STALE"
-        elif after_close and not entry.get("closed") and not entry.get("status"):
+        elif not market_open and not entry.get("closed") and not entry.get("status"):
             entry["status"] = "SESSION CLOSED"
-        elif from_snapshot and after_close and not entry.get("status"):
+        elif from_snapshot and not market_open and not entry.get("status"):
+            entry["status"] = "SESSION CLOSED"
+        elif not market_open and not entry.get("closed") and entry.get("status") in (
+            None,
+            "",
+            "RUNNING",
+            "DATA STALE",
+            "SL APPROACHING",
+            "TARGET APPROACHING",
+        ):
             entry["status"] = "SESSION CLOSED"
 
         return {**p, **entry}
@@ -751,7 +764,7 @@ def get_live_prices_for_plan() -> dict[str, Any]:
         ),
         "newAlerts": new_alerts,
         "marketOpen": market_open,
-        "sessionClosed": after_close,
+        "sessionClosed": after_close if market_open else True,
         "dataStale": bool(any_stale),
         "ltpSourceMix": source_mix,
         "locked": bool(fixed.get("locked")),
@@ -799,7 +812,7 @@ def get_trade_outcomes() -> dict[str, Any]:
             save_fixed_trade_plan(fixed)
         fixed["updatedAt"] = _utc_now()
         fixed["marketOpen"] = _is_market_open()
-        fixed["sessionClosed"] = after_close
+        fixed["sessionClosed"] = not fixed["marketOpen"]
         return fixed
     
     picks = _load_persisted_picks()

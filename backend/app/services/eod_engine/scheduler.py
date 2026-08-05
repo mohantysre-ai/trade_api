@@ -343,7 +343,7 @@ def _maybe_auto_commit(now: datetime) -> None:
         return
 
     try:
-        from ..intraday_session_engine import commit_session, load_session
+        from ..intraday_session_engine import ensure_intraday_session_locked, load_session
         from ..swing_session import ensure_swing_session_locked
 
         def _job() -> None:
@@ -352,40 +352,27 @@ def _maybe_auto_commit(now: datetime) -> None:
                 prior = load_session()
                 prior_date = str(prior.get("sessionDate") or "").strip()[:10]
                 stale_day = bool(prior.get("locked") and prior_date and prior_date != day_key)
-                result = commit_session(force=stale_day)
-                locked = bool(result.get("locked")) or (
-                    isinstance(result.get("session"), dict) and bool(result["session"].get("locked"))
-                )
-                if not locked and result.get("success") is not False and result.get("long"):
-                    locked = True
+                # Idempotent ensure — rotates when sessionDate != today
+                result_sess = ensure_intraday_session_locked()
+                locked = bool(result_sess.get("locked")) and str(result_sess.get("sessionDate") or "")[:10] == day_key
+                rotated = bool(result_sess.get("rotated") or stale_day)
                 if locked:
                     _COMMIT_ATTEMPTED_FOR = day_key
                     _mark_stage(
                         now,
                         "session_commit",
                         status="done",
-                        reason="rotated" if stale_day or result.get("rotated") else "committed",
+                        reason="rotated" if rotated else "committed",
                     )
                     ensure_swing_session_locked()
                     _mark_stage(now, "swing_lock", status="done")
                     log.info(
                         "Auto-commit locked intraday + swing for %s (stale_rotate=%s)",
                         day_key,
-                        stale_day,
+                        rotated,
                     )
                     return
-                # Same-day LOCKED only — never treat stale-day force failure as already_locked
-                if (
-                    not stale_day
-                    and result.get("success") is False
-                    and "LOCKED" in str(result.get("error") or "").upper()
-                ):
-                    _COMMIT_ATTEMPTED_FOR = day_key
-                    _mark_stage(now, "session_commit", status="skipped", reason="already_locked")
-                    ensure_swing_session_locked()
-                    _mark_stage(now, "swing_lock", status="done")
-                    return
-                err = result.get("error") or "commit_failed"
+                err = result_sess.get("commitError") or "commit_failed"
                 log.warning("Auto-commit not ready: %s", err)
                 _mark_stage(now, "session_commit", status="pending", error=str(err))
             except Exception as exc:

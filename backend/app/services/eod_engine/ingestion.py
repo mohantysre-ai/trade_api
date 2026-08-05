@@ -158,15 +158,15 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
       - fixed_trade_plan.json only if intradAy session empty (legacy mirror)
       - eod_archive fills gaps for missing keys only
     Stale cross-day session files are rejected for Book symbol parity.
+    Read-only: never calls ensure_* lock/rotate — that belongs to scheduler / explicit lock APIs.
     """
-    from ..swing_session import ensure_swing_session_locked, load_swing_session
+    from ..swing_session import load_swing_session
 
     plan = load_fixed_trade_plan(for_date)
     session = load_intraday_session(for_date)
     archive = load_archive(for_date)
     snapshot = load_market_snapshot()
 
-    ensure_swing_session_locked()
     swing = load_swing_session()
     day_key = for_date.isoformat()
     swing_date = str(swing.get("sessionDate") or "").strip()[:10]
