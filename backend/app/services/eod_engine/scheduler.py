@@ -1,15 +1,16 @@
 """Full desk automation daemon — weekday IST pipeline, no manual clicks required.
 
-Stages (weekdays):
-  10:00+  Morning pre-work (Angel live + LLM day-lock + ticker news)
-  ~10:15+ Auto intraday commit (5+5) + swing lock (after pre-work)
+Stages (weekdays, institutional open cadence):
+  09:45+  Morning pre-work (Angel live + LLM day-lock) — post open-auction
+  09:45–10:15  Primary basket lock (intraday 5+5 + swing); catch-up if app starts later
   12:00   Midday live refresh (quotes/candles; LLM stays day-locked)
   14:00   Afternoon live refresh (same)
   15:31   Fixed-plan close marks
   15:35   EOD analysis (deterministic)
   16:00+  EOD PM LLM commentary (once)
 
-Catch-up: if the app starts mid-day, pending stages run in order until the EOD window.
+Catch-up: if the app starts after 10:15, pending pre-work + lock still run once
+until cash close — never before 09:45 (refuse stale pre-open books).
 """
 from __future__ import annotations
 
@@ -24,6 +25,7 @@ from zoneinfo import ZoneInfo
 
 from .ingestion import eod_day_dir
 from .runner import ensure_pm_llm_once, run_eod_analysis
+from ..desk_clock import basket_lock_allowed, lock_window_config
 
 log = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
@@ -61,8 +63,9 @@ def _spawn_once(job_key: str, target) -> bool:
 _DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 _STAMP_PATH = _DATA_DIR / "desk_automation_stamp.json"
 
-_PREWORK_HOUR = int(os.getenv("MARKET_PREWORK_HOUR", "10"))
-_PREWORK_MINUTE = int(os.getenv("MARKET_PREWORK_MINUTE", "0"))
+# Align pre-work with lock open (09:45) — env overrideable
+_PREWORK_HOUR = int(os.getenv("MARKET_PREWORK_HOUR", "9"))
+_PREWORK_MINUTE = int(os.getenv("MARKET_PREWORK_MINUTE", "45"))
 _PREWORK_ENABLED = os.getenv("MARKET_PREWORK_ENABLED", "1").strip().lower() not in (
     "0",
     "false",
@@ -94,7 +97,8 @@ _AUTO_PM_LLM = os.getenv("DESK_AUTO_PM_LLM", "1").strip().lower() not in (
     "no",
     "off",
 )
-_COMMIT_DELAY_MIN = int(os.getenv("DESK_COMMIT_DELAY_MIN", "15"))
+# Legacy delay kept for status display; commit window is DESK_LOCK_* via desk_clock
+_COMMIT_DELAY_MIN = int(os.getenv("DESK_COMMIT_DELAY_MIN", "0"))
 _MIDDAY_TIMES = os.getenv("DESK_MIDDAY_REFRESH_TIMES", "12:00,14:00")
 _PM_LLM_HOUR = int(os.getenv("DESK_PM_LLM_HOUR", "16"))
 _PM_LLM_MINUTE = int(os.getenv("DESK_PM_LLM_MINUTE", "0"))
@@ -109,10 +113,12 @@ def start_eod_scheduler() -> None:
         _STARTED = True
     t = threading.Thread(target=_scheduler_loop, name="desk-scheduler", daemon=True)
     t.start()
+    lw = lock_window_config()
     msg = (
         f"Desk automation started "
         f"(pre-work {_PREWORK_HOUR:02d}:{_PREWORK_MINUTE:02d} · "
-        f"commit +{_COMMIT_DELAY_MIN}m · midday {_MIDDAY_TIMES} · "
+        f"lock {lw['lockStart']}–{lw['lockEnd']} catch-up≤{lw['catchupUntil']} · "
+        f"midday {_MIDDAY_TIMES} · "
         f"close 15:31 · EOD 15:35 · PM-LLM {_PM_LLM_HOUR:02d}:{_PM_LLM_MINUTE:02d} IST)"
     )
     log.info(msg)
@@ -128,6 +134,7 @@ def desk_automation_status() -> dict[str, Any]:
     now = datetime.now(tz=IST)
     stamp = _load_stamp()
     day = now.strftime("%Y-%m-%d")
+    allowed, reason = basket_lock_allowed(now)
     return {
         "success": True,
         "enabled": _DESK_AUTO,
@@ -139,6 +146,9 @@ def desk_automation_status() -> dict[str, Any]:
             "preworkEnabled": _PREWORK_ENABLED,
             "autoCommit": _AUTO_COMMIT,
             "commitDelayMin": _COMMIT_DELAY_MIN,
+            "lockWindow": lock_window_config(),
+            "lockAllowedNow": allowed,
+            "lockReason": reason,
             "autoMiddayRefresh": _AUTO_MIDDAY,
             "middayTimes": [f"{h:02d}:{m:02d}" for h, m in _parse_midday_times()],
             "autoPmLlm": _AUTO_PM_LLM,
@@ -193,14 +203,15 @@ def _mins(h: int, m: int) -> int:
 
 
 def _in_prework_window(now: datetime) -> bool:
+    """Pre-work from configured open through cash close (catch-up friendly)."""
     mins = _mins(now.hour, now.minute)
     return _mins(_PREWORK_HOUR, _PREWORK_MINUTE) <= mins < _mins(15, 30)
 
 
 def _in_commit_window(now: datetime) -> bool:
-    start = _mins(_PREWORK_HOUR, _PREWORK_MINUTE) + max(0, _COMMIT_DELAY_MIN)
-    mins = _mins(now.hour, now.minute)
-    return start <= mins < _mins(15, 30)
+    """Primary lock window + late-start catch-up via desk_clock."""
+    allowed, _reason = basket_lock_allowed(now)
+    return allowed
 
 
 def _load_stamp() -> dict[str, Any]:

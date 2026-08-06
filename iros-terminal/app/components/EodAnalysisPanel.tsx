@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { LiveTickNumber } from '@/lib/desk-motion';
 
 /* -------------------------------------------------------------------------- */
 /*  Types for EOD report responses from the backend                          */
@@ -46,6 +47,22 @@ type IntradayTrade = {
   missDiagnostic?: MissDiagnostic | null;
   outcomeNarrative?: string | null;
   deskIcSummary?: { decision?: string; conviction?: number; oneLiner?: string } | null;
+  /** Live overlay (session only) — not from book cache */
+  markLive?: boolean;
+  pnlKind?: 'realised' | 'unrealised';
+  /** Scale-trail state fields — from backend SCALE_TRAIL mode */
+  remainingQty?: number | null;
+  effectiveStop?: number | null;
+  exitState?: {
+    legsFilled?: number[];
+    remainingQty?: number | null;
+    effectiveStop?: number | null;
+    realizedPnl?: number | null;
+    unrealizedPnl?: number | null;
+    rMultiple?: number | null;
+    closed?: boolean;
+  } | null;
+  exitPlan?: { mode?: string } | null;
 };
 
 type IntradayReport = {
@@ -100,6 +117,21 @@ type SwingPick = {
   outcomeNarrative?: string | null;
   deskIcSummary?: { decision?: string; conviction?: number; oneLiner?: string } | null;
   analysis?: string | null;
+  markLive?: boolean;
+  pnlKind?: 'realised' | 'unrealised';
+  /** Scale-trail state — from backend SCALE_TRAIL mode */
+  remainingQty?: number | null;
+  effectiveStop?: number | null;
+  exitPlan?: { mode?: string } | null;
+  exitState?: {
+    legsFilled?: number[];
+    remainingQty?: number | null;
+    effectiveStop?: number | null;
+    realizedPnl?: number | null;
+    unrealizedPnl?: number | null;
+    rMultiple?: number | null;
+    closed?: boolean;
+  } | null;
 };
 
 type SwingReport = {
@@ -145,6 +177,7 @@ function exitReasonBadge(reason: string) {
     case 'T1_HIT': return { bg: 'bg-emerald-50', txt: 'text-emerald-700', label: 'T1 ✓' };
     case 'SL_HIT': return { bg: 'bg-red-100', txt: 'text-red-800', label: 'SL ✗' };
     case 'EOD_SQUAREOFF': return { bg: 'bg-amber-100', txt: 'text-amber-800', label: 'EOD ∎' };
+    case 'PARTIAL_SCALE': return { bg: 'bg-amber-100', txt: 'text-amber-800', label: 'PARTIAL ⟳' };
     default: return { bg: 'bg-slate-100', txt: 'text-slate-600', label: reason };
   }
 }
@@ -154,6 +187,7 @@ function statusBadge(status: string) {
     case 'T2_HIT': return { bg: 'bg-emerald-100', txt: 'text-emerald-800', label: 'T2 ✓' };
     case 'T1_HIT': return { bg: 'bg-emerald-50', txt: 'text-emerald-700', label: 'T1 ✓' };
     case 'SL_HIT': return { bg: 'bg-red-100', txt: 'text-red-800', label: 'SL ✗' };
+    case 'PARTIAL_SCALE': return { bg: 'bg-amber-100', txt: 'text-amber-800', label: 'PARTIAL ⟳' };
     case 'NOT_TRIGGERED': return { bg: 'bg-slate-200', txt: 'text-slate-600', label: 'Not Triggered' };
     case 'OPEN': return { bg: 'bg-blue-100', txt: 'text-blue-800', label: 'Open ◇' };
     case 'NO_MARK': return { bg: 'bg-slate-200', txt: 'text-slate-600', label: 'No mark' };
@@ -172,6 +206,63 @@ function fmtInr(v: number | null | undefined, digits = 2): string {
 function pnlTone(v: number | null | undefined): string {
   if (v == null || Number.isNaN(Number(v))) return 'text-slate-500';
   return Number(v) >= 0 ? 'text-emerald-600' : 'text-red-500';
+}
+
+const CLOSED_EXIT = new Set(['T1_HIT', 'T2_HIT', 'SL_HIT']);
+// PARTIAL_SCALE is intentionally excluded — the runner is still live (not fully closed).
+
+function isClosedBookLeg(exitReason: string | null | undefined): boolean {
+  return CLOSED_EXIT.has(String(exitReason || '').toUpperCase());
+}
+
+function mtmPnl(direction: string, entry: number, mark: number, qty: number): number {
+  const sign = String(direction || 'LONG').toUpperCase() === 'SHORT' ? -1 : 1;
+  return sign * (mark - entry) * qty;
+}
+
+function istCalendarToday(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+type LivePriceRow = {
+  symbol?: string;
+  direction?: string;
+  currentPrice?: number | null;
+  ltp?: number | null;
+  entryPrice?: number | null;
+  approxQty?: number | null;
+  outcome?: { hitLevel?: string | null; ltp?: number | null; pctChange?: number | null; scaleTrail?: boolean } | null;
+  exitPlan?: { mode?: string } | null;
+  exitState?: { remainingQty?: number | null; effectiveStop?: number | null; realizedPnl?: number | null; closed?: boolean } | null;
+  remainingQty?: number | null;
+  effectiveStop?: number | null;
+};
+
+type LiveMarksState = {
+  marketOpen: boolean;
+  updatedAt: string | null;
+  byKey: Record<string, { ltp: number; hitLevel: string | null }>;
+  bySymbol: Record<string, number>;
+};
+
+function markKey(symbol: string, direction?: string | null): string {
+  return `${String(symbol || '').toUpperCase()}|${String(direction || 'LONG').toUpperCase()}`;
+}
+
+function exitReasonFromHit(hit: string | null | undefined, fallback: string): string {
+  const h = String(hit || '').toLowerCase();
+  if (h === 't2') return 'T2_HIT';
+  if (h === 't1') return 'T1_HIT';
+  if (h === 'sl') return 'SL_HIT';
+  if (h === 'partial') return 'PARTIAL_SCALE';
+  return fallback;
 }
 
 function fmtMissNum(v: number | null | undefined, digits = 2, suffix = ''): string {
@@ -513,9 +604,12 @@ export default function EodAnalysisPanel({
   const [error, setError] = useState<string | null>(null);
   const [localDate, setLocalDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [localSwingDate, setLocalSwingDate] = useState('');
+  const [liveMarks, setLiveMarks] = useState<LiveMarksState | null>(null);
+  const liveBusy = useRef(false);
 
   const dateStr = controlledDate ?? localDate;
   const swingDateStr = controlledSwingDate ?? localSwingDate;
+  const isTodayBook = dateStr === istCalendarToday();
 
   const setDateStr = (v: string) => {
     onDateChange?.(v);
@@ -585,10 +679,239 @@ export default function EodAnalysisPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot force paired with refreshToken
   }, [fetchReports, refreshToken]);
 
-  const noIntraday = intraday && (!intraday.trades || intraday.trades.length === 0);
-  const noSwing = swing && (!swing.picks || swing.picks.length === 0);
+  // Market-hours live marks — overlay LTP / MTM without rewriting book cache
+  useEffect(() => {
+    if (!isTodayBook) {
+      setLiveMarks(null);
+      return;
+    }
+    let cancelled = false;
+
+    const loadLive = async () => {
+      if (liveBusy.current) return;
+      liveBusy.current = true;
+      try {
+        const [lpRes, swingRes] = await Promise.all([
+          fetch('/api/live-prices', { cache: 'no-store' }),
+          fetch('/api/swing-session?live=1', { cache: 'no-store' }),
+        ]);
+        const lp = lpRes.ok ? await lpRes.json() : null;
+        const sw = swingRes.ok ? await swingRes.json() : null;
+        if (cancelled) return;
+
+        const byKey: LiveMarksState['byKey'] = {};
+        const bySymbol: LiveMarksState['bySymbol'] = {};
+
+        const ingestPlan = (rows: LivePriceRow[] | undefined, fallbackDir: string) => {
+          for (const row of rows || []) {
+            const sym = String(row.symbol || '').toUpperCase();
+            if (!sym) continue;
+            const ltp = Number(row.currentPrice ?? row.ltp ?? row.outcome?.ltp);
+            if (!Number.isFinite(ltp) || ltp <= 0) continue;
+            const dir = String(row.direction || fallbackDir).toUpperCase();
+            const hit = row.outcome?.hitLevel != null ? String(row.outcome.hitLevel) : null;
+            byKey[markKey(sym, dir)] = { ltp, hitLevel: hit };
+            bySymbol[sym] = ltp;
+          }
+        };
+        ingestPlan(lp?.long as LivePriceRow[] | undefined, 'LONG');
+        ingestPlan(lp?.short as LivePriceRow[] | undefined, 'SHORT');
+
+        for (const row of [...(sw?.long || []), ...(sw?.short || [])] as LivePriceRow[]) {
+          const sym = String(row.symbol || '').toUpperCase();
+          if (!sym) continue;
+          const ltp = Number(row.currentPrice ?? row.ltp);
+          if (!Number.isFinite(ltp) || ltp <= 0) continue;
+          bySymbol[sym] = ltp;
+          const dir = String(row.direction || 'LONG').toUpperCase();
+          if (!byKey[markKey(sym, dir)]) {
+            byKey[markKey(sym, dir)] = { ltp, hitLevel: null };
+          }
+        }
+
+        const marketOpen = Boolean(lp?.marketOpen);
+        setLiveMarks({
+          marketOpen,
+          updatedAt: typeof lp?.updatedAt === 'string' ? lp.updatedAt : new Date().toISOString(),
+          byKey,
+          bySymbol,
+        });
+      } catch {
+        /* keep last good marks */
+      } finally {
+        liveBusy.current = false;
+      }
+    };
+
+    void loadLive();
+    const id = window.setInterval(() => {
+      void loadLive();
+    }, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [isTodayBook]);
+
+  const liveActive = Boolean(isTodayBook && liveMarks && (liveMarks.marketOpen || Object.keys(liveMarks.bySymbol).length > 0));
+
+  const displayIntraday = useMemo(() => {
+    if (!intraday) return null;
+    if (!liveActive || !liveMarks) return intraday;
+
+    let realised = 0;
+    let unrealised = 0;
+    const trades = (intraday.trades || []).map((t) => {
+      const sym = String(t.symbol || '').toUpperCase();
+      const dir = String(t.direction || 'LONG').toUpperCase();
+      const live = liveMarks.byKey[markKey(sym, dir)] || (liveMarks.bySymbol[sym] != null
+        ? { ltp: liveMarks.bySymbol[sym], hitLevel: null as string | null }
+        : null);
+
+      const closedBook = isClosedBookLeg(t.exitReason);
+      // For PARTIAL_SCALE trades, if exitState is available use it directly — do not re-mark via binary MTM.
+      if (t.exitPlan?.mode === 'SCALE_TRAIL' || t.exitState != null) {
+        const state = t.exitState;
+        const pnl = (state?.realizedPnl ?? 0) + (state?.unrealizedPnl ?? 0);
+        const isFullyClosed = Boolean(state?.closed);
+        if (isFullyClosed) realised += state?.realizedPnl ?? 0;
+        else {
+          realised += state?.realizedPnl ?? 0;
+          unrealised += state?.unrealizedPnl ?? 0;
+        }
+        return {
+          ...t,
+          pnl: state != null ? pnl : t.pnl,
+          markLive: !isFullyClosed,
+          pnlKind: isFullyClosed ? ('realised' as const) : ('unrealised' as const),
+        };
+      }
+      if (closedBook && !live?.hitLevel) {
+        const pnl = t.pnl ?? 0;
+        realised += pnl;
+        return { ...t, markLive: false, pnlKind: 'realised' as const };
+      }
+
+      if (live) {
+        const reason = exitReasonFromHit(live.hitLevel, closedBook ? t.exitReason : 'EOD_SQUAREOFF');
+        const closedLive = isClosedBookLeg(reason);
+        let exitPrice = t.exitPrice;
+        if (closedLive) {
+          if (reason === 'T2_HIT' && t.target2 != null) exitPrice = Number(t.target2);
+          else if (reason === 'T1_HIT' && t.target1 != null) exitPrice = Number(t.target1);
+          else if (reason === 'SL_HIT' && t.stopLoss != null) exitPrice = Number(t.stopLoss);
+          else exitPrice = live.ltp;
+        } else {
+          exitPrice = live.ltp;
+        }
+        const entry = Number(t.entryPrice) || 0;
+        const qty = Number(t.qty) || 0;
+        const pnl = mtmPnl(dir, entry, exitPrice, qty);
+        const pnlPct = entry > 0 ? (mtmPnl(dir, entry, exitPrice, 1) / entry) * 100 : null;
+        if (closedLive) realised += pnl;
+        else unrealised += pnl;
+        return {
+          ...t,
+          exitPrice,
+          exitReason: reason,
+          pnl,
+          pnlPct,
+          markLive: !closedLive,
+          pnlKind: closedLive ? ('realised' as const) : ('unrealised' as const),
+        };
+      }
+
+      const pnl = t.pnl ?? 0;
+      if (closedBook) realised += pnl;
+      else unrealised += pnl;
+      return {
+        ...t,
+        markLive: false,
+        pnlKind: closedBook ? ('realised' as const) : ('unrealised' as const),
+      };
+    });
+
+    return {
+      ...intraday,
+      trades,
+      totalPnl: realised + unrealised,
+      remainingCapital: (intraday.capital || 0) - (intraday.totalDeployed || 0) + realised + unrealised,
+      liveRealisedPnl: realised,
+      liveUnrealisedPnl: unrealised,
+      liveOverlay: true,
+    } as IntradayReport & {
+      liveRealisedPnl: number;
+      liveUnrealisedPnl: number;
+      liveOverlay: boolean;
+    };
+  }, [intraday, liveActive, liveMarks]);
+
+  const displaySwing = useMemo(() => {
+    if (!swing) return null;
+    if (!liveActive || !liveMarks) return swing;
+
+    let realised = 0;
+    let unrealised = 0;
+    const picks = (swing.picks || []).map((p) => {
+      if (p.skipped) {
+        return { ...p, markLive: false, pnlKind: 'realised' as const };
+      }
+      const sym = String(p.symbol || '').toUpperCase();
+      const dir = String(p.direction || 'LONG').toUpperCase();
+      const liveLtp =
+        liveMarks.byKey[markKey(sym, dir)]?.ltp ?? liveMarks.bySymbol[sym] ?? null;
+      const closed = isClosedBookLeg(p.exitReason) || String(p.status || '').toUpperCase().includes('HIT');
+
+      if (closed && liveLtp == null) {
+        const pnl = p.pnl ?? 0;
+        realised += pnl;
+        return { ...p, markLive: false, pnlKind: 'realised' as const };
+      }
+
+      if (liveLtp != null && !closed) {
+        const entry = Number(p.entryPrice) || 0;
+        const qty = Number(p.qty) || 0;
+        const pnl = mtmPnl(dir, entry, liveLtp, qty);
+        const pnlPct = entry > 0 ? (mtmPnl(dir, entry, liveLtp, 1) / entry) * 100 : null;
+        unrealised += pnl;
+        return {
+          ...p,
+          currentPrice: liveLtp,
+          pnl,
+          pnlPct,
+          markLive: true,
+          pnlKind: 'unrealised' as const,
+        };
+      }
+
+      const pnl = p.pnl ?? 0;
+      if (closed) realised += pnl;
+      else unrealised += pnl;
+      return {
+        ...p,
+        markLive: false,
+        pnlKind: closed ? ('realised' as const) : ('unrealised' as const),
+      };
+    });
+
+    return {
+      ...swing,
+      picks,
+      totalPnl: realised + unrealised,
+      liveRealisedPnl: realised,
+      liveUnrealisedPnl: unrealised,
+      liveOverlay: true,
+    } as SwingReport & {
+      liveRealisedPnl: number;
+      liveUnrealisedPnl: number;
+      liveOverlay: boolean;
+    };
+  }, [swing, liveActive, liveMarks]);
+
+  const noIntraday = displayIntraday && (!displayIntraday.trades || displayIntraday.trades.length === 0);
+  const noSwing = displaySwing && (!displaySwing.picks || displaySwing.picks.length === 0);
   const fromCache = Boolean(intraday?.fromCache || swing?.fromCache);
-  const showBody = Boolean(intraday || swing || error);
+  const showBody = Boolean(displayIntraday || displaySwing || error);
 
   return (
     <div className={`space-y-3 ${embedded ? 'eod-book-surface' : ''}`}>
@@ -615,6 +938,15 @@ export default function EodAnalysisPanel({
             />
           </div>
           {fromCache && <span className="desk-pill desk-pill--ok">BOOK · CACHED</span>}
+          {liveActive && liveMarks?.marketOpen && (
+            <span className="desk-pill desk-pill--ok inline-flex items-center gap-1.5">
+              <span className="desk-breathe-dot" aria-hidden />
+              LIVE MARKS
+            </span>
+          )}
+          {liveActive && liveMarks && !liveMarks.marketOpen && (
+            <span className="desk-pill desk-pill--warn">SESSION MARKS</span>
+          )}
           <button
             onClick={() => void fetchReports({ force: false })}
             disabled={loading}
@@ -637,6 +969,12 @@ export default function EodAnalysisPanel({
       {embedded && (
         <div className="flex flex-wrap items-center gap-2 px-0.5">
           {fromCache && <span className="desk-pill desk-pill--ok">BOOK · CACHED</span>}
+          {liveActive && liveMarks?.marketOpen && (
+            <span className="desk-pill desk-pill--ok inline-flex items-center gap-1.5">
+              <span className="desk-breathe-dot" aria-hidden />
+              LIVE MARKS · 2s
+            </span>
+          )}
           {loading && <span className="text-[9px] text-slate-400">Loading book…</span>}
           <span className="text-[9px] text-slate-400">
             Swing date follows EOD date unless changed
@@ -673,11 +1011,11 @@ export default function EodAnalysisPanel({
         </div>
       )}
 
-      {(intraday || swing) && (
+      {(displayIntraday || displaySwing) && (
         <>
           {(() => {
-            const i = intraday?.deskCounts;
-            const s = swing?.deskCounts;
+            const i = displayIntraday?.deskCounts;
+            const s = displaySwing?.deskCounts;
             if (!i && !s) return null;
             const swingN = Math.max(s?.swing ?? 0, i?.swing ?? 0);
             const intraL = Math.max(i?.intradayLong ?? 0, s?.intradayLong ?? 0);
@@ -702,19 +1040,19 @@ export default function EodAnalysisPanel({
             );
           })()}
 
-          {intraday && (
+          {displayIntraday && (
             <OutcomeDesk
-              trades={intraday.trades}
-              coverage={intraday.missScorecardCoverage}
-              isMock={intraday.isMock}
-              symbolSource={intraday.symbolSource}
+              trades={displayIntraday.trades}
+              coverage={displayIntraday.missScorecardCoverage}
+              isMock={displayIntraday.isMock}
+              symbolSource={displayIntraday.symbolSource}
               bookLabel="Intraday"
             />
           )}
 
-          {swing && (
+          {displaySwing && (
             <OutcomeDesk
-              trades={(swing.picks || [])
+              trades={(displaySwing.picks || [])
                 .filter((p) => p.missDiagnostic)
                 .map((p) => ({
                   symbol: p.symbol,
@@ -734,8 +1072,8 @@ export default function EodAnalysisPanel({
                   outcomeNarrative: p.outcomeNarrative,
                   deskIcSummary: p.deskIcSummary,
                 }))}
-              isMock={swing.isMock}
-              symbolSource={swing.symbolSource}
+              isMock={displaySwing.isMock}
+              symbolSource={displaySwing.symbolSource}
               bookLabel="Swing"
             />
           )}
@@ -746,44 +1084,65 @@ export default function EodAnalysisPanel({
             <div className="bg-gradient-to-r from-teal-50 to-teal-100/50 px-3 py-2 border-b border-slate-200">
               <h3 className="desk-panel-title text-teal-800">Intraday EOD Report</h3>
               <p className="text-[9px] text-teal-600">
-                {intraday?.date ?? dateStr}
-                {intraday?.symbolSource ? ` · ${intraday.symbolSource}` : ''}
-                {intraday?.isMock ? ' · MOCK' : ''}
+                {displayIntraday?.date ?? dateStr}
+                {displayIntraday?.symbolSource ? ` · ${displayIntraday.symbolSource}` : ''}
+                {displayIntraday?.isMock ? ' · MOCK' : ''}
+                {liveActive && liveMarks?.marketOpen ? ' · LIVE MTM' : ''}
               </p>
             </div>
 
             {noIntraday ? (
               <div className="p-4 text-[11px] text-slate-400 text-center">No archived intraday picks for this date.</div>
-            ) : intraday ? (
+            ) : displayIntraday ? (
               <>
-                <AttributionStrip attribution={intraday.attribution} label="Fill / skip" />
-                <DayLessonsStrip lessons={intraday.dayLessons} />
+                <AttributionStrip attribution={displayIntraday.attribution} label="Fill / skip" />
+                <DayLessonsStrip lessons={displayIntraday.dayLessons} />
                 {/* Summary cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-50/50">
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
                     <div className="desk-panel-title">Total P&L</div>
-                    <div className={`desk-metric-value tabular-nums ${pnlTone(intraday.totalPnl)}`}>
-                      {fmtInr(intraday.totalPnl, 2)}
+                    <div className={`desk-metric-value tabular-nums ${pnlTone(displayIntraday.totalPnl)}`}>
+                      <LiveTickNumber value={fmtInr(displayIntraday.totalPnl, 2)} />
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
+                    <div className="desk-panel-title">Realised</div>
+                    <div className={`desk-metric-value tabular-nums ${pnlTone((displayIntraday as { liveRealisedPnl?: number }).liveRealisedPnl ?? (liveActive ? 0 : displayIntraday.totalPnl))}`}>
+                      {fmtInr(
+                        (displayIntraday as { liveRealisedPnl?: number }).liveRealisedPnl ??
+                          (liveActive ? 0 : displayIntraday.totalPnl),
+                        2,
+                      )}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
+                    <div className="desk-panel-title">Unrealised</div>
+                    <div className={`desk-metric-value tabular-nums ${pnlTone((displayIntraday as { liveUnrealisedPnl?: number }).liveUnrealisedPnl ?? null)}`}>
+                      {liveActive
+                        ? fmtInr((displayIntraday as { liveUnrealisedPnl?: number }).liveUnrealisedPnl ?? 0, 2)
+                        : '—'}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
                     <div className="desk-panel-title">Deployed</div>
-                    <div className="desk-metric-value text-slate-800 tabular-nums">₹{intraday.totalDeployed.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                    <div className="desk-metric-value text-slate-800 tabular-nums">₹{displayIntraday.totalDeployed.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-2 gap-2 px-3 pb-2">
+                  <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
+                    <div className="desk-panel-title">Hit Rate</div>
+                    <div className="desk-metric-value text-slate-800 tabular-nums">{displayIntraday.hitRatePct}%</div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
                     <div className="desk-panel-title">Remaining</div>
-                    <div className="desk-metric-value text-slate-800 tabular-nums">₹{intraday.remainingCapital.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
-                  </div>
-                  <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="desk-panel-title">Hit Rate</div>
-                    <div className="desk-metric-value text-slate-800 tabular-nums">{intraday.hitRatePct}%</div>
+                    <div className="desk-metric-value text-slate-800 tabular-nums">₹{displayIntraday.remainingCapital.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
                   </div>
                 </div>
 
                 <PortfolioDist
                   title="Intraday portfolio balance"
-                  totalDeployed={intraday.totalDeployed || 0}
-                  rows={(intraday.trades || []).map((t) => ({
+                  totalDeployed={displayIntraday.totalDeployed || 0}
+                  rows={(displayIntraday.trades || []).map((t) => ({
                     symbol: String(t.symbol || ''),
                     qty: t.qty || 0,
                     deployed: t.deployedCapital || 0,
@@ -795,10 +1154,10 @@ export default function EodAnalysisPanel({
                 {/* Hit breakdown */}
                 <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 text-[9px]">
                   <span className="text-slate-500 uppercase tracking-wider font-bold">Breakdown:</span>
-                  <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">T2 {intraday.hitBreakdown?.T2_HIT ?? 0}</span>
-                  <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold">T1 {intraday.hitBreakdown?.T1_HIT ?? 0}</span>
-                  <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold">SL {intraday.hitBreakdown?.SL_HIT ?? 0}</span>
-                  <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">EOD {intraday.hitBreakdown?.EOD_SQUAREOFF ?? 0}</span>
+                  <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">T2 {displayIntraday.hitBreakdown?.T2_HIT ?? 0}</span>
+                  <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold">T1 {displayIntraday.hitBreakdown?.T1_HIT ?? 0}</span>
+                  <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold">SL {displayIntraday.hitBreakdown?.SL_HIT ?? 0}</span>
+                  <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">EOD {displayIntraday.hitBreakdown?.EOD_SQUAREOFF ?? 0}</span>
                 </div>
 
                 {/* Trades table */}
@@ -809,32 +1168,56 @@ export default function EodAnalysisPanel({
                         <th className="text-left px-2 py-1.5 font-bold">Symbol</th>
                         <th className="text-right px-2 py-1.5 font-bold">Qty</th>
                         <th className="text-right px-2 py-1.5 font-bold">Entry</th>
-                        <th className="text-right px-2 py-1.5 font-bold">Exit</th>
+                        <th className="text-right px-2 py-1.5 font-bold">Mark / Exit</th>
                         <th className="text-center px-2 py-1.5 font-bold">Result</th>
                         <th className="text-right px-2 py-1.5 font-bold">P&L</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {intraday.trades.map((trade, i) => {
+                      {displayIntraday.trades.map((trade, i) => {
                         const badge = exitReasonBadge(trade.exitReason);
                         return (
-                          <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                          <tr key={`${trade.symbol}-${trade.direction}-${i}`} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                             <td className="px-2 py-1.5">
                               <span className={`font-bold ${trade.direction === 'LONG' ? 'text-emerald-700' : 'text-red-700'}`}>
                                 {trade.symbol}
                               </span>
                               <span className="text-[8px] text-slate-400 ml-1">{trade.direction}</span>
+                              {trade.pnlKind === 'unrealised' && (
+                                <span className="ml-1 text-[7px] font-black uppercase text-cyan-600">U</span>
+                              )}
+                              {trade.pnlKind === 'realised' && (
+                                <span className="ml-1 text-[7px] font-black uppercase text-slate-400">R</span>
+                              )}
                             </td>
-                            <td className="text-right px-2 py-1.5 tabular-nums text-slate-700">{trade.qty ?? '—'}</td>
+                            <td className="text-right px-2 py-1.5 tabular-nums text-slate-700">
+                              {trade.exitState?.remainingQty != null ? (
+                                <span title="rem qty / total">
+                                  {trade.exitState.remainingQty}/{trade.qty ?? '—'}
+                                </span>
+                              ) : (trade.qty ?? '—')}
+                            </td>
                             <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">{trade.entryPrice}</td>
-                            <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">{trade.exitPrice}</td>
+                            <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">
+                              {trade.exitState?.effectiveStop != null ? (
+                                <span className="text-amber-700" title="Trail stop">
+                                  {trade.exitState.effectiveStop.toFixed(2)}*
+                                </span>
+                              ) : trade.markLive ? (
+                                <LiveTickNumber value={trade.exitPrice} />
+                              ) : (
+                                trade.exitPrice
+                              )}
+                            </td>
                             <td className="text-center px-2 py-1.5">
                               <span className={`${badge.bg} ${badge.txt} px-1 py-0.5 rounded text-[9px] font-bold`}>{badge.label}</span>
                             </td>
                             <td className={`text-right px-2 py-1.5 font-bold tabular-nums ${pnlTone(trade.pnl)}`}>
                               {trade.pnl == null
                                 ? (trade.pnlPct != null ? fmtMissSigned(trade.pnlPct, 2, '%') : '—')
-                                : fmtInr(trade.pnl, 2)}
+                                : trade.markLive
+                                  ? <LiveTickNumber value={fmtInr(trade.pnl, 2)} />
+                                  : fmtInr(trade.pnl, 2)}
                             </td>
                           </tr>
                         );
@@ -853,10 +1236,11 @@ export default function EodAnalysisPanel({
             <div className="bg-gradient-to-r from-indigo-50 to-indigo-100/50 px-3 py-2 border-b border-slate-200">
               <h3 className="desk-panel-title text-indigo-800">Swing EOD Report</h3>
               <p className="text-[9px] text-indigo-600">
-                {swing?.date ?? dateStr}
-                {swing?.symbolSource ? ` · ${swing.symbolSource}` : ''}
-                {swing?.isMock ? ' · MOCK' : ''}
+                {displaySwing?.date ?? dateStr}
+                {displaySwing?.symbolSource ? ` · ${displaySwing.symbolSource}` : ''}
+                {displaySwing?.isMock ? ' · MOCK' : ''}
                 {' · Asset Matrix swing lock (not intradAy)'}
+                {liveActive && liveMarks?.marketOpen ? ' · LIVE MTM' : ''}
               </p>
             </div>
 
@@ -864,50 +1248,53 @@ export default function EodAnalysisPanel({
               <div className="p-4 text-[11px] text-slate-400 text-center">
                 No locked swing portfolio. Lock swing from Asset Matrix BUY set first.
               </div>
-            ) : swing ? (
+            ) : displaySwing ? (
               <>
-                <AttributionStrip attribution={swing.attribution} label="Fill / skip" />
+                <AttributionStrip attribution={displaySwing.attribution} label="Fill / skip" />
                 {/* Summary cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-50/50">
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
                     <div className="desk-panel-title">Total P&L</div>
-                    <div className={`desk-metric-value tabular-nums ${pnlTone(swing.totalPnl || swing.totalPnlPct)}`}>
-                      {swing.totalPnl != null && Math.abs(Number(swing.totalPnl)) >= 0.005
-                        ? fmtInr(swing.totalPnl, 2)
-                        : swing.totalPnlPct != null
-                          ? fmtMissSigned(swing.totalPnlPct, 2, '%')
+                    <div className={`desk-metric-value tabular-nums ${pnlTone(displaySwing.totalPnl || displaySwing.totalPnlPct)}`}>
+                      {displaySwing.totalPnl != null && Math.abs(Number(displaySwing.totalPnl)) >= 0.005
+                        ? <LiveTickNumber value={fmtInr(displaySwing.totalPnl, 2)} />
+                        : displaySwing.totalPnlPct != null
+                          ? fmtMissSigned(displaySwing.totalPnlPct, 2, '%')
                           : '—'}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
+                    <div className="desk-panel-title">Realised</div>
+                    <div className={`desk-metric-value tabular-nums ${pnlTone((displaySwing as { liveRealisedPnl?: number }).liveRealisedPnl ?? null)}`}>
+                      {liveActive
+                        ? fmtInr((displaySwing as { liveRealisedPnl?: number }).liveRealisedPnl ?? 0, 2)
+                        : '—'}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
+                    <div className="desk-panel-title">Unrealised</div>
+                    <div className={`desk-metric-value tabular-nums ${pnlTone((displaySwing as { liveUnrealisedPnl?: number }).liveUnrealisedPnl ?? null)}`}>
+                      {liveActive
+                        ? fmtInr((displaySwing as { liveUnrealisedPnl?: number }).liveUnrealisedPnl ?? 0, 2)
+                        : '—'}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
                     <div className="desk-panel-title">Win / Loss</div>
                     <div className="desk-metric-value tabular-nums">
-                      <span className="text-emerald-700">{swing.winCount}</span>
+                      <span className="text-emerald-700">{displaySwing.winCount}</span>
                       <span className="text-slate-400">/</span>
-                      <span className="text-red-700">{swing.lossCount}</span>
+                      <span className="text-red-700">{displaySwing.lossCount}</span>
                     </div>
-                  </div>
-                  <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="desk-panel-title">Triggered / Skip</div>
-                    <div className="desk-metric-value tabular-nums text-slate-800">
-                      {swing.activePicks ?? swing.attribution?.triggered ?? '—'}
-                      <span className="text-slate-400">/</span>
-                      {swing.skippedNotTriggered ?? swing.attribution?.skipped ?? 0}
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="desk-panel-title">Picks / Sleeve</div>
-                    <div className="desk-metric-value text-slate-800 tabular-nums">{swing.totalPicks}</div>
-                    <div className="text-[8px] text-slate-400">₹10L swing · daily</div>
                   </div>
                 </div>
 
-                <DayLessonsStrip lessons={swing.dayLessons} />
+                <DayLessonsStrip lessons={displaySwing.dayLessons} />
 
                 <PortfolioDist
                   title="Swing portfolio balance"
-                  totalDeployed={swing.totalDeployed || 0}
-                  rows={(swing.picks || []).map((p) => ({
+                  totalDeployed={displaySwing.totalDeployed || 0}
+                  rows={(displaySwing.picks || []).map((p) => ({
                     symbol: p.symbol,
                     qty: p.qty || 0,
                     deployed: p.deployedCapital || 0,
@@ -917,10 +1304,10 @@ export default function EodAnalysisPanel({
                 />
 
                 {/* P&L by day bucket */}
-                {swing.pnlByDayBucket && Object.keys(swing.pnlByDayBucket).length > 0 && (
+                {displaySwing.pnlByDayBucket && Object.keys(displaySwing.pnlByDayBucket).length > 0 && (
                   <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 text-[9px] flex-wrap">
                     <span className="text-slate-500 uppercase tracking-wider font-bold">P&L by Day:</span>
-                    {Object.entries(swing.pnlByDayBucket).map(([bucket, pnl]) => (
+                    {Object.entries(displaySwing.pnlByDayBucket).map(([bucket, pnl]) => (
                       <span key={bucket} className={`px-1.5 py-0.5 rounded font-bold ${Number(pnl) >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
                         Day {bucket}: {fmtInr(Number(pnl), 0)}
                       </span>
@@ -944,29 +1331,43 @@ export default function EodAnalysisPanel({
                       </tr>
                     </thead>
                     <tbody>
-                      {swing.picks.map((pick, i) => {
+                      {displaySwing.picks.map((pick, i) => {
                         const badge = statusBadge(pick.status);
                         return (
-                          <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                          <tr key={`${pick.symbol}-${i}`} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                             <td className="px-2 py-1.5">
                               <span className={`font-bold ${pick.direction === 'LONG' ? 'text-emerald-700' : 'text-red-700'}`}>
                                 {pick.symbol}
                               </span>
                               <span className="text-[8px] text-slate-400 ml-1">{pick.direction}</span>
+                              {pick.pnlKind === 'unrealised' && (
+                                <span className="ml-1 text-[7px] font-black uppercase text-cyan-600">U</span>
+                              )}
+                              {pick.pnlKind === 'realised' && !pick.skipped && (
+                                <span className="ml-1 text-[7px] font-black uppercase text-slate-400">R</span>
+                              )}
                             </td>
                             <td className="text-center px-2 py-1.5">
                               <span className={`${badge.bg} ${badge.txt} px-1 py-0.5 rounded text-[9px] font-bold`}>{badge.label}</span>
                             </td>
                             <td className="text-right px-2 py-1.5 tabular-nums text-slate-700">{pick.qty || '—'}</td>
                             <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">{pick.entryPrice}</td>
-                            <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">{pick.currentPrice ?? '—'}</td>
+                            <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">
+                              {pick.markLive && pick.currentPrice != null ? (
+                                <LiveTickNumber value={pick.currentPrice} />
+                              ) : (
+                                pick.currentPrice ?? '—'
+                              )}
+                            </td>
                             <td className="text-right px-2 py-1.5 tabular-nums text-slate-600">
                               {pick.deployedCapital
                                 ? `₹${Number(pick.deployedCapital).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
                                 : '—'}
                             </td>
                             <td className={`text-right px-2 py-1.5 font-bold tabular-nums ${pnlTone(pick.pnl ?? pick.pnlPct)}`}>
-                              {pick.pnl != null ? fmtInr(pick.pnl, 2) : '—'}
+                              {pick.pnl != null
+                                ? (pick.markLive ? <LiveTickNumber value={fmtInr(pick.pnl, 2)} /> : fmtInr(pick.pnl, 2))
+                                : '—'}
                             </td>
                             <td className={`text-right px-2 py-1.5 font-bold tabular-nums ${pnlTone(pick.pnlPct)}`}>
                               {fmtMissSigned(pick.pnlPct, 2, '%')}
@@ -986,12 +1387,12 @@ export default function EodAnalysisPanel({
         </>
       )}
 
-      {(intraday || swing) && (
+      {(displayIntraday || displaySwing) && (
         <>
           {/* Best / Worst performer cards */}
-          {swing && (swing.bestPerformer || swing.worstPerformer) && (
+          {displaySwing && (displaySwing.bestPerformer || displaySwing.worstPerformer) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {swing.bestPerformer && (
+              {displaySwing.bestPerformer && (
                 <div className="bg-gradient-to-r from-emerald-50 to-white border border-emerald-200 rounded-xl p-3 shadow-sm">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -999,29 +1400,29 @@ export default function EodAnalysisPanel({
                   </div>
                   <div className="flex items-end justify-between mt-1">
                     <div>
-                      <span className="text-[16px] font-black text-slate-900">{swing.bestPerformer.symbol}</span>
-                      <span className="text-[10px] text-slate-500 ml-1">{swing.bestPerformer.direction}</span>
+                      <span className="text-[16px] font-black text-slate-900">{displaySwing.bestPerformer.symbol}</span>
+                      <span className="text-[10px] text-slate-500 ml-1">{displaySwing.bestPerformer.direction}</span>
                       <div className="text-[9px] text-slate-500 tabular-nums">
-                        Qty {swing.bestPerformer.qty || '—'}
-                        {swing.bestPerformer.deployedCapital
-                          ? ` · ₹${Number(swing.bestPerformer.deployedCapital).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+                        Qty {displaySwing.bestPerformer.qty || '—'}
+                        {displaySwing.bestPerformer.deployedCapital
+                          ? ` · ₹${Number(displaySwing.bestPerformer.deployedCapital).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
                           : ''}
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className={`text-[16px] font-black tabular-nums ${pnlTone(swing.bestPerformer.pnl ?? swing.bestPerformer.pnlPct)}`}>
-                        {swing.bestPerformer.pnl != null
-                          ? fmtInr(swing.bestPerformer.pnl, 2)
-                          : fmtMissSigned(swing.bestPerformer.pnlPct, 2, '%')}
+                      <div className={`text-[16px] font-black tabular-nums ${pnlTone(displaySwing.bestPerformer.pnl ?? displaySwing.bestPerformer.pnlPct)}`}>
+                        {displaySwing.bestPerformer.pnl != null
+                          ? fmtInr(displaySwing.bestPerformer.pnl, 2)
+                          : fmtMissSigned(displaySwing.bestPerformer.pnlPct, 2, '%')}
                       </div>
-                      <div className={`text-[10px] font-bold tabular-nums ${pnlTone(swing.bestPerformer.pnlPct)}`}>
-                        {fmtMissSigned(swing.bestPerformer.pnlPct, 2, '%')}
+                      <div className={`text-[10px] font-bold tabular-nums ${pnlTone(displaySwing.bestPerformer.pnlPct)}`}>
+                        {fmtMissSigned(displaySwing.bestPerformer.pnlPct, 2, '%')}
                       </div>
                     </div>
                   </div>
                 </div>
               )}
-              {swing.worstPerformer && (
+              {displaySwing.worstPerformer && (
                 <div className="bg-gradient-to-r from-red-50 to-white border border-red-200 rounded-xl p-3 shadow-sm">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -1029,23 +1430,23 @@ export default function EodAnalysisPanel({
                   </div>
                   <div className="flex items-end justify-between mt-1">
                     <div>
-                      <span className="text-[16px] font-black text-slate-900">{swing.worstPerformer.symbol}</span>
-                      <span className="text-[10px] text-slate-500 ml-1">{swing.worstPerformer.direction}</span>
+                      <span className="text-[16px] font-black text-slate-900">{displaySwing.worstPerformer.symbol}</span>
+                      <span className="text-[10px] text-slate-500 ml-1">{displaySwing.worstPerformer.direction}</span>
                       <div className="text-[9px] text-slate-500 tabular-nums">
-                        Qty {swing.worstPerformer.qty || '—'}
-                        {swing.worstPerformer.deployedCapital
-                          ? ` · ₹${Number(swing.worstPerformer.deployedCapital).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+                        Qty {displaySwing.worstPerformer.qty || '—'}
+                        {displaySwing.worstPerformer.deployedCapital
+                          ? ` · ₹${Number(displaySwing.worstPerformer.deployedCapital).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
                           : ''}
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className={`text-[16px] font-black tabular-nums ${pnlTone(swing.worstPerformer.pnl ?? swing.worstPerformer.pnlPct)}`}>
-                        {swing.worstPerformer.pnl != null
-                          ? fmtInr(swing.worstPerformer.pnl, 2)
-                          : fmtMissSigned(swing.worstPerformer.pnlPct, 2, '%')}
+                      <div className={`text-[16px] font-black tabular-nums ${pnlTone(displaySwing.worstPerformer.pnl ?? displaySwing.worstPerformer.pnlPct)}`}>
+                        {displaySwing.worstPerformer.pnl != null
+                          ? fmtInr(displaySwing.worstPerformer.pnl, 2)
+                          : fmtMissSigned(displaySwing.worstPerformer.pnlPct, 2, '%')}
                       </div>
-                      <div className={`text-[10px] font-bold tabular-nums ${pnlTone(swing.worstPerformer.pnlPct)}`}>
-                        {fmtMissSigned(swing.worstPerformer.pnlPct, 2, '%')}
+                      <div className={`text-[10px] font-bold tabular-nums ${pnlTone(displaySwing.worstPerformer.pnlPct)}`}>
+                        {fmtMissSigned(displaySwing.worstPerformer.pnlPct, 2, '%')}
                       </div>
                     </div>
                   </div>

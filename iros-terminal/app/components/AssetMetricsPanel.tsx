@@ -75,6 +75,18 @@ type PositionRow = {
   closed?: boolean;
   ltpSource?: string;
   dataStale?: boolean;
+  /** Scale-trail plan and live state — from backend SCALE_TRAIL mode */
+  exitPlan?: { mode?: string; legs?: { r: number; label: string }[]; runnerQty?: number | null } | null;
+  exitState?: {
+    legsFilled?: number[];
+    remainingQty?: number | null;
+    effectiveStop?: number | null;
+    realizedPnl?: number | null;
+    unrealizedPnl?: number | null;
+    rMultiple?: number | null;
+    closed?: boolean;
+  } | null;
+  realizedPnl?: number | null;
 };
 
 type AttentionItem = {
@@ -592,7 +604,7 @@ function PositionTable({
                     </td>
                     <td className="px-2 py-1.5 tabular-nums">{dash(r.ltp)}</td>
                     <td className="px-2 py-1.5 tabular-nums">{dash(r.entryPrice)}</td>
-                    <td className="px-2 py-1.5 tabular-nums">{r.approxQty ?? '—'}</td>
+                    <td className="px-2 py-1.5 tabular-nums">{r.approxQty ?? '—'}{r.exitState?.remainingQty != null && r.exitState.remainingQty !== r.approxQty ? <span className="text-amber-600 ml-1">/{r.exitState.remainingQty}rem</span> : null}</td>
                     <td className="px-2 py-1.5 tabular-nums">{inr(r.positionValue ?? r.deployedCapital ?? null)}</td>
                     <td className={`px-2 py-1.5 tabular-nums font-semibold ${pnlClass(r.unrealizedPnl)}`}>{pnlFmt(r.unrealizedPnl)}</td>
                     <td className={`px-2 py-1.5 tabular-nums ${pnlClass(r.pnlPct)}`}>{pct(r.pnlPct)}</td>
@@ -613,7 +625,7 @@ function PositionTable({
                       )}
                     </td>
                     <td className={`px-2 py-1.5 tabular-nums ${pnlClass(rs)}`}>{pct(rs, 1)}</td>
-                    <td className="px-2 py-1.5 tabular-nums">{dash(r.stopLoss)}</td>
+                    <td className="px-2 py-1.5 tabular-nums">{r.exitState?.effectiveStop != null ? <span title="Effective trail stop">{dash(r.exitState.effectiveStop)}*</span> : dash(r.stopLoss)}</td>
                     <td className="px-2 py-1.5 tabular-nums">{dash(r.target1)}</td>
                     <td className="px-2 py-1.5 tabular-nums">{dash(r.target2)}</td>
                     <td className="px-2 py-1.5 tabular-nums">{dash(r.rewardRisk, 1)}</td>
@@ -1091,8 +1103,24 @@ export default function AssetMetricsPanel({
                     <Kpi label="Entry" value={dash(selectedRow.entryPrice)} />
                     <Kpi label="LTP" value={dash(selectedRow.ltp)} />
                     <Kpi label="SL" value={dash(selectedRow.stopLoss)} />
-                    <Kpi label="T1 / T2" value={`${dash(selectedRow.target1)} / ${dash(selectedRow.target2)}`} />
+                    <Kpi label="T1 / T2" value={`${dash(selectedRow.target1)} / ${dash(selectedRow.target2)}${selectedRow.exitPlan?.mode === 'SCALE_TRAIL' ? ' (ref)' : ''}`} />
                     <Kpi label="Qty" value={selectedRow.approxQty == null ? '—' : String(selectedRow.approxQty)} />
+                    {selectedRow.exitState != null && (
+                      <>
+                        <Kpi label="Rem Qty" value={selectedRow.exitState.remainingQty == null ? '—' : String(selectedRow.exitState.remainingQty)} />
+                        <Kpi label="Eff SL" value={selectedRow.exitState.effectiveStop == null ? '—' : dash(selectedRow.exitState.effectiveStop)} />
+                        <Kpi
+                          label="Realised PnL"
+                          value={pnlFmt(selectedRow.exitState.realizedPnl ?? selectedRow.realizedPnl)}
+                          valueClass={pnlClass(selectedRow.exitState.realizedPnl ?? selectedRow.realizedPnl)}
+                        />
+                        <Kpi
+                          label="Unrealised PnL"
+                          value={pnlFmt(selectedRow.exitState.unrealizedPnl ?? selectedRow.unrealizedPnl)}
+                          valueClass={pnlClass(selectedRow.exitState.unrealizedPnl ?? selectedRow.unrealizedPnl)}
+                        />
+                      </>
+                    )}
                     <Kpi label="R:R" value={dash(selectedRow.rewardRisk, 1)} />
                     <Kpi label="Risk scale" value={dash(selectedRow.riskScale, 2)} />
                     <Kpi

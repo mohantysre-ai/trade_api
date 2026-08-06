@@ -335,13 +335,38 @@ type CapitalAllocation = {
 };
 
 /* ── Trade Outcome types ─────────────────────────────────────────────────── */
+type ExitLeg = { r: number; label?: string; qty?: number; price?: number };
+
+type ExitPlan = {
+  mode?: string;
+  legs?: ExitLeg[];
+  runnerQty?: number | null;
+};
+
+type ExitState = {
+  legsFilled?: Array<number | { r: number | string; qty?: number; price?: number; pnl?: number }>;
+  remainingQty?: number | null;
+  effectiveStop?: number | null;
+  realizedPnl?: number | null;
+  unrealizedPnl?: number | null;
+  rMultiple?: number | null;
+  closed?: boolean;
+};
+
 type TradeOutcome = {
     label: string;  // "TARGET 1 HIT", "TARGET 2 HIT", "STOP LOSS HIT", "PENDING"
     detail: string;
-    hitLevel: "t1" | "t2" | "sl" | null;
+    hitLevel: "t1" | "t2" | "sl" | "partial" | null;
     ltp: number;
     pctChange: number;
     resolvedAt: string | null;
+    /** Scale-trail enrichment — present when backend SCALE_TRAIL mode */
+    scaleTrail?: boolean;
+    remainingQty?: number | null;
+    effectiveStop?: number | null;
+    realizedPnl?: number | null;
+    unrealizedPnl?: number | null;
+    rMultiple?: number | null;
 };
 
 type OutcomePick = {
@@ -361,6 +386,9 @@ type OutcomePick = {
     approxQty?: number;
     deployedCapital?: number;
     riskAmount?: number;
+    /** Scale-trail plan and state — from backend */
+    exitPlan?: ExitPlan | null;
+    exitState?: ExitState | null;
 };
 
 type DhanScannerResponse = {
@@ -425,7 +453,7 @@ type AlertRecord = {
   key: string;
   symbol: string;
   direction: 'LONG' | 'SHORT';
-  hitLevel: 't1' | 't2' | 'sl';
+  hitLevel: 't1' | 't2' | 'sl' | 'partial';
   label: string;
   ltp: number;
   planDate: string;
@@ -609,6 +637,8 @@ type PlanRowItem = {
   rrT2?: number;
   currentPrice?: number | null;
   outcome?: TradeOutcome | null;
+  exitPlan?: ExitPlan | null;
+  exitState?: ExitState | null;
 };
 
 function BookPlanRow({
@@ -660,20 +690,52 @@ function BookPlanRow({
       <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
       <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
       <td className="p-1.5 text-center">
-        <OutcomeBadge outcome={tp.outcome} />
+        <OutcomeBadge outcome={tp.outcome} exitPlan={tp.exitPlan} exitState={tp.exitState} />
       </td>
     </tr>
   );
 }
 
+/* ── Scale-trail exit progress string ──────────────────────────────────── */
+function exitProgressStr(exitPlan: ExitPlan | null | undefined, exitState: ExitState | null | undefined, outcome: TradeOutcome | null | undefined): string | null {
+  const state = exitState ?? (outcome?.scaleTrail ? {
+    remainingQty: outcome.remainingQty,
+    effectiveStop: outcome.effectiveStop,
+    realizedPnl: outcome.realizedPnl,
+    unrealizedPnl: outcome.unrealizedPnl,
+    rMultiple: outcome.rMultiple,
+  } : null);
+  if (!state && !exitPlan) return null;
+  const parts: string[] = [];
+  const legs = exitPlan?.legs ?? [];
+  const filled = state?.legsFilled ?? [];
+  const filledRs = new Set(
+    filled.map((x) => (typeof x === 'number' ? x : Number(x?.r))).filter((n) => Number.isFinite(n)),
+  );
+  for (const leg of legs) {
+    const hit = filledRs.has(leg.r) || (outcome?.rMultiple != null && Number(outcome.rMultiple) >= leg.r);
+    parts.push(`${leg.r}R${hit ? '✓' : '·'}`);
+  }
+  if (state?.remainingQty != null) parts.push(`rem ${state.remainingQty}`);
+  if (state?.effectiveStop != null) parts.push(`trail SL ${state.effectiveStop.toFixed(2)}`);
+  if (!parts.length) return null;
+  return parts.join(' ');
+}
+
 /* ── Outcome Badge ───────────────────────────────────────────────────── */
-function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null | undefined }) {
+function OutcomeBadge({ outcome, exitPlan, exitState }: {
+  outcome: TradeOutcome | null | undefined;
+  exitPlan?: ExitPlan | null;
+  exitState?: ExitState | null;
+}) {
   if (!outcome) {
     return <span className="text-[8px] text-slate-400">—</span>;
   }
   
   const baseClasses = "inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider";
   const hitLevel = outcome.hitLevel;
+  const isScaleTrail = Boolean(outcome.scaleTrail || exitPlan?.mode === 'SCALE_TRAIL');
+  const progress = isScaleTrail ? exitProgressStr(exitPlan, exitState, outcome) : null;
 
   if (outcome.label === "NOT TRIGGERED") {
     return (
@@ -684,11 +746,25 @@ function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null | undefined })
     );
   }
 
+  if (hitLevel === "partial" || (isScaleTrail && hitLevel === "t1")) {
+    return (
+      <span className="inline-flex flex-col gap-0.5 items-start">
+        <span className={`${baseClasses} bg-amber-100 text-amber-800 border border-amber-300 glass-pill`}>
+          <span className="desk-breathe-dot shrink-0 mr-1" style={{ background: 'var(--terminal-amber, #f59e0b)' }} />
+          {exitState?.closed ? 'TRAIL CLOSED' : 'PARTIAL · TRAIL'}
+        </span>
+        {progress && (
+          <span className="text-[7px] text-slate-500 font-mono tabular-nums pl-0.5 whitespace-nowrap">{progress}</span>
+        )}
+      </span>
+    );
+  }
+
   if (hitLevel === "t2") {
     return (
       <span className={`${baseClasses} bg-emerald-100 text-emerald-700 border border-emerald-300 glass-pill`}>
         <span className="desk-breathe-dot shrink-0 mr-1" />
-        TARGET 2 HIT
+        {isScaleTrail ? 'TRAIL ✓ T2' : 'TARGET 2 HIT'}
       </span>
     );
   }
@@ -704,7 +780,7 @@ function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null | undefined })
     return (
       <span className={`${baseClasses} bg-red-100 text-red-700 border border-red-300 glass-pill`}>
         <span className="desk-breathe-dot is-error shrink-0 mr-1" />
-        STOP LOSS HIT
+        {isScaleTrail ? 'TRAIL STOP HIT' : 'STOP LOSS HIT'}
       </span>
     );
   }
@@ -712,7 +788,7 @@ function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null | undefined })
   return (
     <span className={`${baseClasses} bg-slate-100 text-slate-600 border border-slate-300 glass-pill`}>
       <span className="desk-breathe-dot shrink-0 mr-1 opacity-70" />
-      PENDING
+      {isScaleTrail ? 'TRAIL · RUNNING' : 'PENDING'}
     </span>
   );
 }
@@ -968,7 +1044,7 @@ export default function IntradayMatrixPanel() {
         <div className="flex flex-col gap-1">
           {alerts.map((a, idx) => (
             <div key={`alert-${idx}`} className={`flex items-center justify-between px-3 py-1.5 rounded-lg border text-[10px] ${
-              a.hitLevel === 'sl' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              a.hitLevel === 'sl' ? 'bg-red-50 border-red-200 text-red-700' : a.hitLevel === 'partial' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
             }`}>
               <span className="font-bold uppercase tracking-wider">
                 {a.symbol} ({a.direction}) — {a.label}
@@ -1218,7 +1294,11 @@ export default function IntradayMatrixPanel() {
                   const rrT2 = risk > 0 ? rewardToT2 / risk : 0;
                   const currentPrice = item.currentPrice ?? outcomeMap.get(item.symbol)?.currentPrice ?? entry;
                   const backendOutcome = item.outcome ?? outcomeMap.get(item.symbol)?.outcome;
+                  // Gate: if pick has exitPlan (SCALE_TRAIL) or backend returned scaleTrail, do not
+                  // invent client-side binary T1/T2/SL hits — use backend outcome only.
+                  const hasScaleTrail = Boolean(item.exitPlan) || Boolean(backendOutcome?.scaleTrail) || Boolean(outcomeMap.get(item.symbol)?.exitPlan);
                   const outcome = backendOutcome != null ? backendOutcome : (() => {
+                    if (hasScaleTrail) return null;
                     if (!entry || !sl || !t1 || !t2) return null;
                     if (direction === 'LONG') {
                       if (currentPrice >= t2) return { label: 'TARGET 2 HIT', detail: `LTP ${currentPrice.toFixed(2)} >= T2 ${t2.toFixed(2)}`, hitLevel: 't2', ltp: currentPrice, pctChange: +(((currentPrice - entry) / entry) * 100), resolvedAt: new Date().toISOString() };
@@ -1238,6 +1318,8 @@ export default function IntradayMatrixPanel() {
                     rrT2: item.rrT2 ?? (rrT2 > 0 ? parseFloat(rrT2.toFixed(1)) : 0),
                     currentPrice,
                     outcome,
+                    exitPlan: item.exitPlan ?? outcomeMap.get(item.symbol)?.exitPlan ?? null,
+                    exitState: item.exitState ?? outcomeMap.get(item.symbol)?.exitState ?? null,
                   };
                 });
               }

@@ -17,6 +17,8 @@ from typing import Any
 from pathlib import Path
 import json as _json
 
+from .exit_plan import attach_exit_plan, evaluate_scale_trail
+
 # Import from the correct snapshot file that stores live market data (last_market_snapshot.json)
 _LAST_MARKET_SNAPSHOT = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -108,9 +110,43 @@ def _fetch_angel_plan_prices(symbols: list[str]) -> dict[str, float]:
                 continue
             ltp = float(quote.get("ltp", 0) or 0)
             if ltp > 0:
-                out[sym] = ltp
+                out[sym.upper()] = ltp
         except Exception:
             continue
+    return out
+
+
+def fetch_live_marks_for_symbols(symbols: list[str]) -> dict[str, float]:
+    """Angel (when session open) + Yahoo fill for arbitrary symbols on trading days.
+
+    Used by plan live-prices and swing-session live MTM so Book/EOD can refresh
+    marks without rewriting book_*.json caches.
+    """
+    unique = list(dict.fromkeys(str(s or "").upper().strip() for s in symbols if s))
+    unique = [s for s in unique if s]
+    if not unique or not _is_trading_day():
+        return {}
+
+    market_open = _is_market_open()
+    after_close = _is_after_market_close()
+    if not _should_refresh_plan_ltps(market_open, after_close):
+        return {}
+
+    out: dict[str, float] = {}
+    if market_open:
+        out.update(_fetch_angel_plan_prices(unique))
+
+    now = time.time()
+    for sym in unique:
+        if sym in out:
+            continue
+        cached = _YAHOO_FINANCE_CACHE.get(sym)
+        if cached and (now - cached[1]) < _YAHOO_FINANCE_CACHE_TTL:
+            out[sym] = cached[0]
+            continue
+        price = _fetch_yahoo_finance_price(sym)
+        if price is not None:
+            out[sym] = price
     return out
 
 
@@ -323,18 +359,59 @@ def _resolve_ltp(pick: dict[str, Any]) -> float:
 
 
 def compute_outcome(pick: dict[str, Any]) -> dict[str, Any] | None:
-    """Evaluate target1 / target2 / stopLoss against current live price."""
+    """Evaluate exits against LTP — scale-trail when exitPlan present, else binary T1/T2/SL."""
     entry = float(pick.get("entryPrice") or 0)
     sl = float(pick.get("stopLoss") or 0)
     t1 = float(pick.get("target1") or 0)
     t2 = float(pick.get("target2") or 0)
     direction = str(pick.get("direction") or "LONG")
-    if not entry or not sl or not t1 or not t2:
-        return None
 
     ltp = _resolve_ltp(pick)
     pick["currentPrice"] = ltp
     pick["priceUpdatedAt"] = _utc_now()
+
+    plan = pick.get("exitPlan") if isinstance(pick.get("exitPlan"), dict) else None
+    if (not plan or plan.get("mode") != "SCALE_TRAIL") and entry and (sl or pick.get("riskPerShare")) and pick.get("approxQty"):
+        enriched = attach_exit_plan(pick)
+        pick["exitPlan"] = enriched.get("exitPlan")
+        if enriched.get("target1") is not None:
+            pick["target1"] = enriched["target1"]
+        if enriched.get("target2") is not None:
+            pick["target2"] = enriched["target2"]
+        plan = pick.get("exitPlan")
+
+    if plan and plan.get("mode") == "SCALE_TRAIL":
+        result = evaluate_scale_trail(pick, ltp, after_close=False)
+        if result:
+            if result.get("closed"):
+                result["resolvedAt"] = _utc_now()
+            if isinstance(result.get("exitState"), dict):
+                pick["exitState"] = result["exitState"]
+            pick["realizedPnl"] = result.get("realizedPnl")
+            pick["unrealizedPnl"] = result.get("unrealizedPnl")
+            pick["remainingQty"] = result.get("remainingQty")
+            pick["effectiveStop"] = result.get("effectiveStop")
+            if result.get("closed"):
+                pick["closed"] = True
+            return {
+                "label": result.get("label"),
+                "detail": result.get("detail"),
+                "hitLevel": result.get("hitLevel"),
+                "ltp": result.get("ltp"),
+                "pctChange": result.get("pctChange"),
+                "resolvedAt": result.get("resolvedAt"),
+                "exitState": result.get("exitState"),
+                "realizedPnl": result.get("realizedPnl"),
+                "unrealizedPnl": result.get("unrealizedPnl"),
+                "remainingQty": result.get("remainingQty"),
+                "effectiveStop": result.get("effectiveStop"),
+                "rMultiple": result.get("rMultiple"),
+                "closed": result.get("closed"),
+                "scaleTrail": True,
+            }
+
+    if not entry or not sl or not t1 or not t2:
+        return None
 
     outcome_label = "PENDING"
     outcome_detail = "Awaiting trade"
@@ -358,7 +435,7 @@ def compute_outcome(pick: dict[str, Any]) -> dict[str, Any] | None:
             outcome_label = "PENDING"
             outcome_detail = f"LTP {ltp:.2f} | Entry {entry:.2f} | {pct_change:+.2f}%"
             hit_level = None
-    else:  # SHORT
+    else:
         if ltp <= t2:
             outcome_label = "TARGET 2 HIT"
             outcome_detail = f"LTP {ltp:.2f} <= T2 {t2:.2f}"
@@ -376,7 +453,7 @@ def compute_outcome(pick: dict[str, Any]) -> dict[str, Any] | None:
             outcome_detail = f"LTP {ltp:.2f} | Entry {entry:.2f} | {pct_change:+.2f}%"
             hit_level = None
 
-    outcome = {
+    return {
         "label": outcome_label,
         "detail": outcome_detail,
         "hitLevel": hit_level,
@@ -384,11 +461,10 @@ def compute_outcome(pick: dict[str, Any]) -> dict[str, Any] | None:
         "pctChange": round(pct_change, 2),
         "resolvedAt": _utc_now() if hit_level else None,
     }
-    return outcome
 
 
 def _finalize_pending_outcome(pick: dict[str, Any], ltp: float) -> dict[str, Any]:
-    """Mark a still-PENDING intraday pick as NOT TRIGGERED at market close."""
+    """Mark a still-PENDING intradAy pick as NOT TRIGGERED at market close."""
     entry = float(pick.get("entryPrice") or 0)
     pct_change = ((ltp - entry) / entry * 100) if entry else 0.0
     return {
@@ -404,7 +480,42 @@ def _finalize_pending_outcome(pick: dict[str, Any], ltp: float) -> dict[str, Any
 
 def evaluate_outcome(pick: dict[str, Any], finalize_if_closed: bool = False) -> dict[str, Any] | None:
     """Compute an outcome, finalizing a still-pending pick if the market has closed."""
-    if not _is_after_market_close() or not finalize_if_closed:
+    plan = pick.get("exitPlan") if isinstance(pick.get("exitPlan"), dict) else None
+    after_close = bool(_is_after_market_close() and finalize_if_closed)
+
+    if plan and plan.get("mode") == "SCALE_TRAIL":
+        ltp = _resolve_ltp(pick)
+        pick["currentPrice"] = ltp
+        existing = pick.get("outcome")
+        if existing and existing.get("closed") and existing.get("final"):
+            return existing
+        result = evaluate_scale_trail(pick, ltp, after_close=after_close)
+        if result:
+            if result.get("closed"):
+                result["resolvedAt"] = _utc_now()
+                if after_close:
+                    result["final"] = True
+            if isinstance(result.get("exitState"), dict):
+                pick["exitState"] = result["exitState"]
+            return {
+                "label": result.get("label"),
+                "detail": result.get("detail"),
+                "hitLevel": result.get("hitLevel"),
+                "ltp": result.get("ltp"),
+                "pctChange": result.get("pctChange"),
+                "resolvedAt": result.get("resolvedAt"),
+                "exitState": result.get("exitState"),
+                "realizedPnl": result.get("realizedPnl"),
+                "unrealizedPnl": result.get("unrealizedPnl"),
+                "remainingQty": result.get("remainingQty"),
+                "effectiveStop": result.get("effectiveStop"),
+                "rMultiple": result.get("rMultiple"),
+                "closed": result.get("closed"),
+                "scaleTrail": True,
+                "final": result.get("final"),
+            }
+
+    if not after_close:
         return compute_outcome(pick)
 
     existing = pick.get("outcome")
@@ -415,7 +526,7 @@ def evaluate_outcome(pick: dict[str, Any], finalize_if_closed: bool = False) -> 
     pick["currentPrice"] = ltp
     pick["priceUpdatedAt"] = _utc_now()
     pending = compute_outcome(pick)
-    if pending and pending.get("hitLevel") is None:
+    if pending and pending.get("hitLevel") is None and not pending.get("scaleTrail"):
         return _finalize_pending_outcome(pick, ltp)
     return pending
 
@@ -690,19 +801,38 @@ def get_live_prices_for_plan() -> dict[str, Any]:
                         "firedAt": _utc_now(),
                     })
             entry["outcome"] = outcome
-            if hit_level or outcome.get("final"):
+            if hit_level or outcome.get("final") or outcome.get("closed"):
                 p["outcome"] = outcome
+                if isinstance(outcome.get("exitState"), dict):
+                    p["exitState"] = outcome["exitState"]
                 plan_changed.append(True)
-                if hit_level == "sl":
+                if outcome.get("closed") or hit_level == "sl":
                     entry["closed"] = True
-                    entry["status"] = "CLOSED"
+                    if hit_level == "sl" and outcome.get("scaleTrail"):
+                        entry["status"] = "TRAIL STOP HIT"
+                    elif hit_level == "sl":
+                        entry["status"] = "STOP LOSS HIT"
+                    else:
+                        entry["status"] = "CLOSED"
+                elif hit_level == "partial":
+                    entry["status"] = str(outcome.get("label") or "PARTIAL")
+                    entry["closed"] = False
                 elif hit_level in ("t1", "t2"):
                     entry["status"] = (
                         "TARGET 2 HIT" if hit_level == "t2" else "TARGET 1 HIT"
                     )
                 elif after_close or outcome.get("final"):
-                    # Market closed with no SL — close mark, not a stop-out
                     entry["status"] = "SESSION CLOSED"
+            if outcome.get("realizedPnl") is not None:
+                entry["realizedPnl"] = outcome.get("realizedPnl")
+            if outcome.get("unrealizedPnl") is not None:
+                entry["unrealizedPnl"] = outcome.get("unrealizedPnl")
+            if outcome.get("remainingQty") is not None:
+                entry["remainingQty"] = outcome.get("remainingQty")
+            if outcome.get("effectiveStop") is not None:
+                entry["effectiveStop"] = outcome.get("effectiveStop")
+            if isinstance(outcome.get("exitState"), dict):
+                entry["exitState"] = outcome["exitState"]
         else:
             entry["outcome"] = None
 

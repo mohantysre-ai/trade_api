@@ -9,7 +9,9 @@ from datetime import date, datetime
 from typing import Any
 
 from .trade_outcome import load_fixed_trade_plan, get_alert_history, _today_ist
-from .eod_reference import get_reference_price, generate_swing_analysis
+from .eod_reference import get_close_mark_price, get_reference_price, generate_swing_analysis
+from .eod_intraday_report import _build_levels_diagnostic, _exit_reason_from_scale_eval
+from .exit_plan import attach_exit_plan, blended_pnl_from_state
 
 log = logging.getLogger(__name__)
 
@@ -126,8 +128,6 @@ def _entry_was_triggered(
 
 def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
     """Evaluate one swing pick vs reference + real close mark (never mock-0 → SL)."""
-    from .eod_reference import get_close_mark_price
-
     symbol = (pick.get("symbol") or "").upper()
     direction = pick.get("direction", "LONG")
     entry = float(pick.get("entryPrice") or pick.get("buyAbove") or 0)
@@ -273,27 +273,83 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
         }
 
     sign = 1 if direction == "LONG" else -1
-    pnl_pct = sign * (eod_price - base_entry) / base_entry * 100
-    pnl = sign * (eod_price - base_entry) * qty if qty else None
+    scale_extra: dict[str, Any] = {}
+    used_scale = False
 
-    if direction == "LONG":
-        if t2 > 0 and eod_price >= t2:
-            status = "T2_HIT"
-        elif t1 > 0 and eod_price >= t1:
-            status = "T1_HIT"
-        elif sl > 0 and eod_price <= sl:
-            status = "SL_HIT"
-        else:
-            status = "OPEN"
+    # Scale-trail blended PnL when exitPlan present or attachable
+    work: dict[str, Any] | None = None
+    plan = pick.get("exitPlan") if isinstance(pick.get("exitPlan"), dict) else None
+    if plan and plan.get("mode") == "SCALE_TRAIL":
+        work = {
+            **pick,
+            "entryPrice": base_entry,
+            "approxQty": qty,
+            "direction": direction,
+            "stopLoss": sl or pick.get("stopLoss"),
+            "target1": t1 or pick.get("target1"),
+            "target2": t2 or pick.get("target2"),
+        }
     else:
-        if t2 > 0 and eod_price <= t2:
-            status = "T2_HIT"
-        elif t1 > 0 and eod_price <= t1:
-            status = "T1_HIT"
-        elif sl > 0 and eod_price >= sl:
-            status = "SL_HIT"
+        risk = float(pick.get("riskPerShare") or 0)
+        if base_entry > 0 and qty > 0 and (risk > 0 or sl > 0):
+            work = attach_exit_plan({
+                **pick,
+                "entryPrice": base_entry,
+                "approxQty": qty,
+                "direction": direction,
+                "stopLoss": sl or pick.get("stopLoss"),
+            })
+            attached = work.get("exitPlan") if isinstance(work.get("exitPlan"), dict) else None
+            if not attached or attached.get("mode") != "SCALE_TRAIL":
+                work = None
+
+    if work is not None:
+        if isinstance(pick.get("exitState"), dict) and not work.get("exitState"):
+            work["exitState"] = pick["exitState"]
+        total_pnl, avg_exit, eval_result = blended_pnl_from_state(
+            work, eod_price, after_close=True
+        )
+        if eval_result:
+            used_scale = True
+            pnl = float(total_pnl)
+            pnl_pct = sign * (avg_exit - base_entry) / base_entry * 100 if base_entry else 0.0
+            status = _exit_reason_from_scale_eval(eval_result)
+            exit_state = eval_result.get("exitState")
+            scale_extra = {
+                "exitPrice": round(float(avg_exit), 2),
+                "exitState": exit_state,
+                "realizedPnl": eval_result.get("realizedPnl"),
+                "unrealizedPnl": eval_result.get("unrealizedPnl"),
+                "remainingQty": eval_result.get("remainingQty"),
+                "effectiveStop": eval_result.get("effectiveStop"),
+                "rMultiple": eval_result.get("rMultiple"),
+                "scaleTrail": True,
+                "exitPlan": work.get("exitPlan"),
+            }
+
+    if not used_scale:
+        # Legacy binary T1/T2/SL full-qty
+        pnl_pct = sign * (eod_price - base_entry) / base_entry * 100
+        pnl = sign * (eod_price - base_entry) * qty if qty else None
+
+        if direction == "LONG":
+            if t2 > 0 and eod_price >= t2:
+                status = "T2_HIT"
+            elif t1 > 0 and eod_price >= t1:
+                status = "T1_HIT"
+            elif sl > 0 and eod_price <= sl:
+                status = "SL_HIT"
+            else:
+                status = "OPEN"
         else:
-            status = "OPEN"
+            if t2 > 0 and eod_price <= t2:
+                status = "T2_HIT"
+            elif t1 > 0 and eod_price <= t1:
+                status = "T1_HIT"
+            elif sl > 0 and eod_price >= sl:
+                status = "SL_HIT"
+            else:
+                status = "OPEN"
 
     analysis = generate_swing_analysis(
         symbol, direction, base_entry, eod_price, pnl or 0.0, pnl_pct, status
@@ -301,16 +357,16 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
 
     # Deterministic diagnostic — OPEN maps to EOD_SQUAREOFF FactPack shape for Outcome Desk
     diag_reason = None
-    if status in ("SL_HIT", "T1_HIT", "T2_HIT"):
+    if status in ("SL_HIT", "T1_HIT", "T2_HIT", "TRAIL_SL_HIT", "PARTIAL_SCALE", "EOD_SQUAREOFF"):
         diag_reason = status
     elif status == "OPEN":
         diag_reason = "EOD_SQUAREOFF"
     miss_diagnostic = None
     if diag_reason:
-        from .eod_intraday_report import _build_levels_diagnostic
-
         exit_for_diag = eod_price
-        if status == "SL_HIT" and sl > 0:
+        if used_scale and scale_extra.get("exitPrice") is not None:
+            exit_for_diag = float(scale_extra["exitPrice"])
+        elif status == "SL_HIT" and sl > 0:
             exit_for_diag = sl
         elif status == "T1_HIT" and t1 > 0:
             exit_for_diag = t1
@@ -363,6 +419,7 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
         "triggered": True,
         "triggerSource": trigger_src,
         "skipped": False,
+        **scale_extra,
     }
 
 

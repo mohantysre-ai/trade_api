@@ -15,6 +15,9 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from .feed_scanner import SWING_MIN_PRICE, is_swing_desk_eligible
+from .exit_plan import attach_exit_plan, evaluate_scale_trail
+from .trade_outcome import _is_market_open
+from .desk_clock import basket_lock_allowed, basket_lock_block_message
 
 log = logging.getLogger(__name__)
 
@@ -150,10 +153,12 @@ def apply_swing_sizing(
 
     slots = max(1, len(long_rows) + len(short_rows))
     sized_long = [
-        _size_swing_row(r, sleeve=SWING_CAPITAL, slots=slots, force=must_force) for r in long_rows
+        attach_exit_plan(_size_swing_row(r, sleeve=SWING_CAPITAL, slots=slots, force=must_force))
+        for r in long_rows
     ]
     sized_short = [
-        _size_swing_row(r, sleeve=SWING_CAPITAL, slots=slots, force=must_force) for r in short_rows
+        attach_exit_plan(_size_swing_row(r, sleeve=SWING_CAPITAL, slots=slots, force=must_force))
+        for r in short_rows
     ]
     changed = sized_long != long_rows or sized_short != short_rows or must_force
     sess["long"] = sized_long
@@ -439,12 +444,15 @@ def _scrub_ineligible_swing_rows(session: dict[str, Any]) -> tuple[dict[str, Any
     return sess, removed
 
 
-def lock_swing_session(*, force: bool = False) -> dict[str, Any]:
+def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False) -> dict[str, Any]:
     """Snapshot Asset Matrix BUY set into swing_session.json.
 
     Daily rotation: a locked book from a prior IST sessionDate is treated as stale
     and re-locked from fresh Matrix BUY cards (force), irrespective of P&L.
     Never locks from dhanSwingPicks / ScanX.
+
+    Time gate: primary 09:45–10:15 IST (or late-start catch-up). Only
+    ``bypass_lock_window=True`` skips the clock. ``force`` rebuilds — does not open early.
     """
     existing = load_swing_session()
     today = _ist_today()
@@ -476,6 +484,15 @@ def lock_swing_session(*, force: bool = False) -> dict[str, Any]:
         return {
             "success": True,
             "alreadyLocked": True,
+            "session": existing,
+        }
+
+    allowed, reason = basket_lock_allowed(allow_manual_override=bool(bypass_lock_window))
+    if not allowed:
+        return {
+            "success": False,
+            "error": basket_lock_block_message(reason),
+            "lockWindow": reason,
             "session": existing,
         }
 
@@ -515,7 +532,10 @@ def lock_swing_session(*, force: bool = False) -> dict[str, Any]:
         }
 
     slots = max(1, len(long_rows))
-    long_rows = [_size_swing_row(r, sleeve=SWING_CAPITAL, slots=slots) for r in long_rows]
+    long_rows = [
+        attach_exit_plan(_size_swing_row(r, sleeve=SWING_CAPITAL, slots=slots))
+        for r in long_rows
+    ]
 
     committed_at = _utc_now_iso()
     session = {
@@ -569,16 +589,30 @@ def ensure_swing_session_locked() -> dict[str, Any]:
     return result.get("session") or existing
 
 
-def _enrich_swing_row_prices(row: dict[str, Any], quotes: dict[str, Any], stocks_by: dict[str, Any]) -> dict[str, Any]:
+def _enrich_swing_row_prices(
+    row: dict[str, Any],
+    quotes: dict[str, Any],
+    stocks_by: dict[str, Any],
+    live_marks: dict[str, float] | None = None,
+) -> dict[str, Any]:
     """Price-only MTM — never mutate symbol / levels / lock fields."""
     out = dict(row)
     symbol = str(out.get("symbol") or "").upper()
     ltp = None
     ltp_source = "none"
     delta = None
+    # Prefer Angel/Yahoo live marks when provided (market-hours desk poll)
+    if live_marks and symbol in live_marks:
+        try:
+            mark = float(live_marks[symbol])
+            if mark > 0:
+                ltp = mark
+                ltp_source = "live"
+        except (TypeError, ValueError):
+            pass
     q = quotes.get(symbol) if isinstance(quotes.get(symbol), dict) else None
     s = stocks_by.get(symbol) if isinstance(stocks_by.get(symbol), dict) else None
-    if q:
+    if ltp is None and q:
         ltp = _parse_price(q.get("ltpRaw") or q.get("ltp"))
         if ltp is not None:
             ltp_source = "snapshot_quote"
@@ -606,16 +640,65 @@ def _enrich_swing_row_prices(row: dict[str, Any], quotes: dict[str, Any], stocks
     out["dayChangePct"] = delta if delta is not None else out.get("dayChangePct")
     out["unrealizedPnl"] = unrealized
     out["unrealizedPnlPct"] = unrealized_pct
-    # Outside RTH: open swing rows are session-closed (price-only MTM still applies)
-    try:
-        from .trade_outcome import _is_market_open
 
-        if not _is_market_open():
-            st = str(out.get("status") or "").upper()
-            if st in ("", "RUNNING", "DATA STALE") or out.get("status") is None:
-                out["status"] = "SESSION CLOSED"
+    # Scale-trail live MTM when exitPlan present (or attachable)
+    after_close = False
+    try:
+        after_close = not _is_market_open()
     except Exception:
-        pass
+        after_close = False
+
+    if not isinstance(out.get("exitPlan"), dict):
+        try:
+            attached = attach_exit_plan(out)
+            if isinstance(attached.get("exitPlan"), dict):
+                out["exitPlan"] = attached["exitPlan"]
+        except Exception:
+            pass
+
+    if isinstance(out.get("exitPlan"), dict) and ltp is not None:
+        try:
+            ev = evaluate_scale_trail(out, ltp, after_close=after_close)
+            if ev:
+                out["outcome"] = {
+                    "label": ev.get("label"),
+                    "detail": ev.get("detail"),
+                    "hitLevel": ev.get("hitLevel"),
+                    "ltp": ev.get("ltp"),
+                    "pctChange": ev.get("pctChange"),
+                    "scaleTrail": True,
+                    "closed": ev.get("closed"),
+                }
+                if isinstance(ev.get("exitState"), dict):
+                    out["exitState"] = ev["exitState"]
+                out["remainingQty"] = ev.get("remainingQty")
+                out["realizedPnl"] = ev.get("realizedPnl")
+                out["unrealizedPnl"] = ev.get("unrealizedPnl")
+                out["effectiveStop"] = ev.get("effectiveStop")
+                if entry > 0 and ltp is not None:
+                    out["unrealizedPnlPct"] = round((ltp - entry) / entry * 100.0, 2)
+                if ev.get("closed"):
+                    out["closed"] = True
+                    out["status"] = str(ev.get("label") or "CLOSED")
+                elif ev.get("hitLevel") == "partial":
+                    out["status"] = str(ev.get("label") or "PARTIAL")
+                elif after_close:
+                    st = str(out.get("status") or "").upper()
+                    if st in ("", "RUNNING", "DATA STALE") or out.get("status") is None:
+                        out["status"] = "SESSION CLOSED"
+            elif after_close:
+                st = str(out.get("status") or "").upper()
+                if st in ("", "RUNNING", "DATA STALE") or out.get("status") is None:
+                    out["status"] = "SESSION CLOSED"
+        except Exception:
+            if after_close:
+                st = str(out.get("status") or "").upper()
+                if st in ("", "RUNNING", "DATA STALE") or out.get("status") is None:
+                    out["status"] = "SESSION CLOSED"
+    elif after_close:
+        st = str(out.get("status") or "").upper()
+        if st in ("", "RUNNING", "DATA STALE") or out.get("status") is None:
+            out["status"] = "SESSION CLOSED"
     # Symbols / levels stay immutable
     return out
 
@@ -635,12 +718,28 @@ def get_swing_session(*, live: bool = False) -> dict[str, Any]:
             sym = str(s.get("ticker") or s.get("symbol") or "").upper().strip()
             if sym:
                 stocks_by[sym] = s
+    live_marks: dict[str, float] = {}
+    try:
+        from .trade_outcome import fetch_live_marks_for_symbols
+
+        syms = [
+            str(r.get("symbol") or "").upper()
+            for r in (sess.get("long") or []) + (sess.get("short") or [])
+            if isinstance(r, dict) and r.get("symbol")
+        ]
+        live_marks = fetch_live_marks_for_symbols(syms)
+    except Exception:
+        live_marks = {}
     out = dict(sess)
     out["long"] = [
-        _enrich_swing_row_prices(r, quotes, stocks_by) for r in (sess.get("long") or []) if isinstance(r, dict)
+        _enrich_swing_row_prices(r, quotes, stocks_by, live_marks)
+        for r in (sess.get("long") or [])
+        if isinstance(r, dict)
     ]
     out["short"] = [
-        _enrich_swing_row_prices(r, quotes, stocks_by) for r in (sess.get("short") or []) if isinstance(r, dict)
+        _enrich_swing_row_prices(r, quotes, stocks_by, live_marks)
+        for r in (sess.get("short") or [])
+        if isinstance(r, dict)
     ]
     long_u = sum(float(r.get("unrealizedPnl") or 0) for r in out["long"])
     out["portfolio"] = {
@@ -649,6 +748,7 @@ def get_swing_session(*, live: bool = False) -> dict[str, Any]:
         "lockedCount": len(out["long"]),
     }
     out["priceOnly"] = True
+    out["liveMarks"] = len(live_marks)
     out["updatedAt"] = _utc_now_iso()
     out["snapshotUpdatedAt"] = snap.get("updatedAt")
     return out

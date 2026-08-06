@@ -21,6 +21,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from .exit_plan import attach_exit_plan
+from .desk_clock import basket_lock_allowed, basket_lock_block_message, lock_window_config
+
 log = logging.getLogger(__name__)
 
 _IST = timezone(timedelta(hours=5, minutes=30))
@@ -1082,14 +1085,18 @@ def _adopt_high_probability(
         sizing = _size_position(
             entry, risk, capital, risk_scale=risk_scale, basket_slots=LOCK_SIZE
         )
-        out.append({
-            **row,
-            **sizing,
-            "rank": i + 1,
-            "adopted": True,
-            "adoptReason": "HIGH_PROBABILITY_SCORE",
-            "candidatePoolSize": len(rows),
-        })
+        out.append(
+            attach_exit_plan(
+                {
+                    **row,
+                    **sizing,
+                    "rank": i + 1,
+                    "adopted": True,
+                    "adoptReason": "HIGH_PROBABILITY_SCORE",
+                    "candidatePoolSize": len(rows),
+                }
+            )
+        )
     return out
 
 
@@ -1134,7 +1141,7 @@ def _construct_side(
         counts[sector] = counts.get(sector, 0) + 1
         used.add(sym)
         rank = start_rank + len(picked) + 1
-        picked.append({
+        row = {
             "rank": rank,
             "symbol": cand["symbol"],
             "name": cand.get("name"),
@@ -1164,7 +1171,8 @@ def _construct_side(
             "closed": False,
             **levels,
             **sizing,
-        })
+        }
+        picked.append(attach_exit_plan(row))
     return picked, counts
 
 
@@ -1439,11 +1447,15 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
     }
 
 
-def commit_session(force: bool = False) -> dict[str, Any]:
+def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> dict[str, Any]:
     """Lock high-probability 5 BUY + 5 SELL from the 10+10 candidate pool.
 
     Daily rotation: a locked basket from a prior IST sessionDate is stale and
     force-rebuilt irrespective of P&L (mirrors swing_session).
+
+    Time gate: primary 09:45–10:15 IST (or late-start catch-up). Only
+    ``bypass_lock_window=True`` (operator emergency) skips the clock.
+    ``force`` only means rebuild an already-locked basket — it does not open early.
     """
     existing = load_session()
     today = _ist_now().strftime("%Y-%m-%d")
@@ -1467,6 +1479,16 @@ def commit_session(force: bool = False) -> dict[str, Any]:
             "error": "SESSION BASKET LOCKED — symbols immutable. Pass force=true only to rebuild after explicit unlock.",
             "session": existing,
             "alreadyLocked": True,
+        }
+
+    allowed, reason = basket_lock_allowed(allow_manual_override=bool(bypass_lock_window))
+    if not allowed:
+        return {
+            "success": False,
+            "error": basket_lock_block_message(reason),
+            "lockWindow": reason,
+            "lockWindowConfig": lock_window_config(),
+            "session": existing,
         }
 
     candidates = generate_candidates()
@@ -1572,6 +1594,8 @@ def commit_session(force: bool = False) -> dict[str, Any]:
                 "stopLoss": r.get("stopLoss"),
                 "target1": r.get("target1"),
                 "target2": r.get("target2"),
+                "riskPerShare": r.get("riskPerShare"),
+                "exitPlan": r.get("exitPlan"),
                 "scanLtp": r.get("ltp"),
                 "currentPrice": r.get("ltp"),
                 "score": r.get("score"),
@@ -1594,6 +1618,8 @@ def commit_session(force: bool = False) -> dict[str, Any]:
                 "stopLoss": r.get("stopLoss"),
                 "target1": r.get("target1"),
                 "target2": r.get("target2"),
+                "riskPerShare": r.get("riskPerShare"),
+                "exitPlan": r.get("exitPlan"),
                 "scanLtp": r.get("ltp"),
                 "currentPrice": r.get("ltp"),
                 "score": r.get("score"),
@@ -1615,6 +1641,7 @@ def commit_session(force: bool = False) -> dict[str, Any]:
         "funnel": f"{BASKET_SIZE}+{BASKET_SIZE} candidates → {LOCK_SIZE}+{LOCK_SIZE} locked",
         "rotation": "DAILY",
         "priorSessionDate": existing_date if stale_day else None,
+        "exitMode": "SCALE_TRAIL",
     }
     _atomic_write(_FIXED_PLAN_FILE, plan)
     session["fixedPlanSynced"] = True
@@ -1687,26 +1714,52 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
     out["dataStale"] = live_stale or ltp_source in ("cached", "none")
 
     if ltp is not None and entry is not None and entry > 0:
+        rem_qty = int(out.get("remainingQty") if out.get("remainingQty") is not None else qty)
+        if live_row and live_row.get("remainingQty") is not None:
+            rem_qty = int(live_row.get("remainingQty") or 0)
         if direction == "LONG":
-            pnl = (ltp - entry) * qty
+            unreal = (ltp - entry) * rem_qty
             pnl_pct = ((ltp - entry) / entry) * 100
         else:
-            pnl = (entry - ltp) * qty
+            unreal = (entry - ltp) * rem_qty
             pnl_pct = ((entry - ltp) / entry) * 100
-        out["unrealizedPnl"] = round(pnl, 2)
+        realized = None
+        if live_row and live_row.get("realizedPnl") is not None:
+            realized = float(live_row["realizedPnl"])
+        elif out.get("realizedPnl") is not None:
+            realized = float(out["realizedPnl"])
+        out["realizedPnl"] = round(realized, 2) if realized is not None else None
+        out["unrealizedPnl"] = round(unreal, 2)
         out["pnlPct"] = round(pnl_pct, 2)
-        out["positionValue"] = round(ltp * qty, 2)
+        out["remainingQty"] = rem_qty
+        out["positionValue"] = round(ltp * rem_qty, 2)
+        if realized is not None:
+            out["totalPnl"] = round(realized + unreal, 2)
     else:
         out["unrealizedPnl"] = None
         out["pnlPct"] = None
         out["positionValue"] = None
+
+    if live_row and live_row.get("effectiveStop") is not None:
+        out["effectiveStop"] = live_row.get("effectiveStop")
+    if live_row and isinstance(live_row.get("exitState"), dict):
+        out["exitState"] = live_row.get("exitState")
+    if live_row and isinstance(live_row.get("exitPlan"), dict):
+        out["exitPlan"] = live_row.get("exitPlan")
+    elif out.get("exitPlan") is None and out.get("approxQty"):
+        try:
+            attached = attach_exit_plan(out)
+            out["exitPlan"] = attached.get("exitPlan")
+        except Exception:
+            pass
 
     def _dist_pct(level: float | None) -> float | None:
         if ltp is None or level is None or ltp == 0:
             return None
         return round(abs(level - ltp) / ltp * 100, 2)
 
-    out["distToSlPct"] = _dist_pct(sl)
+    eff_sl = _safe_float(out.get("effectiveStop") or sl)
+    out["distToSlPct"] = _dist_pct(eff_sl)
     out["distToT1Pct"] = _dist_pct(t1)
     out["distToT2Pct"] = _dist_pct(t2)
 
@@ -1716,13 +1769,19 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
     if live_row and isinstance(live_row.get("outcome"), dict):
         hit = live_row["outcome"].get("hitLevel")
         label = str(live_row["outcome"].get("label") or "")
-        if hit == "sl" or "STOP" in label.upper():
-            status = "STOP LOSS HIT"
+        if hit == "sl" or "STOP" in label.upper() or "TRAIL" in label.upper():
+            status = "TRAIL STOP HIT" if live_row["outcome"].get("scaleTrail") else "STOP LOSS HIT"
             out["closed"] = True
+        elif hit == "partial":
+            status = label or "PARTIAL"
         elif hit == "t2":
             status = "TARGET 2 HIT"
         elif hit == "t1":
             status = "TARGET 1 HIT"
+        if live_row["outcome"].get("closed"):
+            out["closed"] = True
+            if status == "RUNNING":
+                status = "CLOSED"
     # Prefer authoritative live-prices close flags (do not re-open)
     if live_row:
         live_st = str(live_row.get("status") or "").upper()

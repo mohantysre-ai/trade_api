@@ -422,7 +422,7 @@ export default function EodDeskPanel({
             <p className="mt-0.5 text-[10px] text-slate-500">
               {postCloseAuto
                 ? 'After close: Book auto-polls ~45s. Rebuild refreshes marks + fills missing outcome narratives (no full LLM reburn). PM LLM never on Refresh.'
-                : 'Refresh never calls LLM · Rebuild fills missing narratives · PM LLM at most 1×/day then cache · Rotate locks via Swing/Intraday panels'}
+                : 'Today’s Book overlays LIVE marks ~2s (Angel/Yahoo) · Realised = T1/T2/SL · Unrealised = open MTM · Refresh never calls LLM · PM LLM 1×/day'}
             </p>
           </div>
 

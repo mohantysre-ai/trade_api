@@ -472,8 +472,10 @@ def morning_prework_done_today() -> bool:
 
 
 def run_scheduled_morning_prework(*, force: bool = False) -> dict[str, Any]:
-    """Once-per-day post-10:00 IST pre-work: live Angel refresh + LLM, then day-lock AI.
+    """Once-per-day post-09:45 IST pre-work: live Angel refresh + LLM, then day-lock AI.
 
+    Timed after open auction / opening-range settle so the Matrix is not built on
+    stale overnight prints. Scheduler env: MARKET_PREWORK_HOUR/MINUTE (default 9:45).
     Subsequent on-demand refreshes keep external API calls live but reuse LLM output
     unless forceLlmRefresh=true.
     """
@@ -538,7 +540,7 @@ def run_scheduled_morning_prework(*, force: bool = False) -> dict[str, Any]:
         if isinstance(payload.get("selectionMeta"), dict):
             payload["selectionMeta"]["mode"] = "live"
             payload["selectionMeta"]["reason"] = (
-                "Scheduled morning pre-work after 10:00 IST; LLM locked for the session."
+                "Scheduled morning pre-work after 09:45 IST; LLM locked for the session."
             )
             payload["selectionMeta"]["dataDate"] = today
         _save_last_snapshot(payload)
@@ -3979,8 +3981,8 @@ def create_app() -> FastAPI:
             "date": today,
             "enabled": os.getenv("MARKET_PREWORK_ENABLED", "1").strip().lower()
             not in ("0", "false", "no", "off"),
-            "preworkHour": int(os.getenv("MARKET_PREWORK_HOUR", "10")),
-            "preworkMinute": int(os.getenv("MARKET_PREWORK_MINUTE", "0")),
+            "preworkHour": int(os.getenv("MARKET_PREWORK_HOUR", "9")),
+            "preworkMinute": int(os.getenv("MARKET_PREWORK_MINUTE", "45")),
             "doneToday": morning_prework_done_today(),
             "llmLockedForDate": (snapshot or {}).get("llmLockedForDate"),
             "llmLockedToday": _llm_locked_for_today(snapshot),
@@ -4001,7 +4003,7 @@ def create_app() -> FastAPI:
 
     @app.post("/api/morning-prework/run")
     def morning_prework_run(force: bool = False) -> dict[str, Any]:
-        """Manual morning pre-work (same path as the 10:00 IST scheduler)."""
+        """Manual morning pre-work (same path as the 09:45 IST scheduler)."""
         try:
             return run_scheduled_morning_prework(force=force)
         except Exception as exc:

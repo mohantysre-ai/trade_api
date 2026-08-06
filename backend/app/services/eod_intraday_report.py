@@ -17,13 +17,16 @@ from datetime import date
 from typing import Any
 
 from .eod_archive import load_archive
+from .exit_plan import attach_exit_plan, blended_pnl_from_state
 
 log = logging.getLogger(__name__)
 
 DEFAULT_INTRADAY_CAPITAL = 1_000_000.0  # ₹10L
 DASH_ROOT = {
     "SL_HIT": "ADVERSE_TRAJECTORY",
+    "TRAIL_SL_HIT": "ADVERSE_TRAJECTORY",
     "EOD_SQUAREOFF": "STALLED_TRADE",
+    "PARTIAL_SCALE": "PARTIAL_FOLLOWTHROUGH",
 }
 
 
@@ -77,6 +80,41 @@ def _round(v: float | None, digits: int = 2) -> float | None:
     return round(float(v), digits)
 
 
+def _exit_reason_from_scale_eval(eval_result: dict[str, Any]) -> str:
+    """Map evaluate_scale_trail / blended result to Book exitReason (facts only)."""
+    hit = eval_result.get("hitLevel")
+    label = str(eval_result.get("label") or "").upper()
+    if hit == "sl" or "TRAIL STOP" in label:
+        return "TRAIL_SL_HIT"
+    if "EOD SQUARE" in label:
+        return "EOD_SQUAREOFF"
+    if hit == "partial" or label.startswith("PARTIAL") or "SCALE COMPLETE" in label:
+        return "PARTIAL_SCALE"
+    if eval_result.get("closed"):
+        return "PARTIAL_SCALE"
+    return "PARTIAL_SCALE"
+
+
+def _scale_trail_work_pick(pick: dict[str, Any]) -> dict[str, Any] | None:
+    """Return pick with SCALE_TRAIL exitPlan, or None if binary fallback."""
+    plan = pick.get("exitPlan") if isinstance(pick.get("exitPlan"), dict) else None
+    if plan and plan.get("mode") == "SCALE_TRAIL":
+        return pick
+    entry = float(pick.get("entryPrice") or 0)
+    qty = int(pick.get("approxQty") or 0)
+    risk = float(pick.get("riskPerShare") or 0)
+    sl = float(pick.get("stopLoss") or 0)
+    if entry <= 0 or qty <= 0 or (risk <= 0 and sl <= 0):
+        return None
+    work = attach_exit_plan(pick)
+    attached = work.get("exitPlan") if isinstance(work.get("exitPlan"), dict) else None
+    if not attached or attached.get("mode") != "SCALE_TRAIL":
+        return None
+    if isinstance(pick.get("exitState"), dict) and not work.get("exitState"):
+        work["exitState"] = pick["exitState"]
+    return work
+
+
 def _leg_pnl(pick: dict[str, Any]) -> tuple[str, float, float]:
     """Return (exit_reason, exit_price, pnl) for one intraday pick."""
     direction = pick.get("direction", "LONG")
@@ -84,8 +122,19 @@ def _leg_pnl(pick: dict[str, Any]) -> tuple[str, float, float]:
     qty = int(pick.get("approxQty") or 0)
     outcome = pick.get("outcome") or {}
     hit_level = outcome.get("hitLevel") if isinstance(outcome, dict) else None
-    ltp = float(pick.get("currentPrice") or (outcome.get("ltp") if isinstance(outcome, dict) else None) or entry)
+    ltp = float(
+        pick.get("currentPrice")
+        or (outcome.get("ltp") if isinstance(outcome, dict) else None)
+        or entry
+    )
 
+    work = _scale_trail_work_pick(pick)
+    if work is not None:
+        total_pnl, avg_exit, eval_result = blended_pnl_from_state(work, ltp, after_close=True)
+        if eval_result:
+            return _exit_reason_from_scale_eval(eval_result), float(avg_exit), float(total_pnl)
+
+    # Legacy binary T1/T2/SL full-qty (no exitPlan / attach failed)
     if hit_level == "t2":
         exit_price = float(pick.get("target2") or ltp)
         reason = "T2_HIT"
@@ -111,7 +160,14 @@ def _build_levels_diagnostic(
     pnl: float,
 ) -> dict[str, Any] | None:
     """Deterministic outcome metrics from plan levels — facts only, no narrative."""
-    if reason not in ("SL_HIT", "EOD_SQUAREOFF", "T1_HIT", "T2_HIT"):
+    if reason not in (
+        "SL_HIT",
+        "TRAIL_SL_HIT",
+        "EOD_SQUAREOFF",
+        "T1_HIT",
+        "T2_HIT",
+        "PARTIAL_SCALE",
+    ):
         return None
 
     direction = str(pick.get("direction") or "LONG").upper()
@@ -138,7 +194,7 @@ def _build_levels_diagnostic(
         gap_t2_pct = sign * (t2 - exit_price) / entry * 100.0
 
     stop_util: float | None = None
-    if reason == "SL_HIT" and risk and signed_move is not None:
+    if reason in ("SL_HIT", "TRAIL_SL_HIT") and risk and signed_move is not None:
         stop_util = abs(signed_move) / risk
 
     factors: list[str] = []
@@ -153,6 +209,18 @@ def _build_levels_diagnostic(
         else:
             root = "STOP_BEFORE_FOLLOWTHROUGH"
             factors.append("STOP_BEFORE_FOLLOWTHROUGH")
+    elif reason == "TRAIL_SL_HIT":
+        factors.append("TRAIL_STOP_HIT")
+        if pnl >= 0 or (move_pct is not None and move_pct >= 0):
+            is_miss = False
+            root = "TRAIL_LOCKED_GAINS"
+            factors.append("TRAIL_LOCKED_GAINS")
+        else:
+            is_miss = True
+            root = "ADVERSE_TRAJECTORY"
+            factors.append("TRAIL_STOPPED_LOSS")
+            if stop_util is not None and stop_util >= 0.9:
+                factors.append("FULL_STOP_TRAVERSAL")
     elif reason == "EOD_SQUAREOFF":
         factors.append("TARGET_NOT_REACHED")
         if pnl > 0 or (move_pct is not None and move_pct > 0):
@@ -161,6 +229,16 @@ def _build_levels_diagnostic(
         else:
             root = "STALLED_TRADE"
             factors.append("NEGATIVE_OR_FLAT_EOD")
+    elif reason == "PARTIAL_SCALE":
+        factors.append("SCALE_LEGS_FILLED")
+        if pnl > 0 or (move_pct is not None and move_pct > 0):
+            is_miss = False
+            root = "PARTIAL_FOLLOWTHROUGH"
+            factors.append("POSITIVE_SCALE_BOOK")
+        else:
+            is_miss = True
+            root = "STALLED_TRADE"
+            factors.append("NEGATIVE_OR_FLAT_SCALE")
     elif reason == "T2_HIT":
         root = "TREND_FOLLOWTHROUGH"
         factors.extend(["TARGET_REACHED", "T2_HIT"])
