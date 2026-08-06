@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import type { SparkFlag } from '@/lib/market-api';
 import { fetchNseSparkline } from '@/lib/market-api';
+import { LiveTickNumber } from '@/lib/desk-motion';
 
 /* ── Smooth sparkline SVG with Catmull-Rom spline ─────────────────────── */
 let intraSparkIdCounter = 0;
@@ -515,6 +517,155 @@ function buildMonitorStatusLine(data: LivePricesResponse | null, sessionClosed: 
   return parts.join(' · ');
 }
 
+function pnlAccentVar(pct: number | null | undefined): string {
+  if (pct == null || Math.abs(pct) < 0.001) return 'var(--terminal-line)';
+  return pct > 0 ? 'var(--terminal-green)' : 'var(--terminal-red)';
+}
+
+function MonitorStatusPills({
+  data,
+  sessionClosed,
+  marketOpen,
+}: {
+  data: LivePricesResponse | null;
+  sessionClosed: boolean;
+  marketOpen: boolean;
+}) {
+  const stale = Boolean(data?.dataStale);
+  const sources = summarizePlanLtpSources(data);
+  const evalAt = formatIstClock(data?.updatedAt);
+  const snapAt = formatIstClock(data?.snapshotUpdatedAt);
+  const mixFromApi = data?.ltpSourceMix
+    ? Object.entries(data.ltpSourceMix)
+        .filter(([, n]) => typeof n === 'number' && n > 0)
+        .map(([k, n]) => `${k}:${n}`)
+        .join(' · ')
+    : '';
+
+  const liveDotClass = stale
+    ? 'desk-breathe-dot is-warn'
+    : sessionClosed
+      ? 'w-2 h-2 rounded-full bg-slate-500 shrink-0'
+      : marketOpen
+        ? 'desk-breathe-dot'
+        : 'desk-breathe-dot is-warn';
+
+  const pollLabel = sessionClosed
+    ? 'poll ~2s · close marks'
+    : marketOpen
+      ? 'Eval poll ~2s'
+      : 'Market closed · poll ~2s';
+
+  const sessionLabel = marketOpen ? 'SESSION OPEN' : sessionClosed ? 'SESSION CLOSED' : 'SESSION —';
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-lg glass-flat text-slate-900">
+      <span className="glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+        <span className={liveDotClass} aria-hidden />
+        MONITOR · MANUAL EXECUTION
+      </span>
+      <span className="glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-600">
+        {!sessionClosed && marketOpen && !stale && <span className="desk-breathe-dot" aria-hidden />}
+        {pollLabel}
+      </span>
+      {evalAt && (
+        <span className="glass-pill px-2 py-0.5 text-[9px] text-slate-500 tabular-nums">
+          eval@ {evalAt} IST
+        </span>
+      )}
+      {snapAt && (
+        <span className="glass-pill px-2 py-0.5 text-[9px] text-slate-500 tabular-nums">
+          snapshot@ {snapAt} IST
+        </span>
+      )}
+      <span className="glass-pill px-2 py-0.5 text-[9px] text-slate-500">
+        sources {mixFromApi || sources.label || '—'}
+      </span>
+      <span className={`glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+        marketOpen ? 'text-emerald-700' : sessionClosed ? 'text-slate-600' : 'text-amber-700'
+      }`}>
+        {marketOpen && !stale && <span className="desk-breathe-dot" aria-hidden />}
+        {sessionClosed && <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0" aria-hidden />}
+        {!marketOpen && !sessionClosed && <span className="desk-breathe-dot is-warn" aria-hidden />}
+        {sessionLabel}
+      </span>
+      {stale && (
+        <span className="glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700">
+          <span className="desk-breathe-dot is-warn" aria-hidden />
+          FEED STALE
+        </span>
+      )}
+    </div>
+  );
+}
+
+type PlanRowItem = {
+  symbol: string;
+  entryPrice?: number;
+  stopLoss?: number;
+  target1?: number;
+  target2?: number;
+  riskPerShare?: number;
+  rrT2?: number;
+  currentPrice?: number | null;
+  outcome?: TradeOutcome | null;
+};
+
+function BookPlanRow({
+  tp,
+  entryClass,
+  hoverClass,
+}: {
+  tp: PlanRowItem;
+  entryClass: string;
+  hoverClass: string;
+}) {
+  const prevPriceRef = useRef<number | null>(null);
+  const [rowFlash, setRowFlash] = useState<'up' | 'down' | null>(null);
+  const ltp = tp.currentPrice ?? null;
+  const pct = tp.outcome?.pctChange;
+
+  useEffect(() => {
+    if (ltp == null) return;
+    const prev = prevPriceRef.current;
+    if (prev != null && prev !== ltp) {
+      setRowFlash(ltp > prev ? 'up' : 'down');
+      const id = window.setTimeout(() => setRowFlash(null), 280);
+      prevPriceRef.current = ltp;
+      return () => window.clearTimeout(id);
+    }
+    prevPriceRef.current = ltp;
+    return undefined;
+  }, [ltp, tp.symbol]);
+
+  const flashClass = rowFlash === 'up' ? 'is-flash-up' : rowFlash === 'down' ? 'is-flash-down' : '';
+
+  return (
+    <tr
+      className={`glass-flat desk-book-row border-b border-slate-100 ${hoverClass} cursor-pointer ${flashClass}`}
+      style={{ ['--row-pnl-accent' as string]: pnlAccentVar(pct) }}
+    >
+      <td className="p-1.5 font-bold text-slate-900">
+        <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
+      </td>
+      <td className="p-1.5 text-right font-mono text-slate-900 font-bold">
+        {ltp != null ? (
+          <LiveTickNumber value={ltp.toFixed(2)} className="font-mono text-slate-900 font-bold" />
+        ) : '—'}
+      </td>
+      <td className={`p-1.5 text-right font-mono font-bold ${entryClass}`}>{tp.entryPrice?.toFixed(2) ?? '—'}</td>
+      <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
+      <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
+      <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
+      <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
+      <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
+      <td className="p-1.5 text-center">
+        <OutcomeBadge outcome={tp.outcome} />
+      </td>
+    </tr>
+  );
+}
+
 /* ── Outcome Badge ───────────────────────────────────────────────────── */
 function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null | undefined }) {
   if (!outcome) {
@@ -526,8 +677,8 @@ function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null | undefined })
 
   if (outcome.label === "NOT TRIGGERED") {
     return (
-      <span className={`${baseClasses} bg-slate-200 text-slate-500 border border-slate-400`}>
-        <span className="w-1 h-1 rounded-full bg-slate-500 mr-1" />
+      <span className={`${baseClasses} bg-slate-200 text-slate-500 border border-slate-400 glass-pill`}>
+        <span className="desk-breathe-dot shrink-0 mr-1 opacity-60" style={{ animation: 'none' }} />
         NOT TRIGGERED
       </span>
     );
@@ -535,32 +686,32 @@ function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null | undefined })
 
   if (hitLevel === "t2") {
     return (
-      <span className={`${baseClasses} bg-emerald-100 text-emerald-700 border border-emerald-300 animate-pulse`}>
-        <span className="w-1 h-1 rounded-full bg-emerald-500 mr-1" />
+      <span className={`${baseClasses} bg-emerald-100 text-emerald-700 border border-emerald-300 glass-pill`}>
+        <span className="desk-breathe-dot shrink-0 mr-1" />
         TARGET 2 HIT
       </span>
     );
   }
   if (hitLevel === "t1") {
     return (
-      <span className={`${baseClasses} bg-blue-100 text-blue-700 border border-blue-300`}>
-        <span className="w-1 h-1 rounded-full bg-blue-500 mr-1" />
+      <span className={`${baseClasses} bg-blue-100 text-blue-700 border border-blue-300 glass-pill`}>
+        <span className="desk-breathe-dot shrink-0 mr-1" style={{ background: 'var(--terminal-cyan)', animation: 'none' }} />
         TARGET 1 HIT
       </span>
     );
   }
   if (hitLevel === "sl") {
     return (
-      <span className={`${baseClasses} bg-red-100 text-red-700 border border-red-300`}>
-        <span className="w-1 h-1 rounded-full bg-red-500 mr-1" />
+      <span className={`${baseClasses} bg-red-100 text-red-700 border border-red-300 glass-pill`}>
+        <span className="desk-breathe-dot is-error shrink-0 mr-1" />
         STOP LOSS HIT
       </span>
     );
   }
   // PENDING
   return (
-    <span className={`${baseClasses} bg-slate-100 text-slate-600 border border-slate-300`}>
-      <span className="w-1 h-1 rounded-full bg-slate-400 mr-1 animate-pulse" />
+    <span className={`${baseClasses} bg-slate-100 text-slate-600 border border-slate-300 glass-pill`}>
+      <span className="desk-breathe-dot shrink-0 mr-1 opacity-70" />
       PENDING
     </span>
   );
@@ -614,6 +765,8 @@ export default function IntradayMatrixPanel() {
   const [marketOpen, setMarketOpen] = useState(true);
   const [sessionClosed, setSessionClosed] = useState(false);
   const prevOutcomeRef = useRef<Record<string, string | null>>({});
+  const [longBookRef] = useAutoAnimate({ duration: 200, easing: 'ease-in-out' });
+  const [shortBookRef] = useAutoAnimate({ duration: 200, easing: 'ease-in-out' });
 
   /* last fetch times */
   const [lemonnTime, setLemonnTime] = useState('');
@@ -803,18 +956,11 @@ export default function IntradayMatrixPanel() {
 
       {/* ── MONITOR MODE INDICATOR ──────────────────────────────────────── */}
       {monitorMode && (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 desk-panel-title">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              livePricesData?.dataStale
-                ? 'bg-amber-500'
-                : sessionClosed
-                  ? 'bg-slate-500'
-                  : 'bg-emerald-500'
-            } ${sessionClosed || livePricesData?.dataStale ? '' : 'animate-pulse'}`}
-          />
-          {buildMonitorStatusLine(livePricesData, !!sessionClosed, !!marketOpen)}
-        </div>
+        <MonitorStatusPills
+          data={livePricesData}
+          sessionClosed={!!sessionClosed}
+          marketOpen={!!marketOpen}
+        />
       )}
 
       {/* ── RECENT ALERTS ───────────────────────────────────────────────── */}
@@ -1110,10 +1256,10 @@ export default function IntradayMatrixPanel() {
               return (
                 <>
                   {sessionClosed && (
-                    <div className="mb-3 flex items-center gap-2 rounded-md bg-slate-50 border border-slate-200 px-3 py-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                      <span className="desk-panel-title text-slate-900">
-                        Market Closed — Session Finalized
+                    <div className="mb-3 flex items-center gap-2 rounded-md glass-flat desk-banner-warn px-3 py-2">
+                      <span className="desk-breathe-dot shrink-0 opacity-70" style={{ animation: 'none', background: 'var(--terminal-line)' }} />
+                      <span className="glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 desk-panel-title text-slate-900">
+                        SESSION CLOSED
                       </span>
                       <span className="text-[9px] text-slate-500 ml-1">
                         Unfilled picks marked NOT TRIGGERED. Monitoring halted.
@@ -1121,9 +1267,25 @@ export default function IntradayMatrixPanel() {
                     </div>
                   )}
                   <div className="mb-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`w-1.5 h-1.5 rounded-full ${monitorMode ? (sessionClosed ? 'bg-slate-500' : 'bg-emerald-500') : 'bg-amber-500'}`} />
-                      <span className="desk-panel-title">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className={`glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                        monitorMode
+                          ? sessionClosed
+                            ? 'text-slate-600'
+                            : marketOpen
+                              ? 'text-emerald-700'
+                              : 'text-amber-700'
+                          : 'text-amber-700'
+                      }`}>
+                        {monitorMode && !sessionClosed && marketOpen && (
+                          <span className="desk-breathe-dot shrink-0" aria-hidden />
+                        )}
+                        {monitorMode && sessionClosed && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0" aria-hidden />
+                        )}
+                        {(!monitorMode || (!sessionClosed && !marketOpen)) && (
+                          <span className="desk-breathe-dot is-warn shrink-0" aria-hidden />
+                        )}
                         TRADE PLAN — CONFIGURED SLEEVE{' '}
                         {monitorMode &&
                           (sessionClosed
@@ -1132,7 +1294,7 @@ export default function IntradayMatrixPanel() {
                               ? '(LIVE MONITOR)'
                               : '(MONITOR · MARKET CLOSED)')}
                       </span>
-                      <span className="text-[9px] text-slate-400 ml-2">(updated @{planTime || '—'})</span>
+                      <span className="glass-pill px-2 py-0.5 text-[9px] text-slate-400 tabular-nums">updated @{planTime || '—'}</span>
                     </div>
 
                     {/* Trade plan table — LONG */}
@@ -1151,23 +1313,14 @@ export default function IntradayMatrixPanel() {
                             <th className="p-1.5 text-center font-bold uppercase tracking-wider">Outcome</th>
                           </tr>
                         </thead>
-                        <tbody>
+                        <tbody ref={longBookRef}>
                           {planLong.slice(0, 5).map((tp, idx) => (
-                            <tr key={`lp-long-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer">
-                              <td className="p-1.5 font-bold text-slate-900">
-                                <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
-                              </td>
-                              <td className="p-1.5 text-right font-mono text-slate-900 font-bold">{tp.currentPrice != null ? tp.currentPrice.toFixed(2) : '—'}</td>
-                              <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">{tp.entryPrice?.toFixed(2) ?? '—'}</td>
-                              <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
-                              <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
-                              <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
-                              <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
-                              <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
-                              <td className="p-1.5 text-center">
-                                <OutcomeBadge outcome={tp.outcome} />
-                              </td>
-                            </tr>
+                            <BookPlanRow
+                              key={`lp-long-${tp.symbol}-${idx}`}
+                              tp={tp}
+                              entryClass="text-emerald-600"
+                              hoverClass="hover:bg-slate-50"
+                            />
                           ))}
                         </tbody>
                       </table>
@@ -1228,17 +1381,23 @@ export default function IntradayMatrixPanel() {
                   {/* ── SHORT TRADE PLAN — from persistent picks (stable across the day) ── */}
                   {planShort.length > 0 && (
                     <div className="mb-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            monitorMode
-                              ? sessionClosed
-                                ? 'bg-slate-500'
-                                : 'bg-emerald-500'
-                              : 'bg-rose-500'
-                          } ${monitorMode && !sessionClosed ? 'animate-pulse' : ''}`}
-                        />
-                        <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <span className={`glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                          monitorMode
+                            ? sessionClosed
+                              ? 'text-slate-600'
+                              : 'text-rose-700'
+                            : 'text-rose-700'
+                        }`}>
+                          {monitorMode && !sessionClosed && (
+                            <span className="desk-breathe-dot shrink-0" aria-hidden />
+                          )}
+                          {monitorMode && sessionClosed && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0" aria-hidden />
+                          )}
+                          {!monitorMode && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" aria-hidden />
+                          )}
                           SHORT TRADE PLAN — SELL BOOK (CONFIGURED SLEEVE){' '}
                           {monitorMode &&
                             (sessionClosed
@@ -1263,23 +1422,14 @@ export default function IntradayMatrixPanel() {
                               <th className="p-1.5 text-center font-bold uppercase tracking-wider">Outcome</th>
                             </tr>
                           </thead>
-                          <tbody>
+                          <tbody ref={shortBookRef}>
                             {planShort.slice(0, 5).map((tp, idx) => (
-                              <tr key={`lp-short-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-rose-50 cursor-pointer">
-                                <td className="p-1.5 font-bold text-slate-900">
-                                  <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
-                                </td>
-                                <td className="p-1.5 text-right font-mono text-slate-900 font-bold">{tp.currentPrice != null ? tp.currentPrice.toFixed(2) : '—'}</td>
-                                <td className="p-1.5 text-right font-mono text-rose-600 font-bold">{tp.entryPrice?.toFixed(2) ?? '—'}</td>
-                                <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
-                                <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
-                                <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
-                                <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
-                                <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
-                                <td className="p-1.5 text-center">
-                                  <OutcomeBadge outcome={tp.outcome} />
-                                </td>
-                              </tr>
+                              <BookPlanRow
+                                key={`lp-short-${tp.symbol}-${idx}`}
+                                tp={tp}
+                                entryClass="text-rose-600"
+                                hoverClass="hover:bg-rose-50"
+                              />
                             ))}
                           </tbody>
                         </table>

@@ -16,6 +16,9 @@ import RightDrawer from './components/RightDrawer';
 import AssetMetricsPanel from './components/AssetMetricsPanel';
 import EodDeskPanel from './components/EodDeskPanel';
 import DeskControls from './components/DeskControls';
+import { DeskLiveTile, motion } from '@/lib/desk-motion';
+import { LayoutGroup } from 'motion/react';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 
 type DrawerContent = {
   stock?: LiveStock | LedgerStock | null;
@@ -629,6 +632,59 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
 /*  GainersLosersHeatmap                                                         */
 /* -------------------------------------------------------------------------- */
 
+function ScreenerStockList({
+  stocks,
+  categoryKey,
+  loading,
+}: {
+  stocks: NseStock[];
+  categoryKey: string;
+  loading: boolean;
+}) {
+  const [listParent] = useAutoAnimate();
+  return (
+    <div className="space-y-0" ref={listParent}>
+      {stocks.length === 0 && (
+        <div className="text-[13px] text-slate-400 px-2 py-1">
+          {loading ? <span className="glass-skeleton block h-8 rounded" /> : 'No data'}
+        </div>
+      )}
+      {stocks.map((stock) => {
+        const ticker = stock.symbol ?? 'UNKNOWN';
+        const changeText =
+          typeof stock.pchange === 'number'
+            ? `${stock.pchange > 0 ? '+' : ''}${stock.pchange.toFixed(2)}`
+            : 'N/A';
+        const changeClass =
+          typeof stock.pchange === 'number'
+            ? stock.pchange >= 0
+              ? 'text-emerald-600'
+              : 'text-red-500'
+            : 'text-slate-500';
+
+        return (
+          <div
+            key={`${categoryKey}-${ticker}`}
+            className="group flex items-center justify-between py-2 cursor-default border-b border-slate-100 last:border-b-0"
+          >
+            <div className="flex-1 min-w-0">
+              <NseTickerTooltip stock={stock} ticker={ticker} />
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <span className="text-[11px] text-slate-600 tabular-nums desk-num">
+                ₹{formatNseNumber(stock.lastPrice)}
+              </span>
+              <span className={`text-[11px] font-semibold tabular-nums min-w-[50px] text-right ${changeClass}`}>
+                {changeText}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function GainersLosersHeatmap() {
   const [categories, setCategories] = useState<Record<NseTopFiveCategoryKey, NseStock[]>>({
     topGainers: [],
@@ -688,7 +744,7 @@ function GainersLosersHeatmap() {
   );
 
   return (
-    <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-2.5 shadow-sm min-h-[160px] overflow-visible">
+    <div className="glass-card p-2.5 min-h-[160px] overflow-visible">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">NIFTY TOP 5 GAINERS & LOSERS</span>
       </div>
@@ -702,36 +758,12 @@ function GainersLosersHeatmap() {
           const dotClass = getCategoryDotClass(category.key);
 
           return (
-            <div key={category.key} className="bg-white border border-slate-200 rounded-lg p-2 min-h-[200px] overflow-visible shadow-sm">
+            <div key={category.key} className="glass-flat p-2 min-h-[200px] overflow-visible">
               <div className={`text-[13px] uppercase tracking-wider ${accentClass} font-bold mb-2 flex items-center gap-1.5`}>
                 <span className={`w-2 h-2 rounded-full ${dotClass}`} />
                 {category.label}
               </div>
-                    <div className="space-y-0">
-                      {stocks.length === 0 && (
-                        <div className="text-[13px] text-slate-400 px-2 py-1">No data</div>
-                      )}
-                      {stocks.map((stock, index) => {
-                        const ticker = stock.symbol ?? 'UNKNOWN';
-                        const changeText = typeof stock.pchange === 'number' ? `${stock.pchange > 0 ? '+' : ''}${stock.pchange.toFixed(2)}` : 'N/A';
-                        const changeClass = typeof stock.pchange === 'number' ? (stock.pchange >= 0 ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500';
-
-                        return (
-                          <div
-                            key={`${category.key}-${ticker}-${index}`}
-                            className="group flex items-center justify-between py-2 cursor-default border-b border-slate-100 last:border-b-0"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <NseTickerTooltip stock={stock} ticker={ticker} />
-                            </div>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              <span className="text-[11px] text-slate-600 tabular-nums">₹{formatNseNumber(stock.lastPrice)}</span>
-                              <span className={`text-[11px] font-semibold tabular-nums min-w-[50px] text-right ${changeClass}`}>{changeText}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+              <ScreenerStockList stocks={stocks} categoryKey={category.key} loading={loading} />
             </div>
           );
         })}
@@ -1019,33 +1051,28 @@ function GlobalIndicesGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
         {items.map((item) => {
           const isPositive = item.state === 'POSITIVE';
           return (
-            <div
+            <DeskLiveTile
               key={item.label}
-              className={`desk-metric-tile${tilesLive ? ' is-live-tile' : ''}${tilesUpdating ? ' is-updating' : ''}`}
-              style={{ ['--tile-accent' as string]: getGlobalAccent(item.label) }}
-              onClick={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
-              onKeyDown={(e) => { if (e.key === 'Enter') window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer'); }}
-              tabIndex={0}
-              role="link"
-              aria-label={`View ${item.label} details`}
-            >
-              <div className="flex-1 min-w-0 z-10">
-                <span className="desk-metric-label block">{item.label}</span>
-                <span className="desk-metric-value block font-mono">{item.val}</span>
-                <span className={`desk-metric-delta block ${isPositive ? 'is-up' : 'is-down'}`}>
-                  {isPositive ? '↑' : '↓'} {item.delta}
-                </span>
-              </div>
-              <div className="w-12 h-10 sm:w-16 sm:h-14 flex-shrink-0 relative max-[380px]:hidden">
-                {item.sparkline && item.sparkline.length >= 2 ? (
-                  <SparklineSVG positive={isPositive} data={item.sparkline} />
-                ) : (
-                  <div className="absolute top-0 right-0 w-full h-full opacity-70">
-                    <MiniSparkline positive={isPositive} />
-                  </div>
-                )}
-              </div>
-            </div>
+              label={item.label}
+              value={item.val}
+              delta={item.delta}
+              positive={isPositive}
+              accent={getGlobalAccent(item.label)}
+              tilesLive={tilesLive}
+              tilesUpdating={tilesUpdating}
+              onActivate={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
+              sparkline={
+                <div className="w-12 h-10 sm:w-16 sm:h-14 flex-shrink-0 relative max-[380px]:hidden">
+                  {item.sparkline && item.sparkline.length >= 2 ? (
+                    <SparklineSVG positive={isPositive} data={item.sparkline} />
+                  ) : (
+                    <div className="absolute top-0 right-0 w-full h-full opacity-70">
+                      <MiniSparkline positive={isPositive} />
+                    </div>
+                  )}
+                </div>
+              }
+            />
           );
         })}
       </div>
@@ -1222,33 +1249,28 @@ function CommoditiesFxGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
           if (displayLabel === 'BRENT CRUDE OIL') displayLabel = 'BRENT CRUDE';
           const isPositive = item.state === 'POSITIVE';
           return (
-            <div
+            <DeskLiveTile
               key={item.label}
-              className={`desk-metric-tile${tilesLive ? ' is-live-tile' : ''}${tilesUpdating ? ' is-updating' : ''}`}
-              style={{ ['--tile-accent' as string]: getCommodityAccent(displayLabel) }}
-              onClick={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
-              onKeyDown={(e) => { if (e.key === 'Enter') window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer'); }}
-              tabIndex={0}
-              role="link"
-              aria-label={`View ${displayLabel} details`}
-            >
-              <div className="flex-1 min-w-0 z-10">
-                <span className="desk-metric-label block">{displayLabel}</span>
-                <span className="desk-metric-value block font-mono">{item.val}</span>
-                <span className={`desk-metric-delta block ${isPositive ? 'is-up' : 'is-down'}`}>
-                  {isPositive ? '↑' : '↓'} {item.delta}
-                </span>
-              </div>
-              <div className="w-12 h-10 sm:w-16 sm:h-14 flex-shrink-0 relative max-[380px]:hidden">
-                {item.sparkline && item.sparkline.length >= 2 ? (
-                  <SparklineSVG positive={isPositive} data={item.sparkline} />
-                ) : (
-                  <div className="absolute top-0 right-0 w-full h-full opacity-70">
-                    <MiniSparkline positive={isPositive} />
-                  </div>
-                )}
-              </div>
-            </div>
+              label={displayLabel}
+              value={item.val}
+              delta={item.delta}
+              positive={isPositive}
+              accent={getCommodityAccent(displayLabel)}
+              tilesLive={tilesLive}
+              tilesUpdating={tilesUpdating}
+              onActivate={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
+              sparkline={
+                <div className="w-12 h-10 sm:w-16 sm:h-14 flex-shrink-0 relative max-[380px]:hidden">
+                  {item.sparkline && item.sparkline.length >= 2 ? (
+                    <SparklineSVG positive={isPositive} data={item.sparkline} />
+                  ) : (
+                    <div className="absolute top-0 right-0 w-full h-full opacity-70">
+                      <MiniSparkline positive={isPositive} />
+                    </div>
+                  )}
+                </div>
+              }
+            />
           );
         })}
       </div>
@@ -1285,33 +1307,28 @@ function IndiaMarketsGrid({ items, staleLabel, tilesLive, tilesUpdating }: { ite
           if (displayLabel === 'USD / INR Spot') displayLabel = 'USD / INR';
           const isPositive = item.state === 'POSITIVE';
           return (
-            <div
+            <DeskLiveTile
               key={item.label}
-              className={`desk-metric-tile${tilesLive ? ' is-live-tile' : ''}${tilesUpdating ? ' is-updating' : ''}`}
-              style={{ ['--tile-accent' as string]: getIndiaAccent(displayLabel) }}
-              onClick={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
-              onKeyDown={(e) => { if (e.key === 'Enter') window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer'); }}
-              tabIndex={0}
-              role="link"
-              aria-label={`View ${displayLabel} details`}
-            >
-              <div className="flex-1 min-w-0 z-10">
-                <span className="desk-metric-label block">{displayLabel}</span>
-                <span className="desk-metric-value block font-mono">{item.val}</span>
-                <span className={`desk-metric-delta block ${isPositive ? 'is-up' : 'is-down'}`}>
-                  {isPositive ? '↑' : '↓'} {item.delta}
-                </span>
-              </div>
-              <div className="w-12 h-10 sm:w-16 sm:h-14 flex-shrink-0 relative max-[380px]:hidden">
-                {item.sparkline && item.sparkline.length >= 2 ? (
-                  <SparklineSVG positive={isPositive} data={item.sparkline} />
-                ) : (
-                  <div className="absolute top-0 right-0 w-full h-full opacity-70">
-                    <MiniSparkline positive={isPositive} />
-                  </div>
-                )}
-              </div>
-            </div>
+              label={displayLabel}
+              value={item.val}
+              delta={item.delta}
+              positive={isPositive}
+              accent={getIndiaAccent(displayLabel)}
+              tilesLive={tilesLive}
+              tilesUpdating={tilesUpdating}
+              onActivate={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
+              sparkline={
+                <div className="w-12 h-10 sm:w-16 sm:h-14 flex-shrink-0 relative max-[380px]:hidden">
+                  {item.sparkline && item.sparkline.length >= 2 ? (
+                    <SparklineSVG positive={isPositive} data={item.sparkline} />
+                  ) : (
+                    <div className="absolute top-0 right-0 w-full h-full opacity-70">
+                      <MiniSparkline positive={isPositive} />
+                    </div>
+                  )}
+                </div>
+              }
+            />
           );
         })}
       </div>
@@ -1986,7 +2003,6 @@ function SparklineSVG({ positive, data }: { positive: boolean; data?: number[] }
   const color = positive ? '#10b981' : '#ef4444';
   const fillUrl = 'url(#' + id + ')';
 
-  // Need at least 2 points to draw a meaningful line
   if (!data || data.length < 2) return null;
 
   const W = 100;
@@ -2003,25 +2019,30 @@ function SparklineSVG({ positive, data }: { positive: boolean; data?: number[] }
     return [x, y] as const;
   });
 
-  // Smooth curve via Catmull-Rom spline
   const pathD = catmullRomToBezier(points);
   const areaD = `${pathD} L ${points[points.length - 1][0].toFixed(2)},${H} L ${points[0][0].toFixed(2)},${H} Z`;
   const lastPoint = points[points.length - 1];
 
   return (
-    <svg className="absolute top-0 right-0 w-full h-full opacity-70" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+    <svg className="absolute top-0 right-0 w-full h-full opacity-70 desk-sparkline" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.5" />
           <stop offset="100%" stopColor={color} stopOpacity="0.05" />
         </linearGradient>
       </defs>
-      {/* Area fill */}
-      <path d={areaD} fill={fillUrl} />
-      {/* Smooth line with Catmull-Rom spline */}
-      <path d={pathD} pathLength={1} stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      {/* End dot */}
-      <circle cx={lastPoint[0]} cy={lastPoint[1]} r="2" fill={color} stroke="white" strokeWidth="1" />
+      <path d={areaD} fill={fillUrl} className="desk-spark-fill" />
+      <path
+        d={pathD}
+        pathLength={1}
+        stroke={color}
+        strokeWidth="1.5"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="desk-spark-stroke"
+      />
+      <circle cx={lastPoint[0]} cy={lastPoint[1]} r="2" fill={color} stroke="white" strokeWidth="1" className="desk-spark-dot" />
     </svg>
   );
 }
@@ -2268,6 +2289,7 @@ export default function IrosMasterAdvancedTerminal() {
           )}
         </header>
 
+        <LayoutGroup>
         <nav className="terminal-tabs app-tabbar sticky top-0 z-30 flex gap-1.5 p-1.5 overflow-x-auto desk-scroll-x" role="tablist" aria-label="Desk views">
           {([
             { key: 'marketSnapshot' as TabKey, label: 'SNAPSHOT' },
@@ -2286,10 +2308,19 @@ export default function IrosMasterAdvancedTerminal() {
                 activeTab === tab.key ? 'is-active' : ''
               }`}
             >
-              {tab.label}
+              {activeTab === tab.key && (
+                <motion.span
+                  layoutId="desk-tab-indicator"
+                  className="desk-tab-indicator"
+                  transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.85 }}
+                  aria-hidden
+                />
+              )}
+              <span className="relative z-10">{tab.label}</span>
             </button>
           ))}
         </nav>
+        </LayoutGroup>
 
         <main className="app-main min-w-0">
         {activeTab === 'marketSnapshot' && (

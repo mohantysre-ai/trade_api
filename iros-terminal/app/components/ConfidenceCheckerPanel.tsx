@@ -1,4 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { LiveTickNumber } from "@/lib/desk-motion";
+import { deskTransition } from "@/lib/motion-tokens";
 
 type CriterionStatus = "PASS" | "FAIL" | "INSUFFICIENT";
 
@@ -34,17 +37,18 @@ type ConfidenceCheckerPanelProps = {
 };
 
 function ConfidenceGauge({ score }: { score: number }) {
+  const reduce = useReducedMotion();
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
-  const color = score >= 80 ? "#22c55e" : score >= 60 ? "#f59e0b" : score >= 40 ? "#3b82f6" : "#ef4444";
+  const color = score >= 80 ? "#22c55e" : score >= 60 ? "#E2A33D" : score >= 40 ? "#3b82f6" : "#ef4444";
 
   return (
     <div className="flex flex-col items-center">
       <div className="relative w-[130px] h-[130px]">
         <svg width="130" height="130" className="transform -rotate-90 absolute inset-0">
           <circle cx="65" cy="65" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="8" />
-          <circle
+          <motion.circle
             cx="65"
             cy="65"
             r={radius}
@@ -53,12 +57,14 @@ function ConfidenceGauge({ score }: { score: number }) {
             strokeWidth="8"
             strokeLinecap="round"
             strokeDasharray={circumference}
-            strokeDashoffset={offset}
+            initial={false}
+            animate={{ strokeDashoffset: offset }}
+            transition={deskTransition("gauge", reduce)}
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-black tabular-nums leading-none" style={{ color }}>
-            {score.toFixed(0)}
+          <span style={{ color }}>
+            <LiveTickNumber value={score.toFixed(0)} className="text-3xl font-black leading-none" />
           </span>
           <span className="text-[9px] uppercase tracking-wider text-slate-400 mt-1">Conviction</span>
         </div>

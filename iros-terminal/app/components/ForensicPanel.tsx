@@ -31,6 +31,8 @@ import {
   type WinEdgeResult,
 } from '@/lib/intelligence-summary';
 import type { DhanSwingPicksPayload } from '@/lib/market-api';
+import { DeskCardTilt, DeskGaugeFill, IcStatusChip, LiveTickNumber, motion, useReducedMotion } from '@/lib/desk-motion';
+import { duration } from '@/lib/motion-tokens';
 
 const MAX_TRENDLYNE_CARDS = 12;
 const TRENDLYNE_BATCH_SIZE = 4;
@@ -68,6 +70,7 @@ function catmullRomToBezier(points: readonly (readonly [number, number])[]): str
 function StockSparklineSVG({ data }: { data: number[] }) {
   const [id] = useState(() => `asset-spk-${++assetSparkIdCounter}`);
   const [glowId] = useState(() => `asset-glow-${++assetSparkIdCounter}`);
+  const reduce = useReducedMotion();
   if (!data || data.length < 2) return null;
 
   const first = data[0];
@@ -88,32 +91,21 @@ function StockSparklineSVG({ data }: { data: number[] }) {
     return [x, y] as const;
   });
 
-  // Smooth curve via Catmull-Rom spline
   const pathD = catmullRomToBezier(points);
   const areaD = `${pathD} L ${points[points.length - 1][0].toFixed(2)},${H} L ${points[0][0].toFixed(2)},${H} Z`;
   const lastPt = points[points.length - 1];
-
-  // Grid lines for reference
   const gridLines = [0.25, 0.5, 0.75].map((f) => pad + f * (H - pad * 2));
-
-  /* min/max labels */
   const minIdx = data.indexOf(Math.min(...data));
   const maxIdx = data.indexOf(Math.max(...data));
 
   return (
-    <svg
-      className="w-full h-14"
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="xMidYMid meet"
-    >
+    <svg className="w-full h-14" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
       <defs>
-        {/* Rich multi-stop gradient for area fill */}
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.4" />
           <stop offset="50%" stopColor={color} stopOpacity="0.15" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
-        {/* Glow filter for the stroke — expanded region so pulse/glow aren't cropped */}
         <filter id={glowId} x="-40%" y="-40%" width="180%" height="180%">
           <feGaussianBlur stdDeviation="1.2" result="blur" />
           <feMerge>
@@ -122,8 +114,6 @@ function StockSparklineSVG({ data }: { data: number[] }) {
           </feMerge>
         </filter>
       </defs>
-
-      {/* Subtle grid lines */}
       {gridLines.map((gy, i) => (
         <line
           key={`grid-${i}`}
@@ -136,12 +126,14 @@ function StockSparklineSVG({ data }: { data: number[] }) {
           strokeDasharray="2,3"
         />
       ))}
-
-      {/* Area fill with gradient */}
-      <path d={areaD} fill={`url(#${id})`} />
-
-      {/* Smooth line with glow */}
-      <path
+      <motion.path
+        d={areaD}
+        fill={`url(#${id})`}
+        initial={reduce ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: reduce ? 0.01 : duration.sparkDraw * 0.45, delay: reduce ? 0 : 0.35 }}
+      />
+      <motion.path
         d={pathD}
         stroke={color}
         strokeWidth="1.2"
@@ -149,28 +141,20 @@ function StockSparklineSVG({ data }: { data: number[] }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         filter={`url(#${glowId})`}
-        className="sparkline-draw"
-        style={{
-          strokeDasharray: 300,
-          strokeDashoffset: 0,
-        }}
+        pathLength={1}
+        initial={reduce ? false : { pathLength: 0, opacity: 0.85 }}
+        animate={{ pathLength: 1, opacity: 1 }}
+        transition={{ duration: reduce ? 0.01 : duration.sparkDraw, ease: [0.16, 1, 0.3, 1] }}
       />
-
-      {/* High dot */}
       <circle cx={points[maxIdx][0]} cy={points[maxIdx][1]} r="1.5" fill={color} stroke="white" strokeWidth="0.8" opacity="0.6" />
-      {/* Low dot */}
       <circle cx={points[minIdx][0]} cy={points[minIdx][1]} r="1.5" fill={color} stroke="white" strokeWidth="0.8" opacity="0.6" />
-
-      {/* Pulsing dot at the latest price point */}
       <circle cx={lastPt[0]} cy={lastPt[1]} r="2.5" fill={color} stroke="white" strokeWidth="1.2">
-        <animate attributeName="r" values="2.5;3.5;2.5" dur="2s" repeatCount="indefinite" />
-        <animate attributeName="opacity" values="1;0.7;1" dur="2s" repeatCount="indefinite" />
-      </circle>
-
-      {/* Outer pulse ring */}
-      <circle cx={lastPt[0]} cy={lastPt[1]} r="2.5" fill="none" stroke={color} strokeWidth="0.8" opacity="0.5">
-        <animate attributeName="r" values="2.5;6;2.5" dur="2s" repeatCount="indefinite" />
-        <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite" />
+        {!reduce && (
+          <>
+            <animate attributeName="r" values="2.5;3.5;2.5" dur="2s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="1;0.7;1" dur="2s" repeatCount="indefinite" />
+          </>
+        )}
       </circle>
     </svg>
   );
@@ -585,26 +569,17 @@ function useTrendlyneSummaries(tickers: string[], maxCards = MAX_TRENDLYNE_CARDS
 function StrengthMeter({ score }: { score: number }) {
   const bars = scoreToStrengthBars(score);
   const label = bars === 0 ? '—' : `${bars}/5`;
+  const pct = Math.max(0, Math.min(100, (bars / 5) * 100));
+  const tone =
+    bars >= 4 ? 'bg-emerald-500' : bars >= 3 ? 'bg-[var(--terminal-marigold)]' : 'bg-slate-400';
   return (
-    <div className="flex items-center gap-1.5" title={`Setup strength ${label} (score ${score.toFixed(1)})`}>
+    <div className="flex items-center gap-1.5 min-w-[7.5rem]" title={`Setup strength ${label} (score ${score.toFixed(1)})`}>
       <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400">Strength</span>
-      <div className="flex items-center gap-0.5">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div
-            key={i}
-            className={`w-2 h-2.5 rounded-sm ${
-              i <= bars
-                ? bars >= 4
-                  ? 'bg-emerald-500'
-                  : bars >= 3
-                    ? 'bg-amber-400'
-                    : 'bg-slate-400'
-                : 'bg-slate-200'
-            }`}
-          />
-        ))}
-      </div>
-      <span className="text-[8px] font-bold tabular-nums text-slate-500">{score > 0 ? score.toFixed(1) : '—'}</span>
+      <DeskGaugeFill pct={pct} className="w-14" toneClass={tone} />
+      <LiveTickNumber
+        value={score > 0 ? score.toFixed(1) : '—'}
+        className="text-[8px] font-bold text-slate-500"
+      />
     </div>
   );
 }
@@ -1330,15 +1305,25 @@ export default function ForensicPanel({
               : null;
 
           return (
-            <div
+            <DeskCardTilt
               key={row.ticker}
               onClick={() => onSelect?.(row.ticker)}
-              className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm hover:shadow-md transition-all group cursor-pointer"
-              style={{ borderLeft: `3px solid ${styles.border}` }}
+              className="glass-card relative overflow-hidden p-2.5 group cursor-pointer"
+              style={{ borderLeft: `3px solid ${styles.border}`, '--tile-accent': styles.border } as React.CSSProperties}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open analysis for ${row.ticker}`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelect?.(row.ticker);
+                }
+              }}
             >
               <div
-                className="absolute -top-4 -right-4 w-12 h-12 rounded-full opacity-15 blur-2xl"
+                className="absolute -top-4 -right-4 w-12 h-12 rounded-full opacity-15 blur-2xl pointer-events-none"
                 style={{ backgroundColor: styles.glow }}
+                aria-hidden
               />
 
               {/* Header: ticker + conviction tier + win edge */}
@@ -1365,55 +1350,18 @@ export default function ForensicPanel({
                 </div>
               </div>
 
-              {/* Portfolio guidance reason */}
-              <p className="text-[10px] leading-snug text-slate-600 mb-1 relative z-10 line-clamp-2">
-                {reason}
-              </p>
-
-              {/* Source chips: QUANT / DHAN / TRENDLYNE */}
-              {sourceChips.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-1 relative z-10">
-                  {sourceChips.map((chip) => (
-                    <span
-                      key={`${row.ticker}-src-${chip.label}`}
-                      className={`inline-flex items-center border px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-wider ${matrixSourceChipClass(chip.label, chip.active)}`}
-                    >
-                      {chip.label}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Trendlyne / drawer intelligence chips */}
-              {intelligence.chips.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-1.5 relative z-10">
-                  {intelligence.chips.map((chip) => (
-                    <span
-                      key={`${row.ticker}-${chip.label}`}
-                      className={`inline-flex items-center border px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide ${chipToneClass(chip.tone)}`}
-                    >
-                      {chip.label}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {showTrendlyneHint && intelligence.chips.length === 0 && (
-                <p className="text-[8px] text-slate-400 mb-1.5 relative z-10">
-                  Open card for full Trendlyne analysis
-                </p>
-              )}
-
               {/* Price + day/period change */}
               <div className="flex items-baseline gap-1.5 mb-1.5 relative z-10">
-                <span className="desk-metric-value tabular-nums">{priceVal}</span>
+                <LiveTickNumber value={priceVal} className="desk-metric-value" />
                 {displayChange && (
-                  <span
-                    className={`text-[11px] font-bold tabular-nums ${displayChange.positive ? 'text-emerald-600' : 'text-red-500'}`}
-                  >
-                    {displayChange.label}
-                    {!period && dayPct ? ' today' : ''}
-                  </span>
+                  <LiveTickNumber
+                    value={displayChange.label}
+                    className={`text-[11px] font-bold ${displayChange.positive ? 'text-emerald-600' : 'text-red-500'}`}
+                  />
                 )}
+                {displayChange && !period && dayPct ? (
+                  <span className="text-[10px] text-slate-400">today</span>
+                ) : null}
               </div>
 
               {/* Full-width chart band + timeframe pills */}
@@ -1424,20 +1372,10 @@ export default function ForensicPanel({
                 onFlagChange={(f) => setFlag(row.ticker, f)}
               />
 
-              {/* Secondary: strength meter + risk badge */}
+              {/* Core: strength meter + risk badge */}
               <div className="flex items-center justify-between gap-2 mt-1 relative z-10 flex-wrap">
                 <StrengthMeter score={row.score} />
                 <div className="flex items-center gap-1 flex-wrap justify-end">
-                  {row.deskIcDecision && String(row.deskIcDecision).toUpperCase() === 'REJECT' && (
-                    <span className="inline-block border border-red-200 bg-red-50 text-red-700 px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap font-black uppercase">
-                      Desk IC REJECT
-                    </span>
-                  )}
-                  {row.deskIcDecision && String(row.deskIcDecision).toUpperCase() === 'HOLD_FOR_DATA' && (
-                    <span className="inline-block border border-amber-200 bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap font-black uppercase">
-                      Desk IC HOLD
-                    </span>
-                  )}
                   {row.riskFlag && !row.isVolumePad && !row.riskFlag.toUpperCase().includes('VOLUME_FILL') && (
                     <span className={`inline-block border px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap font-black uppercase ${flagClass(row.riskFlag)}`}>
                       {row.riskFlag}
@@ -1446,63 +1384,129 @@ export default function ForensicPanel({
                 </div>
               </div>
 
-              {/* Optional real allocation / W/L / R:R — facts only */}
-              {(showKelly || showWl || dhanRr !== null || rrEstimate) && (
-                <div className="flex items-center gap-1.5 mt-1 text-[9px] text-slate-400 relative z-10 tabular-nums flex-wrap">
-                  {dhanRr !== null && (
-                    <span>
-                      R:R <span className="font-semibold text-violet-700">{dhanRr.toFixed(1)}:1</span>
-                      <span className="text-violet-400"> DHAN</span>
-                    </span>
+              <div className="desk-card-disclose relative z-10">
+                <div className="desk-card-disclose-inner">
+                  <p className="text-[10px] leading-snug text-slate-600 mb-1 line-clamp-2 pt-1">
+                    {reason}
+                  </p>
+
+                  {sourceChips.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-1">
+                      {sourceChips.map((chip) => (
+                        <span
+                          key={`${row.ticker}-src-${chip.label}`}
+                          className={`inline-flex items-center border px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-wider ${matrixSourceChipClass(chip.label, chip.active)}`}
+                        >
+                          {chip.label}
+                        </span>
+                      ))}
+                    </div>
                   )}
-                  {dhanRr === null && rrEstimate && (
-                    <span className="text-slate-500">{rrEstimate.display}</span>
+
+                  {intelligence.chips.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-1">
+                      {intelligence.chips.map((chip) => (
+                        <span
+                          key={`${row.ticker}-${chip.label}`}
+                          className={`inline-flex items-center border px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide ${chipToneClass(chip.tone)}`}
+                        >
+                          {chip.label}
+                        </span>
+                      ))}
+                    </div>
                   )}
-                  {showKelly && (
-                    <span>
-                      Alloc <span className="font-semibold text-slate-600">{row.kellyPolicy}</span>
-                    </span>
+                  {showTrendlyneHint && intelligence.chips.length === 0 && (
+                    <p className="text-[8px] text-slate-400 mb-1">
+                      Open card for full Trendlyne analysis
+                    </p>
                   )}
-                  {showKelly && showWl && <span className="text-slate-500">·</span>}
-                  {showWl && (
-                    <span>
-                      W/L <span className="font-semibold text-slate-600">{row.winLossRatio}</span>
-                    </span>
+
+                  {(row.deskIcDecision && ['REJECT', 'HOLD_FOR_DATA', 'APPROVE'].includes(String(row.deskIcDecision).toUpperCase())) && (
+                    <div className="flex items-center gap-1 flex-wrap mb-1">
+                      {row.deskIcDecision && String(row.deskIcDecision).toUpperCase() === 'REJECT' && (
+                        <IcStatusChip
+                          status="REJECT"
+                          className="inline-block border border-red-200 bg-red-50 text-red-700 px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap font-black uppercase"
+                        >
+                          Desk IC REJECT
+                        </IcStatusChip>
+                      )}
+                      {row.deskIcDecision && String(row.deskIcDecision).toUpperCase() === 'HOLD_FOR_DATA' && (
+                        <IcStatusChip
+                          status="HOLD"
+                          className="inline-block border border-amber-200 bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap font-black uppercase"
+                        >
+                          Desk IC HOLD
+                        </IcStatusChip>
+                      )}
+                      {row.deskIcDecision && String(row.deskIcDecision).toUpperCase() === 'APPROVE' && (
+                        <IcStatusChip
+                          status="APPROVE"
+                          className="inline-block border border-emerald-200 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap font-black uppercase"
+                        >
+                          Desk IC PASS
+                        </IcStatusChip>
+                      )}
+                    </div>
+                  )}
+
+                  {(showKelly || showWl || dhanRr !== null || rrEstimate) && (
+                    <div className="flex items-center gap-1.5 text-[9px] text-slate-400 tabular-nums flex-wrap">
+                      {dhanRr !== null && (
+                        <span>
+                          R:R <span className="font-semibold text-violet-700">{dhanRr.toFixed(1)}:1</span>
+                          <span className="text-violet-400"> DHAN</span>
+                        </span>
+                      )}
+                      {dhanRr === null && rrEstimate && (
+                        <span className="text-slate-500">{rrEstimate.display}</span>
+                      )}
+                      {showKelly && (
+                        <span>
+                          Alloc <span className="font-semibold text-slate-600">{row.kellyPolicy}</span>
+                        </span>
+                      )}
+                      {showKelly && showWl && <span className="text-slate-500">·</span>}
+                      {showWl && (
+                        <span>
+                          W/L <span className="font-semibold text-slate-600">{row.winLossRatio}</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {sizingHint && (
+                    <p className="text-[9px] text-slate-500 mt-0.5 tabular-nums" title={sizingHint.source}>
+                      {sizingHint.display}
+                    </p>
+                  )}
+
+                  {(typeof row.promoterPct === 'number' || (typeof row.bulkDealValueCr === 'number' && row.bulkDealValueCr > 0)) && (
+                    <div className="flex items-center gap-1.5 mt-1 text-[9px] text-slate-400 tabular-nums flex-wrap">
+                      {typeof row.promoterPct === 'number' && (
+                        <span>
+                          Promoter{' '}
+                          <span className={`font-semibold ${row.promoterPct >= 60 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {row.promoterPct.toFixed(1)}%
+                          </span>
+                        </span>
+                      )}
+                      {typeof row.promoterPct === 'number' && typeof row.bulkDealValueCr === 'number' && row.bulkDealValueCr > 0 && (
+                        <span className="text-slate-500">·</span>
+                      )}
+                      {typeof row.bulkDealValueCr === 'number' && row.bulkDealValueCr > 0 && (
+                        <span>
+                          Bulk{' '}
+                          <span className={`font-semibold ${row.bulkDealSignal ? 'text-emerald-600' : 'text-slate-500'}`}>
+                            {row.bulkDealValueCr.toFixed(1)} Cr
+                          </span>
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-
-              {sizingHint && (
-                <p className="text-[9px] text-slate-500 mt-0.5 relative z-10 tabular-nums" title={sizingHint.source}>
-                  {sizingHint.display}
-                </p>
-              )}
-
-              {/* Promoter / Bulk Deal — quiet secondary row when present */}
-              {(typeof row.promoterPct === 'number' || (typeof row.bulkDealValueCr === 'number' && row.bulkDealValueCr > 0)) && (
-                <div className="flex items-center gap-1.5 mt-1 text-[9px] text-slate-400 relative z-10 tabular-nums flex-wrap">
-                  {typeof row.promoterPct === 'number' && (
-                    <span>
-                      Promoter{' '}
-                      <span className={`font-semibold ${row.promoterPct >= 60 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                        {row.promoterPct.toFixed(1)}%
-                      </span>
-                    </span>
-                  )}
-                  {typeof row.promoterPct === 'number' && typeof row.bulkDealValueCr === 'number' && row.bulkDealValueCr > 0 && (
-                    <span className="text-slate-500">·</span>
-                  )}
-                  {typeof row.bulkDealValueCr === 'number' && row.bulkDealValueCr > 0 && (
-                    <span>
-                      Bulk{' '}
-                      <span className={`font-semibold ${row.bulkDealSignal ? 'text-emerald-600' : 'text-slate-500'}`}>
-                        {row.bulkDealValueCr.toFixed(1)} Cr
-                      </span>
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
+              </div>
+            </DeskCardTilt>
           );
         })}
         {!portfolioDisplayRows.length && (

@@ -15,14 +15,18 @@ export type DeskFontSize = "sm" | "md" | "lg" | "xl";
 type DeskPrefs = {
   theme: DeskTheme;
   fontSize: DeskFontSize;
+  performanceMode: boolean;
   setTheme: (theme: DeskTheme) => void;
   toggleTheme: () => void;
   setFontSize: (size: DeskFontSize) => void;
   bumpFont: (dir: -1 | 1) => void;
+  setPerformanceMode: (on: boolean) => void;
+  togglePerformanceMode: () => void;
 };
 
 const STORAGE_THEME = "iros-desk-theme";
 const STORAGE_FONT = "iros-desk-font";
+const STORAGE_PERF = "iros-desk-perf";
 const FONT_ORDER: DeskFontSize[] = ["sm", "md", "lg", "xl"];
 
 const DeskPrefsContext = createContext<DeskPrefs | null>(null);
@@ -41,23 +45,32 @@ function readStoredFont(): DeskFontSize {
   return "md";
 }
 
-function applyDomPrefs(theme: DeskTheme, fontSize: DeskFontSize) {
+function readStoredPerf(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(STORAGE_PERF) === "1";
+}
+
+function applyDomPrefs(theme: DeskTheme, fontSize: DeskFontSize, performanceMode: boolean) {
   const root = document.documentElement;
   root.setAttribute("data-theme", theme);
   root.setAttribute("data-font", fontSize);
+  root.setAttribute("data-perf", performanceMode ? "1" : "0");
   root.style.colorScheme = theme;
 }
 
 export function DeskPrefsProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<DeskTheme>("dark");
   const [fontSize, setFontState] = useState<DeskFontSize>("md");
+  const [performanceMode, setPerfState] = useState(false);
 
   useLayoutEffect(() => {
     const nextTheme = readStoredTheme();
     const nextFont = readStoredFont();
+    const nextPerf = readStoredPerf();
     setThemeState(nextTheme);
     setFontState(nextFont);
-    applyDomPrefs(nextTheme, nextFont);
+    setPerfState(nextPerf);
+    applyDomPrefs(nextTheme, nextFont, nextPerf);
   }, []);
 
   const setTheme = useCallback((next: DeskTheme) => {
@@ -73,12 +86,27 @@ export function DeskPrefsProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.setAttribute("data-font", next);
   }, []);
 
+  const setPerformanceMode = useCallback((on: boolean) => {
+    setPerfState(on);
+    window.localStorage.setItem(STORAGE_PERF, on ? "1" : "0");
+    document.documentElement.setAttribute("data-perf", on ? "1" : "0");
+  }, []);
+
   const toggleTheme = useCallback(() => {
     setThemeState((prev) => {
       const next = prev === "dark" ? "light" : "dark";
       window.localStorage.setItem(STORAGE_THEME, next);
       document.documentElement.setAttribute("data-theme", next);
       document.documentElement.style.colorScheme = next;
+      return next;
+    });
+  }, []);
+
+  const togglePerformanceMode = useCallback(() => {
+    setPerfState((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(STORAGE_PERF, next ? "1" : "0");
+      document.documentElement.setAttribute("data-perf", next ? "1" : "0");
       return next;
     });
   }, []);
@@ -94,8 +122,28 @@ export function DeskPrefsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ theme, fontSize, setTheme, toggleTheme, setFontSize, bumpFont }),
-    [theme, fontSize, setTheme, toggleTheme, setFontSize, bumpFont]
+    () => ({
+      theme,
+      fontSize,
+      performanceMode,
+      setTheme,
+      toggleTheme,
+      setFontSize,
+      bumpFont,
+      setPerformanceMode,
+      togglePerformanceMode,
+    }),
+    [
+      theme,
+      fontSize,
+      performanceMode,
+      setTheme,
+      toggleTheme,
+      setFontSize,
+      bumpFont,
+      setPerformanceMode,
+      togglePerformanceMode,
+    ],
   );
 
   return <DeskPrefsContext.Provider value={value}>{children}</DeskPrefsContext.Provider>;

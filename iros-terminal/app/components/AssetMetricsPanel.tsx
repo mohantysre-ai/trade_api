@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { DeskGaugeFill, motion } from '@/lib/desk-motion';
 
 /* ── Types (API facts only) ─────────────────────────────────────────── */
 
@@ -284,22 +285,28 @@ function OrbBand({
   return (
     <div className="space-y-1">
       <div className="text-[8px] uppercase tracking-wider text-slate-500">ORB band</div>
-      <div className="relative h-5 rounded bg-slate-100 border border-slate-200 overflow-hidden">
-        <div
+      <div className="relative h-5 rounded glass-flat overflow-hidden">
+        <motion.div
           className="absolute top-0 bottom-0 bg-cyan-200/70 border-x border-cyan-500/50"
-          style={{ left: `${lowPct}%`, width: `${bandW}%` }}
+          initial={false}
+          animate={{ left: `${lowPct}%`, width: `${bandW}%` }}
+          transition={{ type: 'spring', stiffness: 260, damping: 28 }}
         />
         {vwap != null && !Number.isNaN(vwap) && (
-          <div
+          <motion.div
             className="absolute top-0 bottom-0 w-0.5 bg-violet-500"
-            style={{ left: `${pctOf(vwap)}%` }}
+            initial={false}
+            animate={{ left: `${pctOf(vwap)}%` }}
+            transition={{ type: 'spring', stiffness: 280, damping: 30 }}
             title={`VWAP ${vwap}`}
           />
         )}
         {ltp != null && !Number.isNaN(ltp) && (
-          <div
+          <motion.div
             className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-slate-900 border border-white"
-            style={{ left: `calc(${pctOf(ltp)}% - 4px)` }}
+            initial={false}
+            animate={{ left: `calc(${pctOf(ltp)}% - 4px)` }}
+            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
             title={`LTP ${ltp}`}
           />
         )}
@@ -495,8 +502,20 @@ async function commitSession(force = false): Promise<SessionResponse & { error?:
 /* ── Subcomponents ──────────────────────────────────────────────────── */
 
 function StatusPill({ children, tone }: { children: React.ReactNode; tone?: string }) {
+  const label = String(children ?? '');
+  const liveish = /LIVE|RUNNING|OPEN|POLL|LOCKED/i.test(label);
+  const warnish = /STALE|WARN|CLOSED|HOLD/i.test(label);
+  const errish = /ERROR|FAIL|REJECT/i.test(label);
+  const dotClass = errish
+    ? 'desk-breathe-dot is-error'
+    : warnish
+      ? 'desk-breathe-dot is-warn'
+      : liveish
+        ? 'desk-breathe-dot'
+        : 'desk-breathe-dot';
   return (
-    <span className={`desk-pill ${tone || 'desk-pill--muted'}`}>
+    <span className={`desk-pill glass-pill inline-flex items-center gap-1.5 ${tone || 'desk-pill--muted'}`}>
+      {(liveish || warnish || errish) && <span className={dotClass} aria-hidden />}
       {children}
     </span>
   );
@@ -1023,7 +1042,7 @@ export default function AssetMetricsPanel({
           </div>
 
           <div className="space-y-3">
-            <div className="bg-white/80 border border-slate-200 rounded-xl p-3 shadow-sm">
+            <div className="glass-overlay rounded-xl p-3">
               <h3 className="desk-panel-title text-slate-900 mb-2">DETAIL</h3>
               {!selectedRow ? (
                 <p className="text-[10px] text-slate-400">Select a symbol</p>
@@ -1096,36 +1115,55 @@ export default function AssetMetricsPanel({
                   {selectedRow.factorBreakdown && (
                     <div className="mt-2 border-t border-slate-100 pt-2">
                       <div className="text-[8px] uppercase tracking-wider text-slate-500 mb-1">Factor breakdown</div>
-                      <div className="space-y-1 max-h-40 overflow-y-auto">
-                        {Object.entries(selectedRow.factorBreakdown).map(([k, c]) => (
-                          <div key={k} className="flex justify-between tabular-nums gap-2">
-                            <span className="text-slate-600">
-                              {k}{c.rated ? '' : ' · UNRATED'}
-                              {k === 'relativeStrength' && c.rsVsIndexPct != null
-                                ? ` · RS ${pct(c.rsVsIndexPct, 1)}`
-                                : ''}
-                              {k === 'momentum' && c.overextended
-                                ? ' · OVEREXTENDED'
-                                : ''}
-                              {k === 'vwap' && c.vwapMode
-                                ? ` · ${c.vwapMode}`
-                                : ''}
-                              {k === 'volume' && c.rvolTime != null
-                                ? ` · rvolT ${dash(c.rvolTime, 2)}×`
-                                : ''}
-                              {k === 'breakout' && c.orbHigh != null && c.orbLow != null
-                                ? ` · ORB ${dash(c.orbLow)}–${dash(c.orbHigh)}`
-                                : ''}
-                              {k === 'breakout' && c.inPlay
-                                ? ' · IN-PLAY'
-                                : ''}
-                              {k === 'breakout' && c.orbVelocityPct != null
-                                ? ` · vel ${pct(c.orbVelocityPct, 1)}`
-                                : ''}
-                            </span>
-                            <span className="font-semibold shrink-0 text-slate-900">{c.rated ? dash(c.score, 1) : '—'}</span>
-                          </div>
-                        ))}
+                      <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                        {Object.entries(selectedRow.factorBreakdown).map(([k, c], i) => {
+                          const scorePct = c.rated
+                            ? Math.max(0, Math.min(100, Number(c.score) <= 1 ? Number(c.score) * 100 : Number(c.score)))
+                            : 0;
+                          return (
+                            <motion.div
+                              key={k}
+                              className="space-y-0.5"
+                              initial={{ opacity: 0, y: 4 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: i * 0.04, duration: 0.28 }}
+                            >
+                              <div className="flex justify-between tabular-nums gap-2">
+                                <span className="text-slate-600">
+                                  {k}{c.rated ? '' : ' · UNRATED'}
+                                  {k === 'relativeStrength' && c.rsVsIndexPct != null
+                                    ? ` · RS ${pct(c.rsVsIndexPct, 1)}`
+                                    : ''}
+                                  {k === 'momentum' && c.overextended
+                                    ? ' · OVEREXTENDED'
+                                    : ''}
+                                  {k === 'vwap' && c.vwapMode
+                                    ? ` · ${c.vwapMode}`
+                                    : ''}
+                                  {k === 'volume' && c.rvolTime != null
+                                    ? ` · rvolT ${dash(c.rvolTime, 2)}×`
+                                    : ''}
+                                  {k === 'breakout' && c.orbHigh != null && c.orbLow != null
+                                    ? ` · ORB ${dash(c.orbLow)}–${dash(c.orbHigh)}`
+                                    : ''}
+                                  {k === 'breakout' && c.inPlay
+                                    ? ' · IN-PLAY'
+                                    : ''}
+                                  {k === 'breakout' && c.orbVelocityPct != null
+                                    ? ` · vel ${pct(c.orbVelocityPct, 1)}`
+                                    : ''}
+                                </span>
+                                <span className="font-semibold shrink-0 text-slate-900">{c.rated ? dash(c.score, 1) : '—'}</span>
+                              </div>
+                              {c.rated && (
+                                <DeskGaugeFill
+                                  pct={scorePct}
+                                  toneClass={scorePct >= 60 ? 'bg-emerald-500' : scorePct >= 40 ? 'bg-amber-500' : 'bg-slate-400'}
+                                />
+                              )}
+                            </motion.div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
