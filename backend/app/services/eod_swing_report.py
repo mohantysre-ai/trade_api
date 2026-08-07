@@ -11,7 +11,7 @@ from typing import Any
 from .trade_outcome import load_fixed_trade_plan, get_alert_history, _today_ist
 from .eod_reference import get_close_mark_price, get_reference_price, generate_swing_analysis
 from .eod_intraday_report import _build_levels_diagnostic, _exit_reason_from_scale_eval
-from .exit_plan import attach_exit_plan, blended_pnl_from_state
+from .exit_plan import attach_exit_plan, blended_pnl_from_state, format_scale_progress
 
 log = logging.getLogger(__name__)
 
@@ -307,7 +307,7 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
         if isinstance(pick.get("exitState"), dict) and not work.get("exitState"):
             work["exitState"] = pick["exitState"]
         total_pnl, avg_exit, eval_result = blended_pnl_from_state(
-            work, eod_price, after_close=True
+            work, eod_price, after_close=True, day_high=day_high, day_low=day_low
         )
         if eval_result:
             used_scale = True
@@ -325,6 +325,13 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
                 "rMultiple": eval_result.get("rMultiple"),
                 "scaleTrail": True,
                 "exitPlan": work.get("exitPlan"),
+                "scaleProgress": format_scale_progress(
+                    work.get("exitPlan") if isinstance(work.get("exitPlan"), dict) else None,
+                    exit_state if isinstance(exit_state, dict) else None,
+                    r_multiple=float(eval_result["rMultiple"])
+                    if eval_result.get("rMultiple") is not None
+                    else None,
+                ),
             }
 
     if not used_scale:

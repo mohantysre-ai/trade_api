@@ -1,0 +1,33 @@
+{
+  "name": "alphix-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Alphix Terminal — Capacitor Android & iOS shell",
+  "scripts": {
+    "sync": "npx cap sync",
+    "sync:android": "npx cap sync android",
+    "sync:ios": "npx cap sync ios",
+    "open:android": "npx cap open android",
+    "open:ios": "npx cap open ios",
+    "add:android": "npx cap add android",
+    "add:ios": "npx cap add ios",
+    "copy": "npx cap copy",
+    "doctor": "npx cap doctor",
+    "desk:local": "cross-env ALPHIX_DESK_URL=http://10.0.2.2:3000 npx cap sync",
+    "desk:prod": "cross-env ALPHIX_DESK_URL=https://sigq.in npx cap sync"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/app": "^7.1.0",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/ios": "^7.4.3",
+    "@capacitor/network": "^7.0.2",
+    "@capacitor/splash-screen": "^7.0.3",
+    "@capacitor/status-bar": "^7.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.3",
+    "cross-env": "^7.0.3",
+    "typescript": "^5.8.2"
+  }
+}

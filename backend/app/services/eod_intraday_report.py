@@ -17,7 +17,10 @@ from datetime import date
 from typing import Any
 
 from .eod_archive import load_archive
-from .exit_plan import attach_exit_plan, blended_pnl_from_state
+from .exit_plan import attach_exit_plan, blended_pnl_from_state, format_scale_progress
+import json
+import time
+import urllib.request
 
 log = logging.getLogger(__name__)
 
@@ -115,8 +118,47 @@ def _scale_trail_work_pick(pick: dict[str, Any]) -> dict[str, Any] | None:
     return work
 
 
-def _leg_pnl(pick: dict[str, Any]) -> tuple[str, float, float]:
-    """Return (exit_reason, exit_price, pnl) for one intraday pick."""
+def _yahoo_day_range(symbol: str) -> tuple[float | None, float | None, float | None]:
+    """Return (high, low, close) from Yahoo 1d bar, or (None, None, None)."""
+    sym = str(symbol or "").upper().strip()
+    if not sym:
+        return None, None, None
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}.NS?interval=1d&range=5d"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode())
+        q = data["chart"]["result"][0]["indicators"]["quote"][0]
+        i = -1
+        hi, lo, cl = q["high"][i], q["low"][i], q["close"][i]
+        if hi is None or lo is None or cl is None:
+            return None, None, None
+        return float(hi), float(lo), float(cl)
+    except Exception:
+        return None, None, None
+
+
+def _enrich_pick_day_range(pick: dict[str, Any], cache: dict[str, tuple]) -> dict[str, Any]:
+    """Attach dayHigh/dayLow/closeMark for path-aware SCALE_TRAIL EOD."""
+    out = dict(pick)
+    if out.get("dayHigh") is not None and out.get("dayLow") is not None:
+        return out
+    sym = str(out.get("symbol") or "").upper()
+    if sym not in cache:
+        cache[sym] = _yahoo_day_range(sym)
+        time.sleep(0.08)
+    hi, lo, cl = cache[sym]
+    if hi is not None:
+        out["dayHigh"] = hi
+    if lo is not None:
+        out["dayLow"] = lo
+    if cl is not None and not out.get("currentPrice"):
+        out["currentPrice"] = cl
+    return out
+
+
+def _leg_pnl(pick: dict[str, Any]) -> tuple[str, float, float, dict[str, Any]]:
+    """Return (exit_reason, exit_price, pnl, scale_meta) for one intraday pick."""
     direction = pick.get("direction", "LONG")
     entry = float(pick.get("entryPrice") or 0)
     qty = int(pick.get("approxQty") or 0)
@@ -132,7 +174,28 @@ def _leg_pnl(pick: dict[str, Any]) -> tuple[str, float, float]:
     if work is not None:
         total_pnl, avg_exit, eval_result = blended_pnl_from_state(work, ltp, after_close=True)
         if eval_result:
-            return _exit_reason_from_scale_eval(eval_result), float(avg_exit), float(total_pnl)
+            state = eval_result.get("exitState") if isinstance(eval_result.get("exitState"), dict) else {}
+            plan = work.get("exitPlan") if isinstance(work.get("exitPlan"), dict) else None
+            r_mult = eval_result.get("rMultiple")
+            scale_meta = {
+                "exitPlan": plan,
+                "exitState": state,
+                "remainingQty": eval_result.get("remainingQty"),
+                "effectiveStop": eval_result.get("effectiveStop"),
+                "realizedPnl": eval_result.get("realizedPnl"),
+                "unrealizedPnl": eval_result.get("unrealizedPnl"),
+                "rMultiple": r_mult,
+                "scaleTrail": True,
+                "scaleProgress": format_scale_progress(
+                    plan, state, r_multiple=float(r_mult) if r_mult is not None else None
+                ),
+            }
+            return (
+                _exit_reason_from_scale_eval(eval_result),
+                float(avg_exit),
+                float(total_pnl),
+                scale_meta,
+            )
 
     # Legacy binary T1/T2/SL full-qty (no exitPlan / attach failed)
     if hit_level == "t2":
@@ -150,7 +213,7 @@ def _leg_pnl(pick: dict[str, Any]) -> tuple[str, float, float]:
 
     sign = 1 if direction == "LONG" else -1
     pnl = sign * (exit_price - entry) * qty
-    return reason, exit_price, pnl
+    return reason, exit_price, pnl, {}
 
 
 def _build_levels_diagnostic(
@@ -577,7 +640,7 @@ def _load_canonical_intraday_picks(for_date: date) -> tuple[list[dict[str, Any]]
 def _apply_scorecard_to_leg(
     pick: dict[str, Any],
     card: dict[str, Any],
-) -> tuple[str, float, float]:
+) -> tuple[str, float, float, dict[str, Any]]:
     """When archive lacks a resolved exit, use institutional scorecard marks."""
     outcome_raw = str(card.get("outcome") or "").upper()
     if outcome_raw in {"STOP_HIT", "SL_HIT"}:
@@ -616,7 +679,7 @@ def _apply_scorecard_to_leg(
             # Size unknown — keep abs PnL at 0; pct comes from scorecard on the row
             pnl = 0.0
 
-    return reason, float(exit_price), float(pnl)
+    return reason, float(exit_price or 0), float(pnl or 0), {}
 
 
 def generate_intraday_eod_report(
@@ -680,18 +743,25 @@ def generate_intraday_eod_report(
     rows = []
     total_pnl = 0.0
     total_deployed = 0.0
-    hits = {"T1_HIT": 0, "T2_HIT": 0, "SL_HIT": 0, "EOD_SQUAREOFF": 0}
+    hits = {"T1_HIT": 0, "T2_HIT": 0, "SL_HIT": 0, "EOD_SQUAREOFF": 0, "TRAIL_SL_HIT": 0, "PARTIAL_SCALE": 0}
     miss_rows = 0
+    ohlc_cache: dict[str, tuple] = {}
 
     for pick in picks:
+        pick = _enrich_pick_day_range(pick, ohlc_cache)
         ticker = str(pick.get("symbol") or "").upper()
         card = scorecards.get(ticker)
 
-        if card and _outcome_unresolved(pick):
-            reason, exit_price, pnl = _apply_scorecard_to_leg(pick, card)
+        # Prefer SCALE_TRAIL blended PnL + ladder fields when attachable.
+        # Scorecard only for legacy unresolved binary legs (no inventing ladder).
+        if _scale_trail_work_pick(pick) is not None:
+            reason, exit_price, pnl, scale_meta = _leg_pnl(pick)
+            exit_source = "SCALE_TRAIL"
+        elif card and _outcome_unresolved(pick):
+            reason, exit_price, pnl, scale_meta = _apply_scorecard_to_leg(pick, card)
             exit_source = "SCORECARD"
         else:
-            reason, exit_price, pnl = _leg_pnl(pick)
+            reason, exit_price, pnl, scale_meta = _leg_pnl(pick)
             exit_source = "ARCHIVE"
 
         deployed = float(pick.get("deployedCapital") or 0)
@@ -725,7 +795,7 @@ def generate_intraday_eod_report(
             elif card and _f(card.get("realized_pnl_pct")) is not None:
                 pnl_pct = _round(_f(card.get("realized_pnl_pct")), 2)
 
-        rows.append({
+        row: dict[str, Any] = {
             "symbol": pick.get("symbol"),
             "direction": pick.get("direction") or (card.get("direction") if card else None),
             "entryPrice": pick.get("entryPrice") or (card.get("entry_price") if card else None),
@@ -741,7 +811,13 @@ def generate_intraday_eod_report(
             "missAnalysis": None,
             "missDiagnostic": diagnostic,
             "pickSource": pick.get("source") or symbol_source,
-        })
+        }
+        if isinstance(scale_meta, dict) and scale_meta:
+            row.update(scale_meta)
+        else:
+            row["scaleTrail"] = False
+            row["scaleProgress"] = None
+        rows.append(row)
 
     from .outcome_narrative import attach_outcome_narratives, build_day_lessons
 

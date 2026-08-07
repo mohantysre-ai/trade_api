@@ -62,7 +62,12 @@ type IntradayTrade = {
     rMultiple?: number | null;
     closed?: boolean;
   } | null;
-  exitPlan?: { mode?: string } | null;
+  exitPlan?: { mode?: string; legs?: { r?: number }[] } | null;
+  scaleTrail?: boolean;
+  scaleProgress?: string | null;
+  realizedPnl?: number | null;
+  unrealizedPnl?: number | null;
+  rMultiple?: number | null;
 };
 
 type IntradayReport = {
@@ -122,9 +127,9 @@ type SwingPick = {
   /** Scale-trail state — from backend SCALE_TRAIL mode */
   remainingQty?: number | null;
   effectiveStop?: number | null;
-  exitPlan?: { mode?: string } | null;
+  exitPlan?: { mode?: string; legs?: { r?: number }[] } | null;
   exitState?: {
-    legsFilled?: number[];
+    legsFilled?: Array<number | { r?: number | string }>;
     remainingQty?: number | null;
     effectiveStop?: number | null;
     realizedPnl?: number | null;
@@ -132,6 +137,11 @@ type SwingPick = {
     rMultiple?: number | null;
     closed?: boolean;
   } | null;
+  scaleTrail?: boolean;
+  scaleProgress?: string | null;
+  realizedPnl?: number | null;
+  unrealizedPnl?: number | null;
+  rMultiple?: number | null;
 };
 
 type SwingReport = {
@@ -176,6 +186,7 @@ function exitReasonBadge(reason: string) {
     case 'T2_HIT': return { bg: 'bg-emerald-100', txt: 'text-emerald-800', label: 'T2 ✓' };
     case 'T1_HIT': return { bg: 'bg-emerald-50', txt: 'text-emerald-700', label: 'T1 ✓' };
     case 'SL_HIT': return { bg: 'bg-red-100', txt: 'text-red-800', label: 'SL ✗' };
+    case 'TRAIL_SL_HIT': return { bg: 'bg-red-100', txt: 'text-red-800', label: 'TRAIL ✗' };
     case 'EOD_SQUAREOFF': return { bg: 'bg-amber-100', txt: 'text-amber-800', label: 'EOD ∎' };
     case 'PARTIAL_SCALE': return { bg: 'bg-amber-100', txt: 'text-amber-800', label: 'PARTIAL ⟳' };
     default: return { bg: 'bg-slate-100', txt: 'text-slate-600', label: reason };
@@ -187,13 +198,51 @@ function statusBadge(status: string) {
     case 'T2_HIT': return { bg: 'bg-emerald-100', txt: 'text-emerald-800', label: 'T2 ✓' };
     case 'T1_HIT': return { bg: 'bg-emerald-50', txt: 'text-emerald-700', label: 'T1 ✓' };
     case 'SL_HIT': return { bg: 'bg-red-100', txt: 'text-red-800', label: 'SL ✗' };
+    case 'TRAIL_SL_HIT': return { bg: 'bg-red-100', txt: 'text-red-800', label: 'TRAIL ✗' };
     case 'PARTIAL_SCALE': return { bg: 'bg-amber-100', txt: 'text-amber-800', label: 'PARTIAL ⟳' };
     case 'NOT_TRIGGERED': return { bg: 'bg-slate-200', txt: 'text-slate-600', label: 'Not Triggered' };
     case 'OPEN': return { bg: 'bg-blue-100', txt: 'text-blue-800', label: 'Open ◇' };
     case 'NO_MARK': return { bg: 'bg-slate-200', txt: 'text-slate-600', label: 'No mark' };
     case 'SESSION CLOSED': return { bg: 'bg-slate-200', txt: 'text-slate-700', label: 'Closed' };
+    case 'EOD_SQUAREOFF': return { bg: 'bg-amber-100', txt: 'text-amber-800', label: 'EOD ∎' };
     default: return { bg: 'bg-slate-100', txt: 'text-slate-600', label: status };
   }
+}
+
+function ScaleExitCell({
+  scaleTrail,
+  scaleProgress,
+  exitPlan,
+  exitState,
+  effectiveStop,
+  remainingQty,
+  qty,
+}: {
+  scaleTrail?: boolean;
+  scaleProgress?: string | null;
+  exitPlan?: { mode?: string } | null;
+  exitState?: { remainingQty?: number | null; effectiveStop?: number | null } | null;
+  effectiveStop?: number | null;
+  remainingQty?: number | null;
+  qty?: number | null;
+}) {
+  const isScale = Boolean(scaleTrail || exitPlan?.mode === 'SCALE_TRAIL' || scaleProgress);
+  if (!isScale) {
+    return <span className="text-[8px] text-slate-400 font-bold uppercase">BINARY</span>;
+  }
+  const rem = exitState?.remainingQty ?? remainingQty;
+  const trail = exitState?.effectiveStop ?? effectiveStop;
+  return (
+    <div className="flex flex-col items-start gap-0.5 min-w-[9rem]">
+      <span className="text-[8px] font-mono tabular-nums text-slate-700 whitespace-nowrap">
+        {scaleProgress || 'SCALE_TRAIL'}
+      </span>
+      <span className="text-[7px] text-amber-700 font-bold tabular-nums">
+        {rem != null ? `rem ${rem}${qty != null ? `/${qty}` : ''}` : null}
+        {trail != null ? `${rem != null ? ' · ' : ''}trail SL ${Number(trail).toFixed(2)}` : null}
+      </span>
+    </div>
+  );
 }
 
 function fmtInr(v: number | null | undefined, digits = 2): string {
@@ -208,7 +257,7 @@ function pnlTone(v: number | null | undefined): string {
   return Number(v) >= 0 ? 'text-emerald-600' : 'text-red-500';
 }
 
-const CLOSED_EXIT = new Set(['T1_HIT', 'T2_HIT', 'SL_HIT']);
+const CLOSED_EXIT = new Set(['T1_HIT', 'T2_HIT', 'SL_HIT', 'TRAIL_SL_HIT']);
 // PARTIAL_SCALE is intentionally excluded — the runner is still live (not fully closed).
 
 function isClosedBookLeg(exitReason: string | null | undefined): boolean {
@@ -238,22 +287,46 @@ type LivePriceRow = {
   ltp?: number | null;
   entryPrice?: number | null;
   approxQty?: number | null;
-  outcome?: { hitLevel?: string | null; ltp?: number | null; pctChange?: number | null; scaleTrail?: boolean } | null;
-  exitPlan?: { mode?: string } | null;
-  exitState?: { remainingQty?: number | null; effectiveStop?: number | null; realizedPnl?: number | null; closed?: boolean } | null;
+  status?: string | null;
+  closed?: boolean | null;
   remainingQty?: number | null;
-  effectiveStop?: number | null;
+  realizedPnl?: number | null;
+  unrealizedPnl?: number | null;
+  outcome?: { hitLevel?: string | null; ltp?: number | null; pctChange?: number | null; scaleTrail?: boolean; label?: string | null; pnl?: number | null } | null;
+  exitPlan?: { mode?: string } | null;
+  exitState?: { remainingQty?: number | null; effectiveStop?: number | null; realizedPnl?: number | null; unrealizedPnl?: number | null; closed?: boolean } | null;
+};
+
+type LiveMark = {
+  ltp: number;
+  hitLevel: string | null;
+  remainingQty?: number | null;
+  realizedPnl?: number | null;
+  unrealizedPnl?: number | null;
+  closed?: boolean | null;
+  status?: string | null;
 };
 
 type LiveMarksState = {
   marketOpen: boolean;
   updatedAt: string | null;
-  byKey: Record<string, { ltp: number; hitLevel: string | null }>;
+  byKey: Record<string, LiveMark>;
   bySymbol: Record<string, number>;
 };
 
 function markKey(symbol: string, direction?: string | null): string {
   return `${String(symbol || '').toUpperCase()}|${String(direction || 'LONG').toUpperCase()}`;
+}
+
+function isLiveHardClose(mark: LiveMark | null | undefined): boolean {
+  if (!mark) return false;
+  const hit = String(mark.hitLevel || '').toLowerCase();
+  const status = String(mark.status || '').toUpperCase();
+  if (hit === 'sl' || hit === 't1' || hit === 't2') return true;
+  if (status.includes('STOP') || status.includes('TRAIL STOP') || status.includes('TARGET 1') || status.includes('TARGET 2')) {
+    return true;
+  }
+  return Boolean(mark.closed) && !(Number(mark.remainingQty) > 0);
 }
 
 function exitReasonFromHit(hit: string | null | undefined, fallback: string): string {
@@ -332,9 +405,9 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
         <td className={`px-2 py-1.5 text-right tabular-nums ${rBad ? 'text-red-600' : 'text-slate-700'}`}>
           {fmtMissSigned(d.movePct, 2, '%')}
         </td>
-        <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{fmtMissNum(d.maePct, 2)}</td>
-        <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{fmtMissNum(d.mfePct, 2)}</td>
-        <td className="px-2 py-1.5">
+        <td className="hidden sm:table-cell px-2 py-1.5 text-right tabular-nums text-slate-600">{fmtMissNum(d.maePct, 2)}</td>
+        <td className="hidden sm:table-cell px-2 py-1.5 text-right tabular-nums text-slate-600">{fmtMissNum(d.mfePct, 2)}</td>
+        <td className="hidden sm:table-cell px-2 py-1.5">
           <span className={`desk-pill ${rootCauseTone(d.rootCause)}`}>
             {(d.rootCause || '—').replace(/_/g, ' ')}
           </span>
@@ -346,7 +419,7 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
               ? fmtMissSigned(trade.pnlPct, 2, '%')
               : fmtInr(trade.pnl, 0)}
         </td>
-        <td className="px-2 py-1.5">
+        <td className="hidden sm:table-cell px-2 py-1.5">
           <div className="flex max-w-[220px] flex-wrap gap-1">
             {d.falsePositive && <span className="desk-pill desk-pill--danger">FP</span>}
             {(d.factors || []).slice(0, 3).map((f) => (
@@ -356,7 +429,7 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
             ))}
           </div>
         </td>
-        <td className="px-2 py-1.5 font-bold text-slate-500">{d.source === 'SCORECARD' ? 'SC' : 'LVL'}</td>
+        <td className="hidden sm:table-cell px-2 py-1.5 font-bold text-slate-500">{d.source === 'SCORECARD' ? 'SC' : 'LVL'}</td>
       </tr>
       {trade.outcomeNarrative && (
         <tr className="bg-slate-50/60">
@@ -382,12 +455,12 @@ function OutcomeTable({ rows }: { rows: IntradayTrade[] }) {
             <th className="px-2 py-2 text-left font-bold">Exit</th>
             <th className="px-2 py-2 text-right font-bold">R</th>
             <th className="px-2 py-2 text-right font-bold">Move%</th>
-            <th className="px-2 py-2 text-right font-bold">MAE</th>
-            <th className="px-2 py-2 text-right font-bold">MFE</th>
-            <th className="px-2 py-2 text-left font-bold">Why (root)</th>
+            <th className="hidden sm:table-cell px-2 py-2 text-right font-bold">MAE</th>
+            <th className="hidden sm:table-cell px-2 py-2 text-right font-bold">MFE</th>
+            <th className="hidden sm:table-cell px-2 py-2 text-left font-bold">Why (root)</th>
             <th className="px-2 py-2 text-right font-bold">P&L</th>
-            <th className="px-2 py-2 text-left font-bold">Flags</th>
-            <th className="px-2 py-2 text-left font-bold">Src</th>
+            <th className="hidden sm:table-cell px-2 py-2 text-left font-bold">Flags</th>
+            <th className="hidden sm:table-cell px-2 py-2 text-left font-bold">Src</th>
           </tr>
         </thead>
         <tbody>
@@ -691,12 +764,14 @@ export default function EodAnalysisPanel({
       if (liveBusy.current) return;
       liveBusy.current = true;
       try {
-        const [lpRes, swingRes] = await Promise.all([
+        const [lpRes, swingRes, intraRes] = await Promise.all([
           fetch('/api/live-prices', { cache: 'no-store' }),
           fetch('/api/swing-session?live=1', { cache: 'no-store' }),
+          fetch('/api/intraday-session', { cache: 'no-store' }),
         ]);
         const lp = lpRes.ok ? await lpRes.json() : null;
         const sw = swingRes.ok ? await swingRes.json() : null;
+        const intra = intraRes.ok ? await intraRes.json() : null;
         if (cancelled) return;
 
         const byKey: LiveMarksState['byKey'] = {};
@@ -710,24 +785,47 @@ export default function EodAnalysisPanel({
             if (!Number.isFinite(ltp) || ltp <= 0) continue;
             const dir = String(row.direction || fallbackDir).toUpperCase();
             const hit = row.outcome?.hitLevel != null ? String(row.outcome.hitLevel) : null;
-            byKey[markKey(sym, dir)] = { ltp, hitLevel: hit };
+            byKey[markKey(sym, dir)] = {
+              ltp,
+              hitLevel: hit,
+              remainingQty: row.remainingQty ?? row.exitState?.remainingQty ?? null,
+              realizedPnl: row.realizedPnl ?? row.exitState?.realizedPnl ?? null,
+              unrealizedPnl: row.unrealizedPnl ?? row.exitState?.unrealizedPnl ?? null,
+              closed: row.closed ?? row.exitState?.closed ?? null,
+              status: row.status ?? row.outcome?.label ?? null,
+            };
             bySymbol[sym] = ltp;
           }
         };
         ingestPlan(lp?.long as LivePriceRow[] | undefined, 'LONG');
         ingestPlan(lp?.short as LivePriceRow[] | undefined, 'SHORT');
 
-        for (const row of [...(sw?.long || []), ...(sw?.short || [])] as LivePriceRow[]) {
-          const sym = String(row.symbol || '').toUpperCase();
-          if (!sym) continue;
-          const ltp = Number(row.currentPrice ?? row.ltp);
-          if (!Number.isFinite(ltp) || ltp <= 0) continue;
-          bySymbol[sym] = ltp;
-          const dir = String(row.direction || 'LONG').toUpperCase();
-          if (!byKey[markKey(sym, dir)]) {
-            byKey[markKey(sym, dir)] = { ltp, hitLevel: null };
+        const ingestSession = (rows: LivePriceRow[] | undefined, fallbackDir: string) => {
+          for (const row of rows || []) {
+            const sym = String(row.symbol || '').toUpperCase();
+            if (!sym) continue;
+            const ltp = Number(row.currentPrice ?? row.ltp);
+            if (!Number.isFinite(ltp) || ltp <= 0) continue;
+            bySymbol[sym] = ltp;
+            const dir = String(row.direction || fallbackDir).toUpperCase();
+            const key = markKey(sym, dir);
+            const prev = byKey[key];
+            byKey[key] = {
+              ltp,
+              hitLevel: prev?.hitLevel ?? null,
+              remainingQty: row.remainingQty ?? row.exitState?.remainingQty ?? prev?.remainingQty ?? null,
+              realizedPnl: row.realizedPnl ?? row.exitState?.realizedPnl ?? prev?.realizedPnl ?? null,
+              unrealizedPnl: row.unrealizedPnl ?? row.exitState?.unrealizedPnl ?? prev?.unrealizedPnl ?? null,
+              closed: row.closed ?? row.exitState?.closed ?? prev?.closed ?? null,
+              status: row.status ?? prev?.status ?? null,
+            };
           }
-        }
+        };
+        ingestSession([...(sw?.long || []), ...(sw?.short || [])] as LivePriceRow[], 'LONG');
+        ingestSession(
+          [...(intra?.long || []), ...(intra?.short || []), ...(intra?.locked?.long || []), ...(intra?.locked?.short || [])] as LivePriceRow[],
+          'LONG',
+        );
 
         const marketOpen = Boolean(lp?.marketOpen);
         setLiveMarks({
@@ -769,21 +867,87 @@ export default function EodAnalysisPanel({
         : null);
 
       const closedBook = isClosedBookLeg(t.exitReason);
-      // For PARTIAL_SCALE trades, if exitState is available use it directly — do not re-mark via binary MTM.
+      // SCALE_TRAIL / exitState: prefer live-prices economics while market is open.
+      // Stale book often has EOD_SQUAREOFF closed rem=0 — that must not freeze LIVE MTM.
       if (t.exitPlan?.mode === 'SCALE_TRAIL' || t.exitState != null) {
         const state = t.exitState;
-        const pnl = (state?.realizedPnl ?? 0) + (state?.unrealizedPnl ?? 0);
-        const isFullyClosed = Boolean(state?.closed);
-        if (isFullyClosed) realised += state?.realizedPnl ?? 0;
-        else {
-          realised += state?.realizedPnl ?? 0;
-          unrealised += state?.unrealizedPnl ?? 0;
+        const reason = String(t.exitReason || '').toUpperCase();
+        const hardHitBook = isClosedBookLeg(reason);
+        const entry = Number(t.entryPrice) || 0;
+        const qty = Number(t.qty) || 0;
+
+        if (!live) {
+          const realized = Number(state?.realizedPnl ?? t.realizedPnl ?? 0);
+          const unrealized = hardHitBook ? 0 : Number(state?.unrealizedPnl ?? t.unrealizedPnl ?? 0);
+          const pnl = realized + unrealized;
+          realised += realized;
+          unrealised += unrealized;
+          return {
+            ...t,
+            pnl: state != null || t.realizedPnl != null ? pnl : t.pnl,
+            markLive: false,
+            pnlKind: hardHitBook ? ('realised' as const) : ('unrealised' as const),
+          };
         }
+
+        const liveHard = isLiveHardClose(live);
+        if (liveHard || (hardHitBook && !(Number(live.remainingQty) > 0) && !liveMarks.marketOpen)) {
+          const realized = Number(state?.realizedPnl ?? t.realizedPnl ?? t.pnl ?? 0);
+          realised += realized;
+          return {
+            ...t,
+            markLive: false,
+            pnlKind: 'realised' as const,
+            pnl: realized,
+          };
+        }
+
+        const exitPrice = live.ltp;
+        let remQty = Number(live.remainingQty);
+        if (!Number.isFinite(remQty)) {
+          remQty = Math.max(0, Number(state?.remainingQty ?? t.remainingQty ?? 0));
+        }
+        // Soft book square during market hours: remount open qty from live / full size
+        if (liveMarks.marketOpen && remQty <= 0 && !liveHard && (reason === 'EOD_SQUAREOFF' || reason === 'PARTIAL_SCALE' || !hardHitBook)) {
+          remQty = qty;
+        }
+
+        let realized =
+          live.realizedPnl != null && Number.isFinite(Number(live.realizedPnl))
+            ? Number(live.realizedPnl)
+            : remQty > 0 && liveMarks.marketOpen && (reason === 'EOD_SQUAREOFF' || Boolean(state?.closed))
+              ? 0
+              : Number(state?.realizedPnl ?? t.realizedPnl ?? 0);
+
+        let unrealized =
+          live.unrealizedPnl != null && Number.isFinite(Number(live.unrealizedPnl))
+            ? Number(live.unrealizedPnl)
+            : remQty > 0 && entry > 0
+              ? mtmPnl(dir, entry, exitPrice, remQty)
+              : 0;
+
+        const pnl = realized + unrealized;
+        realised += realized;
+        unrealised += unrealized;
+        const stillOpen = remQty > 0 || !liveHard;
         return {
           ...t,
-          pnl: state != null ? pnl : t.pnl,
-          markLive: !isFullyClosed,
-          pnlKind: isFullyClosed ? ('realised' as const) : ('unrealised' as const),
+          exitPrice,
+          exitReason: liveHard ? exitReasonFromHit(live.hitLevel, reason) : stillOpen && reason === 'EOD_SQUAREOFF' ? 'EOD_SQUAREOFF' : reason,
+          exitState: {
+            ...(state || {}),
+            unrealizedPnl: unrealized,
+            realizedPnl: realized,
+            remainingQty: remQty,
+            closed: !stillOpen,
+          },
+          remainingQty: remQty,
+          realizedPnl: realized,
+          unrealizedPnl: unrealized,
+          pnl,
+          pnlPct: entry > 0 && qty > 0 ? (pnl / (entry * qty)) * 100 : t.pnlPct,
+          markLive: stillOpen,
+          pnlKind: stillOpen ? ('unrealised' as const) : ('realised' as const),
         };
       }
       if (closedBook && !live?.hitLevel) {
@@ -858,19 +1022,72 @@ export default function EodAnalysisPanel({
       }
       const sym = String(p.symbol || '').toUpperCase();
       const dir = String(p.direction || 'LONG').toUpperCase();
-      const liveLtp =
-        liveMarks.byKey[markKey(sym, dir)]?.ltp ?? liveMarks.bySymbol[sym] ?? null;
-      const closed = isClosedBookLeg(p.exitReason) || String(p.status || '').toUpperCase().includes('HIT');
+      const live =
+        liveMarks.byKey[markKey(sym, dir)] ||
+        (liveMarks.bySymbol[sym] != null
+          ? ({ ltp: liveMarks.bySymbol[sym], hitLevel: null } as LiveMark)
+          : null);
+      const liveLtp = live?.ltp ?? null;
+      const closedBook = isClosedBookLeg(p.exitReason);
+      const liveHard = isLiveHardClose(live);
+      // Book EOD_SQUAREOFF / status containing HIT (TRAIL) — don't treat soft EOD as hard.
+      const hardClosed = liveHard || (closedBook && !(Number(live?.remainingQty) > 0));
 
-      if (closed && liveLtp == null) {
+      if (hardClosed && liveLtp == null) {
         const pnl = p.pnl ?? 0;
         realised += pnl;
         return { ...p, markLive: false, pnlKind: 'realised' as const };
       }
 
-      if (liveLtp != null && !closed) {
+      if (liveLtp != null && !hardClosed) {
         const entry = Number(p.entryPrice) || 0;
         const qty = Number(p.qty) || 0;
+        const state = p.exitState;
+        const reason = String(p.exitReason || '').toUpperCase();
+        const isScale = Boolean(p.exitPlan?.mode === 'SCALE_TRAIL' || state != null || p.scaleTrail);
+        if (isScale || liveMarks.marketOpen) {
+          let remQty = Number(live?.remainingQty);
+          if (!Number.isFinite(remQty)) {
+            remQty = Math.max(0, Number(state?.remainingQty ?? p.remainingQty ?? 0));
+          }
+          if (liveMarks.marketOpen && remQty <= 0 && (reason === 'EOD_SQUAREOFF' || Boolean(state?.closed))) {
+            remQty = qty;
+          }
+          let realized =
+            live?.realizedPnl != null && Number.isFinite(Number(live.realizedPnl))
+              ? Number(live.realizedPnl)
+              : remQty > 0 && liveMarks.marketOpen && (reason === 'EOD_SQUAREOFF' || Boolean(state?.closed))
+                ? 0
+                : Number(state?.realizedPnl ?? p.realizedPnl ?? 0);
+          let unrealized =
+            live?.unrealizedPnl != null && Number.isFinite(Number(live.unrealizedPnl))
+              ? Number(live.unrealizedPnl)
+              : remQty > 0 && entry > 0
+                ? mtmPnl(dir, entry, liveLtp, remQty)
+                : 0;
+          const pnl = realized + unrealized;
+          const stillOpen = remQty > 0;
+          realised += realized;
+          unrealised += unrealized;
+          return {
+            ...p,
+            currentPrice: liveLtp,
+            exitState: {
+              ...(state || {}),
+              unrealizedPnl: unrealized,
+              realizedPnl: realized,
+              remainingQty: remQty,
+              closed: !stillOpen,
+            },
+            remainingQty: remQty,
+            realizedPnl: realized,
+            unrealizedPnl: unrealized,
+            pnl,
+            pnlPct: entry > 0 && qty > 0 ? (pnl / (entry * qty)) * 100 : p.pnlPct,
+            markLive: stillOpen,
+            pnlKind: stillOpen ? ('unrealised' as const) : ('realised' as const),
+          };
+        }
         const pnl = mtmPnl(dir, entry, liveLtp, qty);
         const pnlPct = entry > 0 ? (mtmPnl(dir, entry, liveLtp, 1) / entry) * 100 : null;
         unrealised += pnl;
@@ -885,12 +1102,12 @@ export default function EodAnalysisPanel({
       }
 
       const pnl = p.pnl ?? 0;
-      if (closed) realised += pnl;
+      if (hardClosed || closedBook) realised += pnl;
       else unrealised += pnl;
       return {
         ...p,
         markLive: false,
-        pnlKind: closed ? ('realised' as const) : ('unrealised' as const),
+        pnlKind: hardClosed || closedBook ? ('realised' as const) : ('unrealised' as const),
       };
     });
 
@@ -920,21 +1137,21 @@ export default function EodAnalysisPanel({
         <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-400 via-cyan-400 to-transparent pointer-events-none" aria-hidden />
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Intraday Date</span>
+            <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Intraday Date</span>
             <input
               type="date"
               value={dateStr}
               onChange={(e) => setDateStr(e.target.value)}
-              className="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-teal-300"
+              className="min-h-11 text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-teal-300"
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Swing Date</span>
+            <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Swing Date</span>
             <input
               type="date"
               value={swingDateStr}
               onChange={(e) => setSwingDateStr(e.target.value)}
-              className="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-teal-300"
+              className="min-h-11 text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-teal-300"
             />
           </div>
           {fromCache && <span className="desk-pill desk-pill--ok">BOOK · CACHED</span>}
@@ -950,14 +1167,14 @@ export default function EodAnalysisPanel({
           <button
             onClick={() => void fetchReports({ force: false })}
             disabled={loading}
-            className="desk-btn-ghost ml-auto px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
+            className="desk-btn-ghost ml-auto min-h-11 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider disabled:opacity-50"
           >
             {loading ? 'LOADING...' : 'REFRESH'}
           </button>
           <button
             onClick={() => void fetchReports({ force: true })}
             disabled={loading}
-            className="desk-btn-primary px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
+            className="desk-btn-primary min-h-11 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider disabled:opacity-50"
             title="Rebuild marks/cache; fills missing outcome narratives only (does not reburn existing LLM text)"
           >
             REBUILD
@@ -983,7 +1200,7 @@ export default function EodAnalysisPanel({
             type="button"
             onClick={() => void fetchReports({ force: false })}
             disabled={loading}
-            className="desk-btn-ghost ml-auto rounded-md px-2 py-1 text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
+            className="desk-btn-ghost ml-auto min-h-11 rounded-md px-2 py-1 text-[11px] font-black uppercase tracking-wider disabled:opacity-50"
           >
             Refresh book
           </button>
@@ -991,7 +1208,7 @@ export default function EodAnalysisPanel({
             type="button"
             onClick={() => void fetchReports({ force: true })}
             disabled={loading}
-            className="desk-btn-ghost rounded-md px-2 py-1 text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
+            className="desk-btn-ghost min-h-11 rounded-md px-2 py-1 text-[11px] font-black uppercase tracking-wider disabled:opacity-50"
             title="Rebuild marks/cache; fills missing outcome narratives only"
           >
             Rebuild book
@@ -1152,12 +1369,14 @@ export default function EodAnalysisPanel({
                 />
 
                 {/* Hit breakdown */}
-                <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 text-[9px]">
-                  <span className="text-slate-500 uppercase tracking-wider font-bold">Breakdown:</span>
-                  <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">T2 {displayIntraday.hitBreakdown?.T2_HIT ?? 0}</span>
-                  <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold">T1 {displayIntraday.hitBreakdown?.T1_HIT ?? 0}</span>
-                  <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold">SL {displayIntraday.hitBreakdown?.SL_HIT ?? 0}</span>
-                  <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">EOD {displayIntraday.hitBreakdown?.EOD_SQUAREOFF ?? 0}</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 text-[11px] sm:text-[9px] overflow-x-auto desk-scroll-x flex-nowrap">
+                  <span className="shrink-0 text-slate-500 uppercase tracking-wider font-bold">Breakdown:</span>
+                  <span className="shrink-0 bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">T2 {displayIntraday.hitBreakdown?.T2_HIT ?? 0}</span>
+                  <span className="shrink-0 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold">T1 {displayIntraday.hitBreakdown?.T1_HIT ?? 0}</span>
+                  <span className="shrink-0 bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold">SL {displayIntraday.hitBreakdown?.SL_HIT ?? 0}</span>
+                  <span className="shrink-0 bg-red-50 text-red-700 px-1.5 py-0.5 rounded font-bold">TRAIL {(displayIntraday.hitBreakdown as { TRAIL_SL_HIT?: number })?.TRAIL_SL_HIT ?? 0}</span>
+                  <span className="shrink-0 bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded font-bold">PARTIAL {(displayIntraday.hitBreakdown as { PARTIAL_SCALE?: number })?.PARTIAL_SCALE ?? 0}</span>
+                  <span className="shrink-0 bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">EOD {displayIntraday.hitBreakdown?.EOD_SQUAREOFF ?? 0}</span>
                 </div>
 
                 {/* Trades table */}
@@ -1169,6 +1388,7 @@ export default function EodAnalysisPanel({
                         <th className="text-right px-2 py-1.5 font-bold">Qty</th>
                         <th className="text-right px-2 py-1.5 font-bold">Entry</th>
                         <th className="text-right px-2 py-1.5 font-bold">Mark / Exit</th>
+                        <th className="hidden sm:table-cell text-left px-2 py-1.5 font-bold">Scale / Trail</th>
                         <th className="text-center px-2 py-1.5 font-bold">Result</th>
                         <th className="text-right px-2 py-1.5 font-bold">P&L</th>
                       </tr>
@@ -1199,15 +1419,22 @@ export default function EodAnalysisPanel({
                             </td>
                             <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">{trade.entryPrice}</td>
                             <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">
-                              {trade.exitState?.effectiveStop != null ? (
-                                <span className="text-amber-700" title="Trail stop">
-                                  {trade.exitState.effectiveStop.toFixed(2)}*
-                                </span>
-                              ) : trade.markLive ? (
+                              {trade.markLive ? (
                                 <LiveTickNumber value={trade.exitPrice} />
                               ) : (
                                 trade.exitPrice
                               )}
+                            </td>
+                            <td className="hidden sm:table-cell px-2 py-1.5">
+                              <ScaleExitCell
+                                scaleTrail={trade.scaleTrail}
+                                scaleProgress={trade.scaleProgress}
+                                exitPlan={trade.exitPlan}
+                                exitState={trade.exitState}
+                                effectiveStop={trade.effectiveStop}
+                                remainingQty={trade.remainingQty}
+                                qty={trade.qty}
+                              />
                             </td>
                             <td className="text-center px-2 py-1.5">
                               <span className={`${badge.bg} ${badge.txt} px-1 py-0.5 rounded text-[9px] font-bold`}>{badge.label}</span>
@@ -1305,10 +1532,10 @@ export default function EodAnalysisPanel({
 
                 {/* P&L by day bucket */}
                 {displaySwing.pnlByDayBucket && Object.keys(displaySwing.pnlByDayBucket).length > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 text-[9px] flex-wrap">
-                    <span className="text-slate-500 uppercase tracking-wider font-bold">P&L by Day:</span>
+                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 text-[11px] sm:text-[9px] overflow-x-auto desk-scroll-x flex-nowrap">
+                    <span className="shrink-0 text-slate-500 uppercase tracking-wider font-bold">P&L by Day:</span>
                     {Object.entries(displaySwing.pnlByDayBucket).map(([bucket, pnl]) => (
-                      <span key={bucket} className={`px-1.5 py-0.5 rounded font-bold ${Number(pnl) >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                      <span key={bucket} className={`shrink-0 px-1.5 py-0.5 rounded font-bold ${Number(pnl) >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
                         Day {bucket}: {fmtInr(Number(pnl), 0)}
                       </span>
                     ))}
@@ -1325,9 +1552,10 @@ export default function EodAnalysisPanel({
                         <th className="text-right px-2 py-1.5 font-bold">Qty</th>
                         <th className="text-right px-2 py-1.5 font-bold">Entry</th>
                         <th className="text-right px-2 py-1.5 font-bold">Mark</th>
-                        <th className="text-right px-2 py-1.5 font-bold">Deployed</th>
+                        <th className="hidden sm:table-cell text-left px-2 py-1.5 font-bold">Scale / Trail</th>
+                        <th className="hidden sm:table-cell text-right px-2 py-1.5 font-bold">Deployed</th>
                         <th className="text-right px-2 py-1.5 font-bold">P&L</th>
-                        <th className="text-right px-2 py-1.5 font-bold">%</th>
+                        <th className="hidden sm:table-cell text-right px-2 py-1.5 font-bold">%</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1350,7 +1578,11 @@ export default function EodAnalysisPanel({
                             <td className="text-center px-2 py-1.5">
                               <span className={`${badge.bg} ${badge.txt} px-1 py-0.5 rounded text-[9px] font-bold`}>{badge.label}</span>
                             </td>
-                            <td className="text-right px-2 py-1.5 tabular-nums text-slate-700">{pick.qty || '—'}</td>
+                            <td className="text-right px-2 py-1.5 tabular-nums text-slate-700">
+                              {pick.exitState?.remainingQty != null
+                                ? `${pick.exitState.remainingQty}/${pick.qty || '—'}`
+                                : (pick.qty || '—')}
+                            </td>
                             <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">{pick.entryPrice}</td>
                             <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">
                               {pick.markLive && pick.currentPrice != null ? (
@@ -1359,7 +1591,18 @@ export default function EodAnalysisPanel({
                                 pick.currentPrice ?? '—'
                               )}
                             </td>
-                            <td className="text-right px-2 py-1.5 tabular-nums text-slate-600">
+                            <td className="hidden sm:table-cell px-2 py-1.5">
+                              <ScaleExitCell
+                                scaleTrail={pick.scaleTrail}
+                                scaleProgress={pick.scaleProgress}
+                                exitPlan={pick.exitPlan}
+                                exitState={pick.exitState}
+                                effectiveStop={pick.effectiveStop}
+                                remainingQty={pick.remainingQty}
+                                qty={pick.qty}
+                              />
+                            </td>
+                            <td className="hidden sm:table-cell text-right px-2 py-1.5 tabular-nums text-slate-600">
                               {pick.deployedCapital
                                 ? `₹${Number(pick.deployedCapital).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
                                 : '—'}
@@ -1369,7 +1612,7 @@ export default function EodAnalysisPanel({
                                 ? (pick.markLive ? <LiveTickNumber value={fmtInr(pick.pnl, 2)} /> : fmtInr(pick.pnl, 2))
                                 : '—'}
                             </td>
-                            <td className={`text-right px-2 py-1.5 font-bold tabular-nums ${pnlTone(pick.pnlPct)}`}>
+                            <td className={`hidden sm:table-cell text-right px-2 py-1.5 font-bold tabular-nums ${pnlTone(pick.pnlPct)}`}>
                               {fmtMissSigned(pick.pnlPct, 2, '%')}
                             </td>
                           </tr>

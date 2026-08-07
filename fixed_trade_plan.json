@@ -1,322 +1,1608 @@
 {
-  "updatedAt": "2026-08-06T16:47:43.679873+00:00",
-  "sessionDate": "2026-08-06",
-  "locked": true,
-  "executionPolicy": "MANUAL_ONLY",
-  "capital": {
-    "longCapital": 500000.0,
-    "shortCapital": 500000.0,
-    "riskFraction": 0.01,
-    "basketSize": 5,
-    "candidatePoolSize": 10,
-    "lockSize": 5,
-    "momentumSlots": 6,
-    "meanRevSlots": 4,
-    "riskScaleLong": 1.0,
-    "riskScaleShort": 1.0
-  },
-  "regime": {
-    "label": "NEUTRAL",
-    "regime": "NEUTRAL",
-    "bias": "NEUTRAL",
-    "niftyChangePct": 0.01,
-    "bankNiftyChangePct": 0.1,
-    "indiaVix": 12.27,
-    "nifty": "24,628.00",
-    "bankNifty": "57,795.55",
-    "indiaVixDisplay": "12.27",
-    "reasons": [
-      "mixed index tape"
-    ],
-    "longGate": 0.75,
-    "shortGate": 0.75
-  },
-  "source": "intraday_session_engine",
-  "funnel": "10+10 candidates \u2192 5+5 locked",
-  "rotation": "DAILY",
-  "priorSessionDate": "2026-08-05",
+  "updatedAt": "2026-08-07T07:12:19.698459+00:00",
+  "source": "intraday_session_fallback",
   "long": [
     {
-      "symbol": "CUMMINSIND",
+      "rank": 1,
+      "symbol": "ENRIN",
+      "name": "ENRIN",
       "direction": "LONG",
-      "entryDate": "2026-08-06",
-      "approxQty": 14,
-      "deployedCapital": 76286.0,
-      "entryPrice": 5449.0,
-      "stopLoss": 5112.25,
-      "target1": 5954.12,
-      "target2": 6459.24,
-      "scanLtp": 5449.0,
-      "currentPrice": 5449.0,
-      "score": 79.2,
       "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "score": 80.8,
+      "scorePctRank": 100.0,
+      "intradayRetPctRank": 98.0,
+      "meanrevScore": 36.3,
+      "gapPct": 6.082,
+      "intradayRet": 4.959,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+      "rsVsIndexPct": 5.0394202898550695,
+      "overextended": false,
+      "vwapMode": "REVERSION",
+      "vwap": 3561.97,
+      "orbHigh": 3621.1,
+      "orbLow": 3450.0,
+      "orbPosPct": 100.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 5.039,
+          "niftyChangePct": -0.08,
+          "gapPct": 6.082,
+          "intradayRet": 4.959
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 79.8,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 40.5,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "REVERSION",
+          "vwapZ": 0.637,
+          "vwapSource": "snapshot",
+          "vwap": 3561.97
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 5.102,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 0.196
+        },
+        "breakout": {
+          "score": 78.1,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 3621.1,
+          "orbLow": 3450.0,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 100.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 47.2,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 91.8,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 3621.1,
+      "scanLtp": 3621.1,
+      "atrPct": 6.52,
+      "status": "CLOSED",
+      "closed": true,
+      "entryPrice": 3621.1,
+      "stopLoss": 3337.79,
+      "target1": 4046.07,
+      "target2": 4471.03,
+      "riskPerShare": 283.31,
       "rewardRisk": 1.5,
-      "status": "RUNNING",
-      "sessionLocked": true,
+      "approxQty": 17,
+      "deployedCapital": 61558.7,
+      "maxLoss": 4816.27,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 3621.1,
+        "riskPerShare": 283.31,
+        "initialStop": 3337.79,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.2,
+            "qty": 4,
+            "price": 3762.76,
+            "trailStopAfter": null
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 5,
+            "price": 3904.41,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 4,
+            "price": 4046.07,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 4,
+        "runnerFrac": 0.25,
+        "trailRatchet": {
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 4046.07,
+        "target2": 4471.03,
+        "notes": []
+      },
       "adopted": true,
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10
+    },
+    {
+      "rank": 2,
+      "symbol": "TATAINVEST",
+      "name": "TATAINVEST",
+      "direction": "LONG",
+      "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "score": 79.5,
+      "scorePctRank": 99.0,
+      "intradayRetPctRank": 97.0,
+      "meanrevScore": 41.3,
+      "gapPct": 0.779,
+      "intradayRet": 4.723,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 20.28\u00d7 \u2265 2.0",
+      "rsVsIndexPct": 4.802594080023799,
+      "overextended": true,
+      "vwapMode": "REVERSION",
+      "vwap": 698.36,
+      "orbHigh": 685.0,
+      "orbLow": 669.1,
+      "orbPosPct": 100.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 98.0,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 4.803,
+          "niftyChangePct": -0.08,
+          "gapPct": 0.779,
+          "intradayRet": 4.723
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 61.7,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": true
+        },
+        "vwap": {
+          "score": 37.4,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "REVERSION",
+          "vwapZ": 0.842,
+          "vwapSource": "snapshot",
+          "vwap": 698.36
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 20.284,
+          "rvolRaw": 3.98,
+          "cumVolFracHeuristic": 0.196
+        },
+        "breakout": {
+          "score": 67.6,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 685.0,
+          "orbLow": 669.1,
+          "orbVelocityPct": 2.78,
+          "orbPosPct": 100.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 20.28\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 91.3,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 90.6,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 704.05,
+      "scanLtp": 704.05,
+      "atrPct": 2.42,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 704.05,
+      "stopLoss": 683.6,
+      "target1": 734.72,
+      "target2": 765.4,
+      "riskPerShare": 20.45,
+      "rewardRisk": 1.5,
+      "approxQty": 142,
+      "deployedCapital": 99975.1,
+      "maxLoss": 2903.9,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 704.05,
+        "riskPerShare": 20.45,
+        "initialStop": 683.6,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.2,
+            "qty": 28,
+            "price": 714.27,
+            "trailStopAfter": null
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 43,
+            "price": 724.5,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 36,
+            "price": 734.72,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 35,
+        "runnerFrac": 0.25,
+        "trailRatchet": {
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 734.72,
+        "target2": 765.4,
+        "notes": []
+      },
+      "adopted": true,
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10
+    },
+    {
+      "rank": 3,
+      "symbol": "MOTHERSON",
+      "name": "MOTHERSON",
+      "direction": "LONG",
+      "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "score": 78.9,
+      "scorePctRank": 98.0,
+      "intradayRetPctRank": 99.0,
+      "meanrevScore": 50.4,
+      "gapPct": 0.11,
+      "intradayRet": 5.13,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+      "rsVsIndexPct": 5.209857575562292,
+      "overextended": false,
+      "vwapMode": "REVERSION",
+      "vwap": 160.7,
+      "orbHigh": 163.13,
+      "orbLow": 155.17,
+      "orbPosPct": 100.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 5.21,
+          "niftyChangePct": -0.08,
+          "gapPct": 0.11,
+          "intradayRet": 5.13
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 80.8,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 39.8,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "REVERSION",
+          "vwapZ": 0.679,
+          "vwapSource": "snapshot",
+          "vwap": 160.7
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 5.102,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 0.196
+        },
+        "breakout": {
+          "score": 51.6,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 163.13,
+          "orbLow": 155.17,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 100.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 61.4,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 92.2,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 163.13,
+      "scanLtp": 163.13,
+      "atrPct": 5.57,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 163.13,
+      "stopLoss": 152.23,
+      "target1": 179.48,
+      "target2": 195.83,
+      "riskPerShare": 10.9,
+      "rewardRisk": 1.5,
+      "approxQty": 458,
+      "deployedCapital": 74713.54,
+      "maxLoss": 4992.2,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 163.13,
+        "riskPerShare": 10.9,
+        "initialStop": 152.23,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.2,
+            "qty": 92,
+            "price": 168.58,
+            "trailStopAfter": null
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 137,
+            "price": 174.03,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 115,
+            "price": 179.48,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 114,
+        "runnerFrac": 0.25,
+        "trailRatchet": {
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 179.48,
+        "target2": 195.83,
+        "notes": []
+      },
+      "adopted": true,
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10,
       "outcome": {
-        "label": "NOT TRIGGERED",
-        "detail": "LTP 5402.00 | never crossed T1/SL | -0.86%",
-        "hitLevel": null,
-        "ltp": 5402.0,
-        "pctChange": -0.86,
-        "resolvedAt": "2026-08-06T14:34:27.117390+00:00",
-        "final": true
+        "label": "PARTIAL 0.5R",
+        "detail": "Filled ['0.5R'] \u00b7 rem 366",
+        "hitLevel": "partial",
+        "ltp": 168.5,
+        "pctChange": 3.29,
+        "resolvedAt": null,
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": 0.5,
+              "qty": 92,
+              "price": 168.58,
+              "pnl": 501.4
+            }
+          ],
+          "remainingQty": 366,
+          "effectiveStop": 152.23,
+          "realizedPnl": 501.4,
+          "unrealizedPnl": 1965.42,
+          "rMultiple": 0.493,
+          "closed": false,
+          "mode": "SCALE_TRAIL"
+        },
+        "realizedPnl": 501.4,
+        "unrealizedPnl": 1965.42,
+        "remainingQty": 366,
+        "effectiveStop": 152.23,
+        "rMultiple": 0.493,
+        "closed": false,
+        "scaleTrail": true,
+        "final": null
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 0.5,
+            "qty": 92,
+            "price": 168.58,
+            "pnl": 501.4
+          }
+        ],
+        "remainingQty": 366,
+        "effectiveStop": 152.23,
+        "realizedPnl": 501.4,
+        "unrealizedPnl": 1965.42,
+        "rMultiple": 0.493,
+        "closed": false,
+        "mode": "SCALE_TRAIL"
       }
     },
     {
-      "symbol": "TATATECH",
+      "rank": 4,
+      "symbol": "BRITANNIA",
+      "name": "BRITANNIA",
       "direction": "LONG",
-      "entryDate": "2026-08-06",
-      "approxQty": 101,
-      "deployedCapital": 80042.5,
-      "entryPrice": 792.5,
-      "stopLoss": 743.33,
-      "target1": 866.25,
-      "target2": 940.0,
-      "scanLtp": 792.5,
-      "currentPrice": 792.5,
-      "score": 75.2,
-      "sector": "OTHER",
-      "rewardRisk": 1.5,
+      "sector": "FMCG",
+      "sleeve": "MOMENTUM",
+      "score": 76.9,
+      "scorePctRank": 96.0,
+      "intradayRetPctRank": 90.0,
+      "meanrevScore": 43.4,
+      "gapPct": 1.823,
+      "intradayRet": 2.526,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+      "rsVsIndexPct": 2.606124488868696,
+      "overextended": false,
+      "vwapMode": "REVERSION",
+      "vwap": 5599.67,
+      "orbHigh": 5641.5,
+      "orbLow": 5502.5,
+      "orbPosPct": 100.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 76.1,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 2.606,
+          "niftyChangePct": -0.08,
+          "gapPct": 1.823,
+          "intradayRet": 2.526
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 65.2,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 40.1,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "REVERSION",
+          "vwapZ": 0.662,
+          "vwapSource": "snapshot",
+          "vwap": 5599.67
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 5.102,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 0.196
+        },
+        "breakout": {
+          "score": 64.9,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 5641.5,
+          "orbLow": 5502.5,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 100.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 97.3,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 91.1,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 5641.5,
+      "scanLtp": 5641.5,
+      "atrPct": 2.82,
       "status": "RUNNING",
-      "sessionLocked": true,
+      "closed": false,
+      "entryPrice": 5641.5,
+      "stopLoss": 5450.59,
+      "target1": 5927.86,
+      "target2": 6214.23,
+      "riskPerShare": 190.91,
+      "rewardRisk": 1.5,
+      "approxQty": 17,
+      "deployedCapital": 95905.5,
+      "maxLoss": 3245.47,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 5641.5,
+        "riskPerShare": 190.91,
+        "initialStop": 5450.59,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.2,
+            "qty": 4,
+            "price": 5736.95,
+            "trailStopAfter": null
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 5,
+            "price": 5832.41,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 4,
+            "price": 5927.86,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 4,
+        "runnerFrac": 0.25,
+        "trailRatchet": {
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 5927.86,
+        "target2": 6214.23,
+        "notes": []
+      },
       "adopted": true,
-      "outcome": {
-        "label": "NOT TRIGGERED",
-        "detail": "LTP 801.55 | never crossed T1/SL | +1.14%",
-        "hitLevel": null,
-        "ltp": 801.55,
-        "pctChange": 1.14,
-        "resolvedAt": "2026-08-06T14:34:27.248914+00:00",
-        "final": true
-      }
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10
     },
     {
-      "symbol": "ASTERDM",
+      "rank": 5,
+      "symbol": "HCLTECH",
+      "name": "HCLTECH",
       "direction": "LONG",
-      "entryDate": "2026-08-06",
-      "approxQty": 62,
-      "deployedCapital": 53630.0,
-      "entryPrice": 865.0,
-      "stopLoss": 785.59,
-      "target1": 984.11,
-      "target2": 1103.22,
-      "scanLtp": 865.0,
-      "currentPrice": 865.0,
-      "score": 75.1,
-      "sector": "OTHER",
-      "rewardRisk": 1.5,
+      "sector": "IT",
+      "sleeve": "MOMENTUM",
+      "score": 76.6,
+      "scorePctRank": 95.0,
+      "intradayRetPctRank": 93.0,
+      "meanrevScore": 48.4,
+      "gapPct": -0.449,
+      "intradayRet": 2.935,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+      "rsVsIndexPct": 3.0145372460496613,
+      "overextended": false,
+      "vwapMode": "REVERSION",
+      "vwap": 1355.0,
+      "orbHigh": 1368.0,
+      "orbLow": 1329.0,
+      "orbPosPct": 100.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 80.1,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 3.015,
+          "niftyChangePct": -0.08,
+          "gapPct": -0.449,
+          "intradayRet": 2.935
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 67.6,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 38.3,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "REVERSION",
+          "vwapZ": 0.781,
+          "vwapSource": "snapshot",
+          "vwap": 1355.0
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 5.102,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 0.196
+        },
+        "breakout": {
+          "score": 52.0,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1368.0,
+          "orbLow": 1329.0,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 100.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 99.0,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 97.6,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 1368.0,
+      "scanLtp": 1368.0,
+      "atrPct": 3.07,
       "status": "RUNNING",
-      "sessionLocked": true,
-      "adopted": true,
-      "outcome": {
-        "label": "NOT TRIGGERED",
-        "detail": "LTP 844.45 | never crossed T1/SL | -2.38%",
-        "hitLevel": null,
-        "ltp": 844.45,
-        "pctChange": -2.38,
-        "resolvedAt": "2026-08-06T14:34:27.371878+00:00",
-        "final": true
-      }
-    },
-    {
-      "symbol": "RELIANCE",
-      "direction": "LONG",
-      "entryDate": "2026-08-06",
-      "approxQty": 76,
-      "deployedCapital": 98822.8,
-      "entryPrice": 1300.3,
-      "stopLoss": 1271.28,
-      "target1": 1343.83,
-      "target2": 1387.37,
-      "scanLtp": 1300.3,
-      "currentPrice": 1300.3,
-      "score": 68.5,
-      "sector": "ENERGY",
+      "closed": false,
+      "entryPrice": 1368.0,
+      "stopLoss": 1317.6,
+      "target1": 1443.6,
+      "target2": 1519.2,
+      "riskPerShare": 50.4,
       "rewardRisk": 1.5,
-      "status": "RUNNING",
-      "sessionLocked": true,
+      "approxQty": 73,
+      "deployedCapital": 99864.0,
+      "maxLoss": 3679.2,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 1368.0,
+        "riskPerShare": 50.4,
+        "initialStop": 1317.6,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.2,
+            "qty": 15,
+            "price": 1393.2,
+            "trailStopAfter": null
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 22,
+            "price": 1418.4,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 18,
+            "price": 1443.6,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 18,
+        "runnerFrac": 0.25,
+        "trailRatchet": {
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 1443.6,
+        "target2": 1519.2,
+        "notes": []
+      },
       "adopted": true,
-      "outcome": {
-        "label": "NOT TRIGGERED",
-        "detail": "LTP 1325.00 | never crossed T1/SL | +1.90%",
-        "hitLevel": null,
-        "ltp": 1325.0,
-        "pctChange": 1.9,
-        "resolvedAt": "2026-08-06T14:34:27.488476+00:00",
-        "final": true
-      }
-    },
-    {
-      "symbol": "COHANCE",
-      "direction": "LONG",
-      "entryDate": "2026-08-06",
-      "approxQty": 227,
-      "deployedCapital": 99664.35,
-      "entryPrice": 439.05,
-      "stopLoss": 420.87,
-      "target1": 466.32,
-      "target2": 493.58,
-      "scanLtp": 439.05,
-      "currentPrice": 439.05,
-      "score": 68.1,
-      "sector": "OTHER",
-      "rewardRisk": 1.5,
-      "status": "RUNNING",
-      "sessionLocked": true,
-      "adopted": true,
-      "outcome": {
-        "label": "NOT TRIGGERED",
-        "detail": "LTP 438.90 | never crossed T1/SL | -0.03%",
-        "hitLevel": null,
-        "ltp": 438.9,
-        "pctChange": -0.03,
-        "resolvedAt": "2026-08-06T14:34:27.568682+00:00",
-        "final": true
-      }
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10
     }
   ],
   "short": [
     {
-      "symbol": "GESHIP",
+      "rank": 1,
+      "symbol": "CROMPTON",
+      "name": "CROMPTON",
       "direction": "SHORT",
-      "entryDate": "2026-08-06",
-      "approxQty": 73,
-      "deployedCapital": 98564.6,
-      "entryPrice": 1350.2,
-      "stopLoss": 1417.93,
-      "target1": 1248.61,
-      "target2": 1180.88,
-      "scanLtp": 1350.2,
-      "currentPrice": 1350.2,
-      "score": 80.7,
       "sector": "OTHER",
-      "rewardRisk": 1.5,
+      "sleeve": "MOMENTUM",
+      "score": 83.4,
+      "scorePctRank": 100.0,
+      "intradayRetPctRank": 0.0,
+      "meanrevScore": 51.9,
+      "gapPct": 0.0,
+      "intradayRet": -6.852,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+      "rsVsIndexPct": -6.771851851851852,
+      "overextended": false,
+      "vwapMode": "REVERSION",
+      "vwap": 257.33,
+      "orbHigh": 270.0,
+      "orbLow": 251.5,
+      "orbPosPct": 0.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": -6.772,
+          "niftyChangePct": -0.08,
+          "gapPct": 0.0,
+          "intradayRet": -6.852
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 91.1,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 38.2,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "REVERSION",
+          "vwapZ": -0.784,
+          "vwapSource": "snapshot",
+          "vwap": 257.33
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 5.102,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 0.196
+        },
+        "breakout": {
+          "score": 98.8,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 270.0,
+          "orbLow": 251.5,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 0.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 36.7,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 94.9,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 251.5,
+      "scanLtp": 251.5,
+      "atrPct": 7.22,
       "status": "RUNNING",
-      "sessionLocked": true,
+      "closed": false,
+      "entryPrice": 251.5,
+      "stopLoss": 273.29,
+      "target1": 218.81,
+      "target2": 186.13,
+      "riskPerShare": 21.79,
+      "rewardRisk": 1.5,
+      "approxQty": 229,
+      "deployedCapital": 57593.5,
+      "maxLoss": 4989.91,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 251.5,
+        "riskPerShare": 21.79,
+        "initialStop": 273.29,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.2,
+            "qty": 46,
+            "price": 240.6,
+            "trailStopAfter": null
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 69,
+            "price": 229.71,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 57,
+            "price": 218.81,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 57,
+        "runnerFrac": 0.25,
+        "trailRatchet": {
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 218.81,
+        "target2": 186.13,
+        "notes": []
+      },
       "adopted": true,
-      "outcome": {
-        "label": "NOT TRIGGERED",
-        "detail": "LTP 1352.90 | never crossed T1/SL | +0.20%",
-        "hitLevel": null,
-        "ltp": 1352.9,
-        "pctChange": 0.2,
-        "resolvedAt": "2026-08-06T14:34:27.702006+00:00",
-        "final": true
-      }
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10
     },
     {
-      "symbol": "SAREGAMA",
+      "rank": 2,
+      "symbol": "BLUESTARCO",
+      "name": "BLUESTARCO",
       "direction": "SHORT",
-      "entryDate": "2026-08-06",
-      "approxQty": 115,
-      "deployedCapital": 61208.75,
-      "entryPrice": 532.25,
-      "stopLoss": 575.62,
-      "target1": 467.2,
-      "target2": 423.83,
-      "scanLtp": 532.25,
-      "currentPrice": 532.25,
-      "score": 77.5,
       "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "score": 77.8,
+      "scorePctRank": 99.0,
+      "intradayRetPctRank": 4.0,
+      "meanrevScore": 44.0,
+      "gapPct": -0.458,
+      "intradayRet": -1.522,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+      "rsVsIndexPct": -1.441933751119066,
+      "overextended": false,
+      "vwapMode": "REVERSION",
+      "vwap": 1558.33,
+      "orbHigh": 1563.8,
+      "orbLow": 1540.0,
+      "orbPosPct": 0.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 64.4,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": -1.442,
+          "niftyChangePct": -0.08,
+          "gapPct": -0.458,
+          "intradayRet": -1.522
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 59.1,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 37.4,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "REVERSION",
+          "vwapZ": -0.84,
+          "vwapSource": "snapshot",
+          "vwap": 1558.33
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 5.102,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 0.196
+        },
+        "breakout": {
+          "score": 98.8,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1563.8,
+          "orbLow": 1540.0,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 0.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 92.5,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 1540.0,
+      "scanLtp": 1540.0,
+      "atrPct": 3.5,
+      "status": "CLOSED",
+      "closed": true,
+      "entryPrice": 1540.0,
+      "stopLoss": 1604.68,
+      "target1": 1442.98,
+      "target2": 1345.96,
+      "riskPerShare": 64.68,
       "rewardRisk": 1.5,
-      "status": "RUNNING",
-      "sessionLocked": true,
+      "approxQty": 64,
+      "deployedCapital": 98560.0,
+      "maxLoss": 4139.52,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 1540.0,
+        "riskPerShare": 64.68,
+        "initialStop": 1604.68,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.2,
+            "qty": 13,
+            "price": 1507.66,
+            "trailStopAfter": null
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 19,
+            "price": 1475.32,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 16,
+            "price": 1442.98,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 16,
+        "runnerFrac": 0.25,
+        "trailRatchet": {
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 1442.98,
+        "target2": 1345.96,
+        "notes": []
+      },
       "adopted": true,
-      "outcome": {
-        "label": "NOT TRIGGERED",
-        "detail": "LTP 528.00 | never crossed T1/SL | -0.80%",
-        "hitLevel": null,
-        "ltp": 528.0,
-        "pctChange": -0.8,
-        "resolvedAt": "2026-08-06T14:34:27.799980+00:00",
-        "final": true
-      }
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10
     },
     {
-      "symbol": "ZEEL",
+      "rank": 3,
+      "symbol": "PREMIERENE",
+      "name": "PREMIERENE",
       "direction": "SHORT",
-      "entryDate": "2026-08-06",
-      "approxQty": 1070,
-      "deployedCapital": 99927.3,
-      "entryPrice": 93.39,
-      "stopLoss": 96.94,
-      "target1": 88.06,
-      "target2": 84.51,
-      "scanLtp": 93.39,
-      "currentPrice": 93.39,
-      "score": 75.4,
       "sector": "OTHER",
-      "rewardRisk": 1.5,
+      "sleeve": "MOMENTUM",
+      "score": 76.8,
+      "scorePctRank": 98.0,
+      "intradayRetPctRank": 6.0,
+      "meanrevScore": 53.3,
+      "gapPct": 0.883,
+      "intradayRet": -1.484,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+      "rsVsIndexPct": -1.404441906936924,
+      "overextended": false,
+      "vwapMode": "REVERSION",
+      "vwap": 1036.1,
+      "orbHigh": 1050.9,
+      "orbLow": 1035.3,
+      "orbPosPct": 0.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 64.0,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": -1.404,
+          "niftyChangePct": -0.08,
+          "gapPct": 0.883,
+          "intradayRet": -1.484
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 58.9,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 49.0,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "REVERSION",
+          "vwapZ": -0.069,
+          "vwapSource": "snapshot",
+          "vwap": 1036.1
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 5.102,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 0.196
+        },
+        "breakout": {
+          "score": 98.8,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1050.9,
+          "orbLow": 1035.3,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 0.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 96.7,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 54.1,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 1035.3,
+      "scanLtp": 1035.3,
+      "atrPct": 2.78,
       "status": "RUNNING",
-      "sessionLocked": true,
+      "closed": false,
+      "entryPrice": 1035.3,
+      "stopLoss": 1069.84,
+      "target1": 983.49,
+      "target2": 931.68,
+      "riskPerShare": 34.54,
+      "rewardRisk": 1.5,
+      "approxQty": 96,
+      "deployedCapital": 99388.8,
+      "maxLoss": 3315.84,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 1035.3,
+        "riskPerShare": 34.54,
+        "initialStop": 1069.84,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.2,
+            "qty": 19,
+            "price": 1018.03,
+            "trailStopAfter": null
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 29,
+            "price": 1000.76,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 24,
+            "price": 983.49,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 24,
+        "runnerFrac": 0.25,
+        "trailRatchet": {
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 983.49,
+        "target2": 931.68,
+        "notes": []
+      },
       "adopted": true,
-      "outcome": {
-        "label": "NOT TRIGGERED",
-        "detail": "LTP 92.57 | never crossed T1/SL | -0.88%",
-        "hitLevel": null,
-        "ltp": 92.57,
-        "pctChange": -0.88,
-        "resolvedAt": "2026-08-06T14:34:27.954002+00:00",
-        "final": true
-      }
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10
     },
     {
-      "symbol": "AUROPHARMA",
+      "rank": 4,
+      "symbol": "BAJAJFINSV",
+      "name": "BAJAJFINSV",
       "direction": "SHORT",
-      "entryDate": "2026-08-06",
-      "approxQty": 62,
-      "deployedCapital": 98952.0,
-      "entryPrice": 1596.0,
-      "stopLoss": 1655.56,
-      "target1": 1506.66,
-      "target2": 1447.09,
-      "scanLtp": 1596.0,
-      "currentPrice": 1596.0,
-      "score": 75.3,
-      "sector": "PHARMA",
-      "rewardRisk": 1.5,
+      "sector": "FINANCE",
+      "sleeve": "MOMENTUM",
+      "score": 76.7,
+      "scorePctRank": 97.0,
+      "intradayRetPctRank": 5.0,
+      "meanrevScore": 45.0,
+      "gapPct": -1.726,
+      "intradayRet": -1.493,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+      "rsVsIndexPct": -1.4126829268292638,
+      "overextended": false,
+      "vwapMode": "REVERSION",
+      "vwap": 2025.03,
+      "orbHigh": 2050.0,
+      "orbLow": 2019.4,
+      "orbPosPct": 0.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 64.1,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": -1.413,
+          "niftyChangePct": -0.08,
+          "gapPct": -1.726,
+          "intradayRet": -1.493
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 59.0,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 45.1,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "REVERSION",
+          "vwapZ": -0.328,
+          "vwapSource": "snapshot",
+          "vwap": 2025.03
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 5.102,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 0.196
+        },
+        "breakout": {
+          "score": 98.8,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 2050.0,
+          "orbLow": 2019.4,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 0.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 86.8,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 69.1,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 2019.4,
+      "scanLtp": 2019.4,
+      "atrPct": 2.12,
       "status": "RUNNING",
-      "sessionLocked": true,
+      "closed": false,
+      "entryPrice": 2019.4,
+      "stopLoss": 2070.77,
+      "target1": 1942.35,
+      "target2": 1865.29,
+      "riskPerShare": 51.37,
+      "rewardRisk": 1.5,
+      "approxQty": 49,
+      "deployedCapital": 98950.6,
+      "maxLoss": 2517.13,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 2019.4,
+        "riskPerShare": 51.37,
+        "initialStop": 2070.77,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.2,
+            "qty": 10,
+            "price": 1993.72,
+            "trailStopAfter": null
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 15,
+            "price": 1968.03,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 12,
+            "price": 1942.35,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 12,
+        "runnerFrac": 0.25,
+        "trailRatchet": {
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 1942.35,
+        "target2": 1865.29,
+        "notes": []
+      },
       "adopted": true,
-      "outcome": {
-        "label": "NOT TRIGGERED",
-        "detail": "LTP 1588.90 | never crossed T1/SL | -0.44%",
-        "hitLevel": null,
-        "ltp": 1588.9,
-        "pctChange": -0.44,
-        "resolvedAt": "2026-08-06T14:34:28.043897+00:00",
-        "final": true
-      }
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10
     },
     {
-      "symbol": "ONGC",
+      "rank": 5,
+      "symbol": "BAJFINANCE",
+      "name": "BAJFINANCE",
       "direction": "SHORT",
-      "entryDate": "2026-08-06",
-      "approxQty": 421,
-      "deployedCapital": 99764.37,
-      "entryPrice": 236.97,
-      "stopLoss": 242.46,
-      "target1": 228.74,
-      "target2": 223.25,
-      "scanLtp": 236.97,
-      "currentPrice": 236.97,
-      "score": 75.2,
-      "sector": "ENERGY",
-      "rewardRisk": 1.5,
+      "sector": "FINANCE",
+      "sleeve": "MOMENTUM",
+      "score": 76.3,
+      "scorePctRank": 95.0,
+      "intradayRetPctRank": 8.0,
+      "meanrevScore": 44.4,
+      "gapPct": -2.778,
+      "intradayRet": -1.375,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+      "rsVsIndexPct": -1.2946630727762762,
+      "overextended": false,
+      "vwapMode": "REVERSION",
+      "vwap": 1098.57,
+      "orbHigh": 1113.0,
+      "orbLow": 1097.7,
+      "orbPosPct": 0.0,
+      "factorBreakdown": {
+        "regime": {
+          "score": 75.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 62.9,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": -1.295,
+          "niftyChangePct": -0.08,
+          "gapPct": -2.778,
+          "intradayRet": -1.375
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 58.2,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 48.8,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "REVERSION",
+          "vwapZ": -0.081,
+          "vwapSource": "snapshot",
+          "vwap": 1098.57
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 5.102,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 0.196
+        },
+        "breakout": {
+          "score": 98.8,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1113.0,
+          "orbLow": 1097.7,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 0.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 5.10\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 91.8,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 54.6,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "ltp": 1097.7,
+      "scanLtp": 1097.7,
+      "atrPct": 2.45,
       "status": "RUNNING",
-      "sessionLocked": true,
+      "closed": false,
+      "entryPrice": 1097.7,
+      "stopLoss": 1129.97,
+      "target1": 1049.3,
+      "target2": 1000.89,
+      "riskPerShare": 32.27,
+      "rewardRisk": 1.5,
+      "approxQty": 91,
+      "deployedCapital": 99890.7,
+      "maxLoss": 2936.57,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 1097.7,
+        "riskPerShare": 32.27,
+        "initialStop": 1129.97,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.2,
+            "qty": 18,
+            "price": 1081.57,
+            "trailStopAfter": null
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 27,
+            "price": 1065.43,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 23,
+            "price": 1049.3,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 23,
+        "runnerFrac": 0.25,
+        "trailRatchet": {
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 1049.3,
+        "target2": 1000.89,
+        "notes": []
+      },
       "adopted": true,
-      "outcome": {
-        "label": "NOT TRIGGERED",
-        "detail": "LTP 237.80 | never crossed T1/SL | +0.35%",
-        "hitLevel": null,
-        "ltp": 237.8,
-        "pctChange": 0.35,
-        "resolvedAt": "2026-08-06T14:34:28.211998+00:00",
-        "final": true
-      }
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10
     }
   ]
 }

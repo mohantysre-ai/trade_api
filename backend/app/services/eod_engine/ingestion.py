@@ -249,6 +249,31 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
                 by_key[key] = pick
 
     picks = list(by_key.values())
+
+    # Cross-book uniqueness: intradAy wins; drop colliding SWING rows for this date.
+    intra_syms = {
+        str(p.get("symbol") or "").upper().strip()
+        for p in picks
+        if p.get("book") == "INTRADAY" and p.get("symbol")
+    }
+    cross_dropped: list[str] = []
+    if intra_syms:
+        kept: list[dict[str, Any]] = []
+        for p in picks:
+            sym = str(p.get("symbol") or "").upper().strip()
+            if p.get("book") == "SWING" and sym in intra_syms:
+                cross_dropped.append(sym)
+                continue
+            kept.append(p)
+        if cross_dropped:
+            picks = kept
+            log.info(
+                "Dropped %d swing pick(s) already on intradAy for %s: %s",
+                len(cross_dropped),
+                day_key,
+                ",".join(sorted(set(cross_dropped))),
+            )
+
     swing_n = sum(1 for p in picks if p.get("book") == "SWING")
     intra_long = sum(1 for p in picks if p.get("book") == "INTRADAY" and p.get("direction") == "LONG")
     intra_short = sum(1 for p in picks if p.get("book") == "INTRADAY" and p.get("direction") == "SHORT")
@@ -282,6 +307,7 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
             "intradayLocked": bool(session.get("locked")),
             "swingDateParity": swing_ok,
             "intradayDateParity": session_ok,
+            "crossBookDropped": sorted(set(cross_dropped)),
         },
     }
 

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useDragControls, useReducedMotion } from "motion/react";
 import type { AITickerNewsReport, DeskIcSummary, TerminalIntelligence } from "@/lib/market-api";
 import AITickerNewsPanel from "./AITickerNewsPanel";
 import ConfidenceCheckerPanel from "./ConfidenceCheckerPanel";
@@ -400,6 +400,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
 
   const reduceMotion = useReducedMotion();
   const drawerMotion = deskDrawerVariants(reduceMotion);
+  const dragControls = useDragControls();
 
   const drawer = (
     <AnimatePresence>
@@ -418,14 +419,30 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           />
           <motion.div
             key="drawer-panel"
-            className="right-drawer glass-overlay fixed top-0 right-0 h-[100dvh] w-full sm:w-[min(100%,32rem)] lg:w-[50%] xl:w-[50%] 2xl:w-[45%] border-l border-slate-200 shadow-2xl z-50 overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+            className="right-drawer glass-overlay fixed top-0 right-0 h-[100dvh] w-full sm:w-[min(100%,32rem)] lg:w-[50%] xl:w-[50%] 2xl:w-[45%] border-l border-slate-200 shadow-2xl z-50 overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] touch-pan-y"
             variants={drawerMotion}
             initial="closed"
             animate="open"
             exit="closed"
             role="dialog"
             aria-modal={true}
+            drag="x"
+            dragControls={dragControls}
+            dragListener={false}
+            dragConstraints={{ left: 0, right: 320 }}
+            dragElastic={0.12}
+            onDragEnd={(_, info) => {
+              if (info.offset.x > 96 || info.velocity.x > 520) onClose();
+            }}
           >
+      {/* Mobile grabber — swipe right to dismiss */}
+      <div
+        className="sm:hidden flex justify-center pt-2 pb-1 cursor-grab active:cursor-grabbing touch-none"
+        onPointerDown={(e) => dragControls.start(e)}
+        aria-hidden
+      >
+        <span className="h-1 w-10 rounded-full bg-slate-300/80" />
+      </div>
       {/* Header */}
       <div className="sticky top-0 z-20 backdrop-blur-md border-b border-slate-200">
         <div className="px-3 sm:px-5 py-3.5 flex items-center justify-between">

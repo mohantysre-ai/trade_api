@@ -1652,19 +1652,19 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 mb-0.5">
                       <span
-                        className="text-[7px] font-black uppercase tracking-wider px-1 py-0.5 rounded text-white truncate max-w-[80px]"
+                        className="text-[10px] sm:text-[7px] font-black uppercase tracking-wider px-1 py-0.5 rounded text-white truncate max-w-[80px]"
                         style={{ background: color }}
                       >
                         {item.source}
                       </span>
-                      <span className="text-[7px] font-mono text-slate-400 ml-auto whitespace-nowrap">{timeAgo(item.publishedAt)}</span>
+                      <span className="text-[10px] sm:text-[7px] font-mono text-slate-400 ml-auto whitespace-nowrap">{timeAgo(item.publishedAt)}</span>
                     </div>
-                    <h4 className="text-[10px] font-bold text-slate-800 leading-snug group-hover:text-teal-700 transition-colors line-clamp-2">
+                    <h4 className="text-[12px] sm:text-[10px] font-bold text-slate-800 leading-snug group-hover:text-teal-700 transition-colors line-clamp-2">
                       {item.title}
                     </h4>
                     <div className="flex items-center gap-1 mt-0.5">
-                      <span className={`text-[7px] font-bold px-1 py-0.5 rounded ${cat.bg} ${cat.txt}`}>{item.category ?? "Market"}</span>
-                      <span className={`flex items-center gap-0.5 text-[7px] font-bold px-1 py-0.5 rounded ${st.bg} ${st.txt}`}>
+                      <span className={`text-[10px] sm:text-[7px] font-bold px-1 py-0.5 rounded ${cat.bg} ${cat.txt}`}>{item.category ?? "Market"}</span>
+                      <span className={`flex items-center gap-0.5 text-[10px] sm:text-[7px] font-bold px-1 py-0.5 rounded ${st.bg} ${st.txt}`}>
                         <span className={`w-1 h-1 rounded-full ${st.dot}`} />
                         {st.label}
                       </span>
@@ -1682,7 +1682,7 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
         {filtered.length > 20 && !expanded && (
           <button
             onClick={() => setExpanded(true)}
-            className="w-full py-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 hover:text-teal-700 hover:bg-slate-50 border-t border-slate-100 transition-colors"
+            className="w-full min-h-11 py-1.5 text-[11px] sm:text-[9px] font-bold uppercase tracking-wider text-slate-500 hover:text-teal-700 hover:bg-slate-50 border-t border-slate-100 transition-colors"
           >
             Show {filtered.length} stories
           </button>
@@ -2128,16 +2128,43 @@ export default function IrosMasterAdvancedTerminal() {
     [selectedTickerForView, liveMarket, stocks]
   );
 
+  const resolveStockForDrawer = useCallback(
+    (ticker: string): LiveStock | LedgerStock => {
+      const key = String(ticker || '').toUpperCase();
+      const fromStocks =
+        stocks.find((s) => String(s.ticker || '').toUpperCase() === key) ??
+        stocks.find((s) => String(s.ticker || '') === ticker);
+      if (fromStocks) return fromStocks;
+      const quote = liveMarket?.stockQuotes?.[ticker] ?? liveMarket?.stockQuotes?.[key];
+      if (quote && typeof quote === 'object') {
+        const q = quote as LiveStock;
+        return { ...q, ticker: q.ticker || ticker };
+      }
+      // Ledger / Matrix ticker may not be in the live stocks[] pool — keep drawer identity
+      return {
+        ticker,
+        name: ticker,
+        capSize: '—',
+        ltp: '—',
+        ltpRaw: 0,
+        delta: '—',
+        state: 'neutral',
+      } as LiveStock;
+    },
+    [stocks, liveMarket?.stockQuotes],
+  );
+
   const handleSelect = async (t: string) => {
     setSelectedTicker(t);
     setDrawerOpen(true);
+    const stock = resolveStockForDrawer(t);
 
     const tickerIntelligence = liveMarket?.tickerIntelligenceByTicker?.[t];
     const tickerNewsFromSnapshot = liveMarket?.tickerNewsByTicker?.[t] as AITickerNewsReport | undefined;
     if (tickerIntelligence) {
       setTickerIntelligence(tickerIntelligence);
       setDrawerContent({
-        stock: stocks.find((s) => s.ticker === t) ?? null,
+        stock,
         analysis: {
           ...tickerIntelligence,
           isSnapshotFallback: liveMarket?.isSnapshotFallback ?? false,
@@ -2157,16 +2184,16 @@ export default function IrosMasterAdvancedTerminal() {
         const ti = body.terminalIntelligence ?? body;
         setTickerIntelligence(ti);
         setDrawerContent({
-          stock: stocks.find((s) => s.ticker === t) ?? null,
+          stock,
           analysis: { ...ti, isSnapshotFallback: body.isSnapshotFallback },
           tickerNews: tickerNewsFromSnapshot ?? null,
         });
       } else {
         const text = await resp.text();
-        setDrawerContent({ stock: stocks.find((s) => s.ticker === t) ?? null, analysis: { error: text } });
+        setDrawerContent({ stock, analysis: { error: text } });
       }
     } catch (err) {
-      setDrawerContent({ stock: stocks.find((s) => s.ticker === t) ?? null, analysis: { error: String(err) } });
+      setDrawerContent({ stock, analysis: { error: String(err) } });
     }
 
     if (!tickerNewsFromSnapshot) {
@@ -2223,68 +2250,69 @@ export default function IrosMasterAdvancedTerminal() {
     [globalIndices, mcGlobalSparklines]
   );
 
+  const sourcesTape = useMemo(() => {
+    const base =
+      liveMarket?.rawSources?.join(' · ') ??
+      'Reuters · TradingView · Moneycontrol · Livemint Markets · Indian Express Business';
+    return selectedPool ? `${base} · ${selectedPool}` : base;
+  }, [liveMarket?.rawSources, selectedPool]);
+
   return (
-    <div className="terminal-shell app-shell min-h-screen antialiased overflow-x-hidden">
-      <div className="app-shell-inner max-w-[1600px] mx-auto w-full min-w-0 p-2 sm:p-3 md:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-2 sm:space-y-3 md:space-y-4">
-        <header className="terminal-header">
-            <div className="flex flex-col gap-2 sm:gap-3 p-3 sm:p-4">
-            <div className="desk-live-ribbon" aria-hidden />
-            <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-2 sm:gap-3">
-              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                <div className="desk-brand-mark" aria-hidden>
-                  <img
-                    src="/alphix-logo.svg"
-                    alt=""
-                    width={44}
-                    height={44}
-                    className="desk-brand-logo"
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h1 className="font-black tracking-[0.06em] uppercase">
-                    Alphix Terminal
-                  </h1>
-                  <p className="mt-0.5 sm:mt-1 uppercase tracking-[0.12em] truncate" style={{ fontSize: 'var(--desk-label)', color: 'var(--fg-muted)' }} suppressHydrationWarning>
-                    NSE / BSE · live desk
-                  </p>
-                </div>
-                <button
-                  onClick={handleRefresh}
-                  disabled={feedStatus === 'loading'}
-                  className="desk-btn-primary sm:hidden shrink-0 !min-h-10 !px-3"
-                >
-                  {feedStatus === 'loading' ? '…' : '↻'}
-                </button>
-              </div>
-
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                <DeskControls
-                  feedStatus={feedStatus}
-                  clockLabel={liveMarket?.updatedAt ? new Date(liveMarket.updatedAt).toLocaleTimeString('en-IN', { hour12: false }) : '--:--'}
+    <div className="terminal-shell app-shell min-h-[100dvh] antialiased overflow-x-hidden">
+      <div className="app-shell-inner max-w-[1600px] mx-auto w-full min-w-0 p-2 sm:p-3 md:p-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] space-y-2 sm:space-y-3 md:space-y-4">
+        <header className="terminal-header app-chrome">
+          <div className="desk-topbar">
+            <div className="desk-brand" title="NSE / BSE · live desk">
+              <div className="desk-brand-mark" aria-hidden>
+                <img
+                  src="/alphix-logo.svg"
+                  alt=""
+                  width={32}
+                  height={32}
+                  className="desk-brand-logo"
                 />
-                <button
-                  onClick={handleRefresh}
-                  disabled={feedStatus === 'loading'}
-                  className="desk-btn-primary hidden sm:inline-flex w-full sm:w-auto"
-                >
-                  {feedStatus === 'loading' ? 'Refreshing…' : 'Refresh'}
-                </button>
+              </div>
+              <div className="desk-brand-text min-w-0">
+                <h1 className="desk-brand-word">
+                  Alphix <span className="desk-brand-meta">Terminal</span>
+                </h1>
+                <p className="desk-brand-sub" suppressHydrationWarning>
+                  NSE / BSE
+                </p>
               </div>
             </div>
 
-            <div className="hidden sm:flex flex-wrap items-center justify-between gap-2" style={{ fontSize: 'var(--desk-label)', color: 'var(--fg-muted)' }}>
-              <span className="font-bold uppercase tracking-wider truncate">
-                {liveMarket?.rawSources?.join(' · ') ?? 'Reuters · TradingView · Moneycontrol'}
-              </span>
-              <span className="uppercase tracking-wider xl:hidden">{selectedPool}</span>
+            <DeskControls
+              feedStatus={feedStatus}
+              clockLabel={liveMarket?.updatedAt ? new Date(liveMarket.updatedAt).toLocaleTimeString('en-IN', { hour12: false }) : '--:--'}
+            />
+
+            <div className="desk-sources" title={sourcesTape} aria-label={`Data sources: ${sourcesTape}`}>
+              <div className="desk-sources-mask">
+                <div className="desk-sources-track">
+                  <span className="desk-sources-seg">{sourcesTape}</span>
+                  <span className="desk-sources-gap" aria-hidden>···</span>
+                  <span className="desk-sources-seg" aria-hidden>{sourcesTape}</span>
+                  <span className="desk-sources-gap" aria-hidden>···</span>
+                </div>
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={feedStatus === 'loading'}
+              className="desk-btn-refresh"
+              aria-label="Refresh market data"
+            >
+              <span className="desk-btn-refresh-icon" aria-hidden>{feedStatus === 'loading' ? '…' : '↻'}</span>
+              <span className="desk-btn-refresh-label">{feedStatus === 'loading' ? 'Sync…' : 'Refresh'}</span>
+            </button>
           </div>
 
           {isSnapshotFallback && (
-            <div className="px-3 sm:px-4 pb-3">
-              <div className="desk-banner-warn p-2 rounded-lg text-[11px] leading-snug">
-                Snapshot fallback — showing latest saved analysis.
-              </div>
+            <div className="desk-banner-warn desk-banner-warn--bar">
+              Snapshot fallback — showing latest saved analysis.
             </div>
           )}
         </header>

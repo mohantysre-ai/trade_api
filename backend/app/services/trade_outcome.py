@@ -573,8 +573,10 @@ def load_fixed_trade_plan() -> dict[str, Any]:
             payload = json.load(fh)
         if isinstance(payload, dict):
             return payload
+        log.warning("fixed trade plan is not a JSON object: %s", _FIXED_PLAN_FILE)
         return {}
-    except Exception:
+    except Exception as exc:
+        log.error("Failed to load fixed trade plan (%s): %s", _FIXED_PLAN_FILE, exc)
         return {}
 
 
@@ -640,6 +642,27 @@ def get_live_prices_for_plan() -> dict[str, Any]:
     snapshot_updated_prefetch = snapshot_prefetch.get("updatedAt", "")
 
     fixed = load_fixed_trade_plan()
+    plan_note = None
+    if not fixed or (not (fixed.get("long") or []) and not (fixed.get("short") or [])):
+        # Corrupt/missing plan must not kill the desk — fall back to locked session basket.
+        try:
+            from .intraday_session_engine import load_session
+
+            sess = load_session() or {}
+            long_fb = list(sess.get("long") or [])
+            short_fb = list(sess.get("short") or [])
+            if long_fb or short_fb:
+                fixed = {
+                    "long": long_fb,
+                    "short": short_fb,
+                    "updatedAt": sess.get("updatedAt") or _utc_now(),
+                    "source": "intraday_session_fallback",
+                }
+                plan_note = "Fixed plan missing/corrupt; pricing locked session basket"
+                log.error("%s (%s)", plan_note, _FIXED_PLAN_FILE)
+        except Exception as exc:
+            log.error("Session fallback after empty fixed plan failed: %s", exc)
+
     if not fixed:
         return {
             "long": [],
@@ -882,15 +905,18 @@ def get_live_prices_for_plan() -> dict[str, Any]:
         "updatedAt": _utc_now(),
         "snapshotUpdatedAt": snapshot_updated,
         "snapshotAgeSec": snapshot_age_sec,
-        "source": "fixed_plan",
+        "source": "fixed_plan" if not plan_note else "session_fallback",
         "priceSourcesNote": (
-            (
-                "Angel One ltpData + Yahoo last print for every plan ticker"
-                if market_open
-                else "Yahoo close marks for every plan ticker (post-close)"
+            plan_note
+            or (
+                (
+                    "Angel One ltpData + Yahoo last print for every plan ticker"
+                    if market_open
+                    else "Yahoo close marks for every plan ticker (post-close)"
+                )
+                if live_attempted
+                else "Angel One snapshot / plan cache only (weekend or no plan symbols)"
             )
-            if live_attempted
-            else "Angel One snapshot / plan cache only (weekend or no plan symbols)"
         ),
         "newAlerts": new_alerts,
         "marketOpen": market_open,

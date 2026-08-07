@@ -279,7 +279,7 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag }: 
             <button
               key={f}
               onClick={(e) => { e.stopPropagation(); onFlagChange(f); }}
-              className={`px-1.5 py-0.5 rounded-md desk-chip ${
+              className={`min-h-10 min-w-10 py-2 px-2.5 sm:min-h-0 sm:min-w-0 sm:px-1.5 sm:py-0.5 rounded-md desk-chip ${
                 f === currentFlag ? 'is-on' : ''
               }`}
             >
@@ -288,7 +288,7 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag }: 
           ))}
         </div>
         {change && (
-          <span className={`text-[7px] font-bold tabular-nums ${change.positive ? 'text-emerald-600' : 'text-red-500'}`}>
+          <span className={`text-[10px] sm:text-[7px] font-bold tabular-nums ${change.positive ? 'text-emerald-600' : 'text-red-500'}`}>
             {change.label}
           </span>
         )}
@@ -574,11 +574,11 @@ function StrengthMeter({ score }: { score: number }) {
     bars >= 4 ? 'bg-emerald-500' : bars >= 3 ? 'bg-[var(--terminal-marigold)]' : 'bg-slate-400';
   return (
     <div className="flex items-center gap-1.5 min-w-[7.5rem]" title={`Setup strength ${label} (score ${score.toFixed(1)})`}>
-      <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400">Strength</span>
+      <span className="text-[10px] sm:text-[8px] font-bold uppercase tracking-wider text-slate-400">Strength</span>
       <DeskGaugeFill pct={pct} className="w-14" toneClass={tone} />
       <LiveTickNumber
         value={score > 0 ? score.toFixed(1) : '—'}
-        className="text-[8px] font-bold text-slate-500"
+        className="text-[10px] sm:text-[8px] font-bold text-slate-500"
       />
     </div>
   );
@@ -1332,7 +1332,7 @@ export default function ForensicPanel({
                 <div className="flex items-center gap-1 shrink-0">
                   {winEdge && (
                     <span
-                      className={`inline-block border px-1.5 py-0.5 rounded-md text-[8px] whitespace-nowrap font-bold tabular-nums ${
+                      className={`inline-block border px-1.5 py-0.5 rounded-md text-[10px] sm:text-[8px] whitespace-nowrap font-bold tabular-nums ${
                         winEdge.kind === 'win_edge'
                           ? 'text-indigo-700 bg-indigo-50 border-indigo-200'
                           : 'text-slate-600 bg-slate-50 border-slate-200'
@@ -1395,7 +1395,7 @@ export default function ForensicPanel({
                       {sourceChips.map((chip) => (
                         <span
                           key={`${row.ticker}-src-${chip.label}`}
-                          className={`inline-flex items-center border px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-wider ${matrixSourceChipClass(chip.label, chip.active)}`}
+                          className={`inline-flex items-center border px-1.5 py-0.5 rounded text-[10px] sm:text-[7px] font-black uppercase tracking-wider ${matrixSourceChipClass(chip.label, chip.active)}`}
                         >
                           {chip.label}
                         </span>
@@ -1408,7 +1408,7 @@ export default function ForensicPanel({
                       {intelligence.chips.map((chip) => (
                         <span
                           key={`${row.ticker}-${chip.label}`}
-                          className={`inline-flex items-center border px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide ${chipToneClass(chip.tone)}`}
+                          className={`inline-flex items-center border px-1.5 py-0.5 rounded text-[10px] sm:text-[8px] font-bold uppercase tracking-wide ${chipToneClass(chip.tone)}`}
                         >
                           {chip.label}
                         </span>
@@ -1416,7 +1416,7 @@ export default function ForensicPanel({
                     </div>
                   )}
                   {showTrendlyneHint && intelligence.chips.length === 0 && (
-                    <p className="text-[8px] text-slate-400 mb-1">
+                    <p className="text-[10px] sm:text-[8px] text-slate-400 mb-1">
                       Open card for full Trendlyne analysis
                     </p>
                   )}

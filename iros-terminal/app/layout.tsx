@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { DeskPrefsProvider } from "./components/DeskPrefsProvider";
+import ServiceWorkerRegister from "./components/ServiceWorkerRegister";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,18 +39,19 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
       { url: "/alphix-logo.svg", type: "image/svg+xml" },
-      { url: "/alphix-logo.png", type: "image/png" },
     ],
-    apple: [{ url: "/alphix-logo.png" }],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: dark)", color: "#07111f" },
@@ -74,7 +76,10 @@ export default function RootLayout({
         <Script src="/theme-boot.js" strategy="beforeInteractive" />
       </head>
       <body className="min-h-full min-h-[100dvh] flex flex-col overflow-x-hidden overscroll-none" suppressHydrationWarning>
-        <DeskPrefsProvider>{children}</DeskPrefsProvider>
+        <DeskPrefsProvider>
+          <ServiceWorkerRegister />
+          {children}
+        </DeskPrefsProvider>
       </body>
     </html>
   );

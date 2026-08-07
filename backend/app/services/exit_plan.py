@@ -365,9 +365,38 @@ def blended_pnl_from_state(
     mark: float,
     *,
     after_close: bool = True,
+    day_high: float | None = None,
+    day_low: float | None = None,
 ) -> tuple[float, float, dict[str, Any]]:
-    """Return (total_pnl, avg_exit_price, eval_result) for EOD books."""
-    result = evaluate_scale_trail(pick, mark, after_close=after_close)
+    """Return (total_pnl, avg_exit_price, eval_result) for EOD books.
+
+    When day_high/day_low provided, uses path-aware scale fills + trail.
+    """
+    hi = day_high
+    lo = day_low
+    if hi is None:
+        for k in ("dayHigh", "orbHigh"):
+            try:
+                if pick.get(k) is not None:
+                    hi = float(pick[k])
+                    break
+            except (TypeError, ValueError):
+                pass
+    if lo is None:
+        for k in ("dayLow", "orbLow"):
+            try:
+                if pick.get(k) is not None:
+                    lo = float(pick[k])
+                    break
+            except (TypeError, ValueError):
+                pass
+
+    if hi is not None or lo is not None:
+        result = evaluate_scale_trail_path(
+            pick, mark, hi, lo, after_close=after_close
+        )
+    else:
+        result = evaluate_scale_trail(pick, mark, after_close=after_close)
     if not result:
         return 0.0, mark, {}
     realized = float(result.get("realizedPnl") or 0)
@@ -387,3 +416,80 @@ def blended_pnl_from_state(
     else:
         avg = mark
     return total, avg, result
+
+
+def evaluate_scale_trail_path(
+    pick: dict[str, Any],
+    mark: float,
+    day_high: float | None = None,
+    day_low: float | None = None,
+    *,
+    after_close: bool = True,
+) -> dict[str, Any]:
+    """Path-aware scale eval: book/ratchet at fav extreme, then trail vs adverse or mark.
+
+    Used by EOD books so R-ladder progress reflects the day's range, not only the close.
+    """
+    work = dict(pick)
+    direction = str(work.get("direction") or "LONG").upper()
+    try:
+        mark_f = float(mark)
+    except (TypeError, ValueError):
+        return {}
+    hi = float(day_high) if day_high is not None else mark_f
+    lo = float(day_low) if day_low is not None else mark_f
+    fav = hi if direction == "LONG" else lo
+    adv = lo if direction == "LONG" else hi
+
+    r1 = evaluate_scale_trail(work, fav, after_close=False)
+    if r1 and isinstance(r1.get("exitState"), dict):
+        work["exitState"] = r1["exitState"]
+
+    stop = float((work.get("exitState") or {}).get("effectiveStop") or work.get("stopLoss") or 0)
+    eval_px = mark_f
+    if stop > 0:
+        if direction == "LONG" and adv <= stop:
+            eval_px = stop
+        elif direction == "SHORT" and adv >= stop:
+            eval_px = stop
+    return evaluate_scale_trail(work, eval_px, after_close=after_close)
+
+
+def format_scale_progress(
+    exit_plan: dict[str, Any] | None,
+    exit_state: dict[str, Any] | None,
+    *,
+    r_multiple: float | None = None,
+) -> str | None:
+    """Desk progress string: ``0.5R+ 1R+ 1.5R. · rem N · trail SL xxx`` (+ filled, . open)."""
+    if not isinstance(exit_plan, dict) or exit_plan.get("mode") != "SCALE_TRAIL":
+        return None
+    filled_rs: set[float] = set()
+    state = exit_state if isinstance(exit_state, dict) else {}
+    for x in state.get("legsFilled") or []:
+        if isinstance(x, dict) and isinstance(x.get("r"), (int, float)):
+            filled_rs.add(float(x["r"]))
+        elif isinstance(x, (int, float)):
+            filled_rs.add(float(x))
+    parts: list[str] = []
+    for leg in exit_plan.get("legs") or []:
+        if not isinstance(leg, dict):
+            continue
+        r = float(leg.get("r") or 0)
+        hit = r in filled_rs or (r_multiple is not None and r_multiple + 1e-9 >= r)
+        parts.append(f"{r:g}R{'+' if hit else '.'}")
+    for thresh in (2.0, 3.0, 4.0):
+        hit = r_multiple is not None and r_multiple + 1e-9 >= thresh
+        if not hit:
+            hit = any(abs(x - thresh) < 1e-9 for x in filled_rs)
+        parts.append(f"{thresh:g}R{'+' if hit else '.'}")
+    rem = state.get("remainingQty")
+    if rem is not None:
+        parts.append(f"rem {int(rem)}")
+    eff = state.get("effectiveStop")
+    if eff is not None:
+        try:
+            parts.append(f"trail SL {float(eff):.2f}")
+        except (TypeError, ValueError):
+            pass
+    return " ".join(parts) if parts else None

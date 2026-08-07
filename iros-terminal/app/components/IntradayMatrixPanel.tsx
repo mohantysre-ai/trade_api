@@ -266,7 +266,7 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag, di
             <button
               key={f}
               onClick={(e) => { e.stopPropagation(); e.preventDefault(); onFlagChange(f); }}
-              className={`px-1.5 py-0.5 rounded-md desk-chip ${
+              className={`min-h-10 min-w-10 py-2 px-2.5 sm:min-h-0 sm:min-w-0 sm:px-1.5 sm:py-0.5 rounded-md desk-chip ${
                 f === currentFlag ? 'is-on' : ''
               }`}
             >
@@ -275,7 +275,7 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag, di
           ))}
         </div>
         {hasData && (
-          <span className={`text-[7px] font-bold tabular-nums ${changeColor}`}>{changeLabel}</span>
+          <span className={`text-[10px] sm:text-[7px] font-bold tabular-nums ${changeColor}`}>{changeLabel}</span>
         )}
       </div>
     </div>
@@ -696,6 +696,55 @@ function BookPlanRow({
   );
 }
 
+/** Phone essentials for 9-col trade plan (table remains md+) */
+function BookPlanMobileCard({
+  tp,
+  entryClass,
+  entryLabel,
+}: {
+  tp: PlanRowItem;
+  entryClass: string;
+  entryLabel: string;
+}) {
+  const ltp = tp.currentPrice ?? null;
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-2.5 space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <a
+          href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="desk-metric-value font-mono hover:text-indigo-600 transition-colors"
+        >
+          {tp.symbol}
+        </a>
+        <OutcomeBadge outcome={tp.outcome} exitPlan={tp.exitPlan} exitState={tp.exitState} />
+      </div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+        <div className="text-slate-500">
+          LTP{' '}
+          <span className="font-mono font-bold text-slate-900">
+            {ltp != null ? <LiveTickNumber value={ltp.toFixed(2)} className="font-mono font-bold text-slate-900" /> : '—'}
+          </span>
+        </div>
+        <div className="text-slate-500">
+          {entryLabel}{' '}
+          <span className={`font-mono font-bold ${entryClass}`}>{tp.entryPrice?.toFixed(2) ?? '—'}</span>
+        </div>
+        <div className="text-slate-500">
+          SL <span className="font-mono font-bold text-red-500">{tp.stopLoss?.toFixed(2) ?? '—'}</span>
+        </div>
+        <div className="text-slate-500">
+          T1/T2{' '}
+          <span className="font-mono text-blue-600">
+            {tp.target1?.toFixed(2) ?? '—'} / {tp.target2?.toFixed(2) ?? '—'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Scale-trail exit progress string ──────────────────────────────────── */
 function exitProgressStr(exitPlan: ExitPlan | null | undefined, exitState: ExitState | null | undefined, outcome: TradeOutcome | null | undefined): string | null {
   const state = exitState ?? (outcome?.scaleTrail ? {
@@ -729,10 +778,10 @@ function OutcomeBadge({ outcome, exitPlan, exitState }: {
   exitState?: ExitState | null;
 }) {
   if (!outcome) {
-    return <span className="text-[8px] text-slate-400">—</span>;
+    return <span className="text-[10px] sm:text-[8px] text-slate-400">—</span>;
   }
   
-  const baseClasses = "inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider";
+  const baseClasses = "inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] sm:text-[8px] font-bold uppercase tracking-wider";
   const hitLevel = outcome.hitLevel;
   const isScaleTrail = Boolean(outcome.scaleTrail || exitPlan?.mode === 'SCALE_TRAIL');
   const progress = isScaleTrail ? exitProgressStr(exitPlan, exitState, outcome) : null;
@@ -754,7 +803,7 @@ function OutcomeBadge({ outcome, exitPlan, exitState }: {
           {exitState?.closed ? 'TRAIL CLOSED' : 'PARTIAL · TRAIL'}
         </span>
         {progress && (
-          <span className="text-[7px] text-slate-500 font-mono tabular-nums pl-0.5 whitespace-nowrap">{progress}</span>
+          <span className="text-[10px] sm:text-[7px] text-slate-500 font-mono tabular-nums pl-0.5 whitespace-nowrap">{progress}</span>
         )}
       </span>
     );
@@ -796,7 +845,7 @@ function OutcomeBadge({ outcome, exitPlan, exitState }: {
 function DirectionBadge({ dir }: { dir: string }) {
   const isBuy = dir === 'BUY';
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[8px] font-black uppercase tracking-wider ${
       isBuy ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
             : 'bg-red-100 text-red-700 border border-red-300'}`}>
       <span className={`w-1 h-1 rounded-full ${isBuy ? 'bg-emerald-500' : 'bg-red-500'} animate-pulse`} />
@@ -1072,7 +1121,7 @@ export default function IntradayMatrixPanel() {
               </div>
               <div>
                 <h3 className="desk-panel-title text-slate-900">LEMOON CO.IN — 10 INTRADAY PICKS</h3>
-                <p className="text-[7px] text-slate-500">
+                <p className="text-[10px] sm:text-[7px] text-slate-500">
                   {lemonnData?.source ?? 'lemonn.co.in'}
                   {lemonnData?.isMock && <span className="ml-1 text-amber-500 font-bold">(mock fallback)</span>}
                   {lemonnTime && <span className="ml-1 text-slate-400">@{lemonnTime}</span>}
@@ -1081,7 +1130,7 @@ export default function IntradayMatrixPanel() {
             </div>
             <div className="flex items-center gap-1.5">
               <div className="px-1.5 py-0.5 rounded-lg bg-cyan-500/10 border border-cyan-400/25">
-                <span className="text-[8px] text-cyan-300 font-semibold">{lemonnData?.count ?? 0} picks</span>
+                <span className="text-[10px] sm:text-[8px] text-cyan-300 font-semibold">{lemonnData?.count ?? 0} picks</span>
               </div>
             </div>
           </div>
@@ -1110,14 +1159,14 @@ export default function IntradayMatrixPanel() {
                     <span className="desk-metric-value font-mono">{rec.symbol}</span>
                     <DirectionBadge dir={rec.direction} />
                   </div>
-                  <p className="text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
+                  <p className="text-[10px] sm:text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
                   <SparklineFlagSlider
                     ticker={rec.symbol}
                     sparklines={allSparklines[rec.symbol] ?? ({} as Record<SparkFlag, number[]>)}
                     currentFlag={getFlag(rec.symbol)}
                     onFlagChange={(f) => setFlag(rec.symbol, f)}
                   />
-                  <div className="space-y-1 text-[8px] relative z-10">
+                  <div className="space-y-1 text-[10px] sm:text-[8px] relative z-10">
                     <div className="flex justify-between"><span className="text-slate-400">Buy</span><span className="font-bold text-emerald-600">₹{rec.buyPrice.toFixed(2)}</span></div>
                     <div className="flex justify-between"><span className="text-slate-400">Sell</span><span className="font-bold text-blue-600">₹{rec.sellPrice.toFixed(2)}</span></div>
                     <div className="flex justify-between"><span className="text-slate-400">Stop Loss</span><span className="font-bold text-red-500">₹{rec.stopLoss.toFixed(2)}</span></div>
@@ -1152,7 +1201,7 @@ export default function IntradayMatrixPanel() {
                 <h3 className="desk-panel-title text-slate-900">
                   DHAN ScanX → FEED SCANNER — TOP 10 + TRADE PLAN
                 </h3>
-                <p className="text-[7px] text-slate-500">
+                <p className="text-[10px] sm:text-[7px] text-slate-500">
                   {dhanData?.source ?? 'dhan-scanx'}
                   {dhanData?.isMock && <span className="ml-1 text-amber-500 font-bold">(mock fallback — Dhan API unreachable)</span>}
                   &nbsp;·&nbsp;Scanned {dhanData?.scannedCount ?? 0} stocks
@@ -1164,7 +1213,7 @@ export default function IntradayMatrixPanel() {
             </div>
             <div className="flex items-center gap-1.5">
               <div className="px-1.5 py-0.5 rounded-lg bg-gradient-to-r from-emerald-100 to-teal-50 border border-emerald-200">
-                <span className="text-[8px] text-emerald-700 font-semibold">{dhanData?.recommendations?.length ?? 0} stocks</span>
+                <span className="text-[10px] sm:text-[8px] text-emerald-700 font-semibold">{dhanData?.recommendations?.length ?? 0} stocks</span>
               </div>
             </div>
           </div>
@@ -1201,12 +1250,12 @@ export default function IntradayMatrixPanel() {
                       <div className="flex items-center justify-between mb-1.5 relative z-10">
                         <span className="desk-metric-value font-mono">{rec.symbol}</span>
                         {rec.score != null && (
-                          <span className="text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] sm:text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                             {rec.score.toFixed(0)}
                           </span>
                         )}
                       </div>
-                      <p className="text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
+                      <p className="text-[10px] sm:text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
                       <SparklineFlagSlider
                         ticker={rec.symbol}
                         sparklines={allSparklines[rec.symbol] ?? ({} as Record<SparkFlag, number[]>)}
@@ -1214,7 +1263,7 @@ export default function IntradayMatrixPanel() {
                         onFlagChange={(f) => setFlag(rec.symbol, f)}
                         direction="LONG"
                       />
-                      <div className="space-y-1 text-[8px] relative z-10">
+                      <div className="space-y-1 text-[10px] sm:text-[8px] relative z-10">
                         <div className="flex justify-between"><span className="text-slate-400">Buy Above</span><span className="font-bold text-emerald-600">{rec.buyAbove?.toFixed(2) ?? '—'}</span></div>
                         <div className="flex justify-between"><span className="text-slate-400">T1 / T2</span><span className="font-bold text-blue-600">{rec.target1?.toFixed(2) ?? '—'} / {rec.target2?.toFixed(2) ?? '—'}</span></div>
                         <div className="flex justify-between"><span className="text-slate-400">Stop Loss</span><span className="font-bold text-red-500">{rec.stopLoss?.toFixed(2) ?? '—'}</span></div>
@@ -1251,12 +1300,12 @@ export default function IntradayMatrixPanel() {
                         <div className="flex items-center justify-between mb-1.5 relative z-10">
                           <span className="desk-metric-value font-mono">{rec.symbol}</span>
                           {rec.score != null && (
-                            <span className="text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                            <span className="text-[10px] sm:text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                               {rec.score.toFixed(0)}
                             </span>
                           )}
                         </div>
-                        <p className="text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
+                        <p className="text-[10px] sm:text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
                         <SparklineFlagSlider
                           ticker={rec.symbol}
                           sparklines={allSparklines[rec.symbol] ?? ({} as Record<SparkFlag, number[]>)}
@@ -1264,7 +1313,7 @@ export default function IntradayMatrixPanel() {
                           onFlagChange={(f) => setFlag(rec.symbol, f)}
                           direction="SHORT"
                         />
-                        <div className="space-y-1 text-[8px] relative z-10">
+                        <div className="space-y-1 text-[10px] sm:text-[8px] relative z-10">
                           <div className="flex justify-between"><span className="text-slate-400">Sell Below</span><span className="font-bold text-rose-600">{rec.buyAbove?.toFixed(2) ?? '—'}</span></div>
                           <div className="flex justify-between"><span className="text-slate-400">T1 / T2</span><span className="font-bold text-blue-600">{rec.target1?.toFixed(2) ?? '—'} / {rec.target2?.toFixed(2) ?? '—'}</span></div>
                           <div className="flex justify-between"><span className="text-slate-400">Stop Loss</span><span className="font-bold text-red-500">{rec.stopLoss?.toFixed(2) ?? '—'}</span></div>
@@ -1379,8 +1428,18 @@ export default function IntradayMatrixPanel() {
                       <span className="glass-pill px-2 py-0.5 text-[9px] text-slate-400 tabular-nums">updated @{planTime || '—'}</span>
                     </div>
 
-                    {/* Trade plan table — LONG */}
-                    <div className="overflow-x-auto desk-scroll-x">
+                    {/* Trade plan — LONG: mobile cards / md+ table */}
+                    <div className="md:hidden space-y-2">
+                      {planLong.slice(0, 5).map((tp, idx) => (
+                        <BookPlanMobileCard
+                          key={`lp-long-m-${tp.symbol}-${idx}`}
+                          tp={tp}
+                          entryClass="text-emerald-600"
+                          entryLabel="Buy"
+                        />
+                      ))}
+                    </div>
+                    <div className="hidden md:block overflow-x-auto desk-scroll-x">
                       <table className="w-full text-[12px] border-collapse">
                         <thead>
                           <tr className="bg-slate-100 text-slate-600">
@@ -1489,7 +1548,17 @@ export default function IntradayMatrixPanel() {
                                 : '(MONITOR · MARKET CLOSED)')}
                         </span>
                       </div>
-                      <div className="overflow-x-auto desk-scroll-x">
+                      <div className="md:hidden space-y-2">
+                        {planShort.slice(0, 5).map((tp, idx) => (
+                          <BookPlanMobileCard
+                            key={`lp-short-m-${tp.symbol}-${idx}`}
+                            tp={tp}
+                            entryClass="text-rose-600"
+                            entryLabel="Sell"
+                          />
+                        ))}
+                      </div>
+                      <div className="hidden md:block overflow-x-auto desk-scroll-x">
                         <table className="w-full text-[12px] border-collapse">
                           <thead>
                             <tr className="bg-rose-50 text-slate-600">

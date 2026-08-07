@@ -23,6 +23,7 @@ from typing import Any
 
 from .exit_plan import attach_exit_plan
 from .desk_clock import basket_lock_allowed, basket_lock_block_message, lock_window_config
+from .desk_book_symbols import swing_locked_symbols
 
 log = logging.getLogger(__name__)
 
@@ -1056,10 +1057,12 @@ def _adopt_high_probability(
     direction: str,
     capital: float,
     regime: dict[str, Any],
+    exclude_symbols: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """From candidate pool (≈10/side), keep top-n by score / in-play / RR — facts only."""
     if n <= 0 or not rows:
         return []
+    blocked = {str(s).upper().strip() for s in (exclude_symbols or set()) if str(s).strip()}
     ranked = sorted(
         rows,
         key=lambda r: (
@@ -1070,10 +1073,14 @@ def _adopt_high_probability(
         ),
         reverse=True,
     )
-    adopted = ranked[:n]
-    risk_scale = _regime_risk_scale(regime, direction)
     out: list[dict[str, Any]] = []
-    for i, row in enumerate(adopted):
+    risk_scale = _regime_risk_scale(regime, direction)
+    for row in ranked:
+        if len(out) >= n:
+            break
+        sym = str(row.get("symbol") or "").upper().strip()
+        if not sym or sym in blocked:
+            continue
         entry = float(row.get("entryPrice") or row.get("ltp") or 0)
         risk = float(row.get("riskPerShare") or 0)
         if entry <= 0:
@@ -1090,13 +1097,14 @@ def _adopt_high_probability(
                 {
                     **row,
                     **sizing,
-                    "rank": i + 1,
+                    "rank": len(out) + 1,
                     "adopted": True,
                     "adoptReason": "HIGH_PROBABILITY_SCORE",
                     "candidatePoolSize": len(rows),
                 }
             )
         )
+        blocked.add(sym)
     return out
 
 
@@ -1331,10 +1339,18 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
 
     # Sequential construction: long first, then short excludes long basket symbols
     # (avoids wiping MR pool via premature opposite-side top-N filter)
+    # Also exclude today's locked swing symbols so books stay unique.
+    swing_exclude = swing_locked_symbols(_ist_now().strftime("%Y-%m-%d"))
     long_basket = _construct_dual_sleeve(
-        long_scored[:60], long_mr[:60], "LONG", LONG_CAPITAL, regime, mr_gate_open
+        long_scored[:60],
+        long_mr[:60],
+        "LONG",
+        LONG_CAPITAL,
+        regime,
+        mr_gate_open,
+        exclude_symbols=swing_exclude or None,
     )
-    long_syms = {p["symbol"] for p in long_basket}
+    long_syms = {p["symbol"] for p in long_basket} | set(swing_exclude)
     short_basket = _construct_dual_sleeve(
         short_scored[:60],
         short_mr[:60],
@@ -1347,10 +1363,20 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
 
     # High-probability adoption: 20 candidates → 5 BUY + 5 SELL
     adopt_long = _adopt_high_probability(
-        long_basket, LOCK_SIZE, direction="LONG", capital=LONG_CAPITAL, regime=regime
+        long_basket,
+        LOCK_SIZE,
+        direction="LONG",
+        capital=LONG_CAPITAL,
+        regime=regime,
+        exclude_symbols=swing_exclude,
     )
     adopt_short = _adopt_high_probability(
-        short_basket, LOCK_SIZE, direction="SHORT", capital=SHORT_CAPITAL, regime=regime
+        short_basket,
+        LOCK_SIZE,
+        direction="SHORT",
+        capital=SHORT_CAPITAL,
+        regime=regime,
+        exclude_symbols=swing_exclude | {r["symbol"] for r in adopt_long},
     )
 
     return {
@@ -1508,11 +1534,22 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
         }
     if len(long_rows) < LOCK_SIZE or len(short_rows) < LOCK_SIZE:
         regime = candidates.get("regime") or {}
+        swing_exclude = swing_locked_symbols(_ist_now().strftime("%Y-%m-%d"))
         long_rows = _adopt_high_probability(
-            pool_long, LOCK_SIZE, direction="LONG", capital=LONG_CAPITAL, regime=regime
+            pool_long,
+            LOCK_SIZE,
+            direction="LONG",
+            capital=LONG_CAPITAL,
+            regime=regime,
+            exclude_symbols=swing_exclude,
         )
         short_rows = _adopt_high_probability(
-            pool_short, LOCK_SIZE, direction="SHORT", capital=SHORT_CAPITAL, regime=regime
+            pool_short,
+            LOCK_SIZE,
+            direction="SHORT",
+            capital=SHORT_CAPITAL,
+            regime=regime,
+            exclude_symbols=swing_exclude | {r["symbol"] for r in long_rows},
         )
     if len(long_rows) < LOCK_SIZE or len(short_rows) < LOCK_SIZE:
         return {
@@ -1681,10 +1718,7 @@ def ensure_intraday_session_locked() -> dict[str, Any]:
 def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict[str, Any] | None = None) -> dict[str, Any]:
     """Update LTP/PnL/distances; never mutate symbol or CLOSED→open."""
     out = dict(pos)
-    if out.get("closed") or str(out.get("status") or "").upper() == "CLOSED":
-        out["status"] = "CLOSED"
-        out["closed"] = True
-        return out
+    was_closed = bool(out.get("closed") or str(out.get("status") or "").upper() == "CLOSED")
 
     symbol = str(out.get("symbol") or "").upper()
     ltp = None
@@ -1711,7 +1745,34 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
     out["ltp"] = round(ltp, 2) if ltp is not None else None
     out["ltpSource"] = ltp_source
     live_stale = bool(live_row.get("dataStale")) if live_row else False
-    out["dataStale"] = live_stale or ltp_source in ("cached", "none")
+    out["dataStale"] = (not was_closed) and (live_stale or ltp_source in ("cached", "none"))
+
+    # Prefer persisted / live realized for closes; MTM only while open.
+    realized = None
+    if live_row and live_row.get("realizedPnl") is not None:
+        realized = float(live_row["realizedPnl"])
+    elif out.get("realizedPnl") is not None:
+        realized = float(out["realizedPnl"])
+    elif isinstance(out.get("exitState"), dict) and out["exitState"].get("realizedPnl") is not None:
+        realized = float(out["exitState"]["realizedPnl"])
+    elif isinstance(out.get("outcome"), dict) and out["outcome"].get("pnl") is not None:
+        realized = float(out["outcome"]["pnl"])
+
+    if was_closed:
+        out["status"] = "CLOSED"
+        out["closed"] = True
+        out["realizedPnl"] = round(realized, 2) if realized is not None else None
+        out["unrealizedPnl"] = 0.0 if realized is not None else None
+        out["pnlPct"] = None
+        if realized is not None and entry is not None and entry > 0 and qty > 0:
+            out["pnlPct"] = round((realized / (entry * qty)) * 100, 2)
+        if realized is not None:
+            out["totalPnl"] = round(realized, 2)
+        if live_row and isinstance(live_row.get("exitState"), dict):
+            out["exitState"] = live_row.get("exitState")
+        if live_row and isinstance(live_row.get("outcome"), dict):
+            out["outcome"] = live_row.get("outcome")
+        return out
 
     if ltp is not None and entry is not None and entry > 0:
         rem_qty = int(out.get("remainingQty") if out.get("remainingQty") is not None else qty)
@@ -1723,11 +1784,6 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
         else:
             unreal = (entry - ltp) * rem_qty
             pnl_pct = ((entry - ltp) / entry) * 100
-        realized = None
-        if live_row and live_row.get("realizedPnl") is not None:
-            realized = float(live_row["realizedPnl"])
-        elif out.get("realizedPnl") is not None:
-            realized = float(out["realizedPnl"])
         out["realizedPnl"] = round(realized, 2) if realized is not None else None
         out["unrealizedPnl"] = round(unreal, 2)
         out["pnlPct"] = round(pnl_pct, 2)
@@ -1867,7 +1923,25 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
             orig = session.get(side_key) or []
             for i, row in enumerate(rows):
                 if row.get("closed") and i < len(orig) and not orig[i].get("closed"):
-                    orig[i] = {**orig[i], "closed": True, "status": "CLOSED"}
+                    keep = {
+                        k: row.get(k)
+                        for k in (
+                            "ltp",
+                            "ltpSource",
+                            "realizedPnl",
+                            "unrealizedPnl",
+                            "pnlPct",
+                            "totalPnl",
+                            "exitState",
+                            "outcome",
+                            "effectiveStop",
+                            "remainingQty",
+                            "exitPlan",
+                            "scaleProgress",
+                        )
+                        if row.get(k) is not None
+                    }
+                    orig[i] = {**orig[i], **keep, "closed": True, "status": "CLOSED"}
                     changed = True
                     events = list(session.get("events") or [])
                     events.append({

@@ -153,11 +153,15 @@ body {
   transition: background-color 0.35s var(--ease-collapse), color 0.35s var(--ease-collapse);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+  /* Notch / Dynamic Island / home indicator for standalone & Capacitor */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* ─── Shell ─────────────────────────────────────────────────────────────── */
 
 .terminal-shell {
+  --desk-tabbar-h: 3.25rem;
   min-height: 100vh;
   min-height: 100dvh;
   color: var(--foreground);
@@ -169,6 +173,10 @@ body {
     radial-gradient(ellipse 70% 45% at 0% 0%, var(--shell-glow-a), transparent 55%),
     radial-gradient(ellipse 55% 40% at 100% 0%, var(--shell-glow-b), transparent 50%),
     linear-gradient(165deg, var(--background) 0%, var(--terminal-panel) 48%, var(--background) 100%) !important;
+}
+.app-shell-inner {
+  min-width: 0;
+  width: 100%;
 }
 .terminal-shell::before,
 .terminal-shell::after {
@@ -395,6 +403,11 @@ html[data-perf="1"] .terminal-shell > div::before {
 .desk-scroll-x > table {
   min-width: max(100%, 36rem);
 }
+@media (max-width: 640px) {
+  .desk-scroll-x > table {
+    min-width: max(100%, 20rem);
+  }
+}
 
 .terminal-shell > div { position: relative; }
 .terminal-shell > div::before {
@@ -599,13 +612,7 @@ html[data-perf="1"] .terminal-shell > div::before {
   animation: desk-flash 0.7s var(--ease-out-strong);
 }
 .desk-live-ribbon {
-  height: 2px;
-  width: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, transparent, var(--terminal-cyan), transparent);
-  background-size: 200% 100%;
-  animation: desk-sheen 2.4s linear infinite;
-  opacity: 0.85;
+  display: none;
 }
 
 /* ─── Header / tabs ─────────────────────────────────────────────────────── */
@@ -614,7 +621,7 @@ html[data-perf="1"] .terminal-shell > div::before {
 .terminal-tabs {
   background: var(--glass-1) !important;
   border: 1px solid var(--glass-border) !important;
-  border-radius: 14px !important;
+  border-radius: 10px !important;
   box-shadow: var(--glass-edge), var(--shadow-panel) !important;
   -webkit-backdrop-filter: var(--blur-shell);
   backdrop-filter: var(--blur-shell);
@@ -627,10 +634,162 @@ html[data-perf="1"] .terminal-shell > div::before {
 .terminal-header::before {
   content: "";
   display: block;
-  height: 3px;
-  background: linear-gradient(90deg, var(--terminal-cyan), #38bdf8 40%, transparent 78%);
+  height: 2px;
+  background: linear-gradient(90deg, var(--terminal-cyan), #38bdf8 42%, transparent 82%);
   background-size: 200% 100%;
-  animation: desk-sheen 3.5s ease-in-out infinite;
+  animation: desk-sheen 4s ease-in-out infinite;
+}
+
+/* Single-row desk toolbar */
+.desk-topbar {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+  min-height: 40px;
+  padding: 0.4rem 0.65rem;
+}
+.desk-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.desk-brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  line-height: 1.15;
+}
+.desk-brand-word {
+  margin: 0;
+  font-size: calc(var(--desk-title) * 0.92) !important;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-strong) !important;
+  white-space: nowrap;
+}
+.desk-brand-meta {
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--fg-muted);
+}
+.desk-brand-sub {
+  margin: 0;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  opacity: 0.85;
+}
+.desk-sources {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  justify-self: stretch;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  border-left: 1px solid var(--terminal-line);
+  padding-left: 0.65rem;
+  mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 14px), transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 14px), transparent);
+}
+.desk-sources-mask {
+  overflow: hidden;
+  width: 100%;
+  min-width: 0;
+}
+.desk-sources-track {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  will-change: transform;
+  animation: desk-sources-marquee 42s linear infinite;
+}
+.desk-sources:hover .desk-sources-track,
+.desk-sources:focus-within .desk-sources-track {
+  animation-play-state: paused;
+}
+.desk-sources-seg {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: var(--desk-label);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.desk-sources-gap {
+  flex: 0 0 auto;
+  padding: 0 1.25rem;
+  font-size: var(--desk-label);
+  letter-spacing: 0.35em;
+  color: color-mix(in srgb, var(--terminal-cyan) 70%, var(--fg-muted));
+  opacity: 0.7;
+}
+@keyframes desk-sources-marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+html[data-perf="1"] .desk-sources-track {
+  animation-duration: 60s;
+}
+.desk-btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 30px;
+  padding: 0 0.75rem;
+  border-radius: 7px;
+  font-size: var(--desk-label);
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accent-ink) !important;
+  background: linear-gradient(135deg, var(--terminal-cyan), #38bdf8) !important;
+  border: 0;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--terminal-cyan) 22%, transparent);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out-strong), box-shadow var(--dur-fast) var(--ease-collapse), opacity var(--dur-fast);
+}
+.desk-btn-refresh:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--terminal-cyan) 38%, transparent);
+}
+.desk-btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+.desk-btn-refresh-icon { font-size: 0.85em; line-height: 1; }
+.desk-banner-warn--bar {
+  margin: 0;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 1100px) and (min-width: 641px) {
+  .desk-topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "brand controls refresh"
+      "sources sources sources";
+  }
+  .desk-brand { grid-area: brand; }
+  .desk-controls { grid-area: controls; justify-self: end; }
+  .desk-sources {
+    grid-area: sources;
+    border-left: 0;
+    padding-left: 0;
+    padding-top: 0.2rem;
+    border-top: 1px solid var(--terminal-line);
+  }
+  .desk-btn-refresh { grid-area: refresh; }
 }
 
 .terminal-tabs {
@@ -731,26 +890,28 @@ html[data-perf="1"] .terminal-shell > div::before {
 
 /* ─── Desk controls (theme + font) ──────────────────────────────────────── */
 
-.desk-controls { gap: 8px; }
-.desk-controls.glass-shell {
-  border-radius: 12px;
+.desk-controls {
+  gap: 6px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
 }
 .desk-seg {
   display: inline-flex;
   align-items: stretch;
   border: 1px solid var(--glass-border);
-  border-radius: 999px;
+  border-radius: 7px;
   overflow: hidden;
-  background: var(--glass-flat);
-  box-shadow: var(--glass-edge);
+  background: color-mix(in srgb, var(--glass-flat) 88%, transparent);
 }
 .desk-seg button {
-  min-width: 40px;
-  min-height: 40px;
-  padding: 0 10px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0 8px;
   font-size: var(--desk-label);
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--fg-muted);
   background: transparent;
@@ -770,19 +931,19 @@ html[data-perf="1"] .terminal-shell > div::before {
 .desk-live-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 10px;
-  border-radius: 10px;
-  border: 1px solid var(--terminal-line);
-  background: var(--terminal-panel-2);
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--terminal-green) 35%, var(--terminal-line));
+  background: color-mix(in srgb, var(--terminal-green) 8%, var(--terminal-panel-2));
   font-size: var(--desk-label);
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
 }
 .desk-live-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
   background: var(--terminal-amber);
   position: relative;
@@ -795,46 +956,46 @@ html[data-perf="1"] .terminal-shell > div::before {
 .desk-live-dot.is-loading { background: var(--terminal-amber); animation: desk-pulse-soft 1.2s ease-in-out infinite; }
 .desk-live-dot.is-error { background: var(--terminal-red); }
 .desk-live-label { color: var(--fg-strong); }
-.desk-live-clock { color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.desk-live-clock { color: var(--fg-muted); font-variant-numeric: tabular-nums; font-weight: 600; }
 
 .desk-brand-mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   flex-shrink: 0;
-  background: #06101c;
-  box-shadow: 0 0 24px color-mix(in srgb, var(--terminal-cyan) 40%, transparent);
-  animation: desk-brand-breathe 3.2s ease-in-out infinite;
+  background: #04101a;
+  border: 1px solid color-mix(in srgb, var(--terminal-cyan) 45%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--terminal-cyan) 12%, transparent);
 }
 .desk-brand-logo {
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   display: block;
   object-fit: cover;
 }
 
 .desk-btn-primary {
-  min-height: 44px;
-  padding: 0 14px;
-  border-radius: 10px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 7px;
   font-size: var(--desk-label);
   font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent-ink) !important;
   background: linear-gradient(135deg, var(--terminal-cyan), #38bdf8) !important;
-  box-shadow: 0 0 18px color-mix(in srgb, var(--terminal-cyan) 30%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--terminal-cyan) 28%, transparent);
   border: 0;
   cursor: pointer;
   transition: transform var(--dur-fast) var(--ease-out-strong), box-shadow var(--dur-fast) var(--ease-collapse);
 }
 .desk-btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 0 28px color-mix(in srgb, var(--terminal-cyan) 45%, transparent);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--terminal-cyan) 42%, transparent);
 }
 .desk-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -1655,9 +1816,30 @@ html[data-perf="1"] .terminal-shell > div::before {
     -webkit-backdrop-filter: blur(16px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   }
-  .terminal-header { border-radius: 12px !important; }
+  .terminal-header { border-radius: 10px !important; }
+  .desk-topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "brand refresh"
+      "controls controls"
+      "sources sources";
+    gap: 0.4rem 0.5rem;
+    padding: 0.45rem 0.55rem;
+  }
+  .desk-brand { grid-area: brand; }
+  .desk-controls { grid-area: controls; width: 100%; justify-content: flex-start; }
+  .desk-sources {
+    grid-area: sources;
+    border-left: 0;
+    padding-left: 0;
+    padding-top: 0.15rem;
+    border-top: 1px solid var(--terminal-line);
+  }
+  .desk-btn-refresh { grid-area: refresh; }
+  .desk-btn-refresh-label { display: none; }
+  .desk-brand-sub { display: none; }
   .terminal-header .desk-brand-mark,
-  .terminal-header .desk-brand-logo { width: 36px; height: 36px; border-radius: 10px; }
+  .terminal-header .desk-brand-logo { width: 28px; height: 28px; border-radius: 7px; }
   .terminal-tabs {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -1670,12 +1852,27 @@ html[data-perf="1"] .terminal-shell > div::before {
     min-width: 3.6rem;
     flex: 1 1 0;
     padding-inline: 0.4rem;
-    font-size: 0.62rem;
+    font-size: 0.72rem;
     letter-spacing: 0.06em;
+    min-height: 44px;
   }
-  .desk-controls { width: 100%; justify-content: flex-start; }
-  .desk-seg button { min-width: 44px; min-height: 44px; }
-  .desk-live-chip { min-height: 44px; flex-wrap: wrap; }
+  .desk-seg button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .desk-live-chip {
+    min-height: 44px;
+    padding-inline: 10px;
+  }
+  .desk-btn-refresh {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .desk-chip {
+    min-height: 40px;
+    min-width: 40px;
+    padding: 8px 10px;
+  }
   .desk-metric-grid { gap: 0.5rem; }
   .desk-metric-tile {
     min-height: 68px;
@@ -1687,11 +1884,14 @@ html[data-perf="1"] .terminal-shell > div::before {
   }
   .news-sidebar { max-height: min(55dvh, 520px); }
   .right-drawer { width: 100% !important; max-width: 100% !important; }
-  .desk-scroll-x > table { min-width: max(100%, 32rem); }
+  .desk-scroll-x > table { min-width: max(100%, 20rem); }
   /* Keep forensic cards from overflowing */
   .terminal-shell section,
   .terminal-shell .desk-panel-enter > * {
     max-width: 100%;
+  }
+  .desk-mobile-card {
+    min-height: 44px;
   }
 }
 
@@ -1702,11 +1902,11 @@ html[data-perf="1"] .terminal-shell > div::before {
 
 /* App-like chrome when installed / standalone */
 @media (display-mode: standalone), (display-mode: fullscreen) {
-  .app-chrome {
-    padding-top: max(0.5rem, env(safe-area-inset-top));
-  }
   .terminal-shell {
     min-height: 100dvh;
+  }
+  .app-tabbar {
+    top: 0; /* body already applies safe-area-inset-top */
   }
 }
 
@@ -1735,6 +1935,20 @@ html[data-perf="1"] .terminal-shell > div::before {
   .terminal-shell::before,
   .terminal-shell::after { animation: none !important; opacity: 0.12; }
   .desk-tab-indicator { transition: none !important; }
+  .desk-sources-track {
+    animation: none !important;
+    transform: none !important;
+  }
+  .desk-sources-seg[aria-hidden],
+  .desk-sources-gap {
+    display: none !important;
+  }
+  .desk-sources-seg:not([aria-hidden]) {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
 }
 
 .total-row-long {

@@ -428,7 +428,7 @@ export default function EodDeskPanel({
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Date</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Date</span>
               {dates.length > 0 ? (
                 <select
                   value={dateStr}
@@ -437,7 +437,7 @@ export default function EodDeskPanel({
                     setDateStr(next);
                     setSwingDateStr(next);
                   }}
-                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-300"
+                  className="min-h-11 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-300"
                 >
                   {[dateStr, ...dates.filter((d) => d !== dateStr)]
                     .filter((d, i, a) => a.indexOf(d) === i)
@@ -456,18 +456,18 @@ export default function EodDeskPanel({
                     setDateStr(next);
                     setSwingDateStr(next);
                   }}
-                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-300"
+                  className="min-h-11 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-300"
                 />
               )}
             </label>
             {(mode === 'book' || mode === 'full') && (
               <label className="flex items-center gap-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Swing</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Swing</span>
                 <input
                   type="date"
                   value={swingDateStr}
                   onChange={(e) => setSwingDateStr(e.target.value)}
-                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-300"
+                  className="min-h-11 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-300"
                 />
               </label>
             )}
@@ -475,7 +475,7 @@ export default function EodDeskPanel({
               type="button"
               onClick={onRefresh}
               disabled={busy}
-              className="desk-btn-ghost rounded-lg px-3 py-1.5 text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
+              className="desk-btn-ghost min-h-11 rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-wider disabled:opacity-50"
             >
               Refresh
             </button>
@@ -483,7 +483,7 @@ export default function EodDeskPanel({
               type="button"
               onClick={() => void onRun()}
               disabled={busy || !dateStr}
-              className="desk-btn-ghost rounded-lg px-3 py-1.5 text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
+              className="desk-btn-ghost min-h-11 rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-wider disabled:opacity-50"
               title="Deterministic engine — no LLM"
             >
               {runBusy ? 'Running…' : 'Run EOD'}
@@ -492,7 +492,7 @@ export default function EodDeskPanel({
               type="button"
               onClick={() => void onPmLlm()}
               disabled={busy || !dateStr || llmDone}
-              className="desk-btn-primary rounded-lg px-3 py-1.5 text-[9px] font-black uppercase tracking-wider disabled:opacity-50"
+              className="desk-btn-primary min-h-11 rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-wider disabled:opacity-50"
               title={
                 llmDone
                   ? 'Already generated for this date — using cache'
@@ -553,7 +553,7 @@ export default function EodDeskPanel({
                 active ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.12em] truncate">{m.label}</div>
+              <div className="text-[11px] sm:text-[10px] font-black uppercase tracking-[0.12em] truncate">{m.label}</div>
               <div className="mt-0.5 hidden text-[9px] text-slate-400 sm:block">{m.hint}</div>
             </button>
           );

@@ -18,6 +18,7 @@ from .feed_scanner import SWING_MIN_PRICE, is_swing_desk_eligible
 from .exit_plan import attach_exit_plan, evaluate_scale_trail
 from .trade_outcome import _is_market_open
 from .desk_clock import basket_lock_allowed, basket_lock_block_message
+from .desk_book_symbols import filter_rows_excluding, intraday_locked_symbols
 
 log = logging.getLogger(__name__)
 
@@ -313,16 +314,21 @@ def _stock_is_matrix_buy(row: dict[str, Any]) -> bool:
     return bool(score is not None and score >= 15.0 and verdict not in ("REJECT", "SELL", "AVOID"))
 
 
-def _picks_from_asset_matrix(snapshot: dict[str, Any] | None = None) -> tuple[list[dict[str, Any]], str]:
+def _picks_from_asset_matrix(
+    snapshot: dict[str, Any] | None = None,
+    *,
+    exclude_symbols: set[str] | None = None,
+) -> tuple[list[dict[str, Any]], str]:
     """SWING PORTFOLIO lock source: ledger_stocks then ranked Matrix BUY stocks[].
 
-    Never reads dhanSwingPicks.
+    Never reads dhanSwingPicks. Skips symbols already locked on the intradAy desk.
     """
     snap = snapshot if isinstance(snapshot, dict) else _read_json(_SNAPSHOT_PATH)
     ti = snap.get("terminalIntelligence") if isinstance(snap.get("terminalIntelligence"), dict) else {}
     ledger = ti.get("ledger_stocks") if isinstance(ti.get("ledger_stocks"), list) else []
     stocks = snap.get("stocks") if isinstance(snap.get("stocks"), list) else []
     quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
+    blocked = {str(s).upper().strip() for s in (exclude_symbols or set()) if str(s).strip()}
 
     by_ticker: dict[str, dict[str, Any]] = {}
     for s in stocks:
@@ -333,7 +339,8 @@ def _picks_from_asset_matrix(snapshot: dict[str, Any] | None = None) -> tuple[li
             by_ticker[sym] = s
 
     candidates: list[dict[str, Any]] = []
-    seen: set[str] = set()
+    seen: set[str] = set(blocked)
+    skipped_cross = 0
 
     def _merge_quote(row: dict[str, Any], sym: str) -> dict[str, Any]:
         out = dict(row)
@@ -364,7 +371,12 @@ def _picks_from_asset_matrix(snapshot: dict[str, Any] | None = None) -> tuple[li
         )
         for row in ranked_ledger:
             sym = str(row.get("ticker") or row.get("symbol") or "").upper().strip()
-            if not sym or sym in seen:
+            if not sym:
+                continue
+            if sym in blocked:
+                skipped_cross += 1
+                continue
+            if sym in seen:
                 continue
             merged = _merge_quote({**row, "_fromLedger": True, "symbol": sym, "ticker": sym}, sym)
             if not _stock_is_matrix_buy(merged):
@@ -382,7 +394,12 @@ def _picks_from_asset_matrix(snapshot: dict[str, Any] | None = None) -> tuple[li
         )
         for row in ranked:
             sym = str(row.get("ticker") or row.get("symbol") or "").upper().strip()
-            if not sym or sym in seen:
+            if not sym:
+                continue
+            if sym in blocked:
+                skipped_cross += 1
+                continue
+            if sym in seen:
                 continue
             merged = _merge_quote({**row, "symbol": sym, "ticker": sym}, sym)
             if not _stock_is_matrix_buy(merged):
@@ -392,6 +409,11 @@ def _picks_from_asset_matrix(snapshot: dict[str, Any] | None = None) -> tuple[li
             if len(candidates) >= SWING_MATRIX_LOCK_COUNT:
                 break
 
+    if skipped_cross:
+        log.info(
+            "Swing matrix skip %d intradAy-locked symbol(s) for cross-book uniqueness",
+            skipped_cross,
+        )
     return candidates[:SWING_MATRIX_LOCK_COUNT], src
 
 
@@ -444,6 +466,57 @@ def _scrub_ineligible_swing_rows(session: dict[str, Any]) -> tuple[dict[str, Any
     return sess, removed
 
 
+def _scrub_cross_book_swing_rows(session: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Drop swing rows whose symbol is already on today's locked intradAy desk.
+
+    Does not re-size remaining rows — preserves qty / outcome fields.
+    """
+    day = str(session.get("sessionDate") or _ist_today())[:10]
+    blocked = intraday_locked_symbols(day)
+    if not blocked:
+        return session, []
+    long_kept, dropped_long = filter_rows_excluding(list(session.get("long") or []), blocked)
+    short_kept, dropped_short = filter_rows_excluding(list(session.get("short") or []), blocked)
+    removed = sorted(set(dropped_long + dropped_short))
+    if not removed:
+        return session, []
+    sess = dict(session)
+    sess["long"] = long_kept
+    sess["short"] = short_kept
+    prev_skip = list(sess.get("skippedIncomplete") or [])
+    for sym in removed:
+        tag = f"{sym}:cross_book_intraday"
+        if tag not in prev_skip:
+            prev_skip.append(tag)
+    sess["skippedIncomplete"] = prev_skip
+    sess["counts"] = {
+        "long": len(long_kept),
+        "short": len(short_kept),
+        "total": len(long_kept) + len(short_kept),
+    }
+    sess["crossBookExcluded"] = removed
+    sess["updatedAt"] = _utc_now_iso()
+    log.info(
+        "Scrubbed %d swing name(s) already on intradAy desk: %s",
+        len(removed),
+        ",".join(removed),
+    )
+    return sess, removed
+
+
+def _persist_swing_if_changed(original: dict[str, Any], scrubbed: dict[str, Any]) -> dict[str, Any]:
+    if scrubbed is original:
+        return scrubbed
+    if (
+        scrubbed.get("long") == original.get("long")
+        and scrubbed.get("short") == original.get("short")
+        and scrubbed.get("skippedIncomplete") == original.get("skippedIncomplete")
+    ):
+        return scrubbed
+    _atomic_write(_SWING_SESSION_PATH, scrubbed)
+    return scrubbed
+
+
 def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False) -> dict[str, Any]:
     """Snapshot Asset Matrix BUY set into swing_session.json.
 
@@ -472,19 +545,19 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
         force = True
 
     if existing.get("locked") and not force and (existing.get("long") or []):
-        scrubbed, removed = _scrub_ineligible_swing_rows(existing)
-        if removed:
+        scrubbed, removed_gate = _scrub_ineligible_swing_rows(existing)
+        scrubbed, removed_cross = _scrub_cross_book_swing_rows(scrubbed)
+        removed = removed_gate + removed_cross
+        if removed_gate:
             scrubbed = apply_swing_sizing(scrubbed, persist=True, force=True)
-            return {
-                "success": True,
-                "alreadyLocked": True,
-                "scrubbed": removed,
-                "session": scrubbed,
-            }
+        elif removed_cross:
+            scrubbed = _persist_swing_if_changed(existing, scrubbed)
         return {
             "success": True,
             "alreadyLocked": True,
-            "session": existing,
+            "scrubbed": removed,
+            "crossBookExcluded": removed_cross,
+            "session": scrubbed,
         }
 
     allowed, reason = basket_lock_allowed(allow_manual_override=bool(bypass_lock_window))
@@ -496,7 +569,8 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
             "session": existing,
         }
 
-    raw_picks, snap_src = _picks_from_asset_matrix()
+    exclude = intraday_locked_symbols(today)
+    raw_picks, snap_src = _picks_from_asset_matrix(exclude_symbols=exclude)
     session_date = today
     long_rows: list[dict[str, Any]] = []
     skipped: list[str] = []
@@ -559,14 +633,16 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
         },
         "counts": {"long": len(long_rows), "short": 0, "total": len(long_rows)},
         "deskGates": {"minPrice": SWING_MIN_PRICE, "rejectDvr": True},
+        "crossBookExcluded": sorted(exclude),
     }
     _atomic_write(_SWING_SESSION_PATH, session)
     log.info(
-        "Locked swing session from %s: %d LONGs (%s)%s",
+        "Locked swing session from %s: %d LONGs (%s)%s%s",
         session["source"],
         len(long_rows),
         session_date,
         f" rotated from {existing_date}" if stale_day else "",
+        f" excluded intradAy={sorted(exclude)}" if exclude else "",
     )
     return {
         "success": True,
@@ -582,8 +658,13 @@ def ensure_swing_session_locked() -> dict[str, Any]:
     today = _ist_today()
     existing_date = str(existing.get("sessionDate") or "").strip()[:10]
     if existing.get("locked") and (existing.get("long") or []) and existing_date == today:
-        scrubbed, removed = _scrub_ineligible_swing_rows(existing)
-        return apply_swing_sizing(scrubbed, persist=True, force=bool(removed))
+        scrubbed, removed_gate = _scrub_ineligible_swing_rows(existing)
+        scrubbed, removed_cross = _scrub_cross_book_swing_rows(scrubbed)
+        if removed_gate:
+            return apply_swing_sizing(scrubbed, persist=True, force=True)
+        if removed_cross:
+            return _persist_swing_if_changed(existing, scrubbed)
+        return scrubbed
     # New day or empty → force re-lock from Asset Matrix BUY
     result = lock_swing_session(force=True if (existing.get("locked") and existing_date != today) else False)
     return result.get("session") or existing

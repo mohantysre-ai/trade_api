@@ -63,6 +63,8 @@ type PositionRow = {
   deployedCapital?: number | null;
   positionValue?: number | null;
   unrealizedPnl?: number | null;
+  realizedPnl?: number | null;
+  totalPnl?: number | null;
   pnlPct?: number | null;
   stopLoss?: number | null;
   target1?: number | null;
@@ -86,7 +88,6 @@ type PositionRow = {
     rMultiple?: number | null;
     closed?: boolean;
   } | null;
-  realizedPnl?: number | null;
 };
 
 type AttentionItem = {
@@ -542,6 +543,18 @@ function Kpi({ label, value, valueClass }: { label: string; value: string; value
   );
 }
 
+/** Mobile card essentials — T1 + scale-trail legs from existing exit fields only. */
+function t1ScaleStatus(r: PositionRow): string {
+  const t1 = dash(r.target1);
+  if (r.exitPlan?.mode === 'SCALE_TRAIL') {
+    const filled = r.exitState?.legsFilled?.length ?? 0;
+    const total = r.exitPlan.legs?.length;
+    const scaleBit = total != null && total > 0 ? `${filled}/${total}` : String(filled);
+    return `T1 ${t1} · Scale ${scaleBit}`;
+  }
+  return `T1 ${t1}`;
+}
+
 function PositionTable({
   title,
   rows,
@@ -565,12 +578,74 @@ function PositionTable({
         <h3 className="desk-panel-title text-slate-900">{title}</h3>
         <span className="text-[9px] text-slate-500 tabular-nums">{rows.length} names</span>
       </div>
-      <div className="overflow-x-auto desk-scroll-x">
+
+      {/* Mobile / small: card list essentials */}
+      <div className="md:hidden divide-y divide-slate-100">
+        {rows.length === 0 ? (
+          <p className="px-3 py-6 text-center text-[10px] text-slate-400">{emptyHint}</p>
+        ) : (
+          rows.map((r, i) => {
+            const sym = r.symbol;
+            const isSel = selected === sym;
+            const sl =
+              r.exitState?.effectiveStop != null
+                ? dash(r.exitState.effectiveStop)
+                : dash(r.stopLoss);
+            return (
+              <button
+                key={`card-${sym}-${i}`}
+                type="button"
+                onClick={() => onSelect(sym)}
+                className={`w-full text-left px-3 py-3 min-h-[44px] space-y-1.5 ${
+                  isSel ? 'bg-cyan-50/60' : 'hover:bg-cyan-50/40 active:bg-cyan-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-bold text-[13px] text-slate-900 truncate">{sym || '—'}</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 shrink-0">
+                      {r.direction || '—'}
+                    </span>
+                  </div>
+                  <StatusPill tone={statusTone(r.status)}>{r.status || '—'}</StatusPill>
+                </div>
+                <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-[10px] tabular-nums">
+                  <div>
+                    <div className="text-[8px] uppercase tracking-wider text-slate-500">LTP</div>
+                    <div className="font-semibold text-slate-900">{dash(r.ltp)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[8px] uppercase tracking-wider text-slate-500">PnL%</div>
+                    <div className={`font-semibold ${pnlClass(r.pnlPct)}`}>{pct(r.pnlPct)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[8px] uppercase tracking-wider text-slate-500">SL</div>
+                    <div className="font-semibold text-slate-900">
+                      {r.exitState?.effectiveStop != null ? (
+                        <span title="Effective trail stop">{sl}*</span>
+                      ) : (
+                        sl
+                      )}
+                    </div>
+                  </div>
+                  <div className="col-span-3">
+                    <div className="text-[8px] uppercase tracking-wider text-slate-500">T1 / Scale</div>
+                    <div className="font-semibold text-slate-800">{t1ScaleStatus(r)}</div>
+                  </div>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      {/* md+: full book table */}
+      <div className="hidden md:block overflow-x-auto desk-scroll-x">
         <table className="w-full text-left text-[10px]">
           <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[8px]">
             <tr>
               {cols.map((h) => (
-                <th key={h} className="px-2 py-1.5 font-semibold whitespace-nowrap">{h}</th>
+                <th key={h} className="px-2 py-2.5 font-semibold whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
@@ -595,43 +670,53 @@ function PositionTable({
                     onClick={() => onSelect(sym)}
                     className={`border-t border-slate-100 cursor-pointer hover:bg-cyan-50/40 ${isSel ? 'bg-cyan-50/60' : ''}`}
                   >
-                    <td className="px-2 py-1.5 tabular-nums text-slate-500">{r.rank ?? i + 1}</td>
-                    <td className="px-2 py-1.5 font-bold text-slate-900">{sym || '—'}</td>
-                    <td className="px-2 py-1.5">
+                    <td className="px-2 py-2.5 tabular-nums text-slate-500">{r.rank ?? i + 1}</td>
+                    <td className="px-2 py-2.5 font-bold text-slate-900">{sym || '—'}</td>
+                    <td className="px-2 py-2.5">
                       <StatusPill tone={sleeveTone(sleeve)}>
                         {sleeve.includes('MEAN') || sleeve.includes('REV') ? 'MR' : 'MOM'}
                       </StatusPill>
                     </td>
-                    <td className="px-2 py-1.5 tabular-nums">{dash(r.ltp)}</td>
-                    <td className="px-2 py-1.5 tabular-nums">{dash(r.entryPrice)}</td>
-                    <td className="px-2 py-1.5 tabular-nums">{r.approxQty ?? '—'}{r.exitState?.remainingQty != null && r.exitState.remainingQty !== r.approxQty ? <span className="text-amber-600 ml-1">/{r.exitState.remainingQty}rem</span> : null}</td>
-                    <td className="px-2 py-1.5 tabular-nums">{inr(r.positionValue ?? r.deployedCapital ?? null)}</td>
-                    <td className={`px-2 py-1.5 tabular-nums font-semibold ${pnlClass(r.unrealizedPnl)}`}>{pnlFmt(r.unrealizedPnl)}</td>
-                    <td className={`px-2 py-1.5 tabular-nums ${pnlClass(r.pnlPct)}`}>{pct(r.pnlPct)}</td>
-                    <td className="px-2 py-1.5 tabular-nums">{r.score == null ? 'UNRATED' : dash(r.score, 1)}</td>
-                    <td className="px-2 py-1.5 tabular-nums">
+                    <td className="px-2 py-2.5 tabular-nums">{dash(r.ltp)}</td>
+                    <td className="px-2 py-2.5 tabular-nums">{dash(r.entryPrice)}</td>
+                    <td className="px-2 py-2.5 tabular-nums">{r.approxQty ?? '—'}{r.exitState?.remainingQty != null && r.exitState.remainingQty !== r.approxQty ? <span className="text-amber-600 ml-1">/{r.exitState.remainingQty}rem</span> : null}</td>
+                    <td className="px-2 py-2.5 tabular-nums">{inr(r.positionValue ?? r.deployedCapital ?? null)}</td>
+                    <td className={`px-2 py-2.5 tabular-nums font-semibold ${pnlClass(
+                      r.status?.toUpperCase().includes('CLOSED') || r.closed
+                        ? (r.totalPnl ?? r.realizedPnl ?? r.exitState?.realizedPnl ?? r.unrealizedPnl)
+                        : (r.totalPnl ?? r.unrealizedPnl)
+                    )}`}>
+                      {pnlFmt(
+                        r.status?.toUpperCase().includes('CLOSED') || r.closed
+                          ? (r.totalPnl ?? r.realizedPnl ?? r.exitState?.realizedPnl ?? r.unrealizedPnl)
+                          : (r.totalPnl ?? r.unrealizedPnl)
+                      )}
+                    </td>
+                    <td className={`px-2 py-2.5 tabular-nums ${pnlClass(r.pnlPct)}`}>{pct(r.pnlPct)}</td>
+                    <td className="px-2 py-2.5 tabular-nums">{r.score == null ? 'UNRATED' : dash(r.score, 1)}</td>
+                    <td className="px-2 py-2.5 tabular-nums">
                       {r.scorePctRank == null ? '—' : dash(r.scorePctRank, 0)}
                     </td>
-                    <td className="px-2 py-1.5 tabular-nums whitespace-nowrap">
+                    <td className="px-2 py-2.5 tabular-nums whitespace-nowrap">
                       {gap == null && intra == null
                         ? '—'
                         : `${gap == null ? '—' : pct(gap, 1)} / ${intra == null ? '—' : pct(intra, 1)}`}
                     </td>
-                    <td className="px-2 py-1.5">
+                    <td className="px-2 py-2.5">
                       {play ? (
                         <span className="inline-block w-2 h-2 rounded-full bg-cyan-500" title={r.inPlayReason || 'in play'} />
                       ) : (
                         <span className="text-slate-300">—</span>
                       )}
                     </td>
-                    <td className={`px-2 py-1.5 tabular-nums ${pnlClass(rs)}`}>{pct(rs, 1)}</td>
-                    <td className="px-2 py-1.5 tabular-nums">{r.exitState?.effectiveStop != null ? <span title="Effective trail stop">{dash(r.exitState.effectiveStop)}*</span> : dash(r.stopLoss)}</td>
-                    <td className="px-2 py-1.5 tabular-nums">{dash(r.target1)}</td>
-                    <td className="px-2 py-1.5 tabular-nums">{dash(r.target2)}</td>
-                    <td className="px-2 py-1.5 tabular-nums">{dash(r.rewardRisk, 1)}</td>
-                    <td className="px-2 py-1.5 tabular-nums">{r.distToSlPct == null ? '—' : `${r.distToSlPct.toFixed(2)}%`}</td>
-                    <td className="px-2 py-1.5 tabular-nums">{r.distToT1Pct == null ? '—' : `${r.distToT1Pct.toFixed(2)}%`}</td>
-                    <td className="px-2 py-1.5">
+                    <td className={`px-2 py-2.5 tabular-nums ${pnlClass(rs)}`}>{pct(rs, 1)}</td>
+                    <td className="px-2 py-2.5 tabular-nums">{r.exitState?.effectiveStop != null ? <span title="Effective trail stop">{dash(r.exitState.effectiveStop)}*</span> : dash(r.stopLoss)}</td>
+                    <td className="px-2 py-2.5 tabular-nums">{dash(r.target1)}</td>
+                    <td className="px-2 py-2.5 tabular-nums">{dash(r.target2)}</td>
+                    <td className="px-2 py-2.5 tabular-nums">{dash(r.rewardRisk, 1)}</td>
+                    <td className="px-2 py-2.5 tabular-nums">{r.distToSlPct == null ? '—' : `${r.distToSlPct.toFixed(2)}%`}</td>
+                    <td className="px-2 py-2.5 tabular-nums">{r.distToT1Pct == null ? '—' : `${r.distToT1Pct.toFixed(2)}%`}</td>
+                    <td className="px-2 py-2.5">
                       <StatusPill tone={statusTone(r.status)}>{r.status || '—'}</StatusPill>
                     </td>
                   </tr>
@@ -950,7 +1035,7 @@ export default function AssetMetricsPanel({
       </div>
 
       {/* Portfolio summary */}
-      <div className="bg-white/80 border border-slate-200 rounded-xl p-3 shadow-sm grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-2 sm:gap-3 min-w-0">
+      <div className="bg-white/80 border border-slate-200 rounded-xl p-3 shadow-sm grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3 min-w-0">
         <Kpi label="Long exposure" value={inr(session?.portfolio?.longExposure ?? null)} />
         <Kpi label="Short exposure" value={inr(session?.portfolio?.shortExposure ?? null)} />
         <Kpi label="Gross" value={inr(session?.portfolio?.grossExposure ?? null)} />
@@ -1243,35 +1328,35 @@ export default function AssetMetricsPanel({
               <table className="w-full text-[10px]">
                 <thead className="text-[8px] uppercase text-slate-500">
                   <tr>
-                    <th className="text-left py-1">Symbol</th>
-                    <th className="text-left py-1">Dir</th>
-                    <th className="text-left py-1">Risk scale</th>
-                    <th className="text-left py-1">Eff. frac</th>
-                    <th className="text-left py-1">RS</th>
-                    <th className="text-left py-1">Max loss</th>
-                    <th className="text-left py-1">→SL%</th>
-                    <th className="text-left py-1">→T1%</th>
-                    <th className="text-left py-1">Status</th>
+                    <th className="text-left px-1 py-2.5">Symbol</th>
+                    <th className="text-left px-1 py-2.5">Dir</th>
+                    <th className="text-left px-1 py-2.5 hidden sm:table-cell">Risk scale</th>
+                    <th className="text-left px-1 py-2.5 hidden sm:table-cell">Eff. frac</th>
+                    <th className="text-left px-1 py-2.5 hidden md:table-cell">RS</th>
+                    <th className="text-left px-1 py-2.5">Max loss</th>
+                    <th className="text-left px-1 py-2.5">→SL%</th>
+                    <th className="text-left px-1 py-2.5 hidden sm:table-cell">→T1%</th>
+                    <th className="text-left px-1 py-2.5">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {allRows.map((r) => (
                     <tr key={r.symbol} className="border-t border-slate-100">
-                      <td className="py-1 font-bold text-slate-900">{r.symbol}</td>
-                      <td className="py-1 text-slate-700">{r.direction}</td>
-                      <td className="py-1 tabular-nums text-slate-800">{dash(r.riskScale, 2)}</td>
-                      <td className="py-1 tabular-nums text-slate-800">
+                      <td className="px-1 py-2.5 font-bold text-slate-900">{r.symbol}</td>
+                      <td className="px-1 py-2.5 text-slate-700">{r.direction}</td>
+                      <td className="px-1 py-2.5 tabular-nums text-slate-800 hidden sm:table-cell">{dash(r.riskScale, 2)}</td>
+                      <td className="px-1 py-2.5 tabular-nums text-slate-800 hidden sm:table-cell">
                         {r.effectiveRiskFraction == null ? '—' : dash(r.effectiveRiskFraction, 4)}
                       </td>
-                      <td className={`py-1 tabular-nums ${pnlClass(rowRsVsIndex(r))}`}>{pct(rowRsVsIndex(r), 1)}</td>
-                      <td className="py-1 tabular-nums text-slate-800">
+                      <td className={`px-1 py-2.5 tabular-nums hidden md:table-cell ${pnlClass(rowRsVsIndex(r))}`}>{pct(rowRsVsIndex(r), 1)}</td>
+                      <td className="px-1 py-2.5 tabular-nums text-slate-800">
                         {r.approxQty != null && r.entryPrice != null && r.stopLoss != null
                           ? inr(Math.abs(r.entryPrice - r.stopLoss) * r.approxQty)
                           : '—'}
                       </td>
-                      <td className="py-1 tabular-nums text-slate-800">{r.distToSlPct == null ? '—' : `${r.distToSlPct.toFixed(2)}%`}</td>
-                      <td className="py-1 tabular-nums text-slate-800">{r.distToT1Pct == null ? '—' : `${r.distToT1Pct.toFixed(2)}%`}</td>
-                      <td className="py-1"><StatusPill tone={statusTone(r.status)}>{r.status || '—'}</StatusPill></td>
+                      <td className="px-1 py-2.5 tabular-nums text-slate-800">{r.distToSlPct == null ? '—' : `${r.distToSlPct.toFixed(2)}%`}</td>
+                      <td className="px-1 py-2.5 tabular-nums text-slate-800 hidden sm:table-cell">{r.distToT1Pct == null ? '—' : `${r.distToT1Pct.toFixed(2)}%`}</td>
+                      <td className="px-1 py-2.5"><StatusPill tone={statusTone(r.status)}>{r.status || '—'}</StatusPill></td>
                     </tr>
                   ))}
                 </tbody>
