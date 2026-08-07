@@ -77,6 +77,16 @@ type PositionRow = {
   closed?: boolean;
   ltpSource?: string;
   dataStale?: boolean;
+  /** Capital-slot / rotation fields from session engine — only when present */
+  slotStatus?: string;
+  slotFreed?: boolean;
+  closedSlotStatus?: string;
+  profitGuardActive?: boolean;
+  profitProtectedInr?: number | null;
+  entryState?: string;
+  excludeReason?: string;
+  oiSetup?: string | null;
+  qualityAdjustedExpectedR?: number | null;
   /** Scale-trail plan and live state — from backend SCALE_TRAIL mode */
   exitPlan?: { mode?: string; legs?: { r: number; label: string }[]; runnerQty?: number | null } | null;
   exitState?: {
@@ -88,6 +98,30 @@ type PositionRow = {
     rMultiple?: number | null;
     closed?: boolean;
   } | null;
+};
+
+type FreeSlots = {
+  long?: number;
+  short?: number;
+  total?: number;
+  openLong?: number;
+  openShort?: number;
+  lockSize?: number;
+};
+
+type ReplacementCandidate = {
+  symbol: string;
+  direction?: string;
+  entryState?: string;
+  score?: number | null;
+  ltp?: number | null;
+  ltpSource?: string;
+  qualityAdjustedExpectedR?: number | null;
+  excludeReason?: string;
+  proposalOnly?: boolean;
+  sector?: string;
+  sleeve?: string;
+  oiSetup?: string | null;
 };
 
 type AttentionItem = {
@@ -164,11 +198,20 @@ type SessionResponse = {
     netExposure?: number;
     unrealizedPnl?: number | null;
     realizedPnl?: number | null;
+    cashHeld?: boolean;
+    dailyLossHit?: boolean;
   };
+  cashHeld?: boolean;
   attention?: AttentionItem[];
   long?: PositionRow[];
   short?: PositionRow[];
   events?: SessionEvent[];
+  freeSlots?: FreeSlots | null;
+  replacementCandidates?: ReplacementCandidate[];
+  replacementBlockedReason?: string | null;
+  replacementCutoffIst?: string | null;
+  rotationWindowOpen?: boolean | null;
+  rotationWindowCode?: string | null;
   error?: string;
 };
 
@@ -374,6 +417,42 @@ function statusTone(status?: string): string {
   return 'desk-pill--muted';
 }
 
+function entryStateTone(state?: string): string {
+  const s = (state || '').toUpperCase();
+  if (s === 'QUALIFIED') return 'desk-pill--ok';
+  if (s === 'WAIT_RETEST' || s === 'WAIT') return 'desk-pill--warn';
+  if (s === 'EXHAUSTED' || s === 'NO_EDGE' || s === 'STALE_DATA' || s === 'REGIME_AGAINST') {
+    return 'desk-pill--danger';
+  }
+  return 'desk-pill--muted';
+}
+
+/** Display label for entryState — raw code kept in title attr. */
+function entryStateLabel(state?: string | null): string {
+  if (state == null || state === '') return '—';
+  const s = state.toUpperCase();
+  if (s === 'QUALIFIED') return 'ENTER';
+  if (s === 'WAIT_RETEST') return 'WAIT';
+  if (s === 'EXHAUSTED' || s === 'NO_EDGE' || s === 'STALE_DATA' || s === 'REGIME_AGAINST') {
+    return 'SKIP';
+  }
+  return state;
+}
+
+function protectingLabel(amount: number | null | undefined): string | null {
+  if (amount == null || Number.isNaN(amount) || amount <= 0) return null;
+  return `Protecting ${inr(amount)}`;
+}
+
+function slotStatusTone(status?: string): string {
+  const s = (status || '').toUpperCase();
+  if (s === 'REPLACEABLE') return 'desk-pill--warn';
+  if (s === 'BOOKED') return 'desk-pill--info';
+  if (s === 'RUNNING') return 'desk-pill--strong';
+  if (s === 'SESSION_CLOSED') return 'desk-pill--muted';
+  return 'desk-pill--muted';
+}
+
 function mixLabel(mix?: Record<string, number> | null): string {
   if (!mix) return '—';
   const bits = Object.entries(mix)
@@ -514,11 +593,19 @@ async function commitSession(force = false): Promise<SessionResponse & { error?:
 
 /* ── Subcomponents ──────────────────────────────────────────────────── */
 
-function StatusPill({ children, tone }: { children: React.ReactNode; tone?: string }) {
+function StatusPill({
+  children,
+  tone,
+  title,
+}: {
+  children: React.ReactNode;
+  tone?: string;
+  title?: string;
+}) {
   const label = String(children ?? '');
   const liveish = /LIVE|RUNNING|OPEN|POLL|LOCKED/i.test(label);
-  const warnish = /STALE|WARN|CLOSED|HOLD/i.test(label);
-  const errish = /ERROR|FAIL|REJECT/i.test(label);
+  const warnish = /STALE|WARN|CLOSED|HOLD|REPLACEABLE/i.test(label);
+  const errish = /ERROR|FAIL|REJECT|STOP LOSS/i.test(label);
   const dotClass = errish
     ? 'desk-breathe-dot is-error'
     : warnish
@@ -527,18 +614,72 @@ function StatusPill({ children, tone }: { children: React.ReactNode; tone?: stri
         ? 'desk-breathe-dot'
         : 'desk-breathe-dot';
   return (
-    <span className={`desk-pill glass-pill inline-flex items-center gap-1.5 ${tone || 'desk-pill--muted'}`}>
-      {(liveish || warnish || errish) && <span className={dotClass} aria-hidden />}
-      {children}
+    <span
+      className={`desk-pill inline-flex items-center gap-1 max-w-[9.5rem] truncate ${tone || 'desk-pill--muted'}`}
+      title={title ?? (label || undefined)}
+    >
+      {(liveish || warnish || errish) && <span className={`${dotClass} shrink-0`} aria-hidden />}
+      <span className="truncate">{children}</span>
     </span>
   );
 }
 
-function Kpi({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
+function Kpi({
+  label,
+  value,
+  valueClass,
+  title,
+  span2,
+}: {
+  label: string;
+  value: string;
+  valueClass?: string;
+  title?: string;
+  span2?: boolean;
+}) {
   return (
-    <div className="min-w-0">
+    <div
+      className={`min-w-0 rounded-lg border border-slate-100 bg-slate-50/70 px-2 py-1.5 ${
+        span2 ? 'col-span-2' : ''
+      }`}
+    >
       <div className="text-[8px] uppercase tracking-wider text-slate-500 font-semibold">{label}</div>
-      <div className={`text-[13px] font-bold tabular-nums ${valueClass || 'text-slate-900'}`}>{value}</div>
+      <div
+        className={`text-[12px] font-bold tabular-nums truncate ${valueClass || 'text-slate-900'}`}
+        title={title ?? value}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function sleeveShort(sleeve?: string | null): string {
+  if (!sleeve) return '—';
+  return sleeve.includes('MEAN') || sleeve.includes('REV') ? 'MR' : 'MOM';
+}
+
+/** Unified status chip row — Status → Slot → Entry → Guard (same everywhere). */
+function PositionStatusPills({ row }: { row: PositionRow }) {
+  const guardTitle =
+    protectingLabel(row.profitProtectedInr) ||
+    (row.profitProtectedInr != null ? inr(row.profitProtectedInr) : undefined);
+  return (
+    <div className="flex items-center gap-1 flex-wrap justify-end min-w-0">
+      <StatusPill tone={statusTone(row.status)}>{row.status || '—'}</StatusPill>
+      {row.slotStatus != null && row.slotStatus !== '' && (
+        <StatusPill tone={slotStatusTone(row.slotStatus)}>{row.slotStatus}</StatusPill>
+      )}
+      {row.entryState != null && row.entryState !== '' && (
+        <StatusPill tone={entryStateTone(row.entryState)} title={row.entryState}>
+          {entryStateLabel(row.entryState)}
+        </StatusPill>
+      )}
+      {row.profitGuardActive === true && (
+        <StatusPill tone="desk-pill--ok" title={guardTitle}>
+          GUARD
+        </StatusPill>
+      )}
     </div>
   );
 }
@@ -607,7 +748,7 @@ function PositionTable({
                       {r.direction || '—'}
                     </span>
                   </div>
-                  <StatusPill tone={statusTone(r.status)}>{r.status || '—'}</StatusPill>
+                  <PositionStatusPills row={r} />
                 </div>
                 <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-[10px] tabular-nums">
                   <div>
@@ -717,7 +858,7 @@ function PositionTable({
                     <td className="px-2 py-2.5 tabular-nums">{r.distToSlPct == null ? '—' : `${r.distToSlPct.toFixed(2)}%`}</td>
                     <td className="px-2 py-2.5 tabular-nums">{r.distToT1Pct == null ? '—' : `${r.distToT1Pct.toFixed(2)}%`}</td>
                     <td className="px-2 py-2.5">
-                      <StatusPill tone={statusTone(r.status)}>{r.status || '—'}</StatusPill>
+                      <PositionStatusPills row={r} />
                     </td>
                   </tr>
                 );
@@ -906,6 +1047,15 @@ export default function AssetMetricsPanel({
   const adoptLong = candidates?.adoptLong || [];
   const adoptShort = candidates?.adoptShort || [];
   const showAttention = attentionItems.length > 0 && lockedToday;
+  const freeSlots = session?.freeSlots ?? null;
+  const replacementCandidates = session?.replacementCandidates || [];
+  const rotationOpen = session?.rotationWindowOpen;
+  const replacementBlocked = session?.replacementBlockedReason ?? null;
+  const replacementCutoff = session?.replacementCutoffIst ?? null;
+  const cashHeld =
+    session?.cashHeld === true ||
+    session?.portfolio?.cashHeld === true ||
+    replacementBlocked === 'prefer_cash_no_qualified';
 
   const emptyHint = showLockedBasket
     ? lockedToday
@@ -1062,6 +1212,115 @@ export default function AssetMetricsPanel({
         <Kpi label="Committed" value={formatIstClock(session?.committedAt)} />
       </div>
 
+      {/* Quant rotation — free slots + replacement proposals from session payload */}
+      <div className="bg-white/80 border border-slate-200 rounded-xl p-3 shadow-sm space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="desk-panel-title text-slate-900">ROTATION</h3>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <StatusPill
+              tone={
+                rotationOpen === true
+                  ? 'desk-pill--ok'
+                  : rotationOpen === false
+                    ? 'desk-pill--muted'
+                    : 'desk-pill--muted'
+              }
+            >
+              {rotationOpen === true ? 'WINDOW OPEN' : rotationOpen === false ? 'WINDOW CLOSED' : 'WINDOW —'}
+            </StatusPill>
+            {cashHeld && (
+              <StatusPill tone="desk-pill--info">CASH HELD</StatusPill>
+            )}
+            {replacementBlocked != null && replacementBlocked !== '' && (
+              <StatusPill tone="desk-pill--warn">{replacementBlocked}</StatusPill>
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+          <Kpi
+            label="Free L / S"
+            value={
+              freeSlots == null
+                ? '—'
+                : `${freeSlots.long ?? '—'} / ${freeSlots.short ?? '—'}`
+            }
+          />
+          <Kpi label="Free total" value={freeSlots?.total == null ? '—' : String(freeSlots.total)} />
+          <Kpi
+            label="Open L / S"
+            value={
+              freeSlots == null
+                ? '—'
+                : `${freeSlots.openLong ?? '—'} / ${freeSlots.openShort ?? '—'}`
+            }
+          />
+          <Kpi label="Lock size" value={freeSlots?.lockSize == null ? '—' : String(freeSlots.lockSize)} />
+          <Kpi label="Cutoff IST" value={replacementCutoff || '—'} />
+          <Kpi
+            label="Candidates"
+            value={replacementCandidates.length > 0 ? String(replacementCandidates.length) : '—'}
+          />
+        </div>
+        {replacementCandidates.length > 0 ? (
+          <div className="overflow-x-auto desk-scroll-x border-t border-slate-100 pt-2">
+            <table className="w-full text-left text-[10px]">
+              <thead className="text-slate-500 uppercase tracking-wider text-[8px]">
+                <tr>
+                  <th className="px-1.5 py-1.5 font-semibold">Symbol</th>
+                  <th className="px-1.5 py-1.5 font-semibold">Dir</th>
+                  <th className="px-1.5 py-1.5 font-semibold">Entry</th>
+                  <th className="px-1.5 py-1.5 font-semibold">OI</th>
+                  <th className="px-1.5 py-1.5 font-semibold">Score</th>
+                  <th className="px-1.5 py-1.5 font-semibold">LTP</th>
+                  <th className="px-1.5 py-1.5 font-semibold">Src</th>
+                  <th className="px-1.5 py-1.5 font-semibold">Adj R</th>
+                  <th className="px-1.5 py-1.5 font-semibold">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {replacementCandidates.map((c, i) => (
+                  <tr key={`${c.symbol}-${c.direction}-${i}`} className="border-t border-slate-50">
+                    <td className="px-1.5 py-1.5 font-bold text-slate-900">{c.symbol || '—'}</td>
+                    <td className="px-1.5 py-1.5 text-slate-600">{c.direction || '—'}</td>
+                    <td className="px-1.5 py-1.5">
+                      <StatusPill tone={entryStateTone(c.entryState)} title={c.entryState || undefined}>
+                        {entryStateLabel(c.entryState)}
+                      </StatusPill>
+                    </td>
+                    <td className="px-1.5 py-1.5 text-slate-600 whitespace-nowrap">
+                      {c.oiSetup || '—'}
+                    </td>
+                    <td className="px-1.5 py-1.5 tabular-nums">
+                      {c.score == null ? '—' : dash(c.score, 1)}
+                    </td>
+                    <td className="px-1.5 py-1.5 tabular-nums">{dash(c.ltp)}</td>
+                    <td className="px-1.5 py-1.5 text-slate-500">{c.ltpSource || '—'}</td>
+                    <td className="px-1.5 py-1.5 tabular-nums">
+                      {c.qualityAdjustedExpectedR == null
+                        ? '—'
+                        : dash(c.qualityAdjustedExpectedR, 2)}
+                    </td>
+                    <td className="px-1.5 py-1.5 text-slate-500 max-w-[140px] truncate" title={c.excludeReason || ''}>
+                      {c.excludeReason
+                        ? c.excludeReason
+                        : c.proposalOnly === true
+                          ? 'proposal'
+                          : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-[9px] text-slate-400 border-t border-slate-100 pt-2">
+            {replacementBlocked
+              ? `No replacement candidates — ${replacementBlocked}`
+              : 'No replacement candidates —'}
+          </p>
+        )}
+      </div>
+
       {/* Attention strip */}
       {showAttention && (
         <div className="flex flex-wrap gap-2">
@@ -1120,8 +1379,8 @@ export default function AssetMetricsPanel({
       )}
 
       {subView === 'positions' && (
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-3">
-          <div className="space-y-3">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] gap-3 items-start">
+          <div className={`space-y-3 min-w-0 ${selectedRow ? 'order-2 xl:order-1' : ''}`}>
             <PositionTable
               title={locked ? 'LONG BOOK' : 'LONG CANDIDATES'}
               rows={displayLong}
@@ -1138,101 +1397,294 @@ export default function AssetMetricsPanel({
             />
           </div>
 
-          <div className="space-y-3">
-            <div className="glass-overlay rounded-xl p-3">
+          <div className={`space-y-3 min-w-0 ${selectedRow ? 'order-1 xl:order-2' : ''}`}>
+            <div className="bg-white/80 border border-slate-200 rounded-xl p-3 shadow-sm xl:sticky xl:top-3">
               <h3 className="desk-panel-title text-slate-900 mb-2">DETAIL</h3>
               {!selectedRow ? (
                 <p className="text-[10px] text-slate-400">Select a symbol</p>
               ) : (
-                <div className="space-y-2 text-[10px]">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900 text-[13px]">{selectedRow.symbol}</span>
-                    <StatusPill tone={statusTone(selectedRow.status)}>{selectedRow.status || '—'}</StatusPill>
+                <div className="space-y-3 text-[10px]">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-900 text-[13px] truncate">
+                        {selectedRow.symbol}
+                      </div>
+                      <div className="text-[9px] text-slate-500 mt-0.5">
+                        {selectedRow.direction || '—'} · {sleeveShort(selectedRow.sleeve)}
+                        {selectedRow.sector ? ` · ${selectedRow.sector}` : ''}
+                      </div>
+                    </div>
+                    <PositionStatusPills row={selectedRow} />
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Kpi label="Direction" value={selectedRow.direction || '—'} />
-                    <Kpi label="Sector" value={selectedRow.sector || '—'} />
-                    <Kpi
-                      label="Sleeve"
-                      value={
-                        selectedRow.sleeve
-                          ? selectedRow.sleeve.includes('MEAN') || selectedRow.sleeve.includes('REV')
-                            ? 'MEAN_REV'
-                            : 'MOMENTUM'
-                          : '—'
-                      }
-                    />
-                    <Kpi label="Score" value={selectedRow.score == null ? 'UNRATED' : dash(selectedRow.score, 1)} />
-                    <Kpi
-                      label="Score rank %"
-                      value={selectedRow.scorePctRank == null ? '—' : dash(selectedRow.scorePctRank, 0)}
-                    />
-                    <Kpi
-                      label="RS vs NIFTY"
-                      value={pct(rowRsVsIndex(selectedRow), 1)}
-                      valueClass={pnlClass(rowRsVsIndex(selectedRow))}
-                    />
-                    <Kpi
-                      label="Gap / Intraday"
-                      value={(() => {
-                        const { gap, intra } = rowGapIntra(selectedRow);
-                        if (gap == null && intra == null) return '—';
-                        return `${gap == null ? '—' : pct(gap, 1)} / ${intra == null ? '—' : pct(intra, 1)}`;
-                      })()}
-                    />
-                    <Kpi
-                      label="In-play"
-                      value={rowInPlay(selectedRow) ? (selectedRow.inPlayReason || selectedRow.factorBreakdown?.breakout?.inPlayReason || 'yes') : 'no'}
-                    />
-                    <Kpi label="LTP src" value={selectedRow.ltpSource || '—'} />
-                    <Kpi label="Entry" value={dash(selectedRow.entryPrice)} />
-                    <Kpi label="LTP" value={dash(selectedRow.ltp)} />
-                    <Kpi label="SL" value={dash(selectedRow.stopLoss)} />
-                    <Kpi label="T1 / T2" value={`${dash(selectedRow.target1)} / ${dash(selectedRow.target2)}${selectedRow.exitPlan?.mode === 'SCALE_TRAIL' ? ' (ref)' : ''}`} />
-                    <Kpi label="Qty" value={selectedRow.approxQty == null ? '—' : String(selectedRow.approxQty)} />
-                    {selectedRow.exitState != null && (
-                      <>
-                        <Kpi label="Rem Qty" value={selectedRow.exitState.remainingQty == null ? '—' : String(selectedRow.exitState.remainingQty)} />
-                        <Kpi label="Eff SL" value={selectedRow.exitState.effectiveStop == null ? '—' : dash(selectedRow.exitState.effectiveStop)} />
+
+                  {/* Book snapshot — mirrors table columns */}
+                  <div>
+                    <div className="text-[8px] uppercase tracking-wider text-slate-500 font-semibold mb-1.5">
+                      Book
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                      <Kpi
+                        label="Score"
+                        value={selectedRow.score == null ? 'UNRATED' : dash(selectedRow.score, 1)}
+                      />
+                      <Kpi
+                        label="Rank %"
+                        value={
+                          selectedRow.scorePctRank == null
+                            ? '—'
+                            : dash(selectedRow.scorePctRank, 0)
+                        }
+                      />
+                      <Kpi label="LTP" value={dash(selectedRow.ltp)} />
+                      <Kpi label="Entry" value={dash(selectedRow.entryPrice)} />
+                      <Kpi
+                        label="Qty"
+                        value={
+                          selectedRow.approxQty == null
+                            ? '—'
+                            : selectedRow.exitState?.remainingQty != null &&
+                                selectedRow.exitState.remainingQty !== selectedRow.approxQty
+                              ? `${selectedRow.approxQty} / ${selectedRow.exitState.remainingQty} rem`
+                              : String(selectedRow.approxQty)
+                        }
+                      />
+                      <Kpi
+                        label="Value"
+                        value={inr(
+                          selectedRow.positionValue ?? selectedRow.deployedCapital ?? null
+                        )}
+                      />
+                      <Kpi
+                        label="P&L"
+                        value={pnlFmt(
+                          selectedRow.status?.toUpperCase().includes('CLOSED') ||
+                            selectedRow.closed
+                            ? (selectedRow.totalPnl ??
+                                selectedRow.realizedPnl ??
+                                selectedRow.exitState?.realizedPnl ??
+                                selectedRow.unrealizedPnl)
+                            : (selectedRow.totalPnl ?? selectedRow.unrealizedPnl)
+                        )}
+                        valueClass={pnlClass(
+                          selectedRow.status?.toUpperCase().includes('CLOSED') ||
+                            selectedRow.closed
+                            ? (selectedRow.totalPnl ??
+                                selectedRow.realizedPnl ??
+                                selectedRow.exitState?.realizedPnl ??
+                                selectedRow.unrealizedPnl)
+                            : (selectedRow.totalPnl ?? selectedRow.unrealizedPnl)
+                        )}
+                      />
+                      <Kpi
+                        label="P&L %"
+                        value={pct(selectedRow.pnlPct)}
+                        valueClass={pnlClass(selectedRow.pnlPct)}
+                      />
+                      <Kpi
+                        label="→SL"
+                        value={
+                          selectedRow.distToSlPct == null
+                            ? '—'
+                            : `${selectedRow.distToSlPct.toFixed(2)}%`
+                        }
+                      />
+                      <Kpi
+                        label="→T1"
+                        value={
+                          selectedRow.distToT1Pct == null
+                            ? '—'
+                            : `${selectedRow.distToT1Pct.toFixed(2)}%`
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {/* Levels */}
+                  <div>
+                    <div className="text-[8px] uppercase tracking-wider text-slate-500 font-semibold mb-1.5">
+                      Levels
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                      <Kpi
+                        label="SL"
+                        value={
+                          selectedRow.exitState?.effectiveStop != null
+                            ? `${dash(selectedRow.exitState.effectiveStop)}*`
+                            : dash(selectedRow.stopLoss)
+                        }
+                        title={
+                          selectedRow.exitState?.effectiveStop != null
+                            ? 'Effective trail stop'
+                            : undefined
+                        }
+                      />
+                      <Kpi label="T1" value={dash(selectedRow.target1)} />
+                      <Kpi
+                        label="T2"
+                        value={`${dash(selectedRow.target2)}${
+                          selectedRow.exitPlan?.mode === 'SCALE_TRAIL' ? ' ref' : ''
+                        }`}
+                      />
+                      <Kpi label="R:R" value={dash(selectedRow.rewardRisk, 1)} />
+                      <Kpi label="LTP src" value={selectedRow.ltpSource || '—'} />
+                      <Kpi
+                        label="Gap / Intra"
+                        value={(() => {
+                          const { gap, intra } = rowGapIntra(selectedRow);
+                          if (gap == null && intra == null) return '—';
+                          return `${gap == null ? '—' : pct(gap, 1)} / ${
+                            intra == null ? '—' : pct(intra, 1)
+                          }`;
+                        })()}
+                      />
+                      <Kpi
+                        label="RS vs NIFTY"
+                        value={pct(rowRsVsIndex(selectedRow), 1)}
+                        valueClass={pnlClass(rowRsVsIndex(selectedRow))}
+                      />
+                      <Kpi
+                        label="In-play"
+                        value={rowInPlay(selectedRow) ? 'yes' : 'no'}
+                        title={
+                          rowInPlay(selectedRow)
+                            ? selectedRow.inPlayReason ||
+                              selectedRow.factorBreakdown?.breakout?.inPlayReason ||
+                              'in play'
+                            : undefined
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {/* Gate / rotation */}
+                  <div>
+                    <div className="text-[8px] uppercase tracking-wider text-slate-500 font-semibold mb-1.5">
+                      Gate
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                      <Kpi label="OI setup" value={selectedRow.oiSetup || '—'} />
+                      <Kpi
+                        label="Protected ₹"
+                        value={
+                          selectedRow.profitProtectedInr == null ||
+                          Number.isNaN(selectedRow.profitProtectedInr)
+                            ? '—'
+                            : inr(selectedRow.profitProtectedInr)
+                        }
+                        title={
+                          protectingLabel(selectedRow.profitProtectedInr) || undefined
+                        }
+                      />
+                      <Kpi
+                        label="Exclude"
+                        value={selectedRow.excludeReason || '—'}
+                        title={selectedRow.excludeReason || undefined}
+                        span2
+                      />
+                      <Kpi label="Risk scale" value={dash(selectedRow.riskScale, 2)} />
+                      <Kpi
+                        label="Eff. risk frac"
+                        value={
+                          selectedRow.effectiveRiskFraction == null
+                            ? '—'
+                            : dash(selectedRow.effectiveRiskFraction, 4)
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {selectedRow.exitState != null && (
+                    <div>
+                      <div className="text-[8px] uppercase tracking-wider text-slate-500 font-semibold mb-1.5">
+                        Scale / trail
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5 min-w-0">
                         <Kpi
-                          label="Realised PnL"
-                          value={pnlFmt(selectedRow.exitState.realizedPnl ?? selectedRow.realizedPnl)}
-                          valueClass={pnlClass(selectedRow.exitState.realizedPnl ?? selectedRow.realizedPnl)}
+                          label="Rem Qty"
+                          value={
+                            selectedRow.exitState.remainingQty == null
+                              ? '—'
+                              : String(selectedRow.exitState.remainingQty)
+                          }
                         />
                         <Kpi
-                          label="Unrealised PnL"
-                          value={pnlFmt(selectedRow.exitState.unrealizedPnl ?? selectedRow.unrealizedPnl)}
-                          valueClass={pnlClass(selectedRow.exitState.unrealizedPnl ?? selectedRow.unrealizedPnl)}
+                          label="Eff SL"
+                          value={
+                            selectedRow.exitState.effectiveStop == null
+                              ? '—'
+                              : dash(selectedRow.exitState.effectiveStop)
+                          }
                         />
-                      </>
-                    )}
-                    <Kpi label="R:R" value={dash(selectedRow.rewardRisk, 1)} />
-                    <Kpi label="Risk scale" value={dash(selectedRow.riskScale, 2)} />
-                    <Kpi
-                      label="Eff. risk frac"
-                      value={
-                        selectedRow.effectiveRiskFraction == null
-                          ? '—'
-                          : dash(selectedRow.effectiveRiskFraction, 4)
-                      }
-                    />
-                  </div>
-                  <div className="mt-2">
-                    <OrbBand
-                      orbLow={selectedRow.orbLow ?? selectedRow.factorBreakdown?.breakout?.orbLow}
-                      orbHigh={selectedRow.orbHigh ?? selectedRow.factorBreakdown?.breakout?.orbHigh}
-                      vwap={selectedRow.vwap ?? selectedRow.factorBreakdown?.vwap?.vwap}
-                      ltp={selectedRow.ltp}
-                    />
-                  </div>
+                        <Kpi
+                          label="Realised"
+                          value={pnlFmt(
+                            selectedRow.exitState.realizedPnl ?? selectedRow.realizedPnl
+                          )}
+                          valueClass={pnlClass(
+                            selectedRow.exitState.realizedPnl ?? selectedRow.realizedPnl
+                          )}
+                        />
+                        <Kpi
+                          label="Unrealised"
+                          value={pnlFmt(
+                            selectedRow.exitState.unrealizedPnl ?? selectedRow.unrealizedPnl
+                          )}
+                          valueClass={pnlClass(
+                            selectedRow.exitState.unrealizedPnl ?? selectedRow.unrealizedPnl
+                          )}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <OrbBand
+                    orbLow={selectedRow.orbLow ?? selectedRow.factorBreakdown?.breakout?.orbLow}
+                    orbHigh={
+                      selectedRow.orbHigh ?? selectedRow.factorBreakdown?.breakout?.orbHigh
+                    }
+                    vwap={selectedRow.vwap ?? selectedRow.factorBreakdown?.vwap?.vwap}
+                    ltp={selectedRow.ltp}
+                  />
+
                   {selectedRow.factorBreakdown && (
-                    <div className="mt-2 border-t border-slate-100 pt-2">
-                      <div className="text-[8px] uppercase tracking-wider text-slate-500 mb-1">Factor breakdown</div>
+                    <div className="border-t border-slate-100 pt-2">
+                      <div className="text-[8px] uppercase tracking-wider text-slate-500 mb-1">
+                        Factor breakdown
+                      </div>
                       <div className="space-y-1.5 max-h-40 overflow-y-auto">
                         {Object.entries(selectedRow.factorBreakdown).map(([k, c], i) => {
                           const scorePct = c.rated
-                            ? Math.max(0, Math.min(100, Number(c.score) <= 1 ? Number(c.score) * 100 : Number(c.score)))
+                            ? Math.max(
+                                0,
+                                Math.min(
+                                  100,
+                                  Number(c.score) <= 1
+                                    ? Number(c.score) * 100
+                                    : Number(c.score)
+                                )
+                              )
                             : 0;
+                          const left = [
+                            k,
+                            c.rated ? '' : 'UNRATED',
+                            k === 'relativeStrength' && c.rsVsIndexPct != null
+                              ? `RS ${pct(c.rsVsIndexPct, 1)}`
+                              : '',
+                            k === 'momentum' && c.overextended ? 'OVEREXTENDED' : '',
+                            k === 'vwap' && c.vwapMode ? String(c.vwapMode) : '',
+                            k === 'volume' && c.rvolTime != null
+                              ? `rvolT ${dash(c.rvolTime, 2)}×`
+                              : '',
+                            k === 'breakout' && c.orbHigh != null && c.orbLow != null
+                              ? `ORB ${dash(c.orbLow)}–${dash(c.orbHigh)}`
+                              : '',
+                            k === 'breakout' && c.inPlay ? 'IN-PLAY' : '',
+                            k === 'breakout' && c.orbVelocityPct != null
+                              ? `vel ${pct(c.orbVelocityPct, 1)}`
+                              : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' · ');
                           return (
                             <motion.div
                               key={k}
@@ -1241,37 +1693,24 @@ export default function AssetMetricsPanel({
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: i * 0.04, duration: 0.28 }}
                             >
-                              <div className="flex justify-between tabular-nums gap-2">
-                                <span className="text-slate-600">
-                                  {k}{c.rated ? '' : ' · UNRATED'}
-                                  {k === 'relativeStrength' && c.rsVsIndexPct != null
-                                    ? ` · RS ${pct(c.rsVsIndexPct, 1)}`
-                                    : ''}
-                                  {k === 'momentum' && c.overextended
-                                    ? ' · OVEREXTENDED'
-                                    : ''}
-                                  {k === 'vwap' && c.vwapMode
-                                    ? ` · ${c.vwapMode}`
-                                    : ''}
-                                  {k === 'volume' && c.rvolTime != null
-                                    ? ` · rvolT ${dash(c.rvolTime, 2)}×`
-                                    : ''}
-                                  {k === 'breakout' && c.orbHigh != null && c.orbLow != null
-                                    ? ` · ORB ${dash(c.orbLow)}–${dash(c.orbHigh)}`
-                                    : ''}
-                                  {k === 'breakout' && c.inPlay
-                                    ? ' · IN-PLAY'
-                                    : ''}
-                                  {k === 'breakout' && c.orbVelocityPct != null
-                                    ? ` · vel ${pct(c.orbVelocityPct, 1)}`
-                                    : ''}
+                              <div className="flex justify-between tabular-nums gap-2 min-w-0">
+                                <span className="text-slate-600 min-w-0 truncate" title={left}>
+                                  {left}
                                 </span>
-                                <span className="font-semibold shrink-0 text-slate-900">{c.rated ? dash(c.score, 1) : '—'}</span>
+                                <span className="font-semibold shrink-0 text-slate-900">
+                                  {c.rated ? dash(c.score, 1) : '—'}
+                                </span>
                               </div>
                               {c.rated && (
                                 <DeskGaugeFill
                                   pct={scorePct}
-                                  toneClass={scorePct >= 60 ? 'bg-emerald-500' : scorePct >= 40 ? 'bg-amber-500' : 'bg-slate-400'}
+                                  toneClass={
+                                    scorePct >= 60
+                                      ? 'bg-emerald-500'
+                                      : scorePct >= 40
+                                        ? 'bg-amber-500'
+                                        : 'bg-slate-400'
+                                  }
                                 />
                               )}
                             </motion.div>
@@ -1290,13 +1729,18 @@ export default function AssetMetricsPanel({
                 {(session?.events || []).length === 0 ? (
                   <p className="text-[10px] text-slate-400">No events yet</p>
                 ) : (
-                  [...(session?.events || [])].reverse().slice(0, 30).map((ev, i) => (
-                    <div key={i} className="text-[9px] border-b border-slate-50 pb-1">
-                      <span className="font-bold text-slate-700">{ev.type || 'EVENT'}</span>
-                      <span className="text-slate-400 ml-2">{formatIstClock(ev.at)}</span>
-                      {ev.symbol && <span className="ml-2 text-slate-600">{ev.symbol}</span>}
-                    </div>
-                  ))
+                  [...(session?.events || [])]
+                    .reverse()
+                    .slice(0, 30)
+                    .map((ev, i) => (
+                      <div key={i} className="text-[9px] border-b border-slate-50 pb-1">
+                        <span className="font-bold text-slate-700">{ev.type || 'EVENT'}</span>
+                        <span className="text-slate-400 ml-2">{formatIstClock(ev.at)}</span>
+                        {ev.symbol && (
+                          <span className="ml-2 text-slate-600">{ev.symbol}</span>
+                        )}
+                      </div>
+                    ))
                 )}
               </div>
             </div>

@@ -762,12 +762,13 @@ def _get_credential() -> str:
 
 
 def _pct_change(ltp: float, close: float | None) -> tuple[str, str]:
+    """Return absolute pts + pct for desk tiles, e.g. ``201.52 (0.16%)``."""
     if close in (None, 0):
-        return "0.00%", "POSITIVE"
-    change = ((ltp - close) / close) * 100
-    sign = "+" if change >= 0 else ""
-    state = "POSITIVE" if change >= 0 else "NEGATIVE"
-    return f"{sign}{change:.2f}%", state
+        return "0.00 (0.00%)", "POSITIVE"
+    pts = float(ltp) - float(close)
+    pct = (pts / float(close)) * 100.0
+    state = "POSITIVE" if pts >= 0 else "NEGATIVE"
+    return f"{abs(pts):,.2f} ({abs(pct):.2f}%)", state
 
 
 def _format_inr(value: float) -> str:
@@ -3762,6 +3763,29 @@ def create_app() -> FastAPI:
         try:
             from .intraday_session_engine import get_session
             return get_session(include_live=True)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/intraday-session/replacements")
+    def intraday_session_replacements() -> dict[str, Any]:
+        """GET-only replacement candidates + free capital slots (proposal, no mutate)."""
+        try:
+            from .intraday_session_engine import get_session
+
+            sess = get_session(include_live=True)
+            return {
+                "success": bool(sess.get("success")),
+                "sessionDate": sess.get("sessionDate"),
+                "locked": sess.get("locked"),
+                "freeSlots": sess.get("freeSlots"),
+                "replacementCandidates": sess.get("replacementCandidates") or [],
+                "replacementBlockedReason": sess.get("replacementBlockedReason"),
+                "replacementCutoffIst": sess.get("replacementCutoffIst"),
+                "rotationWindow": sess.get("rotationWindow"),
+                "rotationWindowCode": sess.get("rotationWindowCode"),
+                "rotationWindowOpen": sess.get("rotationWindowOpen"),
+                "updatedAt": sess.get("updatedAt"),
+            }
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 

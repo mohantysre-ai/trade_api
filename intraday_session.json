@@ -3,7 +3,7 @@
   "locked": true,
   "sessionDate": "2026-08-07",
   "committedAt": "2026-08-07T04:21:24.904316+00:00",
-  "updatedAt": "2026-08-07T05:31:31.402856+00:00",
+  "updatedAt": "2026-08-07T10:01:03.866389+00:00",
   "snapshotUpdatedAt": "2026-08-07T04:20:28.905145+00:00",
   "dataStale": false,
   "regime": {
@@ -134,7 +134,7 @@
           "rated": true
         }
       },
-      "ltp": 3621.1,
+      "ltp": 3648.0,
       "scanLtp": 3621.1,
       "atrPct": 6.52,
       "status": "CLOSED",
@@ -194,7 +194,9 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "currentPrice": 3648.0,
+      "ltpSource": "live"
     },
     {
       "rank": 2,
@@ -289,11 +291,11 @@
           "rated": true
         }
       },
-      "ltp": 704.05,
+      "ltp": 687.0,
       "scanLtp": 704.05,
       "atrPct": 2.42,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 704.05,
       "stopLoss": 683.6,
       "target1": 734.72,
@@ -349,7 +351,31 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "ltpSource": "live",
+      "realizedPnl": -1334.8,
+      "unrealizedPnl": -0.0,
+      "pnlPct": -2.42,
+      "totalPnl": -1334.8,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 142,
+            "price": 694.65,
+            "pnl": -1334.8
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 683.6,
+        "realizedPnl": -1334.8,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -0.46,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "effectiveStop": 683.6,
+      "remainingQty": 0
     },
     {
       "rank": 3,
@@ -444,11 +470,11 @@
           "rated": true
         }
       },
-      "ltp": 163.13,
+      "ltp": 168.9,
       "scanLtp": 163.13,
       "atrPct": 5.57,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 163.13,
       "stopLoss": 152.23,
       "target1": 179.48,
@@ -504,7 +530,31 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "ltpSource": "live",
+      "realizedPnl": 2404.5,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 3.54,
+      "totalPnl": 2404.5,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 458,
+            "price": 168.38,
+            "pnl": 2404.5
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 152.23,
+        "realizedPnl": 2404.5,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.482,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "effectiveStop": 152.23,
+      "remainingQty": 0
     },
     {
       "rank": 4,
@@ -599,11 +649,11 @@
           "rated": true
         }
       },
-      "ltp": 5641.5,
+      "ltp": 5508.0,
       "scanLtp": 5641.5,
       "atrPct": 2.82,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 5641.5,
       "stopLoss": 5450.59,
       "target1": 5927.86,
@@ -659,7 +709,31 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "ltpSource": "live",
+      "realizedPnl": -1921.0,
+      "unrealizedPnl": -0.0,
+      "pnlPct": -2.37,
+      "totalPnl": -1921.0,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 17,
+            "price": 5528.5,
+            "pnl": -1921.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 5450.59,
+        "realizedPnl": -1921.0,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -0.592,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "effectiveStop": 5450.59,
+      "remainingQty": 0
     },
     {
       "rank": 5,
@@ -754,11 +828,11 @@
           "rated": true
         }
       },
-      "ltp": 1368.0,
+      "ltp": 1349.3,
       "scanLtp": 1368.0,
       "atrPct": 3.07,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 1368.0,
       "stopLoss": 1317.6,
       "target1": 1443.6,
@@ -814,7 +888,31 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "ltpSource": "live",
+      "realizedPnl": -1058.5,
+      "unrealizedPnl": -0.0,
+      "pnlPct": -1.37,
+      "totalPnl": -1058.5,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 73,
+            "price": 1353.5,
+            "pnl": -1058.5
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1317.6,
+        "realizedPnl": -1058.5,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -0.288,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "effectiveStop": 1317.6,
+      "remainingQty": 0
     }
   ],
   "short": [
@@ -911,11 +1009,11 @@
           "rated": true
         }
       },
-      "ltp": 251.5,
+      "ltp": 249.3,
       "scanLtp": 251.5,
       "atrPct": 7.22,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 251.5,
       "stopLoss": 273.29,
       "target1": 218.81,
@@ -971,7 +1069,31 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "ltpSource": "live",
+      "realizedPnl": 194.65,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 0.87,
+      "totalPnl": 194.65,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 229,
+            "price": 250.65,
+            "pnl": 194.65
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 273.29,
+        "realizedPnl": 194.65,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.039,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "effectiveStop": 273.29,
+      "remainingQty": 0
     },
     {
       "rank": 2,
@@ -1066,7 +1188,7 @@
           "rated": true
         }
       },
-      "ltp": 1540.0,
+      "ltp": 1514.0,
       "scanLtp": 1540.0,
       "atrPct": 3.5,
       "status": "CLOSED",
@@ -1126,7 +1248,9 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "currentPrice": 1514.0,
+      "ltpSource": "live"
     },
     {
       "rank": 3,
@@ -1221,11 +1345,11 @@
           "rated": true
         }
       },
-      "ltp": 1035.3,
+      "ltp": 1048.0,
       "scanLtp": 1035.3,
       "atrPct": 2.78,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 1035.3,
       "stopLoss": 1069.84,
       "target1": 983.49,
@@ -1281,7 +1405,31 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "ltpSource": "live",
+      "realizedPnl": -1219.2,
+      "unrealizedPnl": -0.0,
+      "pnlPct": -1.23,
+      "totalPnl": -1219.2,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 96,
+            "price": 1048.0,
+            "pnl": -1219.2
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1069.84,
+        "realizedPnl": -1219.2,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -0.368,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "effectiveStop": 1069.84,
+      "remainingQty": 0
     },
     {
       "rank": 4,
@@ -1376,11 +1524,11 @@
           "rated": true
         }
       },
-      "ltp": 2019.4,
+      "ltp": 2004.0,
       "scanLtp": 2019.4,
       "atrPct": 2.12,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 2019.4,
       "stopLoss": 2070.77,
       "target1": 1942.35,
@@ -1436,7 +1584,31 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "ltpSource": "live",
+      "realizedPnl": 1048.6,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 0.76,
+      "totalPnl": 1048.6,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 49,
+            "price": 1998.0,
+            "pnl": 1048.6
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 2070.77,
+        "realizedPnl": 1048.6,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.417,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "effectiveStop": 2070.77,
+      "remainingQty": 0
     },
     {
       "rank": 5,
@@ -1531,11 +1703,11 @@
           "rated": true
         }
       },
-      "ltp": 1097.7,
+      "ltp": 1081.2,
       "scanLtp": 1097.7,
       "atrPct": 2.45,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 1097.7,
       "stopLoss": 1129.97,
       "target1": 1049.3,
@@ -1591,7 +1763,37 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "ltpSource": "live",
+      "realizedPnl": 1677.34,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 1.5,
+      "totalPnl": 1677.34,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 0.5,
+            "qty": 18,
+            "price": 1081.57,
+            "pnl": 290.34
+          },
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 73,
+            "price": 1078.7,
+            "pnl": 1387.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1129.97,
+        "realizedPnl": 1677.34,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.589,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "effectiveStop": 1129.97,
+      "remainingQty": 0
     }
   ],
   "candidatePoolLong": [
@@ -4364,6 +4566,54 @@
       "at": "2026-08-07T05:31:31.402833+00:00",
       "symbol": "BLUESTARCO",
       "direction": "SHORT"
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-07T10:01:03.301673+00:00",
+      "symbol": "TATAINVEST",
+      "direction": "LONG"
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-07T10:01:03.301690+00:00",
+      "symbol": "MOTHERSON",
+      "direction": "LONG"
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-07T10:01:03.301698+00:00",
+      "symbol": "BRITANNIA",
+      "direction": "LONG"
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-07T10:01:03.301706+00:00",
+      "symbol": "HCLTECH",
+      "direction": "LONG"
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-07T10:01:03.301768+00:00",
+      "symbol": "CROMPTON",
+      "direction": "SHORT"
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-07T10:01:03.301791+00:00",
+      "symbol": "PREMIERENE",
+      "direction": "SHORT"
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-07T10:01:03.301800+00:00",
+      "symbol": "BAJAJFINSV",
+      "direction": "SHORT"
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-07T10:01:03.301808+00:00",
+      "symbol": "BAJFINANCE",
+      "direction": "SHORT"
     }
   ],
   "funnel": {
@@ -4400,5 +4650,6 @@
   "rotation": "DAILY",
   "priorSessionDate": "2026-08-06",
   "rotated": true,
-  "fixedPlanSynced": true
+  "fixedPlanSynced": true,
+  "closeMarksFrozenAt": "2026-08-07T10:01:03.866389+00:00"
 }

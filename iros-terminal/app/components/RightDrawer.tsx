@@ -409,7 +409,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           <motion.button
             key="drawer-overlay"
             type="button"
-            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px] lg:bg-black/25"
+            className="fixed inset-0 z-[90] bg-black/45 backdrop-blur-[2px] lg:bg-black/25"
             aria-label="Close analysis drawer overlay"
             onClick={onClose}
             initial={{ opacity: 0 }}
@@ -419,7 +419,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           />
           <motion.div
             key="drawer-panel"
-            className="right-drawer glass-overlay fixed top-0 right-0 h-[100dvh] w-full sm:w-[min(100%,32rem)] lg:w-[50%] xl:w-[50%] 2xl:w-[45%] border-l border-slate-200 shadow-2xl z-50 overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] touch-pan-y"
+            className="right-drawer glass-overlay fixed top-0 right-0 h-[100dvh] w-full sm:w-[min(100%,32rem)] lg:w-[50%] xl:w-[50%] 2xl:w-[45%] border-l border-slate-200 shadow-2xl z-[100] overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] touch-pan-y"
             variants={drawerMotion}
             initial="closed"
             animate="open"

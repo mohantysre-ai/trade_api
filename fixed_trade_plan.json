@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-07T07:12:19.698459+00:00",
+  "updatedAt": "2026-08-07T18:34:19.458831+00:00",
   "source": "intraday_session_fallback",
   "long": [
     {
@@ -310,7 +310,57 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "outcome": {
+        "label": "EOD SQUAREOFF",
+        "detail": "Session square rem @ 694.65",
+        "hitLevel": null,
+        "ltp": 694.65,
+        "pctChange": -1.34,
+        "resolvedAt": "2026-08-07T10:01:03.138085+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": "EOD_SQUAREOFF",
+              "qty": 142,
+              "price": 694.65,
+              "pnl": -1334.8
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 683.6,
+          "realizedPnl": -1334.8,
+          "unrealizedPnl": 0.0,
+          "rMultiple": -0.46,
+          "closed": true,
+          "mode": "SCALE_TRAIL"
+        },
+        "realizedPnl": -1334.8,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 683.6,
+        "rMultiple": -0.46,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 142,
+            "price": 694.65,
+            "pnl": -1334.8
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 683.6,
+        "realizedPnl": -1334.8,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -0.46,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      }
     },
     {
       "rank": 3,
@@ -467,53 +517,53 @@
       "adoptReason": "HIGH_PROBABILITY_SCORE",
       "candidatePoolSize": 10,
       "outcome": {
-        "label": "PARTIAL 0.5R",
-        "detail": "Filled ['0.5R'] \u00b7 rem 366",
-        "hitLevel": "partial",
-        "ltp": 168.5,
-        "pctChange": 3.29,
-        "resolvedAt": null,
+        "label": "EOD SQUAREOFF",
+        "detail": "Session square rem @ 168.38",
+        "hitLevel": null,
+        "ltp": 168.38,
+        "pctChange": 3.22,
+        "resolvedAt": "2026-08-07T10:01:03.166663+00:00",
         "exitState": {
           "legsFilled": [
             {
-              "r": 0.5,
-              "qty": 92,
-              "price": 168.58,
-              "pnl": 501.4
+              "r": "EOD_SQUAREOFF",
+              "qty": 458,
+              "price": 168.38,
+              "pnl": 2404.5
             }
           ],
-          "remainingQty": 366,
+          "remainingQty": 0,
           "effectiveStop": 152.23,
-          "realizedPnl": 501.4,
-          "unrealizedPnl": 1965.42,
-          "rMultiple": 0.493,
-          "closed": false,
+          "realizedPnl": 2404.5,
+          "unrealizedPnl": 0.0,
+          "rMultiple": 0.482,
+          "closed": true,
           "mode": "SCALE_TRAIL"
         },
-        "realizedPnl": 501.4,
-        "unrealizedPnl": 1965.42,
-        "remainingQty": 366,
+        "realizedPnl": 2404.5,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
         "effectiveStop": 152.23,
-        "rMultiple": 0.493,
-        "closed": false,
+        "rMultiple": 0.482,
+        "closed": true,
         "scaleTrail": true,
-        "final": null
+        "final": true
       },
       "exitState": {
         "legsFilled": [
           {
-            "r": 0.5,
-            "qty": 92,
-            "price": 168.58,
-            "pnl": 501.4
+            "r": "EOD_SQUAREOFF",
+            "qty": 458,
+            "price": 168.38,
+            "pnl": 2404.5
           }
         ],
-        "remainingQty": 366,
+        "remainingQty": 0,
         "effectiveStop": 152.23,
-        "realizedPnl": 501.4,
-        "unrealizedPnl": 1965.42,
-        "rMultiple": 0.493,
-        "closed": false,
+        "realizedPnl": 2404.5,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.482,
+        "closed": true,
         "mode": "SCALE_TRAIL"
       }
     },
@@ -670,7 +720,57 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "outcome": {
+        "label": "EOD SQUAREOFF",
+        "detail": "Session square rem @ 5528.50",
+        "hitLevel": null,
+        "ltp": 5528.5,
+        "pctChange": -2.0,
+        "resolvedAt": "2026-08-07T10:01:03.184138+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": "EOD_SQUAREOFF",
+              "qty": 17,
+              "price": 5528.5,
+              "pnl": -1921.0
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 5450.59,
+          "realizedPnl": -1921.0,
+          "unrealizedPnl": 0.0,
+          "rMultiple": -0.592,
+          "closed": true,
+          "mode": "SCALE_TRAIL"
+        },
+        "realizedPnl": -1921.0,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 5450.59,
+        "rMultiple": -0.592,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 17,
+            "price": 5528.5,
+            "pnl": -1921.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 5450.59,
+        "realizedPnl": -1921.0,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -0.592,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      }
     },
     {
       "rank": 5,
@@ -825,7 +925,57 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "outcome": {
+        "label": "EOD SQUAREOFF",
+        "detail": "Session square rem @ 1353.50",
+        "hitLevel": null,
+        "ltp": 1353.5,
+        "pctChange": -1.06,
+        "resolvedAt": "2026-08-07T10:01:03.200716+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": "EOD_SQUAREOFF",
+              "qty": 73,
+              "price": 1353.5,
+              "pnl": -1058.5
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 1317.6,
+          "realizedPnl": -1058.5,
+          "unrealizedPnl": 0.0,
+          "rMultiple": -0.288,
+          "closed": true,
+          "mode": "SCALE_TRAIL"
+        },
+        "realizedPnl": -1058.5,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 1317.6,
+        "rMultiple": -0.288,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 73,
+            "price": 1353.5,
+            "pnl": -1058.5
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1317.6,
+        "realizedPnl": -1058.5,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -0.288,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      }
     }
   ],
   "short": [
@@ -982,7 +1132,57 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "outcome": {
+        "label": "EOD SQUAREOFF",
+        "detail": "Session square rem @ 250.65",
+        "hitLevel": null,
+        "ltp": 250.65,
+        "pctChange": -0.34,
+        "resolvedAt": "2026-08-07T10:01:03.239590+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": "EOD_SQUAREOFF",
+              "qty": 229,
+              "price": 250.65,
+              "pnl": 194.65
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 273.29,
+          "realizedPnl": 194.65,
+          "unrealizedPnl": 0.0,
+          "rMultiple": 0.039,
+          "closed": true,
+          "mode": "SCALE_TRAIL"
+        },
+        "realizedPnl": 194.65,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 273.29,
+        "rMultiple": 0.039,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 229,
+            "price": 250.65,
+            "pnl": 194.65
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 273.29,
+        "realizedPnl": 194.65,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.039,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      }
     },
     {
       "rank": 2,
@@ -1292,7 +1492,57 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "outcome": {
+        "label": "EOD SQUAREOFF",
+        "detail": "Session square rem @ 1048.00",
+        "hitLevel": null,
+        "ltp": 1048.0,
+        "pctChange": 1.23,
+        "resolvedAt": "2026-08-07T10:01:03.256403+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": "EOD_SQUAREOFF",
+              "qty": 96,
+              "price": 1048.0,
+              "pnl": -1219.2
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 1069.84,
+          "realizedPnl": -1219.2,
+          "unrealizedPnl": 0.0,
+          "rMultiple": -0.368,
+          "closed": true,
+          "mode": "SCALE_TRAIL"
+        },
+        "realizedPnl": -1219.2,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 1069.84,
+        "rMultiple": -0.368,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 96,
+            "price": 1048.0,
+            "pnl": -1219.2
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1069.84,
+        "realizedPnl": -1219.2,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -0.368,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      }
     },
     {
       "rank": 4,
@@ -1447,7 +1697,57 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "outcome": {
+        "label": "EOD SQUAREOFF",
+        "detail": "Session square rem @ 1998.00",
+        "hitLevel": null,
+        "ltp": 1998.0,
+        "pctChange": -1.06,
+        "resolvedAt": "2026-08-07T10:01:03.268805+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": "EOD_SQUAREOFF",
+              "qty": 49,
+              "price": 1998.0,
+              "pnl": 1048.6
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 2070.77,
+          "realizedPnl": 1048.6,
+          "unrealizedPnl": 0.0,
+          "rMultiple": 0.417,
+          "closed": true,
+          "mode": "SCALE_TRAIL"
+        },
+        "realizedPnl": 1048.6,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 2070.77,
+        "rMultiple": 0.417,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 49,
+            "price": 1998.0,
+            "pnl": 1048.6
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 2070.77,
+        "realizedPnl": 1048.6,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.417,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      }
     },
     {
       "rank": 5,
@@ -1602,7 +1902,69 @@
       },
       "adopted": true,
       "adoptReason": "HIGH_PROBABILITY_SCORE",
-      "candidatePoolSize": 10
+      "candidatePoolSize": 10,
+      "outcome": {
+        "label": "EOD SQUAREOFF",
+        "detail": "Session square rem @ 1078.70",
+        "hitLevel": null,
+        "ltp": 1078.7,
+        "pctChange": -1.73,
+        "resolvedAt": "2026-08-07T10:01:03.277463+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": 0.5,
+              "qty": 18,
+              "price": 1081.57,
+              "pnl": 290.34
+            },
+            {
+              "r": "EOD_SQUAREOFF",
+              "qty": 73,
+              "price": 1078.7,
+              "pnl": 1387.0
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 1129.97,
+          "realizedPnl": 1677.34,
+          "unrealizedPnl": 0.0,
+          "rMultiple": 0.589,
+          "closed": true,
+          "mode": "SCALE_TRAIL"
+        },
+        "realizedPnl": 1677.34,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 1129.97,
+        "rMultiple": 0.589,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 0.5,
+            "qty": 18,
+            "price": 1081.57,
+            "pnl": 290.34
+          },
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 73,
+            "price": 1078.7,
+            "pnl": 1387.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1129.97,
+        "realizedPnl": 1677.34,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.589,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      }
     }
   ]
 }

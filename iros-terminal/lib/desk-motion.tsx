@@ -29,6 +29,7 @@ import {
   tickCoalesceMs,
   tilt,
 } from "@/lib/motion-tokens";
+import { formatDeskDelta } from "@/lib/format-delta";
 
 export type TickDirection = "up" | "down" | "neutral";
 
@@ -372,6 +373,7 @@ export function DeskLiveTile({
   }, [value]);
 
   const updating = tilesUpdating || Boolean(dirClass);
+  const deltaLabel = formatDeskDelta(value, delta);
 
   return (
     <DeskCardTilt
@@ -391,9 +393,9 @@ export function DeskLiveTile({
       <div className="flex-1 min-w-0 z-10">
         <span className="desk-metric-label block">{label}</span>
         <LiveTickNumber value={value} className="desk-metric-value block" />
-        {delta != null && (
+        {deltaLabel != null && (
           <span className={`desk-metric-delta block ${positive ? "is-up" : "is-down"}`}>
-            {positive ? "↑" : "↓"} {delta}
+            {positive ? "↑" : "↓"} {deltaLabel}
           </span>
         )}
       </div>

@@ -1,10 +1,11 @@
 """Institutional scale-out + R-ratchet trailing exit plan.
 
 Policy (original qty fractions via largest-remainder):
-  +0.5R book 20%  — de-risk; keep initial hard SL
-  +1.0R book 30%  — core harvest; trail stop → breakeven
-  +1.5R book 25%  — harvest; trail stop → +0.5R
-  Runner ~25%     — ratchet trail at 2R→+1R, 3R→+1.5R, 4R→+2.5R
+  +0.25R profit guard — remaining never risks full hard SL (lock ≤ −0.5R)
+  +0.5R book 35%  — early harvest; trail stop → breakeven (do not give back to hard SL)
+  +1.0R book 30%  — core harvest; trail stays ≥ BE
+  +1.5R book 20%  — harvest; trail stop → +0.5R
+  Runner ~15%     — ratchet trail at 2R→+1R, 3R→+1.5R, 4R→+2.5R
   Remainder exits on trail stop hit or session square-off.
 
 Legacy target1/target2 remain as 1.5R / 3.0R *reference* levels for UI.
@@ -15,16 +16,21 @@ from __future__ import annotations
 from typing import Any
 
 SCALE_LEGS: list[tuple[float, float]] = [
-    (0.5, 0.20),
+    (0.5, 0.35),  # first meaningful harvest (capital-aware; ≥35%)
     (1.0, 0.30),
-    (1.5, 0.25),
+    (1.5, 0.20),
 ]
-# After scale legs, ~0.25 remains as runner
+# After scale legs, ~0.15 remains as runner
 RUNNER_FRAC = round(1.0 - sum(p for _, p in SCALE_LEGS), 4)
 
 # Highest R reached → trail stop locked at entry + k·R (LONG) / entry − k·R (SHORT)
-# k=0.0 means breakeven (entry)
+# k=0.0 means breakeven (entry). Profit guard at +0.25R halves remaining risk;
+# BE engages at +0.5R so greens are not given back to hard SL.
+PROFIT_GUARD_TRIGGER_R = 0.25
+PROFIT_GUARD_LOCK_R = -0.5  # entry − 0.5R (LONG) / entry + 0.5R (SHORT)
 TRAIL_RATCHET: dict[float, float] = {
+    PROFIT_GUARD_TRIGGER_R: PROFIT_GUARD_LOCK_R,
+    0.5: 0.0,
     1.0: 0.0,
     1.5: 0.5,
     2.0: 1.0,
@@ -34,6 +40,25 @@ TRAIL_RATCHET: dict[float, float] = {
 
 REF_T1_R = 1.5
 REF_T2_R = 3.0
+
+
+def profit_guard_active(state: dict[str, Any] | None) -> bool:
+    """True once first meaningful green prints (+0.25R) or stop has left hard SL."""
+    if not isinstance(state, dict):
+        return False
+    try:
+        r_mult = float(state.get("rMultiple") or 0)
+    except (TypeError, ValueError):
+        r_mult = 0.0
+    if r_mult + 1e-9 >= PROFIT_GUARD_TRIGGER_R:
+        return True
+    if state.get("profitGuardActive") is True:
+        return True
+    for x in state.get("legsFilled") or []:
+        if isinstance(x, dict) and isinstance(x.get("r"), (int, float)):
+            if float(x["r"]) + 1e-9 >= PROFIT_GUARD_TRIGGER_R:
+                return True
+    return False
 
 
 def allocate_leg_qty(total_qty: int, fracs: list[float] | None = None) -> list[int]:
@@ -332,6 +357,18 @@ def evaluate_scale_trail(
         hit_level = None
         detail = f"LTP {ltp:.2f} | Entry {entry:.2f} | R {r_now:+.2f}"
 
+    guard_on = r_now + 1e-9 >= PROFIT_GUARD_TRIGGER_R or any(
+        isinstance(x.get("r"), (int, float)) and float(x["r"]) + 1e-9 >= PROFIT_GUARD_TRIGGER_R
+        for x in legs_filled
+    ) or bool(prior.get("profitGuardActive"))
+    # Once meaningful green: remainder never sits on full hard SL.
+    if guard_on and remaining > 0:
+        guarded = _stop_at_r(entry, risk, PROFIT_GUARD_LOCK_R, direction)
+        if direction == "SHORT":
+            effective_stop = min(effective_stop, guarded)
+        else:
+            effective_stop = max(effective_stop, guarded)
+
     exit_state = {
         "legsFilled": legs_filled,
         "remainingQty": remaining,
@@ -341,6 +378,8 @@ def evaluate_scale_trail(
         "rMultiple": round(r_now, 3),
         "closed": closed,
         "mode": "SCALE_TRAIL",
+        "profitGuardActive": bool(guard_on),
+        "profitGuardTriggerR": PROFIT_GUARD_TRIGGER_R,
     }
 
     return {
@@ -357,6 +396,7 @@ def evaluate_scale_trail(
         "rMultiple": round(r_now, 3),
         "closed": closed,
         "scaleTrail": True,
+        "profitGuardActive": bool(guard_on),
     }
 
 

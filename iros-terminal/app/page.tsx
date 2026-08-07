@@ -16,7 +16,9 @@ import RightDrawer from './components/RightDrawer';
 import AssetMetricsPanel from './components/AssetMetricsPanel';
 import EodDeskPanel from './components/EodDeskPanel';
 import DeskControls from './components/DeskControls';
+import DeskActivityAlerts from './components/DeskActivityAlerts';
 import { DeskLiveTile, motion } from '@/lib/desk-motion';
+import { formatDeskDelta, formatPtsPctLabel } from '@/lib/format-delta';
 import { LayoutGroup } from 'motion/react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 
@@ -51,12 +53,15 @@ function marketStateClass(state: string) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Helper: parse delta string like "+2.73" or "-3.12"                      */
+/*  Helper: parse delta pct from "+2.73%" or "201.52 (0.16%)"                 */
 /* -------------------------------------------------------------------------- */
 function parseDeltaPct(delta: string | undefined): number {
   if (!delta) return 0;
-  const cleaned = delta.replace('%', '').replace(',', '');
-  return parseFloat(cleaned) || 0;
+  const paren = delta.match(/\(([+\-]?\d+(?:\.\d+)?)%\)/);
+  if (paren) return parseFloat(paren[1]) || 0;
+  const cleaned = delta.replace('%', '').replace(/,/g, '');
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : 0;
 }
 
 type TrendlyneScreenKey = 'risingDelivery' | 'topLosersVolume' | 'volumeShockers' | 'highVolumeGain' | 'highVolumeLoss' | 'outPerformanceWeek';
@@ -98,6 +103,7 @@ type NseStock = Record<string, unknown> & {
   symbol?: string;
   lastPrice?: number;
   pchange?: number;
+  change?: number;
 };
 
 type NseTopFiveResponse = {
@@ -113,6 +119,8 @@ type NseTopFiveResponse = {
 type NseEquityStock = Record<string, unknown> & {
   symbol?: string;
   pChange?: number;
+  lastPrice?: number;
+  change?: number;
 };
 
 type NseEquityStockIndicesResponse = {
@@ -651,13 +659,25 @@ function ScreenerStockList({
       )}
       {stocks.map((stock) => {
         const ticker = stock.symbol ?? 'UNKNOWN';
+        const pct = typeof stock.pchange === 'number' ? stock.pchange : null;
+        const abs =
+          typeof stock.change === 'number'
+            ? Math.abs(stock.change).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : typeof stock.lastPrice === 'number' && pct != null
+              ? formatPtsPctLabel(stock.lastPrice, pct).split(' (')[0]
+              : null;
         const changeText =
-          typeof stock.pchange === 'number'
-            ? `${stock.pchange > 0 ? '+' : ''}${stock.pchange.toFixed(2)}`
+          pct != null
+            ? abs
+              ? `${abs} (${Math.abs(pct).toFixed(2)}%)`
+              : formatPtsPctLabel(
+                  typeof stock.lastPrice === 'number' ? stock.lastPrice : null,
+                  pct,
+                )
             : 'N/A';
         const changeClass =
-          typeof stock.pchange === 'number'
-            ? stock.pchange >= 0
+          pct != null
+            ? pct >= 0
               ? 'text-emerald-600'
               : 'text-red-500'
             : 'text-slate-500';
@@ -674,7 +694,7 @@ function ScreenerStockList({
               <span className="text-[11px] text-slate-600 tabular-nums desk-num">
                 ₹{formatNseNumber(stock.lastPrice)}
               </span>
-              <span className={`text-[11px] font-semibold tabular-nums min-w-[50px] text-right ${changeClass}`}>
+              <span className={`text-[10px] font-semibold tabular-nums min-w-[72px] text-right ${changeClass}`}>
                 {changeText}
               </span>
             </div>
@@ -827,6 +847,15 @@ function NseHeatMapTooltip({ stock, ticker, colors }: { stock: NseEquityStock; t
   const pchange = typeof stock.pChange === 'number' ? stock.pChange : null;
   const positive = pchange !== null && pchange >= 0;
   const symbol = stock.symbol ?? ticker;
+  const changeLabel =
+    pchange != null
+      ? typeof stock.change === 'number'
+        ? `${Math.abs(stock.change).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${Math.abs(pchange).toFixed(2)}%)`
+        : formatPtsPctLabel(
+            typeof stock.lastPrice === 'number' ? stock.lastPrice : null,
+            pchange,
+          )
+      : 'N/A';
 
   const handleClick = () => {
     const nseUrl = `https://www.nseindia.com/get-quotes/equity?symbol=${encodeURIComponent(symbol)}`;
@@ -853,8 +882,8 @@ function NseHeatMapTooltip({ stock, ticker, colors }: { stock: NseEquityStock; t
         <span className="text-[9px] font-bold leading-tight relative z-10" style={{ color: colors.text }}>
           {ticker}
         </span>
-        <span className="text-[8px] font-semibold mt-0.5 relative z-10" style={{ color: colors.text }}>
-          {typeof stock.pChange === 'number' ? `${stock.pChange > 0 ? '+' : ''}${stock.pChange.toFixed(2)}` : 'N/A'}
+        <span className="text-[7px] font-semibold mt-0.5 relative z-10 text-center leading-tight" style={{ color: colors.text }}>
+          {changeLabel}
         </span>
       </div>
       <AdaptiveTooltipPortal
@@ -1357,6 +1386,10 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
   const low = 'low' in stock ? stock.low : undefined;
   const volume = 'volume' in stock ? stock.volume : undefined;
   const deltaValue = 'delta' in stock ? (stock as LiveStock).delta : (stock as LedgerStock).delta;
+  const deltaFmt = formatDeskDelta(price, deltaValue);
+  const deltaUp =
+    ('state' in stock && (stock as LiveStock).state === 'POSITIVE') ||
+    (typeof deltaValue === 'string' && (deltaValue.includes('+') || parseDeltaPct(deltaValue) >= 0));
 
   return (
     <div className="bg-white border border-emerald-300 border-[0.5px] rounded-lg p-3 shadow-sm">
@@ -1365,13 +1398,13 @@ function StockDetailPanel({ stock }: { stock?: LiveStock | LedgerStock | null })
           <div className="text-slate-500 text-[9px] uppercase tracking-wider">{name}</div>
           <div className="flex items-baseline gap-3 mt-1">
               <span className="text-2xl font-black text-slate-900">{normalizedPrice}</span>
-            {deltaValue && (
+            {deltaFmt && (
               <span
                 className={`text-xs font-bold ${
-                  deltaValue.includes('+') ? 'text-emerald-500' : 'text-red-500'
+                  deltaUp ? 'text-emerald-500' : 'text-red-500'
                 }`}
               >
-                {deltaValue}
+                {deltaUp ? '↑' : '↓'} {deltaFmt}
               </span>
             )}
           </div>
@@ -2259,6 +2292,7 @@ export default function IrosMasterAdvancedTerminal() {
 
   return (
     <div className="terminal-shell app-shell min-h-[100dvh] antialiased overflow-x-hidden">
+      <DeskActivityAlerts paused={drawerOpen} />
       <div className="app-shell-inner max-w-[1600px] mx-auto w-full min-w-0 p-2 sm:p-3 md:p-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] space-y-2 sm:space-y-3 md:space-y-4">
         <header className="terminal-header app-chrome">
           <div className="desk-topbar">

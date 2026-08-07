@@ -3,11 +3,11 @@
 Desk automation may auto-commit after morning pre-work. Broker orders are never
 placed by this module (executionPolicy remains advisory / manual-broker).
 
-Funnel: Nifty 500 → regime → multi-factor score →
+Funnel: Nifty 500 → regime → multi-factor score → entry_quality_gate →
   10 LONG + 10 SHORT candidate pool (20) →
-  adopt highest-probability 5 BUY + 5 SELL (10) → immutable JSON lock.
+  adopt highest-probability QUALIFIED 5 BUY + 5 SELL (10) → immutable JSON lock.
 
-No broker order placement. Missing inputs → UNRATED / omitted, never invented.
+No broker order placement. Missing inputs → UNRATED / STALE_DATA / NO_EDGE, never invented.
 """
 from __future__ import annotations
 
@@ -21,8 +21,16 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from .exit_plan import attach_exit_plan
-from .desk_clock import basket_lock_allowed, basket_lock_block_message, lock_window_config
+from .exit_plan import attach_exit_plan, profit_guard_active
+from .desk_clock import (
+    basket_lock_allowed,
+    basket_lock_block_message,
+    can_add_replacement,
+    ist_now,
+    lock_window_config,
+    rotation_window_allowed,
+    rotation_window_config,
+)
 from .desk_book_symbols import swing_locked_symbols
 
 log = logging.getLogger(__name__)
@@ -99,6 +107,47 @@ MR_VIX_MAX = float(os.environ.get("INTRADAY_MR_VIX_MAX", "18"))
 W_MR_VWAP = float(os.environ.get("INTRADAY_W_MR_VWAP", "40"))
 W_MR_RSI = float(os.environ.get("INTRADAY_W_MR_RSI", "30"))
 W_MR_GAP = float(os.environ.get("INTRADAY_W_MR_GAP", "30"))
+
+# Entry quality gate / exhaustion filter (conservative starting params — not proven optimal)
+EXHAUSTION_PCT = float(os.environ.get("INTRADAY_EXHAUSTION_PCT", "3.5"))
+EXHAUSTION_HARD_PCT = float(os.environ.get("INTRADAY_EXHAUSTION_HARD_PCT", "4.0"))
+VWAP_CHASE_PCT = float(os.environ.get("INTRADAY_VWAP_CHASE_PCT", "1.25"))
+ORB_CHASE_PCT = float(os.environ.get("INTRADAY_ORB_CHASE_PCT", "1.0"))
+REGIME_BLOCK_NIFTY_PCT = float(os.environ.get("INTRADAY_REGIME_BLOCK_NIFTY_PCT", "0.6"))
+ENTRY_MIN_EXPECTED_R = float(os.environ.get("INTRADAY_ENTRY_MIN_EXPECTED_R", "0.85"))
+ENTRY_EXCEPTIONAL_SCORE = float(os.environ.get("INTRADAY_ENTRY_EXCEPTIONAL_SCORE", "72"))
+ENTRY_WICK_NOISE_MAX = float(os.environ.get("INTRADAY_ENTRY_WICK_NOISE_MAX", "0.70"))
+# OI preference (F&O only — when oi/prev_oi facts exist; never invent OI).
+# Soft by default: aligned ranks first + R haircut if misaligned. Hard reject only if OI_REQUIRE_FNO=1.
+OI_LONG_OK = frozenset({"LONG_BUILDUP", "SHORT_COVERING"})
+OI_SHORT_OK = frozenset({"SHORT_BUILDUP", "LONG_UNWINDING"})
+OI_REQUIRE_FNO = os.environ.get("INTRADAY_OI_REQUIRE_FNO", "0").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
+OI_MISALIGN_HAIRCUT = float(os.environ.get("INTRADAY_OI_MISALIGN_HAIRCUT", "0.75"))
+OI_ALIGN_BONUS = float(os.environ.get("INTRADAY_OI_ALIGN_BONUS", "1.05"))
+# Entry states (facts-only gate outcomes — never invent fills)
+ENTRY_QUALIFIED = "QUALIFIED"
+ENTRY_WAIT_RETEST = "WAIT_RETEST"
+ENTRY_EXHAUSTED = "EXHAUSTED"
+ENTRY_NO_EDGE = "NO_EDGE"
+ENTRY_STALE_DATA = "STALE_DATA"
+ENTRY_REGIME_AGAINST = "REGIME_AGAINST"
+_ENTRY_HARD_REJECT = frozenset(
+    {ENTRY_EXHAUSTED, ENTRY_STALE_DATA, ENTRY_REGIME_AGAINST, ENTRY_NO_EDGE}
+)
+
+# Replacement planner — propose only until cutoff; prefer cash over weak names
+REPLACEMENT_CUTOFF_HHMM = os.environ.get("INTRADAY_REPLACEMENT_CUTOFF", "1445")
+REPLACEMENT_MIN_SCORE = float(os.environ.get("INTRADAY_REPLACEMENT_MIN_SCORE", "55"))
+REPLACEMENT_MAX_PER_SIDE = int(os.environ.get("INTRADAY_REPLACEMENT_MAX_PER_SIDE", str(LOCK_SIZE)))
+# Portfolio risk stops (rotation) — prefer cash when hit
+DAILY_LOSS_LIMIT_INR = float(os.environ.get("INTRADAY_DAILY_LOSS_LIMIT", "15000"))
+MAX_CONCURRENT_NAMES = int(
+    os.environ.get("INTRADAY_MAX_CONCURRENT", str(max(LOCK_SIZE * 2, 10)))
+)
 
 # Lightweight sector hints for concentration caps (facts from ticker identity only).
 _SECTOR_HINTS: dict[str, str] = {
@@ -488,6 +537,579 @@ def _meanrev_gate_open(regime: dict[str, Any]) -> tuple[bool, str]:
     if vix >= MR_VIX_MAX:
         return False, f"VIX {vix:.1f} ≥ {MR_VIX_MAX} (MR gated)"
     return True, f"NEUTRAL + VIX {vix:.1f} < {MR_VIX_MAX}"
+
+
+def _classify_oi_setup(
+    ltp: float,
+    prev_close: float,
+    current_oi: float,
+    prev_oi: float,
+) -> str:
+    """Price + OI facts → setup label (same rules as Angel feed; never invent OI)."""
+    price_up = ltp > prev_close
+    if price_up and current_oi > prev_oi:
+        return "LONG_BUILDUP"
+    if price_up and current_oi < prev_oi:
+        return "SHORT_COVERING"
+    if (not price_up) and current_oi > prev_oi:
+        return "SHORT_BUILDUP"
+    if (not price_up) and current_oi < prev_oi:
+        return "LONG_UNWINDING"
+    return "NEUTRAL"
+
+
+def _resolve_oi_facts(
+    work: dict[str, Any],
+    intra: dict[str, Any],
+    *,
+    quotes: dict[str, Any] | None = None,
+    live: dict[str, Any] | None = None,
+) -> tuple[float | None, float | None, float | None, str | None]:
+    """Return (oi, prev_oi, prev_close, oi_setup) from facts only.
+
+    F&O detectable when oi or prev_oi > 0. Cash / missing → oi_setup None + no invent.
+    """
+    live = live if isinstance(live, dict) else {}
+    quotes = quotes if isinstance(quotes, dict) else {}
+    sym = str(work.get("symbol") or work.get("ticker") or "").upper().strip()
+    q = quotes.get(sym) if sym and isinstance(quotes.get(sym), dict) else {}
+
+    oi = _safe_float(
+        live.get("oi")
+        or work.get("oi")
+        or intra.get("oi")
+        or q.get("oi")
+        or q.get("opnInterest")
+    )
+    prev_oi = _safe_float(
+        live.get("prev_oi")
+        or live.get("previousOI")
+        or work.get("prev_oi")
+        or work.get("previousOI")
+        or intra.get("prev_oi")
+        or q.get("prev_oi")
+        or q.get("previousOI")
+    )
+    prev_close = _safe_float(
+        live.get("close")
+        or live.get("prevClose")
+        or work.get("close")
+        or work.get("prevClose")
+        or q.get("close")
+        or q.get("prevClose")
+    )
+    labeled = (
+        live.get("oiSetup")
+        or live.get("oi_setup")
+        or work.get("oiSetup")
+        or work.get("oi_setup")
+        or intra.get("oi_setup")
+        or q.get("oi_setup")
+    )
+    setup = str(labeled).upper().strip() if labeled else None
+    if setup in ("", "NONE", "NULL"):
+        setup = None
+
+    has_oi = (oi is not None and oi > 0) or (prev_oi is not None and prev_oi > 0)
+    if not has_oi:
+        return oi, prev_oi, prev_close, None
+
+    if setup in OI_LONG_OK | OI_SHORT_OK | {"NEUTRAL"}:
+        return oi, prev_oi, prev_close, setup
+
+    # Recompute from facts when label missing / unknown — still never invent OI numbers.
+    ltp = _safe_float(
+        live.get("ltp")
+        or work.get("ltpRaw")
+        or work.get("ltp")
+        or work.get("lastPrice")
+        or q.get("ltp")
+    )
+    if ltp is None or prev_close is None or prev_close <= 0:
+        return oi, prev_oi, prev_close, "NEUTRAL"
+    cur = float(oi or 0.0)
+    prv = float(prev_oi or 0.0)
+    return oi, prev_oi, prev_close, _classify_oi_setup(float(ltp), float(prev_close), cur, prv)
+
+
+def _gate_payload(
+    entry_state: str,
+    *,
+    exclude_reason: str | None,
+    quality_r: float | None,
+    flags: list[str],
+    ltp_source: str | None = None,
+    day_move: float | None = None,
+    oi_setup: str | None = None,
+    oi_aligned: bool | None = None,
+) -> dict[str, Any]:
+    """Normalize gate response (entryState API + replacement `state` alias)."""
+    return {
+        "entryState": entry_state,
+        "excludeReason": exclude_reason,
+        "qualityAdjustedExpectedR": quality_r,
+        "flags": flags,
+        # Compatibility aliases for propose_replacements
+        "state": entry_state,
+        "reasons": [exclude_reason] if exclude_reason else (flags or ["passed"]),
+        "ltpSource": ltp_source,
+        "dayMovePct": None if day_move is None else round(day_move, 3),
+        "oiSetup": oi_setup,
+        "oiAligned": oi_aligned,
+    }
+
+
+def _day_move_pct(
+    cand: dict[str, Any],
+    quotes: dict[str, Any] | None = None,
+    live_row: dict[str, Any] | None = None,
+) -> float | None:
+    """Best-available day/intraday move % from live → cand → quotes (never invent)."""
+    live = live_row if isinstance(live_row, dict) else {}
+    for src in (live, cand):
+        if not isinstance(src, dict):
+            continue
+        for key in ("intradayRet", "dayChangePct", "pctChange", "pChange", "changePct"):
+            v = _safe_float(src.get(key))
+            if v is not None:
+                return v
+        # Derive from open/close/ltp when present
+        _, intra_ret, day_chg = _gap_and_intraday(src)
+        if intra_ret is not None:
+            return intra_ret
+        if day_chg is not None:
+            return day_chg
+    quotes = quotes if isinstance(quotes, dict) else {}
+    sym = str(cand.get("symbol") or cand.get("ticker") or "").upper().strip()
+    q = quotes.get(sym) if sym else None
+    if isinstance(q, dict):
+        for key in ("intradayRet", "dayChangePct", "changePct", "pChange"):
+            v = _safe_float(q.get(key))
+            if v is not None:
+                return v
+        _, intra_ret, day_chg = _gap_and_intraday(q)
+        if intra_ret is not None:
+            return intra_ret
+        if day_chg is not None:
+            return day_chg
+    return None
+
+
+def entry_quality_gate(
+    row: dict[str, Any],
+    direction: str,
+    regime_ctx: dict[str, Any] | None = None,
+    *,
+    quotes: dict[str, Any] | None = None,
+    live_row: dict[str, Any] | None = None,
+    regime: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Low-error entry gate: exhaustion, chase, regime, OI (F&O), data honesty.
+
+    Uses only existing quote/snapshot/live fields (never invents LTP/VWAP/ORB/OI).
+
+        gate = entry_quality_gate(row, "LONG", regime)
+        # or replacement path:
+        gate = entry_quality_gate(cand, "LONG", quotes=q, live_row=live, regime=regime)
+        if gate["entryState"] != ENTRY_QUALIFIED:
+            ...
+
+    Returns entryState, excludeReason (or None), qualityAdjustedExpectedR, flags, oiSetup.
+    Also exposes state/reasons/ltpSource/dayMovePct for replacement callers.
+    """
+    regime_use = regime if isinstance(regime, dict) else (
+        regime_ctx if isinstance(regime_ctx, dict) else {}
+    )
+    is_long = str(direction or "").upper() == "LONG"
+    flags: list[str] = []
+    live = live_row if isinstance(live_row, dict) else {}
+    quotes = quotes if isinstance(quotes, dict) else {}
+    oi_setup: str | None = None
+
+    # Overlay live marks onto a working view (facts only — no invented LTP).
+    work = dict(row) if isinstance(row, dict) else {}
+    if live.get("ltp") is not None:
+        work["ltp"] = live.get("ltp")
+    if live.get("ltpSource") is not None:
+        work["ltpSource"] = live.get("ltpSource")
+    if live.get("vwap") is not None:
+        work["vwap"] = live.get("vwap")
+    if live.get("oi") is not None:
+        work["oi"] = live.get("oi")
+    if live.get("prev_oi") is not None or live.get("previousOI") is not None:
+        work["prev_oi"] = live.get("prev_oi") if live.get("prev_oi") is not None else live.get("previousOI")
+
+    intra = work.get("intraday") if isinstance(work.get("intraday"), dict) else {}
+    ltp = _safe_float(
+        work.get("ltpRaw") or work.get("ltp") or work.get("lastPrice") or work.get("entryPrice")
+        or work.get("scanLtp")
+    )
+    vwap = _safe_float(work.get("vwap") if work.get("vwap") is not None else intra.get("vwap"))
+    atr = _safe_float(work.get("atrPct") if work.get("atrPct") is not None else intra.get("atr_pct"))
+    orb_high = _safe_float(
+        work.get("orbHigh") if work.get("orbHigh") is not None else intra.get("orb_high")
+    )
+    orb_low = _safe_float(
+        work.get("orbLow") if work.get("orbLow") is not None else intra.get("orb_low")
+    )
+    turnover = _safe_float(
+        work.get("turnoverCr") if work.get("turnoverCr") is not None else intra.get("turnover_cr")
+    )
+    wick = _safe_float(intra.get("wick_noise_ratio") or work.get("wickNoiseRatio"))
+    score = _safe_float(work.get("score") or work.get("meanrevScore"))
+    in_play = bool(work.get("inPlay")) if "inPlay" in work else False
+    if not in_play and intra:
+        rvol_t, _ = _rvol_time(intra)
+        gap_pct_tmp, _, _ = _gap_and_intraday(work)
+        if rvol_t is not None and rvol_t >= INPLAY_RVOL:
+            in_play = True
+        elif (
+            gap_pct_tmp is not None
+            and atr is not None
+            and atr > 0
+            and abs(gap_pct_tmp) >= INPLAY_GAP_ATR_MULT * atr
+        ):
+            in_play = True
+
+    gap_pct, intraday_ret, day_chg = _gap_and_intraday(work)
+    if day_chg is None:
+        day_chg = _safe_float(work.get("dayChangePct"))
+    if intraday_ret is None:
+        intraday_ret = _safe_float(work.get("intradayRet"))
+    if gap_pct is None:
+        gap_pct = _safe_float(work.get("gapPct"))
+    # Prefer live/quote day move when provided by replacement path.
+    quote_move = None
+    if quotes or live:
+        quote_move = _day_move_pct(work, quotes, live)
+    move_pct = quote_move if quote_move is not None else (
+        intraday_ret if intraday_ret is not None else day_chg
+    )
+    day_move = move_pct
+
+    ltp_source = str(work.get("ltpSource") or work.get("ltp_source") or "").strip().lower()
+    if ltp is None:
+        return _gate_payload(
+            ENTRY_STALE_DATA,
+            exclude_reason="missing LTP",
+            quality_r=None,
+            flags=["STALE_DATA", "MISSING_LTP"],
+            ltp_source=ltp_source or "none",
+            day_move=day_move,
+        )
+    if ltp_source in ("cached", "none"):
+        return _gate_payload(
+            ENTRY_STALE_DATA,
+            exclude_reason=f"ltpSource={ltp_source}",
+            quality_r=None,
+            flags=["STALE_DATA", f"SOURCE_{ltp_source.upper()}"],
+            ltp_source=ltp_source,
+            day_move=day_move,
+        )
+
+    nifty_chg = _safe_float(regime_use.get("niftyChangePct"))
+    regime_label = str(regime_use.get("label") or regime_use.get("regime") or "UNRATED")
+    if nifty_chg is not None:
+        if is_long and nifty_chg <= -REGIME_BLOCK_NIFTY_PCT:
+            return _gate_payload(
+                ENTRY_REGIME_AGAINST,
+                exclude_reason=(
+                    f"NIFTY {nifty_chg:.2f}% ≤ -{REGIME_BLOCK_NIFTY_PCT}% (block LONG)"
+                ),
+                quality_r=None,
+                flags=["REGIME_AGAINST", "NIFTY_SHARP_DOWN"],
+                ltp_source=ltp_source or None,
+                day_move=day_move,
+            )
+        if (not is_long) and nifty_chg >= REGIME_BLOCK_NIFTY_PCT:
+            return _gate_payload(
+                ENTRY_REGIME_AGAINST,
+                exclude_reason=(
+                    f"NIFTY {nifty_chg:.2f}% ≥ +{REGIME_BLOCK_NIFTY_PCT}% (block SHORT)"
+                ),
+                quality_r=None,
+                flags=["REGIME_AGAINST", "NIFTY_SHARP_UP"],
+                ltp_source=ltp_source or None,
+                day_move=day_move,
+            )
+    elif regime_label == "UNRATED":
+        flags.append("REGIME_UNRATED")
+
+    if turnover is not None and turnover < MIN_TURNOVER_CR:
+        return _gate_payload(
+            ENTRY_NO_EDGE,
+            exclude_reason=f"turnover {turnover:.1f} Cr < {MIN_TURNOVER_CR}",
+            quality_r=None,
+            flags=["LOW_TURNOVER", *flags],
+            ltp_source=ltp_source or None,
+            day_move=day_move,
+        )
+    if turnover is None:
+        flags.append("TURNOVER_MISSING")
+
+    if wick is not None and wick > ENTRY_WICK_NOISE_MAX:
+        return _gate_payload(
+            ENTRY_NO_EDGE,
+            exclude_reason=f"wick_noise_ratio {wick:.2f} > {ENTRY_WICK_NOISE_MAX}",
+            quality_r=None,
+            flags=["WICK_NOISE", *flags],
+            ltp_source=ltp_source or None,
+            day_move=day_move,
+            oi_setup=oi_setup,
+        )
+
+    # --- OI preference (F&O only): prefer aligned first — soft haircut, not hard reject ---
+    _oi, _prev_oi, _prev_close, oi_setup = _resolve_oi_facts(
+        work, intra, quotes=quotes, live=live
+    )
+    has_fno_oi = (_oi is not None and _oi > 0) or (_prev_oi is not None and _prev_oi > 0)
+    oi_aligned: bool | None = None
+    if not has_fno_oi:
+        flags.append("OI_MISSING")
+    else:
+        flags.append("FNO_OI")
+        if oi_setup:
+            flags.append(f"OI_{oi_setup}")
+        allowed = OI_LONG_OK if is_long else OI_SHORT_OK
+        oi_aligned = bool(oi_setup and oi_setup in allowed)
+        if oi_aligned:
+            flags.append("OI_PREFERRED")
+        else:
+            flags.append("OI_MISALIGNED")
+            # Opt-in hard gate only (default soft)
+            if OI_REQUIRE_FNO:
+                return _gate_payload(
+                    ENTRY_NO_EDGE,
+                    exclude_reason=(
+                        f"OI {oi_setup or 'NEUTRAL'} not aligned for "
+                        f"{'LONG' if is_long else 'SHORT'} "
+                        f"(need {'/'.join(sorted(allowed))})"
+                    ),
+                    quality_r=None,
+                    flags=flags,
+                    ltp_source=ltp_source or None,
+                    day_move=day_move,
+                    oi_setup=oi_setup,
+                    oi_aligned=False,
+                )
+        # Soft demotion signal when extended move + adverse OI (still not a hard block alone)
+        if is_long and oi_setup == "LONG_UNWINDING":
+            flags.append("OI_EXHAUSTION_CLASH")
+        if (not is_long) and oi_setup == "SHORT_COVERING":
+            flags.append("OI_EXHAUSTION_CLASH")
+
+    exhausted = False
+    hard_exhausted = False
+    if move_pct is not None:
+        signed = move_pct if is_long else -move_pct
+        if signed >= EXHAUSTION_HARD_PCT:
+            hard_exhausted = True
+            exhausted = True
+            flags.append("EXHAUSTION_HARD")
+        elif signed >= EXHAUSTION_PCT:
+            exhausted = True
+            flags.append("EXHAUSTION_SOFT")
+
+    exceptional = False
+    if exhausted and not hard_exhausted:
+        regime_ok = (
+            (is_long and regime_label == "RISK_ON")
+            or ((not is_long) and regime_label == "RISK_OFF")
+        )
+        score_ok = score is not None and score >= ENTRY_EXCEPTIONAL_SCORE
+        # OI is preference only: aligned helps exceptional; misaligned does not hard-block it
+        clash = "OI_EXHAUSTION_CLASH" in flags
+        if in_play and score_ok and regime_ok and not clash:
+            exceptional = True
+            flags.append("EXCEPTIONAL_CONTINUATION")
+        elif in_play and score_ok and regime_ok and clash and oi_aligned:
+            # Aligned OI can still rescue soft exhaustion; clash alone prefers skip
+            exceptional = True
+            flags.append("EXCEPTIONAL_CONTINUATION")
+            flags.append("OI_RESCUE")
+        else:
+            why = "no exceptional continuation"
+            if clash:
+                why = f"OI {oi_setup} clashes with extended move (prefer skip)"
+            return _gate_payload(
+                ENTRY_EXHAUSTED,
+                exclude_reason=(
+                    f"|move| {abs(move_pct):.2f}% ≥ {EXHAUSTION_PCT}% ({why})"
+                ),
+                quality_r=None,
+                flags=flags,
+                ltp_source=ltp_source or None,
+                day_move=day_move,
+                oi_setup=oi_setup,
+                oi_aligned=oi_aligned,
+            )
+    elif hard_exhausted:
+        return _gate_payload(
+            ENTRY_EXHAUSTED,
+            exclude_reason=f"|move| {abs(move_pct):.2f}% ≥ {EXHAUSTION_HARD_PCT}% hard cap",
+            quality_r=None,
+            flags=flags,
+            ltp_source=ltp_source or None,
+            day_move=day_move,
+            oi_setup=oi_setup,
+            oi_aligned=oi_aligned,
+        )
+
+    # Overextended flag from factor score (when present) — soft exhaustion signal.
+    if work.get("overextended") and not exceptional:
+        return _gate_payload(
+            ENTRY_EXHAUSTED,
+            exclude_reason="overextended factor flag",
+            quality_r=None,
+            flags=["OVEREXTENDED", *flags],
+            ltp_source=ltp_source or None,
+            day_move=day_move,
+            oi_setup=oi_setup,
+        )
+
+    vwap_dist_pct: float | None = None
+    if ltp is not None and vwap is not None and vwap > 0:
+        vwap_dist_pct = ((ltp - vwap) / vwap) * 100.0
+        chase_vwap = (is_long and vwap_dist_pct >= VWAP_CHASE_PCT) or (
+            (not is_long) and vwap_dist_pct <= -VWAP_CHASE_PCT
+        )
+        if chase_vwap:
+            flags.append("TOO_FAR_FROM_VWAP")
+            strong = score is not None and score >= ENTRY_EXCEPTIONAL_SCORE * 0.9
+            if strong or in_play:
+                base_r = T1_R_LONG if is_long else T1_R_SHORT
+                adj = round(base_r * 0.55, 3)
+                return _gate_payload(
+                    ENTRY_WAIT_RETEST,
+                    exclude_reason=(
+                        f"price {vwap_dist_pct:+.2f}% from VWAP "
+                        f"(limit ±{VWAP_CHASE_PCT}%) — wait retest"
+                    ),
+                    quality_r=adj,
+                    flags=flags,
+                    ltp_source=ltp_source or None,
+                    day_move=day_move,
+                    oi_setup=oi_setup,
+                )
+            return _gate_payload(
+                ENTRY_NO_EDGE,
+                exclude_reason=f"chase vs VWAP {vwap_dist_pct:+.2f}%",
+                quality_r=None,
+                flags=flags,
+                ltp_source=ltp_source or None,
+                day_move=day_move,
+                oi_setup=oi_setup,
+            )
+    else:
+        flags.append("VWAP_MISSING")
+
+    if ltp is not None and orb_high is not None and orb_low is not None and orb_high >= orb_low > 0:
+        if is_long and ltp > orb_high:
+            orb_ext = ((ltp - orb_high) / orb_high) * 100.0
+            if orb_ext >= ORB_CHASE_PCT:
+                flags.append("TOO_FAR_FROM_ORB")
+                return _gate_payload(
+                    ENTRY_WAIT_RETEST,
+                    exclude_reason=(
+                        f"LONG {orb_ext:.2f}% above ORB high "
+                        f"(limit {ORB_CHASE_PCT}%) — wait ORB retest"
+                    ),
+                    quality_r=round((T1_R_LONG if is_long else T1_R_SHORT) * 0.5, 3),
+                    flags=flags,
+                    ltp_source=ltp_source or None,
+                    day_move=day_move,
+                    oi_setup=oi_setup,
+                )
+        elif (not is_long) and ltp < orb_low:
+            orb_ext = ((orb_low - ltp) / orb_low) * 100.0
+            if orb_ext >= ORB_CHASE_PCT:
+                flags.append("TOO_FAR_FROM_ORB")
+                return _gate_payload(
+                    ENTRY_WAIT_RETEST,
+                    exclude_reason=(
+                        f"SHORT {orb_ext:.2f}% below ORB low "
+                        f"(limit {ORB_CHASE_PCT}%) — wait ORB retest"
+                    ),
+                    quality_r=round(T1_R_SHORT * 0.5, 3),
+                    flags=flags,
+                    ltp_source=ltp_source or None,
+                    day_move=day_move,
+                    oi_setup=oi_setup,
+                )
+    else:
+        flags.append("ORB_MISSING")
+
+    base_r = T1_R_LONG if is_long else T1_R_SHORT
+    adj = float(base_r)
+    if atr is None or atr <= 0:
+        flags.append("ATR_MISSING")
+        return _gate_payload(
+            ENTRY_NO_EDGE,
+            exclude_reason="ATR% missing — cannot compute risk distance",
+            quality_r=None,
+            flags=flags,
+            ltp_source=ltp_source or None,
+            day_move=day_move,
+            oi_setup=oi_setup,
+        )
+    if atr > MAX_ATR_PCT * 0.75:
+        adj *= 0.75
+        flags.append("WIDE_STOP_HAIRCUT")
+    if vwap_dist_pct is not None:
+        adj *= max(0.55, 1.0 - abs(vwap_dist_pct) / max(VWAP_CHASE_PCT * 3.0, 1.0) * 0.25)
+    if exceptional:
+        adj *= 0.85
+        flags.append("EXHAUSTION_DISCOUNT")
+    if regime_label == "UNRATED":
+        adj *= 0.90
+    if score is not None and score < REPLACEMENT_MIN_SCORE:
+        adj *= 0.70
+        flags.append("LOW_SCORE_HAIRCUT")
+    # Soft OI preference: boost aligned / haircut misaligned (never invent OI)
+    if oi_aligned is True:
+        adj *= OI_ALIGN_BONUS
+        flags.append("OI_ALIGN_BONUS")
+    elif oi_aligned is False:
+        adj *= OI_MISALIGN_HAIRCUT
+        flags.append("OI_MISALIGN_HAIRCUT")
+
+    adj = round(adj, 3)
+    if adj < ENTRY_MIN_EXPECTED_R:
+        return _gate_payload(
+            ENTRY_NO_EDGE,
+            exclude_reason=f"qualityAdjustedExpectedR {adj:.3f} < {ENTRY_MIN_EXPECTED_R}",
+            quality_r=adj,
+            flags=flags,
+            ltp_source=ltp_source or None,
+            day_move=day_move,
+            oi_setup=oi_setup,
+            oi_aligned=oi_aligned,
+        )
+    # Replacement path only: enforce minimum score (morning scan uses expected-R hurdle).
+    if (quotes or live) and score is not None and score < REPLACEMENT_MIN_SCORE:
+        return _gate_payload(
+            ENTRY_NO_EDGE,
+            exclude_reason=f"score {score:.1f} < {REPLACEMENT_MIN_SCORE}",
+            quality_r=adj,
+            flags=["LOW_SCORE", *flags],
+            ltp_source=ltp_source or None,
+            day_move=day_move,
+            oi_setup=oi_setup,
+            oi_aligned=oi_aligned,
+        )
+
+    if in_play:
+        flags.append("IN_PLAY")
+    return _gate_payload(
+        ENTRY_QUALIFIED,
+        exclude_reason=None,
+        quality_r=adj,
+        flags=flags,
+        ltp_source=ltp_source or None,
+        day_move=day_move,
+        oi_setup=oi_setup,
+        oi_aligned=oi_aligned,
+    )
 
 
 def _attach_percentile_ranks(bucket: list[dict[str, Any]]) -> None:
@@ -1059,13 +1681,16 @@ def _adopt_high_probability(
     regime: dict[str, Any],
     exclude_symbols: set[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """From candidate pool (≈10/side), keep top-n by score / in-play / RR — facts only."""
+    """From candidate pool (≈10/side), keep top-n QUALIFIED by score / in-play / RR."""
     if n <= 0 or not rows:
         return []
     blocked = {str(s).upper().strip() for s in (exclude_symbols or set()) if str(s).strip()}
     ranked = sorted(
         rows,
         key=lambda r: (
+            1.0 if r.get("entryState") == ENTRY_QUALIFIED else 0.0,
+            1.0 if r.get("oiAligned") is True else (0.5 if r.get("oiAligned") is None else 0.0),
+            float(r.get("qualityAdjustedExpectedR") or 0.0),
             float(r.get("score") or 0.0),
             1.0 if r.get("inPlay") else 0.0,
             float(r.get("scorePctRank") or 0.0),
@@ -1080,6 +1705,11 @@ def _adopt_high_probability(
             break
         sym = str(row.get("symbol") or "").upper().strip()
         if not sym or sym in blocked:
+            continue
+        # Re-run gate at adopt time (honest; demotes exhausted/chasing).
+        gate = entry_quality_gate(row, direction, regime)
+        state = str(gate.get("entryState") or "")
+        if state != ENTRY_QUALIFIED:
             continue
         entry = float(row.get("entryPrice") or row.get("ltp") or 0)
         risk = float(row.get("riskPerShare") or 0)
@@ -1101,6 +1731,12 @@ def _adopt_high_probability(
                     "adopted": True,
                     "adoptReason": "HIGH_PROBABILITY_SCORE",
                     "candidatePoolSize": len(rows),
+                    "entryState": gate["entryState"],
+                    "excludeReason": gate.get("excludeReason"),
+                    "qualityAdjustedExpectedR": gate.get("qualityAdjustedExpectedR"),
+                    "entryFlags": gate.get("flags") or [],
+                    "oiSetup": gate.get("oiSetup") or row.get("oiSetup"),
+                    "oiAligned": gate.get("oiAligned"),
                 }
             )
         )
@@ -1132,6 +1768,10 @@ def _construct_side(
             break
         sym = cand.get("symbol")
         if not sym or sym in used:
+            continue
+        # Hard rejects stay out of the live pool; WAIT_RETEST may sit for later rotation.
+        entry_state = str(cand.get("entryState") or "")
+        if entry_state in _ENTRY_HARD_REJECT:
             continue
         sector = cand.get("sector") or "OTHER"
         if counts.get(sector, 0) >= sector_cap:
@@ -1171,11 +1811,18 @@ def _construct_side(
             "orbHigh": cand.get("orbHigh"),
             "orbLow": cand.get("orbLow"),
             "orbPosPct": cand.get("orbPosPct"),
+            "turnoverCr": cand.get("turnoverCr"),
+            "wickNoiseRatio": cand.get("wickNoiseRatio"),
             "factorBreakdown": cand.get("components"),
+            "entryState": cand.get("entryState"),
+            "excludeReason": cand.get("excludeReason"),
+            "qualityAdjustedExpectedR": cand.get("qualityAdjustedExpectedR"),
+            "entryFlags": cand.get("entryFlags") or [],
             "ltp": round(float(entry), 2),
             "scanLtp": round(float(entry), 2),
+            "ltpSource": cand.get("ltpSource"),
             "atrPct": atr,
-            "status": "RUNNING",
+            "status": "RUNNING" if entry_state == ENTRY_QUALIFIED else "WAIT",
             "closed": False,
             **levels,
             **sizing,
@@ -1269,6 +1916,7 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
     long_mr: list[dict[str, Any]] = []
     short_mr: list[dict[str, Any]] = []
     filter_reject = 0
+    gate_reject = 0
     unrated = 0
 
     for row in rows:
@@ -1309,8 +1957,33 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
                 "orbHigh": scored.get("orbHigh"),
                 "orbLow": scored.get("orbLow"),
                 "orbPosPct": scored.get("orbPosPct"),
+                "turnoverCr": _safe_float(intra.get("turnover_cr")),
+                "wickNoiseRatio": _safe_float(intra.get("wick_noise_ratio")),
+                "oi": _safe_float(row.get("oi") if row.get("oi") is not None else intra.get("oi")),
+                "prev_oi": _safe_float(
+                    row.get("prev_oi")
+                    if row.get("prev_oi") is not None
+                    else row.get("previousOI") if row.get("previousOI") is not None else intra.get("prev_oi")
+                ),
+                "close": _safe_float(row.get("close")),
+                "oiSetup": (
+                    str(intra.get("oi_setup") or row.get("oi_setup") or "").upper().strip() or None
+                ),
                 "filterReasons": reasons,
+                "ltpSource": row.get("ltpSource") or row.get("ltp_source"),
+                "intraday": intra,
             }
+            gate = entry_quality_gate(base, direction, regime)
+            base["entryState"] = gate["entryState"]
+            base["excludeReason"] = gate.get("excludeReason")
+            base["qualityAdjustedExpectedR"] = gate.get("qualityAdjustedExpectedR")
+            base["entryFlags"] = gate.get("flags") or []
+            base["oiSetup"] = gate.get("oiSetup") or base.get("oiSetup")
+            base["oiAligned"] = gate.get("oiAligned")
+            # Drop nested intraday after gate — flat fields are enough for adopt re-check.
+            base.pop("intraday", None)
+            if gate["entryState"] in _ENTRY_HARD_REJECT:
+                gate_reject += 1
             mom_bucket.append(base)
 
             mr = _factor_scores_meanrev(row, regime, direction)
@@ -1323,6 +1996,13 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
                     "sleeve": "MEAN_REVERSION",
                     "gateReason": mr.get("gateReason"),
                 }
+                mr_gate = entry_quality_gate(mr_row, direction, regime)
+                mr_row["entryState"] = mr_gate["entryState"]
+                mr_row["excludeReason"] = mr_gate.get("excludeReason")
+                mr_row["qualityAdjustedExpectedR"] = mr_gate.get("qualityAdjustedExpectedR")
+                mr_row["entryFlags"] = mr_gate.get("flags") or []
+                mr_row["oiSetup"] = mr_gate.get("oiSetup") or mr_row.get("oiSetup")
+                mr_row["oiAligned"] = mr_gate.get("oiAligned")
                 mr_bucket.append(mr_row)
                 # Stash MR score on momentum row for UI transparency
                 base["meanrevScore"] = mr["score"]
@@ -1332,10 +2012,21 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
     _attach_percentile_ranks(long_mr)
     _attach_percentile_ranks(short_mr)
 
-    long_scored.sort(key=lambda x: float(x.get("score") or 0), reverse=True)
-    short_scored.sort(key=lambda x: float(x.get("score") or 0), reverse=True)
-    long_mr.sort(key=lambda x: float(x.get("score") or 0), reverse=True)
-    short_mr.sort(key=lambda x: float(x.get("score") or 0), reverse=True)
+    def _rank_key(x: dict[str, Any]) -> tuple:
+        # Prefer OI-aligned F&O names first (soft); unknown/cash mid; misaligned last
+        oa = x.get("oiAligned")
+        oi_pref = 1.0 if oa is True else (0.5 if oa is None else 0.0)
+        return (
+            1 if x.get("entryState") == ENTRY_QUALIFIED else 0,
+            oi_pref,
+            float(x.get("qualityAdjustedExpectedR") or 0),
+            float(x.get("score") or 0),
+        )
+
+    long_scored.sort(key=_rank_key, reverse=True)
+    short_scored.sort(key=_rank_key, reverse=True)
+    long_mr.sort(key=_rank_key, reverse=True)
+    short_mr.sort(key=_rank_key, reverse=True)
 
     # Sequential construction: long first, then short excludes long basket symbols
     # (avoids wiping MR pool via premature opposite-side top-N filter)
@@ -1406,6 +2097,7 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
         "funnel": {
             "universe": len(rows),
             "filterReject": filter_reject,
+            "gateReject": gate_reject,
             "longScored": len(long_scored),
             "shortScored": len(short_scored),
             "longMeanRevScored": len(long_mr),
@@ -1413,7 +2105,36 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
             "unratedComponents": unrated,
             "candidatePool": len(long_basket) + len(short_basket),
             "adopted": len(adopt_long) + len(adopt_short),
-            "funnelNote": f"{BASKET_SIZE}+{BASKET_SIZE} candidates -> adopt top {LOCK_SIZE}+{LOCK_SIZE} by score",
+            "funnelNote": (
+                f"{BASKET_SIZE}+{BASKET_SIZE} candidates -> adopt top "
+                f"{LOCK_SIZE}+{LOCK_SIZE} QUALIFIED by entry gate"
+            ),
+        },
+        "entryGate": {
+            "exhaustionPct": EXHAUSTION_PCT,
+            "exhaustionHardPct": EXHAUSTION_HARD_PCT,
+            "vwapChasePct": VWAP_CHASE_PCT,
+            "orbChasePct": ORB_CHASE_PCT,
+            "regimeBlockNiftyPct": REGIME_BLOCK_NIFTY_PCT,
+            "minExpectedR": ENTRY_MIN_EXPECTED_R,
+            "oiRequireFno": OI_REQUIRE_FNO,
+            "oiPreferFirst": True,
+            "oiMisalignHaircut": OI_MISALIGN_HAIRCUT,
+            "oiAlignBonus": OI_ALIGN_BONUS,
+            "oiLongOk": sorted(OI_LONG_OK),
+            "oiShortOk": sorted(OI_SHORT_OK),
+            "dailyLossLimitInr": DAILY_LOSS_LIMIT_INR,
+            "maxConcurrentNames": MAX_CONCURRENT_NAMES,
+            "replacementCutoff": REPLACEMENT_CUTOFF_HHMM,
+            "maxPerSector": MAX_PER_SECTOR,
+            "states": [
+                ENTRY_QUALIFIED,
+                ENTRY_WAIT_RETEST,
+                ENTRY_EXHAUSTED,
+                ENTRY_NO_EDGE,
+                ENTRY_STALE_DATA,
+                ENTRY_REGIME_AGAINST,
+            ],
         },
         "longCandidates": [
             {
@@ -1426,6 +2147,10 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
                 "inPlay": c.get("inPlay"),
                 "gapPct": c.get("gapPct"),
                 "intradayRet": c.get("intradayRet"),
+                "entryState": c.get("entryState"),
+                "excludeReason": c.get("excludeReason"),
+                "qualityAdjustedExpectedR": c.get("qualityAdjustedExpectedR"),
+                "oiSetup": c.get("oiSetup"),
             }
             for c in long_scored[:20]
         ],
@@ -1440,6 +2165,10 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
                 "inPlay": c.get("inPlay"),
                 "gapPct": c.get("gapPct"),
                 "intradayRet": c.get("intradayRet"),
+                "entryState": c.get("entryState"),
+                "excludeReason": c.get("excludeReason"),
+                "qualityAdjustedExpectedR": c.get("qualityAdjustedExpectedR"),
+                "oiSetup": c.get("oiSetup"),
             }
             for c in short_scored[:20]
         ],
@@ -1581,6 +2310,17 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
             "executionPolicy": "MANUAL_ONLY",
         }
     ]
+    try:
+        from .trade_outcome import emit_book_lock_alerts
+
+        emit_book_lock_alerts(
+            book="INTRADAY",
+            session_date=session_date,
+            long_rows=long_rows,
+            short_rows=short_rows,
+        )
+    except Exception as exc:
+        log.warning("Intraday lock alerts failed: %s", exc)
 
     capital = dict(candidates.get("capital") or {})
     capital["basketSize"] = LOCK_SIZE
@@ -1713,6 +2453,362 @@ def ensure_intraday_session_locked() -> dict[str, Any]:
     if isinstance(result, dict) and result.get("error"):
         failed["commitError"] = result.get("error")
     return failed
+
+
+def _cutoff_passed(now: datetime | None = None) -> bool:
+    """True when IST clock is at/after REPLACEMENT_CUTOFF_HHMM (default 14:45)."""
+    n = now or _ist_now()
+    cutoff = _hhmm_to_minutes(REPLACEMENT_CUTOFF_HHMM)
+    return (n.hour * 60 + n.minute) >= cutoff
+
+
+def _sum_realized_pnl(rows: list[dict[str, Any]]) -> float | None:
+    """Sum realized P&L from position rows / exitState (facts only; None if none)."""
+    vals: list[float] = []
+    for r in rows:
+        v = r.get("realizedPnl")
+        if v is None and isinstance(r.get("exitState"), dict):
+            v = r["exitState"].get("realizedPnl")
+        if v is None and isinstance(r.get("outcome"), dict):
+            v = r["outcome"].get("realizedPnl")
+        fv = _safe_float(v)
+        if fv is not None:
+            vals.append(fv)
+    if not vals:
+        return None
+    return round(sum(vals), 2)
+
+
+def _portfolio_risk_flags(
+    long_rows: list[dict[str, Any]],
+    short_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Daily-loss / max-concurrent stops for rotation (plan §6)."""
+    all_rows = list(long_rows) + list(short_rows)
+    realized = _sum_realized_pnl(all_rows)
+    open_count = sum(1 for r in all_rows if _position_is_open(r))
+    daily_loss_hit = (
+        realized is not None and DAILY_LOSS_LIMIT_INR > 0 and realized <= -abs(DAILY_LOSS_LIMIT_INR)
+    )
+    max_names_hit = (
+        MAX_CONCURRENT_NAMES > 0 and open_count >= MAX_CONCURRENT_NAMES
+    )
+    return {
+        "realizedPnl": realized,
+        "openCount": open_count,
+        "dailyLossLimitInr": DAILY_LOSS_LIMIT_INR,
+        "maxConcurrentNames": MAX_CONCURRENT_NAMES,
+        "dailyLossHit": daily_loss_hit,
+        "maxNamesHit": max_names_hit,
+    }
+
+
+def _open_sector_counts(
+    long_rows: list[dict[str, Any]],
+    short_rows: list[dict[str, Any]],
+) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for r in list(long_rows) + list(short_rows):
+        if not _position_is_open(r):
+            continue
+        sec = str(r.get("sector") or _sector_of(str(r.get("symbol") or ""), r) or "OTHER")
+        counts[sec] = counts.get(sec, 0) + 1
+    return counts
+
+
+def replacement_window_open(
+    now: datetime | None = None,
+    *,
+    daily_loss_hit: bool = False,
+    max_names_hit: bool = False,
+) -> tuple[bool, str | None]:
+    """Replacements allowed in desk rotation windows (see desk_clock.rotation_window_allowed).
+
+    Returns (allowed, block_reason_or_None). After cutoff / midday pause / weekend /
+    daily loss / max concurrent → blocked.
+    """
+    if _cutoff_passed(now):
+        return False, "after_rotation"
+    ok, code = can_add_replacement(
+        now, daily_loss_hit=daily_loss_hit, max_names_hit=max_names_hit
+    )
+    if ok:
+        return True, None
+    return False, code
+
+
+def can_add_replacement_slot(
+    now: datetime | None = None,
+    *,
+    daily_loss_hit: bool = False,
+    max_names_hit: bool = False,
+) -> tuple[bool, str]:
+    """Thin wrapper — prefer desk_clock.can_add_replacement for new callers."""
+    if _cutoff_passed(now):
+        return False, "after_rotation"
+    return can_add_replacement(
+        now, daily_loss_hit=daily_loss_hit, max_names_hit=max_names_hit
+    )
+
+
+def _position_is_open(pos: dict[str, Any]) -> bool:
+    if pos.get("closed"):
+        return False
+    st = str(pos.get("status") or "").upper()
+    if st in ("CLOSED", "STOP LOSS HIT", "TRAIL STOP HIT", "SCALE COMPLETE"):
+        return False
+    if st.startswith("TARGET") and "HIT" in st and pos.get("closed"):
+        return False
+    return True
+
+
+def compute_free_slots(
+    long_rows: list[dict[str, Any]],
+    short_rows: list[dict[str, Any]],
+    *,
+    lock_size: int | None = None,
+) -> dict[str, Any]:
+    """Capital slots freed when positions close (CLOSED / target / scale / trail / SL)."""
+    n = int(lock_size if lock_size is not None else LOCK_SIZE)
+    open_l = sum(1 for r in long_rows if _position_is_open(r))
+    open_s = sum(1 for r in short_rows if _position_is_open(r))
+    free_l = max(0, n - open_l)
+    free_s = max(0, n - open_s)
+    return {
+        "long": free_l,
+        "short": free_s,
+        "total": free_l + free_s,
+        "openLong": open_l,
+        "openShort": open_s,
+        "lockSize": n,
+    }
+
+
+def propose_replacements(
+    session: dict[str, Any],
+    quotes: dict[str, Any],
+    live_map: dict[str, dict[str, Any]],
+    regime: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Propose replacements for freed capital slots from locked candidate pools.
+
+    Prefer cash over weak / exhausted / stale candidates. Proposal-only — does not mutate.
+    Uses entry_quality_gate (EXHAUSTED / STALE / NO_EDGE / WAIT_RETEST skipped).
+    No revenge replace of SL'd symbols (closed set excluded). Sector caps enforced.
+    """
+    regime = regime or session.get("regime") or {}
+    long_rows = list(session.get("long") or [])
+    short_rows = list(session.get("short") or [])
+    risk = _portfolio_risk_flags(long_rows, short_rows)
+    allowed, _block = replacement_window_open(
+        daily_loss_hit=bool(risk["dailyLossHit"]),
+        max_names_hit=bool(risk["maxNamesHit"]),
+    )
+    if not allowed:
+        return []
+
+    free = compute_free_slots(long_rows, short_rows)
+    if free["total"] <= 0:
+        return []
+
+    current_syms: set[str] = set()
+    closed_syms: set[str] = set()
+    sl_closed: set[str] = set()
+    for side in (long_rows, short_rows):
+        for r in side:
+            sym = str(r.get("symbol") or "").upper().strip()
+            if not sym:
+                continue
+            if _position_is_open(r):
+                current_syms.add(sym)
+            else:
+                closed_syms.add(sym)
+                st = str(r.get("status") or "").upper()
+                if "STOP LOSS" in st or st == "TRAIL STOP HIT":
+                    sl_closed.add(sym)
+
+    try:
+        swing_held = swing_locked_symbols(_ist_now().strftime("%Y-%m-%d"))
+    except Exception:
+        swing_held = set()
+
+    # No revenge after SL / no re-entry of any closed name today; no averaging down.
+    exclude = current_syms | closed_syms | set(swing_held or set()) | sl_closed
+    sector_counts = _open_sector_counts(long_rows, short_rows)
+    proposals: list[dict[str, Any]] = []
+
+    def _pool_rows(raw: Any) -> list[dict[str, Any]]:
+        if not isinstance(raw, list):
+            return []
+        out: list[dict[str, Any]] = []
+        for item in raw:
+            if isinstance(item, dict) and item.get("symbol"):
+                out.append(item)
+            elif isinstance(item, str) and item.strip():
+                out.append({"symbol": item.strip().upper()})
+        return out
+
+    def _merge_live(cand: dict[str, Any], live: dict[str, Any] | None) -> dict[str, Any]:
+        merged = dict(cand)
+        # Prefer quote snapshot for gap/intraday when candidate is thin
+        sym = str(cand.get("symbol") or "").upper()
+        q = quotes.get(sym) if isinstance(quotes, dict) else None
+        if isinstance(q, dict):
+            for k in ("open", "close", "ltpRaw", "ltp", "vwap", "dayChangePct", "oi", "prev_oi"):
+                if merged.get(k) is None and q.get(k) is not None:
+                    merged[k] = q.get(k)
+            intra = q.get("intraday") if isinstance(q.get("intraday"), dict) else None
+            if intra and not isinstance(merged.get("intraday"), dict):
+                merged["intraday"] = intra
+        if live:
+            if live.get("ltp") is not None:
+                merged["ltp"] = live.get("ltp")
+                merged["ltpRaw"] = live.get("ltp")
+            if live.get("ltpSource"):
+                merged["ltpSource"] = live.get("ltpSource")
+            for k in ("dayChangePct", "pctChange", "intradayRet", "oi", "prev_oi"):
+                if live.get(k) is not None and merged.get(k) is None:
+                    merged[k] = live.get(k)
+        return merged
+
+    side_specs = (
+        ("LONG", free["long"], _pool_rows(session.get("candidatePoolLong"))),
+        ("SHORT", free["short"], _pool_rows(session.get("candidatePoolShort"))),
+    )
+    for direction, slots, pool in side_specs:
+        if slots <= 0 or not pool:
+            continue
+        allowed_oi = OI_LONG_OK if direction == "LONG" else OI_SHORT_OK
+        ranked = sorted(
+            pool,
+            key=lambda r: (
+                1.0
+                if (
+                    r.get("oiAligned") is True
+                    or str(r.get("oiSetup") or "").upper() in allowed_oi
+                )
+                else (
+                    0.0
+                    if r.get("oiAligned") is False
+                    or str(r.get("oiSetup") or "").upper()
+                    in (OI_LONG_OK | OI_SHORT_OK | {"NEUTRAL"}) - allowed_oi
+                    else 0.5
+                ),
+                float(r.get("qualityAdjustedExpectedR") or r.get("score") or 0.0),
+                1.0 if r.get("inPlay") else 0.0,
+                float(r.get("rewardRisk") or 0.0),
+            ),
+            reverse=True,
+        )
+        taken = 0
+        for cand in ranked:
+            if taken >= min(slots, REPLACEMENT_MAX_PER_SIDE):
+                break
+            sym = str(cand.get("symbol") or "").upper().strip()
+            if not sym or sym in exclude:
+                continue
+            sector = str(cand.get("sector") or _sector_of(sym, cand) or "OTHER")
+            if sector_counts.get(sector, 0) >= MAX_PER_SECTOR:
+                continue
+            live = live_map.get(sym) if live_map else None
+            merged = _merge_live(cand, live)
+            gate = entry_quality_gate(
+                merged, direction, quotes=quotes, live_row=live, regime=regime
+            )
+            state = str(gate.get("entryState") or gate.get("state") or "")
+            if state in _ENTRY_HARD_REJECT or state == ENTRY_WAIT_RETEST:
+                continue
+            if state != ENTRY_QUALIFIED:
+                continue
+            score = float(cand.get("score") or 0.0)
+            if score < REPLACEMENT_MIN_SCORE:
+                continue
+            # Prefer cash: require qualityAdjustedExpectedR when present
+            q_r = gate.get("qualityAdjustedExpectedR")
+            if q_r is not None and float(q_r) < ENTRY_MIN_EXPECTED_R:
+                continue
+            ltp_val = _safe_float((live or {}).get("ltp")) if live and live.get("ltp") is not None else _safe_float(
+                merged.get("ltp") or cand.get("ltp") or cand.get("entryPrice")
+            )
+            proposals.append(
+                {
+                    "symbol": sym,
+                    "direction": direction,
+                    "score": cand.get("score"),
+                    "sector": sector,
+                    "sleeve": cand.get("sleeve"),
+                    "entryState": state,
+                    "excludeReason": gate.get("excludeReason"),
+                    "flags": gate.get("flags") or [],
+                    "ltpSource": gate.get("ltpSource")
+                    or merged.get("ltpSource")
+                    or cand.get("ltpSource"),
+                    "dayMovePct": gate.get("dayMovePct")
+                    if gate.get("dayMovePct") is not None
+                    else _safe_float(merged.get("intradayRet") or merged.get("dayChangePct")),
+                    "qualityAdjustedExpectedR": gate.get("qualityAdjustedExpectedR"),
+                    "ltp": ltp_val,
+                    "rewardRisk": cand.get("rewardRisk"),
+                    "inPlay": cand.get("inPlay"),
+                    "oiSetup": gate.get("oiSetup") or merged.get("oiSetup") or cand.get("oiSetup"),
+                    "oiAligned": gate.get("oiAligned"),
+                    "replaceReason": "FREE_SLOT",
+                    "proposalOnly": True,
+                }
+            )
+            exclude.add(sym)
+            sector_counts[sector] = sector_counts.get(sector, 0) + 1
+            taken += 1
+
+    return proposals
+
+
+def _mark_slot_status(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        row = dict(r)
+        if not _position_is_open(row):
+            if str(row.get("status") or "").upper() == "SESSION CLOSED":
+                row["slotStatus"] = "SESSION_CLOSED"
+                row["slotFreed"] = False
+            else:
+                # CLOSED book row; REPLACEABLE = capital slot free for rotation
+                row["slotStatus"] = "REPLACEABLE"
+                row["closedSlotStatus"] = "CLOSED"
+                row["slotFreed"] = True
+            row["profitGuardActive"] = False
+            row["profitProtectedInr"] = None
+        else:
+            st = str(row.get("status") or "RUNNING").upper()
+            if "PARTIAL" in st or (
+                isinstance(row.get("exitState"), dict)
+                and (row["exitState"].get("legsFilled") or [])
+            ):
+                row["slotStatus"] = "BOOKED"
+            else:
+                row["slotStatus"] = "RUNNING"
+            row["slotFreed"] = False
+            es = row.get("exitState") if isinstance(row.get("exitState"), dict) else None
+            guard = False
+            if es is not None:
+                guard = profit_guard_active(es) or bool(
+                    row.get("profitGuardActive")
+                    or (
+                        isinstance(row.get("outcome"), dict)
+                        and row["outcome"].get("profitGuardActive")
+                    )
+                )
+            row["profitGuardActive"] = guard
+            # Capital-aware: protect open green ₹ when guard is on (facts from unrealizedPnl)
+            unreal = _safe_float(row.get("unrealizedPnl"))
+            if unreal is None and es is not None:
+                unreal = _safe_float(es.get("unrealizedPnl"))
+            if guard and unreal is not None and unreal > 0:
+                row["profitProtectedInr"] = round(unreal, 2)
+            else:
+                row["profitProtectedInr"] = None
+        out.append(row)
+    return out
 
 
 def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1916,7 +3012,7 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
     long_rows = [_enrich_position(p, quotes, live_map.get(str(p.get("symbol") or "").upper())) for p in (session.get("long") or [])]
     short_rows = [_enrich_position(p, quotes, live_map.get(str(p.get("symbol") or "").upper())) for p in (session.get("short") or [])]
 
-    # Preserve CLOSED forever in persisted session
+    # Preserve CLOSED forever in persisted session; free capital slot on first close
     if session.get("locked"):
         changed = False
         for side_key, rows in (("long", long_rows), ("short", short_rows)):
@@ -1941,7 +3037,14 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
                         )
                         if row.get(k) is not None
                     }
-                    orig[i] = {**orig[i], **keep, "closed": True, "status": "CLOSED"}
+                    orig[i] = {
+                        **orig[i],
+                        **keep,
+                        "closed": True,
+                        "status": "CLOSED",
+                        "slotFreed": True,
+                        "slotStatus": "REPLACEABLE",
+                    }
                     changed = True
                     events = list(session.get("events") or [])
                     events.append({
@@ -1949,31 +3052,161 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
                         "at": _utc_now_iso(),
                         "symbol": row.get("symbol"),
                         "direction": row.get("direction"),
+                        "slotFreed": True,
                     })
                     session["events"] = events[-200:]
         if changed:
             session["long"] = [
-                {**o, "closed": True, "status": "CLOSED"} if (i < len(long_rows) and long_rows[i].get("closed")) else o
+                {
+                    **o,
+                    "closed": True,
+                    "status": "CLOSED",
+                    "slotFreed": True,
+                    "slotStatus": "REPLACEABLE",
+                }
+                if (i < len(long_rows) and long_rows[i].get("closed"))
+                else o
                 for i, o in enumerate(session.get("long") or [])
             ]
             session["short"] = [
-                {**o, "closed": True, "status": "CLOSED"} if (i < len(short_rows) and short_rows[i].get("closed")) else o
+                {
+                    **o,
+                    "closed": True,
+                    "status": "CLOSED",
+                    "slotFreed": True,
+                    "slotStatus": "REPLACEABLE",
+                }
+                if (i < len(short_rows) and short_rows[i].get("closed"))
+                else o
                 for i, o in enumerate(session.get("short") or [])
             ]
+            free_now = compute_free_slots(session.get("long") or [], session.get("short") or [])
+            session["freeSlots"] = free_now
+            events = list(session.get("events") or [])
+            events.append({
+                "type": "CAPITAL_SLOT_FREED",
+                "at": _utc_now_iso(),
+                "freeSlots": free_now,
+            })
+            session["events"] = events[-200:]
             session["updatedAt"] = _utc_now_iso()
             save_session(session)
 
+    long_rows = _mark_slot_status(long_rows)
+    short_rows = _mark_slot_status(short_rows)
+
     def _sum_pnl(rows: list[dict[str, Any]]) -> float | None:
-        vals = [r.get("unrealizedPnl") for r in rows if r.get("unrealizedPnl") is not None]
+        vals = [
+            r.get("unrealizedPnl")
+            for r in rows
+            if r.get("unrealizedPnl") is not None and _position_is_open(r)
+        ]
         if not vals:
             return None
         return round(sum(float(v) for v in vals), 2)
 
-    long_exposure = round(sum(float(r.get("positionValue") or r.get("deployedCapital") or 0) for r in long_rows), 2)
-    short_exposure = round(sum(float(r.get("positionValue") or r.get("deployedCapital") or 0) for r in short_rows), 2)
+    open_long = [r for r in long_rows if _position_is_open(r)]
+    open_short = [r for r in short_rows if _position_is_open(r)]
+    long_exposure = round(sum(float(r.get("positionValue") or r.get("deployedCapital") or 0) for r in open_long), 2)
+    short_exposure = round(sum(float(r.get("positionValue") or r.get("deployedCapital") or 0) for r in open_short), 2)
     u_pnl_l = _sum_pnl(long_rows)
     u_pnl_s = _sum_pnl(short_rows)
     unrealized = None if u_pnl_l is None and u_pnl_s is None else round((u_pnl_l or 0) + (u_pnl_s or 0), 2)
+
+    free_slots = compute_free_slots(long_rows, short_rows)
+    risk_flags = _portfolio_risk_flags(long_rows, short_rows)
+    realized_book = risk_flags.get("realizedPnl")
+    replacement_blocked_reason: str | None = None
+    replacement_candidates: list[dict[str, Any]] = []
+    cash_held = False
+    rot_ok, rot_code = rotation_window_allowed()
+    rot_cfg = rotation_window_config()
+    if not session.get("locked"):
+        replacement_blocked_reason = "session_not_locked"
+    else:
+        allowed, win_reason = replacement_window_open(
+            daily_loss_hit=bool(risk_flags["dailyLossHit"]),
+            max_names_hit=bool(risk_flags["maxNamesHit"]),
+        )
+        if not allowed:
+            replacement_blocked_reason = win_reason or rot_code
+        elif free_slots["total"] <= 0:
+            replacement_blocked_reason = "no_free_slots"
+        else:
+            try:
+                replacement_candidates = propose_replacements(
+                    {
+                        **session,
+                        "long": long_rows,
+                        "short": short_rows,
+                    },
+                    quotes,
+                    live_map,
+                    regime,
+                )
+                if not replacement_candidates:
+                    replacement_blocked_reason = "prefer_cash_no_qualified"
+                    cash_held = True
+            except Exception as exc:
+                log.warning("replacement propose failed: %s", exc)
+                replacement_blocked_reason = "propose_error"
+
+    # Persist proposal / cash-held ledger for EOD attribution (dedupe by symbol set)
+    if session.get("locked") and (
+        replacement_candidates or replacement_blocked_reason == "prefer_cash_no_qualified"
+    ):
+        try:
+            cand_key = tuple(
+                sorted(
+                    f"{c.get('symbol')}:{c.get('direction')}"
+                    for c in replacement_candidates
+                    if c.get("symbol")
+                )
+            )
+            prev_key = tuple(session.get("lastReplacementKey") or ())
+            if cand_key != prev_key or (
+                cash_held and session.get("lastCashHeldAt") is None
+            ):
+                events = list(session.get("events") or [])
+                if replacement_candidates:
+                    events.append(
+                        {
+                            "type": "REPLACEMENT_PROPOSED",
+                            "at": _utc_now_iso(),
+                            "freeSlots": free_slots,
+                            "candidates": [
+                                {
+                                    "symbol": c.get("symbol"),
+                                    "direction": c.get("direction"),
+                                    "entryState": c.get("entryState"),
+                                    "score": c.get("score"),
+                                    "oiSetup": c.get("oiSetup"),
+                                    "qualityAdjustedExpectedR": c.get(
+                                        "qualityAdjustedExpectedR"
+                                    ),
+                                    "proposalOnly": True,
+                                }
+                                for c in replacement_candidates
+                            ],
+                        }
+                    )
+                if cash_held:
+                    events.append(
+                        {
+                            "type": "CASH_HELD",
+                            "at": _utc_now_iso(),
+                            "freeSlots": free_slots,
+                            "reason": replacement_blocked_reason,
+                        }
+                    )
+                    session["lastCashHeldAt"] = _utc_now_iso()
+                session["lastReplacementKey"] = list(cand_key)
+                session["lastReplacementProposals"] = replacement_candidates
+                session["events"] = events[-200:]
+                session["updatedAt"] = _utc_now_iso()
+                save_session(session)
+        except Exception as exc:
+            log.debug("replacement ledger skip: %s", exc)
 
     attention: list[dict[str, Any]] = []
     for r in long_rows + short_rows:
@@ -1986,6 +3219,7 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
             "TARGET 1 HIT",
             "TARGET 2 HIT",
             "SESSION CLOSED",
+            "TRAIL STOP HIT",
         ):
             attention.append({
                 "symbol": r.get("symbol"),
@@ -2069,6 +3303,18 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
         "executionPolicy": "MANUAL_ONLY",
         "regime": regime,
         "capital": capital,
+        "freeSlots": free_slots,
+        "replacementCandidates": replacement_candidates,
+        "replacementBlockedReason": replacement_blocked_reason,
+        "replacementCutoffIst": (
+            f"{_hhmm_to_minutes(REPLACEMENT_CUTOFF_HHMM) // 60:02d}:"
+            f"{_hhmm_to_minutes(REPLACEMENT_CUTOFF_HHMM) % 60:02d}"
+        ),
+        "cashHeld": cash_held,
+        "portfolioRisk": risk_flags,
+        "rotationWindow": rot_cfg,
+        "rotationWindowCode": rot_code,
+        "rotationWindowOpen": bool(rot_ok),
         "macros": {
             "nifty": (macros.get("NIFTY 50") or {}).get("val"),
             "niftyDelta": (macros.get("NIFTY 50") or {}).get("delta"),
@@ -2085,7 +3331,13 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
             "grossExposure": round(long_exposure + short_exposure, 2),
             "netExposure": round(long_exposure - short_exposure, 2),
             "unrealizedPnl": unrealized,
-            "realizedPnl": None,  # not tracked without broker fills
+            "realizedPnl": realized_book,
+            "freeSlots": free_slots,
+            "dailyLossLimitInr": DAILY_LOSS_LIMIT_INR,
+            "maxConcurrentNames": MAX_CONCURRENT_NAMES,
+            "dailyLossHit": bool(risk_flags.get("dailyLossHit")),
+            "maxNamesHit": bool(risk_flags.get("maxNamesHit")),
+            "cashHeld": cash_held,
         },
         "attention": attention,
         "long": long_rows,

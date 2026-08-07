@@ -33,6 +33,7 @@ import {
 import type { DhanSwingPicksPayload } from '@/lib/market-api';
 import { DeskCardTilt, DeskGaugeFill, IcStatusChip, LiveTickNumber, motion, useReducedMotion } from '@/lib/desk-motion';
 import { duration } from '@/lib/motion-tokens';
+import { formatPtsPctLabel, formatSeriesDelta } from '@/lib/format-delta';
 
 const MAX_TRENDLYNE_CARDS = 12;
 const TRENDLYNE_BATCH_SIZE = 4;
@@ -228,12 +229,7 @@ function sparkPeriodChange(data: number[] | undefined): { label: string; pct: nu
   if (!data || data.length < 2 || !data[0]) return null;
   const first = data[0];
   const last = data[data.length - 1];
-  const pct = ((last - first) / first) * 100;
-  return {
-    pct,
-    positive: pct >= 0,
-    label: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`,
-  };
+  return formatSeriesDelta(first, last);
 }
 
 function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag }: {
@@ -1277,9 +1273,17 @@ export default function ForensicPanel({
           const flag = getFlag(row.ticker);
           const sparkData = allSparklines[row.ticker]?.[flag];
           const period = sparkPeriodChange(sparkData);
+          const priceNum = Number(String(priceVal).replace(/[₹,\s]/g, ''));
           const dayPct =
             row.dayChangePct !== null
-              ? { pct: row.dayChangePct, positive: row.dayChangePct >= 0, label: `${row.dayChangePct >= 0 ? '+' : ''}${row.dayChangePct.toFixed(1)}%` }
+              ? {
+                  pct: row.dayChangePct,
+                  positive: row.dayChangePct >= 0,
+                  label: formatPtsPctLabel(
+                    Number.isFinite(priceNum) ? priceNum : null,
+                    row.dayChangePct,
+                  ),
+                }
               : null;
           const displayChange = period ?? dayPct;
           const intelligence = item.intelligence;

@@ -106,3 +106,92 @@ def basket_lock_block_message(reason: str) -> str:
             f"(catch-up until {cfg['catchupUntil']})."
         )
     return f"Basket lock not allowed ({reason})."
+
+
+# --- Rotation / replacement windows (separate from primary basket lock) ---
+# Primary: 09:45–10:15 | Continuation: 10:15–12:45 | Afternoon: 13:30–14:45
+# After 14:45 — no new replacement (risk-reduction / square-off only).
+_ROT_CONT_END_H, _ROT_CONT_END_M = _parse_hhmm(
+    os.getenv("DESK_ROTATION_CONT_END", "12:45"), 12, 45
+)
+_ROT_AFT_START_H, _ROT_AFT_START_M = _parse_hhmm(
+    os.getenv("DESK_ROTATION_AFT_START", "13:30"), 13, 30
+)
+_ROT_AFT_END_H, _ROT_AFT_END_M = _parse_hhmm(
+    os.getenv("DESK_ROTATION_AFT_END", "14:45"), 14, 45
+)
+
+
+def rotation_window_config() -> dict[str, Any]:
+    return {
+        "primaryStart": f"{_LOCK_START_H:02d}:{_LOCK_START_M:02d}",
+        "primaryEnd": f"{_LOCK_END_H:02d}:{_LOCK_END_M:02d}",
+        "continuationEnd": f"{_ROT_CONT_END_H:02d}:{_ROT_CONT_END_M:02d}",
+        "afternoonStart": f"{_ROT_AFT_START_H:02d}:{_ROT_AFT_START_M:02d}",
+        "afternoonEnd": f"{_ROT_AFT_END_H:02d}:{_ROT_AFT_END_M:02d}",
+        "timezone": "Asia/Kolkata",
+        "rationale": (
+            "Primary basket 09:45–10:15; continuation/retest scan until 12:45; "
+            "afternoon high-quality scan 13:30–14:45; no new replacement after 14:45"
+        ),
+    }
+
+
+def rotation_window_allowed(now: datetime | None = None) -> tuple[bool, str]:
+    """Return (allowed, window_code) for live rotation / replacement scans.
+
+    window_code:
+      weekend | pre_lock | primary | continuation | midday_pause |
+      afternoon | after_rotation
+    """
+    n = ist_now(now)
+    if n.weekday() >= 5:
+        return False, "weekend"
+
+    mins = _mins(n.hour, n.minute)
+    primary_start = _mins(_LOCK_START_H, _LOCK_START_M)
+    primary_end = _mins(_LOCK_END_H, _LOCK_END_M)
+    cont_end = _mins(_ROT_CONT_END_H, _ROT_CONT_END_M)
+    aft_start = _mins(_ROT_AFT_START_H, _ROT_AFT_START_M)
+    aft_end = _mins(_ROT_AFT_END_H, _ROT_AFT_END_M)
+    if primary_end <= primary_start:
+        primary_end = primary_start + 30
+    if cont_end < primary_end:
+        cont_end = primary_end
+    if aft_end <= aft_start:
+        aft_end = aft_start + 30
+
+    if mins < primary_start:
+        return False, "pre_lock"
+    if mins < primary_end:
+        return True, "primary"
+    if mins < cont_end:
+        return True, "continuation"
+    if mins < aft_start:
+        return False, "midday_pause"
+    if mins < aft_end:
+        return True, "afternoon"
+    return False, "after_rotation"
+
+
+def can_add_replacement(
+    now: datetime | None = None,
+    *,
+    daily_loss_hit: bool = False,
+    max_names_hit: bool = False,
+    allow_manual_override: bool = False,
+) -> tuple[bool, str]:
+    """Portfolio-level replacement gate (time window + hard risk stops).
+
+    Does not invent opportunity quality — callers still run entry_quality_gate.
+    """
+    if allow_manual_override:
+        return True, "manual_override"
+    if daily_loss_hit:
+        return False, "daily_loss_limit"
+    if max_names_hit:
+        return False, "max_concurrent_names"
+    ok, code = rotation_window_allowed(now)
+    if not ok:
+        return False, code
+    return True, code

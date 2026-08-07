@@ -629,6 +629,132 @@ def _record_alert(alert: dict[str, Any]) -> None:
     _save_alert_history(history)
 
 
+def _alert_already_fired(history: list[dict[str, Any]], key: str, plan_date: str) -> bool:
+    return any(a.get("key") == key and a.get("planDate") == plan_date for a in history)
+
+
+def emit_book_lock_alerts(
+    *,
+    book: str,
+    session_date: str,
+    long_rows: list[dict[str, Any]] | None = None,
+    short_rows: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Persist BUY/SELL pick alerts when a swing or intraday book locks."""
+    history = _load_alert_history()
+    today = (session_date or _today_ist())[:10]
+    new_alerts: list[dict[str, Any]] = []
+
+    def _px(row: dict[str, Any]) -> float | None:
+        for k in ("entryPrice", "buyAbove", "ltp", "scanLtp", "currentPrice"):
+            raw = row.get(k)
+            if raw is None:
+                continue
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    def _one(row: dict[str, Any], direction: str) -> None:
+        if not isinstance(row, dict):
+            return
+        sym = str(row.get("symbol") or row.get("ticker") or "").upper().strip()
+        if not sym:
+            return
+        hit = "buy" if direction == "LONG" else "sell"
+        action = "BUY" if direction == "LONG" else "SELL"
+        key = f"{sym}:{direction}:lock:{book}:{today}"
+        if _alert_already_fired(history, key, today):
+            return
+        px = _px(row)
+        alert = {
+            "key": key,
+            "symbol": sym,
+            "direction": direction,
+            "hitLevel": hit,
+            "label": f"{book} PICK · {action}",
+            "ltp": float(px or 0.0),
+            "entryPrice": px,
+            "planDate": today,
+            "firedAt": _utc_now(),
+            "book": book,
+            "action": action,
+        }
+        new_alerts.append(alert)
+        history.append(alert)
+
+    for r in long_rows or []:
+        _one(r, "LONG")
+    for r in short_rows or []:
+        _one(r, "SHORT")
+    for a in new_alerts:
+        _record_alert(a)
+    return new_alerts
+
+
+def collect_hit_alerts_from_rows(
+    rows: list[dict[str, Any]],
+    *,
+    book: str = "INTRADAY",
+) -> list[dict[str, Any]]:
+    """Fire T1/T2/SL/partial alerts for enriched book rows (deduped by day)."""
+    history = _load_alert_history()
+    today = _today_ist()
+    new_alerts: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        outcome = row.get("outcome") if isinstance(row.get("outcome"), dict) else {}
+        hit_level = outcome.get("hitLevel")
+        if not hit_level:
+            continue
+        sym = str(row.get("symbol") or "").upper().strip()
+        if not sym:
+            continue
+        direction = str(row.get("direction") or "LONG").upper()
+        if direction not in ("LONG", "SHORT"):
+            direction = "LONG"
+        key = f"{sym}:{direction}:{hit_level}:{book}"
+        if _alert_already_fired(history, key, today):
+            continue
+        try:
+            ltp = float(outcome.get("ltp") if outcome.get("ltp") is not None else row.get("ltp") or 0)
+        except (TypeError, ValueError):
+            ltp = 0.0
+        entry = row.get("entryPrice")
+        try:
+            entry_f = float(entry) if entry is not None else None
+        except (TypeError, ValueError):
+            entry_f = None
+        hl = str(hit_level).lower()
+        if hl == "buy":
+            action = "BUY"
+        elif hl == "sell":
+            action = "SELL"
+        else:
+            # Targets / SL / partial book — reverse the sleeve side
+            action = "SELL" if direction == "LONG" else "BUY"
+        alert = {
+            "key": key,
+            "symbol": sym,
+            "direction": direction,
+            "hitLevel": hit_level,
+            "label": outcome.get("label") or f"{book} · {str(hit_level).upper()}",
+            "ltp": ltp,
+            "entryPrice": entry_f,
+            "planDate": today,
+            "firedAt": _utc_now(),
+            "book": book,
+            "action": action,
+        }
+        new_alerts.append(alert)
+        history.append(alert)
+    for a in new_alerts:
+        _record_alert(a)
+    return new_alerts
+
+
 def get_live_prices_for_plan() -> dict[str, Any]:
     """Return prices + evaluated outcomes for symbols in the fixed plan.
 
@@ -813,15 +939,26 @@ def get_live_prices_for_plan() -> dict[str, Any]:
                     for a in alert_history
                 )
                 if not already_fired:
+                    direction = str(p.get("direction") or "LONG").upper()
+                    # LONG exits / targets / SL / partial = SELL; SHORT covers = BUY
+                    action = "SELL" if direction == "LONG" else "BUY"
+                    entry_raw = p.get("entryPrice")
+                    try:
+                        entry_f = float(entry_raw) if entry_raw is not None else None
+                    except (TypeError, ValueError):
+                        entry_f = None
                     new_alerts.append({
                         "key": alert_key,
                         "symbol": symbol,
-                        "direction": p.get("direction", "LONG"),
+                        "direction": direction,
                         "hitLevel": hit_level,
                         "label": outcome.get("label", ""),
                         "ltp": ltp,
+                        "entryPrice": entry_f,
                         "planDate": _today_ist(),
                         "firedAt": _utc_now(),
+                        "book": "INTRADAY",
+                        "action": action,
                     })
             entry["outcome"] = outcome
             if hit_level or outcome.get("final") or outcome.get("closed"):

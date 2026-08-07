@@ -636,6 +636,17 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
         "crossBookExcluded": sorted(exclude),
     }
     _atomic_write(_SWING_SESSION_PATH, session)
+    try:
+        from .trade_outcome import emit_book_lock_alerts
+
+        emit_book_lock_alerts(
+            book="SWING",
+            session_date=session_date,
+            long_rows=long_rows,
+            short_rows=[],
+        )
+    except Exception as exc:
+        log.warning("Swing lock alerts failed: %s", exc)
     log.info(
         "Locked swing session from %s: %d LONGs (%s)%s%s",
         session["source"],
@@ -832,4 +843,13 @@ def get_swing_session(*, live: bool = False) -> dict[str, Any]:
     out["liveMarks"] = len(live_marks)
     out["updatedAt"] = _utc_now_iso()
     out["snapshotUpdatedAt"] = snap.get("updatedAt")
+    try:
+        from .trade_outcome import collect_hit_alerts_from_rows
+
+        out["newAlerts"] = collect_hit_alerts_from_rows(
+            list(out["long"]) + list(out["short"]),
+            book="SWING",
+        )
+    except Exception:
+        out["newAlerts"] = []
     return out

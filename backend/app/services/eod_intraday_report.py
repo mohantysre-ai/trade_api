@@ -33,6 +33,117 @@ DASH_ROOT = {
 }
 
 
+def _build_rotation_attribution(
+    session: dict[str, Any],
+    trade_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """EOD ledger: freed slots, proposed replacements, cash held, closed P&L (facts only)."""
+    events = list(session.get("events") or []) if isinstance(session, dict) else []
+    freed: list[dict[str, Any]] = []
+    proposed: list[dict[str, Any]] = []
+    cash_held_events: list[dict[str, Any]] = []
+    for ev in events:
+        if not isinstance(ev, dict):
+            continue
+        et = str(ev.get("type") or "")
+        if et == "CAPITAL_SLOT_FREED":
+            freed.append(
+                {
+                    "at": ev.get("at"),
+                    "freeSlots": ev.get("freeSlots"),
+                }
+            )
+        elif et == "REPLACEMENT_PROPOSED":
+            proposed.append(
+                {
+                    "at": ev.get("at"),
+                    "freeSlots": ev.get("freeSlots"),
+                    "candidates": ev.get("candidates") or [],
+                }
+            )
+        elif et == "CASH_HELD":
+            cash_held_events.append(
+                {
+                    "at": ev.get("at"),
+                    "reason": ev.get("reason"),
+                    "freeSlots": ev.get("freeSlots"),
+                }
+            )
+        elif et in ("POSITION_CLOSED", "STOP_LOSS_HIT", "TRAIL_STOP_HIT", "TARGET_HIT"):
+            freed.append(
+                {
+                    "at": ev.get("at"),
+                    "symbol": ev.get("symbol"),
+                    "direction": ev.get("direction"),
+                    "status": ev.get("status") or et,
+                    "realizedPnl": ev.get("realizedPnl"),
+                }
+            )
+
+    closed_trades: list[dict[str, Any]] = []
+    for t in trade_rows:
+        if not isinstance(t, dict):
+            continue
+        reason = str(t.get("exitReason") or t.get("status") or "").upper()
+        pnl = t.get("pnl")
+        if pnl is None:
+            pnl = t.get("realizedPnl")
+        closed_trades.append(
+            {
+                "symbol": t.get("symbol"),
+                "direction": t.get("direction"),
+                "exitReason": t.get("exitReason") or t.get("status"),
+                "pnl": pnl,
+                "slotFreed": bool(
+                    t.get("slotFreed")
+                    or str(t.get("slotStatus") or "").upper() == "REPLACEABLE"
+                    or "HIT" in reason
+                    or reason in ("CLOSED", "STOP LOSS HIT", "TRAIL STOP HIT")
+                ),
+            }
+        )
+
+    last_proposals = session.get("lastReplacementProposals") if isinstance(session, dict) else None
+    if isinstance(last_proposals, list) and last_proposals and not proposed:
+        proposed.append(
+            {
+                "at": session.get("updatedAt"),
+                "candidates": last_proposals,
+                "source": "lastReplacementProposals",
+            }
+        )
+
+    proposed_syms = {
+        str(c.get("symbol") or "").upper()
+        for block in proposed
+        for c in (block.get("candidates") or [])
+        if isinstance(c, dict) and c.get("symbol")
+    }
+    closed_pnl = [
+        float(t["pnl"])
+        for t in closed_trades
+        if t.get("pnl") is not None
+    ]
+
+    return {
+        "slotFreedEvents": len(freed),
+        "freed": freed[-50:],
+        "replacementProposals": proposed[-50:],
+        "proposedSymbolCount": len(proposed_syms),
+        "proposedSymbols": sorted(proposed_syms),
+        "cashHeldEvents": cash_held_events[-20:],
+        "cashHeld": bool(cash_held_events) or bool(
+            isinstance(session, dict) and session.get("lastCashHeldAt")
+        ),
+        "closedTrades": closed_trades,
+        "closedPnlSum": round(sum(closed_pnl), 2) if closed_pnl else None,
+        "note": (
+            "Proposals are advisory (proposalOnly); P&L is from closed book rows only. "
+            "No invented replacement fills."
+        ),
+    }
+
+
 def _eod_scorecards_path(for_date: date) -> str:
     root = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "..", "data", "eod", for_date.isoformat())
@@ -841,6 +952,14 @@ def generate_intraday_eod_report(
     hit_rows = sum(1 for r in rows if r.get("missDiagnostic") and r["missDiagnostic"].get("isHit"))
     lessons = build_day_lessons(rows, force=force, refresh_existing=False, existing=prior_lessons)
 
+    from .eod_engine.ingestion import load_intraday_session
+
+    session_live = load_intraday_session(for_date)
+    rotation = _build_rotation_attribution(
+        session_live if isinstance(session_live, dict) else {},
+        rows,
+    )
+
     report = {
         "date": for_date.isoformat(),
         "capital": capital,
@@ -863,6 +982,7 @@ def generate_intraday_eod_report(
             "losses": miss_rows,
             "deployed": round(total_deployed, 2),
         },
+        "rotationAttribution": rotation,
         "dayLessons": lessons,
         "trades": rows,
     }
