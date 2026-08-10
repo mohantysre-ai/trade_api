@@ -21,7 +21,6 @@ log = logging.getLogger(__name__)
 
 def _day_dir(for_date) -> str:
     from .eod_engine.ingestion import eod_day_dir
-
     return eod_day_dir(for_date)
 
 
@@ -44,7 +43,6 @@ def _read_json(path: str) -> dict[str, Any] | None:
 
 def _write_json(path: str, payload: dict[str, Any]) -> None:
     from .eod_engine.ingestion import atomic_write_json
-
     atomic_write_json(path, payload)
 
 
@@ -70,15 +68,11 @@ def _is_triggered_swing(row: dict[str, Any]) -> bool:
 
 
 def _reconcile_master_from_books(for_date) -> None:
-    """Reconcile the institutional EOD summary to the canonical Book caches.
+    """Make the headline EOD artifact agree with the canonical Book caches.
 
-    The forensic engine can model a trade differently (for example a 1-minute
-    T1/SL path) from the Book's SCALE_TRAIL / close-mark execution accounting.
-    That is valid for diagnostics, but it must not make the headline EOD P&L
-    disagree with the Book tab.
-
-    This function only updates the reporting artifact for an existing day. It
-    never changes strategy parameters, trade plans, or live state.
+    The forensic engine may model a different exit path (for example a 1-minute
+    T1/SL path) from the Book's SCALE_TRAIL / close-mark accounting. That is
+    valid for diagnostics, but it must not overwrite realized Book metrics.
     """
     day_dir = _day_dir(for_date)
     master_path = os.path.join(day_dir, "master_eod_payload.json")
@@ -94,9 +88,6 @@ def _reconcile_master_from_books(for_date) -> None:
     intra_rows = [r for r in (intra.get("trades") or []) if isinstance(r, dict)]
     swing_rows = [r for r in (swing.get("picks") or []) if isinstance(r, dict)]
     active_swing = [r for r in swing_rows if _is_triggered_swing(r)]
-
-    # Intraday report already excludes skipped rows; keep an explicit guard so
-    # future schema changes cannot accidentally count a NOT_TRIGGERED row.
     active_intra = [
         r for r in intra_rows
         if str(r.get("exitReason") or "").upper() != "NOT_TRIGGERED"
@@ -120,8 +111,6 @@ def _reconcile_master_from_books(for_date) -> None:
         except (TypeError, ValueError):
             pass
 
-    # Prefer the Book aggregate deployed values when available; they are the
-    # same numbers used by the Book portfolio balance.
     deployed_from_reports = 0.0
     for report in (intra, swing):
         try:
@@ -139,11 +128,14 @@ def _reconcile_master_from_books(for_date) -> None:
 
     win_pcts = [p for p in (_row_pnl_pct(r) for r in active_rows) if p is not None and p > 0]
     loss_pcts = [abs(p) for p in (_row_pnl_pct(r) for r in active_rows) if p is not None and p < 0]
-    avg_rr = round(sum(win_pcts) / len(win_pcts) / (sum(loss_pcts) / len(loss_pcts)), 3) if win_pcts and loss_pcts else None
+    avg_rr = (
+        round((sum(win_pcts) / len(win_pcts)) / (sum(loss_pcts) / len(loss_pcts)), 3)
+        if win_pcts and loss_pcts else None
+    )
 
-    # Keep the score intentionally deterministic and tied to the reconciled
-    # headline metrics. Calibration stays forensic-only and is not fabricated
-    # from Book P&L, so stale ECE/Brier values are removed from the headline.
+    # Score is deterministic and tied to reconciled headline metrics. ECE/Brier
+    # are forensic probability metrics, not Book accounting metrics, so they are
+    # cleared here rather than displaying stale values from a different model.
     score = 5.0
     if win_rate is not None:
         score += (win_rate - 50.0) / 20.0
@@ -168,12 +160,9 @@ def _reconcile_master_from_books(for_date) -> None:
         "capital_efficiency_pct": round(deployed / (deployed + abs(net_pnl)) * 100.0, 2) if deployed else None,
         "expected_calibration_error": None,
         "brier_score": None,
-        "false_positive_count": None,
+        "false_positive_count": 0,
     })
 
-    # Add an explicit reconciliation block so downstream UI/LLM layers can see
-    # which source owns each metric instead of silently mixing two accounting
-    # models.
     master["book_reconciliation"] = {
         "source": "BOOK",
         "locked": locked,
@@ -190,9 +179,8 @@ def _reconcile_master_from_books(for_date) -> None:
         "reconciled_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    # Replace stale PM prose with deterministic Book facts. The PM LLM button
-    # can subsequently regenerate commentary, but the default EOD view can
-    # never display an LLM memo whose headline metrics disagree with the Book.
+    # Deterministic Book commentary replaces stale LLM prose until the user
+    # explicitly regenerates PM commentary from the corrected artifact.
     master["pm_commentary"] = {
         "executive_summary": (
             f"Book-reconciled EOD: {net_pnl:+.2f} net P&L across {locked} locked names "
@@ -215,15 +203,14 @@ def _reconcile_master_from_books(for_date) -> None:
             "Use BOOK as the headline P&L / win-rate source for EOD reporting.",
             "Keep ECE/Brier and forensic scorecards separate from realized Book accounting.",
         ],
-        "source": "BOOK_RECONCILED",
+        "source": "DETERMINISTIC_FALLBACK",
     }
 
-    master["notes"] = list(master.get("notes") or [])
-    master["notes"].append("book_reconciled_headline_metrics")
+    notes = list(master.get("notes") or [])
+    if "book_reconciled_headline_metrics" not in notes:
+        notes.append("book_reconciled_headline_metrics")
+    master["notes"] = notes
     _write_json(master_path, master)
-
-    # Keep the standalone PM artifact in sync with master so the frontend cannot
-    # accidentally read stale prose from the sidecar cache.
     _write_json(os.path.join(day_dir, "pm_commentary.json"), master["pm_commentary"])
 
 
@@ -232,8 +219,6 @@ def load_book_cache(for_date, kind: str) -> dict[str, Any] | None:
     data = _read_json(path)
     if data is None:
         return None
-    # Reconcile after loading either Book layer. This is deliberately limited
-    # to an existing EOD artifact and never touches live trading state.
     try:
         _reconcile_master_from_books(for_date)
     except Exception as exc:
