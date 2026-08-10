@@ -3,7 +3,7 @@
   "locked": true,
   "sessionDate": "2026-08-10",
   "committedAt": "2026-08-10T06:20:45.677040+00:00",
-  "updatedAt": "2026-08-10T06:20:45.677040+00:00",
+  "updatedAt": "2026-08-10T10:14:22.337626+00:00",
   "snapshotUpdatedAt": "2026-08-03T04:57:17.954482+00:00",
   "dataStale": true,
   "regime": {
@@ -145,12 +145,12 @@
         "OI_MISSING",
         "IN_PLAY"
       ],
-      "ltp": 1709.0,
+      "ltp": 1681.0,
       "scanLtp": 1709.0,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 0.84,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 1709.0,
       "stopLoss": 1691.77,
       "target1": 1734.85,
@@ -210,7 +210,35 @@
       "adoptReason": "HIGH_PROBABILITY_SCORE",
       "candidatePoolSize": 10,
       "oiSetup": null,
-      "oiAligned": null
+      "oiAligned": null,
+      "realizedPnl": -999.34,
+      "unrealizedPnl": 0.0,
+      "pnlPct": -1.01,
+      "totalPnl": -999.34,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 58,
+            "price": 1691.77,
+            "pnl": -999.34
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1691.77,
+        "realizedPnl": -999.34,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -1.741,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "profitGuardActive": false,
+        "profitGuardTriggerR": 0.25
+      },
+      "effectiveStop": 1691.77,
+      "remainingQty": 0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "currentPrice": 1681.0
     },
     {
       "rank": 2,
@@ -314,12 +342,12 @@
         "OI_MISSING",
         "IN_PLAY"
       ],
-      "ltp": 5428.5,
+      "ltp": 5860.0,
       "scanLtp": 5428.5,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 1.35,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 5428.5,
       "stopLoss": 5340.56,
       "target1": 5560.41,
@@ -379,7 +407,52 @@
       "adoptReason": "HIGH_PROBABILITY_SCORE",
       "candidatePoolSize": 10,
       "oiSetup": null,
-      "oiAligned": null
+      "oiAligned": null,
+      "realizedPnl": 2525.66,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 7.95,
+      "totalPnl": 2525.66,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 0.5,
+            "qty": 6,
+            "price": 5472.47,
+            "pnl": 263.82
+          },
+          {
+            "r": 1.0,
+            "qty": 5,
+            "price": 5516.44,
+            "pnl": 439.7
+          },
+          {
+            "r": 1.5,
+            "qty": 4,
+            "price": 5560.41,
+            "pnl": 527.64
+          },
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 3,
+            "price": 5860.0,
+            "pnl": 1294.5
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 5648.35,
+        "realizedPnl": 2525.66,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 4.907,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "profitGuardActive": true,
+        "profitGuardTriggerR": 0.25
+      },
+      "effectiveStop": 5648.35,
+      "remainingQty": 0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE"
     },
     {
       "rank": 3,
@@ -483,12 +556,12 @@
         "OI_MISSING",
         "IN_PLAY"
       ],
-      "ltp": 3123.0,
+      "ltp": 3082.1,
       "scanLtp": 3123.0,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 1.33,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 3123.0,
       "stopLoss": 3073.16,
       "target1": 3197.76,
@@ -548,7 +621,34 @@
       "adoptReason": "HIGH_PROBABILITY_SCORE",
       "candidatePoolSize": 10,
       "oiSetup": null,
-      "oiAligned": null
+      "oiAligned": null,
+      "realizedPnl": -1308.8,
+      "unrealizedPnl": -0.0,
+      "pnlPct": -1.31,
+      "totalPnl": -1308.8,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 32,
+            "price": 3082.1,
+            "pnl": -1308.8
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 3073.16,
+        "realizedPnl": -1308.8,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -0.821,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "profitGuardActive": false,
+        "profitGuardTriggerR": 0.25
+      },
+      "effectiveStop": 3073.16,
+      "remainingQty": 0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE"
     },
     {
       "rank": 4,
@@ -652,12 +752,12 @@
         "OI_MISSING",
         "IN_PLAY"
       ],
-      "ltp": 298.55,
+      "ltp": 294.8,
       "scanLtp": 298.55,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 1.33,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 298.55,
       "stopLoss": 293.79,
       "target1": 305.69,
@@ -717,7 +817,35 @@
       "adoptReason": "HIGH_PROBABILITY_SCORE",
       "candidatePoolSize": 10,
       "oiSetup": null,
-      "oiAligned": null
+      "oiAligned": null,
+      "realizedPnl": -1589.84,
+      "unrealizedPnl": 0.0,
+      "pnlPct": -1.26,
+      "totalPnl": -1589.84,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 334,
+            "price": 293.79,
+            "pnl": -1589.84
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 293.79,
+        "realizedPnl": -1589.84,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -1.576,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "profitGuardActive": false,
+        "profitGuardTriggerR": 0.25
+      },
+      "effectiveStop": 293.79,
+      "remainingQty": 0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "currentPrice": 294.8
     },
     {
       "rank": 5,
@@ -821,12 +949,12 @@
         "OI_MISSING",
         "IN_PLAY"
       ],
-      "ltp": 1889.7,
+      "ltp": 1920.0,
       "scanLtp": 1889.7,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 2.3,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 1889.7,
       "stopLoss": 1837.54,
       "target1": 1967.94,
@@ -886,7 +1014,40 @@
       "adoptReason": "HIGH_PROBABILITY_SCORE",
       "candidatePoolSize": 10,
       "oiSetup": null,
-      "oiAligned": null
+      "oiAligned": null,
+      "realizedPnl": 1499.64,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 1.6,
+      "totalPnl": 1499.64,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 0.5,
+            "qty": 18,
+            "price": 1915.78,
+            "pnl": 469.44
+          },
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 34,
+            "price": 1920.0,
+            "pnl": 1030.2
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1889.7,
+        "realizedPnl": 1499.64,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.581,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "profitGuardActive": true,
+        "profitGuardTriggerR": 0.25
+      },
+      "effectiveStop": 1889.7,
+      "remainingQty": 0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE"
     }
   ],
   "short": [
@@ -994,12 +1155,12 @@
         "OI_MISSING",
         "REGIME_HAIRCUT"
       ],
-      "ltp": 861.7,
+      "ltp": 879.0,
       "scanLtp": 861.7,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 3.33,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 861.7,
       "stopLoss": 896.13,
       "target1": 810.06,
@@ -1059,7 +1220,34 @@
       "adoptReason": "HIGH_PROBABILITY_SCORE",
       "candidatePoolSize": 6,
       "oiSetup": null,
-      "oiAligned": null
+      "oiAligned": null,
+      "realizedPnl": -2006.8,
+      "unrealizedPnl": -0.0,
+      "pnlPct": -2.01,
+      "totalPnl": -2006.8,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 116,
+            "price": 879.0,
+            "pnl": -2006.8
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 896.13,
+        "realizedPnl": -2006.8,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -0.502,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "profitGuardActive": false,
+        "profitGuardTriggerR": 0.25
+      },
+      "effectiveStop": 896.13,
+      "remainingQty": 0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE"
     },
     {
       "rank": 2,
@@ -1166,12 +1354,12 @@
         "REGIME_HAIRCUT",
         "IN_PLAY"
       ],
-      "ltp": 1439.6,
+      "ltp": 1437.0,
       "scanLtp": 1439.6,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 2.8,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 1439.6,
       "stopLoss": 1487.97,
       "target1": 1367.04,
@@ -1231,7 +1419,34 @@
       "adoptReason": "HIGH_PROBABILITY_SCORE",
       "candidatePoolSize": 6,
       "oiSetup": null,
-      "oiAligned": null
+      "oiAligned": null,
+      "realizedPnl": 179.4,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 0.18,
+      "totalPnl": 179.4,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 69,
+            "price": 1437.0,
+            "pnl": 179.4
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1487.97,
+        "realizedPnl": 179.4,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.054,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "profitGuardActive": false,
+        "profitGuardTriggerR": 0.25
+      },
+      "effectiveStop": 1487.97,
+      "remainingQty": 0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE"
     },
     {
       "rank": 3,
@@ -1338,12 +1553,12 @@
         "REGIME_HAIRCUT",
         "IN_PLAY"
       ],
-      "ltp": 2606.1,
+      "ltp": 2560.0,
       "scanLtp": 2606.1,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 1.76,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 2606.1,
       "stopLoss": 2661.14,
       "target1": 2523.54,
@@ -1403,7 +1618,40 @@
       "adoptReason": "HIGH_PROBABILITY_SCORE",
       "candidatePoolSize": 6,
       "oiSetup": null,
-      "oiAligned": null
+      "oiAligned": null,
+      "realizedPnl": 1510.26,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 1.77,
+      "totalPnl": 1510.26,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 0.5,
+            "qty": 13,
+            "price": 2578.58,
+            "pnl": 357.76
+          },
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 25,
+            "price": 2560.0,
+            "pnl": 1152.5
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 2606.1,
+        "realizedPnl": 1510.26,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.838,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "profitGuardActive": true,
+        "profitGuardTriggerR": 0.25
+      },
+      "effectiveStop": 2606.1,
+      "remainingQty": 0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE"
     },
     {
       "rank": 4,
@@ -1510,12 +1758,12 @@
         "REGIME_HAIRCUT",
         "IN_PLAY"
       ],
-      "ltp": 1043.9,
+      "ltp": 1068.0,
       "scanLtp": 1043.9,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 1.58,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 1043.9,
       "stopLoss": 1063.69,
       "target1": 1014.22,
@@ -1575,7 +1823,35 @@
       "adoptReason": "HIGH_PROBABILITY_SCORE",
       "candidatePoolSize": 6,
       "oiSetup": null,
-      "oiAligned": null
+      "oiAligned": null,
+      "realizedPnl": -1880.05,
+      "unrealizedPnl": 0.0,
+      "pnlPct": -1.9,
+      "totalPnl": -1880.05,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 95,
+            "price": 1063.69,
+            "pnl": -1880.05
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1063.69,
+        "realizedPnl": -1880.05,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -1.006,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "profitGuardActive": false,
+        "profitGuardTriggerR": 0.25
+      },
+      "effectiveStop": 1063.69,
+      "remainingQty": 0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "currentPrice": 1068.0
     },
     {
       "rank": 5,
@@ -1682,12 +1958,12 @@
         "REGIME_HAIRCUT",
         "IN_PLAY"
       ],
-      "ltp": 193.77,
+      "ltp": 193.34,
       "scanLtp": 193.77,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 1.47,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 193.77,
       "stopLoss": 197.19,
       "target1": 188.64,
@@ -1747,7 +2023,34 @@
       "adoptReason": "HIGH_PROBABILITY_SCORE",
       "candidatePoolSize": 6,
       "oiSetup": null,
-      "oiAligned": null
+      "oiAligned": null,
+      "realizedPnl": 221.88,
+      "unrealizedPnl": 0.0,
+      "pnlPct": 0.22,
+      "totalPnl": 221.88,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 516,
+            "price": 193.34,
+            "pnl": 221.88
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 197.19,
+        "realizedPnl": 221.88,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.126,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "profitGuardActive": false,
+        "profitGuardTriggerR": 0.25
+      },
+      "effectiveStop": 197.19,
+      "remainingQty": 0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE"
     }
   ],
   "candidatePoolLong": [
@@ -4485,6 +4788,132 @@
         "shortFilled": 5
       },
       "executionPolicy": "MANUAL_ONLY"
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-10T08:30:47.495784+00:00",
+      "symbol": "ADANIPORTS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-10T08:30:47.495799+00:00",
+      "symbol": "ANGELONE",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-10T08:30:47.495809+00:00",
+      "symbol": "AUBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-10T08:30:47.495831+00:00",
+      "freeSlots": {
+        "long": 2,
+        "short": 1,
+        "total": 3,
+        "openLong": 3,
+        "openShort": 4,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "REPLACEMENT_PROPOSED",
+      "at": "2026-08-10T08:30:48.021631+00:00",
+      "freeSlots": {
+        "long": 2,
+        "short": 1,
+        "total": 3,
+        "openLong": 3,
+        "openShort": 4,
+        "lockSize": 5
+      },
+      "candidates": [
+        {
+          "symbol": "BIOCON",
+          "direction": "LONG",
+          "entryState": "QUALIFIED",
+          "score": 57.4,
+          "oiSetup": "SHORT_BUILDUP",
+          "qualityAdjustedExpectedR": 1.094,
+          "proposalOnly": true
+        },
+        {
+          "symbol": "AMBUJACEM",
+          "direction": "LONG",
+          "entryState": "QUALIFIED",
+          "score": 66.3,
+          "oiSetup": "SHORT_BUILDUP",
+          "qualityAdjustedExpectedR": 1.043,
+          "proposalOnly": true
+        }
+      ]
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-10T10:14:21.646074+00:00",
+      "symbol": "HEROMOTOCO",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-10T10:14:21.646086+00:00",
+      "symbol": "ESCORTS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-10T10:14:21.646095+00:00",
+      "symbol": "CHOLAFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-10T10:14:21.646101+00:00",
+      "symbol": "CGPOWER",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-10T10:14:21.646108+00:00",
+      "symbol": "ASTRAL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-10T10:14:21.646114+00:00",
+      "symbol": "HDFCAMC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-10T10:14:21.646120+00:00",
+      "symbol": "GROWW",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-10T10:14:21.646224+00:00",
+      "freeSlots": {
+        "long": 5,
+        "short": 5,
+        "total": 10,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
     }
   ],
   "funnel": {
@@ -4524,5 +4953,72 @@
   "rotated": false,
   "shortCashHeld": false,
   "shortCashReason": null,
-  "fixedPlanSynced": true
+  "fixedPlanSynced": true,
+  "freeSlots": {
+    "long": 5,
+    "short": 5,
+    "total": 10,
+    "openLong": 0,
+    "openShort": 0,
+    "lockSize": 5
+  },
+  "lastReplacementKey": [
+    "AMBUJACEM:LONG",
+    "BIOCON:LONG"
+  ],
+  "lastReplacementProposals": [
+    {
+      "symbol": "BIOCON",
+      "direction": "LONG",
+      "score": 57.4,
+      "sector": "PHARMA",
+      "sleeve": "MOMENTUM",
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "flags": [
+        "FNO_OI",
+        "OI_SHORT_BUILDUP",
+        "OI_MISALIGNED",
+        "OI_MISALIGN_HAIRCUT",
+        "IN_PLAY"
+      ],
+      "ltpSource": null,
+      "dayMovePct": -0.431,
+      "qualityAdjustedExpectedR": 1.094,
+      "ltp": 427.15,
+      "rewardRisk": 1.5,
+      "inPlay": true,
+      "oiSetup": "SHORT_BUILDUP",
+      "oiAligned": false,
+      "replaceReason": "FREE_SLOT",
+      "proposalOnly": true
+    },
+    {
+      "symbol": "AMBUJACEM",
+      "direction": "LONG",
+      "score": 66.3,
+      "sector": "CEMENT",
+      "sleeve": "MOMENTUM",
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "flags": [
+        "FNO_OI",
+        "OI_SHORT_BUILDUP",
+        "OI_MISALIGNED",
+        "OI_MISALIGN_HAIRCUT",
+        "IN_PLAY"
+      ],
+      "ltpSource": null,
+      "dayMovePct": 0.921,
+      "qualityAdjustedExpectedR": 1.043,
+      "ltp": 438.2,
+      "rewardRisk": 1.5,
+      "inPlay": true,
+      "oiSetup": "SHORT_BUILDUP",
+      "oiAligned": false,
+      "replaceReason": "FREE_SLOT",
+      "proposalOnly": true
+    }
+  ],
+  "closeMarksFrozenAt": "2026-08-10T10:14:22.337626+00:00"
 }

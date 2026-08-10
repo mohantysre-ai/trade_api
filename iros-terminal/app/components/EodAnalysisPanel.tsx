@@ -65,6 +65,12 @@ type IntradayTrade = {
   exitPlan?: { mode?: string; legs?: { r?: number }[] } | null;
   scaleTrail?: boolean;
   scaleProgress?: string | null;
+  deskProgress?: string | null;
+  deskExitLabel?: string | null;
+  executionStatus?: string | null;
+  outcomeBucket?: string | null;
+  mfeR?: number | null;
+  effectiveStopR?: number | null;
   realizedPnl?: number | null;
   unrealizedPnl?: number | null;
   rMultiple?: number | null;
@@ -368,13 +374,18 @@ function rootCauseTone(root: string | null | undefined): string {
 
 function OutcomeRow({ trade }: { trade: IntradayTrade }) {
   const d = trade.missDiagnostic!;
-  const rBad = (d.rMultiple ?? 0) < 0;
+  const rMult = trade.rMultiple ?? d.rMultiple;
+  const rBad = (rMult ?? 0) < 0;
+  const exitLabel = trade.deskExitLabel || trade.exitReason;
   const exitTone =
-    trade.exitReason === 'SL_HIT'
+    exitLabel === 'INITIAL_SL' || exitLabel === 'SL_HIT' || exitLabel === 'TRAIL_STOP' || exitLabel === 'TRAIL_SL_HIT'
       ? 'desk-pill--danger'
-      : trade.exitReason === 'EOD_SQUAREOFF'
+      : exitLabel === 'EOD_SQUAREOFF' || exitLabel === 'SKIPPED' || exitLabel === 'NOT_TRIGGERED'
         ? 'desk-pill--warn'
-        : 'desk-pill--ok';
+        : exitLabel === 'PARTIAL_SCALE'
+          ? 'desk-pill--info'
+          : 'desk-pill--ok';
+  const ladder = trade.deskProgress || trade.scaleProgress;
   const ic = trade.deskIcSummary?.decision;
   return (
     <>
@@ -397,20 +408,35 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
         </td>
         <td className="px-2 py-1.5 text-right tabular-nums text-slate-700">{trade.qty ?? '—'}</td>
         <td className="px-2 py-1.5">
-          <span className={`desk-pill ${exitTone}`}>{trade.exitReason}</span>
+          <div className="flex flex-col gap-0.5">
+            <span className={`desk-pill ${exitTone}`}>{exitLabel}</span>
+            {trade.outcomeBucket && (
+              <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                {trade.executionStatus ? `${trade.executionStatus} · ` : ''}
+                {trade.outcomeBucket}
+              </span>
+            )}
+          </div>
         </td>
         <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${rBad ? 'text-red-600' : 'text-emerald-700'}`}>
-          {fmtMissSigned(d.rMultiple, 2, 'R')}
+          {fmtMissSigned(rMult, 2, 'R')}
         </td>
         <td className={`px-2 py-1.5 text-right tabular-nums ${rBad ? 'text-red-600' : 'text-slate-700'}`}>
           {fmtMissSigned(d.movePct, 2, '%')}
         </td>
         <td className="hidden sm:table-cell px-2 py-1.5 text-right tabular-nums text-slate-600">{fmtMissNum(d.maePct, 2)}</td>
-        <td className="hidden sm:table-cell px-2 py-1.5 text-right tabular-nums text-slate-600">{fmtMissNum(d.mfePct, 2)}</td>
+        <td className="hidden sm:table-cell px-2 py-1.5 text-right tabular-nums text-slate-600">
+          {trade.mfeR != null ? fmtMissSigned(trade.mfeR, 2, 'R') : fmtMissNum(d.mfePct, 2)}
+        </td>
         <td className="hidden sm:table-cell px-2 py-1.5">
-          <span className={`desk-pill ${rootCauseTone(d.rootCause)}`}>
+          <span className={`desk-pill ${rootCauseTone(d.rootCause)}`} title={ladder || undefined}>
             {(d.rootCause || '—').replace(/_/g, ' ')}
           </span>
+          {ladder && (
+            <div className="mt-0.5 text-[8px] font-semibold tabular-nums text-slate-400 leading-tight max-w-[140px]">
+              {ladder}
+            </div>
+          )}
         </td>
         <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${pnlTone(trade.pnl ?? trade.pnlPct)}`}>
           {trade.pnl == null

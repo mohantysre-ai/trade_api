@@ -19,7 +19,8 @@ log = logging.getLogger(__name__)
 _OUTCOME_SYSTEM = (
     "You are an IB desk risk reviewer for NSE equity day books. "
     "Write 2–4 sentences explaining why the trade hit or missed using ONLY the FactPack numbers "
-    "(prices, R-multiple, MAE/MFE, factors, rootCause). "
+    "(executionStatus, outcomeBucket, deskExitLabel, deskProgress / R-ladder, P&L, MAE/MFE, "
+    "and forensic rootCause/factors as secondary context). "
     "Never invent metrics, news, or catalysts not in the FactPack. "
     "If data is thin, say so. Return JSON: {\"outcomeNarrative\":\"...\"}."
 )
@@ -31,6 +32,13 @@ def _fact_pack(row: dict[str, Any], diagnostic: dict[str, Any]) -> dict[str, Any
         "direction": row.get("direction"),
         "book": row.get("book") or ("SWING" if row.get("daysHeld") is not None else "INTRADAY"),
         "status": row.get("status") or row.get("exitReason"),
+        "executionStatus": row.get("executionStatus"),
+        "outcomeBucket": row.get("outcomeBucket"),
+        "deskExitLabel": row.get("deskExitLabel"),
+        "deskProgress": row.get("deskProgress") or row.get("scaleProgress"),
+        "mfeR": row.get("mfeR"),
+        "effectiveStopR": row.get("effectiveStopR"),
+        "rMultiple": row.get("rMultiple") or diagnostic.get("rMultiple"),
         "entryPrice": row.get("entryPrice"),
         "exitPrice": row.get("exitPrice") or row.get("currentPrice"),
         "stopLoss": row.get("stopLoss"),
@@ -48,13 +56,14 @@ def _fact_pack(row: dict[str, Any], diagnostic: dict[str, Any]) -> dict[str, Any
             "factors": diagnostic.get("factors"),
             "rMultiple": diagnostic.get("rMultiple"),
             "movePct": diagnostic.get("movePct"),
-            "maePct": diagnostic.get("maePct"),
-            "mfePct": diagnostic.get("mfePct"),
+            "maePct": diagnostic.get("maePct") or row.get("maePct"),
+            "mfePct": diagnostic.get("mfePct") or row.get("mfePct"),
             "gapToT1Pct": diagnostic.get("gapToT1Pct"),
             "gapToT2Pct": diagnostic.get("gapToT2Pct"),
             "stopUtilization": diagnostic.get("stopUtilization"),
             "source": diagnostic.get("source"),
         },
+        "policyChain": row.get("policyChain"),
     }
 
 

@@ -12,6 +12,7 @@ from .trade_outcome import load_fixed_trade_plan, get_alert_history, _today_ist
 from .eod_reference import get_close_mark_price, get_reference_price, generate_swing_analysis
 from .eod_intraday_report import _build_levels_diagnostic, _exit_reason_from_scale_eval
 from .exit_plan import attach_exit_plan, blended_pnl_from_state, format_scale_progress
+from .quant_desk_exit_policy import classify_desk_outcome
 
 log = logging.getLogger(__name__)
 
@@ -164,6 +165,11 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
         analysis = generate_swing_analysis(
             symbol, direction, base_entry or 0.0, 0.0, 0.0, 0.0, "NO_MARK"
         )
+        desk = classify_desk_outcome(
+            triggered=False,
+            realized_pnl=0.0,
+            exit_reason="NO_MARK",
+        )
         return {
             "symbol": symbol,
             "direction": direction,
@@ -180,6 +186,11 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
             "pnlPct": None,
             "status": "NO_MARK",
             "analysis": analysis,
+            "executionStatus": desk.get("executionStatus"),
+            "outcomeBucket": "SKIPPED",
+            "deskExitLabel": "SKIPPED",
+            "deskProgress": None,
+            "policyChain": desk.get("chain"),
             "missDiagnostic": {
                 "isMiss": False,
                 "isHit": False,
@@ -222,6 +233,17 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
         if base_entry and eod_price:
             sign = 1.0 if direction == "LONG" else -1.0
             gap_entry_pct = round(sign * (eod_price - base_entry) / base_entry * 100.0, 2)
+        desk = classify_desk_outcome(
+            triggered=False,
+            realized_pnl=0.0,
+            exit_reason="NOT_TRIGGERED",
+            entry=base_entry,
+            direction=direction,
+            day_high=day_high,
+            day_low=day_low,
+            mfe_pct=None,
+            mae_pct=None,
+        )
         return {
             "symbol": symbol,
             "direction": direction,
@@ -240,6 +262,11 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
             "pnlPct": 0.0,
             "status": "NOT_TRIGGERED",
             "analysis": analysis,
+            "executionStatus": desk.get("executionStatus"),
+            "outcomeBucket": desk.get("outcomeBucket"),
+            "deskExitLabel": desk.get("deskExitLabel"),
+            "deskProgress": None,
+            "policyChain": desk.get("chain"),
             "missDiagnostic": {
                 "isMiss": False,
                 "isHit": False,
@@ -394,6 +421,38 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
             float(pnl or 0),
         )
 
+    exit_state = scale_extra.get("exitState") if isinstance(scale_extra.get("exitState"), dict) else None
+    if not isinstance(exit_state, dict) and isinstance(pick.get("exitState"), dict):
+        exit_state = pick["exitState"]
+    desk = classify_desk_outcome(
+        triggered=True,
+        realized_pnl=pnl,
+        exit_reason=diag_reason or status,
+        exit_state=exit_state,
+        entry=base_entry,
+        risk_per_share=float(pick.get("riskPerShare") or 0) or None,
+        direction=direction,
+        effective_stop=(
+            float(exit_state["effectiveStop"])
+            if isinstance(exit_state, dict) and exit_state.get("effectiveStop") is not None
+            else (sl or None)
+        ),
+        current_r=(
+            float(scale_extra["rMultiple"])
+            if scale_extra.get("rMultiple") is not None
+            else None
+        ),
+        day_high=day_high,
+        day_low=day_low,
+        mae_pct=(miss_diagnostic or {}).get("maePct") if miss_diagnostic else None,
+        mfe_pct=(miss_diagnostic or {}).get("mfePct") if miss_diagnostic else None,
+    )
+    pnl = float(desk["pnl"])
+    if desk.get("deskProgress") and not scale_extra.get("scaleProgress"):
+        scale_extra["scaleProgress"] = desk["deskProgress"]
+    if desk.get("deskProgress"):
+        scale_extra["deskProgress"] = desk["deskProgress"]
+
     desk_ic = None
     for key in ("deskIcSummary", "deskIc"):
         if isinstance(pick.get(key), dict):
@@ -418,6 +477,13 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
         "pnlPct": round(pnl_pct, 2),
         "status": status,
         "analysis": analysis,
+        "executionStatus": desk.get("executionStatus"),
+        "outcomeBucket": desk.get("outcomeBucket"),
+        "deskExitLabel": desk.get("deskExitLabel"),
+        "mfeR": desk.get("mfeR"),
+        "effectiveStopR": desk.get("effectiveStopR"),
+        "rMultiple": desk.get("rMultiple") if desk.get("rMultiple") is not None else scale_extra.get("rMultiple"),
+        "policyChain": desk.get("chain"),
         "missDiagnostic": miss_diagnostic,
         "deskIcSummary": desk_ic,
         "selectionReason": pick.get("selectionReason") or pick.get("selection_reason"),

@@ -18,6 +18,7 @@ from typing import Any
 
 from .eod_archive import load_archive
 from .exit_plan import attach_exit_plan, blended_pnl_from_state, format_scale_progress
+from .quant_desk_exit_policy import classify_desk_outcome
 import json
 import time
 import urllib.request
@@ -886,15 +887,45 @@ def generate_intraday_eod_report(
             if deployed <= 0:
                 deployed = round(entry * qty, 2) if entry and qty else 0.0
 
-        total_pnl += pnl
-        total_deployed += deployed
-        hits[reason] = hits.get(reason, 0) + 1
-
         diagnostic = _miss_diagnostic(pick, reason, exit_price, pnl, scorecards)
         if diagnostic:
             diagnostic["exitSource"] = exit_source
             if diagnostic.get("isMiss"):
                 miss_rows += 1
+
+        exit_state = scale_meta.get("exitState") if isinstance(scale_meta, dict) else None
+        if not isinstance(exit_state, dict):
+            exit_state = pick.get("exitState") if isinstance(pick.get("exitState"), dict) else None
+        desk = classify_desk_outcome(
+            triggered=True,
+            realized_pnl=pnl,
+            exit_reason=reason,
+            exit_state=exit_state if isinstance(exit_state, dict) else None,
+            entry=_f(pick.get("entryPrice")),
+            risk_per_share=_f(pick.get("riskPerShare")),
+            direction=str(pick.get("direction") or "LONG"),
+            effective_stop=_f(
+                (exit_state or {}).get("effectiveStop")
+                if isinstance(exit_state, dict)
+                else pick.get("effectiveStop")
+            ),
+            current_r=_f(
+                (scale_meta or {}).get("rMultiple")
+                if isinstance(scale_meta, dict)
+                else None
+            )
+            or _f((exit_state or {}).get("rMultiple") if isinstance(exit_state, dict) else None),
+            day_high=_f(pick.get("dayHigh")),
+            day_low=_f(pick.get("dayLow")),
+            mae_pct=_f((diagnostic or {}).get("maePct")) if diagnostic else None,
+            mfe_pct=_f((diagnostic or {}).get("mfePct")) if diagnostic else None,
+        )
+        # Desk truth layer overrides reportable P&L (Book / forensic cannot invent skips)
+        pnl = float(desk["pnl"])
+        reason_desk = str(desk.get("deskExitLabel") or reason)
+        total_pnl += pnl
+        total_deployed += deployed
+        hits[reason] = hits.get(reason, 0) + 1
 
         pnl_pct = None
         if deployed:
@@ -916,6 +947,12 @@ def generate_intraday_eod_report(
             "target1": pick.get("target1"),
             "target2": pick.get("target2") or (card.get("target_price") if card else None),
             "exitReason": reason,
+            "deskExitLabel": reason_desk,
+            "executionStatus": desk.get("executionStatus"),
+            "outcomeBucket": desk.get("outcomeBucket"),
+            "deskProgress": desk.get("deskProgress"),
+            "mfeR": desk.get("mfeR"),
+            "effectiveStopR": desk.get("effectiveStopR"),
             "qty": pick.get("approxQty") or (card.get("qty") if card else None),
             "deployedCapital": deployed,
             "pnl": round(pnl, 2),
@@ -923,12 +960,19 @@ def generate_intraday_eod_report(
             "missAnalysis": None,
             "missDiagnostic": diagnostic,
             "pickSource": pick.get("source") or symbol_source,
+            "policyChain": desk.get("chain"),
         }
+        if desk.get("rMultiple") is not None:
+            row["rMultiple"] = desk.get("rMultiple")
         if isinstance(scale_meta, dict) and scale_meta:
             row.update(scale_meta)
+            # Prefer policy ladder string when present; keep scaleProgress as fallback
+            if desk.get("deskProgress"):
+                row["deskProgress"] = desk["deskProgress"]
+                row.setdefault("scaleProgress", desk["deskProgress"])
         else:
             row["scaleTrail"] = False
-            row["scaleProgress"] = None
+            row["scaleProgress"] = desk.get("deskProgress")
         rows.append(row)
 
     from .outcome_narrative import attach_outcome_narratives, build_day_lessons
@@ -951,6 +995,9 @@ def generate_intraday_eod_report(
     remaining_capital = capital + total_pnl
     scored = sum(1 for r in rows if r.get("missDiagnostic") and r["missDiagnostic"].get("source") == "SCORECARD")
     hit_rows = sum(1 for r in rows if r.get("missDiagnostic") and r["missDiagnostic"].get("isHit"))
+    wins = sum(1 for r in rows if r.get("outcomeBucket") == "WIN")
+    losses = sum(1 for r in rows if r.get("outcomeBucket") == "LOSS")
+    skipped = sum(1 for r in rows if r.get("outcomeBucket") == "SKIPPED")
     lessons = build_day_lessons(rows, force=force, refresh_existing=False, existing=prior_lessons)
 
     from .eod_engine.ingestion import load_intraday_session
@@ -977,10 +1024,10 @@ def generate_intraday_eod_report(
         "deskCounts": desk_counts,
         "attribution": {
             "locked": len(rows),
-            "triggered": len(rows),
-            "skipped": 0,
-            "wins": hit_rows,
-            "losses": miss_rows,
+            "triggered": len(rows) - skipped,
+            "skipped": skipped,
+            "wins": wins,
+            "losses": losses,
             "deployed": round(total_deployed, 2),
         },
         "rotationAttribution": rotation,

@@ -7,7 +7,7 @@ type SwotAnalysisPanelProps = {
   companyName?: string;
 };
 
-/* ── Color-coded quadrant card (light theme accent) ── */
+/* ── Color-coded quadrant card (light theme: tinted panel + dark text) ── */
 function QuadrantCard({
   title,
   icon,
@@ -15,6 +15,7 @@ function QuadrantCard({
   gradient,
   accentColor,
   borderGlow,
+  titleClass,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -22,18 +23,21 @@ function QuadrantCard({
   gradient: string;
   accentColor: string;
   borderGlow: string;
+  titleClass: string;
 }) {
   return (
     <div className={`relative overflow-hidden rounded-xl border ${borderGlow} shadow-md group hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5`}>
       <div className={`absolute inset-0 ${gradient}`} />
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-300/40 to-transparent" />
 
       <div className="relative p-4">
         <div className="flex items-center gap-2 mb-3">
-          <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/90 shadow-sm" style={{ color: accentColor }}>
+          <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-white shadow-sm border border-slate-100" style={{ color: accentColor }}>
             {icon}
           </div>
-          <span className="text-[11px] font-black uppercase tracking-wider text-white">{title}</span>
+          <span className={`text-[11px] font-black uppercase tracking-wider ${titleClass}`}>
+            {title}
+          </span>
         </div>
 
         <div className="space-y-2">
@@ -43,13 +47,13 @@ function QuadrantCard({
                 className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 transition-all duration-300 group-hover/item:scale-150"
                 style={{ backgroundColor: accentColor }}
               />
-              <span className="text-[11px] text-white/85 leading-relaxed group-hover/item:text-white transition-colors">
+              <span className="text-[11px] text-slate-700 leading-relaxed group-hover/item:text-slate-900 transition-colors">
                 {item}
               </span>
             </div>
           ))}
           {items.length === 0 && (
-            <span className="text-[10px] text-white/50 italic">Loading data...</span>
+            <span className="text-[10px] text-slate-400 italic">Loading data...</span>
           )}
         </div>
 
@@ -397,33 +401,37 @@ export default function SwotAnalysisPanel({ ticker, companyName }: SwotAnalysisP
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <QuadrantCard
                 title="Strengths"
-                accentColor="#22c55e"
+                accentColor="#059669"
                 borderGlow="border-emerald-300"
-                gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
+                gradient="bg-gradient-to-br from-emerald-50 to-white"
+                titleClass="text-emerald-800"
                 icon={<svg viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                 items={swotData.strengths}
               />
               <QuadrantCard
                 title="Weaknesses"
-                accentColor="#ef4444"
+                accentColor="#dc2626"
                 borderGlow="border-red-300"
-                gradient="bg-gradient-to-br from-red-500 to-red-600"
+                gradient="bg-gradient-to-br from-red-50 to-white"
+                titleClass="text-red-800"
                 icon={<svg viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d="M6 18L18 6M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                 items={swotData.weaknesses}
               />
               <QuadrantCard
                 title="Opportunities"
-                accentColor="#3b82f6"
+                accentColor="#2563eb"
                 borderGlow="border-blue-300"
-                gradient="bg-gradient-to-br from-blue-500 to-blue-600"
+                gradient="bg-gradient-to-br from-blue-50 to-white"
+                titleClass="text-blue-800"
                 icon={<svg viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d="M13 7h8m0 0v8m0-8l-9 9-4-4-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                 items={swotData.opportunities}
               />
               <QuadrantCard
                 title="Threats"
-                accentColor="#f59e0b"
+                accentColor="#d97706"
                 borderGlow="border-amber-300"
-                gradient="bg-gradient-to-br from-amber-500 to-amber-600"
+                gradient="bg-gradient-to-br from-amber-50 to-white"
+                titleClass="text-amber-800"
                 icon={<svg viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                 items={swotData.threats}
               />
