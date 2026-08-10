@@ -221,7 +221,9 @@ def classify_desk_outcome(
         st = exit_state if isinstance(exit_state, dict) else {}
         r_now = _f(current_r)
         if r_now is None:
-            r_now = _f(st.get("rMultiple")) or 0.0
+            r_now = _f(st.get("rMultiple"))
+            if r_now is None:
+                r_now = 0.0
         mfe_r = infer_mfe_r(
             exit_state=st,
             current_r=r_now,
