@@ -114,6 +114,10 @@ EXHAUSTION_HARD_PCT = float(os.environ.get("INTRADAY_EXHAUSTION_HARD_PCT", "4.0"
 VWAP_CHASE_PCT = float(os.environ.get("INTRADAY_VWAP_CHASE_PCT", "1.25"))
 ORB_CHASE_PCT = float(os.environ.get("INTRADAY_ORB_CHASE_PCT", "1.0"))
 REGIME_BLOCK_NIFTY_PCT = float(os.environ.get("INTRADAY_REGIME_BLOCK_NIFTY_PCT", "0.6"))
+# Soft headwind (haircut) at ±0.6%; hard reject only at extreme tape (±1.5% default).
+# Hard-blocking shorts on every modest up-day previously froze the daily rotate.
+REGIME_HARD_NIFTY_PCT = float(os.environ.get("INTRADAY_REGIME_HARD_NIFTY_PCT", "1.5"))
+REGIME_HEADWIND_HAIRCUT = float(os.environ.get("INTRADAY_REGIME_HAIRCUT", "0.70"))
 ENTRY_MIN_EXPECTED_R = float(os.environ.get("INTRADAY_ENTRY_MIN_EXPECTED_R", "0.85"))
 ENTRY_EXCEPTIONAL_SCORE = float(os.environ.get("INTRADAY_ENTRY_EXCEPTIONAL_SCORE", "72"))
 ENTRY_WICK_NOISE_MAX = float(os.environ.get("INTRADAY_ENTRY_WICK_NOISE_MAX", "0.70"))
@@ -286,13 +290,36 @@ def _macro_lookup(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return out
 
 
-def _parse_delta_pct(delta: Any) -> float | None:
+def _parse_delta_pct(delta: Any, state: Any = None) -> float | None:
+    """Parse % change from ``+0.16%``, ``27.70 (-0.11%)``, or a bare number.
+
+    Prefer the percentage inside parentheses so absolute pts are never treated as %.
+    """
     if delta is None:
         return None
     if isinstance(delta, (int, float)):
         return float(delta)
-    m = re.search(r"([+-]?\d+(?:\.\d+)?)", str(delta).replace(",", ""))
-    return float(m.group(1)) if m else None
+    text = str(delta).replace(",", "").strip()
+    if not text:
+        return None
+    paren = re.search(r"\(([+-]?\d+(?:\.\d+)?)%\)", text)
+    if paren:
+        pct = float(paren.group(1))
+    else:
+        bare_pct = re.search(r"([+-]?\d+(?:\.\d+)?)\s*%", text)
+        if bare_pct:
+            pct = float(bare_pct.group(1))
+        elif re.fullmatch(r"[+-]?\d+(?:\.\d+)?", text):
+            pct = float(text)
+        else:
+            return None
+    st = str(state or "").upper()
+    # Legacy unsigned ``pts (0.11%)`` — apply macro state sign when present
+    if st == "NEGATIVE" and pct > 0:
+        pct = -pct
+    elif st == "POSITIVE" and pct < 0:
+        pct = abs(pct)
+    return pct
 
 
 def detect_regime(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -305,8 +332,8 @@ def detect_regime(snapshot: dict[str, Any]) -> dict[str, Any]:
     bank = macros.get("NIFTY BANK") or macros.get("BANK NIFTY")
     vix = macros.get("INDIA VIX") or macros.get("INDIAVIX")
 
-    nifty_chg = _parse_delta_pct((nifty or {}).get("delta"))
-    bank_chg = _parse_delta_pct((bank or {}).get("delta"))
+    nifty_chg = _parse_delta_pct((nifty or {}).get("delta"), (nifty or {}).get("state"))
+    bank_chg = _parse_delta_pct((bank or {}).get("delta"), (bank or {}).get("state"))
     vix_val = _safe_float((vix or {}).get("val"))
 
     label = "UNRATED"
@@ -809,29 +836,40 @@ def entry_quality_gate(
 
     nifty_chg = _safe_float(regime_use.get("niftyChangePct"))
     regime_label = str(regime_use.get("label") or regime_use.get("regime") or "UNRATED")
+    regime_haircut = 1.0
     if nifty_chg is not None:
+        # Extreme tape only — hard reject opposite sleeve
+        if is_long and nifty_chg <= -REGIME_HARD_NIFTY_PCT:
+            return _gate_payload(
+                ENTRY_REGIME_AGAINST,
+                exclude_reason=(
+                    f"NIFTY {nifty_chg:.2f}% ≤ -{REGIME_HARD_NIFTY_PCT}% (hard block LONG)"
+                ),
+                quality_r=None,
+                flags=["REGIME_AGAINST", "NIFTY_SHARP_DOWN", "REGIME_HARD"],
+                ltp_source=ltp_source or None,
+                day_move=day_move,
+            )
+        if (not is_long) and nifty_chg >= REGIME_HARD_NIFTY_PCT:
+            return _gate_payload(
+                ENTRY_REGIME_AGAINST,
+                exclude_reason=(
+                    f"NIFTY {nifty_chg:.2f}% ≥ +{REGIME_HARD_NIFTY_PCT}% (hard block SHORT)"
+                ),
+                quality_r=None,
+                flags=["REGIME_AGAINST", "NIFTY_SHARP_UP", "REGIME_HARD"],
+                ltp_source=ltp_source or None,
+                day_move=day_move,
+            )
+        # Modest adverse tape — soft haircut (same pattern as OI misalign), still tradable
         if is_long and nifty_chg <= -REGIME_BLOCK_NIFTY_PCT:
-            return _gate_payload(
-                ENTRY_REGIME_AGAINST,
-                exclude_reason=(
-                    f"NIFTY {nifty_chg:.2f}% ≤ -{REGIME_BLOCK_NIFTY_PCT}% (block LONG)"
-                ),
-                quality_r=None,
-                flags=["REGIME_AGAINST", "NIFTY_SHARP_DOWN"],
-                ltp_source=ltp_source or None,
-                day_move=day_move,
-            )
-        if (not is_long) and nifty_chg >= REGIME_BLOCK_NIFTY_PCT:
-            return _gate_payload(
-                ENTRY_REGIME_AGAINST,
-                exclude_reason=(
-                    f"NIFTY {nifty_chg:.2f}% ≥ +{REGIME_BLOCK_NIFTY_PCT}% (block SHORT)"
-                ),
-                quality_r=None,
-                flags=["REGIME_AGAINST", "NIFTY_SHARP_UP"],
-                ltp_source=ltp_source or None,
-                day_move=day_move,
-            )
+            regime_haircut = REGIME_HEADWIND_HAIRCUT
+            flags.append("REGIME_HEADWIND")
+            flags.append("NIFTY_DOWN_SOFT")
+        elif (not is_long) and nifty_chg >= REGIME_BLOCK_NIFTY_PCT:
+            regime_haircut = REGIME_HEADWIND_HAIRCUT
+            flags.append("REGIME_HEADWIND")
+            flags.append("NIFTY_UP_SOFT")
     elif regime_label == "UNRATED":
         flags.append("REGIME_UNRATED")
 
@@ -1072,6 +1110,10 @@ def entry_quality_gate(
     elif oi_aligned is False:
         adj *= OI_MISALIGN_HAIRCUT
         flags.append("OI_MISALIGN_HAIRCUT")
+    # Soft regime headwind (modest adverse NIFTY) — size down, do not kill the sleeve
+    if regime_haircut < 1.0:
+        adj *= regime_haircut
+        flags.append("REGIME_HAIRCUT")
 
     adj = round(adj, 3)
     if adj < ENTRY_MIN_EXPECTED_R:
@@ -2116,6 +2158,8 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
             "vwapChasePct": VWAP_CHASE_PCT,
             "orbChasePct": ORB_CHASE_PCT,
             "regimeBlockNiftyPct": REGIME_BLOCK_NIFTY_PCT,
+            "regimeHardNiftyPct": REGIME_HARD_NIFTY_PCT,
+            "regimeHeadwindHaircut": REGIME_HEADWIND_HAIRCUT,
             "minExpectedR": ENTRY_MIN_EXPECTED_R,
             "oiRequireFno": OI_REQUIRE_FNO,
             "oiPreferFirst": True,
@@ -2251,19 +2295,23 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
     pool_short = candidates.get("proposedShort") or []
     long_rows = candidates.get("adoptLong") or []
     short_rows = candidates.get("adoptShort") or []
-    if len(pool_long) < LOCK_SIZE or len(pool_short) < LOCK_SIZE:
+    regime = candidates.get("regime") or {}
+
+    # Long sleeve is required. Short sleeve may be thin/empty on RISK_ON days when
+    # REGIME_AGAINST blocks SELL names — prefer cash held over blocking the daily rotate.
+    if len(pool_long) < LOCK_SIZE:
         return {
             "success": False,
             "error": (
-                f"Insufficient candidate pool for {LOCK_SIZE}+{LOCK_SIZE} adopt "
+                f"Insufficient LONG candidate pool for {LOCK_SIZE} adopt "
                 f"(got {len(pool_long)}L / {len(pool_short)}S of {BASKET_SIZE}+{BASKET_SIZE}). "
                 f"Refresh market snapshot."
             ),
             "candidates": candidates,
         }
-    if len(long_rows) < LOCK_SIZE or len(short_rows) < LOCK_SIZE:
-        regime = candidates.get("regime") or {}
-        swing_exclude = swing_locked_symbols(_ist_now().strftime("%Y-%m-%d"))
+
+    swing_exclude = swing_locked_symbols(_ist_now().strftime("%Y-%m-%d"))
+    if len(long_rows) < LOCK_SIZE:
         long_rows = _adopt_high_probability(
             pool_long,
             LOCK_SIZE,
@@ -2272,23 +2320,35 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
             regime=regime,
             exclude_symbols=swing_exclude,
         )
+    if len(long_rows) < LOCK_SIZE:
+        return {
+            "success": False,
+            "error": (
+                f"Could not adopt {LOCK_SIZE} high-probability LONG picks "
+                f"(got {len(long_rows)}L / {len(short_rows)}S)."
+            ),
+            "candidates": candidates,
+        }
+
+    short_target = min(LOCK_SIZE, len(pool_short))
+    if short_target > 0 and len(short_rows) < short_target:
         short_rows = _adopt_high_probability(
             pool_short,
-            LOCK_SIZE,
+            short_target,
             direction="SHORT",
             capital=SHORT_CAPITAL,
             regime=regime,
             exclude_symbols=swing_exclude | {r["symbol"] for r in long_rows},
         )
-    if len(long_rows) < LOCK_SIZE or len(short_rows) < LOCK_SIZE:
-        return {
-            "success": False,
-            "error": (
-                f"Could not adopt {LOCK_SIZE}+{LOCK_SIZE} high-probability picks "
-                f"(got {len(long_rows)}L / {len(short_rows)}S)."
-            ),
-            "candidates": candidates,
-        }
+    short_rows = short_rows[:LOCK_SIZE]
+    short_cash_held = len(short_rows) < LOCK_SIZE
+    short_cash_reason = None
+    if short_cash_held:
+        short_cash_reason = (
+            f"Short sleeve {len(short_rows)}/{LOCK_SIZE} — cash held "
+            f"(regime={regime.get('label')} nifty={regime.get('niftyChangePct')})"
+        )
+        log.warning("Intraday commit %s", short_cash_reason)
 
     session_date = _ist_now().strftime("%Y-%m-%d")
     committed_at = _utc_now_iso()
@@ -2301,11 +2361,14 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
             "candidatePoolLong": [r["symbol"] for r in pool_long],
             "candidatePoolShort": [r["symbol"] for r in pool_short],
             "funnel": f"{len(pool_long)}+{len(pool_short)} → adopt {len(long_rows)}+{len(short_rows)}",
+            "shortCashHeld": short_cash_held,
+            "shortCashReason": short_cash_reason,
             "sleeves": {
                 "momentumSlots": MOMENTUM_SLOTS,
                 "meanRevSlots": (candidates.get("capital") or {}).get("meanRevSlots"),
                 "lockSize": LOCK_SIZE,
                 "candidatePoolSize": BASKET_SIZE,
+                "shortFilled": len(short_rows),
             },
             "executionPolicy": "MANUAL_ONLY",
         }
@@ -2326,6 +2389,10 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
     capital["basketSize"] = LOCK_SIZE
     capital["candidatePoolSize"] = BASKET_SIZE
     capital["lockSize"] = LOCK_SIZE
+    capital["shortFilled"] = len(short_rows)
+    capital["shortCashHeld"] = short_cash_held
+    if short_cash_reason:
+        capital["shortCashReason"] = short_cash_reason
 
     session = {
         "success": True,
@@ -2350,6 +2417,8 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
         "rotation": "DAILY",
         "priorSessionDate": existing_date if stale_day else None,
         "rotated": bool(stale_day),
+        "shortCashHeld": short_cash_held,
+        "shortCashReason": short_cash_reason,
     }
     save_session(session)
 
@@ -2452,6 +2521,19 @@ def ensure_intraday_session_locked() -> dict[str, Any]:
     failed.setdefault("locked", False)
     if isinstance(result, dict) and result.get("error"):
         failed["commitError"] = result.get("error")
+    # Stale prior-day lock must never look "healthy" — stamp rotation failure on disk
+    if existing.get("locked") and existing_date and existing_date != today:
+        failed["locked"] = True
+        failed["sessionDate"] = existing_date
+        failed["rotationPending"] = True
+        failed["rotationError"] = (
+            result.get("error") if isinstance(result, dict) else "commit_failed"
+        )
+        failed["rotationAttemptedAt"] = _utc_now_iso()
+        try:
+            save_session(failed)
+        except Exception as exc:
+            log.warning("Failed to persist rotationPending flag: %s", exc)
     return failed
 
 

@@ -222,8 +222,17 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
         _ingest(session_long, "intraday_session", book="INTRADAY")
         _ingest(session_short, "intraday_session", book="INTRADAY")
     else:
-        _ingest(list(plan.get("long") or []), "fixed_trade_plan", book="INTRADAY")
-        _ingest(list(plan.get("short") or []), "fixed_trade_plan", book="INTRADAY")
+        plan_date = str(plan.get("sessionDate") or "").strip()[:10]
+        plan_ok = bool(plan_date) and plan_date == day_key
+        if plan_ok:
+            _ingest(list(plan.get("long") or []), "fixed_trade_plan", book="INTRADAY")
+            _ingest(list(plan.get("short") or []), "fixed_trade_plan", book="INTRADAY")
+        elif plan.get("long") or plan.get("short"):
+            log.info(
+                "Skipping undated/stale fixed_trade_plan for Book (%s != %s)",
+                plan_date or "missing",
+                day_key,
+            )
 
     # Archive fills gaps for forensic engines only — Book P&L uses locked desks.
     # Keep archive merge for scorecards / missed-opportunity scan via load_day_picks.

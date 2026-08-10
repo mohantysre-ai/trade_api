@@ -2100,6 +2100,33 @@ export default function IrosMasterAdvancedTerminal() {
     return () => clearInterval(id);
   }, []);
 
+  // Market-hours desk auto-refresh — bump all panels that key off deskRefreshKey
+  useEffect(() => {
+    const tick = () => {
+      try {
+        const parts = new Intl.DateTimeFormat('en-GB', {
+          timeZone: 'Asia/Kolkata',
+          weekday: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }).formatToParts(new Date());
+        const weekday = parts.find((p) => p.type === 'weekday')?.value || '';
+        if (weekday === 'Sat' || weekday === 'Sun') return;
+        const hour = Number(parts.find((p) => p.type === 'hour')?.value || 0);
+        const minute = Number(parts.find((p) => p.type === 'minute')?.value || 0);
+        const mins = hour * 60 + minute;
+        // NSE cash 09:15–15:30 IST
+        if (mins < 9 * 60 + 15 || mins > 15 * 60 + 30) return;
+        setDeskRefreshKey((k) => k + 1);
+      } catch {
+        /* ignore clock parse */
+      }
+    };
+    const id = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const { data: liveMarket, status: feedStatus, refreshOnDemand } = useMarketData(selectedPool);
   const stocks = liveMarket?.stocks ?? [];
   const selectedTickerForView = useMemo(() => selectedTicker || stocks[0]?.ticker || '', [selectedTicker, stocks]);

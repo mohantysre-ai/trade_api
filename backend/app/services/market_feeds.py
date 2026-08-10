@@ -44,13 +44,14 @@ def _fmt_usdinr(v: float) -> str:
 
 
 def _pct_change(ltp: float, close: float | None) -> tuple[str, str]:
-    """Return absolute pts + pct for desk tiles, e.g. ``201.52 (0.16%)``."""
+    """Return absolute pts + signed pct for desk tiles, e.g. ``27.70 (-0.11%)``."""
     if close in (None, 0):
-        return "0.00 (0.00%)", "POSITIVE"
+        return "0.00 (+0.00%)", "POSITIVE"
     pts = float(ltp) - float(close)
     pct = (pts / float(close)) * 100.0
     state = "POSITIVE" if pts >= 0 else "NEGATIVE"
-    return f"{abs(pts):,.2f} ({abs(pct):.2f}%)", state
+    sign = "+" if pts >= 0 else "-"
+    return f"{abs(pts):,.2f} ({sign}{abs(pct):.2f}%)", state
 
 
 def _extract_price(value: Any) -> float | None:

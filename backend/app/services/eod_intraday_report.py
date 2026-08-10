@@ -713,7 +713,8 @@ def _load_canonical_intraday_picks(for_date: date) -> tuple[list[dict[str, Any]]
 
     plan = load_fixed_trade_plan(for_date)
     plan_date = str(plan.get("sessionDate") or "").strip()[:10]
-    plan_ok = (not plan_date) or plan_date == day_key
+    # Undated / cross-day plan must not silently replace today's missing lock
+    plan_ok = bool(plan_date) and plan_date == day_key
     plan_long = [p for p in (plan.get("long") or []) if isinstance(p, dict) and p.get("symbol")] if plan_ok else []
     plan_short = [p for p in (plan.get("short") or []) if isinstance(p, dict) and p.get("symbol")] if plan_ok else []
     if plan_long or plan_short:

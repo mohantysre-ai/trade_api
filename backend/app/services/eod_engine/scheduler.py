@@ -386,6 +386,15 @@ def _maybe_auto_commit(now: datetime) -> None:
                 err = result_sess.get("commitError") or "commit_failed"
                 log.warning("Auto-commit not ready: %s", err)
                 _mark_stage(now, "session_commit", status="pending", error=str(err))
+                # Pool often empty when macros/regime mis-parsed or snapshot thin —
+                # kick a live refresh so the next tick can adopt.
+                if "Insufficient candidate" in str(err) or "Could not adopt" in str(err):
+                    try:
+                        from ..angel_one_feed import run_scheduled_live_refresh
+
+                        run_scheduled_live_refresh(reason="auto_commit_pool_retry")
+                    except Exception as refresh_exc:
+                        log.warning("Auto-commit pool refresh failed: %s", refresh_exc)
             except Exception as exc:
                 log.warning("Auto-commit failed: %s", exc)
                 _mark_stage(now, "session_commit", status="error", error=str(exc))

@@ -149,6 +149,11 @@ type SessionResponse = {
   committedAt?: string;
   updatedAt?: string;
   snapshotUpdatedAt?: string;
+  rotationPending?: boolean;
+  rotationError?: string | null;
+  rotationAttemptedAt?: string | null;
+  shortCashHeld?: boolean;
+  shortCashReason?: string | null;
   marketOpen?: boolean | null;
   sessionClosed?: boolean | null;
   dataStale?: boolean | null;
@@ -1093,10 +1098,20 @@ export default function AssetMetricsPanel({
                 <StatusPill tone="desk-pill--info">SESSION BASKET LOCKED · {sessionDate}</StatusPill>
               ) : staleLocked ? (
                 <StatusPill tone="desk-pill--warn">
-                  LOCKED CLOSE · {sessionDate} → EOD
+                  STALE LOCK · {sessionDate} — ROTATE REQUIRED
                 </StatusPill>
               ) : (
                 <StatusPill>UNLOCKED</StatusPill>
+              )}
+              {session?.rotationPending && (
+                <StatusPill tone="desk-pill--warn" title={session.rotationError || ''}>
+                  ROTATION FAILED
+                </StatusPill>
+              )}
+              {session?.shortCashHeld && lockedToday && (
+                <StatusPill tone="desk-pill--info" title={session.shortCashReason || ''}>
+                  SHORT CASH HELD
+                </StatusPill>
               )}
               <StatusPill tone={marketOpen === true ? 'desk-pill--ok' : 'desk-pill--muted'}>
                 {marketOpen === true ? 'MARKET OPEN' : marketOpen === false ? 'MARKET CLOSED' : 'MARKET —'}

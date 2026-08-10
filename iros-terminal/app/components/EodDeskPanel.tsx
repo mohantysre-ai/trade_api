@@ -239,6 +239,31 @@ export default function EodDeskPanel({
       } catch {
         /* keep local date */
       }
+      // Align Book dates to locked session days when today has no parity yet
+      try {
+        const [intraRes, swingRes] = await Promise.all([
+          fetch('/api/intraday-session', { cache: 'no-store' }),
+          fetch('/api/swing-session', { cache: 'no-store' }),
+        ]);
+        if (cancelled) return;
+        const today = getIstMarketState().today;
+        if (intraRes.ok) {
+          const intra = await intraRes.json();
+          const iDate = String(intra?.sessionDate || '').slice(0, 10);
+          if (intra?.locked && iDate && iDate !== today) {
+            setDateStr((prev) => (prev === today ? iDate : prev));
+          }
+        }
+        if (swingRes.ok) {
+          const swing = await swingRes.json();
+          const sDate = String(swing?.sessionDate || '').slice(0, 10);
+          if (swing?.locked && sDate && sDate !== today) {
+            setSwingDateStr((prev) => (prev === today ? sDate : prev));
+          }
+        }
+      } catch {
+        /* keep IST today */
+      }
     })();
     return () => {
       cancelled = true;
