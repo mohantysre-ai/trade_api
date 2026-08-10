@@ -896,6 +896,8 @@ def generate_intraday_eod_report(
         exit_state = scale_meta.get("exitState") if isinstance(scale_meta, dict) else None
         if not isinstance(exit_state, dict):
             exit_state = pick.get("exitState") if isinstance(pick.get("exitState"), dict) else None
+        _scale_r = _f((scale_meta or {}).get("rMultiple") if isinstance(scale_meta, dict) else None)
+        _exit_r = _f((exit_state or {}).get("rMultiple") if isinstance(exit_state, dict) else None)
         desk = classify_desk_outcome(
             triggered=True,
             realized_pnl=pnl,
@@ -909,12 +911,7 @@ def generate_intraday_eod_report(
                 if isinstance(exit_state, dict)
                 else pick.get("effectiveStop")
             ),
-            current_r=_f(
-                (scale_meta or {}).get("rMultiple")
-                if isinstance(scale_meta, dict)
-                else None
-            )
-            or _f((exit_state or {}).get("rMultiple") if isinstance(exit_state, dict) else None),
+            current_r=_scale_r if _scale_r is not None else _exit_r,
             day_high=_f(pick.get("dayHigh")),
             day_low=_f(pick.get("dayLow")),
             mae_pct=_f((diagnostic or {}).get("maePct")) if diagnostic else None,
@@ -973,10 +970,16 @@ def generate_intraday_eod_report(
         else:
             row["scaleTrail"] = False
             row["scaleProgress"] = desk.get("deskProgress")
+        # Desk truth wins over scale_meta / forensic for table + narrative alignment
+        for _k in ("rMultiple", "mfeR", "effectiveStopR", "deskProgress", "deskExitLabel",
+                    "executionStatus", "outcomeBucket", "pnl", "policyChain"):
+            if desk.get(_k) is not None:
+                row[_k] = desk[_k]
         rows.append(row)
 
-    from .outcome_narrative import attach_outcome_narratives, build_day_lessons
+    from .outcome_narrative import attach_outcome_narratives, build_day_lessons, sync_diagnostic_metrics
 
+    rows = [sync_diagnostic_metrics(r) for r in rows]
     prior_lessons: list[str] = []
     if force:
         prior = load_book_cache(for_date, "intraday") or {}
@@ -991,7 +994,7 @@ def generate_intraday_eod_report(
             if sym in prior_narr and not r.get("outcomeNarrative"):
                 r["outcomeNarrative"] = prior_narr[sym]
 
-    rows = attach_outcome_narratives(rows, force=force, refresh_existing=False)
+    rows = attach_outcome_narratives(rows, force=force, refresh_existing=force)
     remaining_capital = capital + total_pnl
     scored = sum(1 for r in rows if r.get("missDiagnostic") and r["missDiagnostic"].get("source") == "SCORECARD")
     hit_rows = sum(1 for r in rows if r.get("missDiagnostic") and r["missDiagnostic"].get("isHit"))

@@ -1,8 +1,10 @@
 """LLM outcome narratives for EOD Book — grounded only in diagnostic FactPacks."""
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import re
 from typing import Any
 
 from .llm_client import (
@@ -18,53 +20,154 @@ log = logging.getLogger(__name__)
 
 _OUTCOME_SYSTEM = (
     "You are an IB desk risk reviewer for NSE equity day books. "
-    "Write 2–4 sentences explaining why the trade hit or missed using ONLY the FactPack numbers "
-    "(executionStatus, outcomeBucket, deskExitLabel, deskProgress / R-ladder, P&L, MAE/MFE, "
-    "and forensic rootCause/factors as secondary context). "
-    "Never invent metrics, news, or catalysts not in the FactPack. "
+    "Write 2–4 sentences explaining why the trade hit or missed using ONLY CanonicalMetrics "
+    "and secondary forensic context in the FactPack. "
+    "If you cite R-multiple, P&L, MAE%, or MFE%, the number MUST match CanonicalMetrics exactly. "
+    "Never invent MAE/MFE when those keys are absent. Never invent a second R-multiple. "
     "If data is thin, say so. Return JSON: {\"outcomeNarrative\":\"...\"}."
 )
 
+_R_MENTION_RE = re.compile(
+    r"(?:"
+    r"([+-]?\d+(?:\.\d+)?)\s*R\b"  # 0.84R / -1.00R
+    r"|"
+    r"[Rr](?:-|\s)?multiple(?:\s+of)?\s+([+-]?\d+(?:\.\d+)?)"  # R-multiple of 0.34
+    r"|"
+    r"\bR\s*[:=]\s*([+-]?\d+(?:\.\d+)?)"  # R: 0.84 / R = -1
+    r")",
+)
+
+
+def _num(v: Any) -> float | None:
+    if v is None or isinstance(v, bool):
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def canonical_r_multiple(row: dict[str, Any], diagnostic: dict[str, Any] | None = None) -> float | None:
+    """Table / desk R is source of truth. Never use `or` (0.0 is valid)."""
+    r = _num(row.get("rMultiple"))
+    if r is not None:
+        return r
+    if isinstance(diagnostic, dict):
+        return _num(diagnostic.get("rMultiple"))
+    return None
+
+
+def sync_diagnostic_metrics(row: dict[str, Any]) -> dict[str, Any]:
+    """Keep missDiagnostic numeric fields aligned with desk/table row."""
+    r = dict(row)
+    diag = r.get("missDiagnostic")
+    if not isinstance(diag, dict):
+        return r
+    d = dict(diag)
+    r_can = _num(r.get("rMultiple"))
+    if r_can is not None:
+        d["rMultiple"] = round(r_can, 3)
+    for src, dst in (
+        ("maePct", "maePct"),
+        ("mfePct", "mfePct"),
+        ("mfeR", "mfeR"),
+        ("pnlPct", "movePct"),
+    ):
+        v = _num(r.get(src))
+        if v is not None and d.get(dst) is None:
+            d[dst] = v
+    # Prefer desk exit label for outcome desk copy; keep forensic exitReason if present
+    if r.get("deskExitLabel") and not d.get("exitReason"):
+        d["exitReason"] = r.get("deskExitLabel")
+    r["missDiagnostic"] = d
+    return r
+
+
+def _omit_none(d: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in d.items() if v is not None}
+
 
 def _fact_pack(row: dict[str, Any], diagnostic: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "symbol": row.get("symbol"),
-        "direction": row.get("direction"),
-        "book": row.get("book") or ("SWING" if row.get("daysHeld") is not None else "INTRADAY"),
-        "status": row.get("status") or row.get("exitReason"),
-        "executionStatus": row.get("executionStatus"),
-        "outcomeBucket": row.get("outcomeBucket"),
-        "deskExitLabel": row.get("deskExitLabel"),
-        "deskProgress": row.get("deskProgress") or row.get("scaleProgress"),
-        "mfeR": row.get("mfeR"),
-        "effectiveStopR": row.get("effectiveStopR"),
-        "rMultiple": row.get("rMultiple") or diagnostic.get("rMultiple"),
-        "entryPrice": row.get("entryPrice"),
-        "exitPrice": row.get("exitPrice") or row.get("currentPrice"),
-        "stopLoss": row.get("stopLoss"),
-        "target1": row.get("target1"),
-        "target2": row.get("target2"),
-        "pnl": row.get("pnl"),
-        "pnlPct": row.get("pnlPct"),
-        "selectionReason": row.get("selectionReason"),
-        "score": row.get("score"),
-        "diagnostic": {
+    r_can = canonical_r_multiple(row, diagnostic)
+    mae = _num(diagnostic.get("maePct"))
+    if mae is None:
+        mae = _num(row.get("maePct"))
+    mfe_pct = _num(diagnostic.get("mfePct"))
+    if mfe_pct is None:
+        mfe_pct = _num(row.get("mfePct"))
+    mfe_r = _num(row.get("mfeR"))
+
+    canonical = _omit_none(
+        {
+            "rMultiple": r_can,
+            "pnl": _num(row.get("pnl")),
+            "pnlPct": _num(row.get("pnlPct")),
+            "mfeR": mfe_r,
+            "maePct": mae,
+            "mfePct": mfe_pct,
+            "deskProgress": row.get("deskProgress") or row.get("scaleProgress"),
+            "executionStatus": row.get("executionStatus"),
+            "outcomeBucket": row.get("outcomeBucket"),
+            "deskExitLabel": row.get("deskExitLabel") or diagnostic.get("exitReason") or row.get("exitReason"),
+        }
+    )
+
+    forensic = _omit_none(
+        {
             "isMiss": diagnostic.get("isMiss"),
             "isHit": diagnostic.get("isHit"),
-            "exitReason": diagnostic.get("exitReason"),
             "rootCause": diagnostic.get("rootCause"),
             "factors": diagnostic.get("factors"),
-            "rMultiple": diagnostic.get("rMultiple"),
-            "movePct": diagnostic.get("movePct"),
-            "maePct": diagnostic.get("maePct") or row.get("maePct"),
-            "mfePct": diagnostic.get("mfePct") or row.get("mfePct"),
-            "gapToT1Pct": diagnostic.get("gapToT1Pct"),
-            "gapToT2Pct": diagnostic.get("gapToT2Pct"),
-            "stopUtilization": diagnostic.get("stopUtilization"),
+            "movePct": _num(diagnostic.get("movePct")),
+            "gapToT1Pct": _num(diagnostic.get("gapToT1Pct")),
+            "gapToT2Pct": _num(diagnostic.get("gapToT2Pct")),
+            "stopUtilization": _num(diagnostic.get("stopUtilization")),
             "source": diagnostic.get("source"),
-        },
-        "policyChain": row.get("policyChain"),
-    }
+            # Intentionally omit forensic rMultiple — CanonicalMetrics.rMultiple is sole R.
+        }
+    )
+
+    return _omit_none(
+        {
+            "symbol": row.get("symbol"),
+            "direction": row.get("direction"),
+            "book": row.get("book") or ("SWING" if row.get("daysHeld") is not None else "INTRADAY"),
+            "CanonicalMetrics": canonical,
+            "entryPrice": _num(row.get("entryPrice")),
+            "exitPrice": _num(row.get("exitPrice") or row.get("currentPrice")),
+            "stopLoss": _num(row.get("stopLoss")),
+            "target1": _num(row.get("target1")),
+            "target2": _num(row.get("target2")),
+            "selectionReason": row.get("selectionReason"),
+            "score": row.get("score"),
+            "forensic": forensic or None,
+            "policyChain": row.get("policyChain"),
+        }
+    )
+
+
+def metrics_fingerprint(row: dict[str, Any], diagnostic: dict[str, Any] | None = None) -> str:
+    diag = diagnostic if isinstance(diagnostic, dict) else {}
+    pack = _fact_pack(row, diag).get("CanonicalMetrics") or {}
+    payload = json.dumps(pack, sort_keys=True, default=str)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def narrative_r_consistent(text: str, r_canonical: float | None, *, tol: float = 0.05) -> bool:
+    """Reject narratives that cite an R-multiple far from the table value."""
+    if r_canonical is None:
+        return True
+    mentions: list[float] = []
+    for m in _R_MENTION_RE.finditer(text or ""):
+        for g in m.groups():
+            if g is not None:
+                try:
+                    mentions.append(float(g))
+                except ValueError:
+                    pass
+    if not mentions:
+        return True
+    return all(abs(m - float(r_canonical)) <= tol for m in mentions)
 
 
 def _call_outcome_llm(fact_pack: dict[str, Any]) -> str | None:
@@ -75,7 +178,7 @@ def _call_outcome_llm(fact_pack: dict[str, Any]) -> str | None:
     if not provider or not api_key:
         return None
     prompt = (
-        "FactPack (sole evidence):\n"
+        "FactPack (sole evidence). Cite ONLY CanonicalMetrics numbers:\n"
         f"{json.dumps(fact_pack, indent=2, default=str)}\n\n"
         'Return JSON: {"outcomeNarrative":"2-4 sentences"}'
     )
@@ -123,14 +226,15 @@ def attach_outcome_narratives(
     """Attach outcomeNarrative from diagnostic FactPack.
 
     force=False → skip LLM (keep rebuild snappy).
-    force=True → fill missing narratives only unless refresh_existing=True.
+    force=True → fill missing / fingerprint-stale narratives unless refresh_existing=True
+    (refresh_existing regenerates even when fingerprint matches).
     """
     if not force:
-        return rows
+        return [sync_diagnostic_metrics(r) for r in rows]
     out: list[dict[str, Any]] = []
     done = 0
     for row in rows:
-        r = dict(row)
+        r = sync_diagnostic_metrics(row)
         diag = r.get("missDiagnostic")
         if not isinstance(diag, dict):
             out.append(r)
@@ -139,16 +243,40 @@ def attach_outcome_narratives(
         if diag.get("isSkip") and not diag.get("isMiss") and not diag.get("isHit"):
             out.append(r)
             continue
-        if r.get("outcomeNarrative") and not refresh_existing:
+        fp = metrics_fingerprint(r, diag)
+        r["narrativeFingerprint"] = fp
+        existing = str(r.get("outcomeNarrative") or "").strip() or None
+        r_can = canonical_r_multiple(r, diag)
+        stored = r.get("narrativeFingerprintStored")
+        consistent = bool(existing) and narrative_r_consistent(existing, r_can)
+        stale = bool(existing) and (
+            (stored is not None and stored != fp) or not consistent
+        )
+        if existing and consistent and not refresh_existing and not stale:
+            r["narrativeFingerprintStored"] = fp
             out.append(r)
             continue
         if done >= max_rows:
             out.append(r)
             continue
-        narrative = _call_outcome_llm(_fact_pack(r, diag))
+        pack = _fact_pack(r, diag)
+        narrative = _call_outcome_llm(pack)
+        if narrative and not narrative_r_consistent(narrative, r_can):
+            log.warning(
+                "Dropping inconsistent outcome narrative for %s (canonical R=%s): %s",
+                r.get("symbol"),
+                r_can,
+                narrative[:160],
+            )
+            narrative = None
         if narrative:
             r["outcomeNarrative"] = narrative
+            r["narrativeFingerprintStored"] = fp
             done += 1
+        elif stale or refresh_existing:
+            # Drop stale mismatched prose rather than keep lying numbers
+            r.pop("outcomeNarrative", None)
+            r.pop("narrativeFingerprintStored", None)
         out.append(r)
     return out
 
@@ -168,9 +296,10 @@ def build_day_lessons(
         return list(existing)[:max_bullets]
     packs = []
     for row in rows:
-        diag = row.get("missDiagnostic")
+        synced = sync_diagnostic_metrics(row)
+        diag = synced.get("missDiagnostic")
         if isinstance(diag, dict):
-            packs.append(_fact_pack(row, diag))
+            packs.append(_fact_pack(synced, diag))
     if not packs:
         return []
     if not _llm_quota_available():
@@ -183,7 +312,8 @@ def build_day_lessons(
         f"Aggregated trade FactPacks ({len(packs)}):\n"
         f"{json.dumps(packs[:20], indent=2, default=str)}\n\n"
         f'Return JSON: {{"lessons":["bullet",...]}} with at most {max_bullets} bullets. '
-        "Ground only in FactPack rootCause/factors/R. No invented metrics."
+        "Ground only in CanonicalMetrics + forensic rootCause/factors. "
+        "Cite R only from CanonicalMetrics.rMultiple. No invented metrics."
     )
     system = (
         "You are a desk post-mortem coach. Emit concise actionable lessons only from provided facts."

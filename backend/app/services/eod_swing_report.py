@@ -477,13 +477,6 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
         "pnlPct": round(pnl_pct, 2),
         "status": status,
         "analysis": analysis,
-        "executionStatus": desk.get("executionStatus"),
-        "outcomeBucket": desk.get("outcomeBucket"),
-        "deskExitLabel": desk.get("deskExitLabel"),
-        "mfeR": desk.get("mfeR"),
-        "effectiveStopR": desk.get("effectiveStopR"),
-        "rMultiple": desk.get("rMultiple") if desk.get("rMultiple") is not None else scale_extra.get("rMultiple"),
-        "policyChain": desk.get("chain"),
         "missDiagnostic": miss_diagnostic,
         "deskIcSummary": desk_ic,
         "selectionReason": pick.get("selectionReason") or pick.get("selection_reason"),
@@ -493,6 +486,15 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
         "triggerSource": trigger_src,
         "skipped": False,
         **scale_extra,
+        # Desk truth last so scale_extra cannot overwrite table/narrative R
+        "executionStatus": desk.get("executionStatus"),
+        "outcomeBucket": desk.get("outcomeBucket"),
+        "deskExitLabel": desk.get("deskExitLabel"),
+        "mfeR": desk.get("mfeR"),
+        "effectiveStopR": desk.get("effectiveStopR"),
+        "rMultiple": desk.get("rMultiple") if desk.get("rMultiple") is not None else scale_extra.get("rMultiple"),
+        "deskProgress": desk.get("deskProgress") or scale_extra.get("deskProgress") or scale_extra.get("scaleProgress"),
+        "policyChain": desk.get("chain"),
     }
 
 
@@ -723,7 +725,7 @@ def generate_swing_eod_report(
             if sym in prior_narr and not r.get("outcomeNarrative"):
                 r["outcomeNarrative"] = prior_narr[sym]
 
-    rows = attach_outcome_narratives(rows, force=force, refresh_existing=False)
+    rows = attach_outcome_narratives(rows, force=force, refresh_existing=force)
     active_rows = [r for r in rows if not r.get("skipped") and r.get("status") != "NOT_TRIGGERED"]
     winners = [r for r in active_rows if (r.get("pnl") or 0) > 0 or ((r.get("pnlPct") or 0) > 0 and r.get("pnl") is None)]
     losers = [r for r in active_rows if (r.get("pnl") or 0) < 0 or ((r.get("pnlPct") or 0) < 0 and r.get("pnl") is None)]
