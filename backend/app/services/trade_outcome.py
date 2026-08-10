@@ -693,6 +693,52 @@ def emit_book_lock_alerts(
     return new_alerts
 
 
+def emit_replacement_alerts(
+    *,
+    session_date: str,
+    rows: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Persist BUY/SELL alerts when an intraday free-slot replacement is applied."""
+    history = _load_alert_history()
+    today = (session_date or _today_ist())[:10]
+    new_alerts: list[dict[str, Any]] = []
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        sym = str(row.get("symbol") or "").upper().strip()
+        if not sym:
+            continue
+        direction = str(row.get("direction") or "LONG").upper()
+        hit = "buy" if direction == "LONG" else "sell"
+        action = "BUY" if direction == "LONG" else "SELL"
+        key = f"{sym}:{direction}:replace:INTRADAY:{today}"
+        if _alert_already_fired(history, key, today):
+            continue
+        try:
+            px = float(row.get("entryPrice") or row.get("ltp") or 0)
+        except (TypeError, ValueError):
+            px = 0.0
+        alert = {
+            "key": key,
+            "symbol": sym,
+            "direction": direction,
+            "hitLevel": hit,
+            "label": f"INTRADAY REPLACE · {action}",
+            "ltp": px,
+            "entryPrice": px or None,
+            "planDate": today,
+            "firedAt": _utc_now(),
+            "book": "INTRADAY",
+            "action": action,
+            "replacedFrom": row.get("replacedFrom"),
+        }
+        new_alerts.append(alert)
+        history.append(alert)
+    for a in new_alerts:
+        _record_alert(a)
+    return new_alerts
+
+
 def collect_hit_alerts_from_rows(
     rows: list[dict[str, Any]],
     *,

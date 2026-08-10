@@ -10,26 +10,27 @@ from typing import Any
 
 # Highest favourable excursion (R) -> minimum locked R on the remaining runner.
 # The stop is monotonic: it can only move in the profit-protecting direction.
+# Early BE at +0.25R cuts the big-loss / small-profit skew vs full −1R cold stops.
 R_RATCHET: tuple[tuple[float, float], ...] = (
-    (0.25, -0.25),  # chop protection: reduce risk materially
-    (0.50, 0.00),   # hard break-even
-    (0.75, 0.25),   # first locked profit
-    (1.00, 0.50),   # trend confirmation
-    (1.25, 0.75),
-    (1.50, 1.00),
-    (2.00, 1.25),
-    (3.00, 2.00),
-    (4.00, 3.00),
-    (5.00, 4.00),
+    (0.25, 0.00),   # break-even at first meaningful green
+    (0.50, 0.25),
+    (0.75, 0.50),
+    (1.00, 0.75),
+    (1.25, 1.00),
+    (1.50, 1.25),
+    (2.00, 1.50),
+    (3.00, 2.25),
+    (4.00, 3.25),
+    (5.00, 4.25),
 )
 
-# Scale only a portion early; preserve a large runner for trend days.
+# Bank meaningful size on confirmed moves; keep a 30% runner for trend days.
 SCALE_LEGS: tuple[tuple[float, float], ...] = (
-    (0.50, 0.20),
-    (1.00, 0.20),
-    (1.50, 0.20),
+    (1.00, 0.30),
+    (1.50, 0.25),
+    (2.00, 0.15),
 )
-RUNNER_FRACTION = 0.40
+RUNNER_FRACTION = 0.30
 
 
 def locked_r_for_mfe(mfe_r: float) -> float:

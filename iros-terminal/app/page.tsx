@@ -13,6 +13,7 @@ import {
 import ForensicPanel from './components/ForensicPanel';
 import DhanRecommendedPanel from './components/DhanRecommendedPanel';
 import RightDrawer from './components/RightDrawer';
+import NseSymbolSearchBar from './components/NseSymbolSearchBar';
 import AssetMetricsPanel from './components/AssetMetricsPanel';
 import EodDeskPanel from './components/EodDeskPanel';
 import DeskControls from './components/DeskControls';
@@ -2180,7 +2181,6 @@ export default function IrosMasterAdvancedTerminal() {
   }, [liveMarket]);
 
   const marketIntelligence = liveMarket?.terminalIntelligence as TerminalIntelligence | undefined;
-  const isSnapshotFallback = liveMarket?.isSnapshotFallback ?? false;
   const [tickerIntelligence, setTickerIntelligence] = useState<TerminalIntelligence | null>(null);
 
   const selectedQuote = useMemo(
@@ -2218,6 +2218,10 @@ export default function IrosMasterAdvancedTerminal() {
     setSelectedTicker(t);
     setDrawerOpen(true);
     const stock = resolveStockForDrawer(t);
+    // Show drawer immediately with ticker shell while intelligence loads
+    setDrawerContent((prev) =>
+      prev?.stock?.ticker === t ? prev : { stock, analysis: null, tickerNews: null },
+    );
 
     const tickerIntelligence = liveMarket?.tickerIntelligenceByTicker?.[t];
     const tickerNewsFromSnapshot = liveMarket?.tickerNewsByTicker?.[t] as AITickerNewsReport | undefined;
@@ -2267,7 +2271,12 @@ export default function IrosMasterAdvancedTerminal() {
   };
 
   const snapshotAgeMin = liveMarket?.updatedAt ? Math.round((now - new Date(liveMarket.updatedAt).getTime()) / 60000) : null;
-  const staleMacroLabel = snapshotAgeMin == null ? "" : `STALE ${snapshotAgeMin}M`;
+  const staleMacroLabel =
+    snapshotAgeMin == null
+      ? ""
+      : snapshotAgeMin <= 2
+        ? "LIVE"
+        : `STALE ${snapshotAgeMin}M`;
   const tilesLive = feedStatus !== 'loading' && feedStatus !== 'offline' && !!liveMarket;
 
   const macroRefreshKey = useMemo(() => {
@@ -2371,11 +2380,7 @@ export default function IrosMasterAdvancedTerminal() {
             </button>
           </div>
 
-          {isSnapshotFallback && (
-            <div className="desk-banner-warn desk-banner-warn--bar">
-              Snapshot fallback — showing latest saved analysis.
-            </div>
-          )}
+          <NseSymbolSearchBar onSelect={handleSelect} selectedTicker={selectedTicker || undefined} />
         </header>
 
         <LayoutGroup>
@@ -2452,7 +2457,6 @@ export default function IrosMasterAdvancedTerminal() {
             />
             <StockDetailPanel stock={selectedQuote} />
             <DhanRecommendedPanel liveMarket={liveMarket} onSelect={handleSelect} />
-            <RightDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} content={drawerContent} />
           </div>
         )}
 
@@ -2468,6 +2472,8 @@ export default function IrosMasterAdvancedTerminal() {
           </div>
         )}
         </main>
+
+        <RightDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} content={drawerContent} />
       </div>
     </div>
   );

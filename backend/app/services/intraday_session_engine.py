@@ -2845,6 +2845,273 @@ def propose_replacements(
     return proposals
 
 
+def apply_replacements(
+    session: dict[str, Any],
+    proposals: list[dict[str, Any]],
+    quotes: dict[str, Any],
+    live_map: dict[str, dict[str, Any]],
+    regime: dict[str, Any] | None = None,
+    *,
+    bypass_window: bool = False,
+) -> list[dict[str, Any]]:
+    """Mutate session: append sized open rows for QUALIFIED free-slot proposals.
+
+    Closed history rows stay in place. Re-runs entry_quality_gate before apply.
+    Returns list of applied position dicts (also stamped on session).
+    """
+    if not proposals or not session.get("locked"):
+        return []
+    regime = regime or session.get("regime") or {}
+    long_rows = list(session.get("long") or [])
+    short_rows = list(session.get("short") or [])
+    risk = _portfolio_risk_flags(long_rows, short_rows)
+    if not bypass_window:
+        allowed, _block = replacement_window_open(
+            daily_loss_hit=bool(risk["dailyLossHit"]),
+            max_names_hit=bool(risk["maxNamesHit"]),
+        )
+        if not allowed:
+            return []
+
+    free = compute_free_slots(long_rows, short_rows)
+    if free["total"] <= 0:
+        return []
+
+    already_open = {
+        str(r.get("symbol") or "").upper()
+        for r in long_rows + short_rows
+        if _position_is_open(r) and r.get("symbol")
+    }
+    closed_syms = {
+        str(r.get("symbol") or "").upper()
+        for r in long_rows + short_rows
+        if r.get("symbol") and not _position_is_open(r)
+    }
+    prior_applied = {
+        str(x.get("symbol") or "").upper()
+        for x in (session.get("replacementsApplied") or [])
+        if isinstance(x, dict) and x.get("symbol")
+    }
+    exclude = already_open | closed_syms | prior_applied
+    sector_counts = _open_sector_counts(long_rows, short_rows)
+
+    pool_by_side = {
+        "LONG": {
+            str(c.get("symbol") or "").upper(): c
+            for c in (session.get("candidatePoolLong") or [])
+            if isinstance(c, dict) and c.get("symbol")
+        },
+        "SHORT": {
+            str(c.get("symbol") or "").upper(): c
+            for c in (session.get("candidatePoolShort") or [])
+            if isinstance(c, dict) and c.get("symbol")
+        },
+    }
+
+    def _freed_queue(rows: list[dict[str, Any]]) -> list[str]:
+        out: list[str] = []
+        for r in rows:
+            if _position_is_open(r):
+                continue
+            if not r.get("slotFreed") and str(r.get("slotStatus") or "").upper() != "REPLACEABLE":
+                # still allow CLOSED history as replace source
+                if not r.get("closed") and str(r.get("status") or "").upper() not in (
+                    "CLOSED",
+                    "STOP LOSS HIT",
+                    "TRAIL STOP HIT",
+                    "SCALE COMPLETE",
+                ):
+                    continue
+            sym = str(r.get("symbol") or "").upper()
+            if sym:
+                out.append(sym)
+        return out
+
+    freed_long = _freed_queue(long_rows)
+    freed_short = _freed_queue(short_rows)
+    used_freed: set[str] = set()
+
+    slots_left = {"LONG": int(free["long"]), "SHORT": int(free["short"])}
+    applied: list[dict[str, Any]] = []
+    risk_scale_cache: dict[str, float] = {}
+
+    for prop in proposals:
+        if not isinstance(prop, dict):
+            continue
+        direction = str(prop.get("direction") or "LONG").upper()
+        if direction not in ("LONG", "SHORT") or slots_left.get(direction, 0) <= 0:
+            continue
+        sym = str(prop.get("symbol") or "").upper().strip()
+        if not sym or sym in exclude:
+            continue
+
+        pool = pool_by_side.get(direction) or {}
+        cand = dict(pool.get(sym) or prop)
+        cand["symbol"] = sym
+        live = live_map.get(sym) if live_map else None
+        q = quotes.get(sym) if isinstance(quotes, dict) else None
+        if isinstance(q, dict):
+            for k in ("open", "close", "ltpRaw", "ltp", "vwap", "dayChangePct", "oi", "prev_oi"):
+                if cand.get(k) is None and q.get(k) is not None:
+                    cand[k] = q.get(k)
+        if live:
+            if live.get("ltp") is not None:
+                cand["ltp"] = live.get("ltp")
+                cand["ltpRaw"] = live.get("ltp")
+            for k in ("dayChangePct", "pctChange", "intradayRet", "oi", "prev_oi"):
+                if live.get(k) is not None and cand.get(k) is None:
+                    cand[k] = live.get(k)
+
+        gate = entry_quality_gate(
+            cand, direction, quotes=quotes, live_row=live, regime=regime
+        )
+        state = str(gate.get("entryState") or gate.get("state") or "")
+        if state != ENTRY_QUALIFIED:
+            continue
+        score = float(cand.get("score") or prop.get("score") or 0.0)
+        if score < REPLACEMENT_MIN_SCORE:
+            continue
+        q_r = gate.get("qualityAdjustedExpectedR")
+        if q_r is not None and float(q_r) < ENTRY_MIN_EXPECTED_R:
+            continue
+
+        sector = str(cand.get("sector") or _sector_of(sym, cand) or "OTHER")
+        if sector_counts.get(sector, 0) >= MAX_PER_SECTOR:
+            continue
+
+        entry = float(
+            cand.get("entryPrice")
+            or cand.get("ltp")
+            or prop.get("ltp")
+            or 0
+        )
+        risk = float(cand.get("riskPerShare") or 0)
+        if entry <= 0:
+            continue
+        if risk <= 0:
+            levels = _build_levels(entry, float(cand.get("atrPct") or 1.5) or 1.5, direction)
+            risk = float(levels.get("riskPerShare") or 0)
+            cand = {**cand, **levels}
+            entry = float(cand.get("entryPrice") or entry)
+        if risk <= 0:
+            continue
+
+        if direction not in risk_scale_cache:
+            risk_scale_cache[direction] = _regime_risk_scale(regime, direction)
+        capital = LONG_CAPITAL if direction == "LONG" else SHORT_CAPITAL
+        sizing = _size_position(
+            entry, risk, capital, risk_scale=risk_scale_cache[direction], basket_slots=LOCK_SIZE
+        )
+        if int(sizing.get("approxQty") or 0) <= 0:
+            continue
+
+        freed_q = freed_long if direction == "LONG" else freed_short
+        replaced_from = None
+        for src in freed_q:
+            if src not in used_freed and src != sym:
+                replaced_from = src
+                used_freed.add(src)
+                break
+
+        at = _utc_now_iso()
+        row = attach_exit_plan(
+            {
+                **cand,
+                **sizing,
+                "symbol": sym,
+                "direction": direction,
+                "sector": sector,
+                "rank": len(applied) + 1,
+                "status": "RUNNING",
+                "closed": False,
+                "slotFreed": False,
+                "slotStatus": "RUNNING",
+                "adopted": True,
+                "adoptReason": "REPLACEMENT_FREE_SLOT",
+                "source": "REPLACEMENT",
+                "replacedFrom": replaced_from,
+                "replacedAt": at,
+                "entryState": gate.get("entryState"),
+                "excludeReason": gate.get("excludeReason"),
+                "qualityAdjustedExpectedR": gate.get("qualityAdjustedExpectedR"),
+                "entryFlags": gate.get("flags") or [],
+                "oiSetup": gate.get("oiSetup") or cand.get("oiSetup"),
+                "oiAligned": gate.get("oiAligned"),
+                "ltp": entry,
+                "currentPrice": entry,
+            }
+        )
+        if direction == "LONG":
+            long_rows.append(row)
+        else:
+            short_rows.append(row)
+        exclude.add(sym)
+        sector_counts[sector] = sector_counts.get(sector, 0) + 1
+        slots_left[direction] = slots_left[direction] - 1
+        applied.append(row)
+
+    if not applied:
+        return []
+
+    session["long"] = long_rows
+    session["short"] = short_rows
+    session["freeSlots"] = compute_free_slots(long_rows, short_rows)
+    applied_summary = [
+        {
+            "symbol": r.get("symbol"),
+            "direction": r.get("direction"),
+            "replacedFrom": r.get("replacedFrom"),
+            "replacedAt": r.get("replacedAt"),
+            "entryPrice": r.get("entryPrice"),
+            "approxQty": r.get("approxQty"),
+            "score": r.get("score"),
+            "source": "REPLACEMENT",
+        }
+        for r in applied
+    ]
+    prior_list = list(session.get("replacementsApplied") or [])
+    if not isinstance(prior_list, list):
+        prior_list = []
+    session["replacementsApplied"] = (prior_list + applied_summary)[-50:]
+    session["lastAppliedReplacementKey"] = [
+        f"{a.get('symbol')}:{a.get('direction')}" for a in applied_summary
+    ]
+    session["lastReplacementAppliedAt"] = _utc_now_iso()
+    events = list(session.get("events") or [])
+    events.append(
+        {
+            "type": "REPLACEMENT_APPLIED",
+            "at": session["lastReplacementAppliedAt"],
+            "freeSlotsAfter": session["freeSlots"],
+            "applied": applied_summary,
+        }
+    )
+    for r in applied:
+        events.append(
+            {
+                "type": "POSITION_REPLACED",
+                "at": r.get("replacedAt"),
+                "symbol": r.get("symbol"),
+                "direction": r.get("direction"),
+                "replacedFrom": r.get("replacedFrom"),
+            }
+        )
+    session["events"] = events[-200:]
+    session["updatedAt"] = _utc_now_iso()
+
+    try:
+        from .trade_outcome import emit_replacement_alerts
+
+        emit_replacement_alerts(
+            session_date=str(session.get("sessionDate") or "")[:10],
+            rows=applied,
+        )
+    except Exception as exc:
+        log.warning("replacement alerts failed: %s", exc)
+
+    return applied
+
+
 def _mark_slot_status(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for r in rows:
@@ -3233,6 +3500,53 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
                 log.warning("replacement propose failed: %s", exc)
                 replacement_blocked_reason = "propose_error"
 
+    replacements_applied: list[dict[str, Any]] = []
+    if (
+        session.get("locked")
+        and replacement_candidates
+        and free_slots.get("total", 0) > 0
+        and not cash_held
+    ):
+        try:
+            applied_rows = apply_replacements(
+                session,
+                replacement_candidates,
+                quotes,
+                live_map,
+                regime,
+            )
+            if applied_rows:
+                save_session(session)
+                long_rows = _mark_slot_status(list(session.get("long") or []))
+                short_rows = _mark_slot_status(list(session.get("short") or []))
+                open_long = [r for r in long_rows if _position_is_open(r)]
+                open_short = [r for r in short_rows if _position_is_open(r)]
+                long_exposure = round(
+                    sum(float(r.get("positionValue") or r.get("deployedCapital") or 0) for r in open_long),
+                    2,
+                )
+                short_exposure = round(
+                    sum(float(r.get("positionValue") or r.get("deployedCapital") or 0) for r in open_short),
+                    2,
+                )
+                free_slots = compute_free_slots(long_rows, short_rows)
+                risk_flags = _portfolio_risk_flags(long_rows, short_rows)
+                realized_book = risk_flags.get("realizedPnl")
+                replacements_applied = list(session.get("replacementsApplied") or [])[-len(applied_rows) :]
+                # Mark just-applied proposals for UI (no longer proposal-only)
+                applied_syms = {
+                    f"{str(r.get('symbol') or '').upper()}:{str(r.get('direction') or '').upper()}"
+                    for r in applied_rows
+                }
+                for c in replacement_candidates:
+                    key = f"{str(c.get('symbol') or '').upper()}:{str(c.get('direction') or '').upper()}"
+                    if key in applied_syms:
+                        c["proposalOnly"] = False
+                        c["applied"] = True
+                replacement_blocked_reason = None
+        except Exception as exc:
+            log.warning("replacement apply failed: %s", exc)
+
     # Persist proposal / cash-held ledger for EOD attribution (dedupe by symbol set)
     if session.get("locked") and (
         replacement_candidates or replacement_blocked_reason == "prefer_cash_no_qualified"
@@ -3387,6 +3701,8 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
         "capital": capital,
         "freeSlots": free_slots,
         "replacementCandidates": replacement_candidates,
+        "replacementsApplied": session.get("replacementsApplied") or replacements_applied,
+        "lastReplacementAppliedAt": session.get("lastReplacementAppliedAt"),
         "replacementBlockedReason": replacement_blocked_reason,
         "replacementCutoffIst": (
             f"{_hhmm_to_minutes(REPLACEMENT_CUTOFF_HHMM) // 60:02d}:"

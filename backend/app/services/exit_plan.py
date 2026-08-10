@@ -3,27 +3,28 @@ from __future__ import annotations
 
 from typing import Any
 
-# Early scale is deliberately light so trend days retain a 40% runner.
-SCALE_LEGS: list[tuple[float, float]] = [(0.50, 0.20), (1.00, 0.20), (1.50, 0.20)]
-RUNNER_FRAC = 0.40
+# Bank meaningful size on confirmed moves; keep a 30% runner for trend days.
+SCALE_LEGS: list[tuple[float, float]] = [(1.00, 0.30), (1.50, 0.25), (2.00, 0.15)]
+RUNNER_FRAC = 0.30
 
 # Highest favourable R reached -> minimum locked R on remaining quantity.
 # Stop is monotonic: it never moves back toward the original hard SL.
+# Early locks are tight (BE at +0.25R) to cut the big-loss / small-profit skew.
 TRAIL_RATCHET: dict[float, float] = {
-    0.25: -0.25,
-    0.50: 0.00,
-    0.75: 0.25,
-    1.00: 0.50,
-    1.25: 0.75,
-    1.50: 1.00,
-    2.00: 1.25,
-    3.00: 2.00,
-    4.00: 3.00,
-    5.00: 4.00,
+    0.25: 0.00,   # break-even at first meaningful green
+    0.50: 0.25,
+    0.75: 0.50,
+    1.00: 0.75,
+    1.25: 1.00,
+    1.50: 1.25,
+    2.00: 1.50,
+    3.00: 2.25,
+    4.00: 3.25,
+    5.00: 4.25,
 }
 
 PROFIT_GUARD_TRIGGER_R = 0.25
-PROFIT_GUARD_LOCK_R = -0.25
+PROFIT_GUARD_LOCK_R = 0.0
 REF_T1_R = 1.5
 REF_T2_R = 3.0
 
@@ -75,7 +76,7 @@ def build_exit_plan(entry: float, risk_per_share: float, direction: str, qty: in
         "initialStop": hard_sl, "legs": legs, "runnerQty": lots[-1] if lots else 0, "runnerFrac": RUNNER_FRAC,
         "trailRatchet": {str(k): v for k, v in TRAIL_RATCHET.items()},
         "target1": _target_price(entry, risk, REF_T1_R, direction), "target2": _target_price(entry, risk, REF_T2_R, direction),
-        "notes": ["40pct_runner", "monotonic_r_ratchet", "no_stop_loosen"],
+        "notes": ["30pct_runner", "monotonic_r_ratchet", "be_at_0p25r", "no_stop_loosen"],
     }
 
 
@@ -95,6 +96,32 @@ def attach_exit_plan(row: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def profit_guard_active(state: dict[str, Any] | None) -> bool:
+    """True once first meaningful green prints (+0.25R) or stop has left hard SL."""
+    if not isinstance(state, dict):
+        return False
+    try:
+        r_mult = float(state.get("rMultiple") or 0)
+    except (TypeError, ValueError):
+        r_mult = 0.0
+    if r_mult + 1e-9 >= PROFIT_GUARD_TRIGGER_R:
+        return True
+    if state.get("profitGuardActive") is True:
+        return True
+    for x in state.get("legsFilled") or []:
+        if isinstance(x, dict) and isinstance(x.get("r"), (int, float)):
+            if float(x["r"]) + 1e-9 >= PROFIT_GUARD_TRIGGER_R:
+                return True
+    try:
+        eff = float(state.get("effectiveStop") or 0)
+        init = float(state.get("initialStop") or 0)
+    except (TypeError, ValueError):
+        return False
+    if eff and init and abs(eff - init) > 1e-6:
+        return True
+    return False
+
+
 def _r_reached(entry: float, risk: float, ltp: float, direction: str) -> float:
     return _sign(direction) * (ltp - entry) / risk if entry > 0 and risk > 0 else 0.0
 
@@ -112,7 +139,11 @@ def _mtm_pnl(direction: str, entry: float, exit_px: float, qty: int) -> float:
 
 
 def _ratchet_stop(entry: float, risk: float, direction: str, current: float, r_now: float) -> float:
+    """Tighten stop from peak R; once +0.25R prints, never allow worse than BE."""
     stop = current
+    if r_now + 1e-9 >= PROFIT_GUARD_TRIGGER_R:
+        guarded = _stop_at_r(entry, risk, PROFIT_GUARD_LOCK_R, direction)
+        stop = min(stop, guarded) if direction == "SHORT" else max(stop, guarded)
     for trigger, lock_r in TRAIL_RATCHET.items():
         if r_now + 1e-9 < trigger:
             break
@@ -145,7 +176,16 @@ def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, afte
         filled_rs.add(r_mult)
 
     r_now = _r_reached(entry, risk, ltp, direction)
-    effective_stop = _ratchet_stop(entry, risk, direction, effective_stop, r_now)
+    peak_leg = max(filled_rs) if filled_rs else None
+    try:
+        prior_mfe = float(prior.get("mfeR")) if prior.get("mfeR") is not None else None
+    except (TypeError, ValueError):
+        prior_mfe = None
+    peak_r = r_now
+    for cand in (prior_mfe, peak_leg):
+        if cand is not None:
+            peak_r = max(peak_r, float(cand))
+    effective_stop = _ratchet_stop(entry, risk, direction, effective_stop, peak_r)
     booked_qty = sum(int(x.get("qty") or 0) for x in legs_filled)
     remaining = max(0, total_qty - booked_qty)
     realized = round(sum(float(x.get("pnl") or 0) for x in legs_filled), 2)
@@ -169,7 +209,20 @@ def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, afte
     elif legs_filled: label, hit = f"PARTIAL {max((float(x['r']) for x in legs_filled if isinstance(x.get('r'), (int, float))), default=0):g}R", "partial"
     else: label, hit = "PENDING", None
 
-    state = {"legsFilled": legs_filled, "remainingQty": remaining, "effectiveStop": round(effective_stop, 2), "realizedPnl": realized, "unrealizedPnl": unrealized, "rMultiple": round(r_now, 3), "mfeR": max(r_now, float(prior.get("mfeR") or r_now)), "closed": trail_hit or square_off or remaining == 0, "mode": "SCALE_TRAIL"}
+    mfe_r = max(peak_r, float(prior.get("mfeR") or peak_r))
+    state = {
+        "legsFilled": legs_filled,
+        "remainingQty": remaining,
+        "effectiveStop": round(effective_stop, 2),
+        "realizedPnl": realized,
+        "unrealizedPnl": unrealized,
+        "rMultiple": round(r_now, 3),
+        "mfeR": round(mfe_r, 3),
+        "profitGuardActive": peak_r + 1e-9 >= PROFIT_GUARD_TRIGGER_R,
+        "closed": trail_hit or square_off or remaining == 0,
+        "mode": "SCALE_TRAIL",
+        "initialStop": round(initial_stop, 2),
+    }
     return {"label": label, "detail": f"R {r_now:+.2f} · trail SL {effective_stop:.2f} · rem {remaining}", "hitLevel": hit, "ltp": round(ltp, 2), "pctChange": round((ltp-entry)/entry*100, 2), "exitState": state, "remainingQty": remaining, "realizedPnl": realized, "unrealizedPnl": unrealized, "effectiveStop": round(effective_stop, 2), "rMultiple": round(r_now, 3), "closed": state["closed"], "scaleTrail": True}
 
 

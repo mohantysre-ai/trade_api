@@ -425,6 +425,14 @@ html[data-perf="1"] .terminal-shell > div::before {
   mask-image: radial-gradient(ellipse 85% 70% at 50% 25%, black, transparent);
 }
 .terminal-shell > div > * { position: relative; z-index: 1; }
+/* Header must outrank sticky tab bar so NSE search dropdown paints above SNAPSHOT/… */
+.terminal-shell > div > .terminal-header {
+  z-index: 40;
+  overflow: visible;
+}
+.terminal-shell > div > .terminal-tabs {
+  z-index: 30;
+}
 
 /* Force contrast: remap Tailwind slate / semantic utilities per theme
    Use [class~="…"] for *-50 fills so *-500 dots are not swallowed. */
@@ -628,7 +636,9 @@ html[data-perf="1"] .terminal-shell > div::before {
 }
 
 .terminal-header {
-  overflow: hidden;
+  position: relative;
+  z-index: 40; /* above sticky tab bar (z-30) so NSE search menu is not clipped behind SNAPSHOT */
+  overflow: visible;
   animation: desk-fade-up 0.45s var(--ease-out-strong) both;
 }
 .terminal-header::before {
@@ -771,6 +781,69 @@ html[data-perf="1"] .desk-sources-track {
   padding: 0.35rem 0.75rem;
   font-size: 0.68rem;
   line-height: 1.35;
+}
+
+.desk-nse-search {
+  position: relative;
+  z-index: 60;
+  background: color-mix(in srgb, var(--terminal-panel) 92%, transparent);
+  border-top: 1px solid var(--terminal-line);
+  overflow: visible;
+}
+.desk-nse-search-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 80;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  background: var(--terminal-panel);
+  border: 1px solid var(--terminal-line);
+  border-top: 0;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+  max-height: min(50vh, 320px);
+  overflow-y: auto;
+}
+.desk-nse-search-option {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  gap: 0.65rem;
+  text-align: left;
+  padding: 0.4rem 0.75rem;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--fg-strong);
+}
+.desk-nse-search-option:hover,
+.desk-nse-search-option.is-active {
+  background: color-mix(in srgb, var(--terminal-cyan) 10%, transparent);
+}
+.desk-nse-search-ticker {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  min-width: 5.5rem;
+}
+.desk-nse-search-name {
+  font-size: 0.65rem;
+  color: var(--fg-muted);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.desk-nse-search-meta {
+  padding: 0.35rem 0.75rem 0.2rem;
+  font-size: 0.58rem;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-top: 1px solid var(--terminal-line);
+  margin-top: 0.15rem;
 }
 
 @media (max-width: 1100px) and (min-width: 641px) {
@@ -1439,12 +1512,14 @@ html[data-perf="1"] .desk-sources-track {
   background: var(--terminal-cyan-dim);
 }
 
-/* Right drawer follows theme */
+/* Right drawer follows theme — solid panel so desk behind is not readable through content */
 .right-drawer {
   background: var(--terminal-panel) !important;
   border-color: var(--terminal-line-strong) !important;
   color: var(--foreground) !important;
-  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.35) !important;
+  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.45) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
   /* transform owned by Motion deskDrawerVariants — no CSS transition on transform */
 }
 .right-drawer .bg-white,
@@ -1492,8 +1567,9 @@ html[data-perf="1"] .desk-sources-track {
 }
 .right-drawer .sticky,
 .right-drawer [class*="bg-white/"] {
-  background: color-mix(in srgb, var(--terminal-panel) 92%, transparent) !important;
-  backdrop-filter: blur(12px);
+  background: var(--terminal-panel) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 .right-drawer .text-slate-900,
 .right-drawer .text-slate-800,

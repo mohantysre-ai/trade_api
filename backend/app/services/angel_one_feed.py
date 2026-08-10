@@ -3486,6 +3486,58 @@ def build_market_payload(
         }
 
 
+def refresh_snapshot_macros(client: AngelOneClient | None = None) -> dict[str, Any]:
+    """Light live refresh of SNAPSHOT indices / commodities only (no LLM / stock rebuild)."""
+    snapshot = _load_last_snapshot()
+    if not isinstance(snapshot, dict):
+        snapshot = {
+            "success": True,
+            "stocks": [],
+            "stockQuotes": {},
+            "macroDataStrip": {"morning": [], "evening": []},
+            "globalMacro": {"indices": [], "commodities": []},
+            "news": [],
+        }
+    else:
+        snapshot = dict(snapshot)
+
+    used = client or AngelOneClient()
+    try:
+        macro_raw = used.fetch_batch_quotes(list(MACRO_INSTRUMENTS))
+    except Exception as exc:
+        logging.getLogger(__name__).warning("macro Angel quotes failed: %s", exc)
+        macro_raw = {}
+
+    morning, evening = _build_macro_strips(macro_raw if isinstance(macro_raw, dict) else {})
+    try:
+        gm = fetch_global_macro()
+    except Exception as exc:
+        logging.getLogger(__name__).warning("global macro failed: %s", exc)
+        gm = snapshot.get("globalMacro") if isinstance(snapshot.get("globalMacro"), dict) else {}
+        gm = dict(gm or {})
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    snapshot["macroDataStrip"] = {"morning": morning, "evening": evening}
+    snapshot["globalMacro"] = {
+        "indices": list(gm.get("indices") or []),
+        "commodities": list(gm.get("commodities") or []),
+    }
+    snapshot["updatedAt"] = now_iso
+    snapshot["macrosRefreshedAt"] = now_iso
+    snapshot["isSnapshotFallback"] = False
+    snapshot["success"] = True
+    _save_last_snapshot(snapshot)
+    return {
+        "success": True,
+        "updatedAt": now_iso,
+        "macrosRefreshedAt": now_iso,
+        "macroCount": len(morning),
+        "globalIndexCount": len(snapshot["globalMacro"]["indices"]),
+        "commodityCount": len(snapshot["globalMacro"]["commodities"]),
+        "payload": snapshot,
+    }
+
+
 def _compile_market_analysis_stream(payload: dict[str, Any], custom_prompt: str | None = None) -> str:
     lines = [
         f"TOP_N: {_TI_TOP_SELECTION_COUNT}",
@@ -3536,6 +3588,84 @@ def create_app() -> FastAPI:
             return build_market_payload(AngelOneClient(), pool_name=pool, custom_prompt=prompt, prefer_cache=True)
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.post("/api/refresh-macros")
+    def refresh_macros() -> dict[str, Any]:
+        """Refresh SNAPSHOT India/global indices + commodities only (fast path)."""
+        try:
+            return refresh_snapshot_macros()
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.get("/api/nse-symbols")
+    def nse_symbols(universe: str = "nifty500") -> dict[str, Any]:
+        """Searchable NSE equity tickers for the desk header search bar.
+
+        universe=nifty500 (default): cached Nifty 500 instruments (~500).
+        universe=all: Angel NSE -EQ scrip master keys (~2.4k) when available.
+        """
+        try:
+            mode = str(universe or "nifty500").strip().lower()
+            items: list[dict[str, str]] = []
+            source = "nifty500_instruments"
+
+            if mode in ("all", "full", "nse"):
+                try:
+                    token_map = _load_nse_eq_token_map(force_refresh=False)
+                    for key in sorted(token_map.keys()):
+                        items.append({"ticker": key, "name": key})
+                    source = "angel_scrip_master_nse_eq"
+                except Exception as exc:
+                    logging.getLogger(__name__).warning("nse-symbols all-universe failed: %s", exc)
+
+            if not items:
+                inst_path = Path(__file__).resolve().parent / "nifty500_instruments.json"
+                sym_path = Path(__file__).resolve().parent.parent / "data" / "nifty500_symbols.json"
+                if inst_path.is_file():
+                    raw = json.loads(inst_path.read_text(encoding="utf-8"))
+                    for row in raw.get("instruments") or []:
+                        if not isinstance(row, dict):
+                            continue
+                        key = str(row.get("key") or "").upper().strip()
+                        if not key:
+                            continue
+                        label = str(row.get("label") or key).strip() or key
+                        items.append({"ticker": key, "name": label})
+                    source = "nifty500_instruments"
+                elif sym_path.is_file():
+                    raw = json.loads(sym_path.read_text(encoding="utf-8"))
+                    for sym in raw.get("symbols") or []:
+                        key = str(sym or "").upper().strip()
+                        if key:
+                            items.append({"ticker": key, "name": key})
+                    source = "nifty500_symbols"
+
+            # Merge any snapshot quote names for richer display
+            snap = _load_last_snapshot() or {}
+            quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
+            by_ticker = {r["ticker"]: r for r in items}
+            for t, q in quotes.items():
+                key = str(t or "").upper().strip()
+                if not key:
+                    continue
+                name = key
+                if isinstance(q, dict):
+                    name = str(q.get("name") or q.get("ticker") or key).strip() or key
+                if key in by_ticker:
+                    if name and name != key:
+                        by_ticker[key]["name"] = name
+                else:
+                    by_ticker[key] = {"ticker": key, "name": name}
+            items = sorted(by_ticker.values(), key=lambda r: r["ticker"])
+            return {
+                "success": True,
+                "source": source,
+                "universe": mode if items else "nifty500",
+                "count": len(items),
+                "symbols": items,
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.get("/api/audit-verdicts")
     def audit_verdicts() -> dict[str, Any]:
@@ -3772,7 +3902,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/intraday-session/replacements")
     def intraday_session_replacements() -> dict[str, Any]:
-        """GET-only replacement candidates + free capital slots (proposal, no mutate)."""
+        """GET replacement candidates + applied fills + free capital slots."""
         try:
             from .intraday_session_engine import get_session
 
@@ -3783,6 +3913,8 @@ def create_app() -> FastAPI:
                 "locked": sess.get("locked"),
                 "freeSlots": sess.get("freeSlots"),
                 "replacementCandidates": sess.get("replacementCandidates") or [],
+                "replacementsApplied": sess.get("replacementsApplied") or [],
+                "lastReplacementAppliedAt": sess.get("lastReplacementAppliedAt"),
                 "replacementBlockedReason": sess.get("replacementBlockedReason"),
                 "replacementCutoffIst": sess.get("replacementCutoffIst"),
                 "rotationWindow": sess.get("rotationWindow"),

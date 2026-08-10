@@ -119,9 +119,21 @@ type ReplacementCandidate = {
   qualityAdjustedExpectedR?: number | null;
   excludeReason?: string;
   proposalOnly?: boolean;
+  applied?: boolean;
   sector?: string;
   sleeve?: string;
   oiSetup?: string | null;
+};
+
+type ReplacementApplied = {
+  symbol?: string;
+  direction?: string;
+  replacedFrom?: string | null;
+  replacedAt?: string | null;
+  entryPrice?: number | null;
+  approxQty?: number | null;
+  score?: number | null;
+  source?: string;
 };
 
 type AttentionItem = {
@@ -213,6 +225,8 @@ type SessionResponse = {
   events?: SessionEvent[];
   freeSlots?: FreeSlots | null;
   replacementCandidates?: ReplacementCandidate[];
+  replacementsApplied?: ReplacementApplied[];
+  lastReplacementAppliedAt?: string | null;
   replacementBlockedReason?: string | null;
   replacementCutoffIst?: string | null;
   rotationWindowOpen?: boolean | null;
@@ -1054,6 +1068,8 @@ export default function AssetMetricsPanel({
   const showAttention = attentionItems.length > 0 && lockedToday;
   const freeSlots = session?.freeSlots ?? null;
   const replacementCandidates = session?.replacementCandidates || [];
+  const replacementsApplied = session?.replacementsApplied || [];
+  const lastReplacementAppliedAt = session?.lastReplacementAppliedAt ?? null;
   const rotationOpen = session?.rotationWindowOpen;
   const replacementBlocked = session?.replacementBlockedReason ?? null;
   const replacementCutoff = session?.replacementCutoffIst ?? null;
@@ -1275,7 +1291,29 @@ export default function AssetMetricsPanel({
             label="Candidates"
             value={replacementCandidates.length > 0 ? String(replacementCandidates.length) : '—'}
           />
+          <Kpi
+            label="Applied"
+            value={replacementsApplied.length > 0 ? String(replacementsApplied.length) : '—'}
+          />
         </div>
+        {replacementsApplied.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5 border-t border-slate-100 pt-2">
+            {replacementsApplied.slice(-8).map((a, i) => (
+              <StatusPill
+                key={`applied-${a.symbol}-${a.direction}-${i}`}
+                tone="desk-pill--ok"
+                title={
+                  a.replacedFrom
+                    ? `Replaced ${a.replacedFrom} · ${a.replacedAt || lastReplacementAppliedAt || ''}`
+                    : a.replacedAt || lastReplacementAppliedAt || 'REPLACED'
+                }
+              >
+                {a.symbol || '—'} · REPLACED
+                {a.replacedFrom ? ` ← ${a.replacedFrom}` : ''}
+              </StatusPill>
+            ))}
+          </div>
+        ) : null}
         {replacementCandidates.length > 0 ? (
           <div className="overflow-x-auto desk-scroll-x border-t border-slate-100 pt-2">
             <table className="w-full text-left text-[10px]">
@@ -1316,11 +1354,13 @@ export default function AssetMetricsPanel({
                         : dash(c.qualityAdjustedExpectedR, 2)}
                     </td>
                     <td className="px-1.5 py-1.5 text-slate-500 max-w-[140px] truncate" title={c.excludeReason || ''}>
-                      {c.excludeReason
-                        ? c.excludeReason
-                        : c.proposalOnly === true
-                          ? 'proposal'
-                          : '—'}
+                      {c.applied
+                        ? 'applied'
+                        : c.excludeReason
+                          ? c.excludeReason
+                          : c.proposalOnly === true
+                            ? 'proposal'
+                            : '—'}
                     </td>
                   </tr>
                 ))}
@@ -1331,7 +1371,9 @@ export default function AssetMetricsPanel({
           <p className="text-[9px] text-slate-400 border-t border-slate-100 pt-2">
             {replacementBlocked
               ? `No replacement candidates — ${replacementBlocked}`
-              : 'No replacement candidates —'}
+              : replacementsApplied.length > 0
+                ? 'No pending proposals — slots filled or cash held'
+                : 'No replacement candidates —'}
           </p>
         )}
       </div>

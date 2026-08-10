@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type MacroRow = {
   label: string;
@@ -235,6 +235,50 @@ export type FeedStatus = "idle" | "loading" | "live" | "offline";
 const MARKET_API_URL = process.env.NEXT_PUBLIC_MARKET_API_URL ?? "";
 
 const STALE_AFTER_MS = 300_000;
+const MACRO_POLL_MS = 60_000;
+
+function isNseCashSessionNow(d = new Date()): boolean {
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kolkata",
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(d);
+    const weekday = parts.find((p) => p.type === "weekday")?.value || "";
+    if (weekday === "Sat" || weekday === "Sun") return false;
+    const hour = Number(parts.find((p) => p.type === "hour")?.value || 0);
+    const minute = Number(parts.find((p) => p.type === "minute")?.value || 0);
+    const mins = hour * 60 + minute;
+    return mins >= 9 * 60 + 15 && mins <= 15 * 60 + 30;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchRefreshMacros(): Promise<MarketDataResponse> {
+  const res = await fetch("/api/refresh-macros", {
+    method: "POST",
+    cache: "no-store",
+    signal: AbortSignal.timeout(90_000),
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.error || body?.detail) detail = body.error || body.detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  const data = await res.json();
+  if (!data?.success || !data?.payload) {
+    throw new Error(data?.error ?? "Macro refresh returned empty payload");
+  }
+  return data.payload as MarketDataResponse;
+}
 
 export async function fetchMarketData(pool?: string): Promise<MarketDataResponse> {
   const url = MARKET_API_URL
@@ -295,17 +339,27 @@ export async function fetchRefreshDataOnDemand(pool?: string): Promise<MarketDat
   return data.payload as MarketDataResponse;
 }
 
-export function useMarketData(pool?: string, pollMs = 30_000) {
+export function useMarketData(pool?: string, _pollMs = 30_000) {
   const [data, setData] = useState<MarketDataResponse | null>(null);
   const [status, setStatus] = useState<FeedStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number>(0);
+  const lastUpdatedRef = useRef(0);
+  const statusRef = useRef<FeedStatus>("idle");
 
   // Shared invalidate key so consumers can coordinate revalidation
   const [invalidateKey, setInvalidateKey] = useState(0);
 
+  useEffect(() => {
+    lastUpdatedRef.current = lastUpdatedAt;
+  }, [lastUpdatedAt]);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
   const refresh = useCallback(async (forceLive: boolean = false) => {
-    if (status === "loading") {
+    if (statusRef.current === "loading") {
       return;
     }
     setStatus((prev) => (prev === "idle" ? "loading" : prev));
@@ -318,12 +372,14 @@ export function useMarketData(pool?: string, pollMs = 30_000) {
       setData(payload);
       setStatus("live");
       setError(null);
-      setLastUpdatedAt(Date.now());
+      const ts = Date.now();
+      setLastUpdatedAt(ts);
+      lastUpdatedRef.current = ts;
     } catch (err) {
       setStatus("offline");
       setError(err instanceof Error ? err.message : "Feed unavailable");
     }
-  }, [pool, status]);
+  }, [pool]);
 
   const refreshOnDemand = useCallback(async () => {
     setStatus("loading");
@@ -332,7 +388,9 @@ export function useMarketData(pool?: string, pollMs = 30_000) {
       setData(payload);
       setStatus("live");
       setError(null);
-      setLastUpdatedAt(Date.now());
+      const ts = Date.now();
+      setLastUpdatedAt(ts);
+      lastUpdatedRef.current = ts;
       // Bump shared invalidate key so dependent SWR consumers revalidate together
       setInvalidateKey((k) => k + 1);
     } catch (err) {
@@ -347,12 +405,16 @@ export function useMarketData(pool?: string, pollMs = 30_000) {
     setStatus("loading");
     (async () => {
       try {
-        const payload = await fetchMarketData(pool);
+        const payload = isNseCashSessionNow()
+          ? await fetchRefreshMacros().catch(() => fetchMarketData(pool))
+          : await fetchMarketData(pool);
         if (cancelled) return;
         setData(payload);
         setStatus("live");
         setError(null);
-        setLastUpdatedAt(Date.now());
+        const ts = Date.now();
+        setLastUpdatedAt(ts);
+        lastUpdatedRef.current = ts;
       } catch (err) {
         if (cancelled) return;
         setStatus("offline");
@@ -366,7 +428,30 @@ export function useMarketData(pool?: string, pollMs = 30_000) {
 
   useEffect(() => {
     const tick = async () => {
-      const age = Date.now() - lastUpdatedAt;
+      if (isNseCashSessionNow()) {
+        try {
+          const payload = await fetchRefreshMacros();
+          setData(payload);
+          setStatus("live");
+          setError(null);
+          const ts = Date.now();
+          setLastUpdatedAt(ts);
+          lastUpdatedRef.current = ts;
+        } catch {
+          // Keep last good SNAPSHOT; fall back to cached poll if very stale
+          const age = Date.now() - lastUpdatedRef.current;
+          if (age >= STALE_AFTER_MS) {
+            try {
+              await refresh(false);
+            } catch {
+              setStatus("offline");
+              setError("Feed unavailable");
+            }
+          }
+        }
+        return;
+      }
+      const age = Date.now() - lastUpdatedRef.current;
       if (age >= STALE_AFTER_MS) {
         try {
           await refresh(false);
@@ -376,9 +461,9 @@ export function useMarketData(pool?: string, pollMs = 30_000) {
         }
       }
     };
-    const id = setInterval(tick, pollMs);
+    const id = setInterval(tick, MACRO_POLL_MS);
     return () => clearInterval(id);
-  }, [refresh, pollMs, lastUpdatedAt]);
+  }, [refresh]);
 
   const isStale = useCallback(() => {
     return Date.now() - lastUpdatedAt >= STALE_AFTER_MS;
