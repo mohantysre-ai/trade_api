@@ -1,1285 +1,1841 @@
 {
-  "updatedAt": "2026-08-10T19:11:59.109757+00:00",
-  "sessionDate": "2026-08-10",
-  "locked": true,
-  "executionPolicy": "MANUAL_ONLY",
-  "capital": {
-    "longCapital": 500000.0,
-    "shortCapital": 500000.0,
-    "riskFraction": 0.01,
-    "basketSize": 5,
-    "candidatePoolSize": 10,
-    "lockSize": 5,
-    "momentumSlots": 6,
-    "meanRevSlots": 0,
-    "riskScaleLong": 1.0,
-    "riskScaleShort": 0.85,
-    "shortFilled": 5,
-    "shortCashHeld": false
-  },
-  "regime": {
-    "label": "RISK_ON",
-    "regime": "RISK_ON",
-    "bias": "LONG_BIAS",
-    "niftyChangePct": 0.8,
-    "bankNiftyChangePct": 0.86,
-    "indiaVix": 11.84,
-    "nifty": "24,577.45",
-    "bankNifty": "57,756.60",
-    "indiaVixDisplay": "11.84",
-    "reasons": [
-      "NIFTY+Bank Nifty both green"
-    ],
-    "longGate": 1.0,
-    "shortGate": 0.55
-  },
-  "source": "intraday_session_engine",
-  "funnel": "10+10 candidates \u2192 5+5 locked",
-  "rotation": "DAILY",
-  "priorSessionDate": null,
-  "exitMode": "SCALE_TRAIL",
+  "updatedAt": "2026-08-11T06:35:05.505920+00:00",
+  "source": "intraday_session_fallback",
   "long": [
     {
-      "symbol": "ADANIPORTS",
+      "rank": 1,
+      "symbol": "TECHM",
+      "name": "TECHM",
       "direction": "LONG",
-      "entryDate": "2026-08-10",
-      "approxQty": 58,
-      "deployedCapital": 99122.0,
-      "entryPrice": 1709.0,
-      "stopLoss": 1691.77,
-      "target1": 1734.85,
-      "target2": 1760.69,
-      "riskPerShare": 17.23,
+      "sector": "IT",
+      "sleeve": "MOMENTUM",
+      "score": 58.4,
+      "scorePctRank": 63.0,
+      "intradayRetPctRank": 56.5,
+      "meanrevScore": null,
+      "gapPct": 0.36,
+      "intradayRet": 0.304,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+      "rsVsIndexPct": 0.7237851631326326,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 1651.6,
+      "orbHigh": 1650.9,
+      "orbLow": 1645.9,
+      "orbPosPct": 100.0,
+      "turnoverCr": 50.27,
+      "wickNoiseRatio": 0.647,
+      "factorBreakdown": {
+        "regime": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 57.2,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 0.724,
+          "niftyChangePct": -0.42,
+          "gapPct": 0.36,
+          "intradayRet": 0.304
+        },
+        "trend": {
+          "score": 50.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 51.8,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 49.6,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 1651.6
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 5.172,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 0.193
+        },
+        "breakout": {
+          "score": 32.2,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1650.9,
+          "orbLow": 1645.9,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 100.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 70.3,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 43.7,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.496,
+      "entryFlags": [
+        "OI_MISSING",
+        "IN_PLAY"
+      ],
+      "ltp": 1650.9,
+      "scanLtp": 1650.9,
+      "ltpSource": null,
+      "atrPct": 1.02,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 1650.9,
+      "stopLoss": 1630.69,
+      "target1": 1681.22,
+      "target2": 1711.53,
+      "riskPerShare": 20.21,
+      "rewardRisk": 1.5,
+      "approxQty": 60,
+      "deployedCapital": 99054.0,
+      "maxLoss": 1212.6,
+      "riskScale": 0.7,
+      "effectiveRiskFraction": 0.007,
       "exitPlan": {
         "mode": "SCALE_TRAIL",
         "direction": "LONG",
-        "entry": 1709.0,
-        "riskPerShare": 17.23,
-        "initialStop": 1691.77,
+        "entry": 1650.9,
+        "riskPerShare": 20.21,
+        "initialStop": 1630.69,
         "legs": [
-          {
-            "r": 0.5,
-            "qtyPct": 0.35,
-            "qty": 20,
-            "price": 1717.62,
-            "trailStopAfter": 0.0
-          },
           {
             "r": 1.0,
             "qtyPct": 0.3,
-            "qty": 17,
-            "price": 1726.23,
-            "trailStopAfter": 0.0
-          },
-          {
-            "r": 1.5,
-            "qtyPct": 0.2,
-            "qty": 12,
-            "price": 1734.85,
-            "trailStopAfter": 0.5
-          }
-        ],
-        "runnerQty": 9,
-        "runnerFrac": 0.15,
-        "trailRatchet": {
-          "0.25": -0.5,
-          "0.5": 0.0,
-          "1.0": 0.0,
-          "1.5": 0.5,
-          "2.0": 1.0,
-          "3.0": 1.5,
-          "4.0": 2.5
-        },
-        "target1": 1734.85,
-        "target2": 1760.69,
-        "notes": []
-      },
-      "scanLtp": 1709.0,
-      "currentPrice": 1709.0,
-      "score": 60.2,
-      "sector": "OTHER",
-      "rewardRisk": 1.5,
-      "status": "RUNNING",
-      "sessionLocked": true,
-      "adopted": true,
-      "outcome": {
-        "label": "TRAIL STOP HIT",
-        "detail": "Trail SL 1691.77 \u00b7 LTP 1681.00 \u00b7 rem flat",
-        "hitLevel": "sl",
-        "ltp": 1681.0,
-        "pctChange": -1.64,
-        "resolvedAt": "2026-08-10T10:14:21.859055+00:00",
-        "exitState": {
-          "legsFilled": [
-            {
-              "r": "TRAIL_SL",
-              "qty": 58,
-              "price": 1691.77,
-              "pnl": -999.34
-            }
-          ],
-          "remainingQty": 0,
-          "effectiveStop": 1691.77,
-          "realizedPnl": -999.34,
-          "unrealizedPnl": 0.0,
-          "rMultiple": -1.625,
-          "closed": true,
-          "mode": "SCALE_TRAIL",
-          "profitGuardActive": false,
-          "profitGuardTriggerR": 0.25
-        },
-        "realizedPnl": -999.34,
-        "unrealizedPnl": 0.0,
-        "remainingQty": 0,
-        "effectiveStop": 1691.77,
-        "rMultiple": -1.625,
-        "closed": true,
-        "scaleTrail": true,
-        "final": true
-      },
-      "exitState": {
-        "legsFilled": [
-          {
-            "r": "TRAIL_SL",
-            "qty": 58,
-            "price": 1691.77,
-            "pnl": -999.34
-          }
-        ],
-        "remainingQty": 0,
-        "effectiveStop": 1691.77,
-        "realizedPnl": -999.34,
-        "unrealizedPnl": 0.0,
-        "rMultiple": -1.625,
-        "closed": true,
-        "mode": "SCALE_TRAIL",
-        "profitGuardActive": false,
-        "profitGuardTriggerR": 0.25
-      }
-    },
-    {
-      "symbol": "HEROMOTOCO",
-      "direction": "LONG",
-      "entryDate": "2026-08-10",
-      "approxQty": 18,
-      "deployedCapital": 97713.0,
-      "entryPrice": 5428.5,
-      "stopLoss": 5340.56,
-      "target1": 5560.41,
-      "target2": 5692.32,
-      "riskPerShare": 87.94,
-      "exitPlan": {
-        "mode": "SCALE_TRAIL",
-        "direction": "LONG",
-        "entry": 5428.5,
-        "riskPerShare": 87.94,
-        "initialStop": 5340.56,
-        "legs": [
-          {
-            "r": 0.5,
-            "qtyPct": 0.35,
-            "qty": 6,
-            "price": 5472.47,
-            "trailStopAfter": 0.0
-          },
-          {
-            "r": 1.0,
-            "qtyPct": 0.3,
-            "qty": 5,
-            "price": 5516.44,
-            "trailStopAfter": 0.0
-          },
-          {
-            "r": 1.5,
-            "qtyPct": 0.2,
-            "qty": 4,
-            "price": 5560.41,
-            "trailStopAfter": 0.5
-          }
-        ],
-        "runnerQty": 3,
-        "runnerFrac": 0.15,
-        "trailRatchet": {
-          "0.25": -0.5,
-          "0.5": 0.0,
-          "1.0": 0.0,
-          "1.5": 0.5,
-          "2.0": 1.0,
-          "3.0": 1.5,
-          "4.0": 2.5
-        },
-        "target1": 5560.41,
-        "target2": 5692.32,
-        "notes": []
-      },
-      "scanLtp": 5428.5,
-      "currentPrice": 5428.5,
-      "score": 66.0,
-      "sector": "AUTO",
-      "rewardRisk": 1.5,
-      "status": "RUNNING",
-      "sessionLocked": true,
-      "adopted": true,
-      "outcome": {
-        "label": "EOD SQUAREOFF",
-        "detail": "Session square rem @ 5860.00",
-        "hitLevel": null,
-        "ltp": 5860.0,
-        "pctChange": 7.95,
-        "resolvedAt": "2026-08-10T10:14:21.922532+00:00",
-        "exitState": {
-          "legsFilled": [
-            {
-              "r": 0.5,
-              "qty": 6,
-              "price": 5472.47,
-              "pnl": 263.82
-            },
-            {
-              "r": 1.0,
-              "qty": 5,
-              "price": 5516.44,
-              "pnl": 439.7
-            },
-            {
-              "r": 1.5,
-              "qty": 4,
-              "price": 5560.41,
-              "pnl": 527.64
-            },
-            {
-              "r": "EOD_SQUAREOFF",
-              "qty": 3,
-              "price": 5860.0,
-              "pnl": 1294.5
-            }
-          ],
-          "remainingQty": 0,
-          "effectiveStop": 5648.35,
-          "realizedPnl": 2525.66,
-          "unrealizedPnl": 0.0,
-          "rMultiple": 4.907,
-          "closed": true,
-          "mode": "SCALE_TRAIL",
-          "profitGuardActive": true,
-          "profitGuardTriggerR": 0.25
-        },
-        "realizedPnl": 2525.66,
-        "unrealizedPnl": 0.0,
-        "remainingQty": 0,
-        "effectiveStop": 5648.35,
-        "rMultiple": 4.907,
-        "closed": true,
-        "scaleTrail": true,
-        "final": true
-      },
-      "exitState": {
-        "legsFilled": [
-          {
-            "r": 0.5,
-            "qty": 6,
-            "price": 5472.47,
-            "pnl": 263.82
-          },
-          {
-            "r": 1.0,
-            "qty": 5,
-            "price": 5516.44,
-            "pnl": 439.7
-          },
-          {
-            "r": 1.5,
-            "qty": 4,
-            "price": 5560.41,
-            "pnl": 527.64
-          },
-          {
-            "r": "EOD_SQUAREOFF",
-            "qty": 3,
-            "price": 5860.0,
-            "pnl": 1294.5
-          }
-        ],
-        "remainingQty": 0,
-        "effectiveStop": 5648.35,
-        "realizedPnl": 2525.66,
-        "unrealizedPnl": 0.0,
-        "rMultiple": 4.907,
-        "closed": true,
-        "mode": "SCALE_TRAIL",
-        "profitGuardActive": true,
-        "profitGuardTriggerR": 0.25
-      }
-    },
-    {
-      "symbol": "ESCORTS",
-      "direction": "LONG",
-      "entryDate": "2026-08-10",
-      "approxQty": 32,
-      "deployedCapital": 99936.0,
-      "entryPrice": 3123.0,
-      "stopLoss": 3073.16,
-      "target1": 3197.76,
-      "target2": 3272.52,
-      "riskPerShare": 49.84,
-      "exitPlan": {
-        "mode": "SCALE_TRAIL",
-        "direction": "LONG",
-        "entry": 3123.0,
-        "riskPerShare": 49.84,
-        "initialStop": 3073.16,
-        "legs": [
-          {
-            "r": 0.5,
-            "qtyPct": 0.35,
-            "qty": 11,
-            "price": 3147.92,
-            "trailStopAfter": 0.0
-          },
-          {
-            "r": 1.0,
-            "qtyPct": 0.3,
-            "qty": 10,
-            "price": 3172.84,
-            "trailStopAfter": 0.0
-          },
-          {
-            "r": 1.5,
-            "qtyPct": 0.2,
-            "qty": 6,
-            "price": 3197.76,
-            "trailStopAfter": 0.5
-          }
-        ],
-        "runnerQty": 5,
-        "runnerFrac": 0.15,
-        "trailRatchet": {
-          "0.25": -0.5,
-          "0.5": 0.0,
-          "1.0": 0.0,
-          "1.5": 0.5,
-          "2.0": 1.0,
-          "3.0": 1.5,
-          "4.0": 2.5
-        },
-        "target1": 3197.76,
-        "target2": 3272.52,
-        "notes": []
-      },
-      "scanLtp": 3123.0,
-      "currentPrice": 3123.0,
-      "score": 64.7,
-      "sector": "OTHER",
-      "rewardRisk": 1.5,
-      "status": "RUNNING",
-      "sessionLocked": true,
-      "adopted": true,
-      "outcome": {
-        "label": "EOD SQUAREOFF",
-        "detail": "Session square rem @ 3082.10",
-        "hitLevel": null,
-        "ltp": 3082.1,
-        "pctChange": -1.31,
-        "resolvedAt": "2026-08-10T10:14:21.970101+00:00",
-        "exitState": {
-          "legsFilled": [
-            {
-              "r": "EOD_SQUAREOFF",
-              "qty": 32,
-              "price": 3082.1,
-              "pnl": -1308.8
-            }
-          ],
-          "remainingQty": 0,
-          "effectiveStop": 3073.16,
-          "realizedPnl": -1308.8,
-          "unrealizedPnl": 0.0,
-          "rMultiple": -0.821,
-          "closed": true,
-          "mode": "SCALE_TRAIL",
-          "profitGuardActive": false,
-          "profitGuardTriggerR": 0.25
-        },
-        "realizedPnl": -1308.8,
-        "unrealizedPnl": 0.0,
-        "remainingQty": 0,
-        "effectiveStop": 3073.16,
-        "rMultiple": -0.821,
-        "closed": true,
-        "scaleTrail": true,
-        "final": true
-      },
-      "exitState": {
-        "legsFilled": [
-          {
-            "r": "EOD_SQUAREOFF",
-            "qty": 32,
-            "price": 3082.1,
-            "pnl": -1308.8
-          }
-        ],
-        "remainingQty": 0,
-        "effectiveStop": 3073.16,
-        "realizedPnl": -1308.8,
-        "unrealizedPnl": 0.0,
-        "rMultiple": -0.821,
-        "closed": true,
-        "mode": "SCALE_TRAIL",
-        "profitGuardActive": false,
-        "profitGuardTriggerR": 0.25
-      }
-    },
-    {
-      "symbol": "ANGELONE",
-      "direction": "LONG",
-      "entryDate": "2026-08-10",
-      "approxQty": 334,
-      "deployedCapital": 99715.7,
-      "entryPrice": 298.55,
-      "stopLoss": 293.79,
-      "target1": 305.69,
-      "target2": 312.83,
-      "riskPerShare": 4.76,
-      "exitPlan": {
-        "mode": "SCALE_TRAIL",
-        "direction": "LONG",
-        "entry": 298.55,
-        "riskPerShare": 4.76,
-        "initialStop": 293.79,
-        "legs": [
-          {
-            "r": 0.5,
-            "qtyPct": 0.35,
-            "qty": 117,
-            "price": 300.93,
-            "trailStopAfter": 0.0
-          },
-          {
-            "r": 1.0,
-            "qtyPct": 0.3,
-            "qty": 100,
-            "price": 303.31,
-            "trailStopAfter": 0.0
-          },
-          {
-            "r": 1.5,
-            "qtyPct": 0.2,
-            "qty": 67,
-            "price": 305.69,
-            "trailStopAfter": 0.5
-          }
-        ],
-        "runnerQty": 50,
-        "runnerFrac": 0.15,
-        "trailRatchet": {
-          "0.25": -0.5,
-          "0.5": 0.0,
-          "1.0": 0.0,
-          "1.5": 0.5,
-          "2.0": 1.0,
-          "3.0": 1.5,
-          "4.0": 2.5
-        },
-        "target1": 305.69,
-        "target2": 312.83,
-        "notes": []
-      },
-      "scanLtp": 298.55,
-      "currentPrice": 298.55,
-      "score": 57.5,
-      "sector": "OTHER",
-      "rewardRisk": 1.5,
-      "status": "RUNNING",
-      "sessionLocked": true,
-      "adopted": true,
-      "outcome": {
-        "label": "EOD SQUAREOFF",
-        "detail": "Session square rem @ 294.80",
-        "hitLevel": null,
-        "ltp": 294.8,
-        "pctChange": -1.26,
-        "resolvedAt": "2026-08-10T10:14:22.009031+00:00",
-        "exitState": {
-          "legsFilled": [
-            {
-              "r": "EOD_SQUAREOFF",
-              "qty": 334,
-              "price": 294.8,
-              "pnl": -1252.5
-            }
-          ],
-          "remainingQty": 0,
-          "effectiveStop": 293.79,
-          "realizedPnl": -1252.5,
-          "unrealizedPnl": 0.0,
-          "rMultiple": -0.788,
-          "closed": true,
-          "mode": "SCALE_TRAIL",
-          "profitGuardActive": false,
-          "profitGuardTriggerR": 0.25
-        },
-        "realizedPnl": -1252.5,
-        "unrealizedPnl": 0.0,
-        "remainingQty": 0,
-        "effectiveStop": 293.79,
-        "rMultiple": -0.788,
-        "closed": true,
-        "scaleTrail": true,
-        "final": true
-      },
-      "exitState": {
-        "legsFilled": [
-          {
-            "r": "EOD_SQUAREOFF",
-            "qty": 334,
-            "price": 294.8,
-            "pnl": -1252.5
-          }
-        ],
-        "remainingQty": 0,
-        "effectiveStop": 293.79,
-        "realizedPnl": -1252.5,
-        "unrealizedPnl": 0.0,
-        "rMultiple": -0.788,
-        "closed": true,
-        "mode": "SCALE_TRAIL",
-        "profitGuardActive": false,
-        "profitGuardTriggerR": 0.25
-      }
-    },
-    {
-      "symbol": "CHOLAFIN",
-      "direction": "LONG",
-      "entryDate": "2026-08-10",
-      "approxQty": 52,
-      "deployedCapital": 98264.4,
-      "entryPrice": 1889.7,
-      "stopLoss": 1837.54,
-      "target1": 1967.94,
-      "target2": 2046.18,
-      "riskPerShare": 52.16,
-      "exitPlan": {
-        "mode": "SCALE_TRAIL",
-        "direction": "LONG",
-        "entry": 1889.7,
-        "riskPerShare": 52.16,
-        "initialStop": 1837.54,
-        "legs": [
-          {
-            "r": 0.5,
-            "qtyPct": 0.35,
             "qty": 18,
-            "price": 1915.78,
-            "trailStopAfter": 0.0
+            "price": 1671.11,
+            "trailStopAfter": 0.75
           },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 15,
+            "price": 1681.22,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 9,
+            "price": 1691.32,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 18,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 1681.22,
+        "target2": 1711.53,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "adopted": true,
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10,
+      "oiSetup": null,
+      "oiAligned": null
+    },
+    {
+      "rank": 2,
+      "symbol": "COFORGE",
+      "name": "COFORGE",
+      "direction": "LONG",
+      "sector": "IT",
+      "sleeve": "MOMENTUM",
+      "score": 58.2,
+      "scorePctRank": 62.0,
+      "intradayRetPctRank": 57.4,
+      "meanrevScore": null,
+      "gapPct": 0.552,
+      "intradayRet": 0.357,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+      "rsVsIndexPct": 0.7771428571428571,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 1827.5,
+      "orbHigh": 1826.5,
+      "orbLow": 1820.0,
+      "orbPosPct": 100.0,
+      "turnoverCr": 69.53,
+      "wickNoiseRatio": 0.375,
+      "factorBreakdown": {
+        "regime": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 57.8,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 0.777,
+          "niftyChangePct": -0.42,
+          "gapPct": 0.552,
+          "intradayRet": 0.357
+        },
+        "trend": {
+          "score": 50.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 52.1,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 49.5,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 1827.5
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 5.172,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 0.193
+        },
+        "breakout": {
+          "score": 32.2,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1826.5,
+          "orbLow": 1820.0,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 100.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 68.2,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 40.6,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.495,
+      "entryFlags": [
+        "OI_MISSING",
+        "IN_PLAY"
+      ],
+      "ltp": 1826.5,
+      "scanLtp": 1826.5,
+      "ltpSource": null,
+      "atrPct": 0.88,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 1826.5,
+      "stopLoss": 1807.21,
+      "target1": 1855.43,
+      "target2": 1884.37,
+      "riskPerShare": 19.29,
+      "rewardRisk": 1.5,
+      "approxQty": 54,
+      "deployedCapital": 98631.0,
+      "maxLoss": 1041.66,
+      "riskScale": 0.7,
+      "effectiveRiskFraction": 0.007,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 1826.5,
+        "riskPerShare": 19.29,
+        "initialStop": 1807.21,
+        "legs": [
           {
             "r": 1.0,
             "qtyPct": 0.3,
             "qty": 16,
-            "price": 1941.86,
-            "trailStopAfter": 0.0
+            "price": 1845.79,
+            "trailStopAfter": 0.75
           },
           {
             "r": 1.5,
-            "qtyPct": 0.2,
-            "qty": 10,
-            "price": 1967.94,
-            "trailStopAfter": 0.5
+            "qtyPct": 0.25,
+            "qty": 14,
+            "price": 1855.43,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 8,
+            "price": 1865.08,
+            "trailStopAfter": 1.5
           }
         ],
-        "runnerQty": 8,
-        "runnerFrac": 0.15,
+        "runnerQty": 16,
+        "runnerFrac": 0.3,
         "trailRatchet": {
-          "0.25": -0.5,
-          "0.5": 0.0,
-          "1.0": 0.0,
-          "1.5": 0.5,
-          "2.0": 1.0,
-          "3.0": 1.5,
-          "4.0": 2.5
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
         },
-        "target1": 1967.94,
-        "target2": 2046.18,
-        "notes": []
+        "target1": 1855.43,
+        "target2": 1884.37,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
       },
-      "scanLtp": 1889.7,
-      "currentPrice": 1889.7,
-      "score": 60.3,
-      "sector": "OTHER",
-      "rewardRisk": 1.5,
-      "status": "RUNNING",
-      "sessionLocked": true,
       "adopted": true,
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10,
+      "oiSetup": null,
+      "oiAligned": null
+    },
+    {
+      "rank": 3,
+      "symbol": "PAYTM",
+      "name": "PAYTM",
+      "direction": "LONG",
+      "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "score": 62.3,
+      "scorePctRank": 68.5,
+      "intradayRetPctRank": 51.9,
+      "meanrevScore": null,
+      "gapPct": 0.593,
+      "intradayRet": -0.038,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+      "rsVsIndexPct": 0.38234703482899846,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 1591.67,
+      "orbHigh": 1593.5,
+      "orbLow": 1592.9,
+      "orbPosPct": 0.0,
+      "turnoverCr": 316.67,
+      "wickNoiseRatio": 0.686,
+      "factorBreakdown": {
+        "regime": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 53.8,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 0.382,
+          "niftyChangePct": -0.42,
+          "gapPct": 0.593,
+          "intradayRet": -0.038
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 49.8,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 50.8,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 1591.67
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 5.172,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 0.193
+        },
+        "breakout": {
+          "score": 11.9,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1593.5,
+          "orbLow": 1592.9,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 0.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 83.3,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 56.2,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.492,
+      "entryFlags": [
+        "OI_MISSING",
+        "IN_PLAY"
+      ],
+      "ltp": 1592.9,
+      "scanLtp": 1592.9,
+      "ltpSource": null,
+      "atrPct": 1.89,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 1592.9,
+      "stopLoss": 1556.77,
+      "target1": 1647.1,
+      "target2": 1701.29,
+      "riskPerShare": 36.13,
+      "rewardRisk": 1.5,
+      "approxQty": 62,
+      "deployedCapital": 98759.8,
+      "maxLoss": 2240.06,
+      "riskScale": 0.7,
+      "effectiveRiskFraction": 0.007,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 1592.9,
+        "riskPerShare": 36.13,
+        "initialStop": 1556.77,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 19,
+            "price": 1629.03,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 15,
+            "price": 1647.1,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 9,
+            "price": 1665.16,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 19,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 1647.1,
+        "target2": 1701.29,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "adopted": true,
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10,
+      "oiSetup": null,
+      "oiAligned": null,
       "outcome": {
-        "label": "EOD SQUAREOFF",
-        "detail": "Session square rem @ 1920.00",
-        "hitLevel": null,
-        "ltp": 1920.0,
-        "pctChange": 1.6,
-        "resolvedAt": "2026-08-10T10:14:22.108139+00:00",
+        "label": "SCALE COMPLETE",
+        "detail": "R +0.58 \u00b7 trail SL 1620.00 \u00b7 rem 0",
+        "hitLevel": "partial",
+        "ltp": 1614.0,
+        "pctChange": 1.32,
+        "resolvedAt": "2026-08-11T06:35:05.220658+00:00",
         "exitState": {
           "legsFilled": [
             {
-              "r": 0.5,
-              "qty": 18,
-              "price": 1915.78,
-              "pnl": 469.44
+              "r": 1.0,
+              "qty": 19,
+              "price": 1629.03,
+              "pnl": 686.47
             },
             {
-              "r": "EOD_SQUAREOFF",
-              "qty": 34,
-              "price": 1920.0,
-              "pnl": 1030.2
+              "r": "TRAIL_SL",
+              "qty": 43,
+              "price": 1620.0,
+              "pnl": 1165.3
             }
           ],
           "remainingQty": 0,
-          "effectiveStop": 1889.7,
-          "realizedPnl": 1499.64,
+          "effectiveStop": 1620.0,
+          "realizedPnl": 1851.77,
           "unrealizedPnl": 0.0,
-          "rMultiple": 0.581,
+          "rMultiple": 0.584,
+          "mfeR": 1.129,
+          "profitGuardActive": true,
           "closed": true,
           "mode": "SCALE_TRAIL",
-          "profitGuardActive": true,
-          "profitGuardTriggerR": 0.25
+          "initialStop": 1556.77
         },
-        "realizedPnl": 1499.64,
+        "realizedPnl": 1851.77,
         "unrealizedPnl": 0.0,
         "remainingQty": 0,
-        "effectiveStop": 1889.7,
-        "rMultiple": 0.581,
+        "effectiveStop": 1620.0,
+        "rMultiple": 0.584,
         "closed": true,
         "scaleTrail": true,
-        "final": true
+        "final": null
       },
       "exitState": {
         "legsFilled": [
           {
-            "r": 0.5,
-            "qty": 18,
-            "price": 1915.78,
-            "pnl": 469.44
+            "r": 1.0,
+            "qty": 19,
+            "price": 1629.03,
+            "pnl": 686.47
           },
           {
-            "r": "EOD_SQUAREOFF",
-            "qty": 34,
-            "price": 1920.0,
-            "pnl": 1030.2
+            "r": "TRAIL_SL",
+            "qty": 43,
+            "price": 1620.0,
+            "pnl": 1165.3
           }
         ],
         "remainingQty": 0,
-        "effectiveStop": 1889.7,
-        "realizedPnl": 1499.64,
+        "effectiveStop": 1620.0,
+        "realizedPnl": 1851.77,
         "unrealizedPnl": 0.0,
-        "rMultiple": 0.581,
+        "rMultiple": 0.584,
+        "mfeR": 1.129,
+        "profitGuardActive": true,
         "closed": true,
         "mode": "SCALE_TRAIL",
-        "profitGuardActive": true,
-        "profitGuardTriggerR": 0.25
+        "initialStop": 1556.77
       }
+    },
+    {
+      "rank": 4,
+      "symbol": "ONGC",
+      "name": "ONGC",
+      "direction": "LONG",
+      "sector": "ENERGY",
+      "sleeve": "MOMENTUM",
+      "score": 67.5,
+      "scorePctRank": 77.8,
+      "intradayRetPctRank": 63.9,
+      "meanrevScore": null,
+      "gapPct": 0.484,
+      "intradayRet": 0.535,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+      "rsVsIndexPct": 0.9552697095435652,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 242.06,
+      "orbHigh": 242.29,
+      "orbLow": 241.0,
+      "orbPosPct": 100.0,
+      "turnoverCr": 98.82,
+      "wickNoiseRatio": 0.661,
+      "factorBreakdown": {
+        "regime": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 59.6,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 0.955,
+          "niftyChangePct": -0.42,
+          "gapPct": 0.484,
+          "intradayRet": 0.535
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 53.2,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 51.0,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 242.06
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 5.172,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 0.193
+        },
+        "breakout": {
+          "score": 52.6,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 242.29,
+          "orbLow": 241.0,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 100.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 76.5,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 60.2,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.49,
+      "entryFlags": [
+        "OI_MISSING",
+        "IN_PLAY"
+      ],
+      "ltp": 242.29,
+      "scanLtp": 242.29,
+      "ltpSource": null,
+      "atrPct": 1.43,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 242.29,
+      "stopLoss": 238.13,
+      "target1": 248.53,
+      "target2": 254.77,
+      "riskPerShare": 4.16,
+      "rewardRisk": 1.5,
+      "approxQty": 412,
+      "deployedCapital": 99823.48,
+      "maxLoss": 1713.92,
+      "riskScale": 0.7,
+      "effectiveRiskFraction": 0.007,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 242.29,
+        "riskPerShare": 4.16,
+        "initialStop": 238.13,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 124,
+            "price": 246.45,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 103,
+            "price": 248.53,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 62,
+            "price": 250.61,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 123,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 248.53,
+        "target2": 254.77,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "adopted": true,
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10,
+      "oiSetup": null,
+      "oiAligned": null
+    },
+    {
+      "rank": 5,
+      "symbol": "HINDCOPPER",
+      "name": "HINDCOPPER",
+      "direction": "LONG",
+      "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "score": 60.6,
+      "scorePctRank": 65.7,
+      "intradayRetPctRank": 64.8,
+      "meanrevScore": null,
+      "gapPct": 0.903,
+      "intradayRet": 0.612,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": 1.0320527306967984,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 533.41,
+      "orbHigh": 537.0,
+      "orbLow": 527.7,
+      "orbPosPct": 70.43010752688159,
+      "turnoverCr": 76.0,
+      "wickNoiseRatio": 0.656,
+      "factorBreakdown": {
+        "regime": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 60.3,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 1.032,
+          "niftyChangePct": -0.42,
+          "gapPct": 0.903,
+          "intradayRet": 0.612
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 59.2,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 51.6,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 533.41
+        },
+        "volume": {
+          "score": 26.5,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 1.324,
+          "rvolRaw": 0.26,
+          "cumVolFracHeuristic": 0.193
+        },
+        "breakout": {
+          "score": 35.8,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 537.0,
+          "orbLow": 527.7,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 70.4,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 96.1,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 68.8,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.484,
+      "entryFlags": [
+        "OI_MISSING"
+      ],
+      "ltp": 534.25,
+      "scanLtp": 534.25,
+      "ltpSource": null,
+      "atrPct": 3.26,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 534.25,
+      "stopLoss": 513.35,
+      "target1": 565.6,
+      "target2": 596.95,
+      "riskPerShare": 20.9,
+      "rewardRisk": 1.5,
+      "approxQty": 167,
+      "deployedCapital": 89219.75,
+      "maxLoss": 3490.3,
+      "riskScale": 0.7,
+      "effectiveRiskFraction": 0.007,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 534.25,
+        "riskPerShare": 20.9,
+        "initialStop": 513.35,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 50,
+            "price": 555.15,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 42,
+            "price": 565.6,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 25,
+            "price": 576.05,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 50,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 565.6,
+        "target2": 596.95,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "adopted": true,
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10,
+      "oiSetup": null,
+      "oiAligned": null
     }
   ],
   "short": [
     {
-      "symbol": "CGPOWER",
+      "rank": 1,
+      "symbol": "LAURUSLABS",
+      "name": "LAURUSLABS",
       "direction": "SHORT",
-      "entryDate": "2026-08-10",
-      "approxQty": 116,
-      "deployedCapital": 99957.2,
-      "entryPrice": 861.7,
-      "stopLoss": 896.13,
-      "target1": 810.06,
-      "target2": 758.41,
-      "riskPerShare": 34.43,
-      "exitPlan": {
-        "mode": "SCALE_TRAIL",
-        "direction": "SHORT",
-        "entry": 861.7,
-        "riskPerShare": 34.43,
-        "initialStop": 896.13,
-        "legs": [
-          {
-            "r": 0.5,
-            "qtyPct": 0.35,
-            "qty": 41,
-            "price": 844.49,
-            "trailStopAfter": 0.0
-          },
-          {
-            "r": 1.0,
-            "qtyPct": 0.3,
-            "qty": 35,
-            "price": 827.27,
-            "trailStopAfter": 0.0
-          },
-          {
-            "r": 1.5,
-            "qtyPct": 0.2,
-            "qty": 23,
-            "price": 810.06,
-            "trailStopAfter": 0.5
-          }
-        ],
-        "runnerQty": 17,
-        "runnerFrac": 0.15,
-        "trailRatchet": {
-          "0.25": -0.5,
-          "0.5": 0.0,
-          "1.0": 0.0,
-          "1.5": 0.5,
-          "2.0": 1.0,
-          "3.0": 1.5,
-          "4.0": 2.5
-        },
-        "target1": 810.06,
-        "target2": 758.41,
-        "notes": []
-      },
-      "scanLtp": 861.7,
-      "currentPrice": 861.7,
-      "score": 59.7,
       "sector": "OTHER",
-      "rewardRisk": 1.5,
-      "status": "RUNNING",
-      "sessionLocked": true,
-      "adopted": true,
-      "outcome": {
-        "label": "EOD SQUAREOFF",
-        "detail": "Session square rem @ 879.00",
-        "hitLevel": null,
-        "ltp": 879.0,
-        "pctChange": 2.01,
-        "resolvedAt": "2026-08-10T10:14:22.150580+00:00",
-        "exitState": {
-          "legsFilled": [
-            {
-              "r": "EOD_SQUAREOFF",
-              "qty": 116,
-              "price": 879.0,
-              "pnl": -2006.8
-            }
-          ],
-          "remainingQty": 0,
-          "effectiveStop": 896.13,
-          "realizedPnl": -2006.8,
-          "unrealizedPnl": 0.0,
-          "rMultiple": -0.502,
-          "closed": true,
-          "mode": "SCALE_TRAIL",
-          "profitGuardActive": false,
-          "profitGuardTriggerR": 0.25
+      "sleeve": "MOMENTUM",
+      "score": 65.1,
+      "scorePctRank": 52.8,
+      "intradayRetPctRank": 37.0,
+      "meanrevScore": null,
+      "gapPct": -0.162,
+      "intradayRet": -0.535,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": -0.11484602917342474,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 1841.13,
+      "orbHigh": 1851.1,
+      "orbLow": 1834.1,
+      "orbPosPct": 41.17647058823529,
+      "turnoverCr": 45.76,
+      "wickNoiseRatio": 0.332,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
         },
-        "realizedPnl": -2006.8,
-        "unrealizedPnl": 0.0,
-        "remainingQty": 0,
-        "effectiveStop": 896.13,
-        "rMultiple": -0.502,
-        "closed": true,
-        "scaleTrail": true,
-        "final": true
+        "relativeStrength": {
+          "score": 51.1,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": -0.115,
+          "niftyChangePct": -0.42,
+          "gapPct": -0.162,
+          "intradayRet": -0.535
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 43.4,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 50.0,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 1841.13
+        },
+        "volume": {
+          "score": 12.1,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 0.606,
+          "rvolRaw": 0.12,
+          "cumVolFracHeuristic": 0.193
+        },
+        "breakout": {
+          "score": 64.5,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1851.1,
+          "orbLow": 1834.1,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 41.2,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 90.2,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 72.8,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 91.5,
+          "weight": 5.0,
+          "rated": true
+        }
       },
-      "exitState": {
-        "legsFilled": [
-          {
-            "r": "EOD_SQUAREOFF",
-            "qty": 116,
-            "price": 879.0,
-            "pnl": -2006.8
-          }
-        ],
-        "remainingQty": 0,
-        "effectiveStop": 896.13,
-        "realizedPnl": -2006.8,
-        "unrealizedPnl": 0.0,
-        "rMultiple": -0.502,
-        "closed": true,
-        "mode": "SCALE_TRAIL",
-        "profitGuardActive": false,
-        "profitGuardTriggerR": 0.25
-      }
-    },
-    {
-      "symbol": "ASTRAL",
-      "direction": "SHORT",
-      "entryDate": "2026-08-10",
-      "approxQty": 69,
-      "deployedCapital": 99332.4,
-      "entryPrice": 1439.6,
-      "stopLoss": 1487.97,
-      "target1": 1367.04,
-      "target2": 1294.49,
-      "riskPerShare": 48.37,
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.5,
+      "entryFlags": [
+        "OI_MISSING"
+      ],
+      "ltp": 1841.1,
+      "scanLtp": 1841.1,
+      "ltpSource": null,
+      "atrPct": 2.35,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 1841.1,
+      "stopLoss": 1893.02,
+      "target1": 1763.22,
+      "target2": 1685.34,
+      "riskPerShare": 51.92,
+      "rewardRisk": 1.5,
+      "approxQty": 54,
+      "deployedCapital": 99419.4,
+      "maxLoss": 2803.68,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
       "exitPlan": {
         "mode": "SCALE_TRAIL",
         "direction": "SHORT",
-        "entry": 1439.6,
-        "riskPerShare": 48.37,
-        "initialStop": 1487.97,
+        "entry": 1841.1,
+        "riskPerShare": 51.92,
+        "initialStop": 1893.02,
         "legs": [
-          {
-            "r": 0.5,
-            "qtyPct": 0.35,
-            "qty": 24,
-            "price": 1415.41,
-            "trailStopAfter": 0.0
-          },
           {
             "r": 1.0,
             "qtyPct": 0.3,
-            "qty": 21,
-            "price": 1391.23,
-            "trailStopAfter": 0.0
+            "qty": 16,
+            "price": 1789.18,
+            "trailStopAfter": 0.75
           },
           {
             "r": 1.5,
-            "qtyPct": 0.2,
+            "qtyPct": 0.25,
             "qty": 14,
-            "price": 1367.04,
-            "trailStopAfter": 0.5
-          }
-        ],
-        "runnerQty": 10,
-        "runnerFrac": 0.15,
-        "trailRatchet": {
-          "0.25": -0.5,
-          "0.5": 0.0,
-          "1.0": 0.0,
-          "1.5": 0.5,
-          "2.0": 1.0,
-          "3.0": 1.5,
-          "4.0": 2.5
-        },
-        "target1": 1367.04,
-        "target2": 1294.49,
-        "notes": []
-      },
-      "scanLtp": 1439.6,
-      "currentPrice": 1439.6,
-      "score": 69.2,
-      "sector": "OTHER",
-      "rewardRisk": 1.5,
-      "status": "RUNNING",
-      "sessionLocked": true,
-      "adopted": true,
-      "outcome": {
-        "label": "EOD SQUAREOFF",
-        "detail": "Session square rem @ 1437.00",
-        "hitLevel": null,
-        "ltp": 1437.0,
-        "pctChange": -0.18,
-        "resolvedAt": "2026-08-10T10:14:22.184249+00:00",
-        "exitState": {
-          "legsFilled": [
-            {
-              "r": "EOD_SQUAREOFF",
-              "qty": 69,
-              "price": 1437.0,
-              "pnl": 179.4
-            }
-          ],
-          "remainingQty": 0,
-          "effectiveStop": 1487.97,
-          "realizedPnl": 179.4,
-          "unrealizedPnl": 0.0,
-          "rMultiple": 0.054,
-          "closed": true,
-          "mode": "SCALE_TRAIL",
-          "profitGuardActive": false,
-          "profitGuardTriggerR": 0.25
-        },
-        "realizedPnl": 179.4,
-        "unrealizedPnl": 0.0,
-        "remainingQty": 0,
-        "effectiveStop": 1487.97,
-        "rMultiple": 0.054,
-        "closed": true,
-        "scaleTrail": true,
-        "final": true
-      },
-      "exitState": {
-        "legsFilled": [
-          {
-            "r": "EOD_SQUAREOFF",
-            "qty": 69,
-            "price": 1437.0,
-            "pnl": 179.4
-          }
-        ],
-        "remainingQty": 0,
-        "effectiveStop": 1487.97,
-        "realizedPnl": 179.4,
-        "unrealizedPnl": 0.0,
-        "rMultiple": 0.054,
-        "closed": true,
-        "mode": "SCALE_TRAIL",
-        "profitGuardActive": false,
-        "profitGuardTriggerR": 0.25
-      }
-    },
-    {
-      "symbol": "HDFCAMC",
-      "direction": "SHORT",
-      "entryDate": "2026-08-10",
-      "approxQty": 38,
-      "deployedCapital": 99031.8,
-      "entryPrice": 2606.1,
-      "stopLoss": 2661.14,
-      "target1": 2523.54,
-      "target2": 2440.98,
-      "riskPerShare": 55.04,
-      "exitPlan": {
-        "mode": "SCALE_TRAIL",
-        "direction": "SHORT",
-        "entry": 2606.1,
-        "riskPerShare": 55.04,
-        "initialStop": 2661.14,
-        "legs": [
-          {
-            "r": 0.5,
-            "qtyPct": 0.35,
-            "qty": 13,
-            "price": 2578.58,
-            "trailStopAfter": 0.0
+            "price": 1763.22,
+            "trailStopAfter": 1.25
           },
           {
-            "r": 1.0,
-            "qtyPct": 0.3,
-            "qty": 11,
-            "price": 2551.06,
-            "trailStopAfter": 0.0
-          },
-          {
-            "r": 1.5,
-            "qtyPct": 0.2,
+            "r": 2.0,
+            "qtyPct": 0.15,
             "qty": 8,
-            "price": 2523.54,
-            "trailStopAfter": 0.5
+            "price": 1737.26,
+            "trailStopAfter": 1.5
           }
         ],
-        "runnerQty": 6,
-        "runnerFrac": 0.15,
+        "runnerQty": 16,
+        "runnerFrac": 0.3,
         "trailRatchet": {
-          "0.25": -0.5,
-          "0.5": 0.0,
-          "1.0": 0.0,
-          "1.5": 0.5,
-          "2.0": 1.0,
-          "3.0": 1.5,
-          "4.0": 2.5
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
         },
-        "target1": 2523.54,
-        "target2": 2440.98,
-        "notes": []
+        "target1": 1763.22,
+        "target2": 1685.34,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
       },
-      "scanLtp": 2606.1,
-      "currentPrice": 2606.1,
-      "score": 69.0,
-      "sector": "OTHER",
-      "rewardRisk": 1.5,
-      "status": "RUNNING",
-      "sessionLocked": true,
       "adopted": true,
-      "outcome": {
-        "label": "EOD SQUAREOFF",
-        "detail": "Session square rem @ 2560.00",
-        "hitLevel": null,
-        "ltp": 2560.0,
-        "pctChange": -1.77,
-        "resolvedAt": "2026-08-10T10:14:22.196395+00:00",
-        "exitState": {
-          "legsFilled": [
-            {
-              "r": 0.5,
-              "qty": 13,
-              "price": 2578.58,
-              "pnl": 357.76
-            },
-            {
-              "r": "EOD_SQUAREOFF",
-              "qty": 25,
-              "price": 2560.0,
-              "pnl": 1152.5
-            }
-          ],
-          "remainingQty": 0,
-          "effectiveStop": 2606.1,
-          "realizedPnl": 1510.26,
-          "unrealizedPnl": 0.0,
-          "rMultiple": 0.838,
-          "closed": true,
-          "mode": "SCALE_TRAIL",
-          "profitGuardActive": true,
-          "profitGuardTriggerR": 0.25
-        },
-        "realizedPnl": 1510.26,
-        "unrealizedPnl": 0.0,
-        "remainingQty": 0,
-        "effectiveStop": 2606.1,
-        "rMultiple": 0.838,
-        "closed": true,
-        "scaleTrail": true,
-        "final": true
-      },
-      "exitState": {
-        "legsFilled": [
-          {
-            "r": 0.5,
-            "qty": 13,
-            "price": 2578.58,
-            "pnl": 357.76
-          },
-          {
-            "r": "EOD_SQUAREOFF",
-            "qty": 25,
-            "price": 2560.0,
-            "pnl": 1152.5
-          }
-        ],
-        "remainingQty": 0,
-        "effectiveStop": 2606.1,
-        "realizedPnl": 1510.26,
-        "unrealizedPnl": 0.0,
-        "rMultiple": 0.838,
-        "closed": true,
-        "mode": "SCALE_TRAIL",
-        "profitGuardActive": true,
-        "profitGuardTriggerR": 0.25
-      }
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10,
+      "oiSetup": null,
+      "oiAligned": null
     },
     {
-      "symbol": "AUBANK",
+      "rank": 2,
+      "symbol": "ITC",
+      "name": "ITC",
       "direction": "SHORT",
-      "entryDate": "2026-08-10",
-      "approxQty": 95,
-      "deployedCapital": 99170.5,
-      "entryPrice": 1043.9,
-      "stopLoss": 1063.69,
-      "target1": 1014.22,
-      "target2": 984.53,
-      "riskPerShare": 19.79,
+      "sector": "FMCG",
+      "sleeve": "MOMENTUM",
+      "score": 67.0,
+      "scorePctRank": 58.3,
+      "intradayRetPctRank": 44.4,
+      "meanrevScore": null,
+      "gapPct": -0.23,
+      "intradayRet": -0.319,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": 0.1008510638297953,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 281.24,
+      "orbHigh": 282.6,
+      "orbLow": 280.9,
+      "orbPosPct": 11.764705882355301,
+      "turnoverCr": 46.92,
+      "wickNoiseRatio": 0.512,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 49.0,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 0.101,
+          "niftyChangePct": -0.42,
+          "gapPct": -0.23,
+          "intradayRet": -0.319
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 55.8,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 50.5,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 281.24
+        },
+        "volume": {
+          "score": 11.5,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 0.573,
+          "rvolRaw": 0.11,
+          "cumVolFracHeuristic": 0.193
+        },
+        "breakout": {
+          "score": 66.8,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 282.6,
+          "orbLow": 280.9,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 11.8,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 80.5,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 93.7,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 93.8,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.495,
+      "entryFlags": [
+        "OI_MISSING"
+      ],
+      "ltp": 281.1,
+      "scanLtp": 281.1,
+      "ltpSource": null,
+      "atrPct": 1.7,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 281.1,
+      "stopLoss": 286.83,
+      "target1": 272.5,
+      "target2": 263.91,
+      "riskPerShare": 5.73,
+      "rewardRisk": 1.5,
+      "approxQty": 355,
+      "deployedCapital": 99790.5,
+      "maxLoss": 2034.15,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
       "exitPlan": {
         "mode": "SCALE_TRAIL",
         "direction": "SHORT",
-        "entry": 1043.9,
-        "riskPerShare": 19.79,
-        "initialStop": 1063.69,
+        "entry": 281.1,
+        "riskPerShare": 5.73,
+        "initialStop": 286.83,
         "legs": [
-          {
-            "r": 0.5,
-            "qtyPct": 0.35,
-            "qty": 33,
-            "price": 1034.01,
-            "trailStopAfter": 0.0
-          },
           {
             "r": 1.0,
             "qtyPct": 0.3,
-            "qty": 29,
-            "price": 1024.11,
-            "trailStopAfter": 0.0
+            "qty": 107,
+            "price": 275.37,
+            "trailStopAfter": 0.75
           },
           {
             "r": 1.5,
-            "qtyPct": 0.2,
+            "qtyPct": 0.25,
+            "qty": 89,
+            "price": 272.5,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 53,
+            "price": 269.64,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 106,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 272.5,
+        "target2": 263.91,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "adopted": true,
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10,
+      "oiSetup": null,
+      "oiAligned": null
+    },
+    {
+      "rank": 3,
+      "symbol": "RELIANCE",
+      "name": "RELIANCE",
+      "direction": "SHORT",
+      "sector": "ENERGY",
+      "sleeve": "MOMENTUM",
+      "score": 59.0,
+      "scorePctRank": 38.9,
+      "intradayRetPctRank": 30.6,
+      "meanrevScore": null,
+      "gapPct": -0.053,
+      "intradayRet": -0.656,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": -0.23581184984168696,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 1318.73,
+      "orbHigh": 1327.0,
+      "orbLow": 1314.1,
+      "orbPosPct": 29.45736434108647,
+      "turnoverCr": 92.64,
+      "wickNoiseRatio": 0.3,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 52.4,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": -0.236,
+          "niftyChangePct": -0.42,
+          "gapPct": -0.053,
+          "intradayRet": -0.656
+        },
+        "trend": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 52.3,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 50.6,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 1318.73
+        },
+        "volume": {
+          "score": 6.2,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 0.312,
+          "rvolRaw": 0.06,
+          "cumVolFracHeuristic": 0.193
+        },
+        "breakout": {
+          "score": 65.4,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1327.0,
+          "orbLow": 1314.1,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 29.5,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 79.3,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 28.6,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.494,
+      "entryFlags": [
+        "OI_MISSING"
+      ],
+      "ltp": 1317.9,
+      "scanLtp": 1317.9,
+      "ltpSource": null,
+      "atrPct": 1.62,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 1317.9,
+      "stopLoss": 1343.52,
+      "target1": 1279.47,
+      "target2": 1241.04,
+      "riskPerShare": 25.62,
+      "rewardRisk": 1.5,
+      "approxQty": 75,
+      "deployedCapital": 98842.5,
+      "maxLoss": 1921.5,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 1317.9,
+        "riskPerShare": 25.62,
+        "initialStop": 1343.52,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 23,
+            "price": 1292.28,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
             "qty": 19,
-            "price": 1014.22,
-            "trailStopAfter": 0.5
-          }
-        ],
-        "runnerQty": 14,
-        "runnerFrac": 0.15,
-        "trailRatchet": {
-          "0.25": -0.5,
-          "0.5": 0.0,
-          "1.0": 0.0,
-          "1.5": 0.5,
-          "2.0": 1.0,
-          "3.0": 1.5,
-          "4.0": 2.5
-        },
-        "target1": 1014.22,
-        "target2": 984.53,
-        "notes": []
-      },
-      "scanLtp": 1043.9,
-      "currentPrice": 1043.9,
-      "score": 68.1,
-      "sector": "OTHER",
-      "rewardRisk": 1.5,
-      "status": "RUNNING",
-      "sessionLocked": true,
-      "adopted": true,
-      "outcome": {
-        "label": "TRAIL STOP HIT",
-        "detail": "Trail SL 1063.69 \u00b7 LTP 1068.00 \u00b7 rem flat",
-        "hitLevel": "sl",
-        "ltp": 1068.0,
-        "pctChange": 2.31,
-        "resolvedAt": "2026-08-10T10:14:22.217332+00:00",
-        "exitState": {
-          "legsFilled": [
-            {
-              "r": "TRAIL_SL",
-              "qty": 95,
-              "price": 1063.69,
-              "pnl": -1880.05
-            }
-          ],
-          "remainingQty": 0,
-          "effectiveStop": 1063.69,
-          "realizedPnl": -1880.05,
-          "unrealizedPnl": 0.0,
-          "rMultiple": -1.218,
-          "closed": true,
-          "mode": "SCALE_TRAIL",
-          "profitGuardActive": false,
-          "profitGuardTriggerR": 0.25
-        },
-        "realizedPnl": -1880.05,
-        "unrealizedPnl": 0.0,
-        "remainingQty": 0,
-        "effectiveStop": 1063.69,
-        "rMultiple": -1.218,
-        "closed": true,
-        "scaleTrail": true,
-        "final": true
-      },
-      "exitState": {
-        "legsFilled": [
+            "price": 1279.47,
+            "trailStopAfter": 1.25
+          },
           {
-            "r": "TRAIL_SL",
-            "qty": 95,
-            "price": 1063.69,
-            "pnl": -1880.05
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 11,
+            "price": 1266.66,
+            "trailStopAfter": 1.5
           }
         ],
-        "remainingQty": 0,
-        "effectiveStop": 1063.69,
-        "realizedPnl": -1880.05,
-        "unrealizedPnl": 0.0,
-        "rMultiple": -1.218,
-        "closed": true,
-        "mode": "SCALE_TRAIL",
-        "profitGuardActive": false,
-        "profitGuardTriggerR": 0.25
-      }
+        "runnerQty": 22,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 1279.47,
+        "target2": 1241.04,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "adopted": true,
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10,
+      "oiSetup": null,
+      "oiAligned": null
     },
     {
-      "symbol": "GROWW",
+      "rank": 4,
+      "symbol": "IOC",
+      "name": "IOC",
       "direction": "SHORT",
-      "entryDate": "2026-08-10",
-      "approxQty": 516,
-      "deployedCapital": 99985.32,
-      "entryPrice": 193.77,
-      "stopLoss": 197.19,
-      "target1": 188.64,
-      "target2": 183.51,
-      "riskPerShare": 3.42,
+      "sector": "ENERGY",
+      "sleeve": "MOMENTUM",
+      "score": 62.6,
+      "scorePctRank": 45.4,
+      "intradayRetPctRank": 16.7,
+      "meanrevScore": null,
+      "gapPct": -0.352,
+      "intradayRet": -1.06,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": -0.6400706713780919,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 140.11,
+      "orbHigh": 141.6,
+      "orbLow": 139.65,
+      "orbPosPct": 17.948717948717764,
+      "turnoverCr": 26.71,
+      "wickNoiseRatio": 0.332,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 56.4,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": -0.64,
+          "niftyChangePct": -0.42,
+          "gapPct": -0.352,
+          "intradayRet": -1.06
+        },
+        "trend": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 57.5,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 50.8,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 140.11
+        },
+        "volume": {
+          "score": 19.4,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 0.968,
+          "rvolRaw": 0.19,
+          "cumVolFracHeuristic": 0.193
+        },
+        "breakout": {
+          "score": 66.3,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 141.6,
+          "orbLow": 139.65,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 17.9,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 82.8,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 93.1,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 53.4,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.492,
+      "entryFlags": [
+        "OI_MISSING"
+      ],
+      "ltp": 140.0,
+      "scanLtp": 140.0,
+      "ltpSource": null,
+      "atrPct": 1.85,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 140.0,
+      "stopLoss": 143.11,
+      "target1": 135.34,
+      "target2": 130.67,
+      "riskPerShare": 3.11,
+      "rewardRisk": 1.5,
+      "approxQty": 714,
+      "deployedCapital": 99960.0,
+      "maxLoss": 2220.54,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
       "exitPlan": {
         "mode": "SCALE_TRAIL",
         "direction": "SHORT",
-        "entry": 193.77,
-        "riskPerShare": 3.42,
-        "initialStop": 197.19,
+        "entry": 140.0,
+        "riskPerShare": 3.11,
+        "initialStop": 143.11,
         "legs": [
-          {
-            "r": 0.5,
-            "qtyPct": 0.35,
-            "qty": 181,
-            "price": 192.06,
-            "trailStopAfter": 0.0
-          },
           {
             "r": 1.0,
             "qtyPct": 0.3,
-            "qty": 155,
-            "price": 190.35,
-            "trailStopAfter": 0.0
+            "qty": 214,
+            "price": 136.89,
+            "trailStopAfter": 0.75
           },
           {
             "r": 1.5,
-            "qtyPct": 0.2,
-            "qty": 103,
-            "price": 188.64,
-            "trailStopAfter": 0.5
-          }
-        ],
-        "runnerQty": 77,
-        "runnerFrac": 0.15,
-        "trailRatchet": {
-          "0.25": -0.5,
-          "0.5": 0.0,
-          "1.0": 0.0,
-          "1.5": 0.5,
-          "2.0": 1.0,
-          "3.0": 1.5,
-          "4.0": 2.5
-        },
-        "target1": 188.64,
-        "target2": 183.51,
-        "notes": []
-      },
-      "scanLtp": 193.77,
-      "currentPrice": 193.77,
-      "score": 67.4,
-      "sector": "OTHER",
-      "rewardRisk": 1.5,
-      "status": "RUNNING",
-      "sessionLocked": true,
-      "adopted": true,
-      "outcome": {
-        "label": "EOD SQUAREOFF",
-        "detail": "Session square rem @ 193.34",
-        "hitLevel": null,
-        "ltp": 193.34,
-        "pctChange": -0.22,
-        "resolvedAt": "2026-08-10T10:14:22.239991+00:00",
-        "exitState": {
-          "legsFilled": [
-            {
-              "r": "EOD_SQUAREOFF",
-              "qty": 516,
-              "price": 193.34,
-              "pnl": 221.88
-            }
-          ],
-          "remainingQty": 0,
-          "effectiveStop": 197.19,
-          "realizedPnl": 221.88,
-          "unrealizedPnl": 0.0,
-          "rMultiple": 0.126,
-          "closed": true,
-          "mode": "SCALE_TRAIL",
-          "profitGuardActive": false,
-          "profitGuardTriggerR": 0.25
-        },
-        "realizedPnl": 221.88,
-        "unrealizedPnl": 0.0,
-        "remainingQty": 0,
-        "effectiveStop": 197.19,
-        "rMultiple": 0.126,
-        "closed": true,
-        "scaleTrail": true,
-        "final": true
-      },
-      "exitState": {
-        "legsFilled": [
+            "qtyPct": 0.25,
+            "qty": 179,
+            "price": 135.34,
+            "trailStopAfter": 1.25
+          },
           {
-            "r": "EOD_SQUAREOFF",
-            "qty": 516,
-            "price": 193.34,
-            "pnl": 221.88
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 107,
+            "price": 133.78,
+            "trailStopAfter": 1.5
           }
         ],
-        "remainingQty": 0,
-        "effectiveStop": 197.19,
-        "realizedPnl": 221.88,
-        "unrealizedPnl": 0.0,
-        "rMultiple": 0.126,
-        "closed": true,
+        "runnerQty": 214,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 135.34,
+        "target2": 130.67,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "adopted": true,
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10,
+      "oiSetup": null,
+      "oiAligned": null
+    },
+    {
+      "rank": 5,
+      "symbol": "BAJFINANCE",
+      "name": "BAJFINANCE",
+      "direction": "SHORT",
+      "sector": "FINANCE",
+      "sleeve": "MOMENTUM",
+      "score": 67.3,
+      "scorePctRank": 60.2,
+      "intradayRetPctRank": 41.7,
+      "meanrevScore": null,
+      "gapPct": -0.381,
+      "intradayRet": -0.364,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+      "rsVsIndexPct": 0.055701275045537346,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 1092.77,
+      "orbHigh": 1098.0,
+      "orbLow": 1094.0,
+      "orbPosPct": 0.0,
+      "turnoverCr": 137.21,
+      "wickNoiseRatio": 0.641,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 49.4,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 0.056,
+          "niftyChangePct": -0.42,
+          "gapPct": -0.381,
+          "intradayRet": -0.364
+        },
+        "trend": {
+          "score": 45.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 52.2,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 48.9,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 1092.77
+        },
+        "volume": {
+          "score": 100.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 5.172,
+          "rvolRaw": 1.0,
+          "cumVolFracHeuristic": 0.193
+        },
+        "breakout": {
+          "score": 77.7,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1098.0,
+          "orbLow": 1094.0,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 0.0,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 70.9,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 34.2,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.489,
+      "entryFlags": [
+        "OI_MISSING",
+        "IN_PLAY"
+      ],
+      "ltp": 1094.0,
+      "scanLtp": 1094.0,
+      "ltpSource": null,
+      "atrPct": 1.06,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 1094.0,
+      "stopLoss": 1107.92,
+      "target1": 1073.12,
+      "target2": 1052.24,
+      "riskPerShare": 13.92,
+      "rewardRisk": 1.5,
+      "approxQty": 91,
+      "deployedCapital": 99554.0,
+      "maxLoss": 1266.72,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
         "mode": "SCALE_TRAIL",
-        "profitGuardActive": false,
-        "profitGuardTriggerR": 0.25
-      }
+        "direction": "SHORT",
+        "entry": 1094.0,
+        "riskPerShare": 13.92,
+        "initialStop": 1107.92,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 27,
+            "price": 1080.08,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 23,
+            "price": 1073.12,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 14,
+            "price": 1066.16,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 27,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 1073.12,
+        "target2": 1052.24,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "adopted": true,
+      "adoptReason": "HIGH_PROBABILITY_SCORE",
+      "candidatePoolSize": 10,
+      "oiSetup": null,
+      "oiAligned": null
     }
   ]
 }
