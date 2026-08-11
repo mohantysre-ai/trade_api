@@ -240,7 +240,9 @@ def load_market_snapshot() -> dict[str, Any]:
 
 def load_session() -> dict[str, Any]:
     try:
-        data = json.loads(_SESSION_FILE.read_text(encoding="utf-8-sig"))
+        from .json_atomic import load_json_with_fallback
+
+        data = load_json_with_fallback(_SESSION_FILE)
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
@@ -3506,13 +3508,23 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
         now = time.monotonic()
         if _SESSION_RESPONSE_CACHE is not None and now - _SESSION_RESPONSE_CACHE_AT < ttl:
             return copy.deepcopy(_SESSION_RESPONSE_CACHE)
-        result = _compute_session(include_live=True)
+        result = _compute_session(include_live=True, persist=False)
         _SESSION_RESPONSE_CACHE = copy.deepcopy(result)
         _SESSION_RESPONSE_CACHE_AT = time.monotonic()
         return result
 
 
-def _compute_session(include_live: bool = True) -> dict[str, Any]:
+def refresh_session_state() -> dict[str, Any]:
+    """Single-writer scheduler path for durable close/replacement transitions."""
+    global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT
+    with _SESSION_RESPONSE_LOCK:
+        result = _compute_session(include_live=True, persist=True)
+        _SESSION_RESPONSE_CACHE = copy.deepcopy(result)
+        _SESSION_RESPONSE_CACHE_AT = time.monotonic()
+        return result
+
+
+def _compute_session(include_live: bool = True, *, persist: bool = False) -> dict[str, Any]:
     session = load_session()
     snap = load_market_snapshot()
     quotes = snap.get("stockQuotes") or {}
@@ -3630,7 +3642,8 @@ def _compute_session(include_live: bool = True) -> dict[str, Any]:
             })
             session["events"] = events[-200:]
             session["updatedAt"] = _utc_now_iso()
-            save_session(session)
+            if persist:
+                save_session(session)
 
     long_rows = _mark_slot_status(long_rows)
     short_rows = _mark_slot_status(short_rows)
@@ -3697,6 +3710,7 @@ def _compute_session(include_live: bool = True) -> dict[str, Any]:
         and replacement_candidates
         and free_slots.get("total", 0) > 0
         and not cash_held
+        and persist
     ):
         try:
             applied_rows = apply_replacements(
@@ -3739,7 +3753,7 @@ def _compute_session(include_live: bool = True) -> dict[str, Any]:
             log.warning("replacement apply failed: %s", exc)
 
     # Persist proposal / cash-held ledger for EOD attribution (dedupe by symbol set)
-    if session.get("locked") and (
+    if persist and session.get("locked") and (
         replacement_candidates or replacement_blocked_reason == "prefer_cash_no_qualified"
     ):
         try:
@@ -3834,7 +3848,7 @@ def _compute_session(include_live: bool = True) -> dict[str, Any]:
 
     # Freeze last LTP + SESSION CLOSED onto disk once per closed session.
     # Skip when already frozen — concurrent GET polls must not fight over the file.
-    if session.get("locked") and market_open is False and not session.get("closeMarksFrozenAt"):
+    if persist and session.get("locked") and market_open is False and not session.get("closeMarksFrozenAt"):
         if _CLOSE_FREEZE_LOCK.acquire(blocking=False):
             try:
                 # Re-check under lock (another request may have just frozen)

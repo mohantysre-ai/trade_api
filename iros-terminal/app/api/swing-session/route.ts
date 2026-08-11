@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cachedBackendJson, liveCacheHeaders } from "@/lib/server-live-cache";
 
 export const runtime = "nodejs";
 
@@ -13,18 +14,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const live = searchParams.get("live") === "1" || searchParams.get("live") === "true";
     const qs = live ? "?live=1" : "";
-    const res = await fetch(`${BACKEND_URL}/api/swing-session${qs}`, {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) {
-      const detail = await res.text();
-      return NextResponse.json(
-        { success: false, error: detail || `Backend HTTP ${res.status}`, locked: false, long: [], short: [] },
-        { status: 502 },
-      );
-    }
-    return NextResponse.json(await res.json());
+    const key = live ? "swing-session-live" : "swing-session";
+    const { data, cacheStatus } = await cachedBackendJson(key, `${BACKEND_URL}/api/swing-session${qs}`, live ? 4_000 : 20_000);
+    return NextResponse.json(data, { headers: liveCacheHeaders(cacheStatus) });
   } catch (err) {
     return NextResponse.json(
       {
@@ -34,7 +26,7 @@ export async function GET(request: Request) {
         long: [],
         short: [],
       },
-      { status: 503 },
+      { status: 503, headers: liveCacheHeaders("ERROR") },
     );
   }
 }

@@ -164,6 +164,14 @@ def _scheduler_loop() -> None:
         try:
             now = datetime.now(tz=IST)
             if now.weekday() < 5 and _DESK_AUTO:
+                # The scheduler is the sole durable intraday state writer.
+                # Public GET handlers only enrich/calculate in memory.
+                try:
+                    from ..intraday_session_engine import refresh_session_state
+
+                    refresh_session_state()
+                except Exception as exc:
+                    log.debug("Live session state refresh skipped: %s", exc)
                 _maybe_run_morning_prework(now)
                 _maybe_auto_commit(now)
                 _maybe_midday_refresh(now)

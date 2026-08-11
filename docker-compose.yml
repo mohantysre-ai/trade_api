@@ -133,6 +133,7 @@ services:
       NEXT_PUBLIC_MARKET_API_URL: ""
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
+      FRONTEND_WORKERS: "6"
       TZ: Asia/Kolkata
     ports:
       - "3000:3000"

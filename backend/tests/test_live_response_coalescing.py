@@ -8,11 +8,11 @@ from app.services import swing_session
 def test_intraday_live_response_is_computed_once_for_concurrent_callers(monkeypatch):
     calls = 0
 
-    def compute(*, include_live=True):
+    def compute(*, include_live=True, persist=False):
         nonlocal calls
         calls += 1
         time.sleep(0.03)
-        return {"locked": True, "long": [{"symbol": "TEST"}], "includeLive": include_live}
+        return {"locked": True, "long": [{"symbol": "TEST"}], "includeLive": include_live, "persist": persist}
 
     monkeypatch.setattr(intraday, "_compute_session", compute)
     monkeypatch.setattr(intraday, "_SESSION_RESPONSE_CACHE", None)

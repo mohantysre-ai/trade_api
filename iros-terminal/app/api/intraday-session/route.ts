@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cachedBackendJson, liveCacheHeaders } from "@/lib/server-live-cache";
 
 export const runtime = "nodejs";
 
@@ -10,18 +11,8 @@ const BACKEND_URL =
 /** GET /api/intraday-session — locked top-five-total basket + MTM (proxies FastAPI). */
 export async function GET() {
   try {
-    const res = await fetch(`${BACKEND_URL}/api/intraday-session`, {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) {
-      const detail = await res.text();
-      return NextResponse.json(
-        { success: false, error: detail || `Backend HTTP ${res.status}`, locked: false, long: [], short: [] },
-        { status: 502 }
-      );
-    }
-    return NextResponse.json(await res.json());
+    const { data, cacheStatus } = await cachedBackendJson("intraday-session", `${BACKEND_URL}/api/intraday-session`, 4_000);
+    return NextResponse.json(data, { headers: liveCacheHeaders(cacheStatus) });
   } catch (err) {
     return NextResponse.json(
       {
@@ -31,7 +22,7 @@ export async function GET() {
         long: [],
         short: [],
       },
-      { status: 503 }
+      { status: 503, headers: liveCacheHeaders("ERROR") }
     );
   }
 }
