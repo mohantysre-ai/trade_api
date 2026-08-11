@@ -2,7 +2,7 @@
 
 Stages (weekdays, institutional open cadence):
   09:45+  Morning pre-work (Angel live + LLM day-lock) — post open-auction
-  09:45–10:15  Primary basket lock (intraday 5+5 + swing); catch-up if app starts later
+  09:45–10:15  Primary basket lock (intraday top-five total + swing); catch-up if app starts later
   12:00   Midday live refresh (quotes/candles; LLM stays day-locked)
   14:00   Afternoon live refresh (same)
   15:31   Fixed-plan close marks
@@ -322,7 +322,7 @@ def _session_already_locked() -> bool:
 
 
 def _maybe_auto_commit(now: datetime) -> None:
-    """Lock intraday 5+5 + swing session once pre-work is done."""
+    """Lock intraday top-five-total + swing session once pre-work is done."""
     global _COMMIT_ATTEMPTED_FOR
     if not _AUTO_COMMIT:
         return

@@ -86,3 +86,29 @@ def test_swing_grade_and_expected_r(monkeypatch):
     assert row is not None
     assert row["expectedR"] == 2.0
     assert row["entryQuality"] == "ENTRY_A"
+
+
+def test_persisted_swing_book_is_migrated_to_five_with_capital_recomputed():
+    rows = [
+        {
+            "symbol": f"S{i}",
+            "deployedCapital": 100_000.0,
+            "maxLoss": 2_000.0,
+        }
+        for i in range(8)
+    ]
+    migrated, dropped = swing_session._enforce_swing_position_cap(
+        {"locked": True, "long": rows, "short": [], "capital": {"swingCapital": 1_000_000}}
+    )
+    assert [r["symbol"] for r in migrated["long"]] == ["S0", "S1", "S2", "S3", "S4"]
+    assert dropped == ["S5", "S6", "S7"]
+    assert migrated["counts"] == {"long": 5, "short": 0, "total": 5}
+    assert migrated["capital"]["deployedCapital"] == 500_000.0
+    assert migrated["capital"]["remainingCapital"] == 500_000.0
+
+
+def test_swing_cap_migration_is_idempotent():
+    session = {"locked": True, "long": [{"symbol": f"S{i}"} for i in range(5)], "short": []}
+    migrated, dropped = swing_session._enforce_swing_position_cap(session)
+    assert migrated is session
+    assert dropped == []

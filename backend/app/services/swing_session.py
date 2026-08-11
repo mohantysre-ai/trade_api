@@ -577,6 +577,54 @@ def _persist_swing_if_changed(original: dict[str, Any], scrubbed: dict[str, Any]
     return scrubbed
 
 
+def _enforce_swing_position_cap(session: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Migrate persisted books to the configured cap without re-sizing history.
+
+    Existing rows are kept in their deterministic lock order. Dropped symbols are
+    recorded so the migration is auditable, and capital is recomputed from the
+    retained rows. This guard runs on reads as well as locks, preventing an old
+    JSON session from bypassing a newly lowered production cap.
+    """
+    long_rows = [r for r in (session.get("long") or []) if isinstance(r, dict)]
+    short_rows = [r for r in (session.get("short") or []) if isinstance(r, dict)]
+    combined = [("long", r) for r in long_rows] + [("short", r) for r in short_rows]
+    if len(combined) <= SWING_MATRIX_LOCK_COUNT:
+        return session, []
+
+    retained = combined[:SWING_MATRIX_LOCK_COUNT]
+    dropped = [str(r.get("symbol") or "?").upper() for _, r in combined[SWING_MATRIX_LOCK_COUNT:]]
+    kept_long = [r for side, r in retained if side == "long"]
+    kept_short = [r for side, r in retained if side == "short"]
+    deployed = round(sum(float(r.get("deployedCapital") or 0) for _, r in retained), 2)
+    portfolio_risk = round(sum(float(r.get("maxLoss") or 0) for _, r in retained), 2)
+
+    sess = dict(session)
+    sess["long"] = kept_long
+    sess["short"] = kept_short
+    sess["counts"] = {
+        "long": len(kept_long),
+        "short": len(kept_short),
+        "total": len(retained),
+    }
+    capital = dict(sess.get("capital") or {})
+    capital.update({
+        "swingCapital": SWING_CAPITAL,
+        "slots": len(retained),
+        "deployedCapital": deployed,
+        "remainingCapital": round(max(0.0, SWING_CAPITAL - deployed), 2),
+        "portfolioRisk": portfolio_risk,
+    })
+    sess["capital"] = capital
+    sess["positionCap"] = SWING_MATRIX_LOCK_COUNT
+    sess["capMigration"] = {
+        "at": _utc_now_iso(),
+        "droppedSymbols": dropped,
+        "reason": "MAX_SWING_POSITIONS",
+    }
+    sess["updatedAt"] = _utc_now_iso()
+    return sess, dropped
+
+
 def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False) -> dict[str, Any]:
     """Snapshot Asset Matrix BUY set into swing_session.json.
 
@@ -607,16 +655,18 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
     if existing.get("locked") and not force and (existing.get("long") or []):
         scrubbed, removed_gate = _scrub_ineligible_swing_rows(existing)
         scrubbed, removed_cross = _scrub_cross_book_swing_rows(scrubbed)
-        removed = removed_gate + removed_cross
+        scrubbed, removed_cap = _enforce_swing_position_cap(scrubbed)
+        removed = removed_gate + removed_cross + removed_cap
         if removed_gate:
             scrubbed = apply_swing_sizing(scrubbed, persist=True, force=True)
-        elif removed_cross:
+        elif removed_cross or removed_cap:
             scrubbed = _persist_swing_if_changed(existing, scrubbed)
         return {
             "success": True,
             "alreadyLocked": True,
             "scrubbed": removed,
             "crossBookExcluded": removed_cross,
+            "capExcluded": removed_cap,
             "session": scrubbed,
         }
 
@@ -743,9 +793,10 @@ def ensure_swing_session_locked() -> dict[str, Any]:
     if existing.get("locked") and (existing.get("long") or []) and existing_date == today:
         scrubbed, removed_gate = _scrub_ineligible_swing_rows(existing)
         scrubbed, removed_cross = _scrub_cross_book_swing_rows(scrubbed)
+        scrubbed, removed_cap = _enforce_swing_position_cap(scrubbed)
         if removed_gate:
             return apply_swing_sizing(scrubbed, persist=True, force=True)
-        if removed_cross:
+        if removed_cross or removed_cap:
             return _persist_swing_if_changed(existing, scrubbed)
         return scrubbed
     # New day or empty → force re-lock from Asset Matrix BUY
@@ -872,6 +923,14 @@ def get_swing_session(*, live: bool = False) -> dict[str, Any]:
     sess = load_swing_session()
     if not sess:
         return {"locked": False, "long": [], "short": [], "counts": {"total": 0}}
+    capped, removed_cap = _enforce_swing_position_cap(sess)
+    if removed_cap:
+        sess = _persist_swing_if_changed(sess, capped)
+        log.warning(
+            "Migrated persisted swing session to cap=%d; dropped=%s",
+            SWING_MATRIX_LOCK_COUNT,
+            removed_cap,
+        )
     if not live:
         return sess
     snap = _read_json(_SNAPSHOT_PATH)

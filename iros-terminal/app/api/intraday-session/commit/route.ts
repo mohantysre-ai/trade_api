@@ -7,7 +7,7 @@ const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ??
   "http://127.0.0.1:8000";
 
-/** POST /api/intraday-session/commit — lock 5+5 server-side (manual execution only). */
+/** POST /api/intraday-session/commit — lock up to five total server-side (manual execution only). */
 export async function POST(request: Request) {
   try {
     const url = new URL(request.url);

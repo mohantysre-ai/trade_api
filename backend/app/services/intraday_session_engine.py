@@ -2334,7 +2334,7 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
         # Full 10+10 research pool (not yet locked)
         "proposedLong": long_basket,
         "proposedShort": short_basket,
-        # High-probability 5+5 that commit will lock
+        # High-probability top five total that commit will lock
         "adoptLong": adopt_long,
         "adoptShort": adopt_short,
         "weights": {

@@ -1154,7 +1154,7 @@ export default function AssetMetricsPanel({
               >
                 {committing
                   ? 'Locking…'
-                  : `Adopt ${basketSize}+${basketSize} from ${candidatePoolSize}+${candidatePoolSize}`}
+                  : `Adopt up to ${basketSize} total from ${candidatePoolSize}+${candidatePoolSize} research candidates`}
               </button>
             )}
             {canForceRotate && (
