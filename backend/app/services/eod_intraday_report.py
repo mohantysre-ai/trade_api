@@ -18,8 +18,7 @@ from typing import Any
 
 from .eod_archive import load_archive
 from .exit_plan import attach_exit_plan, blended_pnl_from_state, format_scale_progress
-from .quant_desk_exit_policy import classify_desk_outcome
-import json
+from .quant_desk_exit_policy import build_trade_outcome, classify_taxonomy
 import time
 import urllib.request
 
@@ -333,6 +332,11 @@ def _build_levels_diagnostic(
     reason: str,
     exit_price: float,
     pnl: float,
+    *,
+    mfe_r: float | None = None,
+    economic_r: float | None = None,
+    day_high: float | None = None,
+    day_low: float | None = None,
 ) -> dict[str, Any] | None:
     """Deterministic outcome metrics from plan levels — facts only, no narrative."""
     if reason not in (
@@ -359,7 +363,7 @@ def _build_levels_diagnostic(
     sign = 1.0 if direction == "LONG" else -1.0
     signed_move = sign * (exit_price - entry) if entry else None
     move_pct = (signed_move / entry * 100.0) if entry and signed_move is not None else None
-    r_multiple = (signed_move / risk) if risk and signed_move is not None else None
+    path_r_val = (signed_move / risk) if risk and signed_move is not None else None
 
     gap_t1_pct: float | None = None
     gap_t2_pct: float | None = None
@@ -372,66 +376,40 @@ def _build_levels_diagnostic(
     if reason in ("SL_HIT", "TRAIL_SL_HIT") and risk and signed_move is not None:
         stop_util = abs(signed_move) / risk
 
-    factors: list[str] = []
-    root: str
-    is_miss = reason in ("SL_HIT", "EOD_SQUAREOFF")
+    # Infer mfeR from day range when not provided
+    mfe = mfe_r
+    if mfe is None and entry and risk and risk > 0:
+        hi = _f(day_high if day_high is not None else pick.get("dayHigh"))
+        lo = _f(day_low if day_low is not None else pick.get("dayLow"))
+        if hi is not None and lo is not None:
+            fav = hi if sign > 0 else lo
+            mfe = sign * (fav - entry) / risk
+        elif path_r_val is not None:
+            mfe = path_r_val
 
-    if reason == "SL_HIT":
-        factors.append("STOP_HIT")
-        if stop_util is not None and stop_util >= 0.9:
-            factors.append("FULL_STOP_TRAVERSAL")
-            root = "ADVERSE_TRAJECTORY"
-        else:
-            root = "STOP_BEFORE_FOLLOWTHROUGH"
-            factors.append("STOP_BEFORE_FOLLOWTHROUGH")
-    elif reason == "TRAIL_SL_HIT":
-        factors.append("TRAIL_STOP_HIT")
-        if pnl >= 0 or (move_pct is not None and move_pct >= 0):
-            is_miss = False
-            root = "TRAIL_LOCKED_GAINS"
-            factors.append("TRAIL_LOCKED_GAINS")
-        else:
-            is_miss = True
-            root = "ADVERSE_TRAJECTORY"
-            factors.append("TRAIL_STOPPED_LOSS")
-            if stop_util is not None and stop_util >= 0.9:
-                factors.append("FULL_STOP_TRAVERSAL")
-    elif reason == "EOD_SQUAREOFF":
-        factors.append("TARGET_NOT_REACHED")
-        if pnl > 0 or (move_pct is not None and move_pct > 0):
-            root = "PARTIAL_FOLLOWTHROUGH"
-            factors.append("POSITIVE_EOD_SQUAREOFF")
-        else:
-            root = "STALLED_TRADE"
-            factors.append("NEGATIVE_OR_FLAT_EOD")
-    elif reason == "PARTIAL_SCALE":
-        factors.append("SCALE_LEGS_FILLED")
-        if pnl > 0 or (move_pct is not None and move_pct > 0):
-            is_miss = False
-            root = "PARTIAL_FOLLOWTHROUGH"
-            factors.append("POSITIVE_SCALE_BOOK")
-        else:
-            is_miss = True
-            root = "STALLED_TRADE"
-            factors.append("NEGATIVE_OR_FLAT_SCALE")
-    elif reason == "T2_HIT":
-        root = "TREND_FOLLOWTHROUGH"
-        factors.extend(["TARGET_REACHED", "T2_HIT"])
-        if r_multiple is not None and r_multiple >= 2.0:
-            factors.append("STRONG_R_MULTIPLE")
-    else:  # T1_HIT
-        root = "TREND_FOLLOWTHROUGH"
-        factors.extend(["TARGET_REACHED", "T1_HIT"])
-        if gap_t2_pct is not None and gap_t2_pct > 0:
-            factors.append("T2_NOT_REACHED")
+    root, factors = classify_taxonomy(
+        execution_status="TRIGGERED",
+        exit_reason=reason,
+        pnl=float(pnl or 0),
+        mfe_r=mfe,
+        stop_utilization=stop_util,
+        economic_r=economic_r,
+        gap_to_t2_pct=gap_t2_pct,
+    )
+    is_hit = reason in ("T1_HIT", "T2_HIT")
+    is_miss = reason in ("SL_HIT", "TRAIL_SL_HIT") or (
+        reason in ("EOD_SQUAREOFF", "PARTIAL_SCALE") and float(pnl or 0) <= 0
+    )
 
     return {
         "isMiss": is_miss,
-        "isHit": not is_miss,
+        "isHit": is_hit,
         "exitReason": reason,
         "rootCause": root,
         "factors": factors,
-        "rMultiple": _round(r_multiple, 2),
+        # Diagnostic path R only — Book economicR synced later via sync_diagnostic_metrics
+        "pathR": _round(path_r_val, 3),
+        "rMultiple": _round(path_r_val, 2),
         "movePct": _round(move_pct, 2),
         "gapToT1Pct": _round(gap_t1_pct, 2),
         "gapToT2Pct": _round(gap_t2_pct, 2),
@@ -440,6 +418,7 @@ def _build_levels_diagnostic(
         "riskPerShare": _round(risk, 4),
         "maePct": None,
         "mfePct": None,
+        "mfeR": _round(mfe, 3) if mfe is not None else None,
         "stopEff": None,
         "falsePositive": False,
         "holdingMins": None,
@@ -448,41 +427,41 @@ def _build_levels_diagnostic(
 
 
 def _merge_scorecard(diag: dict[str, Any], card: dict[str, Any] | None) -> dict[str, Any]:
+    """Enrich efficiency only — never overwrite Book taxonomy rootCause / economic R."""
     if not card:
         return diag
-    outcome = str(card.get("outcome") or "").upper()
-    # Map engine STOP_HIT → same miss family
-    if outcome not in {"STOP_HIT", "EOD_SQUAREOFF", "SL_HIT", ""}:
-        # Still pull efficiency if same ticker day
-        pass
 
-    root = card.get("root_cause")
-    if root:
-        diag["rootCause"] = str(root)
-
+    # Preserve Book taxonomy; scorecard may append forensic factors only
     fail = card.get("failure_factors") or []
     succ = card.get("success_factors") or []
-    factors = [str(x) for x in (fail or succ) if x]
-    if factors:
-        diag["factors"] = factors
+    sc_factors = [str(x) for x in (fail or succ) if x]
+    if sc_factors:
+        existing = list(diag.get("factors") or [])
+        for f in sc_factors:
+            if f not in existing:
+                existing.append(f)
+        diag["factors"] = existing
 
     eff = card.get("efficiency") if isinstance(card.get("efficiency"), dict) else {}
-    diag["maePct"] = _round(_f(eff.get("mae_pct")), 2)
-    diag["mfePct"] = _round(_f(eff.get("mfe_pct")), 2)
-    diag["stopEff"] = _round(_f(eff.get("stop_efficiency_index")), 3)
+    if diag.get("maePct") is None:
+        diag["maePct"] = _round(_f(eff.get("mae_pct")), 2)
+    if diag.get("mfePct") is None:
+        diag["mfePct"] = _round(_f(eff.get("mfe_pct")), 2)
+    if diag.get("stopEff") is None:
+        diag["stopEff"] = _round(_f(eff.get("stop_efficiency_index")), 3)
 
-    rr = _f(eff.get("realized_return_ratio"))
-    if rr is not None:
-        diag["rMultiple"] = _round(rr, 2)
+    # Do NOT overwrite diagnostic rMultiple / pathR with scorecard realized_return_ratio
+    # (that ratio is pnl%/mfe%, not Book economic R)
 
-    pnl_pct = _f(card.get("realized_pnl_pct"))
-    if pnl_pct is not None:
-        diag["movePct"] = _round(pnl_pct, 2)
+    if diag.get("movePct") is None:
+        pnl_pct = _f(card.get("realized_pnl_pct"))
+        if pnl_pct is not None:
+            diag["movePct"] = _round(pnl_pct, 2)
 
     diag["falsePositive"] = bool(card.get("false_positive"))
     hold = card.get("holding_duration_mins")
     diag["holdingMins"] = int(hold) if hold is not None else diag.get("holdingMins")
-    diag["source"] = "SCORECARD"
+    diag["source"] = "SCORECARD" if (fail or succ or eff) else diag.get("source", "LEVELS")
     return diag
 
 
@@ -896,26 +875,58 @@ def generate_intraday_eod_report(
         exit_state = scale_meta.get("exitState") if isinstance(scale_meta, dict) else None
         if not isinstance(exit_state, dict):
             exit_state = pick.get("exitState") if isinstance(pick.get("exitState"), dict) else None
-        _scale_r = _f((scale_meta or {}).get("rMultiple") if isinstance(scale_meta, dict) else None)
-        _exit_r = _f((exit_state or {}).get("rMultiple") if isinstance(exit_state, dict) else None)
-        desk = classify_desk_outcome(
+        qty = int(pick.get("approxQty") or (card.get("qty") if card else 0) or 0)
+        entry_px = _f(pick.get("entryPrice")) or _f(card.get("entry_price") if card else None)
+        risk_ps = _f(pick.get("riskPerShare"))
+        if risk_ps is None and entry_px and pick.get("stopLoss") is not None:
+            risk_ps = abs(entry_px - float(pick.get("stopLoss")))
+        econ_hint = _f((scale_meta or {}).get("economicR") if isinstance(scale_meta, dict) else None)
+        if econ_hint is None:
+            econ_hint = _f((scale_meta or {}).get("rMultiple") if isinstance(scale_meta, dict) else None)
+        path_hint = _f((scale_meta or {}).get("pathR") if isinstance(scale_meta, dict) else None)
+        if path_hint is None and isinstance(exit_state, dict):
+            path_hint = _f(exit_state.get("pathR"))
+        desk = build_trade_outcome(
             triggered=True,
             realized_pnl=pnl,
             exit_reason=reason,
             exit_state=exit_state if isinstance(exit_state, dict) else None,
-            entry=_f(pick.get("entryPrice")),
-            risk_per_share=_f(pick.get("riskPerShare")),
+            entry=entry_px,
+            exit_price=_f(exit_price),
+            risk_per_share=risk_ps,
+            qty=qty,
             direction=str(pick.get("direction") or "LONG"),
             effective_stop=_f(
                 (exit_state or {}).get("effectiveStop")
                 if isinstance(exit_state, dict)
                 else pick.get("effectiveStop")
             ),
-            current_r=_scale_r if _scale_r is not None else _exit_r,
             day_high=_f(pick.get("dayHigh")),
             day_low=_f(pick.get("dayLow")),
             mae_pct=_f((diagnostic or {}).get("maePct")) if diagnostic else None,
             mfe_pct=_f((diagnostic or {}).get("mfePct")) if diagnostic else None,
+            stop_utilization=_f((diagnostic or {}).get("stopUtilization")) if diagnostic else None,
+            gap_to_t2_pct=_f((diagnostic or {}).get("gapToT2Pct")) if diagnostic else None,
+            economic_r_hint=econ_hint,
+            path_r_hint=path_hint,
+            lineage={
+                "source": pick.get("source") or symbol_source,
+                "filterStage": None,
+                "score": _f(pick.get("score")),
+                "scoreComponents": None,
+                "lockRank": None,
+                "selectionReason": pick.get("selectionReason") or pick.get("selection_reason"),
+                "verdict": pick.get("verdict"),
+                "sector": pick.get("sector"),
+                "levelsSource": pick.get("levelsSource"),
+                "triggeredAt": None,
+                "executedFills": (
+                    (exit_state or {}).get("legsFilled")
+                    if isinstance(exit_state, dict)
+                    else None
+                ),
+                "exitPathTag": None,
+            },
         )
         # Desk truth layer overrides reportable P&L (Book / forensic cannot invent skips)
         pnl = float(desk["pnl"])
@@ -924,14 +935,27 @@ def generate_intraday_eod_report(
         total_deployed += deployed
         hits[reason] = hits.get(reason, 0) + 1
 
+        # Align diagnostic with Book taxonomy / economic R
+        if diagnostic:
+            if desk.get("rootCause"):
+                diagnostic["rootCause"] = desk["rootCause"]
+            if desk.get("factors"):
+                diagnostic["factors"] = list(desk["factors"])
+            diagnostic["isHit"] = bool(desk.get("isHit"))
+            diagnostic["isMiss"] = bool(desk.get("isMiss"))
+            if desk.get("pathR") is not None:
+                diagnostic["pathR"] = desk["pathR"]
+            if desk.get("mfeR") is not None:
+                diagnostic["mfeR"] = desk["mfeR"]
+
         pnl_pct = None
         if deployed:
             pnl_pct = round((pnl / deployed * 100), 2)
         else:
-            entry_px = float(pick.get("entryPrice") or 0)
-            if entry_px > 0:
+            entry_for_pct = float(entry_px or 0)
+            if entry_for_pct > 0:
                 sign = 1 if str(pick.get("direction") or "LONG").upper() == "LONG" else -1
-                pnl_pct = round(sign * (exit_price - entry_px) / entry_px * 100, 2)
+                pnl_pct = round(sign * (exit_price - entry_for_pct) / entry_for_pct * 100, 2)
             elif card and _f(card.get("realized_pnl_pct")) is not None:
                 pnl_pct = _round(_f(card.get("realized_pnl_pct")), 2)
 
@@ -949,15 +973,20 @@ def generate_intraday_eod_report(
             "outcomeBucket": desk.get("outcomeBucket"),
             "deskProgress": desk.get("deskProgress"),
             "mfeR": desk.get("mfeR"),
+            "maeR": desk.get("maeR"),
+            "economicR": desk.get("economicR"),
+            "pathR": desk.get("pathR"),
             "effectiveStopR": desk.get("effectiveStopR"),
-            "qty": pick.get("approxQty") or (card.get("qty") if card else None),
+            "qty": qty or pick.get("approxQty") or (card.get("qty") if card else None),
             "deployedCapital": deployed,
             "pnl": round(pnl, 2),
             "pnlPct": pnl_pct,
             "missAnalysis": None,
             "missDiagnostic": diagnostic,
             "pickSource": pick.get("source") or symbol_source,
-            "policyChain": desk.get("chain"),
+            "lineage": desk.get("lineage"),
+            "policyChain": desk.get("policyChain") or desk.get("chain"),
+            "outcomeSchemaVersion": desk.get("outcomeSchemaVersion"),
         }
         if desk.get("rMultiple") is not None:
             row["rMultiple"] = desk.get("rMultiple")
@@ -971,10 +1000,26 @@ def generate_intraday_eod_report(
             row["scaleTrail"] = False
             row["scaleProgress"] = desk.get("deskProgress")
         # Desk truth wins over scale_meta / forensic for table + narrative alignment
-        for _k in ("rMultiple", "mfeR", "effectiveStopR", "deskProgress", "deskExitLabel",
-                    "executionStatus", "outcomeBucket", "pnl", "policyChain"):
+        for _k in (
+            "rMultiple",
+            "economicR",
+            "pathR",
+            "mfeR",
+            "maeR",
+            "effectiveStopR",
+            "deskProgress",
+            "deskExitLabel",
+            "executionStatus",
+            "outcomeBucket",
+            "pnl",
+            "policyChain",
+            "lineage",
+        ):
             if desk.get(_k) is not None:
                 row[_k] = desk[_k]
+        # Invariant: never report WIN with negative Book P&L
+        if float(row.get("pnl") or 0) < 0 and row.get("outcomeBucket") == "WIN":
+            row["outcomeBucket"] = "LOSS"
         rows.append(row)
 
     from .outcome_narrative import attach_outcome_narratives, build_day_lessons, sync_diagnostic_metrics
@@ -997,10 +1042,12 @@ def generate_intraday_eod_report(
     rows = attach_outcome_narratives(rows, force=force, refresh_existing=force)
     remaining_capital = capital + total_pnl
     scored = sum(1 for r in rows if r.get("missDiagnostic") and r["missDiagnostic"].get("source") == "SCORECARD")
-    hit_rows = sum(1 for r in rows if r.get("missDiagnostic") and r["missDiagnostic"].get("isHit"))
     wins = sum(1 for r in rows if r.get("outcomeBucket") == "WIN")
     losses = sum(1 for r in rows if r.get("outcomeBucket") == "LOSS")
     skipped = sum(1 for r in rows if r.get("outcomeBucket") == "SKIPPED")
+    triggered = len(rows) - skipped
+    hit_rows = wins  # Book wins, not path isHit
+    miss_rows = losses
     lessons = build_day_lessons(rows, force=force, refresh_existing=False, existing=prior_lessons)
 
     from .eod_engine.ingestion import load_intraday_session
@@ -1018,7 +1065,7 @@ def generate_intraday_eod_report(
         "totalPnl": round(total_pnl, 2),
         "remainingCapital": round(remaining_capital, 2),
         "hitBreakdown": hits,
-        "hitRatePct": round((hits["T1_HIT"] + hits["T2_HIT"]) / len(picks) * 100, 1) if picks else 0,
+        "hitRatePct": round(wins / triggered * 100, 1) if triggered else 0.0,
         "missCount": miss_rows,
         "hitCount": hit_rows,
         "missScorecardCoverage": scored,
@@ -1027,7 +1074,7 @@ def generate_intraday_eod_report(
         "deskCounts": desk_counts,
         "attribution": {
             "locked": len(rows),
-            "triggered": len(rows) - skipped,
+            "triggered": triggered,
             "skipped": skipped,
             "wins": wins,
             "losses": losses,

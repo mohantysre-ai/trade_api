@@ -92,7 +92,7 @@ def test_apply_replacement_restores_open_count():
     assert applied[0]["replacedFrom"] == "LOSER"
     free = eng.compute_free_slots(session["long"], session["short"])
     assert free["openLong"] == 3
-    assert free["long"] == max(0, eng.LOCK_SIZE - 3)
+    assert free["long"] == max(0, eng.MAX_LONG_POSITIONS - 3)
     assert any(e.get("type") == "REPLACEMENT_APPLIED" for e in session["events"])
 
 

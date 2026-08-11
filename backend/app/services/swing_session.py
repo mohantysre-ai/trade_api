@@ -37,12 +37,15 @@ _SNAPSHOT_PATH = os.path.join(_SERVICES_DIR, "last_market_snapshot.json")
 
 SWING_CAPITAL = float(os.environ.get("SWING_CAPITAL", "1000000"))  # ₹10L sleeve
 SWING_RISK_FRACTION = float(os.environ.get("SWING_RISK_FRACTION", "0.01"))
-# Cap matches Matrix BUY display (≤10–12)
-SWING_MATRIX_LOCK_COUNT = min(12, max(1, int(os.environ.get("SWING_MATRIX_LOCK_COUNT", "12"))))
+SWING_MATRIX_LOCK_COUNT = min(5, max(1, int(os.environ.get("MAX_SWING_POSITIONS", os.environ.get("SWING_MATRIX_LOCK_COUNT", "5")))))
 # Desk ATR% band when stock has no atr_pct / explicit levels (documented on row)
 SWING_DEFAULT_ATR_PCT = float(os.environ.get("SWING_DEFAULT_ATR_PCT", "2.0"))
 SWING_T1_R = float(os.environ.get("SWING_T1_R", "1.5"))
 SWING_T2_R = float(os.environ.get("SWING_T2_R", "3.0"))
+SWING_MIN_EXPECTED_R = float(os.environ.get("SWING_MIN_EXPECTED_R", "1.50"))
+SWING_PRIORITY_R = float(os.environ.get("SWING_PRIORITY_R", "2.00"))
+SWING_MAX_SINGLE_RISK = float(os.environ.get("SWING_MAX_SINGLE_TRADE_RISK", "0.01"))
+SWING_MAX_PORTFOLIO_RISK = float(os.environ.get("SWING_MAX_PORTFOLIO_RISK", "0.05"))
 
 
 def _utc_now_iso() -> str:
@@ -118,7 +121,7 @@ def _size_swing_row(
     ):
         return row
 
-    risk_budget = sleeve * SWING_RISK_FRACTION
+    risk_budget = sleeve * min(SWING_RISK_FRACTION, SWING_MAX_SINGLE_RISK)
     qty_by_risk = int(risk_budget // risk)
     qty_by_notional = int(target_notional // entry)
     qty = max(0, min(qty_by_risk, qty_by_notional))
@@ -272,6 +275,47 @@ def _normalize_swing_row(raw: dict[str, Any], session_date: str) -> dict[str, An
 
     if stop is None or t1 is None or risk is None or risk <= 0:
         return None
+
+    score_components = None
+    intra = raw.get("intraday") if isinstance(raw.get("intraday"), dict) else None
+    if isinstance(raw.get("scoreBreakdown"), dict):
+        score_components = dict(raw["scoreBreakdown"])
+    elif isinstance(raw.get("scoreComponents"), dict):
+        score_components = dict(raw["scoreComponents"])
+    elif intra:
+        # Pass-through known alpha component keys only — never invent
+        keys = (
+            "rel_vol",
+            "relativeVolume",
+            "liquidity_score",
+            "breakout_quality",
+            "sector_rs",
+            "sectorRelativeStrength",
+            "momentum",
+            "momentum_velocity",
+            "bulk_deal_score",
+            "alpha_score",
+        )
+        extracted = {k: intra[k] for k in keys if intra.get(k) is not None}
+        if extracted:
+            score_components = extracted
+
+    filter_stage = (
+        "LEDGER_TOP"
+        if raw.get("_fromLedger") or str(raw.get("_lineageSource") or "").endswith("ledger")
+        else "MATRIX_BUY"
+    )
+    lineage_src = str(raw.get("_lineageSource") or raw.get("source") or "asset_matrix_buy")
+    lock_rank = raw.get("_lockRank")
+    try:
+        lock_rank = int(lock_rank) if lock_rank is not None else None
+    except (TypeError, ValueError):
+        lock_rank = None
+
+    expected_r = ((t2 - entry) / risk) if t2 is not None and risk > 0 else 0.0
+    if expected_r < SWING_MIN_EXPECTED_R:
+        return None
+    entry_quality = "ENTRY_A" if expected_r >= SWING_PRIORITY_R else "ENTRY_B"
     return {
         "symbol": symbol,
         "name": raw.get("name") or symbol,
@@ -284,7 +328,9 @@ def _normalize_swing_row(raw: dict[str, Any], session_date: str) -> dict[str, An
         "target1": t1,
         "target2": t2,
         "riskPerShare": risk,
-        "rewardRisk": _f(raw.get("rewardRisk") or raw.get("rrT2")) or round(SWING_T2_R, 2),
+        "rewardRisk": round(expected_r, 2),
+        "expectedR": round(expected_r, 2),
+        "entryQuality": entry_quality,
         "approxQty": int(raw.get("approxQty") or raw.get("approx_qty") or 0),
         "deployedCapital": _f(raw.get("deployedCapital")) or 0.0,
         "score": _f(raw.get("score")),
@@ -300,6 +346,20 @@ def _normalize_swing_row(raw: dict[str, Any], session_date: str) -> dict[str, An
         "selectionReason": raw.get("selection_reason") or raw.get("selectionReason"),
         "verdict": raw.get("verdict") or raw.get("action"),
         "dayChangePct": _f(raw.get("dayChangePct") or raw.get("delta")),
+        "lineage": {
+            "source": lineage_src,
+            "filterStage": filter_stage,
+            "score": _f(raw.get("score")),
+            "scoreComponents": score_components,
+            "lockRank": lock_rank,
+            "selectionReason": raw.get("selection_reason") or raw.get("selectionReason"),
+            "verdict": raw.get("verdict") or raw.get("action"),
+            "sector": raw.get("sector"),
+            "levelsSource": levels_src or "matrix",
+            "triggeredAt": None,
+            "executedFills": None,
+            "exitPathTag": None,
+        },
     }
 
 
@@ -574,7 +634,7 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
     session_date = today
     long_rows: list[dict[str, Any]] = []
     skipped: list[str] = []
-    for raw in raw_picks:
+    for rank_idx, raw in enumerate(raw_picks, start=1):
         sym = str(raw.get("symbol") or raw.get("ticker") or "?").upper().strip()
         entry = _parse_price(
             raw.get("entryPrice")
@@ -584,7 +644,12 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
             or raw.get("ltpRaw")
             or raw.get("scanLtp")
         )
-        row = _normalize_swing_row(raw, session_date)
+        annotated = {
+            **raw,
+            "_lockRank": rank_idx,
+            "_lineageSource": snap_src if snap_src.startswith("asset_matrix") else "asset_matrix_buy",
+        }
+        row = _normalize_swing_row(annotated, session_date)
         if row is None:
             if sym and entry is not None and not is_swing_desk_eligible(sym, entry):
                 skipped.append(f"{sym}:desk_gate(min={SWING_MIN_PRICE:g}|no_dvr)")
@@ -605,11 +670,15 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
             "staleDay": stale_day,
         }
 
-    slots = max(1, len(long_rows))
+    slots = max(1, min(SWING_MATRIX_LOCK_COUNT, len(long_rows)))
     long_rows = [
         attach_exit_plan(_size_swing_row(r, sleeve=SWING_CAPITAL, slots=slots))
-        for r in long_rows
+        for r in long_rows[:SWING_MATRIX_LOCK_COUNT]
     ]
+    deployed = round(sum(float(r.get("deployedCapital") or 0) for r in long_rows), 2)
+    portfolio_risk = round(sum(float(r.get("maxLoss") or 0) for r in long_rows), 2)
+    if deployed > SWING_CAPITAL + 0.01 or portfolio_risk > SWING_CAPITAL * SWING_MAX_PORTFOLIO_RISK + 0.01:
+        return {"success": False, "error": "SWING_CAPITAL_INVARIANT_VIOLATION", "session": existing}
 
     committed_at = _utc_now_iso()
     session = {
@@ -630,6 +699,9 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
             "swingCapital": SWING_CAPITAL,
             "riskFraction": SWING_RISK_FRACTION,
             "slots": slots,
+            "deployedCapital": deployed,
+            "remainingCapital": round(max(0.0, SWING_CAPITAL - deployed), 2),
+            "portfolioRisk": portfolio_risk,
         },
         "counts": {"long": len(long_rows), "short": 0, "total": len(long_rows)},
         "deskGates": {"minPrice": SWING_MIN_PRICE, "rejectDvr": True},

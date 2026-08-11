@@ -56,13 +56,14 @@ _FIXED_PLAN_FILE = Path(
 # Capital sleeves (₹)
 LONG_CAPITAL = float(os.environ.get("INTRADAY_LONG_CAPITAL", "500000"))
 SHORT_CAPITAL = float(os.environ.get("INTRADAY_SHORT_CAPITAL", "500000"))
+INTRADAY_CAPITAL = float(os.environ.get("INTRADAY_CAPITAL", str(LONG_CAPITAL + SHORT_CAPITAL)))
 RISK_FRACTION = float(os.environ.get("INTRADAY_RISK_FRACTION", "0.01"))  # of sleeve per name
 ATR_STOP_MULT = float(os.environ.get("INTRADAY_ATR_STOP_MULT", "1.2"))
 T1_R_LONG = float(os.environ.get("INTRADAY_T1_R_LONG", "1.5"))
 T2_R_LONG = float(os.environ.get("INTRADAY_T2_R_LONG", "3.0"))
 T1_R_SHORT = float(os.environ.get("INTRADAY_T1_R_SHORT", "1.5"))
 T2_R_SHORT = float(os.environ.get("INTRADAY_T2_R_SHORT", "2.5"))
-MAX_PER_SECTOR = int(os.environ.get("INTRADAY_MAX_PER_SECTOR", "3"))
+MAX_PER_SECTOR = int(os.environ.get("INTRADAY_MAX_PER_SECTOR", "2"))
 MIN_TURNOVER_CR = float(os.environ.get("INTRADAY_MIN_TURNOVER_CR", "20"))
 MIN_PRICE = float(os.environ.get("INTRADAY_MIN_PRICE", "50"))
 MAX_PRICE = float(os.environ.get("INTRADAY_MAX_PRICE", "10000"))
@@ -89,7 +90,11 @@ _BASKET_ENV = os.environ.get("INTRADAY_BASKET_SIZE")
 # Candidate pool size per side (default 10 = 6 MOM + 4 MR)
 BASKET_SIZE = int(_BASKET_ENV) if _BASKET_ENV else max(1, MOMENTUM_SLOTS + MEANREV_SLOTS)
 # Locked desk: high-probability adoption from the 20 → 5 BUY + 5 SELL
-LOCK_SIZE = int(os.environ.get("INTRADAY_LOCK_SIZE", "5"))
+LOCK_SIZE = int(os.environ.get("MAX_INTRADAY_POSITIONS", os.environ.get("INTRADAY_LOCK_SIZE", "5")))
+MAX_LONG_POSITIONS = int(os.environ.get("MAX_LONG_POSITIONS", "3"))
+MAX_SHORT_POSITIONS = int(os.environ.get("MAX_SHORT_POSITIONS", "3"))
+MAX_PORTFOLIO_RISK = float(os.environ.get("INTRADAY_MAX_PORTFOLIO_RISK", "0.05"))
+MAX_SINGLE_TRADE_RISK = float(os.environ.get("INTRADAY_MAX_SINGLE_TRADE_RISK", "0.01"))
 
 # Stocks-in-Play / ORB / overextension (starting params — not proven optimal)
 INPLAY_RVOL = float(os.environ.get("INTRADAY_INPLAY_RVOL", "2.0"))
@@ -118,7 +123,9 @@ REGIME_BLOCK_NIFTY_PCT = float(os.environ.get("INTRADAY_REGIME_BLOCK_NIFTY_PCT",
 # Hard-blocking shorts on every modest up-day previously froze the daily rotate.
 REGIME_HARD_NIFTY_PCT = float(os.environ.get("INTRADAY_REGIME_HARD_NIFTY_PCT", "1.5"))
 REGIME_HEADWIND_HAIRCUT = float(os.environ.get("INTRADAY_REGIME_HAIRCUT", "0.70"))
-ENTRY_MIN_EXPECTED_R = float(os.environ.get("INTRADAY_ENTRY_MIN_EXPECTED_R", "0.85"))
+ENTRY_MIN_EXPECTED_R = float(os.environ.get("INTRADAY_ENTRY_MIN_EXPECTED_R", "1.20"))
+PRIORITY_EXPECTED_R = float(os.environ.get("INTRADAY_PRIORITY_EXPECTED_R", "1.50"))
+HIGH_CONVICTION_R = float(os.environ.get("INTRADAY_HIGH_CONVICTION_R", "2.00"))
 ENTRY_EXCEPTIONAL_SCORE = float(os.environ.get("INTRADAY_ENTRY_EXCEPTIONAL_SCORE", "72"))
 ENTRY_WICK_NOISE_MAX = float(os.environ.get("INTRADAY_ENTRY_WICK_NOISE_MAX", "0.70"))
 # OI preference (F&O only — when oi/prev_oi facts exist; never invent OI).
@@ -149,9 +156,7 @@ REPLACEMENT_MIN_SCORE = float(os.environ.get("INTRADAY_REPLACEMENT_MIN_SCORE", "
 REPLACEMENT_MAX_PER_SIDE = int(os.environ.get("INTRADAY_REPLACEMENT_MAX_PER_SIDE", str(LOCK_SIZE)))
 # Portfolio risk stops (rotation) — prefer cash when hit
 DAILY_LOSS_LIMIT_INR = float(os.environ.get("INTRADAY_DAILY_LOSS_LIMIT", "15000"))
-MAX_CONCURRENT_NAMES = int(
-    os.environ.get("INTRADAY_MAX_CONCURRENT", str(max(LOCK_SIZE * 2, 10)))
-)
+MAX_CONCURRENT_NAMES = int(os.environ.get("INTRADAY_MAX_CONCURRENT", str(LOCK_SIZE)))
 
 # Lightweight sector hints for concentration caps (facts from ticker identity only).
 _SECTOR_HINTS: dict[str, str] = {
@@ -1691,6 +1696,146 @@ def _size_position(
     }
 
 
+def _entry_grade(expected_r: float, flags: list[str] | None = None) -> str:
+    """Deterministic immediate-follow-through classification."""
+    flags = flags or []
+    confirmations = sum(
+        marker in flags
+        for marker in ("IN_PLAY", "OI_PREFERRED", "OI_ALIGN_BONUS")
+    )
+    if expected_r >= PRIORITY_EXPECTED_R and confirmations >= 1:
+        return "ENTRY_A"
+    if expected_r >= ENTRY_MIN_EXPECTED_R:
+        return "ENTRY_B"
+    if expected_r > 0:
+        return "ENTRY_C"
+    return "REJECT"
+
+
+def _trade_quality(row: dict[str, Any]) -> float:
+    """Configuration-compatible 0..100 score that does not replace Expected-R."""
+    expected_r = float(row.get("qualityAdjustedExpectedR") or 0.0)
+    components = row.get("factorBreakdown") or row.get("components") or {}
+
+    def component(name: str, fallback: float = 50.0) -> float:
+        value = components.get(name) if isinstance(components, dict) else None
+        if isinstance(value, dict):
+            value = value.get("score")
+        try:
+            return _clamp(float(value))
+        except (TypeError, ValueError):
+            return fallback
+
+    entry = 100.0 if row.get("entryState") == ENTRY_QUALIFIED else 0.0
+    expected = _clamp(expected_r / max(HIGH_CONVICTION_R, 0.01) * 100.0)
+    score = (
+        0.25 * entry
+        + 0.20 * expected
+        + 0.15 * component("trend")
+        + 0.10 * component("vwap")
+        + 0.10 * component("volume")
+        + 0.10 * component("momentum")
+        + 0.05 * (100.0 if row.get("oiAligned") is True else 50.0)
+        + 0.05 * component("sector")
+    )
+    return round(score, 2)
+
+
+def _allocate_portfolio(rows: list[dict[str, Any]], capital: float) -> list[dict[str, Any]]:
+    """Conviction/risk size with hard capital and portfolio-risk invariants."""
+    remaining = max(0.0, capital)
+    remaining_risk = max(0.0, capital * MAX_PORTFOLIO_RISK)
+    out: list[dict[str, Any]] = []
+    raw_bands = [
+        0.30 if float(r.get("qualityAdjustedExpectedR") or 0) >= HIGH_CONVICTION_R
+        else (0.20 if float(r.get("qualityAdjustedExpectedR") or 0) >= PRIORITY_EXPECTED_R else 0.10)
+        for r in rows
+    ]
+    band_scale = min(1.0, 1.0 / sum(raw_bands)) if raw_bands else 1.0
+    for row, raw_band in zip(rows, raw_bands):
+        entry = float(row.get("entryPrice") or row.get("ltp") or 0.0)
+        risk = float(row.get("riskPerShare") or 0.0)
+        expected_r = float(row.get("qualityAdjustedExpectedR") or 0.0)
+        if entry <= 0 or risk <= 0 or remaining < entry or remaining_risk <= 0:
+            continue
+        band = raw_band * band_scale
+        risk_budget = min(capital * MAX_SINGLE_TRADE_RISK, remaining_risk)
+        qty = min(
+            int((capital * band + 0.01) // entry),
+            int((risk_budget + 0.01) // risk),
+            int((remaining + 0.01) // entry),
+        )
+        if qty <= 0:
+            continue
+        deployed = round(qty * entry, 2)
+        max_loss = round(qty * risk, 2)
+        grade = _entry_grade(expected_r, row.get("entryFlags"))
+        out.append({
+            **row,
+            "approxQty": qty,
+            "deployedCapital": deployed,
+            "maxLoss": max_loss,
+            "entryQuality": grade,
+            "convictionTier": grade[-1] if grade.startswith("ENTRY_") else None,
+            "tradeQualityScore": _trade_quality(row),
+            "allocationPct": round(deployed / capital * 100.0, 2) if capital else 0.0,
+        })
+        remaining = round(max(0.0, remaining - deployed), 2)
+        remaining_risk = round(max(0.0, remaining_risk - max_loss), 2)
+    return out
+
+
+def _select_total_portfolio(
+    long_rows: list[dict[str, Any]], short_rows: list[dict[str, Any]], capital: float
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Stable top-N total selection with side, sector and duplicate controls."""
+    candidates = []
+    for row in [*long_rows, *short_rows]:
+        if row.get("entryState") != ENTRY_QUALIFIED:
+            continue
+        enriched = {**row, "tradeQualityScore": _trade_quality(row)}
+        candidates.append(enriched)
+    candidates.sort(key=lambda r: (
+        -float(r.get("tradeQualityScore") or 0),
+        -float(r.get("qualityAdjustedExpectedR") or 0),
+        -float(r.get("score") or 0),
+        str(r.get("symbol") or ""),
+        str(r.get("direction") or ""),
+    ))
+    selected: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    sectors: dict[str, int] = {}
+    sides = {"LONG": 0, "SHORT": 0}
+    for row in candidates:
+        if len(selected) >= LOCK_SIZE:
+            break
+        symbol = str(row.get("symbol") or "").upper()
+        side = str(row.get("direction") or "").upper()
+        sector = str(row.get("sector") or "OTHER").upper()
+        if not symbol or symbol in seen or side not in sides:
+            continue
+        # Side limits are intentionally soft: quality rank wins and one-sided
+        # five-name books remain valid. Counts are retained for audit/reporting.
+        if sectors.get(sector, 0) >= MAX_PER_SECTOR:
+            continue
+        selected.append(row)
+        seen.add(symbol)
+        sides[side] += 1
+        sectors[sector] = sectors.get(sector, 0) + 1
+    sized = _allocate_portfolio(selected, capital)
+    for rank, row in enumerate(sized, 1):
+        row["rank"] = rank
+        row["whySelected"] = (
+            f"Rank #{rank}; {row.get('entryQuality')}; expected R "
+            f"{float(row.get('qualityAdjustedExpectedR') or 0):.2f}; "
+            f"trade quality {float(row.get('tradeQualityScore') or 0):.1f}."
+        )
+    return (
+        [r for r in sized if r.get("direction") == "LONG"],
+        [r for r in sized if r.get("direction") == "SHORT"],
+    )
+
+
 def _adopt_high_probability(
     rows: list[dict[str, Any]],
     n: int,
@@ -2071,23 +2216,12 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
         exclude_symbols=long_syms,
     )
 
-    # High-probability adoption: 20 candidates → 5 BUY + 5 SELL
-    adopt_long = _adopt_high_probability(
-        long_basket,
-        LOCK_SIZE,
-        direction="LONG",
-        capital=LONG_CAPITAL,
-        regime=regime,
-        exclude_symbols=swing_exclude,
+    # One ranked portfolio: five total is a maximum, never a per-side target.
+    adopt_long, adopt_short = _select_total_portfolio(
+        long_basket, short_basket, INTRADAY_CAPITAL
     )
-    adopt_short = _adopt_high_probability(
-        short_basket,
-        LOCK_SIZE,
-        direction="SHORT",
-        capital=SHORT_CAPITAL,
-        regime=regime,
-        exclude_symbols=swing_exclude | {r["symbol"] for r in adopt_long},
-    )
+    deployed = round(sum(float(r.get("deployedCapital") or 0) for r in [*adopt_long, *adopt_short]), 2)
+    portfolio_risk = round(sum(float(r.get("maxLoss") or 0) for r in [*adopt_long, *adopt_short]), 2)
 
     return {
         "success": True,
@@ -2102,8 +2236,12 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
             "vixMax": MR_VIX_MAX,
         },
         "capital": {
+            "configuredCapital": INTRADAY_CAPITAL,
             "longCapital": LONG_CAPITAL,
             "shortCapital": SHORT_CAPITAL,
+            "deployedCapital": deployed,
+            "remainingCapital": round(max(0.0, INTRADAY_CAPITAL - deployed), 2),
+            "portfolioRisk": portfolio_risk,
             "riskFraction": RISK_FRACTION,
             "basketSize": LOCK_SIZE,
             "candidatePoolSize": BASKET_SIZE,
@@ -2126,7 +2264,7 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
             "adopted": len(adopt_long) + len(adopt_short),
             "funnelNote": (
                 f"{BASKET_SIZE}+{BASKET_SIZE} candidates -> adopt top "
-                f"{LOCK_SIZE}+{LOCK_SIZE} QUALIFIED by entry gate"
+                f"{LOCK_SIZE} TOTAL QUALIFIED by entry gate"
             ),
         },
         "entryGate": {
@@ -2224,7 +2362,7 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
 
 
 def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> dict[str, Any]:
-    """Lock high-probability 5 BUY + 5 SELL from the 10+10 candidate pool.
+    """Lock up to five qualified names total; cash is valid when edge is absent.
 
     Daily rotation: a locked basket from a prior IST sessionDate is stale and
     force-rebuilt irrespective of P&L (mirrors swing_session).
@@ -2274,55 +2412,15 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
     short_rows = candidates.get("adoptShort") or []
     regime = candidates.get("regime") or {}
 
-    # Long sleeve is required. Short sleeve may be thin/empty on RISK_ON days when
-    # REGIME_AGAINST blocks SELL names — prefer cash held over blocking the daily rotate.
-    if len(pool_long) < LOCK_SIZE:
-        return {
-            "success": False,
-            "error": (
-                f"Insufficient LONG candidate pool for {LOCK_SIZE} adopt "
-                f"(got {len(pool_long)}L / {len(pool_short)}S of {BASKET_SIZE}+{BASKET_SIZE}). "
-                f"Refresh market snapshot."
-            ),
-            "candidates": candidates,
-        }
-
-    swing_exclude = swing_locked_symbols(_ist_now().strftime("%Y-%m-%d"))
-    if len(long_rows) < LOCK_SIZE:
-        long_rows = _adopt_high_probability(
-            pool_long,
-            LOCK_SIZE,
-            direction="LONG",
-            capital=LONG_CAPITAL,
-            regime=regime,
-            exclude_symbols=swing_exclude,
-        )
-    if len(long_rows) < LOCK_SIZE:
-        return {
-            "success": False,
-            "error": (
-                f"Could not adopt {LOCK_SIZE} high-probability LONG picks "
-                f"(got {len(long_rows)}L / {len(short_rows)}S)."
-            ),
-            "candidates": candidates,
-        }
-
-    short_target = min(LOCK_SIZE, len(pool_short))
-    if short_target > 0 and len(short_rows) < short_target:
-        short_rows = _adopt_high_probability(
-            pool_short,
-            short_target,
-            direction="SHORT",
-            capital=SHORT_CAPITAL,
-            regime=regime,
-            exclude_symbols=swing_exclude | {r["symbol"] for r in long_rows},
-        )
-    short_rows = short_rows[:LOCK_SIZE]
-    short_cash_held = len(short_rows) < LOCK_SIZE
+    # generate_candidates already applies the single total selector and capital guard.
+    long_rows = long_rows[:LOCK_SIZE]
+    short_rows = short_rows[: max(0, LOCK_SIZE - len(long_rows))]
+    cash_held = len(long_rows) + len(short_rows) < LOCK_SIZE
+    short_cash_held = len(short_rows) < MAX_SHORT_POSITIONS
     short_cash_reason = None
     if short_cash_held:
         short_cash_reason = (
-            f"Short sleeve {len(short_rows)}/{LOCK_SIZE} — cash held "
+            f"Portfolio {len(long_rows) + len(short_rows)}/{LOCK_SIZE} — cash held "
             f"(regime={regime.get('label')} nifty={regime.get('niftyChangePct')})"
         )
         log.warning("Intraday commit %s", short_cash_reason)
@@ -2337,7 +2435,7 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
             "short": [r["symbol"] for r in short_rows],
             "candidatePoolLong": [r["symbol"] for r in pool_long],
             "candidatePoolShort": [r["symbol"] for r in pool_short],
-            "funnel": f"{len(pool_long)}+{len(pool_short)} → adopt {len(long_rows)}+{len(short_rows)}",
+            "funnel": f"{len(pool_long)}+{len(pool_short)} → adopt {len(long_rows) + len(short_rows)} total",
             "shortCashHeld": short_cash_held,
             "shortCashReason": short_cash_reason,
             "sleeves": {
@@ -2345,7 +2443,7 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
                 "meanRevSlots": (candidates.get("capital") or {}).get("meanRevSlots"),
                 "lockSize": LOCK_SIZE,
                 "candidatePoolSize": BASKET_SIZE,
-                "shortFilled": len(short_rows),
+                "totalFilled": len(long_rows) + len(short_rows),
             },
             "executionPolicy": "MANUAL_ONLY",
         }
@@ -2368,6 +2466,12 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
     capital["lockSize"] = LOCK_SIZE
     capital["shortFilled"] = len(short_rows)
     capital["shortCashHeld"] = short_cash_held
+    capital["cashHeld"] = cash_held
+    deployed = round(sum(float(r.get("deployedCapital") or 0) for r in [*long_rows, *short_rows]), 2)
+    if deployed > INTRADAY_CAPITAL + 0.01:
+        return {"success": False, "error": "CAPITAL_INVARIANT_VIOLATION", "candidates": candidates}
+    capital["deployedCapital"] = deployed
+    capital["remainingCapital"] = round(max(0.0, INTRADAY_CAPITAL - deployed), 2)
     if short_cash_reason:
         capital["shortCashReason"] = short_cash_reason
 
@@ -2631,12 +2735,13 @@ def compute_free_slots(
     n = int(lock_size if lock_size is not None else LOCK_SIZE)
     open_l = sum(1 for r in long_rows if _position_is_open(r))
     open_s = sum(1 for r in short_rows if _position_is_open(r))
-    free_l = max(0, n - open_l)
-    free_s = max(0, n - open_s)
+    total_free = max(0, n - open_l - open_s)
+    free_l = min(total_free, max(0, MAX_LONG_POSITIONS - open_l))
+    free_s = min(total_free, max(0, MAX_SHORT_POSITIONS - open_s))
     return {
         "long": free_l,
         "short": free_s,
-        "total": free_l + free_s,
+        "total": total_free,
         "openLong": open_l,
         "openShort": open_s,
         "lockSize": n,
@@ -2909,10 +3014,24 @@ def apply_replacements(
     used_freed: set[str] = set()
 
     slots_left = {"LONG": int(free["long"]), "SHORT": int(free["short"])}
+    total_slots_left = int(free["total"])
+    open_rows = [r for r in long_rows + short_rows if _position_is_open(r)]
+    remaining_capital = max(
+        0.0,
+        INTRADAY_CAPITAL
+        - sum(float(r.get("deployedCapital") or r.get("positionValue") or 0) for r in open_rows),
+    )
+    remaining_risk = max(
+        0.0,
+        INTRADAY_CAPITAL * MAX_PORTFOLIO_RISK
+        - sum(float(r.get("maxLoss") or 0) for r in open_rows),
+    )
     applied: list[dict[str, Any]] = []
     risk_scale_cache: dict[str, float] = {}
 
     for prop in proposals:
+        if total_slots_left <= 0 or remaining_capital <= 0 or remaining_risk <= 0:
+            break
         if not isinstance(prop, dict):
             continue
         direction = str(prop.get("direction") or "LONG").upper()
@@ -2975,10 +3094,19 @@ def apply_replacements(
 
         if direction not in risk_scale_cache:
             risk_scale_cache[direction] = _regime_risk_scale(regime, direction)
-        capital = LONG_CAPITAL if direction == "LONG" else SHORT_CAPITAL
-        sizing = _size_position(
-            entry, risk, capital, risk_scale=risk_scale_cache[direction], basket_slots=LOCK_SIZE
+        expected_r = float(gate.get("qualityAdjustedExpectedR") or 0)
+        band = 0.30 if expected_r >= HIGH_CONVICTION_R else (0.20 if expected_r >= PRIORITY_EXPECTED_R else 0.10)
+        qty = min(
+            int((INTRADAY_CAPITAL * band) // entry),
+            int(min(INTRADAY_CAPITAL * MAX_SINGLE_TRADE_RISK, remaining_risk) // risk),
+            int(remaining_capital // entry),
         )
+        sizing = {
+            "approxQty": max(0, qty),
+            "deployedCapital": round(max(0, qty) * entry, 2),
+            "maxLoss": round(max(0, qty) * risk, 2),
+            "riskScale": risk_scale_cache[direction],
+        }
         if int(sizing.get("approxQty") or 0) <= 0:
             continue
 
@@ -3025,6 +3153,9 @@ def apply_replacements(
         exclude.add(sym)
         sector_counts[sector] = sector_counts.get(sector, 0) + 1
         slots_left[direction] = slots_left[direction] - 1
+        total_slots_left -= 1
+        remaining_capital -= float(sizing["deployedCapital"])
+        remaining_risk -= float(sizing["maxLoss"])
         applied.append(row)
 
     if not applied:

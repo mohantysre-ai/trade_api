@@ -48,12 +48,16 @@ def _num(v: Any) -> float | None:
 
 
 def canonical_r_multiple(row: dict[str, Any], diagnostic: dict[str, Any] | None = None) -> float | None:
-    """Table / desk R is source of truth. Never use `or` (0.0 is valid)."""
-    r = _num(row.get("rMultiple"))
-    if r is not None:
-        return r
+    """Book economic R is source of truth. Never use `or` (0.0 is valid)."""
+    for key in ("economicR", "rMultiple"):
+        r = _num(row.get(key))
+        if r is not None:
+            return r
     if isinstance(diagnostic, dict):
-        return _num(diagnostic.get("rMultiple"))
+        for key in ("economicR", "rMultiple"):
+            r = _num(diagnostic.get(key))
+            if r is not None:
+                return r
     return None
 
 
@@ -64,18 +68,25 @@ def sync_diagnostic_metrics(row: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(diag, dict):
         return r
     d = dict(diag)
-    r_can = _num(r.get("rMultiple"))
+    r_can = canonical_r_multiple(r, d)
     if r_can is not None:
         d["rMultiple"] = round(r_can, 3)
+        d["economicR"] = round(r_can, 3)
+    path = _num(r.get("pathR"))
+    if path is not None:
+        d["pathR"] = round(path, 3)
     for src, dst in (
         ("maePct", "maePct"),
         ("mfePct", "mfePct"),
         ("mfeR", "mfeR"),
+        ("maeR", "maeR"),
         ("pnlPct", "movePct"),
     ):
         v = _num(r.get(src))
         if v is not None and d.get(dst) is None:
             d[dst] = v
+    if r.get("rootCause") and not d.get("rootCause"):
+        d["rootCause"] = r.get("rootCause")
     # Prefer desk exit label for outcome desk copy; keep forensic exitReason if present
     if r.get("deskExitLabel") and not d.get("exitReason"):
         d["exitReason"] = r.get("deskExitLabel")
@@ -89,6 +100,9 @@ def _omit_none(d: dict[str, Any]) -> dict[str, Any]:
 
 def _fact_pack(row: dict[str, Any], diagnostic: dict[str, Any]) -> dict[str, Any]:
     r_can = canonical_r_multiple(row, diagnostic)
+    path = _num(row.get("pathR"))
+    if path is None:
+        path = _num(diagnostic.get("pathR"))
     mae = _num(diagnostic.get("maePct"))
     if mae is None:
         mae = _num(row.get("maePct"))
@@ -99,16 +113,20 @@ def _fact_pack(row: dict[str, Any], diagnostic: dict[str, Any]) -> dict[str, Any
 
     canonical = _omit_none(
         {
-            "rMultiple": r_can,
+            "economicR": r_can,
+            "rMultiple": r_can,  # alias — cite economic Book R only
+            "pathR": path,
             "pnl": _num(row.get("pnl")),
             "pnlPct": _num(row.get("pnlPct")),
             "mfeR": mfe_r,
+            "maeR": _num(row.get("maeR")),
             "maePct": mae,
             "mfePct": mfe_pct,
             "deskProgress": row.get("deskProgress") or row.get("scaleProgress"),
             "executionStatus": row.get("executionStatus"),
             "outcomeBucket": row.get("outcomeBucket"),
             "deskExitLabel": row.get("deskExitLabel") or diagnostic.get("exitReason") or row.get("exitReason"),
+            "rootCause": diagnostic.get("rootCause") or row.get("rootCause"),
         }
     )
 
@@ -122,8 +140,9 @@ def _fact_pack(row: dict[str, Any], diagnostic: dict[str, Any]) -> dict[str, Any
             "gapToT1Pct": _num(diagnostic.get("gapToT1Pct")),
             "gapToT2Pct": _num(diagnostic.get("gapToT2Pct")),
             "stopUtilization": _num(diagnostic.get("stopUtilization")),
+            "pathR": path,
             "source": diagnostic.get("source"),
-            # Intentionally omit forensic rMultiple — CanonicalMetrics.rMultiple is sole R.
+            # Intentionally omit forensic rMultiple — CanonicalMetrics.economicR is sole Book R.
         }
     )
 

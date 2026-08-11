@@ -15,6 +15,8 @@ type MissDiagnostic = {
   rootCause: string | null;
   factors: string[];
   rMultiple: number | null;
+  economicR?: number | null;
+  pathR?: number | null;
   movePct: number | null;
   gapToT1Pct: number | null;
   gapToT2Pct: number | null;
@@ -23,11 +25,29 @@ type MissDiagnostic = {
   riskPerShare: number | null;
   maePct: number | null;
   mfePct: number | null;
+  mfeR?: number | null;
+  maeR?: number | null;
   stopEff: number | null;
   falsePositive: boolean;
   holdingMins: number | null;
   source: 'LEVELS' | 'SCORECARD' | 'SKIP' | string;
   exitSource?: string;
+};
+
+type TradeLineage = {
+  source?: string | null;
+  filterStage?: string | null;
+  score?: number | null;
+  scoreComponents?: Record<string, unknown> | null;
+  lockRank?: number | null;
+  selectionReason?: string | null;
+  verdict?: string | null;
+  sector?: string | null;
+  levelsSource?: string | null;
+  triggeredAt?: string | null;
+  executedFills?: unknown;
+  exitPathTag?: string | null;
+  triggerSource?: string | null;
 };
 
 type IntradayTrade = {
@@ -60,6 +80,8 @@ type IntradayTrade = {
     realizedPnl?: number | null;
     unrealizedPnl?: number | null;
     rMultiple?: number | null;
+    economicR?: number | null;
+    pathR?: number | null;
     closed?: boolean;
   } | null;
   exitPlan?: { mode?: string; legs?: { r?: number }[] } | null;
@@ -70,10 +92,15 @@ type IntradayTrade = {
   executionStatus?: string | null;
   outcomeBucket?: string | null;
   mfeR?: number | null;
+  maeR?: number | null;
+  economicR?: number | null;
+  pathR?: number | null;
   effectiveStopR?: number | null;
   realizedPnl?: number | null;
   unrealizedPnl?: number | null;
   rMultiple?: number | null;
+  riskPerShare?: number | null;
+  lineage?: TradeLineage | null;
 };
 
 type IntradayReport = {
@@ -141,13 +168,27 @@ type SwingPick = {
     realizedPnl?: number | null;
     unrealizedPnl?: number | null;
     rMultiple?: number | null;
+    economicR?: number | null;
+    pathR?: number | null;
     closed?: boolean;
   } | null;
   scaleTrail?: boolean;
   scaleProgress?: string | null;
+  deskProgress?: string | null;
+  deskExitLabel?: string | null;
+  executionStatus?: string | null;
+  outcomeBucket?: string | null;
   realizedPnl?: number | null;
   unrealizedPnl?: number | null;
   rMultiple?: number | null;
+  economicR?: number | null;
+  pathR?: number | null;
+  mfeR?: number | null;
+  maeR?: number | null;
+  riskPerShare?: number | null;
+  score?: number | null;
+  selectionReason?: string | null;
+  lineage?: TradeLineage | null;
 };
 
 type SwingReport = {
@@ -160,6 +201,7 @@ type SwingReport = {
   totalPnlPct: number | null;
   winCount: number;
   lossCount: number;
+  hitRatePct?: number;
   bestPerformer: SwingPick | null;
   worstPerformer: SwingPick | null;
   pnlByDayBucket: Record<string, number>;
@@ -256,6 +298,125 @@ function fmtInr(v: number | null | undefined, digits = 2): string {
   const n = Number(v);
   const sign = n > 0 ? '+' : '';
   return `${sign}₹${n.toFixed(digits)}`;
+}
+
+/** Book P&L → WIN / LOSS / FLAT / SKIPPED (mirrors backend outcome_bucket). */
+function bookOutcomeBucket(pnl: number | null | undefined, executionStatus?: string | null, skipped?: boolean): string {
+  if (skipped || String(executionStatus || '').toUpperCase() === 'NOT_TRIGGERED') return 'SKIPPED';
+  const p = Number(pnl);
+  if (!Number.isFinite(p)) return 'FLAT';
+  if (p > 0) return 'WIN';
+  if (p < 0) return 'LOSS';
+  return 'FLAT';
+}
+
+function economicRFromRow(row: {
+  pnl?: number | null;
+  economicR?: number | null;
+  rMultiple?: number | null;
+  riskPerShare?: number | null;
+  qty?: number | null;
+  entryPrice?: number | null;
+  stopLoss?: number | null;
+}): number | null {
+  const risk =
+    row.riskPerShare != null && Number.isFinite(Number(row.riskPerShare))
+      ? Number(row.riskPerShare)
+      : row.entryPrice != null && row.stopLoss != null
+        ? Math.abs(Number(row.entryPrice) - Number(row.stopLoss))
+        : null;
+  const qty = Number(row.qty) || 0;
+  const pnl = Number(row.pnl);
+  if (risk != null && risk > 0 && qty > 0 && Number.isFinite(pnl)) {
+    return Math.round((pnl / (risk * qty)) * 1000) / 1000;
+  }
+  if (row.economicR != null && Number.isFinite(Number(row.economicR))) return Number(row.economicR);
+  if (row.rMultiple != null && Number.isFinite(Number(row.rMultiple))) return Number(row.rMultiple);
+  return null;
+}
+
+function deriveCanonicalTrade<T extends {
+  pnl?: number | null;
+  outcomeBucket?: string | null;
+  executionStatus?: string | null;
+  skipped?: boolean;
+  economicR?: number | null;
+  rMultiple?: number | null;
+  pathR?: number | null;
+  riskPerShare?: number | null;
+  qty?: number | null;
+  entryPrice?: number | null;
+  stopLoss?: number | null;
+}>(row: T): T {
+  const bucket = bookOutcomeBucket(row.pnl, row.executionStatus, row.skipped);
+  const econ = bucket === 'SKIPPED' ? null : economicRFromRow(row);
+  return {
+    ...row,
+    outcomeBucket: bucket,
+    economicR: econ,
+    rMultiple: econ,
+  };
+}
+
+function deriveIntradayHeadlines(base: IntradayReport, trades: IntradayTrade[]): IntradayReport {
+  const derived = trades.map((t) => deriveCanonicalTrade(t));
+  const wins = derived.filter((t) => t.outcomeBucket === 'WIN').length;
+  const losses = derived.filter((t) => t.outcomeBucket === 'LOSS').length;
+  const skipped = derived.filter((t) => t.outcomeBucket === 'SKIPPED').length;
+  const triggered = derived.length - skipped;
+  const totalPnl = derived.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
+  const deployed = derived.reduce((s, t) => s + (Number(t.deployedCapital) || 0), 0);
+  return {
+    ...base,
+    trades: derived,
+    totalPnl,
+    hitRatePct: triggered ? Math.round((wins / triggered) * 1000) / 10 : 0,
+    hitCount: wins,
+    missCount: losses,
+    attribution: {
+      locked: derived.length,
+      triggered,
+      skipped,
+      wins,
+      losses,
+      deployed,
+    },
+  };
+}
+
+function deriveSwingHeadlines(base: SwingReport, picks: SwingPick[]): SwingReport {
+  const derived = picks.map((p) => deriveCanonicalTrade(p));
+  const active = derived.filter((p) => p.outcomeBucket !== 'SKIPPED' && !p.skipped && p.status !== 'NOT_TRIGGERED');
+  const wins = active.filter((p) => p.outcomeBucket === 'WIN');
+  const losses = active.filter((p) => p.outcomeBucket === 'LOSS');
+  const totalPnl = active.reduce((s, p) => s + (Number(p.pnl) || 0), 0);
+  const deployed = active.reduce((s, p) => s + (Number(p.deployedCapital) || 0), 0);
+  const withPnl = active.filter((p) => p.pnl != null && Number.isFinite(Number(p.pnl)));
+  const best = withPnl.length
+    ? withPnl.reduce((a, b) => (Number(a.pnl) >= Number(b.pnl) ? a : b))
+    : null;
+  const worst = withPnl.length
+    ? withPnl.reduce((a, b) => (Number(a.pnl) <= Number(b.pnl) ? a : b))
+    : null;
+  return {
+    ...base,
+    picks: derived,
+    totalPnl,
+    activePicks: active.length,
+    winCount: wins.length,
+    lossCount: losses.length,
+    hitRatePct: active.length ? Math.round((wins.length / active.length) * 1000) / 10 : 0,
+    bestPerformer: best,
+    worstPerformer: worst,
+    attribution: {
+      locked: derived.length,
+      triggered: active.length,
+      skipped: derived.length - active.length,
+      wins: wins.length,
+      losses: losses.length,
+      deployed,
+    },
+  };
 }
 
 function pnlTone(v: number | null | undefined): string {
@@ -360,13 +521,24 @@ function rootCauseTone(root: string | null | undefined): string {
   const r = String(root || '').toUpperCase();
   switch (r) {
     case 'ADVERSE_TRAJECTORY':
+    case 'ADVERSE':
+    case 'ENTRY_FAILURE':
     case 'FAKE_BREAKOUT':
+    case 'FAILED_BREAKOUT':
+    case 'FAILED_FOLLOWTHROUGH':
     case 'STOP_BEFORE_FOLLOWTHROUGH':
       return 'desk-pill--danger';
     case 'STALLED_TRADE':
+    case 'STALL':
+    case 'GOOD_ENTRY_BAD_EXIT':
       return 'desk-pill--warn';
     case 'PARTIAL_FOLLOWTHROUGH':
+    case 'TRAIL_CAPTURED':
+    case 'TRAIL_LOCKED_GAINS':
       return 'desk-pill--info';
+    case 'GOOD_TREND':
+    case 'TREND_FOLLOWTHROUGH':
+      return 'desk-pill--ok';
     default:
       return 'desk-pill--muted';
   }
@@ -374,8 +546,10 @@ function rootCauseTone(root: string | null | undefined): string {
 
 function OutcomeRow({ trade }: { trade: IntradayTrade }) {
   const d = trade.missDiagnostic!;
-  const rMult = trade.rMultiple ?? d.rMultiple;
-  const rBad = (rMult ?? 0) < 0;
+  const econR = trade.economicR ?? trade.rMultiple ?? d.economicR ?? d.rMultiple;
+  const pathR = trade.pathR ?? d.pathR;
+  const showPath = pathR != null && econR != null && Math.abs(Number(pathR) - Number(econR)) > 0.001;
+  const rBad = (econR ?? 0) < 0;
   const exitLabel = trade.deskExitLabel || trade.exitReason;
   const exitTone =
     exitLabel === 'INITIAL_SL' || exitLabel === 'SL_HIT' || exitLabel === 'TRAIL_STOP' || exitLabel === 'TRAIL_SL_HIT'
@@ -387,6 +561,7 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
           : 'desk-pill--ok';
   const ladder = trade.deskProgress || trade.scaleProgress;
   const ic = trade.deskIcSummary?.decision;
+  const lineage = trade.lineage;
   return (
     <>
       <tr className="border-t border-slate-100 hover:bg-slate-50/80">
@@ -400,6 +575,11 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
               title={trade.deskIcSummary?.oneLiner || ic}
             >
               IC {ic}
+            </span>
+          )}
+          {lineage?.lockRank != null && (
+            <span className="ml-1 text-[8px] font-bold text-slate-400" title="Lock rank">
+              #{lineage.lockRank}
             </span>
           )}
         </td>
@@ -419,7 +599,12 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
           </div>
         </td>
         <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${rBad ? 'text-red-600' : 'text-emerald-700'}`}>
-          {fmtMissSigned(rMult, 2, 'R')}
+          <div>{fmtMissSigned(econR, 2, 'R')}</div>
+          {showPath && (
+            <div className="text-[8px] font-semibold text-slate-400" title="Path R (price move / risk)">
+              path {fmtMissSigned(pathR, 2, 'R')}
+            </div>
+          )}
         </td>
         <td className={`px-2 py-1.5 text-right tabular-nums ${rBad ? 'text-red-600' : 'text-slate-700'}`}>
           {fmtMissSigned(d.movePct, 2, '%')}
@@ -507,16 +692,17 @@ function OutcomeDesk({ trades, coverage, isMock, symbolSource, bookLabel = 'Intr
   symbolSource?: string;
   bookLabel?: string;
 }) {
+  // Book outcomeBucket is authoritative — not path isHit/isMiss
   const misses = trades
-    .filter((t) => t.missDiagnostic?.isMiss)
+    .filter((t) => t.outcomeBucket === 'LOSS' || t.outcomeBucket === 'FLAT')
     .slice()
-    .sort((a, b) => (a.missDiagnostic?.rMultiple ?? 0) - (b.missDiagnostic?.rMultiple ?? 0));
+    .sort((a, b) => (a.economicR ?? a.rMultiple ?? 0) - (b.economicR ?? b.rMultiple ?? 0));
   const hits = trades
-    .filter((t) => Boolean(t.missDiagnostic?.isHit) || (Boolean(t.missDiagnostic) && ['T1_HIT', 'T2_HIT'].includes(t.exitReason)))
+    .filter((t) => t.outcomeBucket === 'WIN')
     .slice()
-    .sort((a, b) => (b.missDiagnostic?.rMultiple ?? 0) - (a.missDiagnostic?.rMultiple ?? 0));
+    .sort((a, b) => (b.economicR ?? b.rMultiple ?? 0) - (a.economicR ?? a.rMultiple ?? 0));
   const skips = trades
-    .filter((t) => Boolean(t.missDiagnostic?.isSkip) || ['NOT_TRIGGERED', 'NO_MARK'].includes(t.exitReason))
+    .filter((t) => t.outcomeBucket === 'SKIPPED' || Boolean(t.missDiagnostic?.isSkip) || ['NOT_TRIGGERED', 'NO_MARK'].includes(t.exitReason))
     .slice()
     .sort((a, b) => a.symbol.localeCompare(b.symbol));
 
@@ -526,8 +712,8 @@ function OutcomeDesk({ trades, coverage, isMock, symbolSource, bookLabel = 'Intr
     <div className="eod-panel-card space-y-0 overflow-hidden rounded-xl border border-slate-300 border-[0.5px] bg-white shadow-sm">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-2">
         <span className="desk-panel-title text-slate-900">Outcome Desk · {bookLabel}</span>
-        <span className="desk-pill desk-pill--danger">{misses.length} miss</span>
-        <span className="desk-pill desk-pill--ok">{hits.length} target hit</span>
+        <span className="desk-pill desk-pill--danger">{misses.length} loss/flat</span>
+        <span className="desk-pill desk-pill--ok">{hits.length} win</span>
         {skips.length > 0 && (
           <span className="desk-pill desk-pill--muted">{skips.length} skip</span>
         )}
@@ -543,14 +729,14 @@ function OutcomeDesk({ trades, coverage, isMock, symbolSource, bookLabel = 'Intr
         )}
         {isMock && <span className="desk-pill desk-pill--warn">MOCK</span>}
         <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-slate-400">
-          {bookLabel} lock · diagnostics first · narrative on rebuild
+          {bookLabel} lock · Book outcome · Economic R
         </span>
       </div>
 
       {misses.length > 0 && (
         <div>
           <div className="border-b border-slate-100 bg-red-50/40 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-red-700">
-            Why miss · SL / EOD square-off
+            Book LOSS / FLAT
           </div>
           <OutcomeTable rows={misses} />
         </div>
@@ -559,7 +745,7 @@ function OutcomeDesk({ trades, coverage, isMock, symbolSource, bookLabel = 'Intr
       {hits.length > 0 && (
         <div>
           <div className="border-b border-slate-100 bg-emerald-50/40 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-emerald-700">
-            Why target hit · T1 / T2
+            Book WIN
           </div>
           <OutcomeTable rows={hits} />
         </div>
@@ -881,7 +1067,9 @@ export default function EodAnalysisPanel({
 
   const displayIntraday = useMemo(() => {
     if (!intraday) return null;
-    if (!liveActive || !liveMarks) return intraday;
+    if (!liveActive || !liveMarks) {
+      return deriveIntradayHeadlines(intraday, intraday.trades || []);
+    }
 
     let realised = 0;
     let unrealised = 0;
@@ -1022,9 +1210,7 @@ export default function EodAnalysisPanel({
     });
 
     return {
-      ...intraday,
-      trades,
-      totalPnl: realised + unrealised,
+      ...deriveIntradayHeadlines(intraday, trades),
       remainingCapital: (intraday.capital || 0) - (intraday.totalDeployed || 0) + realised + unrealised,
       liveRealisedPnl: realised,
       liveUnrealisedPnl: unrealised,
@@ -1038,7 +1224,9 @@ export default function EodAnalysisPanel({
 
   const displaySwing = useMemo(() => {
     if (!swing) return null;
-    if (!liveActive || !liveMarks) return swing;
+    if (!liveActive || !liveMarks) {
+      return deriveSwingHeadlines(swing, swing.picks || []);
+    }
 
     let realised = 0;
     let unrealised = 0;
@@ -1138,9 +1326,7 @@ export default function EodAnalysisPanel({
     });
 
     return {
-      ...swing,
-      picks,
-      totalPnl: realised + unrealised,
+      ...deriveSwingHeadlines(swing, picks),
       liveRealisedPnl: realised,
       liveUnrealisedPnl: unrealised,
       liveOverlay: true,
@@ -1295,9 +1481,7 @@ export default function EodAnalysisPanel({
 
           {displaySwing && (
             <OutcomeDesk
-              trades={(displaySwing.picks || [])
-                .filter((p) => p.missDiagnostic)
-                .map((p) => ({
+              trades={(displaySwing.picks || []).map((p) => ({
                   symbol: p.symbol,
                   direction: p.direction,
                   entryPrice: p.entryPrice,
@@ -1311,9 +1495,40 @@ export default function EodAnalysisPanel({
                   pnl: p.pnl,
                   pnlPct: p.pnlPct,
                   missAnalysis: null,
-                  missDiagnostic: p.missDiagnostic,
+                  missDiagnostic: p.missDiagnostic || {
+                    isMiss: p.outcomeBucket === 'LOSS',
+                    isHit: p.outcomeBucket === 'WIN',
+                    isSkip: p.outcomeBucket === 'SKIPPED' || Boolean(p.skipped),
+                    exitReason: p.exitReason || p.status,
+                    rootCause: null,
+                    factors: [],
+                    rMultiple: p.economicR ?? p.rMultiple ?? null,
+                    economicR: p.economicR ?? null,
+                    pathR: p.pathR ?? null,
+                    movePct: p.pnlPct,
+                    gapToT1Pct: null,
+                    gapToT2Pct: null,
+                    stopUtilization: null,
+                    plannedRr: null,
+                    riskPerShare: p.riskPerShare ?? null,
+                    maePct: null,
+                    mfePct: null,
+                    stopEff: null,
+                    falsePositive: false,
+                    holdingMins: null,
+                    source: 'LEVELS',
+                  },
                   outcomeNarrative: p.outcomeNarrative,
                   deskIcSummary: p.deskIcSummary,
+                  outcomeBucket: p.outcomeBucket,
+                  executionStatus: p.executionStatus,
+                  economicR: p.economicR,
+                  pathR: p.pathR,
+                  rMultiple: p.rMultiple,
+                  mfeR: p.mfeR,
+                  deskExitLabel: p.deskExitLabel,
+                  deskProgress: p.deskProgress || p.scaleProgress,
+                  lineage: p.lineage,
                 }))}
               isMock={displaySwing.isMock}
               symbolSource={displaySwing.symbolSource}
@@ -1574,10 +1789,12 @@ export default function EodAnalysisPanel({
                     <thead>
                       <tr className="text-slate-500 uppercase tracking-wider border-b border-slate-100">
                         <th className="text-left px-2 py-1.5 font-bold">Symbol</th>
+                        <th className="hidden sm:table-cell text-left px-2 py-1.5 font-bold">Src / Rank</th>
                         <th className="text-center px-2 py-1.5 font-bold">Status</th>
                         <th className="text-right px-2 py-1.5 font-bold">Qty</th>
                         <th className="text-right px-2 py-1.5 font-bold">Entry</th>
                         <th className="text-right px-2 py-1.5 font-bold">Mark</th>
+                        <th className="hidden sm:table-cell text-right px-2 py-1.5 font-bold">Econ R</th>
                         <th className="hidden sm:table-cell text-left px-2 py-1.5 font-bold">Scale / Trail</th>
                         <th className="hidden sm:table-cell text-right px-2 py-1.5 font-bold">Deployed</th>
                         <th className="text-right px-2 py-1.5 font-bold">P&L</th>
@@ -1587,6 +1804,10 @@ export default function EodAnalysisPanel({
                     <tbody>
                       {displaySwing.picks.map((pick, i) => {
                         const badge = statusBadge(pick.status);
+                        const econ = pick.economicR ?? pick.rMultiple;
+                        const path = pick.pathR;
+                        const showPath = path != null && econ != null && Math.abs(Number(path) - Number(econ)) > 0.001;
+                        const lin = pick.lineage;
                         return (
                           <tr key={`${pick.symbol}-${i}`} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                             <td className="px-2 py-1.5">
@@ -1594,12 +1815,24 @@ export default function EodAnalysisPanel({
                                 {pick.symbol}
                               </span>
                               <span className="text-[8px] text-slate-400 ml-1">{pick.direction}</span>
+                              {pick.outcomeBucket && (
+                                <span className="ml-1 text-[7px] font-black uppercase text-slate-400">{pick.outcomeBucket}</span>
+                              )}
                               {pick.pnlKind === 'unrealised' && (
                                 <span className="ml-1 text-[7px] font-black uppercase text-cyan-600">U</span>
                               )}
                               {pick.pnlKind === 'realised' && !pick.skipped && (
                                 <span className="ml-1 text-[7px] font-black uppercase text-slate-400">R</span>
                               )}
+                            </td>
+                            <td className="hidden sm:table-cell px-2 py-1.5 text-[8px] text-slate-500">
+                              <div className="font-bold">{lin?.source || pick.selectionReason || '—'}</div>
+                              <div>
+                                {lin?.lockRank != null ? `#${lin.lockRank}` : '—'}
+                                {lin?.score != null || pick.score != null
+                                  ? ` · ${Number(lin?.score ?? pick.score).toFixed(1)}`
+                                  : ''}
+                              </div>
                             </td>
                             <td className="text-center px-2 py-1.5">
                               <span className={`${badge.bg} ${badge.txt} px-1 py-0.5 rounded text-[9px] font-bold`}>{badge.label}</span>
@@ -1617,10 +1850,16 @@ export default function EodAnalysisPanel({
                                 pick.currentPrice ?? '—'
                               )}
                             </td>
+                            <td className={`hidden sm:table-cell text-right px-2 py-1.5 tabular-nums font-bold ${(econ ?? 0) < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                              <div>{fmtMissSigned(econ, 2, 'R')}</div>
+                              {showPath && (
+                                <div className="text-[7px] font-semibold text-slate-400">path {fmtMissSigned(path, 2, 'R')}</div>
+                              )}
+                            </td>
                             <td className="hidden sm:table-cell px-2 py-1.5">
                               <ScaleExitCell
                                 scaleTrail={pick.scaleTrail}
-                                scaleProgress={pick.scaleProgress}
+                                scaleProgress={pick.deskProgress || pick.scaleProgress}
                                 exitPlan={pick.exitPlan}
                                 exitState={pick.exitState}
                                 effectiveStop={pick.effectiveStop}

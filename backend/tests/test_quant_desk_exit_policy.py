@@ -69,15 +69,19 @@ def test_classify_desk_outcome_chain_order():
     assert skip["outcomeBucket"] == "SKIPPED"
     assert skip["deskExitLabel"] == "SKIPPED"
     assert skip["chain"][0] == "execution_truth"
+    assert skip["economicR"] is None
+    assert skip["pathR"] is None
 
     forced = classify_desk_outcome(
         triggered=False,
         realized_pnl=-999.34,
         exit_reason="TRAIL_SL_HIT",
         current_r=-0.4,
-        exit_state={"rMultiple": -0.4, "effectiveStop": 100.0, "legsFilled": []},
+        exit_state={"rMultiple": -0.4, "economicR": -0.4, "effectiveStop": 100.0, "legsFilled": []},
         entry=105.0,
+        exit_price=100.0,
         risk_per_share=5.0,
+        qty=50,
         direction="LONG",
         effective_stop=100.0,
     )
@@ -87,7 +91,94 @@ def test_classify_desk_outcome_chain_order():
     assert forced["deskExitLabel"] == "TRAIL_STOP"
     assert forced["deskProgress"]
     assert "MFE" in forced["deskProgress"]
+    # economicR = -999.34 / (5 * 50) = -3.997
+    assert forced["economicR"] is not None
+    assert forced["economicR"] < 0
+    assert forced["rMultiple"] == forced["economicR"]
     assert outcome_bucket(execution_status="TRIGGERED", pnl=10) == "WIN"
+
+
+def test_build_trade_outcome_splits_economic_and_path_r():
+    from app.services.quant_desk_exit_policy import build_trade_outcome
+
+    # Negative Book P&L with positive path exit (scale / qty mismatch case)
+    out = build_trade_outcome(
+        triggered=True,
+        realized_pnl=-399.84,
+        exit_reason="EOD_SQUAREOFF",
+        entry=100.0,
+        exit_price=100.5,  # path slightly positive
+        risk_per_share=2.0,
+        qty=200,
+        direction="LONG",
+        day_high=101.0,
+        day_low=99.0,
+    )
+    assert out["outcomeBucket"] == "LOSS"
+    assert out["economicR"] is not None and out["economicR"] < 0
+    assert out["pathR"] is not None and out["pathR"] > 0
+    assert out["rMultiple"] == out["economicR"]
+
+
+def test_hindzinc_entry_failure_taxonomy():
+    from app.services.quant_desk_exit_policy import build_trade_outcome
+
+    out = build_trade_outcome(
+        triggered=True,
+        realized_pnl=-1531.0,
+        exit_reason="SL_HIT",
+        entry=100.0,
+        exit_price=98.0,
+        risk_per_share=2.0,
+        qty=765,
+        direction="LONG",
+        day_high=99.5,  # never greened meaningfully
+        day_low=98.0,
+        stop_utilization=1.0,
+    )
+    assert out["outcomeBucket"] == "LOSS"
+    assert out["mfeR"] is not None and out["mfeR"] < 0.10
+    assert out["rootCause"] == "ENTRY_FAILURE"
+    assert "NO_FAVOURABLE_EXCURSION" in out["factors"]
+
+
+def test_positive_eod_is_win_with_partial_followthrough():
+    from app.services.quant_desk_exit_policy import build_trade_outcome
+
+    out = build_trade_outcome(
+        triggered=True,
+        realized_pnl=500.0,
+        exit_reason="EOD_SQUAREOFF",
+        entry=100.0,
+        exit_price=101.0,
+        risk_per_share=2.0,
+        qty=100,
+        direction="LONG",
+        day_high=102.0,
+        day_low=99.5,
+    )
+    assert out["outcomeBucket"] == "WIN"
+    assert out["economicR"] > 0
+    assert out["rootCause"] == "PARTIAL_FOLLOWTHROUGH"
+    assert "EOD_FORCED_EXIT" in out["factors"]
+
+
+def test_exit_plan_emits_path_and_economic_r():
+    pick = attach_exit_plan(
+        {
+            "symbol": "TEST",
+            "direction": "LONG",
+            "entryPrice": 100.0,
+            "riskPerShare": 2.0,
+            "stopLoss": 98.0,
+            "approxQty": 100,
+        }
+    )
+    result = evaluate_scale_trail(pick, ltp=102.0, after_close=False)
+    assert result["economicR"] == result["rMultiple"] == 1.0
+    assert result["pathR"] == 1.0
+    assert result["exitState"]["economicR"] == 1.0
+    assert result["exitState"]["pathR"] == 1.0
 
 
 def test_inverted_long_stop_is_repaired():

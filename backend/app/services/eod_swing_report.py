@@ -1,68 +1,81 @@
 """Post-market-close swing analysis for the locked swing portfolio.
 
 Uses real close marks (snapshot / Yahoo) vs entry — never mock 0→false SL_HIT.
+Book symbols come only from date-matched swing_session (Asset Matrix lock).
 """
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
-from .trade_outcome import load_fixed_trade_plan, get_alert_history, _today_ist
+from .trade_outcome import get_alert_history, _today_ist
 from .eod_reference import get_close_mark_price, get_reference_price, generate_swing_analysis
 from .eod_intraday_report import _build_levels_diagnostic, _exit_reason_from_scale_eval
 from .exit_plan import attach_exit_plan, blended_pnl_from_state, format_scale_progress
-from .quant_desk_exit_policy import classify_desk_outcome
+from .quant_desk_exit_policy import build_trade_outcome
 
 log = logging.getLogger(__name__)
 
 DEFAULT_SWING_CAPITAL = 1_000_000.0  # ₹10L
 DAY_BUCKETS = (1, 7, 15, 30)
 
-# ---------------------------------------------------------------------------
-#  Mock swing trade plan — used when no fixed_trade_plan.json exists yet.
-#  Contains picks matching the Asset Matrix / scan results.
-# ---------------------------------------------------------------------------
-_MOCK_SWING_PICKS: list[dict[str, Any]] = [
-    # === Scanner Shorts (10 picks) ===
-    {"symbol": "KALAMANDIR", "direction": "SHORT", "entryDate": "2026-07-17", "approxQty": 1000, "deployedCapital": 91970.00,  "entryPrice": 91.97,  "stopLoss": 95.86,  "target1": 86.14,  "target2": 82.25},
-    {"symbol": "RAMASTEEL",  "direction": "SHORT", "entryDate": "2026-07-17", "approxQty": 20000, "deployedCapital": 86600.00,  "entryPrice": 4.33,   "stopLoss": 4.50,   "target1": 4.08,   "target2": 3.91},
-    {"symbol": "GTLINFRA",   "direction": "SHORT", "entryDate": "2026-07-17", "approxQty": 80000, "deployedCapital": 99200.00,  "entryPrice": 1.24,   "stopLoss": 1.30,   "target1": 1.15,   "target2": 1.09},
-    {"symbol": "VIKASLIFE",  "direction": "SHORT", "entryDate": "2026-07-17", "approxQty": 70000, "deployedCapital": 93800.00,  "entryPrice": 1.34,   "stopLoss": 1.39,   "target1": 1.27,   "target2": 1.22},
-    {"symbol": "JAINREC",    "direction": "SHORT", "entryDate": "2026-07-17", "approxQty": 300,   "deployedCapital": 98640.00,  "entryPrice": 328.80, "stopLoss": 346.37, "target1": 302.44, "target2": 284.88},
-    {"symbol": "GREENPOWER", "direction": "SHORT", "entryDate": "2026-07-17", "approxQty": 10000, "deployedCapital": 99500.00,  "entryPrice": 9.95,   "stopLoss": 10.21,  "target1": 9.56,   "target2": 9.30},
-    {"symbol": "BSE",        "direction": "SHORT", "entryDate": "2026-07-17", "approxQty": 25,    "deployedCapital": 89545.00,  "entryPrice": 3581.80,"stopLoss": 3697.29,"target1": 3408.57,"target2": 3293.08},
-    {"symbol": "BAJAJCON",   "direction": "SHORT", "entryDate": "2026-07-17", "approxQty": 200,   "deployedCapital": 105130.00, "entryPrice": 525.65, "stopLoss": 557.41, "target1": 478.01, "target2": 446.25},
-    {"symbol": "VIKASECO",   "direction": "SHORT", "entryDate": "2026-07-17", "approxQty": 80000, "deployedCapital": 92000.00,  "entryPrice": 1.15,   "stopLoss": 1.19,   "target1": 1.09,   "target2": 1.05},
-    {"symbol": "NCC",        "direction": "SHORT", "entryDate": "2026-07-17", "approxQty": 700,   "deployedCapital": 97720.00,  "entryPrice": 139.60, "stopLoss": 143.53, "target1": 133.70, "target2": 129.78},
-    # === Scanner Longs (10 picks) ===
-    {"symbol": "RELAXO",     "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 250,   "deployedCapital": 109987.50, "entryPrice": 439.95, "stopLoss": 418.48, "target1": 472.15, "target2": 504.36},
-    {"symbol": "CUPID",      "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 500,   "deployedCapital": 107390.00, "entryPrice": 214.78, "stopLoss": 203.38, "target1": 231.88, "target2": 248.98},
-    {"symbol": "NAVKARURB",  "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 80000, "deployedCapital": 92800.00,  "entryPrice": 1.16,   "stopLoss": 1.10,   "target1": 1.25,   "target2": 1.34},
-    {"symbol": "BAJFINANCE", "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 100,   "deployedCapital": 105630.00, "entryPrice": 1056.30, "stopLoss": 1031.65, "target1": 1093.27, "target2": 1130.25},
-    {"symbol": "ADANIENT",   "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 30,    "deployedCapital": 94821.00,  "entryPrice": 3160.70, "stopLoss": 3078.29, "target1": 3284.31, "target2": 3407.93},
-    {"symbol": "ZEEL",       "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 1000,  "deployedCapital": 107400.00, "entryPrice": 107.40, "stopLoss": 102.17, "target1": 115.25, "target2": 123.09},
-    {"symbol": "BPCL",       "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 350,   "deployedCapital": 110442.50, "entryPrice": 315.55, "stopLoss": 307.74, "target1": 327.26, "target2": 338.98},
-    {"symbol": "SBIN",       "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 100,   "deployedCapital": 104430.00, "entryPrice": 1044.30, "stopLoss": 1024.73, "target1": 1073.65, "target2": 1103.01},
-    {"symbol": "M&M",        "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 35,    "deployedCapital": 111272.00, "entryPrice": 3179.20, "stopLoss": 3105.88, "target1": 3289.18, "target2": 3399.16},
-    {"symbol": "PIRAMALFIN", "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 50,    "deployedCapital": 107215.00, "entryPrice": 2144.30, "stopLoss": 2075.93, "target1": 2246.86, "target2": 2349.41},
-    # === Swing Longs (additional) ===
-    {"symbol": "RELIANCE",   "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 50,    "deployedCapital": 147500.00, "entryPrice": 2950.00, "stopLoss": 2850.00, "target1": 3100.00, "target2": 3250.00},
-    {"symbol": "TCS",        "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 30,    "deployedCapital": 123600.00, "entryPrice": 4120.00, "stopLoss": 3980.00, "target1": 4320.00, "target2": 4500.00},
-    {"symbol": "HDFCBANK",   "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 80,    "deployedCapital": 134400.00, "entryPrice": 1680.00, "stopLoss": 1620.00, "target1": 1760.00, "target2": 1850.00},
-    {"symbol": "INFY",       "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 80,    "deployedCapital": 121600.00, "entryPrice": 1520.00, "stopLoss": 1470.00, "target1": 1600.00, "target2": 1680.00},
-    {"symbol": "BHARTIARTL", "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 100,   "deployedCapital": 142500.00, "entryPrice": 1425.00, "stopLoss": 1380.00, "target1": 1500.00, "target2": 1580.00},
-    {"symbol": "LT",         "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 40,    "deployedCapital": 146000.00, "entryPrice": 3650.00, "stopLoss": 3530.00, "target1": 3830.00, "target2": 4000.00},
-    {"symbol": "SUNPHARMA",  "direction": "SHORT", "entryDate": "2026-07-17", "approxQty": 80,    "deployedCapital": 126400.00, "entryPrice": 1580.00, "stopLoss": 1650.00, "target1": 1480.00, "target2": 1400.00},
-    {"symbol": "TITAN",      "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 35,    "deployedCapital": 131600.00, "entryPrice": 3760.00, "stopLoss": 3640.00, "target1": 3950.00, "target2": 4120.00},
-    {"symbol": "MARUTI",     "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 10,    "deployedCapital": 124500.00, "entryPrice": 12450.00,"stopLoss": 12100.00,"target1": 13000.00,"target2": 13600.00},
-    {"symbol": "HINDUNILVR", "direction": "SHORT", "entryDate": "2026-07-17", "approxQty": 50,    "deployedCapital": 132500.00, "entryPrice": 2650.00, "stopLoss": 2750.00, "target1": 2520.00, "target2": 2400.00},
-    {"symbol": "ITC",        "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 300,   "deployedCapital": 144000.00, "entryPrice": 480.00,  "stopLoss": 465.00,  "target1": 505.00,  "target2": 530.00},
-    {"symbol": "WIPRO",      "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 250,   "deployedCapital": 127500.00, "entryPrice": 510.00,  "stopLoss": 494.00,  "target1": 535.00,  "target2": 560.00},
-    {"symbol": "NTPC",       "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 400,   "deployedCapital": 146000.00, "entryPrice": 365.00,  "stopLoss": 353.00,  "target1": 383.00,  "target2": 400.00},
-    {"symbol": "ONGC",       "direction": "SHORT", "entryDate": "2026-07-17", "approxQty": 450,   "deployedCapital": 128250.00, "entryPrice": 285.00,  "stopLoss": 298.00,  "target1": 268.00,  "target2": 252.00},
-    {"symbol": "JSWSTEEL",   "direction": "LONG",  "entryDate": "2026-07-17", "approxQty": 150,   "deployedCapital": 138000.00, "entryPrice": 920.00,  "stopLoss": 890.00,  "target1": 965.00,  "target2": 1010.00},
-]
+
+def _exit_path_tag(
+    *,
+    status: str,
+    triggered: bool,
+    exit_state: dict[str, Any] | None,
+    mfe_r: float | None,
+) -> str:
+    if not triggered:
+        return "NEVER_TRIGGERED"
+    reason = str(status or "").upper()
+    if reason in {"SL_HIT"} and (mfe_r is None or mfe_r < 0.10):
+        return "IMMEDIATE_STOP"
+    if reason in {"TRAIL_SL_HIT", "TRAIL_SL"}:
+        legs = (exit_state or {}).get("legsFilled") or []
+        scaled = any(isinstance(x, dict) and isinstance(x.get("r"), (int, float)) for x in legs)
+        return "PARTIAL_SCALE_RUNNER_TRAILED" if scaled else "FULL_TRAIL"
+    if reason in {"EOD_SQUAREOFF", "OPEN"}:
+        return "FULL_EOD"
+    if reason.startswith("PARTIAL"):
+        return "PARTIAL_SCALE_RUNNER_TRAILED"
+    if reason in {"T1_HIT", "T2_HIT"}:
+        return "FULL_TRAIL"
+    return "FULL_EOD"
+
+
+def _merge_lineage(
+    pick: dict[str, Any],
+    *,
+    triggered: bool,
+    trigger_src: str | None,
+    exit_state: dict[str, Any] | None,
+    status: str,
+    mfe_r: float | None,
+) -> dict[str, Any]:
+    base = pick.get("lineage") if isinstance(pick.get("lineage"), dict) else {}
+    lineage = dict(base)
+    lineage.setdefault("source", pick.get("source") or "swing_session")
+    lineage.setdefault("score", pick.get("score"))
+    lineage.setdefault("selectionReason", pick.get("selectionReason") or pick.get("selection_reason"))
+    lineage.setdefault("verdict", pick.get("verdict"))
+    lineage.setdefault("sector", pick.get("sector"))
+    lineage.setdefault("levelsSource", pick.get("levelsSource"))
+    if triggered:
+        lineage["triggeredAt"] = datetime.now(timezone.utc).isoformat()
+        if isinstance(exit_state, dict):
+            lineage["executedFills"] = exit_state.get("legsFilled")
+    else:
+        lineage["triggeredAt"] = None
+        lineage["executedFills"] = None
+    lineage["exitPathTag"] = _exit_path_tag(
+        status=status, triggered=triggered, exit_state=exit_state, mfe_r=mfe_r
+    )
+    if trigger_src:
+        lineage["triggerSource"] = trigger_src
+    return lineage
 
 
 def _days_held(entry_date_str: str | None, as_of: date) -> int | None:
@@ -165,10 +178,14 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
         analysis = generate_swing_analysis(
             symbol, direction, base_entry or 0.0, 0.0, 0.0, 0.0, "NO_MARK"
         )
-        desk = classify_desk_outcome(
+        lineage = _merge_lineage(
+            pick, triggered=False, trigger_src=None, exit_state=None, status="NO_MARK", mfe_r=None
+        )
+        desk = build_trade_outcome(
             triggered=False,
             realized_pnl=0.0,
             exit_reason="NO_MARK",
+            lineage=lineage,
         )
         return {
             "symbol": symbol,
@@ -182,7 +199,7 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
             "target2": t2,
             "qty": qty,
             "deployedCapital": float(pick.get("deployedCapital") or ((base_entry or 0) * qty)),
-            "pnl": None,
+            "pnl": 0.0,
             "pnlPct": None,
             "status": "NO_MARK",
             "analysis": analysis,
@@ -190,7 +207,11 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
             "outcomeBucket": "SKIPPED",
             "deskExitLabel": "SKIPPED",
             "deskProgress": None,
-            "policyChain": desk.get("chain"),
+            "economicR": None,
+            "pathR": None,
+            "rMultiple": None,
+            "lineage": lineage,
+            "policyChain": desk.get("policyChain") or desk.get("chain"),
             "missDiagnostic": {
                 "isMiss": False,
                 "isHit": False,
@@ -233,7 +254,15 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
         if base_entry and eod_price:
             sign = 1.0 if direction == "LONG" else -1.0
             gap_entry_pct = round(sign * (eod_price - base_entry) / base_entry * 100.0, 2)
-        desk = classify_desk_outcome(
+        lineage = _merge_lineage(
+            pick,
+            triggered=False,
+            trigger_src=trigger_src,
+            exit_state=None,
+            status="NOT_TRIGGERED",
+            mfe_r=None,
+        )
+        desk = build_trade_outcome(
             triggered=False,
             realized_pnl=0.0,
             exit_reason="NOT_TRIGGERED",
@@ -241,8 +270,8 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
             direction=direction,
             day_high=day_high,
             day_low=day_low,
-            mfe_pct=None,
-            mae_pct=None,
+            trigger_source=trigger_src,
+            lineage=lineage,
         )
         return {
             "symbol": symbol,
@@ -266,7 +295,11 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
             "outcomeBucket": desk.get("outcomeBucket"),
             "deskExitLabel": desk.get("deskExitLabel"),
             "deskProgress": None,
-            "policyChain": desk.get("chain"),
+            "economicR": None,
+            "pathR": None,
+            "rMultiple": None,
+            "lineage": lineage,
+            "policyChain": desk.get("policyChain") or desk.get("chain"),
             "missDiagnostic": {
                 "isMiss": False,
                 "isHit": False,
@@ -302,6 +335,9 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
     sign = 1 if direction == "LONG" else -1
     scale_extra: dict[str, Any] = {}
     used_scale = False
+    pnl = 0.0
+    pnl_pct = 0.0
+    status = "OPEN"
 
     # Scale-trail blended PnL when exitPlan present or attachable
     work: dict[str, Any] | None = None
@@ -349,14 +385,16 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
                 "unrealizedPnl": eval_result.get("unrealizedPnl"),
                 "remainingQty": eval_result.get("remainingQty"),
                 "effectiveStop": eval_result.get("effectiveStop"),
-                "rMultiple": eval_result.get("rMultiple"),
+                "rMultiple": eval_result.get("economicR", eval_result.get("rMultiple")),
+                "economicR": eval_result.get("economicR", eval_result.get("rMultiple")),
+                "pathR": eval_result.get("pathR"),
                 "scaleTrail": True,
                 "exitPlan": work.get("exitPlan"),
                 "scaleProgress": format_scale_progress(
                     work.get("exitPlan") if isinstance(work.get("exitPlan"), dict) else None,
                     exit_state if isinstance(exit_state, dict) else None,
-                    r_multiple=float(eval_result["rMultiple"])
-                    if eval_result.get("rMultiple") is not None
+                    r_multiple=float(eval_result.get("economicR") or eval_result.get("rMultiple") or 0)
+                    if (eval_result.get("economicR") is not None or eval_result.get("rMultiple") is not None)
                     else None,
                 ),
             }
@@ -364,7 +402,7 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
     if not used_scale:
         # Legacy binary T1/T2/SL full-qty
         pnl_pct = sign * (eod_price - base_entry) / base_entry * 100
-        pnl = sign * (eod_price - base_entry) * qty if qty else None
+        pnl = sign * (eod_price - base_entry) * qty if qty else 0.0
 
         if direction == "LONG":
             if t2 > 0 and eod_price >= t2:
@@ -396,16 +434,16 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
     elif status == "OPEN":
         diag_reason = "EOD_SQUAREOFF"
     miss_diagnostic = None
+    exit_for_diag = eod_price
+    if used_scale and scale_extra.get("exitPrice") is not None:
+        exit_for_diag = float(scale_extra["exitPrice"])
+    elif status == "SL_HIT" and sl > 0:
+        exit_for_diag = sl
+    elif status == "T1_HIT" and t1 > 0:
+        exit_for_diag = t1
+    elif status == "T2_HIT" and t2 > 0:
+        exit_for_diag = t2
     if diag_reason:
-        exit_for_diag = eod_price
-        if used_scale and scale_extra.get("exitPrice") is not None:
-            exit_for_diag = float(scale_extra["exitPrice"])
-        elif status == "SL_HIT" and sl > 0:
-            exit_for_diag = sl
-        elif status == "T1_HIT" and t1 > 0:
-            exit_for_diag = t1
-        elif status == "T2_HIT" and t2 > 0:
-            exit_for_diag = t2
         miss_diagnostic = _build_levels_diagnostic(
             {
                 **pick,
@@ -415,39 +453,71 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
                 "target2": t2,
                 "direction": direction,
                 "rrT2": pick.get("rewardRisk") or pick.get("rrT2"),
+                "dayHigh": day_high,
+                "dayLow": day_low,
             },
             diag_reason,
             exit_for_diag,
             float(pnl or 0),
+            day_high=day_high,
+            day_low=day_low,
         )
 
     exit_state = scale_extra.get("exitState") if isinstance(scale_extra.get("exitState"), dict) else None
     if not isinstance(exit_state, dict) and isinstance(pick.get("exitState"), dict):
         exit_state = pick["exitState"]
-    desk = classify_desk_outcome(
+    risk_ps = float(pick.get("riskPerShare") or 0) or None
+    if risk_ps is None and base_entry and sl:
+        risk_ps = abs(base_entry - sl)
+
+    desk = build_trade_outcome(
         triggered=True,
         realized_pnl=pnl,
         exit_reason=diag_reason or status,
         exit_state=exit_state,
         entry=base_entry,
-        risk_per_share=float(pick.get("riskPerShare") or 0) or None,
+        exit_price=float(exit_for_diag) if exit_for_diag else eod_price,
+        risk_per_share=risk_ps,
+        qty=qty,
         direction=direction,
         effective_stop=(
             float(exit_state["effectiveStop"])
             if isinstance(exit_state, dict) and exit_state.get("effectiveStop") is not None
             else (sl or None)
         ),
-        current_r=(
-            float(scale_extra["rMultiple"])
-            if scale_extra.get("rMultiple") is not None
-            else None
-        ),
         day_high=day_high,
         day_low=day_low,
         mae_pct=(miss_diagnostic or {}).get("maePct") if miss_diagnostic else None,
         mfe_pct=(miss_diagnostic or {}).get("mfePct") if miss_diagnostic else None,
+        stop_utilization=(miss_diagnostic or {}).get("stopUtilization") if miss_diagnostic else None,
+        gap_to_t2_pct=(miss_diagnostic or {}).get("gapToT2Pct") if miss_diagnostic else None,
+        trigger_source=trigger_src,
+        economic_r_hint=scale_extra.get("economicR") if scale_extra.get("economicR") is not None else scale_extra.get("rMultiple"),
+        path_r_hint=scale_extra.get("pathR"),
     )
     pnl = float(desk["pnl"])
+    lineage = _merge_lineage(
+        pick,
+        triggered=True,
+        trigger_src=trigger_src,
+        exit_state=exit_state if isinstance(exit_state, dict) else None,
+        status=diag_reason or status,
+        mfe_r=desk.get("mfeR"),
+    )
+    desk["lineage"] = lineage
+
+    if miss_diagnostic:
+        if desk.get("rootCause"):
+            miss_diagnostic["rootCause"] = desk["rootCause"]
+        if desk.get("factors"):
+            miss_diagnostic["factors"] = list(desk["factors"])
+        miss_diagnostic["isHit"] = bool(desk.get("isHit"))
+        miss_diagnostic["isMiss"] = bool(desk.get("isMiss"))
+        if desk.get("pathR") is not None:
+            miss_diagnostic["pathR"] = desk["pathR"]
+        if desk.get("mfeR") is not None:
+            miss_diagnostic["mfeR"] = desk["mfeR"]
+
     if desk.get("deskProgress") and not scale_extra.get("scaleProgress"):
         scale_extra["scaleProgress"] = desk["deskProgress"]
     if desk.get("deskProgress"):
@@ -458,6 +528,10 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
         if isinstance(pick.get(key), dict):
             desk_ic = pick.get(key)
             break
+
+    outcome_bucket = desk.get("outcomeBucket")
+    if pnl < 0 and outcome_bucket == "WIN":
+        outcome_bucket = "LOSS"
 
     return {
         "symbol": symbol,
@@ -488,24 +562,19 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
         **scale_extra,
         # Desk truth last so scale_extra cannot overwrite table/narrative R
         "executionStatus": desk.get("executionStatus"),
-        "outcomeBucket": desk.get("outcomeBucket"),
+        "outcomeBucket": outcome_bucket,
         "deskExitLabel": desk.get("deskExitLabel"),
         "mfeR": desk.get("mfeR"),
+        "maeR": desk.get("maeR"),
+        "economicR": desk.get("economicR"),
+        "pathR": desk.get("pathR"),
         "effectiveStopR": desk.get("effectiveStopR"),
-        "rMultiple": desk.get("rMultiple") if desk.get("rMultiple") is not None else scale_extra.get("rMultiple"),
+        "rMultiple": desk.get("economicR") if desk.get("economicR") is not None else desk.get("rMultiple"),
         "deskProgress": desk.get("deskProgress") or scale_extra.get("deskProgress") or scale_extra.get("scaleProgress"),
-        "policyChain": desk.get("chain"),
+        "lineage": lineage,
+        "policyChain": desk.get("policyChain") or desk.get("chain"),
+        "outcomeSchemaVersion": desk.get("outcomeSchemaVersion"),
     }
-
-
-def _ensure_mock_plan() -> dict[str, Any]:
-    """Legacy fallback only — prefer swing_session via load_day_picks."""
-    plan = load_fixed_trade_plan()
-    if plan and (plan.get("long") or plan.get("short")) and plan.get("source") != "intraday_session_engine":
-        return plan
-    long_picks = [p for p in _MOCK_SWING_PICKS if p.get("direction") == "LONG"]
-    short_picks = [p for p in _MOCK_SWING_PICKS if p.get("direction") == "SHORT"]
-    return {"long": long_picks, "short": short_picks, "updatedAt": datetime.utcnow().isoformat() + "Z", "isMock": True}
 
 
 def _load_swing_book_picks(as_of: date) -> tuple[list[dict[str, Any]], bool, str, dict[str, int]]:
@@ -726,31 +795,42 @@ def generate_swing_eod_report(
                 r["outcomeNarrative"] = prior_narr[sym]
 
     rows = attach_outcome_narratives(rows, force=force, refresh_existing=force)
-    active_rows = [r for r in rows if not r.get("skipped") and r.get("status") != "NOT_TRIGGERED"]
-    winners = [r for r in active_rows if (r.get("pnl") or 0) > 0 or ((r.get("pnlPct") or 0) > 0 and r.get("pnl") is None)]
-    losers = [r for r in active_rows if (r.get("pnl") or 0) < 0 or ((r.get("pnlPct") or 0) < 0 and r.get("pnl") is None)]
+    active_rows = [r for r in rows if not r.get("skipped") and r.get("status") != "NOT_TRIGGERED" and r.get("outcomeBucket") != "SKIPPED"]
+    winners = [r for r in active_rows if r.get("outcomeBucket") == "WIN"]
+    losers = [r for r in active_rows if r.get("outcomeBucket") == "LOSS"]
     lessons = build_day_lessons(rows, force=force, refresh_existing=False, existing=prior_lessons)
+
+    def _book_pnl(r: dict[str, Any]) -> float:
+        try:
+            return float(r["pnl"]) if r.get("pnl") is not None else float("-inf")
+        except (TypeError, ValueError):
+            return float("-inf")
+
+    best = max(active_rows, key=_book_pnl, default=None) if active_rows else None
+    worst = min(active_rows, key=lambda r: float(r["pnl"]) if r.get("pnl") is not None else float("inf"), default=None) if active_rows else None
+    # Guard: best must have max Book P&L among triggered
+    if best is not None and best.get("pnl") is None:
+        best = None
+    if worst is not None and worst.get("pnl") is None:
+        worst = None
+
+    triggered = len(active_rows)
+    win_count = len(winners)
+    hit_rate = round(win_count / triggered * 100, 1) if triggered else 0.0
 
     report = {
         "date": as_of.isoformat(),
         "totalPicks": len(rows),
-        "activePicks": len(active_rows),
+        "activePicks": triggered,
         "skippedNotTriggered": skipped_count,
         "totalDeployed": round(total_deployed, 2),
         "totalPnl": round(total_pnl, 2),
         "totalPnlPct": round((total_pnl / total_deployed * 100), 2) if total_deployed else None,
-        "winCount": len(winners),
+        "winCount": win_count,
         "lossCount": len(losers),
-        "bestPerformer": max(
-            active_rows,
-            key=lambda r: float(r["pnl"] if r.get("pnl") is not None else (r.get("pnlPct") or float("-inf"))),
-            default=None,
-        ),
-        "worstPerformer": min(
-            active_rows,
-            key=lambda r: float(r["pnl"] if r.get("pnl") is not None else (r.get("pnlPct") or float("inf"))),
-            default=None,
-        ),
+        "hitRatePct": hit_rate,
+        "bestPerformer": best,
+        "worstPerformer": worst,
         "pnlByDayBucket": {str(k): round(v, 2) for k, v in bucket_totals.items()},
         "picks": rows,
         "isMock": is_mock,
@@ -760,9 +840,9 @@ def generate_swing_eod_report(
         "source": "asset_matrix_buy",
         "attribution": {
             "locked": len(rows),
-            "triggered": len(active_rows),
+            "triggered": triggered,
             "skipped": skipped_count,
-            "wins": len(winners),
+            "wins": win_count,
             "losses": len(losers),
             "deployed": round(total_deployed, 2),
         },

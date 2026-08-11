@@ -281,6 +281,7 @@ def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, afte
     unrealized = _mtm_pnl(direction, entry, ltp, remaining) if remaining > 0 else 0.0
     total_economic_pnl = round(realized + unrealized, 2)
     economic_r = _economic_r(total_economic_pnl, entry, risk, total_qty)
+    path_r_now = round(r_now, 3)
 
     if trail_hit:
         label, hit = "TRAIL STOP HIT", "sl"
@@ -301,7 +302,9 @@ def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, afte
         "realizedPnl": realized,
         "unrealizedPnl": unrealized,
         "economicPnl": total_economic_pnl,
-        "rMultiple": economic_r,
+        "rMultiple": economic_r,  # alias of economicR (Book headline R)
+        "economicR": economic_r,
+        "pathR": path_r_now,
         "mfeR": round(max(peak_r, float(prior.get("mfeR") or peak_r)), 3),
         "profitGuardActive": peak_r + 1e-9 >= PROFIT_GUARD_TRIGGER_R,
         "closed": trail_hit or square_off or remaining == 0,
@@ -323,6 +326,8 @@ def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, afte
         "economicPnl": total_economic_pnl,
         "effectiveStop": round(effective_stop, 2),
         "rMultiple": economic_r,
+        "economicR": economic_r,
+        "pathR": path_r_now,
         "closed": state["closed"],
         "scaleTrail": True,
     }

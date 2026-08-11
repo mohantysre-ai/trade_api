@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 log = logging.getLogger(__name__)
-BOOK_CACHE_SCHEMA_VERSION = 3
+BOOK_CACHE_SCHEMA_VERSION = 4
 
 
 def _day_dir(for_date) -> str:
@@ -111,8 +111,12 @@ def _reconcile_master_from_books(for_date) -> None:
         deployed = deployed_from_reports
 
     net_pnl = round(sum(pnls), 2)
-    wins = sum(1 for p in pnls if p > 0)
-    losses = sum(1 for p in pnls if p < 0)
+    wins = sum(1 for r in active_rows if str(r.get("outcomeBucket") or "").upper() == "WIN")
+    losses = sum(1 for r in active_rows if str(r.get("outcomeBucket") or "").upper() == "LOSS")
+    if wins == 0 and losses == 0:
+        # Fallback for pre-v4 rows without outcomeBucket
+        wins = sum(1 for p in pnls if p > 0)
+        losses = sum(1 for p in pnls if p < 0)
     win_rate = round(wins / triggered * 100.0, 2) if triggered else None
     net_return = round(net_pnl / deployed * 100.0, 4) if deployed else None
 
