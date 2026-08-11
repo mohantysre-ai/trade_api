@@ -11,6 +11,8 @@ import json
 import os
 import time
 import logging
+import copy
+import threading
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
@@ -49,6 +51,15 @@ _PRICE_TTL = 120  # seconds before we re-fetch live price
 
 _YAHOO_FINANCE_CACHE: dict[str, tuple[float, float]] = {}
 _YAHOO_FINANCE_CACHE_TTL = 30  # seconds
+
+# One computed live-book snapshot is shared by every endpoint and user. Several
+# UI panels call this service indirectly; without request coalescing they repeat
+# quote fetches, exit evaluation and JSON writes at the same instant.
+_LIVE_BOOK_CACHE: dict[str, Any] | None = None
+_LIVE_BOOK_CACHE_AT = 0.0
+_LIVE_BOOK_CACHE_LOCK = threading.Lock()
+_LIVE_BOOK_CACHE_OPEN_TTL = float(os.environ.get("LIVE_BOOK_CACHE_OPEN_TTL", "4"))
+_LIVE_BOOK_CACHE_CLOSED_TTL = float(os.environ.get("LIVE_BOOK_CACHE_CLOSED_TTL", "20"))
 
 # NSE equity cash trading session (IST)
 _MARKET_OPEN_HOUR = 9
@@ -798,6 +809,29 @@ def collect_hit_alerts_from_rows(
 
 
 def get_live_prices_for_plan() -> dict[str, Any]:
+    """Return a process-wide coalesced live-book snapshot.
+
+    A deep copy protects the cached payload from endpoint-specific enrichment.
+    The first caller after expiry performs the work while concurrent callers
+    wait and reuse its result.
+    """
+    global _LIVE_BOOK_CACHE, _LIVE_BOOK_CACHE_AT
+    now = time.monotonic()
+    ttl = _LIVE_BOOK_CACHE_OPEN_TTL if _is_market_open() else _LIVE_BOOK_CACHE_CLOSED_TTL
+    if _LIVE_BOOK_CACHE is not None and now - _LIVE_BOOK_CACHE_AT < ttl:
+        return copy.deepcopy(_LIVE_BOOK_CACHE)
+    with _LIVE_BOOK_CACHE_LOCK:
+        now = time.monotonic()
+        ttl = _LIVE_BOOK_CACHE_OPEN_TTL if _is_market_open() else _LIVE_BOOK_CACHE_CLOSED_TTL
+        if _LIVE_BOOK_CACHE is not None and now - _LIVE_BOOK_CACHE_AT < ttl:
+            return copy.deepcopy(_LIVE_BOOK_CACHE)
+        result = _compute_live_prices_for_plan()
+        _LIVE_BOOK_CACHE = copy.deepcopy(result)
+        _LIVE_BOOK_CACHE_AT = time.monotonic()
+        return result
+
+
+def _compute_live_prices_for_plan() -> dict[str, Any]:
     """Return prices + evaluated outcomes for symbols in the fixed plan.
 
     Honesty contract:

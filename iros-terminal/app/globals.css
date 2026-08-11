@@ -803,8 +803,22 @@ html[data-perf="1"] .desk-sources-track {
   border: 1px solid var(--terminal-line);
   border-top: 0;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
-  max-height: min(50vh, 320px);
+  max-height: min(50vh, 50dvh, 320px);
   overflow-y: auto;
+}
+@media (max-width: 640px) {
+  .desk-nse-search-menu {
+    position: fixed;
+    inset: auto 0 0 0;
+    max-height: min(62vh, 62dvh);
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    border: 1px solid var(--terminal-line);
+    border-radius: 0.75rem 0.75rem 0 0;
+    box-shadow: 0 -12px 32px rgba(15, 23, 42, 0.22);
+    overscroll-behavior: contain;
+  }
+  .desk-nse-search-option { min-height: 44px; padding: 0.65rem 0.85rem; }
+  .desk-nse-search-name { white-space: normal; overflow-wrap: anywhere; }
 }
 .desk-nse-search-option {
   display: flex;
@@ -1951,6 +1965,14 @@ html[data-perf="1"] .desk-sources-track {
   }
   .desk-brand { grid-area: brand; }
   .desk-controls { grid-area: controls; width: 100%; justify-content: flex-start; }
+  .desk-controls {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-padding-inline: 0.25rem;
+    padding: 0.1rem 0.25rem 0.2rem 0;
+  }
+  .desk-controls::-webkit-scrollbar { display: none; }
   .desk-sources {
     grid-area: sources;
     border-left: 0;
@@ -1972,9 +1994,9 @@ html[data-perf="1"] .desk-sources-track {
   }
   .terminal-tabs::-webkit-scrollbar { display: none; }
   .terminal-tabs button {
-    min-width: 3.6rem;
-    flex: 1 1 0;
-    padding-inline: 0.4rem;
+    min-width: 5.25rem;
+    flex: 0 0 auto;
+    padding-inline: 0.75rem;
     font-size: 0.72rem;
     letter-spacing: 0.06em;
     min-height: 44px;

@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { lazy, Suspense, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "motion/react";
 import type { AITickerNewsReport, DeskIcSummary, TerminalIntelligence } from "@/lib/market-api";
-import AITickerNewsPanel from "./AITickerNewsPanel";
-import ConfidenceCheckerPanel from "./ConfidenceCheckerPanel";
-import TechnicalAnalysisPanel from "./TechnicalAnalysisPanel";
-import SwotAnalysisPanel from "./SwotAnalysisPanel";
+const AITickerNewsPanel = lazy(() => import("./AITickerNewsPanel"));
+const ConfidenceCheckerPanel = lazy(() => import("./ConfidenceCheckerPanel"));
+const TechnicalAnalysisPanel = lazy(() => import("./TechnicalAnalysisPanel"));
+const SwotAnalysisPanel = lazy(() => import("./SwotAnalysisPanel"));
 import { parseNewsCatalystsCard } from "@/lib/intelligence-summary";
 import { deskDrawerVariants } from "@/lib/motion-tokens";
 
@@ -419,7 +419,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
           />
           <motion.div
             key="drawer-panel"
-            className="right-drawer fixed top-0 right-0 h-[100dvh] w-full sm:w-[min(100%,32rem)] lg:w-[50%] xl:w-[50%] 2xl:w-[45%] border-l border-slate-200 shadow-2xl z-[100] overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] touch-pan-y"
+            className="right-drawer fixed inset-y-0 right-0 flex h-screen h-[100dvh] w-full min-w-0 flex-col overflow-hidden border-l border-slate-200 shadow-2xl z-[100] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] touch-pan-y sm:w-[min(100dvw,clamp(22rem,48dvw,52rem))]"
             variants={drawerMotion}
             initial="closed"
             animate="open"
@@ -444,7 +444,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
         <span className="h-1 w-10 rounded-full bg-slate-300/80" />
       </div>
       {/* Header */}
-      <div className="sticky top-0 z-20 border-b border-slate-200 bg-[var(--terminal-panel)]">
+      <div className="z-20 shrink-0 border-b border-slate-200 bg-[var(--terminal-panel)]">
         <div className="px-3 sm:px-5 py-3.5 flex items-center justify-between">
           <div className="min-w-0 flex-1">
             <p className="desk-panel-title mb-0.5">Deep Asset Analysis</p>
@@ -546,7 +546,8 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
       </div>
 
       {/* Tab content */}
-      <div className="p-3 sm:p-5">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-3 [overflow-wrap:anywhere] sm:p-5">
+       <Suspense fallback={<div className="flex min-h-48 items-center justify-center text-xs text-slate-500">Loading research module…</div>}>
          {/* AI News Tab */}
          {activeTab === "aiNews" && (
            ticker ? (
@@ -710,6 +711,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
             )}
           </div>
         )}
+       </Suspense>
 
       </div>
           </motion.div>

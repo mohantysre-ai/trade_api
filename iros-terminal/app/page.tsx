@@ -32,6 +32,21 @@ type DrawerContent = {
   tickerNews?: AITickerNewsReport | null;
 };
 
+const drawerIntelligenceCache = new Map<string, TerminalIntelligence>();
+const drawerNewsCache = new Map<string, AITickerNewsReport>();
+const drawerPending = new Map<string, Promise<unknown>>();
+
+function dedupedDrawerFetch<T>(key: string, url: string): Promise<T> {
+  const pending = drawerPending.get(key);
+  if (pending) return pending as Promise<T>;
+  const request = fetch(url, { cache: 'no-store' }).then(async (response) => {
+    if (!response.ok) throw new Error(await response.text() || `HTTP ${response.status}`);
+    return response.json() as Promise<T>;
+  }).finally(() => drawerPending.delete(key));
+  drawerPending.set(key, request);
+  return request;
+}
+
 type TabKey = 'marketSnapshot' | 'stockHeatMap' | 'assetMatrix' | 'intradayMatrix' | 'eod';
 
 const INDIA_MARKET_LABELS = new Set(['NIFTY 100', 'SENSEX', 'NIFTY BANK', 'NIFTY IT', 'NIFTY PHARMA', 'NIFTY MIDCAP', 'NIFTY SMALLCAP', 'GIFT NIFTY']);
@@ -953,7 +968,7 @@ function Nifty100HeatMap() {
       if (aIsGainer && !bIsGainer) return -1;
       if (!aIsGainer && bIsGainer) return 1;
       if (aIsGainer && bIsGainer) return b.changePct - a.changePct;
-      return a.changePct - b.changePct; // losers: most negative last
+      return b.changePct - a.changePct; // losers: mildest decline first, largest decline last
     });
   }, [stocks]);
 
@@ -1051,6 +1066,61 @@ function Nifty100HeatMap() {
         }
       `}</style>
     </div>
+  );
+}
+
+type SectorHeatRow = { name: string; changePct: number; last?: number };
+
+function SectorRotationHeatMap() {
+  const [rows, setRows] = useState<SectorHeatRow[]>([]);
+  const [meta, setMeta] = useState<{ fetchedAt?: string; cached?: boolean; stale?: boolean; error?: string }>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return;
+      try {
+        const response = await fetch('/api/nse-sector-heatmap');
+        const payload = await response.json();
+        if (cancelled) return;
+        if (response.ok && Array.isArray(payload.data)) {
+          setRows(payload.data);
+          setMeta({ fetchedAt: payload.fetchedAt, cached: Boolean(payload.cached), stale: Boolean(payload.stale) });
+        } else setMeta((old) => ({ ...old, error: payload.error || 'Sector data unavailable' }));
+      } catch { if (!cancelled) setMeta((old) => ({ ...old, error: 'Sector data unavailable' })); }
+    };
+    void load();
+    const id = window.setInterval(() => void load(), 60_000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, []);
+
+  const sorted = useMemo(() => [...rows].sort((a, b) => b.changePct - a.changePct), [rows]);
+  return (
+    <section className="rounded-xl border border-slate-300 bg-white p-3 shadow-sm" aria-labelledby="sector-rotation-title">
+      <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h3 id="sector-rotation-title" className="text-[10px] font-black uppercase tracking-wider text-slate-900">Sector Rotation</h3>
+          <p className="truncate text-[8px] text-slate-500">NSE Sectoral Indices · strongest to weakest</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5 text-[8px] font-bold uppercase">
+          <span className={`border px-1.5 py-0.5 ${meta.stale ? 'border-amber-200 bg-amber-50 text-amber-700' : meta.cached ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+            {meta.stale ? 'Stale' : meta.cached ? 'Cached' : meta.fetchedAt ? 'Live' : 'Loading'}
+          </span>
+          {meta.fetchedAt ? <time className="text-slate-500" dateTime={meta.fetchedAt}>{new Date(meta.fetchedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</time> : null}
+        </div>
+      </div>
+      {sorted.length ? (
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-6">
+          {sorted.map((row) => {
+            const tone = row.changePct >= 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800';
+            return <div key={row.name} className={`min-w-0 border px-2 py-2 ${tone}`} title={`${row.name}: ${row.changePct.toFixed(2)}%`}>
+              <div className="truncate text-[9px] font-extrabold uppercase">{row.name.replace(/^NIFTY\s+/i, '')}</div>
+              <div className="mt-0.5 text-sm font-black tabular-nums">{row.changePct >= 0 ? '+' : ''}{row.changePct.toFixed(2)}%</div>
+            </div>;
+          })}
+        </div>
+      ) : <div className="flex min-h-20 items-center justify-center border border-dashed border-slate-200 text-[10px] text-slate-500">{meta.error || 'Loading sector rotation…'}</div>}
+    </section>
   );
 }
 
@@ -2182,6 +2252,7 @@ export default function IrosMasterAdvancedTerminal() {
 
   const marketIntelligence = liveMarket?.terminalIntelligence as TerminalIntelligence | undefined;
   const [tickerIntelligence, setTickerIntelligence] = useState<TerminalIntelligence | null>(null);
+  const drawerRequestRef = useRef(0);
 
   const selectedQuote = useMemo(
     () => selectedTickerForView ? liveMarket?.stockQuotes?.[selectedTickerForView] ?? stocks.find((stock) => stock.ticker === selectedTickerForView) : undefined,
@@ -2215,6 +2286,8 @@ export default function IrosMasterAdvancedTerminal() {
   );
 
   const handleSelect = async (t: string) => {
+    const requestId = ++drawerRequestRef.current;
+    t = t.toUpperCase().trim();
     setSelectedTicker(t);
     setDrawerOpen(true);
     const stock = resolveStockForDrawer(t);
@@ -2223,46 +2296,34 @@ export default function IrosMasterAdvancedTerminal() {
       prev?.stock?.ticker === t ? prev : { stock, analysis: null, tickerNews: null },
     );
 
-    const tickerIntelligence = liveMarket?.tickerIntelligenceByTicker?.[t];
-    const tickerNewsFromSnapshot = liveMarket?.tickerNewsByTicker?.[t] as AITickerNewsReport | undefined;
-    if (tickerIntelligence) {
-      setTickerIntelligence(tickerIntelligence);
-      setDrawerContent({
-        stock,
-        analysis: {
-          ...tickerIntelligence,
-          isSnapshotFallback: liveMarket?.isSnapshotFallback ?? false,
-        },
-        tickerNews: tickerNewsFromSnapshot ?? null,
+    const snapshotIntelligence = liveMarket?.tickerIntelligenceByTicker?.[t];
+    const snapshotNews = liveMarket?.tickerNewsByTicker?.[t] as AITickerNewsReport | undefined;
+    const cachedIntelligence = snapshotIntelligence ?? drawerIntelligenceCache.get(t);
+    const cachedNews = snapshotNews ?? drawerNewsCache.get(t);
+    if (cachedIntelligence || cachedNews) setDrawerContent({ stock, analysis: cachedIntelligence ?? null, tickerNews: cachedNews ?? null });
+
+    const params = new URLSearchParams({ ticker: t });
+    if (selectedPool) params.set('pool', selectedPool);
+    const intelligencePromise = cachedIntelligence ? Promise.resolve(cachedIntelligence) :
+      dedupedDrawerFetch<Record<string, unknown>>(`intelligence:${t}:${selectedPool || ''}`, `/api/terminal-intelligence?${params}`).then((body) => {
+        const value = (body.terminalIntelligence ?? body) as TerminalIntelligence;
+        drawerIntelligenceCache.set(t, value); return value;
       });
-      return;
-    }
-
-    try {
-      const params = new URLSearchParams();
-      if (t) params.set("ticker", t);
-      if (selectedPool) params.set("pool", selectedPool);
-      const resp = await fetch(`/api/terminal-intelligence${params.toString() ? `?${params.toString()}` : ""}`);
-      if (resp.ok) {
-        const body = await resp.json();
-        const ti = body.terminalIntelligence ?? body;
-        setTickerIntelligence(ti);
-        setDrawerContent({
-          stock,
-          analysis: { ...ti, isSnapshotFallback: body.isSnapshotFallback },
-          tickerNews: tickerNewsFromSnapshot ?? null,
-        });
-      } else {
-        const text = await resp.text();
-        setDrawerContent({ stock, analysis: { error: text } });
-      }
-    } catch (err) {
-      setDrawerContent({ stock, analysis: { error: String(err) } });
-    }
-
-    if (!tickerNewsFromSnapshot) {
-      fetch(`/api/ticker-news?ticker=${encodeURIComponent(t)}`, { cache: "no-store" }).catch(() => {});
-    }
+    const newsPromise = cachedNews ? Promise.resolve(cachedNews) :
+      dedupedDrawerFetch<{ success?: boolean; payload?: AITickerNewsReport } & Partial<AITickerNewsReport>>(`news:${t}`, `/api/ticker-news?ticker=${encodeURIComponent(t)}`).then((body) => {
+        const value = (body.payload ?? body) as AITickerNewsReport;
+        drawerNewsCache.set(t, value); return value;
+      });
+    const [intelResult, newsResult] = await Promise.allSettled([intelligencePromise, newsPromise]);
+    if (requestId !== drawerRequestRef.current) return;
+    const intelligence = intelResult.status === 'fulfilled' ? intelResult.value : null;
+    const news = newsResult.status === 'fulfilled' ? newsResult.value : null;
+    if (intelligence) setTickerIntelligence(intelligence);
+    setDrawerContent({
+      stock,
+      analysis: intelligence ? { ...intelligence, isSnapshotFallback: Boolean(snapshotIntelligence && liveMarket?.isSnapshotFallback) } : { error: intelResult.status === 'rejected' ? String(intelResult.reason) : 'Analysis unavailable' },
+      tickerNews: news,
+    });
   };
 
   const handleRefresh = async () => {
@@ -2441,6 +2502,7 @@ export default function IrosMasterAdvancedTerminal() {
 
         {activeTab === 'stockHeatMap' && (
           <div key="stockHeatMap" className="desk-panel-enter space-y-3 min-w-0">
+            <SectorRotationHeatMap />
             <Nifty100HeatMap />
           </div>
         )}

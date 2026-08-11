@@ -3930,6 +3930,13 @@ def create_app() -> FastAPI:
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    @app.get("/api/sector-heatmap")
+    def sector_heatmap() -> dict[str, Any]:
+        """Cached NSE Sectoral Indices heat map used by UI and intraday ranking."""
+        from .sector_rotation import get_sector_heatmap
+
+        return get_sector_heatmap()
+
     @app.post("/api/intraday-session/commit")
     def intraday_session_commit(force: bool = False) -> dict[str, Any]:
         """Lock intradAy basket (default 10L+10S) + auto-lock swing portfolio for EOD.

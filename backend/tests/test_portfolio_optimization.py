@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.services import intraday_session_engine as eng
 from app.services import swing_session
+from app.services import sector_rotation
 
 
 def _candidate(symbol: str, direction: str, expected_r: float, *, sector: str = "OTHER", score: float = 75) -> dict:
@@ -112,3 +113,27 @@ def test_swing_cap_migration_is_idempotent():
     migrated, dropped = swing_session._enforce_swing_position_cap(session)
     assert migrated is session
     assert dropped == []
+
+
+def test_nse_sector_payload_normalization_accepts_nested_shapes():
+    rows = sector_rotation.normalize_sector_payload(
+        {"data": [{"indexName": "NIFTY IT", "percentChange": "1.25%", "lastPrice": "42,100"}]}
+    )
+    assert rows == [{"index": "NIFTY IT", "pChange": 1.25, "last": 42100.0}]
+
+
+def test_sector_signal_rewards_directional_sector_leader(monkeypatch):
+    monkeypatch.setattr(
+        sector_rotation,
+        "get_sector_heatmap",
+        lambda: {
+            "stale": False,
+            "updatedAt": "2026-08-13T04:30:00+00:00",
+            "sectors": [{"index": "NIFTY IT", "pChange": 1.0}],
+        },
+    )
+    signal = sector_rotation.sector_signal("IT", "LONG", 2.0)
+    assert signal["rated"] is True
+    assert signal["leader"] is True
+    assert signal["stockVsSectorPct"] == 1.0
+    assert signal["score"] > 50

@@ -5,6 +5,7 @@ import { useAutoAnimate } from '@formkit/auto-animate/react';
 import type { SparkFlag } from '@/lib/market-api';
 import { fetchNseSparkline } from '@/lib/market-api';
 import { LiveTickNumber } from '@/lib/desk-motion';
+import { fetchLiveDesk } from '@/lib/live-desk';
 
 /* ── Smooth sparkline SVG with Catmull-Rom spline ─────────────────────── */
 let intraSparkIdCounter = 0;
@@ -476,12 +477,7 @@ type LivePricesResponse = {
 };
 
 async function fetchLivePrices(): Promise<LivePricesResponse> {
-  const res = await fetch('/api/live-prices', { cache: 'no-store' });
-  if (!res.ok) {
-    return { long: [], short: [], updatedAt: null, source: 'none' };
-  }
-  const data: LivePricesResponse = await res.json();
-  return data;
+  return fetchLiveDesk<LivePricesResponse>('live-prices');
 }
 
 function formatIstClock(iso?: string | null): string | null {

@@ -12,6 +12,7 @@ import {
 } from '@/lib/market-api';
 import EodAnalysisPanel from './EodAnalysisPanel';
 import EodReviewPanel from './EodReviewPanel';
+import { fetchLiveDesk } from '@/lib/live-desk';
 
 type EodMode = 'book' | 'forensic' | 'full';
 
@@ -241,21 +242,19 @@ export default function EodDeskPanel({
       }
       // Align Book dates to locked session days when today has no parity yet
       try {
-        const [intraRes, swingRes] = await Promise.all([
-          fetch('/api/intraday-session', { cache: 'no-store' }),
-          fetch('/api/swing-session', { cache: 'no-store' }),
+        const [intra, swing] = await Promise.all([
+          fetchLiveDesk<Record<string, any>>('intraday-session'),
+          fetchLiveDesk<Record<string, any>>('swing-session'),
         ]);
         if (cancelled) return;
         const today = getIstMarketState().today;
-        if (intraRes.ok) {
-          const intra = await intraRes.json();
+        if (intra) {
           const iDate = String(intra?.sessionDate || '').slice(0, 10);
           if (intra?.locked && iDate && iDate !== today) {
             setDateStr((prev) => (prev === today ? iDate : prev));
           }
         }
-        if (swingRes.ok) {
-          const swing = await swingRes.json();
+        if (swing) {
           const sDate = String(swing?.sessionDate || '').slice(0, 10);
           if (swing?.locked && sDate && sDate !== today) {
             setSwingDateStr((prev) => (prev === today ? sDate : prev));

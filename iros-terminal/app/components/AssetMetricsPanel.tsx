@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DeskGaugeFill, motion } from '@/lib/desk-motion';
+import { fetchLiveDesk } from '@/lib/live-desk';
 
 /* ── Types (API facts only) ─────────────────────────────────────────── */
 
@@ -534,15 +535,7 @@ async function readJsonSafe<T extends object>(res: Response, fallback: T): Promi
 async function fetchSession(): Promise<SessionResponse> {
   const empty: SessionResponse = { success: false, locked: false, long: [], short: [] };
   try {
-    const res = await fetch('/api/intraday-session', { cache: 'no-store' });
-    const data = await readJsonSafe<SessionResponse>(res, empty);
-    if (res.status === 404) {
-      return { ...empty, error: 'Session API not found (404)' };
-    }
-    if (!res.ok) {
-      return { ...empty, ...data, error: data.error || `Session HTTP ${res.status}` };
-    }
-    return data;
+    return await fetchLiveDesk<SessionResponse>('intraday-session');
   } catch (err) {
     return { ...empty, error: err instanceof Error ? err.message : 'Session fetch failed' };
   }

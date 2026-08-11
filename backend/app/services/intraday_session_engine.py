@@ -32,6 +32,7 @@ from .desk_clock import (
     rotation_window_config,
 )
 from .desk_book_symbols import swing_locked_symbols
+from .sector_rotation import sector_signal
 
 log = logging.getLogger(__name__)
 
@@ -1741,6 +1742,38 @@ def _trade_quality(row: dict[str, Any]) -> float:
     return round(score, 2)
 
 
+def _apply_sector_rotation(
+    scored: dict[str, Any], sector: str, direction: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Replace the legacy stock-range proxy with live NSE sector context."""
+    if scored.get("score") is None:
+        return scored, {"rated": False, "score": 50.0}
+    signal = sector_signal(sector, direction, _safe_float(scored.get("dayChangePct")))
+    if not signal.get("rated"):
+        return scored, signal
+    components = dict(scored.get("components") or {})
+    components["sector"] = {
+        "score": signal["score"],
+        "weight": W_SECTOR,
+        "rated": True,
+        "index": signal.get("index"),
+        "sectorChangePct": signal.get("sectorChangePct"),
+        "stockVsSectorPct": signal.get("stockVsSectorPct"),
+        "leader": signal.get("leader"),
+        "stale": signal.get("stale"),
+        "updatedAt": signal.get("updatedAt"),
+    }
+    rated = [c for c in components.values() if c.get("rated")]
+    total_weight = sum(float(c.get("weight") or 0) for c in rated)
+    adjusted_score = (
+        sum(float(c.get("score") or 0) * float(c.get("weight") or 0) for c in rated)
+        / total_weight
+        if total_weight > 0
+        else float(scored.get("score") or 0)
+    )
+    return {**scored, "score": round(_clamp(adjusted_score), 1), "components": components}, signal
+
+
 def _allocate_portfolio(rows: list[dict[str, Any]], capital: float) -> list[dict[str, Any]]:
     """Conviction/risk size with hard capital and portfolio-risk invariants."""
     remaining = max(0.0, capital)
@@ -2098,6 +2131,7 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
             ("SHORT", short_scored, short_mr),
         ):
             scored = _factor_scores(row, regime, direction)
+            scored, sector_ctx = _apply_sector_rotation(scored, sector, direction)
             if scored.get("score") is None:
                 unrated += 1
                 continue
@@ -2105,6 +2139,11 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
                 "symbol": sym,
                 "name": row.get("name"),
                 "sector": sector,
+                "sectorIndex": sector_ctx.get("index"),
+                "sectorChangePct": sector_ctx.get("sectorChangePct"),
+                "stockVsSectorPct": sector_ctx.get("stockVsSectorPct"),
+                "sectorLeader": sector_ctx.get("leader"),
+                "sectorDataStale": sector_ctx.get("stale"),
                 "ltp": ltp,
                 "atrPct": atr,
                 "score": scored["score"],
@@ -2151,6 +2190,7 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
             mom_bucket.append(base)
 
             mr = _factor_scores_meanrev(row, regime, direction)
+            mr, mr_sector_ctx = _apply_sector_rotation(mr, sector, direction)
             if mr.get("score") is not None:
                 mr_row = {
                     **base,
@@ -2159,6 +2199,11 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
                     "components": mr.get("components"),
                     "sleeve": "MEAN_REVERSION",
                     "gateReason": mr.get("gateReason"),
+                    "sectorIndex": mr_sector_ctx.get("index"),
+                    "sectorChangePct": mr_sector_ctx.get("sectorChangePct"),
+                    "stockVsSectorPct": mr_sector_ctx.get("stockVsSectorPct"),
+                    "sectorLeader": mr_sector_ctx.get("leader"),
+                    "sectorDataStale": mr_sector_ctx.get("stale"),
                 }
                 mr_gate = entry_quality_gate(mr_row, direction, regime)
                 mr_row["entryState"] = mr_gate["entryState"]

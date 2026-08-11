@@ -32,6 +32,8 @@ export default function NseSymbolSearchBar({ onSelect, selectedTicker }: NseSymb
   const [activeIdx, setActiveIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const fullLoadedRef = useRef(false);
+  const fullAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,16 +50,7 @@ export default function NseSymbolSearchBar({ onSelect, selectedTicker }: NseSymb
           setSource(String(fastData.source || 'nifty500'));
           setLoading(false);
         }
-        // Expand to full NSE EQ when available
-        const full = await fetch('/api/nse-symbols?universe=all', { cache: 'no-store' });
-        const fullData = await full.json();
-        if (cancelled) return;
-        if (full.ok && fullData?.success && Array.isArray(fullData.symbols) && fullData.symbols.length > 0) {
-          setSymbols(normalizeRows(fullData.symbols));
-          setSource(String(fullData.source || 'nse'));
-        } else if (!fast.ok) {
-          setError(String(fullData?.error || fastData?.error || 'Symbol list unavailable'));
-        }
+        if (!fast.ok) setError(String(fastData?.error || 'Symbol list unavailable'));
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Symbol list unavailable');
       } finally {
@@ -68,6 +61,35 @@ export default function NseSymbolSearchBar({ onSelect, selectedTicker }: NseSymb
       cancelled = true;
     };
   }, []);
+
+  const loadFullUniverse = useCallback(async () => {
+    if (fullLoadedRef.current || fullAbortRef.current) return;
+    const controller = new AbortController();
+    fullAbortRef.current = controller;
+    try {
+      const response = await fetch('/api/nse-symbols?universe=all', {
+        cache: 'no-store', signal: controller.signal,
+      });
+      const data = await response.json();
+      if (response.ok && data?.success && Array.isArray(data.symbols) && data.symbols.length) {
+        setSymbols(normalizeRows(data.symbols));
+        setSource(String(data.source || 'nse'));
+        fullLoadedRef.current = true;
+      }
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        // Nifty 500 remains usable when the optional full universe is unavailable.
+      }
+    } finally {
+      if (fullAbortRef.current === controller) fullAbortRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => fullAbortRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (open && query.trim().length >= 2) void loadFullUniverse();
+  }, [loadFullUniverse, open, query]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -147,7 +169,10 @@ export default function NseSymbolSearchBar({ onSelect, selectedTicker }: NseSymb
             setQuery(e.target.value);
             setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            setOpen(true);
+            void loadFullUniverse();
+          }}
           onKeyDown={onKeyDown}
           placeholder={
             loading

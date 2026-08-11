@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { LiveTickNumber } from '@/lib/desk-motion';
+import { fetchLiveDesk } from '@/lib/live-desk';
 
 /* -------------------------------------------------------------------------- */
 /*  Types for EOD report responses from the backend                          */
@@ -971,19 +972,18 @@ export default function EodAnalysisPanel({
       return;
     }
     let cancelled = false;
+    let lastMarketOpen = true;
+    let pollTimer: number | null = null;
 
     const loadLive = async () => {
       if (liveBusy.current) return;
       liveBusy.current = true;
       try {
-        const [lpRes, swingRes, intraRes] = await Promise.all([
-          fetch('/api/live-prices', { cache: 'no-store' }),
-          fetch('/api/swing-session?live=1', { cache: 'no-store' }),
-          fetch('/api/intraday-session', { cache: 'no-store' }),
+        const [lp, sw, intra] = await Promise.all([
+          fetchLiveDesk<Record<string, any>>('live-prices'),
+          fetchLiveDesk<Record<string, any>>('swing-session'),
+          fetchLiveDesk<Record<string, any>>('intraday-session'),
         ]);
-        const lp = lpRes.ok ? await lpRes.json() : null;
-        const sw = swingRes.ok ? await swingRes.json() : null;
-        const intra = intraRes.ok ? await intraRes.json() : null;
         if (cancelled) return;
 
         const byKey: LiveMarksState['byKey'] = {};
@@ -1040,6 +1040,7 @@ export default function EodAnalysisPanel({
         );
 
         const marketOpen = Boolean(lp?.marketOpen);
+        lastMarketOpen = marketOpen;
         setLiveMarks({
           marketOpen,
           updatedAt: typeof lp?.updatedAt === 'string' ? lp.updatedAt : new Date().toISOString(),
@@ -1053,13 +1054,17 @@ export default function EodAnalysisPanel({
       }
     };
 
-    void loadLive();
-    const id = window.setInterval(() => {
-      void loadLive();
-    }, 2000);
+    const schedule = () => {
+      if (cancelled) return;
+      pollTimer = window.setTimeout(async () => {
+        if (document.visibilityState === 'visible' && navigator.onLine) await loadLive();
+        schedule();
+      }, lastMarketOpen ? 5_000 : 30_000);
+    };
+    void loadLive().finally(schedule);
     return () => {
       cancelled = true;
-      window.clearInterval(id);
+      if (pollTimer !== null) window.clearTimeout(pollTimer);
     };
   }, [isTodayBook]);
 

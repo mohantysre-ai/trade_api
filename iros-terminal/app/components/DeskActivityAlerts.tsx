@@ -9,6 +9,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { fetchLiveDesk } from '@/lib/live-desk';
 
 export type DeskActivityAlert = {
   id: string;
@@ -378,23 +379,14 @@ export default function DeskActivityAlerts({ paused = false }: { paused?: boolea
     const poll = async () => {
       if (document.visibilityState !== 'visible') return;
       try {
-        const [liveRes, intraRes, swingRes] = await Promise.all([
-          fetch('/api/live-prices', { cache: 'no-store' }),
-          fetch('/api/intraday-session', { cache: 'no-store' }),
-          fetch('/api/swing-session?live=1', { cache: 'no-store' }),
+        const [live, intra, swing] = await Promise.all([
+          fetchLiveDesk<Record<string, unknown>>('live-prices'),
+          fetchLiveDesk<Record<string, unknown>>('intraday-session'),
+          fetchLiveDesk<Record<string, unknown>>('swing-session'),
         ]);
-        if (liveRes.ok) {
-          const live = await liveRes.json();
-          ingest(live.newAlerts);
-        }
-        if (intraRes.ok) {
-          const intra = await intraRes.json();
-          ingestSessionEvents(intra, 'INTRADAY');
-        }
-        if (swingRes.ok) {
-          const swing = await swingRes.json();
-          ingestSessionEvents(swing, 'SWING');
-        }
+        ingest(live.newAlerts);
+        ingestSessionEvents(intra, 'INTRADAY');
+        ingestSessionEvents(swing, 'SWING');
       } catch {
         /* network blip — next poll */
       }
