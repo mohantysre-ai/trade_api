@@ -107,7 +107,7 @@ def test_inverted_long_stop_is_repaired():
     assert pick["exitPlan"]["initialStop"] < pick["entryPrice"]
 
 
-def test_economic_r_matches_book_pnl_after_partial_scale():
+def test_economic_r_matches_book_pnl_after_scale():
     pick = attach_exit_plan(
         {
             "symbol": "TEST",
@@ -118,9 +118,9 @@ def test_economic_r_matches_book_pnl_after_partial_scale():
             "approxQty": 100,
         }
     )
-    result = evaluate_scale_trail(pick, ltp=102.0, after_close=True)
-    # 20 shares at 1R, 20 at 1.5R, 20 at 2R and 40 runner at mark = total +₹200.
-    # Initial portfolio risk is ₹200, therefore the canonical economic R is +1.00R.
+    result = evaluate_scale_trail(pick, ltp=102.0, after_close=False)
+    # Only the 1R leg is crossed; 20 shares are booked at 102 and 80 remain at 102.
+    # Economic P&L = 100 * (102-100) = ₹200, hence +1.00R.
     assert result["economicPnl"] == 200.0
     assert result["rMultiple"] == 1.0
     assert result["exitState"]["rMultiple"] == 1.0
