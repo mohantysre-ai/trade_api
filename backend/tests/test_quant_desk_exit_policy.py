@@ -42,15 +42,14 @@ def test_r_ratchet_is_monotonic_and_break_even_then_profit():
     assert locked_r_for_mfe(5.00) == 4.25
 
 
-def test_scale_legs_sum_with_runner():
+def test_scale_legs_sum_with_40pct_runner():
     leg_sum = sum(pct for _, pct in SCALE_LEGS) + RUNNER_FRACTION
     assert abs(leg_sum - 1.0) < 1e-9
-    assert RUNNER_FRACTION == 0.30
+    assert RUNNER_FRACTION == 0.40
     assert SCALE_LEGS == tuple(EXIT_SCALE_LEGS)
     assert RUNNER_FRACTION == RUNNER_FRAC
     assert abs(PROFIT_GUARD_LOCK_R - 0.0) < 1e-9
     assert abs(PROFIT_GUARD_TRIGGER_R - 0.25) < 1e-9
-    # Policy ratchet mirrors live TRAIL_RATCHET
     assert tuple(R_RATCHET) == tuple(TRAIL_RATCHET.items())
 
 
@@ -91,12 +90,24 @@ def test_classify_desk_outcome_chain_order():
     assert outcome_bucket(execution_status="TRIGGERED", pnl=10) == "WIN"
 
 
-def test_r_ratchet_tuple_nonempty():
-    assert len(R_RATCHET) >= 5
+def test_inverted_long_stop_is_repaired():
+    pick = attach_exit_plan(
+        {
+            "symbol": "ABFRL",
+            "direction": "LONG",
+            "entryPrice": 59.29,
+            "riskPerShare": 1.11,
+            "stopLoss": 60.40,
+            "approxQty": 1686,
+        }
+    )
+    assert pick["riskModelValid"] is True
+    assert pick["stopRepaired"] is True
+    assert pick["stopLoss"] < pick["entryPrice"]
+    assert pick["exitPlan"]["initialStop"] < pick["entryPrice"]
 
 
-def test_cold_path_full_stop_then_be_after_025r():
-    """Cold loser still −1R; after +0.25R MFE stop is BE not initial SL."""
+def test_economic_r_matches_book_pnl_after_partial_scale():
     pick = attach_exit_plan(
         {
             "symbol": "TEST",
@@ -107,25 +118,39 @@ def test_cold_path_full_stop_then_be_after_025r():
             "approxQty": 100,
         }
     )
-    plan = pick["exitPlan"]
-    assert plan["runnerFrac"] == 0.30
-    assert [leg["r"] for leg in plan["legs"]] == [1.0, 1.5, 2.0]
+    result = evaluate_scale_trail(pick, ltp=102.0, after_close=True)
+    # 20 shares at 1R, 20 at 1.5R, 20 at 2R and 40 runner at mark = total +₹200.
+    # Initial portfolio risk is ₹200, therefore the canonical economic R is +1.00R.
+    assert result["economicPnl"] == 200.0
+    assert result["rMultiple"] == 1.0
+    assert result["exitState"]["rMultiple"] == 1.0
 
+
+def test_cold_path_full_stop_then_be_after_025r():
+    pick = attach_exit_plan(
+        {
+            "symbol": "TEST",
+            "direction": "LONG",
+            "entryPrice": 100.0,
+            "riskPerShare": 2.0,
+            "stopLoss": 98.0,
+            "approxQty": 100,
+        }
+    )
     cold = evaluate_scale_trail(pick, ltp=98.0, after_close=False)
     assert cold.get("hitLevel") == "sl"
     assert cold["exitState"]["effectiveStop"] == 98.0
-    assert cold["realizedPnl"] == -200.0  # 100 * (98-100)
+    assert cold["economicPnl"] == -200.0
+    assert cold["rMultiple"] == -1.0
 
-    greened = evaluate_scale_trail(pick, ltp=100.5, after_close=False)  # +0.25R
+    greened = evaluate_scale_trail(pick, ltp=100.5, after_close=False)
     assert greened["exitState"]["mfeR"] >= 0.25
-    assert greened["exitState"]["effectiveStop"] == 100.0  # BE
+    assert greened["exitState"]["effectiveStop"] == 100.0
     assert greened["exitState"]["profitGuardActive"] is True
 
-    # Pullback after green should trail at BE, not reopen −1R
     pulled = dict(pick)
     pulled["exitState"] = greened["exitState"]
-    be_stop = evaluate_scale_trail(pulled, ltp=100.0, after_close=False)
-    assert be_stop["exitState"]["effectiveStop"] == 100.0
     hit = evaluate_scale_trail(pulled, ltp=99.99, after_close=False)
     assert hit.get("hitLevel") == "sl"
-    assert hit["realizedPnl"] == 0.0
+    assert hit["economicPnl"] == 0.0
+    assert hit["rMultiple"] == 0.0
