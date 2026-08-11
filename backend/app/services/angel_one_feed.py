@@ -22,6 +22,7 @@ import time
 import uuid
 from urllib.parse import quote
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 import httpx # Added for internal API calls
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -103,6 +104,7 @@ REFRESH_TASK_RUNNING_MAX_IDLE_SECONDS = int(
 _REFRESH_TASKS: dict[str, dict[str, Any]] = {}
 _ONDEMAND_ACTIVE_BY_KEY: dict[str, str] = {}
 _REFRESH_TASK_LOCK = threading.Lock()
+_MACRO_REFRESH_LOCK = threading.Lock()
 LLM_UNIVERSE_LIMIT = int(os.getenv("LLM_UNIVERSE_LIMIT", "30"))
 # last_market_snapshot.json: persisted market payload for GET /api/market-data (prefer_cache=True).
 # Reused during on-demand refresh for fresh intraday metrics (INTRADAY_METRICS_TTL) and AI output (AI_CACHE_TTL).
@@ -124,6 +126,7 @@ CANDLE_MIN_INTERVAL_SECONDS = float(os.getenv("CANDLE_MIN_INTERVAL_SECONDS", "0.
 CANDLE_RATE_LIMIT_RETRIES = int(os.getenv("CANDLE_RATE_LIMIT_RETRIES", "3"))
 _CANDLE_THROTTLE_LOCK = threading.Lock()
 _CANDLE_LAST_CALL_MONO = 0.0
+_CANDLE_COOLDOWN_UNTIL_MONO = 0.0
 
 AI_NEWS_API_URL = os.getenv("AI_NEWS_API_URL", "http://127.0.0.1:8001")
 
@@ -631,15 +634,47 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
 _thread_local_angel_client = threading.local()
 
 
+def _candle_api_slot():
+    """Hold candle mutex for the full HTTP round-trip (not just start spacing)."""
+
+    @contextmanager
+    def _slot():
+        global _CANDLE_LAST_CALL_MONO, _CANDLE_COOLDOWN_UNTIL_MONO
+        with _CANDLE_THROTTLE_LOCK:
+            now = time.monotonic()
+            wait = max(
+                0.0,
+                _CANDLE_COOLDOWN_UNTIL_MONO - now,
+                CANDLE_MIN_INTERVAL_SECONDS - (now - _CANDLE_LAST_CALL_MONO),
+            )
+            if wait > 0:
+                time.sleep(wait)
+            try:
+                yield
+            finally:
+                _CANDLE_LAST_CALL_MONO = time.monotonic()
+
+    return _slot()
+
+
 def _throttle_candle_api() -> None:
-    """Serialize getCandleData calls with a minimum gap across worker threads."""
-    global _CANDLE_LAST_CALL_MONO
+    """Legacy start-spacing helper — prefer ``_candle_api_slot`` for HTTP calls."""
+    global _CANDLE_LAST_CALL_MONO, _CANDLE_COOLDOWN_UNTIL_MONO
     with _CANDLE_THROTTLE_LOCK:
         now = time.monotonic()
-        wait = CANDLE_MIN_INTERVAL_SECONDS - (now - _CANDLE_LAST_CALL_MONO)
+        wait = max(
+            0.0,
+            _CANDLE_COOLDOWN_UNTIL_MONO - now,
+            CANDLE_MIN_INTERVAL_SECONDS - (now - _CANDLE_LAST_CALL_MONO),
+        )
         if wait > 0:
             time.sleep(wait)
         _CANDLE_LAST_CALL_MONO = time.monotonic()
+
+
+def _trip_candle_rate_limit_cooldown(seconds: float = 8.0) -> None:
+    global _CANDLE_COOLDOWN_UNTIL_MONO
+    _CANDLE_COOLDOWN_UNTIL_MONO = max(_CANDLE_COOLDOWN_UNTIL_MONO, time.monotonic() + seconds)
 
 
 def _is_candle_rate_limited(response_or_exc: Any) -> bool:
@@ -1895,10 +1930,10 @@ class AngelOneClient:
         }
         auth_retried = False
         for attempt in range(CANDLE_RATE_LIMIT_RETRIES + 1):
-            _throttle_candle_api()
             try:
-                smart = self.connect()
-                response = smart.getCandleData(params)
+                with _candle_api_slot():
+                    smart = self.connect()
+                    response = smart.getCandleData(params)
             except Exception as exc:
                 if self._is_auth_error(exc) and not auth_retried:
                     auth_retried = True
@@ -1906,6 +1941,7 @@ class AngelOneClient:
                     continue
                 if _is_candle_rate_limited(exc) and attempt < CANDLE_RATE_LIMIT_RETRIES:
                     delay = min(8.0, (2 ** attempt) + (0.1 * attempt))
+                    _trip_candle_rate_limit_cooldown(delay)
                     log.warning(
                         "Angel candle rate-limited (token=%s interval=%s); retry in %.1fs (%d/%d)",
                         symboltoken, interval, delay, attempt + 1, CANDLE_RATE_LIMIT_RETRIES,
@@ -1921,6 +1957,7 @@ class AngelOneClient:
                 return data if isinstance(data, list) else []
             if _is_candle_rate_limited(response) and attempt < CANDLE_RATE_LIMIT_RETRIES:
                 delay = min(8.0, (2 ** attempt) + (0.1 * attempt))
+                _trip_candle_rate_limit_cooldown(delay)
                 log.warning(
                     "Angel candle AB1021 (token=%s interval=%s); backoff %.1fs (%d/%d)",
                     symboltoken, interval, delay, attempt + 1, CANDLE_RATE_LIMIT_RETRIES,
@@ -3378,18 +3415,12 @@ def build_market_payload(
         snapshot.setdefault("tickerNewsByTicker", {})
         if pool_name:
             snapshot["activePool"] = pool_name
-        # Always serve fresh RSS news even when the rest of the snapshot is cached,
-        # so the news panel never shows stale, pre-RSS headlines.
-        try:
-            fresh_news = fetch_live_news()
-            if fresh_news:
-                snapshot["news"] = fresh_news
-        except Exception:
-            pass
+        # Prefer-cache is the SNAPSHOT first-paint path — do not block on RSS.
+        # Snapshot already carries news; live RSS can refresh via macros/on-demand.
         _apply_selection_meta(
             snapshot,
             mode="snapshot",
-            reason="Cache preferred. Serving the latest saved snapshot with fresh news.",
+            reason="Cache preferred. Serving the latest saved snapshot.",
             data_date=_payload_data_date(snapshot),
         )
         return _hydrate_ticker_intelligence_map(
@@ -3487,7 +3518,50 @@ def build_market_payload(
 
 
 def refresh_snapshot_macros(client: AngelOneClient | None = None) -> dict[str, Any]:
-    """Light live refresh of SNAPSHOT indices / commodities only (no LLM / stock rebuild)."""
+    """Light live refresh of SNAPSHOT indices / commodities only (no LLM / stock rebuild).
+
+    Concurrent callers get the last snapshot immediately (no pile-up). Hard-capped
+    so a slow Angel/Yahoo path cannot block the desk for a minute+.
+    """
+    if not _MACRO_REFRESH_LOCK.acquire(blocking=False):
+        snapshot = _load_last_snapshot()
+        snapshot = dict(snapshot) if isinstance(snapshot, dict) else {}
+        return {
+            "success": True,
+            "busy": True,
+            "updatedAt": snapshot.get("updatedAt"),
+            "macrosRefreshedAt": snapshot.get("macrosRefreshedAt"),
+            "macroCount": len((snapshot.get("macroDataStrip") or {}).get("morning") or []),
+            "globalIndexCount": len((snapshot.get("globalMacro") or {}).get("indices") or []),
+            "commodityCount": len((snapshot.get("globalMacro") or {}).get("commodities") or []),
+            "payload": snapshot,
+        }
+
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            fut = pool.submit(_refresh_snapshot_macros_body, client)
+            try:
+                return fut.result(timeout=18)
+            except Exception as exc:
+                logging.getLogger(__name__).warning("refresh_snapshot_macros timed out/failed: %s", exc)
+                snapshot = _load_last_snapshot()
+                snapshot = dict(snapshot) if isinstance(snapshot, dict) else {}
+                return {
+                    "success": True,
+                    "timedOut": True,
+                    "updatedAt": snapshot.get("updatedAt"),
+                    "macrosRefreshedAt": snapshot.get("macrosRefreshedAt"),
+                    "macroCount": len((snapshot.get("macroDataStrip") or {}).get("morning") or []),
+                    "globalIndexCount": len((snapshot.get("globalMacro") or {}).get("indices") or []),
+                    "commodityCount": len((snapshot.get("globalMacro") or {}).get("commodities") or []),
+                    "payload": snapshot,
+                }
+    finally:
+        _MACRO_REFRESH_LOCK.release()
+
+
+def _refresh_snapshot_macros_body(client: AngelOneClient | None = None) -> dict[str, Any]:
+    """Inner macro refresh body (runs under lock + timeout)."""
     snapshot = _load_last_snapshot()
     if not isinstance(snapshot, dict):
         snapshot = {
@@ -3585,7 +3659,13 @@ def create_app() -> FastAPI:
     @app.get("/api/market-data")
     def market_data(pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
         try:
-            return build_market_payload(AngelOneClient(), pool_name=pool, custom_prompt=prompt, prefer_cache=True)
+            # Prefer-cache path does not need Angel login — avoid constructing client.
+            return build_market_payload(
+                None,  # type: ignore[arg-type]
+                pool_name=pool,
+                custom_prompt=prompt,
+                prefer_cache=True,
+            )
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 

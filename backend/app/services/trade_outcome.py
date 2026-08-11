@@ -202,15 +202,10 @@ def _load_snapshot() -> dict[str, Any]:
 
 
 def _atomic_write(path: str, payload: dict[str, Any]) -> None:
-    """Write JSON atomically, falling back to a direct overwrite."""
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(payload, fh, indent=2, default=str)
-    try:
-        os.replace(tmp, path)
-    except OSError:
-        with open(path, "w", encoding="utf-8") as fh:
-            json.dump(payload, fh, indent=2, default=str)
+    """Write JSON without truncating the live file (Windows Docker safe)."""
+    from .json_atomic import atomic_write_json
+
+    atomic_write_json(path, payload)
 
 
 def _save_snapshot(payload: dict[str, Any]) -> None:
@@ -569,8 +564,9 @@ _FIXED_PLAN_FILE = os.environ.get(
 def load_fixed_trade_plan() -> dict[str, Any]:
     """Load the fixed/static trade plan from JSON."""
     try:
-        with open(_FIXED_PLAN_FILE, "r", encoding="utf-8-sig") as fh:
-            payload = json.load(fh)
+        from .json_atomic import load_json_with_fallback
+
+        payload = load_json_with_fallback(_FIXED_PLAN_FILE)
         if isinstance(payload, dict):
             return payload
         log.warning("fixed trade plan is not a JSON object: %s", _FIXED_PLAN_FILE)

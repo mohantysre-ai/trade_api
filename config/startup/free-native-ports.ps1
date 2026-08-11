@@ -1,7 +1,8 @@
 # Free ports 8000/8001/3000 only when held by native (non-Docker) processes.
 $ErrorActionPreference = "Continue"
 $ports = @(8000, 8001, 3000)
-$dockerNames = '^(com\.docker|docker-proxy|Docker Desktop|vpnkit)$'
+# Match Docker helpers by prefix (ProcessName is often com.docker.backend, not com.docker)
+$dockerNames = '^(com\.docker|docker-proxy|Docker Desktop|vpnkit)'
 $killed = 0
 
 foreach ($p in $ports) {
@@ -16,11 +17,11 @@ foreach ($p in $ports) {
         $name = if ($proc) { $proc.ProcessName } else { "?" }
 
         if ($name -match $dockerNames) {
-            Write-Host "  [OK] Port $p held by Docker ($name) — leave it"
+            Write-Host "  [OK] Port $p held by Docker ($name) - leave it"
             continue
         }
 
-        Write-Host "  [BUSY] Port $p held by $name (pid $($c.OwningProcess)) — stopping"
+        Write-Host "  [BUSY] Port $p held by $name (pid $($c.OwningProcess)) - stopping"
         Stop-Process -Id $c.OwningProcess -Force -ErrorAction SilentlyContinue
         $killed++
     }

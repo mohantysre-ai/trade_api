@@ -3,7 +3,7 @@
   "locked": true,
   "sessionDate": "2026-08-11",
   "committedAt": "2026-08-11T04:20:21.872011+00:00",
-  "updatedAt": "2026-08-11T06:21:15.534388+00:00",
+  "updatedAt": "2026-08-11T06:49:28.769109+00:00",
   "snapshotUpdatedAt": "2026-08-11T04:20:15.392840+00:00",
   "dataStale": false,
   "regime": {
@@ -322,12 +322,12 @@
         "OI_MISSING",
         "IN_PLAY"
       ],
-      "ltp": 1826.5,
+      "ltp": 1824.0,
       "scanLtp": 1826.5,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 0.88,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 1826.5,
       "stopLoss": 1807.21,
       "target1": 1855.43,
@@ -395,7 +395,38 @@
       "adoptReason": "HIGH_PROBABILITY_SCORE",
       "candidatePoolSize": 10,
       "oiSetup": null,
-      "oiAligned": null
+      "oiAligned": null,
+      "realizedPnl": -1041.66,
+      "unrealizedPnl": -0.0,
+      "pnlPct": -0.14,
+      "totalPnl": -1041.66,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 54,
+            "price": 1807.21,
+            "pnl": -1041.66
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1807.21,
+        "realizedPnl": -1041.66,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -1041.66,
+        "rMultiple": -1.0,
+        "mfeR": -4.966,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1807.21,
+        "totalQty": 54,
+        "riskPerShare": 19.29
+      },
+      "effectiveStop": 1807.21,
+      "remainingQty": 0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE"
     },
     {
       "rank": 3,
@@ -1066,12 +1097,12 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 604.4,
+      "ltp": 594.8,
       "scanLtp": 604.4,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 1.28,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 604.4,
       "stopLoss": 595.12,
       "target1": 618.32,
@@ -1140,8 +1171,8 @@
       "ltpRaw": 604.4,
       "oi": 68021800.0,
       "prev_oi": 0.0,
-      "slotFreed": false,
-      "slotStatus": "RUNNING",
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
       "adopted": true,
       "adoptReason": "REPLACEMENT_FREE_SLOT",
       "source": "REPLACEMENT",
@@ -1149,7 +1180,214 @@
       "replacedAt": "2026-08-11T06:21:15.018357+00:00",
       "oiSetup": "LONG_BUILDUP",
       "oiAligned": true,
-      "currentPrice": 604.4
+      "currentPrice": 604.4,
+      "realizedPnl": -1531.2,
+      "unrealizedPnl": -0.0,
+      "pnlPct": -1.59,
+      "totalPnl": -1531.2,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 165,
+            "price": 595.12,
+            "pnl": -1531.2
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 595.12,
+        "realizedPnl": -1531.2,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -1.034,
+        "mfeR": -1.034,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 595.12
+      },
+      "effectiveStop": 595.12,
+      "remainingQty": 0
+    },
+    {
+      "rank": 1,
+      "symbol": "MCX",
+      "name": "MCX",
+      "direction": "LONG",
+      "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "score": 58.1,
+      "scorePctRank": 61.1,
+      "intradayRetPctRank": 43.5,
+      "meanrevScore": null,
+      "gapPct": 0.732,
+      "intradayRet": -0.331,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": 0.08900521676561185,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 2764.81,
+      "orbHigh": 2788.9,
+      "orbLow": 2750.0,
+      "orbPosPct": 52.185089974293405,
+      "turnoverCr": 164.71,
+      "wickNoiseRatio": 0.548,
+      "factorBreakdown": {
+        "regime": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 35.9,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 0.089,
+          "niftyChangePct": -0.42,
+          "gapPct": 0.732,
+          "intradayRet": -0.331
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 48.2,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 52.0,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 2764.81
+        },
+        "volume": {
+          "score": 34.9,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 1.747,
+          "rvolRaw": 0.34,
+          "cumVolFracHeuristic": 0.193
+        },
+        "breakout": {
+          "score": 38.3,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 2788.9,
+          "orbLow": 2750.0,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 52.2,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 95.2,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 91.6,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.48,
+      "entryFlags": [
+        "OI_MISSING"
+      ],
+      "ltp": 2770.3,
+      "scanLtp": 2770.3,
+      "ltpSource": null,
+      "atrPct": 2.68,
+      "status": "RUNNING",
+      "closed": false,
+      "entryPrice": 2770.3,
+      "stopLoss": 2681.21,
+      "target1": 2903.94,
+      "target2": 3037.57,
+      "riskPerShare": 89.09,
+      "rewardRisk": 1.5,
+      "approxQty": 36,
+      "deployedCapital": 99730.8,
+      "maxLoss": 3207.24,
+      "riskScale": 0.7,
+      "effectiveRiskFraction": 0.007,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 2770.3,
+        "riskPerShare": 89.09,
+        "initialStop": 2681.21,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 11,
+            "price": 2859.39,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 9,
+            "price": 2903.94,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 5,
+            "price": 2948.48,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 11,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 2903.94,
+        "target2": 3037.57,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "slotFreed": false,
+      "slotStatus": "RUNNING",
+      "adopted": true,
+      "adoptReason": "REPLACEMENT_FREE_SLOT",
+      "source": "REPLACEMENT",
+      "replacedFrom": "PAYTM",
+      "replacedAt": "2026-08-11T06:39:51.898889+00:00",
+      "oiSetup": null,
+      "oiAligned": null,
+      "currentPrice": 2770.3
     }
   ],
   "short": [
@@ -5655,6 +5893,111 @@
           "proposalOnly": true
         }
       ]
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-11T06:39:50.004935+00:00",
+      "symbol": "HINDZINC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-11T06:39:50.004980+00:00",
+      "freeSlots": {
+        "long": 1,
+        "short": 0,
+        "total": 1,
+        "openLong": 4,
+        "openShort": 5,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "REPLACEMENT_APPLIED",
+      "at": "2026-08-11T06:39:51.899555+00:00",
+      "freeSlotsAfter": {
+        "long": 0,
+        "short": 0,
+        "total": 0,
+        "openLong": 5,
+        "openShort": 5,
+        "lockSize": 5
+      },
+      "applied": [
+        {
+          "symbol": "MCX",
+          "direction": "LONG",
+          "replacedFrom": "PAYTM",
+          "replacedAt": "2026-08-11T06:39:51.898889+00:00",
+          "entryPrice": 2770.3,
+          "approxQty": 36,
+          "score": 58.1,
+          "source": "REPLACEMENT"
+        }
+      ]
+    },
+    {
+      "type": "POSITION_REPLACED",
+      "at": "2026-08-11T06:39:51.898889+00:00",
+      "symbol": "MCX",
+      "direction": "LONG",
+      "replacedFrom": "PAYTM"
+    },
+    {
+      "type": "REPLACEMENT_PROPOSED",
+      "at": "2026-08-11T06:39:54.261346+00:00",
+      "freeSlots": {
+        "long": 0,
+        "short": 0,
+        "total": 0,
+        "openLong": 5,
+        "openShort": 5,
+        "lockSize": 5
+      },
+      "candidates": [
+        {
+          "symbol": "MCX",
+          "direction": "LONG",
+          "entryState": "QUALIFIED",
+          "score": 58.1,
+          "oiSetup": null,
+          "qualityAdjustedExpectedR": 1.48,
+          "proposalOnly": true
+        }
+      ]
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-11T06:49:26.806197+00:00",
+      "symbol": "COFORGE",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-11T06:49:26.806278+00:00",
+      "freeSlots": {
+        "long": 1,
+        "short": 0,
+        "total": 1,
+        "openLong": 4,
+        "openShort": 5,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "CASH_HELD",
+      "at": "2026-08-11T06:49:28.769060+00:00",
+      "freeSlots": {
+        "long": 1,
+        "short": 0,
+        "total": 1,
+        "openLong": 4,
+        "openShort": 5,
+        "lockSize": 5
+      },
+      "reason": "prefer_cash_no_qualified"
     }
   ],
   "funnel": {
@@ -5696,10 +6039,10 @@
   "shortCashReason": null,
   "fixedPlanSynced": true,
   "freeSlots": {
-    "long": 0,
+    "long": 1,
     "short": 0,
-    "total": 0,
-    "openLong": 5,
+    "total": 1,
+    "openLong": 4,
     "openShort": 5,
     "lockSize": 5
   },
@@ -5713,42 +6056,23 @@
       "approxQty": 165,
       "score": 69.2,
       "source": "REPLACEMENT"
+    },
+    {
+      "symbol": "MCX",
+      "direction": "LONG",
+      "replacedFrom": "PAYTM",
+      "replacedAt": "2026-08-11T06:39:51.898889+00:00",
+      "entryPrice": 2770.3,
+      "approxQty": 36,
+      "score": 58.1,
+      "source": "REPLACEMENT"
     }
   ],
   "lastAppliedReplacementKey": [
-    "HINDZINC:LONG"
+    "MCX:LONG"
   ],
-  "lastReplacementAppliedAt": "2026-08-11T06:21:15.018475+00:00",
-  "lastReplacementKey": [
-    "HINDZINC:LONG"
-  ],
-  "lastReplacementProposals": [
-    {
-      "symbol": "HINDZINC",
-      "direction": "LONG",
-      "score": 69.2,
-      "sector": "OTHER",
-      "sleeve": "MOMENTUM",
-      "entryState": "QUALIFIED",
-      "excludeReason": null,
-      "flags": [
-        "FNO_OI",
-        "OI_LONG_BUILDUP",
-        "OI_PREFERRED",
-        "OI_ALIGN_BONUS",
-        "IN_PLAY"
-      ],
-      "ltpSource": null,
-      "dayMovePct": 0.902,
-      "qualityAdjustedExpectedR": 1.556,
-      "ltp": 604.4,
-      "rewardRisk": 1.5,
-      "inPlay": true,
-      "oiSetup": "LONG_BUILDUP",
-      "oiAligned": true,
-      "replaceReason": "FREE_SLOT",
-      "proposalOnly": false,
-      "applied": true
-    }
-  ]
+  "lastReplacementAppliedAt": "2026-08-11T06:39:51.899555+00:00",
+  "lastReplacementKey": [],
+  "lastReplacementProposals": [],
+  "lastCashHeldAt": "2026-08-11T06:49:28.769091+00:00"
 }

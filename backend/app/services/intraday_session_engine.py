@@ -213,33 +213,10 @@ def _clamp(x: float, lo: float = 0.0, hi: float = 100.0) -> float:
 
 
 def _atomic_write(path: Path, payload: dict[str, Any]) -> None:
-    """Atomic JSON write. Docker/Windows bind mounts often reject os.replace (EBUSY);
-    retry with a unique tmp, then fall back to in-place overwrite.
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    text = json.dumps(payload, indent=2, default=str)
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
-    tmp.write_text(text, encoding="utf-8")
-    last_err: OSError | None = None
-    for attempt in range(4):
-        try:
-            os.replace(tmp, path)
-            return
-        except OSError as exc:
-            last_err = exc
-            time.sleep(0.05 * (attempt + 1))
-    try:
-        path.write_text(text, encoding="utf-8")
-    except OSError:
-        if last_err is not None:
-            raise last_err
-        raise
-    finally:
-        try:
-            tmp.unlink(missing_ok=True)
-        except OSError:
-            pass
+    """Write JSON without truncating the live file (Windows Docker safe)."""
+    from .json_atomic import atomic_write_json
 
+    atomic_write_json(path, payload)
 
 def load_market_snapshot() -> dict[str, Any]:
     try:

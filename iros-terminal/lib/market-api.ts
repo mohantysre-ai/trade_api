@@ -261,7 +261,8 @@ export async function fetchRefreshMacros(): Promise<MarketDataResponse> {
   const res = await fetch("/api/refresh-macros", {
     method: "POST",
     cache: "no-store",
-    signal: AbortSignal.timeout(90_000),
+    // Keep short — Angel/Yahoo can hang; SNAPSHOT paints from cache first
+    signal: AbortSignal.timeout(18_000),
   });
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
@@ -291,7 +292,10 @@ export async function fetchMarketData(pool?: string): Promise<MarketDataResponse
     }
   }
 
-  const res = await fetch(typeof url === "string" ? url : url.toString(), { cache: "no-store" });
+  const res = await fetch(typeof url === "string" ? url : url.toString(), {
+    cache: "no-store",
+    signal: AbortSignal.timeout(25_000),
+  });
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
     try {
@@ -405,9 +409,9 @@ export function useMarketData(pool?: string, _pollMs = 30_000) {
     setStatus("loading");
     (async () => {
       try {
-        const payload = isNseCashSessionNow()
-          ? await fetchRefreshMacros().catch(() => fetchMarketData(pool))
-          : await fetchMarketData(pool);
+        // Always paint from cached snapshot first — live macros can take 60s+ and
+        // previously blocked the whole desk on a blank loading state.
+        const payload = await fetchMarketData(pool);
         if (cancelled) return;
         setData(payload);
         setStatus("live");
@@ -415,6 +419,21 @@ export function useMarketData(pool?: string, _pollMs = 30_000) {
         const ts = Date.now();
         setLastUpdatedAt(ts);
         lastUpdatedRef.current = ts;
+
+        if (isNseCashSessionNow()) {
+          try {
+            const live = await fetchRefreshMacros();
+            if (cancelled) return;
+            setData(live);
+            setStatus("live");
+            setError(null);
+            const liveTs = Date.now();
+            setLastUpdatedAt(liveTs);
+            lastUpdatedRef.current = liveTs;
+          } catch {
+            // Keep cached SNAPSHOT; interval poll will retry
+          }
+        }
       } catch (err) {
         if (cancelled) return;
         setStatus("offline");
@@ -427,8 +446,11 @@ export function useMarketData(pool?: string, _pollMs = 30_000) {
   }, [pool]);
 
   useEffect(() => {
+    let inFlight = false;
     const tick = async () => {
+      if (inFlight) return;
       if (isNseCashSessionNow()) {
+        inFlight = true;
         try {
           const payload = await fetchRefreshMacros();
           setData(payload);
@@ -448,6 +470,8 @@ export function useMarketData(pool?: string, _pollMs = 30_000) {
               setError("Feed unavailable");
             }
           }
+        } finally {
+          inFlight = false;
         }
         return;
       }
