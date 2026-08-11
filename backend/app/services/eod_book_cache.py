@@ -1,12 +1,9 @@
 """Per-day Book P&L report cache and EOD reconciliation.
 
-Files under ``backend/app/data/eod/YYYY-MM-DD/``:
-  - book_intraday.json
-  - book_swing.json
-
 Book P&L is the execution/reporting source of truth. Institutional scorecards
-remain useful for forensic diagnostics, but must not overwrite the Book's
-realized trade counts, win rate, deployed capital, or net return.
+remain useful for forensic diagnostics, but must not overwrite realized Book
+metrics. Cache schema is versioned so accounting-policy changes cannot leave
+stale headline numbers on screen.
 """
 from __future__ import annotations
 
@@ -17,6 +14,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 log = logging.getLogger(__name__)
+BOOK_CACHE_SCHEMA_VERSION = 3
 
 
 def _day_dir(for_date) -> str:
@@ -68,12 +66,7 @@ def _is_triggered_swing(row: dict[str, Any]) -> bool:
 
 
 def _reconcile_master_from_books(for_date) -> None:
-    """Make the headline EOD artifact agree with the canonical Book caches.
-
-    The forensic engine may model a different exit path (for example a 1-minute
-    T1/SL path) from the Book's SCALE_TRAIL / close-mark accounting. That is
-    valid for diagnostics, but it must not overwrite realized Book metrics.
-    """
+    """Make the headline EOD artifact agree with canonical Book caches."""
     day_dir = _day_dir(for_date)
     master_path = os.path.join(day_dir, "master_eod_payload.json")
     master = _read_json(master_path)
@@ -88,10 +81,7 @@ def _reconcile_master_from_books(for_date) -> None:
     intra_rows = [r for r in (intra.get("trades") or []) if isinstance(r, dict)]
     swing_rows = [r for r in (swing.get("picks") or []) if isinstance(r, dict)]
     active_swing = [r for r in swing_rows if _is_triggered_swing(r)]
-    active_intra = [
-        r for r in intra_rows
-        if str(r.get("exitReason") or "").upper() != "NOT_TRIGGERED"
-    ]
+    active_intra = [r for r in intra_rows if str(r.get("executionStatus") or "").upper() != "NOT_TRIGGERED"]
     active_rows = active_intra + active_swing
 
     locked = len(intra_rows) + len(swing_rows)
@@ -128,14 +118,8 @@ def _reconcile_master_from_books(for_date) -> None:
 
     win_pcts = [p for p in (_row_pnl_pct(r) for r in active_rows) if p is not None and p > 0]
     loss_pcts = [abs(p) for p in (_row_pnl_pct(r) for r in active_rows) if p is not None and p < 0]
-    avg_rr = (
-        round((sum(win_pcts) / len(win_pcts)) / (sum(loss_pcts) / len(loss_pcts)), 3)
-        if win_pcts and loss_pcts else None
-    )
+    avg_rr = round((sum(win_pcts) / len(win_pcts)) / (sum(loss_pcts) / len(loss_pcts)), 3) if win_pcts and loss_pcts else None
 
-    # Score is deterministic and tied to reconciled headline metrics. ECE/Brier
-    # are forensic probability metrics, not Book accounting metrics, so they are
-    # cleared here rather than displaying stale values from a different model.
     score = 5.0
     if win_rate is not None:
         score += (win_rate - 50.0) / 20.0
@@ -147,7 +131,6 @@ def _reconcile_master_from_books(for_date) -> None:
     if not isinstance(executive, dict):
         executive = {}
         master["executive_summary"] = executive
-
     executive.update({
         "overall_institutional_score": score,
         "total_trades": locked,
@@ -179,8 +162,6 @@ def _reconcile_master_from_books(for_date) -> None:
         "reconciled_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    # Deterministic Book commentary replaces stale LLM prose until the user
-    # explicitly regenerates PM commentary from the corrected artifact.
     master["pm_commentary"] = {
         "executive_summary": (
             f"Book-reconciled EOD: {net_pnl:+.2f} net P&L across {locked} locked names "
@@ -192,13 +173,9 @@ def _reconcile_master_from_books(for_date) -> None:
         "attribution_narrative": (
             f"Intraday P&L {float(intra.get('totalPnl') or 0.0):+.2f}; "
             f"Swing P&L {float(swing.get('totalPnl') or 0.0):+.2f}. "
-            "Trade-level attribution is sourced from the Book rows; forensic "
-            "scorecards remain diagnostic and do not override realized Book P&L."
+            "Trade-level attribution is sourced from Book rows; forensic scorecards remain diagnostic."
         ),
-        "execution_and_slippage_review": (
-            "Book reconciliation uses the same realized P&L, close marks, scale/trail "
-            "state, and deployed-capital rows shown in the EOD Book."
-        ),
+        "execution_and_slippage_review": "Book reconciliation uses realized P&L, close marks, scale/trail state, and deployed-capital rows shown in the EOD Book.",
         "actionable_directives": [
             "Use BOOK as the headline P&L / win-rate source for EOD reporting.",
             "Keep ECE/Brier and forensic scorecards separate from realized Book accounting.",
@@ -219,6 +196,9 @@ def load_book_cache(for_date, kind: str) -> dict[str, Any] | None:
     data = _read_json(path)
     if data is None:
         return None
+    if int(data.get("bookCacheSchemaVersion") or 0) != BOOK_CACHE_SCHEMA_VERSION:
+        log.info("Ignoring stale %s Book cache for %s (schema=%s current=%s)", kind, for_date, data.get("bookCacheSchemaVersion"), BOOK_CACHE_SCHEMA_VERSION)
+        return None
     try:
         _reconcile_master_from_books(for_date)
     except Exception as exc:
@@ -231,6 +211,7 @@ def load_book_cache(for_date, kind: str) -> dict[str, Any] | None:
 def save_book_cache(for_date, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
     path = book_cache_path(for_date, kind)
     to_store = {k: v for k, v in payload.items() if k != "fromCache"}
+    to_store["bookCacheSchemaVersion"] = BOOK_CACHE_SCHEMA_VERSION
     to_store["cachedAt"] = datetime.now(timezone.utc).isoformat()
     _write_json(path, to_store)
     try:
@@ -243,10 +224,8 @@ def save_book_cache(for_date, kind: str, payload: dict[str, Any]) -> dict[str, A
 
 
 def warm_book_caches(for_date) -> dict[str, Any]:
-    """Rebuild and persist both book reports (called after institutional EOD run)."""
     from .eod_intraday_report import generate_intraday_eod_report
     from .eod_swing_report import generate_swing_eod_report
-
     intra = generate_intraday_eod_report(for_date, force=True)
     swing = generate_swing_eod_report(for_date, force=True)
     try:
