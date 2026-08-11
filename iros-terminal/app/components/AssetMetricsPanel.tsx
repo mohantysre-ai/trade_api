@@ -565,32 +565,6 @@ async function fetchCandidates(): Promise<CandidatesResponse> {
   }
 }
 
-async function fetchLivePrices(): Promise<LivePricesResponse> {
-  const empty: LivePricesResponse = {
-    long: [],
-    short: [],
-    updatedAt: null,
-    source: 'none',
-    dataStale: true,
-  };
-  try {
-    const res = await fetch('/api/live-prices', { cache: 'no-store' });
-    const data = await readJsonSafe<LivePricesResponse>(res, empty);
-    if (res.status === 404) {
-      return { ...empty, error: 'live-prices API not found (404)' };
-    }
-    if (!res.ok) {
-      return { ...empty, ...data, error: data.error || `live-prices HTTP ${res.status}` };
-    }
-    return data;
-  } catch (err) {
-    return {
-      ...empty,
-      error: err instanceof Error ? err.message : 'live-prices fetch failed',
-    };
-  }
-}
-
 async function commitSession(force = false): Promise<SessionResponse & { error?: string }> {
   try {
     const res = await fetch(`/api/intraday-session/commit?force=${force ? 'true' : 'false'}`, {
@@ -915,6 +889,21 @@ export default function AssetMetricsPanel({
     try {
       const data = await fetchSession();
       setSession(data);
+      // The session endpoint already performs live-price enrichment. Reuse it
+      // instead of issuing a duplicate /api/live-prices request on every poll.
+      setLivePrices({
+        long: data.long || [],
+        short: data.short || [],
+        updatedAt: data.updatedAt || null,
+        source: 'intraday-session',
+        dataStale: Boolean(data.dataStale),
+        marketOpen: data.marketOpen,
+        sessionClosed: data.sessionClosed,
+        locked: data.locked,
+        ltpSourceMix: data.ltpSourceMix,
+        priceSourcesNote: data.priceSourcesNote,
+        error: data.error,
+      });
       setError(data.error || null);
       setSelected((prev) => {
         if (prev) return prev;
@@ -936,22 +925,6 @@ export default function AssetMetricsPanel({
     }
   }, []);
 
-  const loadLivePrices = useCallback(async () => {
-    try {
-      const data = await fetchLivePrices();
-      setLivePrices(data);
-    } catch {
-      setLivePrices({
-        long: [],
-        short: [],
-        updatedAt: null,
-        source: 'none',
-        dataStale: true,
-        error: 'live-prices unavailable',
-      });
-    }
-  }, []);
-
   const loadResearch = useCallback(async () => {
     try {
       const [l, d] = await Promise.all([
@@ -968,29 +941,27 @@ export default function AssetMetricsPanel({
   useEffect(() => {
     void loadSession();
     void loadCandidates();
-    void loadLivePrices();
-    const clockId = window.setInterval(() => setClock(formatIstNow()), 1000);
+    const clockId = window.setInterval(() => setClock(formatIstNow()), 15_000);
     return () => window.clearInterval(clockId);
-  }, [loadSession, loadCandidates, loadLivePrices]);
+  }, [loadSession, loadCandidates]);
 
   useEffect(() => {
     if (!refreshToken) return;
     void loadSession();
     void loadCandidates();
-    void loadLivePrices();
     void loadResearch();
-  }, [refreshToken, loadSession, loadCandidates, loadLivePrices, loadResearch]);
+  }, [refreshToken, loadSession, loadCandidates, loadResearch]);
 
   useEffect(() => {
     const marketOpen = livePrices?.marketOpen ?? session?.marketOpen;
     const closed = livePrices?.sessionClosed ?? session?.sessionClosed;
-    const ms = closed === true ? 10_000 : marketOpen === true ? 2_000 : 5_000;
+    const ms = closed === true ? 30_000 : marketOpen === true ? 5_000 : 15_000;
     const id = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
       void loadSession();
-      void loadLivePrices();
     }, ms);
     return () => window.clearInterval(id);
-  }, [loadSession, loadLivePrices, livePrices?.marketOpen, livePrices?.sessionClosed, session?.marketOpen, session?.sessionClosed]);
+  }, [loadSession, livePrices?.marketOpen, livePrices?.sessionClosed, session?.marketOpen, session?.sessionClosed]);
 
   const onCommit = async (force = false) => {
     setCommitting(true);
@@ -1002,7 +973,6 @@ export default function AssetMetricsPanel({
       }
       await loadSession();
       await loadCandidates();
-      await loadLivePrices();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Commit failed');
     } finally {

@@ -989,7 +989,7 @@ export default function IntradayMatrixPanel() {
 
     // Standard 2-min refresh for scanner/lemonn feeds
     const slowId = window.setInterval(() => {
-      if (!cancelled) {
+      if (!cancelled && document.visibilityState === 'visible') {
         loadLemonn();
         loadDhan();
         loadOutcomes();
@@ -998,10 +998,10 @@ export default function IntradayMatrixPanel() {
 
     // Fast monitor-mode poll (proxies /api/live-prices — continues after close for close marks).
     const fastId = window.setInterval(() => {
-      if (!cancelled) {
+      if (!cancelled && document.visibilityState === 'visible') {
         loadLivePrices();
       }
-    }, 2000);
+    }, 5000);
 
     return () => {
       cancelled = true;

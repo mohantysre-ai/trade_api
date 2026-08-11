@@ -41,7 +41,7 @@ type RawAlert = {
 const SEEN_KEY = 'alphix.deskActivitySeen.v1';
 const MAX_VISIBLE = 4;
 const AUTO_MS = 9000;
-const POLL_MS = 8000;
+const POLL_MS = 15_000;
 
 function loadSeen(): Set<string> {
   try {
@@ -376,6 +376,7 @@ export default function DeskActivityAlerts({ paused = false }: { paused?: boolea
     };
 
     const poll = async () => {
+      if (document.visibilityState !== 'visible') return;
       try {
         const [liveRes, intraRes, swingRes] = await Promise.all([
           fetch('/api/live-prices', { cache: 'no-store' }),
