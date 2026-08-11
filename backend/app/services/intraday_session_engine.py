@@ -12,6 +12,7 @@ No broker order placement. Missing inputs → UNRATED / STALE_DATA / NO_EDGE, ne
 from __future__ import annotations
 
 import json
+import copy
 import logging
 import os
 import re
@@ -39,6 +40,11 @@ log = logging.getLogger(__name__)
 _IST = timezone(timedelta(hours=5, minutes=30))
 _BASE = Path(__file__).resolve().parent
 _CLOSE_FREEZE_LOCK = threading.Lock()
+_SESSION_RESPONSE_LOCK = threading.Lock()
+_SESSION_RESPONSE_CACHE: dict[str, Any] | None = None
+_SESSION_RESPONSE_CACHE_AT = 0.0
+_SESSION_RESPONSE_OPEN_TTL = float(os.environ.get("INTRADAY_RESPONSE_OPEN_TTL", "4"))
+_SESSION_RESPONSE_CLOSED_TTL = float(os.environ.get("INTRADAY_RESPONSE_CLOSED_TTL", "20"))
 
 _LAST_MARKET_SNAPSHOT = _BASE / "last_market_snapshot.json"
 _SESSION_FILE = Path(
@@ -241,7 +247,12 @@ def load_session() -> dict[str, Any]:
 
 
 def save_session(payload: dict[str, Any]) -> None:
+    global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT
     _atomic_write(_SESSION_FILE, payload)
+    # Explicit mutations invalidate the response snapshot. The computing caller
+    # will republish a fresh value after its state transition finishes.
+    _SESSION_RESPONSE_CACHE = None
+    _SESSION_RESPONSE_CACHE_AT = 0.0
 
 
 def _sector_of(symbol: str, row: dict[str, Any] | None = None) -> str:
@@ -3475,6 +3486,33 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
 
 
 def get_session(include_live: bool = True) -> dict[str, Any]:
+    """Return one coalesced session snapshot to all concurrent UI callers.
+
+    The live read path can persist a newly closed position or replacement. It
+    must therefore execute once per refresh window, rather than once per user.
+    """
+    global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT
+    if not include_live:
+        return _compute_session(include_live=False)
+    try:
+        from .trade_outcome import _is_market_open
+        ttl = _SESSION_RESPONSE_OPEN_TTL if _is_market_open() else _SESSION_RESPONSE_CLOSED_TTL
+    except Exception:
+        ttl = _SESSION_RESPONSE_OPEN_TTL
+    now = time.monotonic()
+    if _SESSION_RESPONSE_CACHE is not None and now - _SESSION_RESPONSE_CACHE_AT < ttl:
+        return copy.deepcopy(_SESSION_RESPONSE_CACHE)
+    with _SESSION_RESPONSE_LOCK:
+        now = time.monotonic()
+        if _SESSION_RESPONSE_CACHE is not None and now - _SESSION_RESPONSE_CACHE_AT < ttl:
+            return copy.deepcopy(_SESSION_RESPONSE_CACHE)
+        result = _compute_session(include_live=True)
+        _SESSION_RESPONSE_CACHE = copy.deepcopy(result)
+        _SESSION_RESPONSE_CACHE_AT = time.monotonic()
+        return result
+
+
+def _compute_session(include_live: bool = True) -> dict[str, Any]:
     session = load_session()
     snap = load_market_snapshot()
     quotes = snap.get("stockQuotes") or {}

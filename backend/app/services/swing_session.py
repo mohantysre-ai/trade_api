@@ -7,8 +7,11 @@ Once locked for the IST day: symbols immutable; prices update only.
 from __future__ import annotations
 
 import json
+import copy
 import logging
 import os
+import threading
+import time
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -46,6 +49,11 @@ SWING_MIN_EXPECTED_R = float(os.environ.get("SWING_MIN_EXPECTED_R", "1.50"))
 SWING_PRIORITY_R = float(os.environ.get("SWING_PRIORITY_R", "2.00"))
 SWING_MAX_SINGLE_RISK = float(os.environ.get("SWING_MAX_SINGLE_TRADE_RISK", "0.01"))
 SWING_MAX_PORTFOLIO_RISK = float(os.environ.get("SWING_MAX_PORTFOLIO_RISK", "0.05"))
+_SWING_RESPONSE_LOCK = threading.Lock()
+_SWING_RESPONSE_CACHE: dict[str, Any] | None = None
+_SWING_RESPONSE_CACHE_AT = 0.0
+_SWING_RESPONSE_OPEN_TTL = float(os.environ.get("SWING_RESPONSE_OPEN_TTL", "4"))
+_SWING_RESPONSE_CLOSED_TTL = float(os.environ.get("SWING_RESPONSE_CLOSED_TTL", "20"))
 
 
 def _utc_now_iso() -> str:
@@ -57,6 +65,7 @@ def _ist_today() -> str:
 
 
 def _atomic_write(path: str, payload: dict[str, Any]) -> None:
+    global _SWING_RESPONSE_CACHE, _SWING_RESPONSE_CACHE_AT
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
@@ -68,6 +77,8 @@ def _atomic_write(path: str, payload: dict[str, Any]) -> None:
     except OSError:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(payload, fh, indent=2, default=str)
+    _SWING_RESPONSE_CACHE = None
+    _SWING_RESPONSE_CACHE_AT = 0.0
 
 
 def _read_json(path: str) -> dict[str, Any]:
@@ -919,6 +930,25 @@ def _enrich_swing_row_prices(
 
 
 def get_swing_session(*, live: bool = False) -> dict[str, Any]:
+    """Return a coalesced live snapshot instead of fetching marks per user."""
+    global _SWING_RESPONSE_CACHE, _SWING_RESPONSE_CACHE_AT
+    if not live:
+        return _compute_swing_session(live=False)
+    ttl = _SWING_RESPONSE_OPEN_TTL if _is_market_open() else _SWING_RESPONSE_CLOSED_TTL
+    now = time.monotonic()
+    if _SWING_RESPONSE_CACHE is not None and now - _SWING_RESPONSE_CACHE_AT < ttl:
+        return copy.deepcopy(_SWING_RESPONSE_CACHE)
+    with _SWING_RESPONSE_LOCK:
+        now = time.monotonic()
+        if _SWING_RESPONSE_CACHE is not None and now - _SWING_RESPONSE_CACHE_AT < ttl:
+            return copy.deepcopy(_SWING_RESPONSE_CACHE)
+        result = _compute_swing_session(live=True)
+        _SWING_RESPONSE_CACHE = copy.deepcopy(result)
+        _SWING_RESPONSE_CACHE_AT = time.monotonic()
+        return result
+
+
+def _compute_swing_session(*, live: bool = False) -> dict[str, Any]:
     """Return locked swing session; with live=True enrich LTP/Δ only."""
     sess = load_swing_session()
     if not sess:
