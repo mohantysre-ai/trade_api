@@ -603,6 +603,8 @@ export default function ForensicPanel({
     locked?: boolean;
     sessionDate?: string;
     source?: string;
+    cashHeld?: boolean;
+    cashReason?: string;
     long?: Array<{
       symbol?: string;
       entryPrice?: number;
@@ -613,9 +615,13 @@ export default function ForensicPanel({
       totalPnl?: number | null;
       score?: number | null;
       stopLoss?: number;
+      effectiveStop?: number | null;
       target1?: number;
       target2?: number;
       selectionReason?: string | null;
+      status?: string | null;
+      closed?: boolean;
+      outcome?: { label?: string | null } | null;
     }>;
     portfolio?: { realizedPnl?: number; unrealizedPnl?: number; totalPnl?: number; lockedCount?: number };
   } | null>(null);
@@ -1056,6 +1062,12 @@ export default function ForensicPanel({
       String(swingSession?.sessionDate || '').slice(0, 10) === istToday &&
       (swingSession?.long?.length ?? 0) > 0,
   );
+  const cashHeldSwing = Boolean(
+    swingSession?.locked &&
+      String(swingSession?.sessionDate || '').slice(0, 10) === istToday &&
+      (swingSession?.long?.length ?? 0) === 0 &&
+      swingSession?.cashHeld,
+  );
   const staleSwingLock = Boolean(
     swingSession?.locked &&
       String(swingSession?.sessionDate || '').slice(0, 10) &&
@@ -1108,6 +1120,19 @@ export default function ForensicPanel({
               price: ltp != null ? String(ltp) : existing.row.price,
               dayChangePct: dayPct,
               thesis: existing.row.thesis || pos.selectionReason || 'Locked swing book',
+              riskFlag: pos.closed
+                ? String(pos.status || pos.outcome?.label || 'CLOSED')
+                : pos.status && String(pos.status).toUpperCase() !== 'RUNNING'
+                  ? String(pos.status)
+                  : existing.row.riskFlag,
+              dhanPick: {
+                ...(existing.row.dhanPick || { symbol: sym }),
+                symbol: sym,
+                buyAbove: pos.entryPrice ?? existing.row.dhanPick?.buyAbove,
+                stopLoss: pos.effectiveStop ?? pos.stopLoss ?? existing.row.dhanPick?.stopLoss,
+                target1: pos.target1 ?? existing.row.dhanPick?.target1,
+                target2: pos.target2 ?? existing.row.dhanPick?.target2,
+              } as DhanSwingPick,
             }
           : {
               ticker: sym,
@@ -1117,14 +1142,18 @@ export default function ForensicPanel({
               dayChangePct: dayPct,
               thesis: pos.selectionReason || 'Locked Asset Matrix swing',
               action: 'BUY',
-              riskFlag: 'SELECTED',
+              riskFlag: pos.closed
+                ? String(pos.status || pos.outcome?.label || 'CLOSED')
+                : pos.status && String(pos.status).toUpperCase() !== 'RUNNING'
+                  ? String(pos.status)
+                  : 'SELECTED',
               isVolumePad: false,
               isMetaRow: false,
               hasQuantSource: true,
               dhanPick: {
                 symbol: sym,
                 buyAbove: pos.entryPrice,
-                stopLoss: pos.stopLoss,
+                stopLoss: pos.effectiveStop ?? pos.stopLoss,
                 target1: pos.target1,
                 target2: pos.target2,
               } as DhanSwingPick,
@@ -1190,7 +1219,7 @@ export default function ForensicPanel({
                 <span className="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-800">
                   LOCKED · {swingSession?.sessionDate}
                 </span>
-                {' · '}live Book P&amp;L · {swingSession?.source || 'asset_matrix_buy'} ·{' '}
+                {' · '}live Book P&amp;L · auto SL/trail · {swingSession?.source || 'asset_matrix_buy'} ·{' '}
                 {portfolioDisplayRows.length} names
                 {typeof swingPortfolioPnl === 'number' && (
                   <>
@@ -1201,6 +1230,15 @@ export default function ForensicPanel({
                     </span>
                   </>
                 )}
+              </>
+            ) : cashHeldSwing ? (
+              <>
+                <span className="inline-flex items-center rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                  CASH HELD · {swingSession?.sessionDate}
+                </span>
+                {' · '}
+                {swingSession?.cashReason || 'NO_ACTIVE_VALID_SWING_SELECTIONS'}
+                {' · '}auto-lock retries in 09:45–10:15 IST window
               </>
             ) : staleSwingLock ? (
               <>
@@ -1249,7 +1287,7 @@ export default function ForensicPanel({
               </select>
             </label>
           )}
-          {!lockedSwingMode && (
+          {!lockedSwingMode && !cashHeldSwing && (
             <button
               type="button"
               disabled={locking}

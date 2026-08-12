@@ -1220,12 +1220,30 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
     }
 
 
-def ensure_swing_session_locked() -> dict[str, Any]:
-    """Idempotent lock — rotates automatically when sessionDate != IST today."""
+def _active_swing_rows(session: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for side in ("long", "short"):
+        for row in session.get(side) or []:
+            if isinstance(row, dict) and row.get("symbol") and not row.get("closed"):
+                rows.append(row)
+    return rows
+
+
+def ensure_swing_session_locked(*, retry_empty: bool = False) -> dict[str, Any]:
+    """Idempotent lock — rotates automatically when sessionDate != IST today.
+
+    ``retry_empty=True`` (scheduler catch-up) re-evaluates Asset Matrix BUY
+    candidates when today's book is cash-held with zero active names. Never
+    fabricates fills; only locks fully qualified deterministic BUY rows.
+    """
     existing = load_swing_session()
     today = _ist_today()
     existing_date = str(existing.get("sessionDate") or "").strip()[:10]
     if existing.get("locked") and existing_date == today:
+        if retry_empty and not _active_swing_rows(existing):
+            # Still in the lock window — try again for fresh BUY evidence.
+            result = lock_swing_session(force=True)
+            return result.get("session") or existing
         scrubbed, removed_gate = _scrub_ineligible_swing_rows(existing)
         scrubbed, removed_cross = _scrub_cross_book_swing_rows(scrubbed)
         scrubbed, removed_cap = _enforce_swing_position_cap(scrubbed)
@@ -1235,6 +1253,89 @@ def ensure_swing_session_locked() -> dict[str, Any]:
     # A new IST day always evaluates a fresh candidate set; no prior-day refill.
     result = lock_swing_session(force=True if (existing.get("locked") and existing_date != today) else False)
     return result.get("session") or existing
+
+
+def refresh_swing_session_state() -> dict[str, Any]:
+    """Scheduler single-writer: persist live marks + scale-trail closes.
+
+    Mirrors intradAy ``refresh_session_state`` so SL / trail SL / EOD square-off
+    survive without a browser tab open. Paper Book only (MANUAL_ONLY) — no broker
+    orders. Never mutates symbols, entry levels, or selection evidence.
+    """
+    sess = load_swing_session()
+    if not sess.get("locked"):
+        return sess
+    day = str(sess.get("sessionDate") or "")[:10]
+    if day != _ist_today():
+        return sess
+
+    live = _compute_swing_session(live=True)
+    changed = False
+    for side in ("long", "short"):
+        orig_rows = [r for r in (sess.get(side) or []) if isinstance(r, dict)]
+        live_by = {
+            str(r.get("symbol") or "").upper(): r
+            for r in (live.get(side) or [])
+            if isinstance(r, dict) and r.get("symbol")
+        }
+        updated_rows: list[dict[str, Any]] = []
+        for row in orig_rows:
+            symbol = str(row.get("symbol") or "").upper()
+            if row.get("closed"):
+                updated_rows.append(row)
+                continue
+            live_row = live_by.get(symbol)
+            if not live_row:
+                updated_rows.append(row)
+                continue
+            merged = dict(row)
+            for key in (
+                "ltp",
+                "currentPrice",
+                "ltpSource",
+                "dayChangePct",
+                "realizedPnl",
+                "unrealizedPnl",
+                "unrealizedPnlPct",
+                "totalPnl",
+                "exitState",
+                "outcome",
+                "effectiveStop",
+                "remainingQty",
+                "exitPlan",
+                "status",
+                "bookExitReason",
+                "executionStatus",
+                "triggered",
+                "skipped",
+                "skipReason",
+            ):
+                if live_row.get(key) is not None and merged.get(key) != live_row.get(key):
+                    merged[key] = live_row.get(key)
+                    changed = True
+            if live_row.get("closed") and not row.get("closed"):
+                merged["closed"] = True
+                merged["status"] = str(live_row.get("status") or "CLOSED")
+                changed = True
+            updated_rows.append(merged)
+        sess[side] = updated_rows
+
+    if isinstance(live.get("portfolio"), dict):
+        if sess.get("portfolio") != live.get("portfolio"):
+            sess["portfolio"] = copy.deepcopy(live["portfolio"])
+            changed = True
+
+    if not changed:
+        return sess
+    sess["updatedAt"] = _utc_now_iso()
+    sess["priceOnly"] = True
+    sess["automation"] = {
+        "lastRefreshAt": sess["updatedAt"],
+        "source": "refresh_swing_session_state",
+        "executionPolicy": sess.get("executionPolicy") or "MANUAL_ONLY",
+    }
+    _atomic_write(_SWING_SESSION_PATH, sess)
+    return sess
 
 
 def _enrich_swing_row_prices(

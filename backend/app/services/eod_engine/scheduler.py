@@ -164,7 +164,7 @@ def _scheduler_loop() -> None:
         try:
             now = datetime.now(tz=IST)
             if now.weekday() < 5 and _DESK_AUTO:
-                # The scheduler is the sole durable intraday state writer.
+                # The scheduler is the sole durable state writer for both books.
                 # Public GET handlers only enrich/calculate in memory.
                 try:
                     from ..intraday_session_engine import refresh_session_state
@@ -172,8 +172,15 @@ def _scheduler_loop() -> None:
                     refresh_session_state()
                 except Exception as exc:
                     log.debug("Live session state refresh skipped: %s", exc)
+                try:
+                    from ..swing_session import refresh_swing_session_state
+
+                    refresh_swing_session_state()
+                except Exception as exc:
+                    log.debug("Swing session state refresh skipped: %s", exc)
                 _maybe_run_morning_prework(now)
                 _maybe_auto_commit(now)
+                _maybe_auto_swing_lock(now)
                 _maybe_midday_refresh(now)
                 if now.hour == 15:
                     if 31 <= now.minute < 35:
@@ -355,8 +362,7 @@ def _maybe_auto_commit(now: datetime) -> None:
         try:
             from ..swing_session import ensure_swing_session_locked
 
-            ensure_swing_session_locked()
-            _mark_stage(now, "swing_lock", status="done")
+            ensure_swing_session_locked(retry_empty=True)
         except Exception as exc:
             log.warning("Swing ensure after locked session failed: %s", exc)
         return
@@ -383,10 +389,10 @@ def _maybe_auto_commit(now: datetime) -> None:
                         status="done",
                         reason="rotated" if rotated else "committed",
                     )
-                    ensure_swing_session_locked()
-                    _mark_stage(now, "swing_lock", status="done")
+                    # Swing has its own scheduler path; still nudge once here.
+                    ensure_swing_session_locked(retry_empty=True)
                     log.info(
-                        "Auto-commit locked intraday + swing for %s (stale_rotate=%s)",
+                        "Auto-commit locked intraday + nudged swing for %s (stale_rotate=%s)",
                         day_key,
                         rotated,
                     )
@@ -413,6 +419,93 @@ def _maybe_auto_commit(now: datetime) -> None:
     except Exception as exc:
         log.warning("Auto-commit schedule error: %s", exc)
         _mark_stage(now, "session_commit", status="error", error=str(exc))
+
+
+
+def _maybe_auto_swing_lock(now: datetime) -> None:
+    """Lock / refresh SWING independently of intradAy commit success.
+
+    Runs every tick inside the desk lock window until today has an active
+    swing book, or the window ends with an intentional cash-held empty book.
+    """
+    if not _AUTO_COMMIT:
+        return
+    if not _in_commit_window(now):
+        # After the window: seal a pending cash-held attempt as done.
+        if _stage_done(now, "swing_lock"):
+            return
+        try:
+            from ..swing_session import load_swing_session
+
+            sess = load_swing_session()
+            day_key = now.strftime("%Y-%m-%d")
+            if (
+                sess.get("locked")
+                and str(sess.get("sessionDate") or "")[:10] == day_key
+                and sess.get("cashHeld")
+            ):
+                _mark_stage(now, "swing_lock", status="done", reason="cash_held_window_closed")
+        except Exception:
+            pass
+        return
+
+    day_key = now.strftime("%Y-%m-%d")
+    try:
+        from ..swing_session import ensure_swing_session_locked, load_swing_session
+
+        sess = load_swing_session()
+        sess_date = str(sess.get("sessionDate") or "")[:10]
+        active = [
+            r
+            for r in (sess.get("long") or [])
+            if isinstance(r, dict) and r.get("symbol") and not r.get("closed")
+        ]
+        if sess.get("locked") and sess_date == day_key and active:
+            if not _stage_done(now, "swing_lock"):
+                _mark_stage(now, "swing_lock", status="done", count=len(active))
+            return
+
+        def _job() -> None:
+            try:
+                # Always evaluate swing — do not wait on intradAy success.
+                result = ensure_swing_session_locked(retry_empty=True)
+                long_rows = [
+                    r
+                    for r in (result.get("long") or [])
+                    if isinstance(r, dict) and r.get("symbol") and not r.get("closed")
+                ]
+                if long_rows:
+                    _mark_stage(now, "swing_lock", status="done", count=len(long_rows))
+                    log.info("Auto swing lock: %d active name(s) for %s", len(long_rows), day_key)
+                    return
+                if result.get("cashHeld") or result.get("locked"):
+                    _mark_stage(
+                        now,
+                        "swing_lock",
+                        status="pending",
+                        reason=str(result.get("cashReason") or "cash_held_no_buy"),
+                    )
+                    log.info(
+                        "Auto swing lock cash-held for %s — will retry while lock window open",
+                        day_key,
+                    )
+                    return
+                _mark_stage(
+                    now,
+                    "swing_lock",
+                    status="pending",
+                    reason=str(result.get("error") or result.get("lockWindow") or "not_locked"),
+                )
+            except Exception as exc:
+                log.warning("Auto swing lock failed: %s", exc)
+                _mark_stage(now, "swing_lock", status="error", error=str(exc))
+
+        if not _spawn_once(f"swing:{day_key}", _job):
+            return
+        log.info("Scheduled auto swing lock for %s", day_key)
+    except Exception as exc:
+        log.warning("Auto swing lock schedule error: %s", exc)
+        _mark_stage(now, "swing_lock", status="error", error=str(exc))
 
 
 def _maybe_midday_refresh(now: datetime) -> None:
