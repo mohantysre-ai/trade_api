@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { fetchLiveDeskSnapshot, subscribeLiveDesk } from '@/lib/live-desk';
 import type { MarketDataResponse, TerminalIntelligence, LiveStock, SparkFlag } from '@/lib/market-api';
 import { fetchNseSparkline } from '@/lib/market-api';
 import {
@@ -609,13 +610,14 @@ export default function ForensicPanel({
       currentPrice?: number | null;
       dayChangePct?: number | null;
       unrealizedPnlPct?: number | null;
+      totalPnl?: number | null;
       score?: number | null;
       stopLoss?: number;
       target1?: number;
       target2?: number;
       selectionReason?: string | null;
     }>;
-    portfolio?: { unrealizedPnl?: number; lockedCount?: number };
+    portfolio?: { realizedPnl?: number; unrealizedPnl?: number; totalPnl?: number; lockedCount?: number };
   } | null>(null);
   const [locking, setLocking] = useState(false);
   const [lockError, setLockError] = useState<string | null>(null);
@@ -1036,21 +1038,18 @@ export default function ForensicPanel({
 
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
-      try {
-        const res = await fetch('/api/swing-session?live=1', { cache: 'no-store' });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled) setSwingSession(data);
-      } catch {
-        /* keep discovery mode */
-      }
-    };
-    void load();
+    const unsubscribe = subscribeLiveDesk((snapshot) => {
+      if (!cancelled) setSwingSession(snapshot['swing-session'] as typeof swingSession);
+    });
     return () => {
       cancelled = true;
+      unsubscribe();
     };
-  }, [live?.updatedAt, refreshToken, istToday]);
+  }, [istToday]);
+
+  useEffect(() => {
+    if (refreshToken > 0) void fetchLiveDeskSnapshot(true);
+  }, [refreshToken]);
 
   const lockedSwingMode = Boolean(
     swingSession?.locked &&
@@ -1062,6 +1061,7 @@ export default function ForensicPanel({
       String(swingSession?.sessionDate || '').slice(0, 10) &&
       String(swingSession?.sessionDate || '').slice(0, 10) !== istToday,
   );
+  const swingPortfolioPnl = swingSession?.portfolio?.totalPnl ?? swingSession?.portfolio?.unrealizedPnl;
 
   const onLockSwing = async (force: boolean) => {
     setLocking(true);
@@ -1132,7 +1132,7 @@ export default function ForensicPanel({
         return {
           row,
           tier: existing?.tier ?? ('CORE' as ConvictionTier),
-          reason: existing?.reason ?? 'LOCKED · price-only MTM',
+          reason: existing?.reason ?? 'LOCKED · live Book P&L',
           winEdge: existing?.winEdge ?? null,
           intelligence: existing?.intelligence ?? mergeIntelligenceSummary(
             tickerIntelMap[sym],
@@ -1190,14 +1190,14 @@ export default function ForensicPanel({
                 <span className="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-800">
                   LOCKED · {swingSession?.sessionDate}
                 </span>
-                {' · '}price-only MTM · {swingSession?.source || 'asset_matrix_buy'} ·{' '}
+                {' · '}live Book P&amp;L · {swingSession?.source || 'asset_matrix_buy'} ·{' '}
                 {portfolioDisplayRows.length} names
-                {typeof swingSession?.portfolio?.unrealizedPnl === 'number' && (
+                {typeof swingPortfolioPnl === 'number' && (
                   <>
-                    {' · '}MTM{' '}
-                    <span className={swingSession.portfolio.unrealizedPnl >= 0 ? 'text-emerald-600 font-bold' : 'text-red-600 font-bold'}>
-                      {swingSession.portfolio.unrealizedPnl >= 0 ? '+' : ''}
-                      ₹{swingSession.portfolio.unrealizedPnl.toFixed(0)}
+                    {' · '}P&amp;L{' '}
+                    <span className={swingPortfolioPnl >= 0 ? 'text-emerald-600 font-bold' : 'text-red-600 font-bold'}>
+                      {swingPortfolioPnl >= 0 ? '+' : ''}
+                      ₹{swingPortfolioPnl.toFixed(0)}
                     </span>
                   </>
                 )}
@@ -1269,7 +1269,10 @@ export default function ForensicPanel({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
         {portfolioDisplayRows.map((item) => {
           const row = item.row;
-          const priceVal = row.price ? `₹${String(row.price).replace(/[₹]+/g, '')}` : '-';
+          const rawPrice = Number(String(row.price ?? '').replace(/[₹,\s]/g, ''));
+          const priceVal = Number.isFinite(rawPrice)
+            ? `₹${rawPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : '-';
           const flag = getFlag(row.ticker);
           const sparkData = allSparklines[row.ticker]?.[flag];
           const period = sparkPeriodChange(sparkData);

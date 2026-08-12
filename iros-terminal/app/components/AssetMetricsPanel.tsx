@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DeskGaugeFill, motion } from '@/lib/desk-motion';
-import { fetchLiveDesk } from '@/lib/live-desk';
+import { fetchLiveDesk, subscribeLiveDesk } from '@/lib/live-desk';
 
 /* ── Types (API facts only) ─────────────────────────────────────────── */
 
@@ -878,36 +878,34 @@ export default function AssetMetricsPanel({
   const [lemonn, setLemonn] = useState<{ count?: number; source?: string; isMock?: boolean } | null>(null);
   const [dhan, setDhan] = useState<{ count?: number; source?: string; isMock?: boolean } | null>(null);
 
+  const applySession = useCallback((data: SessionResponse) => {
+    setSession(data);
+    setLivePrices({
+      long: data.long || [],
+      short: data.short || [],
+      updatedAt: data.updatedAt || null,
+      source: 'shared-live-desk',
+      dataStale: Boolean(data.dataStale),
+      marketOpen: data.marketOpen,
+      sessionClosed: data.sessionClosed,
+      locked: data.locked,
+      ltpSourceMix: data.ltpSourceMix,
+      priceSourcesNote: data.priceSourcesNote,
+      error: data.error,
+    });
+    setError(data.error || null);
+    setSelected((prev) => prev || data.long?.[0]?.symbol || data.short?.[0]?.symbol || null);
+    setLoading(false);
+  }, []);
+
   const loadSession = useCallback(async () => {
     try {
-      const data = await fetchSession();
-      setSession(data);
-      // The session endpoint already performs live-price enrichment. Reuse it
-      // instead of issuing a duplicate /api/live-prices request on every poll.
-      setLivePrices({
-        long: data.long || [],
-        short: data.short || [],
-        updatedAt: data.updatedAt || null,
-        source: 'intraday-session',
-        dataStale: Boolean(data.dataStale),
-        marketOpen: data.marketOpen,
-        sessionClosed: data.sessionClosed,
-        locked: data.locked,
-        ltpSourceMix: data.ltpSourceMix,
-        priceSourcesNote: data.priceSourcesNote,
-        error: data.error,
-      });
-      setError(data.error || null);
-      setSelected((prev) => {
-        if (prev) return prev;
-        return data.long?.[0]?.symbol || data.short?.[0]?.symbol || null;
-      });
+      applySession(await fetchSession());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Session fetch failed');
-    } finally {
       setLoading(false);
     }
-  }, []);
+  }, [applySession]);
 
   const loadCandidates = useCallback(async () => {
     try {
@@ -945,16 +943,9 @@ export default function AssetMetricsPanel({
     void loadResearch();
   }, [refreshToken, loadSession, loadCandidates, loadResearch]);
 
-  useEffect(() => {
-    const marketOpen = livePrices?.marketOpen ?? session?.marketOpen;
-    const closed = livePrices?.sessionClosed ?? session?.sessionClosed;
-    const ms = closed === true ? 30_000 : marketOpen === true ? 5_000 : 15_000;
-    const id = window.setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      void loadSession();
-    }, ms);
-    return () => window.clearInterval(id);
-  }, [loadSession, livePrices?.marketOpen, livePrices?.sessionClosed, session?.marketOpen, session?.sessionClosed]);
+  useEffect(() => subscribeLiveDesk((snapshot) => {
+    applySession(snapshot['intraday-session'] as unknown as SessionResponse);
+  }), [applySession]);
 
   const onCommit = async (force = false) => {
     setCommitting(true);

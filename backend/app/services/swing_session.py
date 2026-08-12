@@ -994,11 +994,67 @@ def _compute_swing_session(*, live: bool = False) -> dict[str, Any]:
         for r in (sess.get("short") or [])
         if isinstance(r, dict)
     ]
-    long_u = sum(float(r.get("unrealizedPnl") or 0) for r in out["long"])
+
+    # Once the cash session is closed, the cached Book is authoritative for
+    # triggered/skipped classification and realized economics. This keeps the
+    # SWING tab aligned with EOD instead of showing correct marks with ₹0 MTM.
+    if not _is_market_open() and sess.get("sessionDate"):
+        try:
+            from datetime import date
+            from .eod_swing_report import generate_swing_eod_report
+
+            book = generate_swing_eod_report(
+                date.fromisoformat(str(sess.get("sessionDate"))[:10]),
+                force=False,
+            )
+            book_by_symbol = {
+                str(row.get("symbol") or "").upper(): row
+                for row in (book.get("picks") or [])
+                if isinstance(row, dict) and row.get("symbol")
+            }
+            for row in [*out["long"], *out["short"]]:
+                booked = book_by_symbol.get(str(row.get("symbol") or "").upper())
+                if not booked:
+                    continue
+                pnl = float(booked.get("pnl") or 0)
+                row.update({
+                    "currentPrice": booked.get("currentPrice") or row.get("currentPrice"),
+                    "ltp": booked.get("currentPrice") or row.get("ltp"),
+                    "deployedCapital": float(booked.get("deployedCapital") or 0),
+                    "realizedPnl": pnl,
+                    "unrealizedPnl": 0.0,
+                    "totalPnl": pnl,
+                    "pnlPct": float(booked.get("pnlPct") or 0),
+                    "triggered": bool(booked.get("triggered")),
+                    "executionStatus": booked.get("executionStatus"),
+                    "skipped": bool(booked.get("skipped")),
+                    "skipReason": booked.get("skipReason"),
+                    "bookExitReason": booked.get("exitReason"),
+                    "closed": bool(booked.get("triggered")) or bool(booked.get("skipped")),
+                })
+                if booked.get("skipped"):
+                    row["status"] = str(booked.get("status") or "NOT_TRIGGERED")
+                    row["outcome"] = None
+                    row["exitState"] = None
+                    row["remainingQty"] = 0
+        except Exception as exc:
+            log.debug("Closed swing Book reconciliation skipped: %s", exc)
+
+    all_rows = [*out["long"], *out["short"]]
+    for row in all_rows:
+        if row.get("totalPnl") is None:
+            row["totalPnl"] = round(
+                float(row.get("realizedPnl") or 0) + float(row.get("unrealizedPnl") or 0),
+                2,
+            )
+    realized = sum(float(r.get("realizedPnl") or 0) for r in all_rows)
+    unrealized = sum(float(r.get("unrealizedPnl") or 0) for r in all_rows)
     out["portfolio"] = {
         "swingCapital": (sess.get("capital") or {}).get("swingCapital", SWING_CAPITAL),
-        "unrealizedPnl": round(long_u, 2),
-        "lockedCount": len(out["long"]),
+        "realizedPnl": round(realized, 2),
+        "unrealizedPnl": round(unrealized, 2),
+        "totalPnl": round(realized + unrealized, 2),
+        "lockedCount": len(all_rows),
     }
     out["priceOnly"] = True
     out["liveMarks"] = len(live_marks)

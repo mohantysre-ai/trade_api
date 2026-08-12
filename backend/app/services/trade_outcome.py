@@ -997,6 +997,19 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
             entry["status"] = "DATA STALE"
             return {**p, **entry}
 
+        execution_status = str(p.get("executionStatus") or "").upper()
+        if execution_status in {"PENDING_ENTRY", "NOT_TRIGGERED"} or p.get("triggered") is False:
+            entry.update({
+                "outcome": None,
+                "closed": False,
+                "realizedPnl": 0.0,
+                "unrealizedPnl": 0.0,
+                "remainingQty": 0,
+                "status": "PENDING ENTRY" if execution_status == "PENDING_ENTRY" else "NOT_TRIGGERED",
+                "executionStatus": execution_status or "PENDING_ENTRY",
+            })
+            return {**p, **entry}
+
         # CLOSED positions stay CLOSED — do not re-open via price refresh
         if p.get("closed") or str(p.get("status") or "").upper() == "CLOSED":
             entry["status"] = "CLOSED"

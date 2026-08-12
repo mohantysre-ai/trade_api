@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from .eod_archive import load_archive
@@ -21,8 +21,10 @@ from .exit_plan import attach_exit_plan, blended_pnl_from_state, format_scale_pr
 from .quant_desk_exit_policy import build_trade_outcome, classify_taxonomy
 import time
 import urllib.request
+from zoneinfo import ZoneInfo
 
 log = logging.getLogger(__name__)
+IST = ZoneInfo("Asia/Kolkata")
 
 DEFAULT_INTRADAY_CAPITAL = 1_000_000.0  # ₹10L
 DASH_ROOT = {
@@ -198,7 +200,18 @@ def _exit_reason_from_scale_eval(eval_result: dict[str, Any]) -> str:
     """Map evaluate_scale_trail / blended result to Book exitReason (facts only)."""
     hit = eval_result.get("hitLevel")
     label = str(eval_result.get("label") or "").upper()
-    if hit == "sl" or "TRAIL STOP" in label:
+    state = eval_result.get("exitState") if isinstance(eval_result.get("exitState"), dict) else {}
+    legs = state.get("legsFilled") if isinstance(state.get("legsFilled"), list) else []
+    has_trail_stop = any(
+        isinstance(leg, dict) and str(leg.get("r") or "").upper() == "TRAIL_SL"
+        for leg in legs
+    )
+    stop_kind = str(eval_result.get("stopKind") or "").upper()
+    if hit == "sl" and stop_kind == "INITIAL":
+        return "SL_HIT"
+    if "INITIAL STOP" in label:
+        return "SL_HIT"
+    if hit == "sl" or "TRAIL STOP" in label or has_trail_stop:
         return "TRAIL_SL_HIT"
     if "EOD SQUARE" in label:
         return "EOD_SQUAREOFF"
@@ -229,8 +242,15 @@ def _scale_trail_work_pick(pick: dict[str, Any]) -> dict[str, Any] | None:
     return work
 
 
-def _yahoo_day_range(symbol: str) -> tuple[float | None, float | None, float | None]:
-    """Return (high, low, close) from Yahoo 1d bar, or (None, None, None)."""
+def _yahoo_day_range(
+    symbol: str,
+    for_date: date | None = None,
+) -> tuple[float | None, float | None, float | None]:
+    """Return a date-matched Yahoo daily (high, low, close) bar.
+
+    Yahoo's final array element is merely the latest available session.  Using it
+    for an older/newer report silently assigns another day's path to the trade.
+    """
     sym = str(symbol or "").upper().strip()
     if not sym:
         return None, None, None
@@ -239,8 +259,21 @@ def _yahoo_day_range(symbol: str) -> tuple[float | None, float | None, float | N
     try:
         with urllib.request.urlopen(req, timeout=6) as resp:
             data = json.loads(resp.read().decode())
-        q = data["chart"]["result"][0]["indicators"]["quote"][0]
+        result = data["chart"]["result"][0]
+        timestamps = result.get("timestamp") or []
+        q = result["indicators"]["quote"][0]
         i = -1
+        if for_date is not None:
+            i = next(
+                (
+                    idx
+                    for idx, raw_ts in enumerate(timestamps)
+                    if datetime.fromtimestamp(float(raw_ts), tz=IST).date() == for_date
+                ),
+                -1,
+            )
+            if i < 0:
+                return None, None, None
         hi, lo, cl = q["high"][i], q["low"][i], q["close"][i]
         if hi is None or lo is None or cl is None:
             return None, None, None
@@ -249,26 +282,34 @@ def _yahoo_day_range(symbol: str) -> tuple[float | None, float | None, float | N
         return None, None, None
 
 
-def _enrich_pick_day_range(pick: dict[str, Any], cache: dict[str, tuple]) -> dict[str, Any]:
+def _enrich_pick_day_range(
+    pick: dict[str, Any],
+    cache: dict[str, tuple],
+    *,
+    for_date: date | None = None,
+) -> dict[str, Any]:
     """Attach dayHigh/dayLow/closeMark for path-aware SCALE_TRAIL EOD."""
     out = dict(pick)
     if out.get("dayHigh") is not None and out.get("dayLow") is not None:
         return out
     sym = str(out.get("symbol") or "").upper()
-    if sym not in cache:
-        cache[sym] = _yahoo_day_range(sym)
+    cache_key = f"{sym}:{for_date.isoformat() if for_date else 'latest'}"
+    if cache_key not in cache:
+        cache[cache_key] = _yahoo_day_range(sym, for_date=for_date)
         time.sleep(0.08)
-    hi, lo, cl = cache[sym]
+    hi, lo, cl = cache[cache_key]
     if hi is not None:
         out["dayHigh"] = hi
     if lo is not None:
         out["dayLow"] = lo
     if cl is not None and not out.get("currentPrice"):
         out["currentPrice"] = cl
+    if cl is not None and for_date is not None:
+        out["_sessionCloseMark"] = cl
     return out
 
 
-def _leg_pnl(pick: dict[str, Any]) -> tuple[str, float, float, dict[str, Any]]:
+def _leg_pnl(pick: dict[str, Any], *, after_close: bool) -> tuple[str, float, float, dict[str, Any]]:
     """Return (exit_reason, exit_price, pnl, scale_meta) for one intraday pick."""
     direction = pick.get("direction", "LONG")
     entry = float(pick.get("entryPrice") or 0)
@@ -283,7 +324,12 @@ def _leg_pnl(pick: dict[str, Any]) -> tuple[str, float, float, dict[str, Any]]:
 
     work = _scale_trail_work_pick(pick)
     if work is not None:
-        total_pnl, avg_exit, eval_result = blended_pnl_from_state(work, ltp, after_close=True)
+        # Strategy accounting must obey the persisted sequential SCALE_TRAIL
+        # state during the session as well as after close.  This is explicitly a
+        # paper-model execution ledger (not a broker fill claim).  Passing
+        # after_close=False advances scale legs/stops from the current tick but
+        # never performs an EOD square-off.
+        total_pnl, avg_exit, eval_result = blended_pnl_from_state(work, ltp, after_close=after_close)
         if eval_result:
             state = eval_result.get("exitState") if isinstance(eval_result.get("exitState"), dict) else {}
             plan = work.get("exitPlan") if isinstance(work.get("exitPlan"), dict) else None
@@ -301,8 +347,11 @@ def _leg_pnl(pick: dict[str, Any]) -> tuple[str, float, float, dict[str, Any]]:
                     plan, state, r_multiple=float(r_mult) if r_mult is not None else None
                 ),
             }
+            reason = _exit_reason_from_scale_eval(eval_result)
+            if not eval_result.get("closed"):
+                reason = "OPEN"
             return (
-                _exit_reason_from_scale_eval(eval_result),
+                reason,
                 float(avg_exit),
                 float(total_pnl),
                 scale_meta,
@@ -320,7 +369,7 @@ def _leg_pnl(pick: dict[str, Any]) -> tuple[str, float, float, dict[str, Any]]:
         reason = "SL_HIT"
     else:
         exit_price = ltp
-        reason = "EOD_SQUAREOFF"
+        reason = "EOD_SQUAREOFF" if after_close else "OPEN"
 
     sign = 1 if direction == "LONG" else -1
     pnl = sign * (exit_price - entry) * qty
@@ -383,9 +432,9 @@ def _build_levels_diagnostic(
         lo = _f(day_low if day_low is not None else pick.get("dayLow"))
         if hi is not None and lo is not None:
             fav = hi if sign > 0 else lo
-            mfe = sign * (fav - entry) / risk
+            mfe = max(0.0, sign * (fav - entry) / risk)
         elif path_r_val is not None:
-            mfe = path_r_val
+            mfe = max(0.0, path_r_val)
 
     root, factors = classify_taxonomy(
         execution_status="TRIGGERED",
@@ -721,7 +770,13 @@ def _load_canonical_intraday_picks(for_date: date) -> tuple[list[dict[str, Any]]
 
     archive = load_archive(for_date)
     archived = list((archive.get("intradayPicks") or {}).values())
-    archived = [p for p in archived if isinstance(p, dict) and p.get("symbol")]
+    from .eod_archive import pick_session_date
+    archived = [
+        p for p in archived
+        if isinstance(p, dict)
+        and p.get("symbol")
+        and pick_session_date(p) == for_date
+    ]
     if archived:
         return archived, False, "eod_archive", desk_counts
 
@@ -784,6 +839,9 @@ def generate_intraday_eod_report(
     from .eod_book_cache import load_book_cache, save_book_cache
 
     picks, is_mock, symbol_source, desk_counts = _load_canonical_intraday_picks(for_date)
+    from .desk_clock import cash_session_phase
+    market_phase = cash_session_phase(for_date)
+    after_close = market_phase == "CLOSED"
 
     if not force:
         cached = load_book_cache(for_date, "intraday")
@@ -800,21 +858,23 @@ def generate_intraday_eod_report(
             }
             stale_mock = bool(cached.get("isMock") and picks and not is_mock)
             stale_set = bool(live_syms) and cached_syms != live_syms
+            stale_source = str(cached.get("symbolSource") or "") != symbol_source
             ghost_cache = bool(cached_syms) and not live_syms and symbol_source in (
                 "empty",
                 "intraday_session_stale",
             )
-            if stale_mock or stale_set or ghost_cache:
+            if stale_mock or stale_set or stale_source or ghost_cache:
                 log.info(
-                    "Rebuilding intraday book for %s (mock=%s set_mismatch=%s ghost=%s live=%s cached=%s)",
+                    "Rebuilding intraday book for %s (mock=%s set_mismatch=%s source_mismatch=%s ghost=%s live=%s cached=%s)",
                     for_date.isoformat(),
                     stale_mock,
                     stale_set,
+                    stale_source,
                     ghost_cache,
                     sorted(live_syms),
                     sorted(cached_syms),
                 )
-            else:
+            elif market_phase == "CLOSED" and str(cached.get("marketPhase") or "") == market_phase:
                 return cached
 
     # Prefetch close marks in parallel (cached) so Book UI does not hang
@@ -830,6 +890,18 @@ def generate_intraday_eod_report(
             pick["currentPrice"] = mark
             pick["ltp"] = mark
 
+    # Persist date-matched minute bars once; these are execution evidence, not
+    # merely analytics. Failure to fetch leaves rows untriggered rather than
+    # inventing fills from a close or daily range.
+    from .eod_engine.ingestion import fetch_and_persist_candles
+    fetch_and_persist_candles(for_date, [str(p.get("symbol") or "") for p in picks])
+    committed_at = None
+    try:
+        from .eod_engine.ingestion import load_intraday_session
+        committed_at = load_intraday_session(for_date).get("committedAt")
+    except Exception:
+        committed_at = None
+
     scorecards = _load_scorecard_by_ticker(for_date)
 
     rows = []
@@ -844,16 +916,89 @@ def generate_intraday_eod_report(
         ticker = str(pick.get("symbol") or "").upper()
         card = scorecards.get(ticker)
 
+        from .intraday_execution_evidence import persisted_entry_evidence
+        entry_evidence = persisted_entry_evidence(
+            pick, session_date=for_date, committed_at=committed_at
+        )
+        if not entry_evidence.get("triggered"):
+            planned = float(pick.get("deployedCapital") or 0)
+            skip_reason = entry_evidence.get("reason") or "ENTRY_NOT_CROSSED_POST_LOCK"
+            row = {
+                "symbol": ticker,
+                "direction": pick.get("direction") or "LONG",
+                "entryPrice": pick.get("entryPrice"),
+                "exitPrice": None,
+                "stopLoss": pick.get("stopLoss"),
+                "target1": pick.get("target1"),
+                "target2": pick.get("target2"),
+                "exitReason": "NOT_TRIGGERED",
+                "deskExitLabel": "SKIPPED",
+                "executionStatus": "NOT_TRIGGERED",
+                "outcomeBucket": "SKIPPED",
+                "qty": pick.get("approxQty") or 0,
+                "plannedCapital": planned,
+                "deployedCapital": 0.0,
+                "positionValue": 0.0,
+                "pnl": 0.0,
+                "pnlPct": 0.0,
+                "realizedPnl": 0.0,
+                "unrealizedPnl": 0.0,
+                "remainingQty": 0,
+                "exitState": None,
+                "closed": True,
+                "triggered": False,
+                "skipped": True,
+                "skipReason": skip_reason,
+                "entryEvidence": entry_evidence,
+                "executionBasis": "MODELED_PAPER",
+                "executionEvidence": "ONE_MINUTE_CANDLES",
+                "pnlKind": "skipped",
+                "pickSource": pick.get("source") or symbol_source,
+                "missDiagnostic": {
+                    "isMiss": False,
+                    "isHit": False,
+                    "isSkip": True,
+                    "exitReason": "NOT_TRIGGERED",
+                    "rootCause": "ENTRY_NEVER_CROSSED",
+                    "factors": ["NOT_TRIGGERED", "SKIP_PNL"],
+                    "rMultiple": None,
+                    "economicR": None,
+                    "pathR": None,
+                    "movePct": None,
+                    "gapToT1Pct": None,
+                    "gapToT2Pct": None,
+                    "stopUtilization": None,
+                    "plannedRr": None,
+                    "riskPerShare": None,
+                    "maePct": None,
+                    "mfePct": None,
+                    "mfeR": None,
+                    "maeR": None,
+                    "stopEff": None,
+                    "falsePositive": False,
+                    "holdingMins": None,
+                    "source": "SKIP",
+                },
+            }
+            rows.append(row)
+            continue
+
+        # Diagnostics may use extrema only from the actual entry candle onward.
+        # A whole-session daily bar can include movement before the modeled fill.
+        pick["dayHigh"] = entry_evidence.get("postEntryHigh")
+        pick["dayLow"] = entry_evidence.get("postEntryLow")
+        pick["entryEvidence"] = entry_evidence
+
         # Prefer SCALE_TRAIL blended PnL + ladder fields when attachable.
         # Scorecard only for legacy unresolved binary legs (no inventing ladder).
         if _scale_trail_work_pick(pick) is not None:
-            reason, exit_price, pnl, scale_meta = _leg_pnl(pick)
+            reason, exit_price, pnl, scale_meta = _leg_pnl(pick, after_close=after_close)
             exit_source = "SCALE_TRAIL"
         elif card and _outcome_unresolved(pick):
             reason, exit_price, pnl, scale_meta = _apply_scorecard_to_leg(pick, card)
             exit_source = "SCORECARD"
         else:
-            reason, exit_price, pnl, scale_meta = _leg_pnl(pick)
+            reason, exit_price, pnl, scale_meta = _leg_pnl(pick, after_close=after_close)
             exit_source = "ARCHIVE"
 
         deployed = float(pick.get("deployedCapital") or 0)
@@ -987,6 +1132,10 @@ def generate_intraday_eod_report(
             "lineage": desk.get("lineage"),
             "policyChain": desk.get("policyChain") or desk.get("chain"),
             "outcomeSchemaVersion": desk.get("outcomeSchemaVersion"),
+            "executionBasis": "MODELED_PAPER",
+            "pnlKind": "realised" if after_close or reason != "OPEN" else "unrealised",
+            "executionEvidence": "NO_BROKER_FILLS",
+            "entryEvidence": entry_evidence,
         }
         if desk.get("rMultiple") is not None:
             row["rMultiple"] = desk.get("rMultiple")
@@ -1071,6 +1220,9 @@ def generate_intraday_eod_report(
         "missScorecardCoverage": scored,
         "isMock": is_mock,
         "symbolSource": symbol_source,
+        "executionPolicy": "MANUAL_ONLY",
+        "executionBasis": "MODELED_PAPER",
+        "marketPhase": market_phase,
         "deskCounts": desk_counts,
         "attribution": {
             "locked": len(rows),

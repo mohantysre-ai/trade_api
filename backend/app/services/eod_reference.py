@@ -232,6 +232,18 @@ def get_close_mark_price(symbol: str) -> float | None:
     if cached and (now - cached[1]) < _CLOSE_MARK_TTL_SEC:
         return cached[0]
 
+    # Use the same shared Angel/Yahoo mark path as Intraday and Swing first, so
+    # all panels agree on a symbol within the shared quote-cache window.
+    shared_px = None
+    try:
+        from .trade_outcome import fetch_live_marks_for_symbols
+        shared_px = fetch_live_marks_for_symbols([sym]).get(sym)
+    except Exception:
+        shared_px = None
+    if shared_px is not None and shared_px > 0:
+        _CLOSE_MARK_CACHE[sym] = (float(shared_px), now)
+        return float(shared_px)
+
     yahoo_px = _yahoo_last_print(sym)
     if yahoo_px is not None:
         _CLOSE_MARK_CACHE[sym] = (yahoo_px, now)

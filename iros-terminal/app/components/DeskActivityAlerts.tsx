@@ -9,7 +9,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { fetchLiveDesk } from '@/lib/live-desk';
+import { subscribeLiveDesk } from '@/lib/live-desk';
 
 export type DeskActivityAlert = {
   id: string;
@@ -42,8 +42,6 @@ type RawAlert = {
 const SEEN_KEY = 'alphix.deskActivitySeen.v1';
 const MAX_VISIBLE = 4;
 const AUTO_MS = 9000;
-const POLL_MS = 15_000;
-
 function loadSeen(): Set<string> {
   try {
     const raw = sessionStorage.getItem(SEEN_KEY);
@@ -376,27 +374,19 @@ export default function DeskActivityAlerts({ paused = false }: { paused?: boolea
       pushMany(alerts);
     };
 
-    const poll = async () => {
-      if (document.visibilityState !== 'visible') return;
-      try {
-        const [live, intra, swing] = await Promise.all([
-          fetchLiveDesk<Record<string, unknown>>('live-prices'),
-          fetchLiveDesk<Record<string, unknown>>('intraday-session'),
-          fetchLiveDesk<Record<string, unknown>>('swing-session'),
-        ]);
-        ingest(live.newAlerts);
-        ingestSessionEvents(intra, 'INTRADAY');
-        ingestSessionEvents(swing, 'SWING');
-      } catch {
-        /* network blip — next poll */
-      }
-    };
+    const unsubscribe = subscribeLiveDesk((snapshot) => {
+      if (cancelled || document.visibilityState !== 'visible') return;
+      const live = snapshot['live-prices'];
+      const intra = snapshot['intraday-session'];
+      const swing = snapshot['swing-session'];
+      ingest(live.newAlerts);
+      ingestSessionEvents(intra, 'INTRADAY');
+      ingestSessionEvents(swing, 'SWING');
+    });
 
-    void poll();
-    const id = window.setInterval(() => void poll(), POLL_MS);
     return () => {
       cancelled = true;
-      window.clearInterval(id);
+      unsubscribe();
       timersRef.current.forEach((t) => window.clearTimeout(t));
       timersRef.current.clear();
     };

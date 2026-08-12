@@ -230,7 +230,15 @@ def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, afte
         return {}
 
     prior = pick.get("exitState") if isinstance(pick.get("exitState"), dict) else {}
-    legs_filled = [dict(x) for x in prior.get("legsFilled", []) if isinstance(x, dict) and (isinstance(x.get("r"), (int, float)) or x.get("r") in {"TRAIL_SL", "EOD_SQUAREOFF"})]
+    legs_filled = [
+        dict(x)
+        for x in prior.get("legsFilled", [])
+        if isinstance(x, dict)
+        and (
+            isinstance(x.get("r"), (int, float))
+            or x.get("r") in {"INITIAL_SL", "TRAIL_SL", "EOD_SQUAREOFF"}
+        )
+    ]
     filled_rs = {float(x["r"]) for x in legs_filled if isinstance(x.get("r"), (int, float))}
     initial_stop = float(plan.get("initialStop") or pick.get("stopLoss") or _initial_stop(entry, risk, direction))
     if not _valid_stop(entry, initial_stop, direction):
@@ -252,7 +260,9 @@ def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, afte
         prior_mfe = float(prior.get("mfeR")) if prior.get("mfeR") is not None else None
     except (TypeError, ValueError):
         prior_mfe = None
-    peak_r = r_now
+    # MFE is an excursion from entry.  A trade that never traded above entry
+    # has zero favourable excursion, not a negative MFE.
+    peak_r = max(0.0, r_now)
     for cand in (prior_mfe, peak_leg):
         if cand is not None:
             peak_r = max(peak_r, float(cand))
@@ -264,10 +274,13 @@ def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, afte
     trail_hit = False
     square_off = False
 
+    guard_active = bool(prior.get("profitGuardActive")) or peak_r + 1e-9 >= PROFIT_GUARD_TRIGGER_R
+
     if remaining > 0 and _stop_hit(effective_stop, ltp, direction):
         px = effective_stop
         pnl = _mtm_pnl(direction, entry, px, remaining)
-        legs_filled.append({"r": "TRAIL_SL", "qty": remaining, "price": px, "pnl": pnl})
+        stop_leg = "TRAIL_SL" if guard_active else "INITIAL_SL"
+        legs_filled.append({"r": stop_leg, "qty": remaining, "price": px, "pnl": pnl})
         realized = round(realized + pnl, 2)
         remaining = 0
         trail_hit = True
@@ -284,7 +297,7 @@ def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, afte
     path_r_now = round(r_now, 3)
 
     if trail_hit:
-        label, hit = "TRAIL STOP HIT", "sl"
+        label, hit = ("TRAIL STOP HIT", "sl") if guard_active else ("INITIAL STOP HIT", "sl")
     elif square_off:
         label, hit = "EOD SQUAREOFF", None
     elif remaining == 0:
@@ -306,7 +319,7 @@ def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, afte
         "economicR": economic_r,
         "pathR": path_r_now,
         "mfeR": round(max(peak_r, float(prior.get("mfeR") or peak_r)), 3),
-        "profitGuardActive": peak_r + 1e-9 >= PROFIT_GUARD_TRIGGER_R,
+        "profitGuardActive": guard_active,
         "closed": trail_hit or square_off or remaining == 0,
         "mode": "SCALE_TRAIL",
         "initialStop": round(initial_stop, 2),
@@ -317,6 +330,7 @@ def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, afte
         "label": label,
         "detail": f"R {economic_r:+.2f} · trail SL {effective_stop:.2f} · rem {remaining}",
         "hitLevel": hit,
+        "stopKind": "TRAIL" if trail_hit and guard_active else "INITIAL" if trail_hit else None,
         "ltp": round(ltp, 2),
         "pctChange": round((_sign(direction) * (ltp - entry)) / entry * 100, 2),
         "exitState": state,

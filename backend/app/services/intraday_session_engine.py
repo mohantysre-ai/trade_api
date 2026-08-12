@@ -2473,6 +2473,32 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
     # generate_candidates already applies the single total selector and capital guard.
     long_rows = long_rows[:LOCK_SIZE]
     short_rows = short_rows[: max(0, LOCK_SIZE - len(long_rows))]
+    # A stale feed can lock a plan, but cannot prove an execution. Fresh locks
+    # use the observed candidate LTP as timestamped modeled-fill evidence.
+    committed_at = _utc_now_iso()
+    feed_stale_at_lock = bool(candidates.get("dataStale"))
+    def _stamp_execution(row: dict[str, Any]) -> dict[str, Any]:
+        out = dict(row)
+        planned = float(out.get("deployedCapital") or 0)
+        out["plannedCapital"] = planned
+        out["lockObservedPrice"] = _safe_float(out.get("ltp") or out.get("currentPrice"))
+        if feed_stale_at_lock:
+            out.update({
+                "triggered": False,
+                "executionStatus": "PENDING_ENTRY",
+                "triggeredAt": None,
+                "deployedCapital": 0.0,
+                "status": "PENDING ENTRY",
+            })
+        else:
+            out.update({
+                "triggered": True,
+                "executionStatus": "TRIGGERED",
+                "triggeredAt": committed_at,
+            })
+        return out
+    long_rows = [_stamp_execution(r) for r in long_rows]
+    short_rows = [_stamp_execution(r) for r in short_rows]
     cash_held = len(long_rows) + len(short_rows) < LOCK_SIZE
     short_cash_held = len(short_rows) < MAX_SHORT_POSITIONS
     short_cash_reason = None
@@ -2484,7 +2510,6 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
         log.warning("Intraday commit %s", short_cash_reason)
 
     session_date = _ist_now().strftime("%Y-%m-%d")
-    committed_at = _utc_now_iso()
     events = [
         {
             "type": "SESSION_COMMIT",
@@ -2512,8 +2537,8 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
         emit_book_lock_alerts(
             book="INTRADAY",
             session_date=session_date,
-            long_rows=long_rows,
-            short_rows=short_rows,
+            long_rows=[r for r in long_rows if r.get("triggered")],
+            short_rows=[r for r in short_rows if r.get("triggered")],
         )
     except Exception as exc:
         log.warning("Intraday lock alerts failed: %s", exc)
@@ -2587,6 +2612,11 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
                 "sector": r.get("sector"),
                 "rewardRisk": r.get("rewardRisk"),
                 "status": "RUNNING",
+                "triggered": r.get("triggered"),
+                "triggeredAt": r.get("triggeredAt"),
+                "executionStatus": r.get("executionStatus"),
+                "plannedCapital": r.get("plannedCapital"),
+                "lockObservedPrice": r.get("lockObservedPrice"),
                 "sessionLocked": True,
                 "adopted": True,
             }
@@ -2611,6 +2641,11 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
                 "sector": r.get("sector"),
                 "rewardRisk": r.get("rewardRisk"),
                 "status": "RUNNING",
+                "triggered": r.get("triggered"),
+                "triggeredAt": r.get("triggeredAt"),
+                "executionStatus": r.get("executionStatus"),
+                "plannedCapital": r.get("plannedCapital"),
+                "lockObservedPrice": r.get("lockObservedPrice"),
                 "sessionLocked": True,
                 "adopted": True,
             }
@@ -2773,6 +2808,8 @@ def can_add_replacement_slot(
 
 
 def _position_is_open(pos: dict[str, Any]) -> bool:
+    if str(pos.get("executionStatus") or "").upper() == "NOT_TRIGGERED":
+        return False
     if pos.get("closed"):
         return False
     st = str(pos.get("status") or "").upper()
@@ -3564,6 +3601,30 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
     long_rows = [_enrich_position(p, quotes, live_map.get(str(p.get("symbol") or "").upper())) for p in (session.get("long") or [])]
     short_rows = [_enrich_position(p, quotes, live_map.get(str(p.get("symbol") or "").upper())) for p in (session.get("short") or [])]
 
+    # After close, reconcile the panel from the same timestamped entry evidence
+    # used by EOD. This also repairs legacy sessions that treated basket lock as
+    # an immediate fill at a stale planned entry.
+    try:
+        session_day = datetime.fromisoformat(str(session.get("sessionDate"))).date()
+        from .trade_outcome import _is_market_open
+        from .intraday_execution_evidence import persisted_entry_evidence, mark_not_triggered
+
+        if session.get("locked") and not _is_market_open():
+            def _reconcile(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+                fixed: list[dict[str, Any]] = []
+                for row in rows:
+                    evidence = persisted_entry_evidence(
+                        row,
+                        session_date=session_day,
+                        committed_at=session.get("committedAt"),
+                    )
+                    fixed.append(row if evidence.get("triggered") else mark_not_triggered(row, evidence))
+                return fixed
+            long_rows = _reconcile(long_rows)
+            short_rows = _reconcile(short_rows)
+    except Exception as exc:
+        log.debug("entry evidence reconciliation skipped: %s", exc)
+
     # Preserve CLOSED forever in persisted session; free capital slot on first close
     if session.get("locked"):
         changed = False
@@ -3940,7 +4001,10 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
             "maxConcurrentNames": MAX_CONCURRENT_NAMES,
             "dailyLossHit": bool(risk_flags.get("dailyLossHit")),
             "maxNamesHit": bool(risk_flags.get("maxNamesHit")),
-            "cashHeld": cash_held,
+            "cashHeld": cash_held or bool(long_rows or short_rows) and all(
+                str(r.get("executionStatus") or "").upper() == "NOT_TRIGGERED"
+                for r in long_rows + short_rows
+            ),
         },
         "attention": attention,
         "long": long_rows,

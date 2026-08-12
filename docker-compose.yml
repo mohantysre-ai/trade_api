@@ -48,12 +48,9 @@ services:
     volumes:
       - iros-backend-data:/app/backend/app/data
       - iros-eod-archive:/app/backend/app/services/eod_archive
-      - iros-desk-state:/app/state
       # Host desk lock — same files native start-app uses (overrides empty volume stubs)
-      - ./fixed_trade_plan.json:/app/state/fixed_trade_plan.json
-      - ./intraday_session.json:/app/state/intraday_session.json
-      - ./swing_session.json:/app/state/swing_session.json
-      - ./trade_api_snapshot.json:/app/state/trade_api_snapshot.json
+      # Directory bind keeps atomic state-file replacements visible in Docker Desktop.
+      - ./:/app/state
     healthcheck:
       test:
         [
@@ -102,11 +99,7 @@ services:
     volumes:
       - iros-backend-data:/app/backend/app/data
       - iros-eod-archive:/app/backend/app/services/eod_archive
-      - iros-desk-state:/app/state
-      - ./fixed_trade_plan.json:/app/state/fixed_trade_plan.json
-      - ./intraday_session.json:/app/state/intraday_session.json
-      - ./swing_session.json:/app/state/swing_session.json
-      - ./trade_api_snapshot.json:/app/state/trade_api_snapshot.json
+      - ./:/app/state
     healthcheck:
       test:
         [

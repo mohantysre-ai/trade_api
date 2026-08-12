@@ -6,7 +6,9 @@ Book symbols come only from date-matched swing_session (Asset Matrix lock).
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+import json
+import os
+from datetime import date, datetime
 from typing import Any
 
 from .trade_outcome import get_alert_history, _today_ist
@@ -19,6 +21,60 @@ log = logging.getLogger(__name__)
 
 DEFAULT_SWING_CAPITAL = 1_000_000.0  # ₹10L
 DAY_BUCKETS = (1, 7, 15, 30)
+
+
+def _live_direction_conflicts() -> dict[str, str]:
+    """Latest persisted scanner direction, used only as a conflict veto."""
+    path = os.environ.get("SNAPSHOT_FILE")
+    if not path:
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8-sig") as fh:
+            snap = json.load(fh)
+    except Exception:
+        return {}
+    picks = snap.get("scannerPicks") if isinstance(snap, dict) else None
+    out: dict[str, str] = {}
+    if isinstance(picks, dict):
+        for raw in picks.values():
+            if not isinstance(raw, dict):
+                continue
+            sym = str(raw.get("symbol") or "").upper().strip()
+            direction = str(raw.get("direction") or "").upper().strip()
+            if sym and direction in {"LONG", "SHORT"}:
+                out[sym] = direction
+    return out
+
+
+def _signal_conflict_row(pick: dict[str, Any], live_direction: str) -> dict[str, Any]:
+    symbol = str(pick.get("symbol") or "").upper()
+    locked_direction = str(pick.get("direction") or "LONG").upper()
+    return {
+        "symbol": symbol,
+        "direction": locked_direction,
+        "entryDate": pick.get("entryDate"),
+        "entryPrice": pick.get("entryPrice"),
+        "currentPrice": pick.get("currentPrice"),
+        "stopLoss": pick.get("stopLoss"),
+        "target1": pick.get("target1"),
+        "target2": pick.get("target2"),
+        "qty": pick.get("approxQty") or 0,
+        "deployedCapital": 0.0,
+        "pnl": 0.0,
+        "pnlPct": 0.0,
+        "status": "SIGNAL_CONFLICT",
+        "exitReason": "SIGNAL_CONFLICT",
+        "executionStatus": "NOT_TRIGGERED",
+        "outcomeBucket": "SKIPPED",
+        "deskExitLabel": "SKIPPED",
+        "triggered": False,
+        "skipped": True,
+        "skipReason": f"locked_{locked_direction.lower()}_live_{live_direction.lower()}",
+        "signalConflict": {"lockedDirection": locked_direction, "liveDirection": live_direction},
+        "analysis": f"Excluded: locked {locked_direction} conflicts with current scanner {live_direction}.",
+        "score": pick.get("score"),
+        "lineage": pick.get("lineage"),
+    }
 
 
 def _exit_path_tag(
@@ -64,7 +120,9 @@ def _merge_lineage(
     lineage.setdefault("sector", pick.get("sector"))
     lineage.setdefault("levelsSource", pick.get("levelsSource"))
     if triggered:
-        lineage["triggeredAt"] = datetime.now(timezone.utc).isoformat()
+        # A daily OHLC crossing proves that the level traded, but not when.  Do
+        # not fabricate a trigger timestamp from the report generation time.
+        lineage["triggeredAt"] = base.get("triggeredAt")
         if isinstance(exit_state, dict):
             lineage["executedFills"] = exit_state.get("legsFilled")
     else:
@@ -140,7 +198,12 @@ def _entry_was_triggered(
     return True, "assume_lock_fill"
 
 
-def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
+def _evaluate_swing_pick(
+    pick: dict[str, Any],
+    *,
+    after_close: bool,
+    require_date_matched_mark: bool = False,
+) -> dict[str, Any]:
     """Evaluate one swing pick vs reference + real close mark (never mock-0 → SL)."""
     symbol = (pick.get("symbol") or "").upper()
     direction = pick.get("direction", "LONG")
@@ -154,16 +217,21 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
     ref_price = get_reference_price(symbol, allow_network=False)
     # Prefetched mark on pick, else live close mark, else session LTP
     eod_price = None
-    for raw in (pick.get("_closeMark"), pick.get("currentPrice")):
+    mark_candidates = (
+        (pick.get("_sessionCloseMark"),)
+        if require_date_matched_mark
+        else (pick.get("_closeMark"), pick.get("currentPrice"))
+    )
+    for raw in mark_candidates:
         try:
             if raw is not None and float(raw) > 0:
                 eod_price = float(raw)
                 break
         except (TypeError, ValueError):
             pass
-    if eod_price is None:
+    if eod_price is None and not require_date_matched_mark:
         eod_price = get_close_mark_price(symbol)
-    if eod_price is None:
+    if eod_price is None and not require_date_matched_mark:
         for raw in (pick.get("ltp"), pick.get("scanLtp")):
             try:
                 if raw is not None and float(raw) > 0:
@@ -198,7 +266,8 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
             "target1": t1,
             "target2": t2,
             "qty": qty,
-            "deployedCapital": float(pick.get("deployedCapital") or ((base_entry or 0) * qty)),
+            "plannedCapital": float(pick.get("deployedCapital") or ((base_entry or 0) * qty)),
+            "deployedCapital": 0.0,
             "pnl": 0.0,
             "pnlPct": None,
             "status": "NO_MARK",
@@ -369,14 +438,24 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
     if work is not None:
         if isinstance(pick.get("exitState"), dict) and not work.get("exitState"):
             work["exitState"] = pick["exitState"]
+        # Apply the paper strategy's SL/scale/break-even/trail state on every
+        # current tick. `after_close` only controls EOD square-off; it must not
+        # disable risk controls during the cash session.
+        # Daily high/low proves an entry crossing, but contains no event order.
+        # Feeding both extremes into the trail engine invents a favourable-first
+        # path (and can book a ratchet/stop that never occurred).  Until a
+        # timestamped tick ledger exists, value the modeled position from the
+        # verified close only.
         total_pnl, avg_exit, eval_result = blended_pnl_from_state(
-            work, eod_price, after_close=True, day_high=day_high, day_low=day_low
+            work, eod_price, after_close=after_close
         )
         if eval_result:
             used_scale = True
             pnl = float(total_pnl)
             pnl_pct = sign * (avg_exit - base_entry) / base_entry * 100 if base_entry else 0.0
             status = _exit_reason_from_scale_eval(eval_result)
+            if not eval_result.get("closed"):
+                status = "OPEN"
             exit_state = eval_result.get("exitState")
             scale_extra = {
                 "exitPrice": round(float(avg_exit), 2),
@@ -443,6 +522,11 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
         exit_for_diag = t1
     elif status == "T2_HIT" and t2 > 0:
         exit_for_diag = t2
+    # The swing trigger is proven by daily OHLC, but its timestamp/order is not
+    # known.  Whole-day extrema therefore cannot be represented as post-entry
+    # MFE/MAE.  Use the evaluated path/exit state until timestamped bars exist.
+    diagnostic_high = pick.get("postEntryHigh")
+    diagnostic_low = pick.get("postEntryLow")
     if diag_reason:
         miss_diagnostic = _build_levels_diagnostic(
             {
@@ -453,14 +537,14 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
                 "target2": t2,
                 "direction": direction,
                 "rrT2": pick.get("rewardRisk") or pick.get("rrT2"),
-                "dayHigh": day_high,
-                "dayLow": day_low,
+                "dayHigh": diagnostic_high,
+                "dayLow": diagnostic_low,
             },
             diag_reason,
             exit_for_diag,
             float(pnl or 0),
-            day_high=day_high,
-            day_low=day_low,
+            day_high=diagnostic_high,
+            day_low=diagnostic_low,
         )
 
     exit_state = scale_extra.get("exitState") if isinstance(scale_extra.get("exitState"), dict) else None
@@ -485,8 +569,8 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
             if isinstance(exit_state, dict) and exit_state.get("effectiveStop") is not None
             else (sl or None)
         ),
-        day_high=day_high,
-        day_low=day_low,
+        day_high=diagnostic_high,
+        day_low=diagnostic_low,
         mae_pct=(miss_diagnostic or {}).get("maePct") if miss_diagnostic else None,
         mfe_pct=(miss_diagnostic or {}).get("mfePct") if miss_diagnostic else None,
         stop_utilization=(miss_diagnostic or {}).get("stopUtilization") if miss_diagnostic else None,
@@ -533,6 +617,17 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
     if pnl < 0 and outcome_bucket == "WIN":
         outcome_bucket = "LOSS"
 
+    book_exit_price = scale_extra.get("exitPrice")
+    if book_exit_price is None:
+        if status == "SL_HIT" and sl > 0:
+            book_exit_price = sl
+        elif status == "T1_HIT" and t1 > 0:
+            book_exit_price = t1
+        elif status == "T2_HIT" and t2 > 0:
+            book_exit_price = t2
+        else:
+            book_exit_price = eod_price
+
     return {
         "symbol": symbol,
         "direction": direction,
@@ -540,6 +635,7 @@ def _evaluate_swing_pick(pick: dict[str, Any]) -> dict[str, Any]:
         "entryPrice": base_entry,
         "refPrice930": ref_price,
         "currentPrice": eod_price,
+        "exitPrice": round(float(book_exit_price), 2) if book_exit_price is not None else None,
         "dayHigh": day_high,
         "dayLow": day_low,
         "stopLoss": sl,
@@ -663,6 +759,9 @@ def generate_swing_eod_report(
     from .eod_book_cache import load_book_cache, save_book_cache
 
     as_of = for_date or date.fromisoformat(_today_ist())
+    from .desk_clock import cash_session_phase
+    market_phase = cash_session_phase(as_of)
+    after_close = market_phase == "CLOSED"
     all_picks, is_mock, symbol_source, desk_counts = _load_swing_book_picks(as_of)
 
     if not force:
@@ -698,7 +797,7 @@ def generate_swing_eod_report(
                     stale_set,
                     ghost_cache,
                 )
-            else:
+            elif market_phase == "CLOSED" and str(cached.get("marketPhase") or "") == market_phase:
                 return cached
 
     if not all_picks:
@@ -748,9 +847,38 @@ def generate_swing_eod_report(
     total_deployed = 0.0
     bucket_totals: dict[int, float] = {b: 0.0 for b in DAY_BUCKETS}
     skipped_count = 0
+    live_directions = _live_direction_conflicts()
+    day_range_cache: dict[str, tuple] = {}
 
     for pick in all_picks:
-        evaluated = _evaluate_swing_pick(pick)
+        # Trigger classification requires same-session range evidence. Snapshot
+        # highs can be stale or from an incompatible price series; refresh the
+        # day bar before declaring that an entry was never crossed.
+        from .eod_intraday_report import _enrich_pick_day_range
+
+        refreshed = _enrich_pick_day_range(
+            {**pick, "dayHigh": None, "dayLow": None},
+            day_range_cache,
+            for_date=as_of,
+        )
+        pick = {
+            **pick,
+            "dayHigh": refreshed.get("dayHigh"),
+            "dayLow": refreshed.get("dayLow"),
+            "_sessionCloseMark": refreshed.get("_sessionCloseMark"),
+        }
+        symbol = str(pick.get("symbol") or "").upper()
+        locked_direction = str(pick.get("direction") or "LONG").upper()
+        live_direction = live_directions.get(symbol)
+        evaluated = (
+            _signal_conflict_row(pick, live_direction)
+            if live_direction and live_direction != locked_direction
+            else _evaluate_swing_pick(
+                pick,
+                after_close=after_close,
+                require_date_matched_mark=True,
+            )
+        )
         days_held = _days_held(evaluated.get("entryDate"), as_of)
         # Daily Matrix lock → de-emphasize multi-day buckets (mostly 0–1)
         bucket = max([b for b in DAY_BUCKETS if days_held is not None and days_held >= b], default=None)
@@ -776,6 +904,8 @@ def generate_swing_eod_report(
             "alertsFired": symbol_alerts,
             "book": "SWING",
             "exitReason": evaluated.get("status"),
+            "executionBasis": "MODELED_PAPER",
+            "pnlKind": "skipped" if evaluated.get("skipped") else "realised" if after_close or evaluated.get("status") != "OPEN" else "unrealised",
         })
 
     from .outcome_narrative import attach_outcome_narratives, build_day_lessons
@@ -835,6 +965,9 @@ def generate_swing_eod_report(
         "picks": rows,
         "isMock": is_mock,
         "symbolSource": symbol_source,
+        "executionPolicy": "MANUAL_ONLY",
+        "executionBasis": "MODELED_PAPER",
+        "marketPhase": market_phase,
         "deskCounts": desk_counts,
         "rotation": "DAILY",
         "source": "asset_matrix_buy",

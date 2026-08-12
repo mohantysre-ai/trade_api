@@ -139,7 +139,7 @@ def infer_mfe_r(
     for key in ("mfeR", "peakR", "maxR"):
         raw = _f(st.get(key))
         if raw is not None:
-            return raw
+            return max(0.0, raw)
     filled_rs = [
         float(x["r"])
         for x in (st.get("legsFilled") or [])
@@ -148,14 +148,14 @@ def infer_mfe_r(
     peak = max(filled_rs) if filled_rs else None
     cur = _f(current_r)
     if peak is not None:
-        return max(peak, cur if cur is not None else peak)
+        return max(0.0, peak, cur if cur is not None else peak)
     entry_f, risk, hi, lo = _f(entry), _f(risk_per_share), _f(day_high), _f(day_low)
     if entry_f and risk and risk > 0 and hi is not None and lo is not None:
         sign = -1.0 if str(direction).upper() == "SHORT" else 1.0
         fav = hi if sign > 0 else lo
         path_mfe = sign * (fav - entry_f) / risk
-        return max(cur, path_mfe) if cur is not None else path_mfe
-    return cur if cur is not None else 0.0
+        return max(0.0, cur if cur is not None else 0.0, path_mfe)
+    return max(0.0, cur if cur is not None else 0.0)
 
 
 def infer_mae_r(
@@ -185,7 +185,9 @@ def infer_mae_r(
         candidates.append(sign * (adv - entry_f) / risk)
     if not candidates:
         return None
-    return round(min(candidates), 3)
+    # MAE uses a signed-R convention here: adverse values are negative and a
+    # trade with no adverse move has zero MAE, never a positive value.
+    return round(min(0.0, *candidates), 3)
 
 
 def infer_stop_r(

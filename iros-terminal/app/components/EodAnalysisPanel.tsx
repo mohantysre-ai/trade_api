@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { LiveTickNumber } from '@/lib/desk-motion';
-import { fetchLiveDesk } from '@/lib/live-desk';
+import { subscribeLiveDesk, type LiveDeskSnapshot } from '@/lib/live-desk';
 
 /* -------------------------------------------------------------------------- */
 /*  Types for EOD report responses from the backend                          */
@@ -55,7 +55,7 @@ type IntradayTrade = {
   symbol: string;
   direction: string;
   entryPrice: number;
-  exitPrice: number;
+  exitPrice: number | null;
   stopLoss?: number | null;
   target1?: number | null;
   target2?: number | null;
@@ -70,7 +70,7 @@ type IntradayTrade = {
   deskIcSummary?: { decision?: string; conviction?: number; oneLiner?: string } | null;
   /** Live overlay (session only) — not from book cache */
   markLive?: boolean;
-  pnlKind?: 'realised' | 'unrealised';
+  pnlKind?: 'realised' | 'unrealised' | 'skipped';
   /** Scale-trail state fields — from backend SCALE_TRAIL mode */
   remainingQty?: number | null;
   effectiveStop?: number | null;
@@ -83,6 +83,8 @@ type IntradayTrade = {
     rMultiple?: number | null;
     economicR?: number | null;
     pathR?: number | null;
+    profitGuardActive?: boolean | null;
+    initialStop?: number | null;
     closed?: boolean;
   } | null;
   exitPlan?: { mode?: string; legs?: { r?: number }[] } | null;
@@ -92,6 +94,7 @@ type IntradayTrade = {
   deskExitLabel?: string | null;
   executionStatus?: string | null;
   outcomeBucket?: string | null;
+  skipped?: boolean;
   mfeR?: number | null;
   maeR?: number | null;
   economicR?: number | null;
@@ -117,6 +120,9 @@ type IntradayReport = {
   missScorecardCoverage?: number;
   isMock?: boolean;
   symbolSource?: string;
+  executionPolicy?: string;
+  executionBasis?: string;
+  marketPhase?: string;
   deskCounts?: { swing?: number; intradayLong?: number; intradayShort?: number; total?: number };
   fromCache?: boolean;
   cachedAt?: string;
@@ -143,6 +149,7 @@ type SwingPick = {
   entryPrice: number;
   refPrice930: number;
   currentPrice: number | null;
+  exitPrice?: number | null;
   stopLoss: number;
   target1: number;
   target2: number;
@@ -157,7 +164,7 @@ type SwingPick = {
   deskIcSummary?: { decision?: string; conviction?: number; oneLiner?: string } | null;
   analysis?: string | null;
   markLive?: boolean;
-  pnlKind?: 'realised' | 'unrealised';
+  pnlKind?: 'realised' | 'unrealised' | 'skipped';
   /** Scale-trail state — from backend SCALE_TRAIL mode */
   remainingQty?: number | null;
   effectiveStop?: number | null;
@@ -171,6 +178,8 @@ type SwingPick = {
     rMultiple?: number | null;
     economicR?: number | null;
     pathR?: number | null;
+    profitGuardActive?: boolean | null;
+    initialStop?: number | null;
     closed?: boolean;
   } | null;
   scaleTrail?: boolean;
@@ -209,6 +218,9 @@ type SwingReport = {
   picks: SwingPick[];
   isMock?: boolean;
   symbolSource?: string;
+  executionPolicy?: string;
+  executionBasis?: string;
+  marketPhase?: string;
   deskCounts?: { swing?: number; intradayLong?: number; intradayShort?: number; total?: number };
   referenceDate?: string;
   referenceLabel?: string;
@@ -270,7 +282,11 @@ function ScaleExitCell({
   scaleTrail?: boolean;
   scaleProgress?: string | null;
   exitPlan?: { mode?: string } | null;
-  exitState?: { remainingQty?: number | null; effectiveStop?: number | null } | null;
+  exitState?: {
+    remainingQty?: number | null;
+    effectiveStop?: number | null;
+    profitGuardActive?: boolean | null;
+  } | null;
   effectiveStop?: number | null;
   remainingQty?: number | null;
   qty?: number | null;
@@ -281,6 +297,7 @@ function ScaleExitCell({
   }
   const rem = exitState?.remainingQty ?? remainingQty;
   const trail = exitState?.effectiveStop ?? effectiveStop;
+  const stopLabel = exitState?.profitGuardActive === false ? 'initial SL' : 'trail SL';
   return (
     <div className="flex flex-col items-start gap-0.5 min-w-[9rem]">
       <span className="text-[8px] font-mono tabular-nums text-slate-700 whitespace-nowrap">
@@ -288,7 +305,7 @@ function ScaleExitCell({
       </span>
       <span className="text-[7px] text-amber-700 font-bold tabular-nums">
         {rem != null ? `rem ${rem}${qty != null ? `/${qty}` : ''}` : null}
-        {trail != null ? `${rem != null ? ' · ' : ''}trail SL ${Number(trail).toFixed(2)}` : null}
+        {trail != null ? `${rem != null ? ' · ' : ''}${stopLabel} ${Number(trail).toFixed(2)}` : null}
       </span>
     </div>
   );
@@ -360,7 +377,21 @@ function deriveCanonicalTrade<T extends {
 }
 
 function deriveIntradayHeadlines(base: IntradayReport, trades: IntradayTrade[]): IntradayReport {
-  const derived = trades.map((t) => deriveCanonicalTrade(t));
+  const derived = trades.map((t) => {
+    const row = deriveCanonicalTrade(t);
+    if (row.outcomeBucket !== 'SKIPPED') return row;
+    return {
+      ...row,
+      deployedCapital: 0,
+      pnl: 0,
+      pnlPct: 0,
+      realizedPnl: 0,
+      unrealizedPnl: 0,
+      remainingQty: 0,
+      markLive: false,
+      pnlKind: 'skipped' as const,
+    };
+  });
   const wins = derived.filter((t) => t.outcomeBucket === 'WIN').length;
   const losses = derived.filter((t) => t.outcomeBucket === 'LOSS').length;
   const skipped = derived.filter((t) => t.outcomeBucket === 'SKIPPED').length;
@@ -386,7 +417,21 @@ function deriveIntradayHeadlines(base: IntradayReport, trades: IntradayTrade[]):
 }
 
 function deriveSwingHeadlines(base: SwingReport, picks: SwingPick[]): SwingReport {
-  const derived = picks.map((p) => deriveCanonicalTrade(p));
+  const derived = picks.map((p) => {
+    const row = deriveCanonicalTrade(p);
+    if (row.outcomeBucket !== 'SKIPPED') return row;
+    return {
+      ...row,
+      deployedCapital: 0,
+      pnl: 0,
+      pnlPct: 0,
+      realizedPnl: 0,
+      unrealizedPnl: 0,
+      remainingQty: 0,
+      markLive: false,
+      pnlKind: 'skipped' as const,
+    };
+  });
   const active = derived.filter((p) => p.outcomeBucket !== 'SKIPPED' && !p.skipped && p.status !== 'NOT_TRIGGERED');
   const wins = active.filter((p) => p.outcomeBucket === 'WIN');
   const losses = active.filter((p) => p.outcomeBucket === 'LOSS');
@@ -451,6 +496,7 @@ function istCalendarToday(): string {
 type LivePriceRow = {
   symbol?: string;
   direction?: string;
+  entryDate?: string | null;
   currentPrice?: number | null;
   ltp?: number | null;
   entryPrice?: number | null;
@@ -463,6 +509,26 @@ type LivePriceRow = {
   outcome?: { hitLevel?: string | null; ltp?: number | null; pctChange?: number | null; scaleTrail?: boolean; label?: string | null; pnl?: number | null } | null;
   exitPlan?: { mode?: string } | null;
   exitState?: { remainingQty?: number | null; effectiveStop?: number | null; realizedPnl?: number | null; unrealizedPnl?: number | null; closed?: boolean } | null;
+};
+
+type LivePricesDesk = {
+  long?: LivePriceRow[];
+  short?: LivePriceRow[];
+  sessionDate?: string;
+  date?: string;
+  marketOpen?: boolean;
+  updatedAt?: string;
+};
+
+type SessionDesk = {
+  long?: LivePriceRow[];
+  short?: LivePriceRow[];
+  sessionDate?: string;
+  locked?: {
+    long?: LivePriceRow[];
+    short?: LivePriceRow[];
+    sessionDate?: string;
+  };
 };
 
 type LiveMark = {
@@ -546,7 +612,29 @@ function rootCauseTone(root: string | null | undefined): string {
 }
 
 function OutcomeRow({ trade }: { trade: IntradayTrade }) {
-  const d = trade.missDiagnostic!;
+  const d: MissDiagnostic = trade.missDiagnostic || {
+    isMiss: trade.outcomeBucket === 'LOSS',
+    isHit: trade.outcomeBucket === 'WIN',
+    isSkip: trade.outcomeBucket === 'SKIPPED',
+    exitReason: trade.exitReason || 'OPEN',
+    rootCause: null,
+    factors: [],
+    rMultiple: trade.economicR ?? trade.rMultiple ?? null,
+    economicR: trade.economicR ?? null,
+    pathR: trade.pathR ?? null,
+    movePct: trade.pnlPct ?? null,
+    gapToT1Pct: null,
+    gapToT2Pct: null,
+    stopUtilization: null,
+    plannedRr: null,
+    riskPerShare: trade.riskPerShare ?? null,
+    maePct: null,
+    mfePct: null,
+    stopEff: null,
+    falsePositive: false,
+    holdingMins: null,
+    source: 'LIVE_MARK',
+  };
   const econR = trade.economicR ?? trade.rMultiple ?? d.economicR ?? d.rMultiple;
   const pathR = trade.pathR ?? d.pathR;
   const showPath = pathR != null && econR != null && Math.abs(Number(pathR) - Number(econR)) > 0.001;
@@ -591,6 +679,11 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
         <td className="px-2 py-1.5">
           <div className="flex flex-col gap-0.5">
             <span className={`desk-pill ${exitTone}`}>{exitLabel}</span>
+            {trade.exitPrice != null && (
+              <span className="text-[8px] font-semibold tabular-nums text-slate-500">
+                @ {Number(trade.exitPrice).toFixed(2)}
+              </span>
+            )}
             {trade.outcomeBucket && (
               <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
                 {trade.executionStatus ? `${trade.executionStatus} · ` : ''}
@@ -610,9 +703,11 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
         <td className={`px-2 py-1.5 text-right tabular-nums ${rBad ? 'text-red-600' : 'text-slate-700'}`}>
           {fmtMissSigned(d.movePct, 2, '%')}
         </td>
-        <td className="hidden sm:table-cell px-2 py-1.5 text-right tabular-nums text-slate-600">{fmtMissNum(d.maePct, 2)}</td>
         <td className="hidden sm:table-cell px-2 py-1.5 text-right tabular-nums text-slate-600">
-          {trade.mfeR != null ? fmtMissSigned(trade.mfeR, 2, 'R') : fmtMissNum(d.mfePct, 2)}
+          {trade.maeR != null ? fmtMissSigned(trade.maeR, 2, 'R') : fmtMissNum(d.maePct, 2)}
+        </td>
+        <td className="hidden sm:table-cell px-2 py-1.5 text-right tabular-nums text-slate-600">
+          {trade.mfeR != null ? fmtMissSigned(Math.max(0, trade.mfeR), 2, 'R') : fmtMissNum(d.mfePct, 2)}
         </td>
         <td className="hidden sm:table-cell px-2 py-1.5">
           <span className={`desk-pill ${rootCauseTone(d.rootCause)}`} title={ladder || undefined}>
@@ -625,7 +720,9 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
           )}
         </td>
         <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${pnlTone(trade.pnl ?? trade.pnlPct)}`}>
-          {trade.pnl == null
+          {trade.outcomeBucket === 'SKIPPED'
+            ? fmtInr(0, 0)
+            : trade.pnl == null
             ? fmtMissSigned(trade.pnlPct, 2, '%')
             : Math.abs(trade.pnl) < 1e-6 && trade.pnlPct != null
               ? fmtMissSigned(trade.pnlPct, 2, '%')
@@ -636,7 +733,9 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
             {d.falsePositive && <span className="desk-pill desk-pill--danger">FP</span>}
             {(d.factors || []).slice(0, 3).map((f) => (
               <span key={f} className="desk-pill desk-pill--muted" title={f}>
-                {f.replace(/_/g, ' ').slice(0, 18)}
+                <span className="inline-block max-w-[9rem] whitespace-normal break-words text-center leading-tight">
+                  {f.replace(/_/g, ' ')}
+                </span>
               </span>
             ))}
           </div>
@@ -664,11 +763,11 @@ function OutcomeTable({ rows }: { rows: IntradayTrade[] }) {
             <th className="px-2 py-2 text-left font-bold">Ticker</th>
             <th className="px-2 py-2 text-left font-bold">Side</th>
             <th className="px-2 py-2 text-right font-bold">Qty</th>
-            <th className="px-2 py-2 text-left font-bold">Exit</th>
+            <th className="px-2 py-2 text-left font-bold">Exit type / price</th>
             <th className="px-2 py-2 text-right font-bold">R</th>
             <th className="px-2 py-2 text-right font-bold">Move%</th>
-            <th className="hidden sm:table-cell px-2 py-2 text-right font-bold">MAE</th>
-            <th className="hidden sm:table-cell px-2 py-2 text-right font-bold">MFE</th>
+            <th className="hidden sm:table-cell px-2 py-2 text-right font-bold">MAE (R)</th>
+            <th className="hidden sm:table-cell px-2 py-2 text-right font-bold">MFE (R)</th>
             <th className="hidden sm:table-cell px-2 py-2 text-left font-bold">Why (root)</th>
             <th className="px-2 py-2 text-right font-bold">P&L</th>
             <th className="hidden sm:table-cell px-2 py-2 text-left font-bold">Flags</th>
@@ -961,6 +1060,7 @@ export default function EodAnalysisPanel({
 
   // forceBookRebuild is read only when refreshToken/date triggers — parent may clear it without a second fetch
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch synchronizes this client panel with the selected report date
     void fetchReports({ force: forceBookRebuild });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot force paired with refreshToken
   }, [fetchReports, refreshToken]);
@@ -968,22 +1068,19 @@ export default function EodAnalysisPanel({
   // Market-hours live marks — overlay LTP / MTM without rewriting book cache
   useEffect(() => {
     if (!isTodayBook) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear a now-inapplicable live overlay when browsing historical books
       setLiveMarks(null);
       return;
     }
     let cancelled = false;
-    let lastMarketOpen = true;
-    let pollTimer: number | null = null;
 
-    const loadLive = async () => {
+    const loadLive = async (snapshot: LiveDeskSnapshot) => {
       if (liveBusy.current) return;
       liveBusy.current = true;
       try {
-        const [lp, sw, intra] = await Promise.all([
-          fetchLiveDesk<Record<string, any>>('live-prices'),
-          fetchLiveDesk<Record<string, any>>('swing-session'),
-          fetchLiveDesk<Record<string, any>>('intraday-session'),
-        ]);
+        const lp = snapshot['live-prices'] as LivePricesDesk;
+        const sw = snapshot['swing-session'] as SessionDesk;
+        const intra = snapshot['intraday-session'] as SessionDesk;
         if (cancelled) return;
 
         const byKey: LiveMarksState['byKey'] = {};
@@ -1009,8 +1106,16 @@ export default function EodAnalysisPanel({
             bySymbol[sym] = ltp;
           }
         };
-        ingestPlan(lp?.long as LivePriceRow[] | undefined, 'LONG');
-        ingestPlan(lp?.short as LivePriceRow[] | undefined, 'SHORT');
+        const planRows = [...(lp?.long || []), ...(lp?.short || [])] as LivePriceRow[];
+        const livePriceDate = String(
+          lp?.sessionDate || lp?.date || planRows.find((row) => row.entryDate)?.entryDate || '',
+        ).slice(0, 10);
+        // A fixed plan can continue streaming fresh prices after its trade date.  Do not
+        // let those prior-day symbols/exit states contaminate today's EOD book.
+        if (livePriceDate === dateStr) {
+          ingestPlan(lp?.long as LivePriceRow[] | undefined, 'LONG');
+          ingestPlan(lp?.short as LivePriceRow[] | undefined, 'SHORT');
+        }
 
         const ingestSession = (rows: LivePriceRow[] | undefined, fallbackDir: string) => {
           for (const row of rows || []) {
@@ -1033,17 +1138,20 @@ export default function EodAnalysisPanel({
             };
           }
         };
-        ingestSession([...(sw?.long || []), ...(sw?.short || [])] as LivePriceRow[], 'LONG');
-        ingestSession(
-          [...(intra?.long || []), ...(intra?.short || []), ...(intra?.locked?.long || []), ...(intra?.locked?.short || [])] as LivePriceRow[],
-          'LONG',
-        );
+        if (String(sw?.sessionDate || '').slice(0, 10) === dateStr) {
+          ingestSession([...(sw?.long || []), ...(sw?.short || [])] as LivePriceRow[], 'LONG');
+        }
+        if (String(intra?.sessionDate || intra?.locked?.sessionDate || '').slice(0, 10) === dateStr) {
+          ingestSession(
+            [...(intra?.long || []), ...(intra?.short || []), ...(intra?.locked?.long || []), ...(intra?.locked?.short || [])] as LivePriceRow[],
+            'LONG',
+          );
+        }
 
         const marketOpen = Boolean(lp?.marketOpen);
-        lastMarketOpen = marketOpen;
         setLiveMarks({
           marketOpen,
-          updatedAt: typeof lp?.updatedAt === 'string' ? lp.updatedAt : new Date().toISOString(),
+          updatedAt: typeof lp?.updatedAt === 'string' ? lp.updatedAt : snapshot.receivedAt,
           byKey,
           bySymbol,
         });
@@ -1054,19 +1162,14 @@ export default function EodAnalysisPanel({
       }
     };
 
-    const schedule = () => {
-      if (cancelled) return;
-      pollTimer = window.setTimeout(async () => {
-        if (document.visibilityState === 'visible' && navigator.onLine) await loadLive();
-        schedule();
-      }, lastMarketOpen ? 5_000 : 30_000);
-    };
-    void loadLive().finally(schedule);
+    const unsubscribe = subscribeLiveDesk((snapshot) => {
+      if (document.visibilityState === 'visible' && navigator.onLine) void loadLive(snapshot);
+    });
     return () => {
       cancelled = true;
-      if (pollTimer !== null) window.clearTimeout(pollTimer);
+      unsubscribe();
     };
-  }, [isTodayBook]);
+  }, [isTodayBook, dateStr]);
 
   const liveActive = Boolean(isTodayBook && liveMarks && (liveMarks.marketOpen || Object.keys(liveMarks.bySymbol).length > 0));
 
@@ -1079,6 +1182,21 @@ export default function EodAnalysisPanel({
     let realised = 0;
     let unrealised = 0;
     const trades = (intraday.trades || []).map((t) => {
+      const skipped = t.skipped || t.outcomeBucket === 'SKIPPED' || String(t.executionStatus || '').toUpperCase() === 'NOT_TRIGGERED';
+      if (skipped) {
+        return {
+          ...t,
+          deployedCapital: 0,
+          pnl: 0,
+          pnlPct: 0,
+          realizedPnl: 0,
+          unrealizedPnl: 0,
+          remainingQty: 0,
+          exitState: null,
+          markLive: false,
+          pnlKind: 'skipped' as const,
+        };
+      }
       const sym = String(t.symbol || '').toUpperCase();
       const dir = String(t.direction || 'LONG').toUpperCase();
       const live = liveMarks.byKey[markKey(sym, dir)] || (liveMarks.bySymbol[sym] != null
@@ -1111,13 +1229,26 @@ export default function EodAnalysisPanel({
 
         const liveHard = isLiveHardClose(live);
         if (liveHard || (hardHitBook && !(Number(live.remainingQty) > 0) && !liveMarks.marketOpen)) {
-          const realized = Number(state?.realizedPnl ?? t.realizedPnl ?? t.pnl ?? 0);
+          const realized = Number(live.realizedPnl ?? state?.realizedPnl ?? t.realizedPnl ?? t.pnl ?? 0);
           realised += realized;
           return {
             ...t,
+            exitPrice: live.ltp,
+            exitReason: exitReasonFromHit(live.hitLevel, reason),
+            exitState: {
+              ...(state || {}),
+              realizedPnl: realized,
+              unrealizedPnl: 0,
+              remainingQty: 0,
+              closed: true,
+            },
+            remainingQty: 0,
+            realizedPnl: realized,
+            unrealizedPnl: 0,
             markLive: false,
             pnlKind: 'realised' as const,
             pnl: realized,
+            pnlPct: entry > 0 && qty > 0 ? (realized / (entry * qty)) * 100 : t.pnlPct,
           };
         }
 
@@ -1131,14 +1262,14 @@ export default function EodAnalysisPanel({
           remQty = qty;
         }
 
-        let realized =
+        const realized =
           live.realizedPnl != null && Number.isFinite(Number(live.realizedPnl))
             ? Number(live.realizedPnl)
             : remQty > 0 && liveMarks.marketOpen && (reason === 'EOD_SQUAREOFF' || Boolean(state?.closed))
               ? 0
               : Number(state?.realizedPnl ?? t.realizedPnl ?? 0);
 
-        let unrealized =
+        const unrealized =
           live.unrealizedPnl != null && Number.isFinite(Number(live.unrealizedPnl))
             ? Number(live.unrealizedPnl)
             : remQty > 0 && entry > 0
@@ -1216,7 +1347,7 @@ export default function EodAnalysisPanel({
 
     return {
       ...deriveIntradayHeadlines(intraday, trades),
-      remainingCapital: (intraday.capital || 0) - (intraday.totalDeployed || 0) + realised + unrealised,
+      remainingCapital: (intraday.capital || 0) + realised + unrealised,
       liveRealisedPnl: realised,
       liveUnrealisedPnl: unrealised,
       liveOverlay: true,
@@ -1236,8 +1367,18 @@ export default function EodAnalysisPanel({
     let realised = 0;
     let unrealised = 0;
     const picks = (swing.picks || []).map((p) => {
-      if (p.skipped) {
-        return { ...p, markLive: false, pnlKind: 'realised' as const };
+      if (p.skipped || p.outcomeBucket === 'SKIPPED' || String(p.executionStatus || '').toUpperCase() === 'NOT_TRIGGERED') {
+        return {
+          ...p,
+          deployedCapital: 0,
+          pnl: 0,
+          pnlPct: 0,
+          realizedPnl: 0,
+          unrealizedPnl: 0,
+          remainingQty: 0,
+          markLive: false,
+          pnlKind: 'skipped' as const,
+        };
       }
       const sym = String(p.symbol || '').toUpperCase();
       const dir = String(p.direction || 'LONG').toUpperCase();
@@ -1272,13 +1413,13 @@ export default function EodAnalysisPanel({
           if (liveMarks.marketOpen && remQty <= 0 && (reason === 'EOD_SQUAREOFF' || Boolean(state?.closed))) {
             remQty = qty;
           }
-          let realized =
+          const realized =
             live?.realizedPnl != null && Number.isFinite(Number(live.realizedPnl))
               ? Number(live.realizedPnl)
               : remQty > 0 && liveMarks.marketOpen && (reason === 'EOD_SQUAREOFF' || Boolean(state?.closed))
                 ? 0
                 : Number(state?.realizedPnl ?? p.realizedPnl ?? 0);
-          let unrealized =
+          const unrealized =
             live?.unrealizedPnl != null && Number.isFinite(Number(live.unrealizedPnl))
               ? Number(live.unrealizedPnl)
               : remQty > 0 && entry > 0
@@ -1346,6 +1487,18 @@ export default function EodAnalysisPanel({
   const noSwing = displaySwing && (!displaySwing.picks || displaySwing.picks.length === 0);
   const fromCache = Boolean(intraday?.fromCache || swing?.fromCache);
   const showBody = Boolean(displayIntraday || displaySwing || error);
+  const intradayModeledBooked = (displayIntraday?.trades || []).reduce(
+    (sum, trade) => sum + (Number(trade.realizedPnl) || 0), 0,
+  );
+  const intradayModeledOpen = (displayIntraday?.trades || []).reduce(
+    (sum, trade) => sum + (Number(trade.unrealizedPnl) || 0), 0,
+  );
+  const swingModeledBooked = (displaySwing?.picks || []).reduce(
+    (sum, pick) => sum + (pick.skipped ? 0 : (Number(pick.realizedPnl ?? (pick.pnlKind === 'realised' ? pick.pnl : 0)) || 0)), 0,
+  );
+  const swingModeledOpen = (displaySwing?.picks || []).reduce(
+    (sum, pick) => sum + (pick.skipped ? 0 : (Number(pick.unrealizedPnl ?? (pick.pnlKind === 'unrealised' ? pick.pnl : 0)) || 0)), 0,
+  );
 
   return (
     <div className={`space-y-3 ${embedded ? 'eod-book-surface' : ''}`}>
@@ -1455,7 +1608,7 @@ export default function EodAnalysisPanel({
             const intraL = Math.max(i?.intradayLong ?? 0, s?.intradayLong ?? 0);
             const intraS = Math.max(i?.intradayShort ?? 0, s?.intradayShort ?? 0);
             const total = swingN + intraL + intraS;
-            const expectOk = total >= 20;
+            const expectOk = total >= 10;
             return (
               <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-300 border-[0.5px] bg-slate-50 px-3 py-2 text-[10px]">
                 <span className="font-black uppercase tracking-wider text-slate-600">Locked desk for EOD</span>
@@ -1463,11 +1616,11 @@ export default function EodAnalysisPanel({
                 <span className="desk-pill desk-pill--ok">Intra L {intraL}</span>
                 <span className="desk-pill desk-pill--danger">Intra S {intraS}</span>
                 <span className={`desk-pill ${expectOk ? 'desk-pill--ok' : 'desk-pill--warn'}`}>
-                  Total {total}{expectOk ? '' : ' / expect ~20+'}
+                  Total {total}{expectOk ? '' : ' / configured max 10'}
                 </span>
                 {!expectOk && (
                   <span className="text-amber-700">
-                    Expect Matrix swing lock + Intra 5 buy / 5 sell after adopt.
+                    Expect up to 5 swing + 5 intraday total; side mix is score-driven.
                   </span>
                 )}
               </div>
@@ -1490,7 +1643,10 @@ export default function EodAnalysisPanel({
                   symbol: p.symbol,
                   direction: p.direction,
                   entryPrice: p.entryPrice,
-                  exitPrice: p.currentPrice ?? p.entryPrice,
+                  exitPrice:
+                    p.skipped || p.outcomeBucket === 'SKIPPED'
+                      ? null
+                      : p.exitPrice ?? p.currentPrice ?? p.entryPrice,
                   stopLoss: p.stopLoss,
                   target1: p.target1,
                   target2: p.target2,
@@ -1505,8 +1661,8 @@ export default function EodAnalysisPanel({
                     isHit: p.outcomeBucket === 'WIN',
                     isSkip: p.outcomeBucket === 'SKIPPED' || Boolean(p.skipped),
                     exitReason: p.exitReason || p.status,
-                    rootCause: null,
-                    factors: [],
+                    rootCause: p.outcomeBucket === 'SKIPPED' ? 'SIGNAL_CONFLICT' : null,
+                    factors: p.outcomeBucket === 'SKIPPED' ? ['NOT_TRIGGERED', 'SKIP_PNL'] : [],
                     rMultiple: p.economicR ?? p.rMultiple ?? null,
                     economicR: p.economicR ?? null,
                     pathR: p.pathR ?? null,
@@ -1521,7 +1677,7 @@ export default function EodAnalysisPanel({
                     stopEff: null,
                     falsePositive: false,
                     holdingMins: null,
-                    source: 'LEVELS',
+                    source: p.outcomeBucket === 'SKIPPED' ? 'SKIP' : 'LEVELS',
                   },
                   outcomeNarrative: p.outcomeNarrative,
                   deskIcSummary: p.deskIcSummary,
@@ -1531,6 +1687,7 @@ export default function EodAnalysisPanel({
                   pathR: p.pathR,
                   rMultiple: p.rMultiple,
                   mfeR: p.mfeR,
+                  maeR: p.maeR,
                   deskExitLabel: p.deskExitLabel,
                   deskProgress: p.deskProgress || p.scaleProgress,
                   lineage: p.lineage,
@@ -1552,6 +1709,11 @@ export default function EodAnalysisPanel({
                 {displayIntraday?.isMock ? ' · MOCK' : ''}
                 {liveActive && liveMarks?.marketOpen ? ' · LIVE MTM' : ''}
               </p>
+              {displayIntraday?.executionBasis === 'MODELED_PAPER' && (
+                <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-amber-700">
+                  Paper model · no broker fills · {displayIntraday.marketPhase === 'OPEN' ? 'unrealized MTM' : 'modeled close'}
+                </p>
+              )}
             </div>
 
             {noIntraday ? (
@@ -1563,27 +1725,25 @@ export default function EodAnalysisPanel({
                 {/* Summary cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-50/50">
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="desk-panel-title">Total P&L</div>
+                    <div className="desk-panel-title">{displayIntraday.executionBasis === 'MODELED_PAPER' ? (displayIntraday.marketPhase === 'OPEN' ? 'Modeled MTM' : 'Modeled P&L') : 'Total P&L'}</div>
                     <div className={`desk-metric-value tabular-nums ${pnlTone(displayIntraday.totalPnl)}`}>
                       <LiveTickNumber value={fmtInr(displayIntraday.totalPnl, 2)} />
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="desk-panel-title">Realised</div>
-                    <div className={`desk-metric-value tabular-nums ${pnlTone((displayIntraday as { liveRealisedPnl?: number }).liveRealisedPnl ?? (liveActive ? 0 : displayIntraday.totalPnl))}`}>
+                    <div className="desk-panel-title">{displayIntraday.executionBasis === 'MODELED_PAPER' ? 'Modeled booked' : 'Realised'}</div>
+                    <div className={`desk-metric-value tabular-nums ${pnlTone((displayIntraday as { liveRealisedPnl?: number }).liveRealisedPnl ?? intradayModeledBooked)}`}>
                       {fmtInr(
                         (displayIntraday as { liveRealisedPnl?: number }).liveRealisedPnl ??
-                          (liveActive ? 0 : displayIntraday.totalPnl),
+                          intradayModeledBooked,
                         2,
                       )}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
                     <div className="desk-panel-title">Unrealised</div>
-                    <div className={`desk-metric-value tabular-nums ${pnlTone((displayIntraday as { liveUnrealisedPnl?: number }).liveUnrealisedPnl ?? null)}`}>
-                      {liveActive
-                        ? fmtInr((displayIntraday as { liveUnrealisedPnl?: number }).liveUnrealisedPnl ?? 0, 2)
-                        : '—'}
+                    <div className={`desk-metric-value tabular-nums ${pnlTone((displayIntraday as { liveUnrealisedPnl?: number }).liveUnrealisedPnl ?? intradayModeledOpen)}`}>
+                      {fmtInr((displayIntraday as { liveUnrealisedPnl?: number }).liveUnrealisedPnl ?? intradayModeledOpen, 2)}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
@@ -1597,7 +1757,7 @@ export default function EodAnalysisPanel({
                     <div className="desk-metric-value text-slate-800 tabular-nums">{displayIntraday.hitRatePct}%</div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="desk-panel-title">Remaining</div>
+                    <div className="desk-panel-title">Portfolio value</div>
                     <div className="desk-metric-value text-slate-800 tabular-nums">₹{displayIntraday.remainingCapital.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
                   </div>
                 </div>
@@ -1605,7 +1765,7 @@ export default function EodAnalysisPanel({
                 <PortfolioDist
                   title="Intraday portfolio balance"
                   totalDeployed={displayIntraday.totalDeployed || 0}
-                  rows={(displayIntraday.trades || []).map((t) => ({
+                  rows={(displayIntraday.trades || []).filter((t) => t.outcomeBucket !== 'SKIPPED' && !t.skipped).map((t) => ({
                     symbol: String(t.symbol || ''),
                     qty: t.qty || 0,
                     deployed: t.deployedCapital || 0,
@@ -1648,12 +1808,13 @@ export default function EodAnalysisPanel({
                               <span className={`font-bold ${trade.direction === 'LONG' ? 'text-emerald-700' : 'text-red-700'}`}>
                                 {trade.symbol}
                               </span>
+                              {' '}
                               <span className="text-[8px] text-slate-400 ml-1">{trade.direction}</span>
                               {trade.pnlKind === 'unrealised' && (
-                                <span className="ml-1 text-[7px] font-black uppercase text-cyan-600">U</span>
+                                <><span aria-hidden> </span><span className="ml-1 text-[7px] font-black uppercase text-cyan-600">U</span></>
                               )}
                               {trade.pnlKind === 'realised' && (
-                                <span className="ml-1 text-[7px] font-black uppercase text-slate-400">R</span>
+                                <><span aria-hidden> </span><span className="ml-1 text-[7px] font-black uppercase text-slate-400">R</span></>
                               )}
                             </td>
                             <td className="text-right px-2 py-1.5 tabular-nums text-slate-700">
@@ -1668,7 +1829,7 @@ export default function EodAnalysisPanel({
                               {trade.markLive ? (
                                 <LiveTickNumber value={trade.exitPrice} />
                               ) : (
-                                trade.exitPrice
+                                trade.exitPrice ?? '—'
                               )}
                             </td>
                             <td className="hidden sm:table-cell px-2 py-1.5">
@@ -1712,9 +1873,14 @@ export default function EodAnalysisPanel({
                 {displaySwing?.date ?? dateStr}
                 {displaySwing?.symbolSource ? ` · ${displaySwing.symbolSource}` : ''}
                 {displaySwing?.isMock ? ' · MOCK' : ''}
-                {' · Asset Matrix swing lock (not intradAy)'}
+                {' · Asset Matrix swing lock (not intraday)'}
                 {liveActive && liveMarks?.marketOpen ? ' · LIVE MTM' : ''}
               </p>
+              {displaySwing?.executionBasis === 'MODELED_PAPER' && (
+                <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-amber-700">
+                  Paper model · no broker fills · {displaySwing.marketPhase === 'OPEN' ? 'unrealized MTM' : 'modeled close'}
+                </p>
+              )}
             </div>
 
             {noSwing ? (
@@ -1727,7 +1893,7 @@ export default function EodAnalysisPanel({
                 {/* Summary cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-50/50">
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="desk-panel-title">Total P&L</div>
+                    <div className="desk-panel-title">{displaySwing.executionBasis === 'MODELED_PAPER' ? (displaySwing.marketPhase === 'OPEN' ? 'Modeled MTM' : 'Modeled P&L') : 'Total P&L'}</div>
                     <div className={`desk-metric-value tabular-nums ${pnlTone(displaySwing.totalPnl || displaySwing.totalPnlPct)}`}>
                       {displaySwing.totalPnl != null && Math.abs(Number(displaySwing.totalPnl)) >= 0.005
                         ? <LiveTickNumber value={fmtInr(displaySwing.totalPnl, 2)} />
@@ -1737,19 +1903,15 @@ export default function EodAnalysisPanel({
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
-                    <div className="desk-panel-title">Realised</div>
-                    <div className={`desk-metric-value tabular-nums ${pnlTone((displaySwing as { liveRealisedPnl?: number }).liveRealisedPnl ?? null)}`}>
-                      {liveActive
-                        ? fmtInr((displaySwing as { liveRealisedPnl?: number }).liveRealisedPnl ?? 0, 2)
-                        : '—'}
+                    <div className="desk-panel-title">{displaySwing.executionBasis === 'MODELED_PAPER' ? 'Modeled booked' : 'Realised'}</div>
+                    <div className={`desk-metric-value tabular-nums ${pnlTone((displaySwing as { liveRealisedPnl?: number }).liveRealisedPnl ?? swingModeledBooked)}`}>
+                      {fmtInr((displaySwing as { liveRealisedPnl?: number }).liveRealisedPnl ?? swingModeledBooked, 2)}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
                     <div className="desk-panel-title">Unrealised</div>
-                    <div className={`desk-metric-value tabular-nums ${pnlTone((displaySwing as { liveUnrealisedPnl?: number }).liveUnrealisedPnl ?? null)}`}>
-                      {liveActive
-                        ? fmtInr((displaySwing as { liveUnrealisedPnl?: number }).liveUnrealisedPnl ?? 0, 2)
-                        : '—'}
+                    <div className={`desk-metric-value tabular-nums ${pnlTone((displaySwing as { liveUnrealisedPnl?: number }).liveUnrealisedPnl ?? swingModeledOpen)}`}>
+                      {fmtInr((displaySwing as { liveUnrealisedPnl?: number }).liveUnrealisedPnl ?? swingModeledOpen, 2)}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
@@ -1767,7 +1929,7 @@ export default function EodAnalysisPanel({
                 <PortfolioDist
                   title="Swing portfolio balance"
                   totalDeployed={displaySwing.totalDeployed || 0}
-                  rows={(displaySwing.picks || []).map((p) => ({
+                  rows={(displaySwing.picks || []).filter((p) => p.outcomeBucket !== 'SKIPPED' && !p.skipped).map((p) => ({
                     symbol: p.symbol,
                     qty: p.qty || 0,
                     deployed: p.deployedCapital || 0,
@@ -1799,6 +1961,7 @@ export default function EodAnalysisPanel({
                         <th className="text-right px-2 py-1.5 font-bold">Qty</th>
                         <th className="text-right px-2 py-1.5 font-bold">Entry</th>
                         <th className="text-right px-2 py-1.5 font-bold">Mark</th>
+                        <th className="text-right px-2 py-1.5 font-bold">Exit</th>
                         <th className="hidden sm:table-cell text-right px-2 py-1.5 font-bold">Econ R</th>
                         <th className="hidden sm:table-cell text-left px-2 py-1.5 font-bold">Scale / Trail</th>
                         <th className="hidden sm:table-cell text-right px-2 py-1.5 font-bold">Deployed</th>
@@ -1819,15 +1982,16 @@ export default function EodAnalysisPanel({
                               <span className={`font-bold ${pick.direction === 'LONG' ? 'text-emerald-700' : 'text-red-700'}`}>
                                 {pick.symbol}
                               </span>
+                              {' '}
                               <span className="text-[8px] text-slate-400 ml-1">{pick.direction}</span>
                               {pick.outcomeBucket && (
-                                <span className="ml-1 text-[7px] font-black uppercase text-slate-400">{pick.outcomeBucket}</span>
+                                <><span aria-hidden> </span><span className="ml-1 text-[7px] font-black uppercase text-slate-400">{pick.outcomeBucket}</span></>
                               )}
                               {pick.pnlKind === 'unrealised' && (
-                                <span className="ml-1 text-[7px] font-black uppercase text-cyan-600">U</span>
+                                <><span aria-hidden> </span><span className="ml-1 text-[7px] font-black uppercase text-cyan-600">U</span></>
                               )}
                               {pick.pnlKind === 'realised' && !pick.skipped && (
-                                <span className="ml-1 text-[7px] font-black uppercase text-slate-400">R</span>
+                                <><span aria-hidden> </span><span className="ml-1 text-[7px] font-black uppercase text-slate-400">R</span></>
                               )}
                             </td>
                             <td className="hidden sm:table-cell px-2 py-1.5 text-[8px] text-slate-500">
@@ -1850,10 +2014,13 @@ export default function EodAnalysisPanel({
                             <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">{pick.entryPrice}</td>
                             <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">
                               {pick.markLive && pick.currentPrice != null ? (
-                                <LiveTickNumber value={pick.currentPrice} />
+                                <LiveTickNumber value={Number(pick.currentPrice).toFixed(2)} />
                               ) : (
-                                pick.currentPrice ?? '—'
+                                pick.currentPrice != null ? Number(pick.currentPrice).toFixed(2) : '—'
                               )}
+                            </td>
+                            <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">
+                              {pick.skipped || pick.outcomeBucket === 'SKIPPED' ? '—' : (pick.exitPrice ?? '—')}
                             </td>
                             <td className={`hidden sm:table-cell text-right px-2 py-1.5 tabular-nums font-bold ${(econ ?? 0) < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
                               <div>{fmtMissSigned(econ, 2, 'R')}</div>
@@ -1914,6 +2081,7 @@ export default function EodAnalysisPanel({
                   <div className="flex items-end justify-between mt-1">
                     <div>
                       <span className="text-[16px] font-black text-slate-900">{displaySwing.bestPerformer.symbol}</span>
+                      {' '}
                       <span className="text-[10px] text-slate-500 ml-1">{displaySwing.bestPerformer.direction}</span>
                       <div className="text-[9px] text-slate-500 tabular-nums">
                         Qty {displaySwing.bestPerformer.qty || '—'}
@@ -1944,6 +2112,7 @@ export default function EodAnalysisPanel({
                   <div className="flex items-end justify-between mt-1">
                     <div>
                       <span className="text-[16px] font-black text-slate-900">{displaySwing.worstPerformer.symbol}</span>
+                      {' '}
                       <span className="text-[10px] text-slate-500 ml-1">{displaySwing.worstPerformer.direction}</span>
                       <div className="text-[9px] text-slate-500 tabular-nums">
                         Qty {displaySwing.worstPerformer.qty || '—'}

@@ -38,6 +38,22 @@ def ist_now(now: datetime | None = None) -> datetime:
     return now.astimezone(_IST)
 
 
+def cash_session_phase(for_date=None, now: datetime | None = None) -> str:
+    """Return PRE_OPEN, OPEN, or CLOSED for an IST trading date."""
+    n = ist_now(now)
+    target = for_date or n.date()
+    if target < n.date() or target.weekday() >= 5:
+        return "CLOSED"
+    if target > n.date():
+        return "PRE_OPEN"
+    minutes = _mins(n.hour, n.minute)
+    if minutes < _mins(9, 15):
+        return "PRE_OPEN"
+    if minutes <= _mins(15, 30):
+        return "OPEN"
+    return "CLOSED"
+
+
 def _mins(h: int, m: int) -> int:
     return h * 60 + m
 

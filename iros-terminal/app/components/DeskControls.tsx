@@ -29,10 +29,6 @@ export default function DeskControls({
   const [liveClock, setLiveClock] = useState(clockLabel);
 
   useEffect(() => {
-    setLiveClock(clockLabel);
-  }, [clockLabel]);
-
-  useEffect(() => {
     const id = window.setInterval(() => {
       setLiveClock(new Date().toLocaleTimeString("en-IN", { hour12: false }));
     }, 1000);
@@ -53,9 +49,9 @@ export default function DeskControls({
       role="group"
       aria-label="Display controls"
     >
-      <div className="desk-live-chip shrink-0" title={`Feed ${feedStatus}`} suppressHydrationWarning>
+      <div className="desk-live-chip shrink-0" title={`Data feed ${feedStatus}`} suppressHydrationWarning>
         <span className={breatheClass} aria-hidden />
-        <span className="desk-live-label">{feedLive ? "LIVE" : feedStatus.toUpperCase()}</span>
+        <span className="desk-live-label">{feedLive ? "FEED LIVE" : feedStatus.toUpperCase()}</span>
         <span className="desk-live-clock tabular-nums hidden min-[420px]:inline" suppressHydrationWarning>
           {liveClock} IST
         </span>

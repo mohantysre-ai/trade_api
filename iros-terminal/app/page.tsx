@@ -20,6 +20,7 @@ import DeskControls from './components/DeskControls';
 import DeskActivityAlerts from './components/DeskActivityAlerts';
 import { DeskLiveTile, motion } from '@/lib/desk-motion';
 import { formatDeskDelta, formatPtsPctLabel } from '@/lib/format-delta';
+import { subscribeLiveDesk } from '@/lib/live-desk';
 import { LayoutGroup } from 'motion/react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 
@@ -2198,7 +2199,55 @@ export default function IrosMasterAdvancedTerminal() {
     return () => window.clearInterval(id);
   }, []);
 
-  const { data: liveMarket, status: feedStatus, refreshOnDemand } = useMarketData(selectedPool);
+  const [liveDeskQuotes, setLiveDeskQuotes] = useState<Record<string, number>>({});
+  useEffect(() => subscribeLiveDesk((snapshot) => {
+    const quotes: Record<string, number> = {};
+    const ingest = (payload: Record<string, unknown>) => {
+      const book = payload as {
+        long?: Array<Record<string, unknown>>;
+        short?: Array<Record<string, unknown>>;
+        locked?: { long?: Array<Record<string, unknown>>; short?: Array<Record<string, unknown>> };
+      };
+      const rows = [
+        ...(book.long || []),
+        ...(book.short || []),
+        ...(book.locked?.long || []),
+        ...(book.locked?.short || []),
+      ];
+      for (const row of rows) {
+        const symbol = String(row.symbol || '').toUpperCase();
+        const outcome = row.outcome as { ltp?: unknown } | undefined;
+        const price = Number(row.currentPrice ?? row.ltp ?? outcome?.ltp);
+        if (symbol && Number.isFinite(price) && price > 0) quotes[symbol] = price;
+      }
+    };
+    // The fixed-plan live-price resource is ingested last and wins conflicts.
+    ingest(snapshot['intraday-session']);
+    ingest(snapshot['swing-session']);
+    ingest(snapshot['live-prices']);
+    setLiveDeskQuotes(quotes);
+  }), []);
+
+  const { data: baseLiveMarket, status: feedStatus, refreshOnDemand } = useMarketData(selectedPool);
+  const liveMarket = useMemo(() => {
+    if (!baseLiveMarket || Object.keys(liveDeskQuotes).length === 0) return baseLiveMarket;
+    const overlay = (stock: LiveStock): LiveStock => {
+      const price = liveDeskQuotes[stock.ticker.toUpperCase()];
+      if (!Number.isFinite(price) || price <= 0) return stock;
+      return {
+        ...stock,
+        ltpRaw: price,
+        ltp: `₹${price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      };
+    };
+    return {
+      ...baseLiveMarket,
+      stocks: (baseLiveMarket.stocks || []).map(overlay),
+      stockQuotes: Object.fromEntries(
+        Object.entries(baseLiveMarket.stockQuotes || {}).map(([ticker, stock]) => [ticker, overlay(stock)]),
+      ),
+    };
+  }, [baseLiveMarket, liveDeskQuotes]);
   const stocks = liveMarket?.stocks ?? [];
   const selectedTickerForView = useMemo(() => selectedTicker || stocks[0]?.ticker || '', [selectedTicker, stocks]);
 

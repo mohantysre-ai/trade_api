@@ -5,7 +5,7 @@ import { useAutoAnimate } from '@formkit/auto-animate/react';
 import type { SparkFlag } from '@/lib/market-api';
 import { fetchNseSparkline } from '@/lib/market-api';
 import { LiveTickNumber } from '@/lib/desk-motion';
-import { fetchLiveDesk } from '@/lib/live-desk';
+import { fetchLiveDesk, subscribeLiveDesk } from '@/lib/live-desk';
 
 /* ── Smooth sparkline SVG with Catmull-Rom spline ─────────────────────── */
 let intraSparkIdCounter = 0;
@@ -932,9 +932,9 @@ export default function IntradayMatrixPanel() {
   }, []);
 
   /* Live prices (monitor mode) */
-  const loadLivePrices = useCallback(async () => {
+  const loadLivePrices = useCallback(async (snapshotData?: LivePricesResponse) => {
     try {
-      const data = await fetchLivePrices();
+      const data = snapshotData ?? await fetchLivePrices();
       if (data.source === 'none' || ((data.long?.length ?? 0) === 0 && (data.short?.length ?? 0) === 0)) {
         // No fixed plan — fall back to normal mode
         setMonitorMode(false);
@@ -993,16 +993,16 @@ export default function IntradayMatrixPanel() {
     }, 120_000);
 
     // Fast monitor-mode poll (proxies /api/live-prices — continues after close for close marks).
-    const fastId = window.setInterval(() => {
+    const unsubscribe = subscribeLiveDesk((snapshot) => {
       if (!cancelled && document.visibilityState === 'visible') {
-        loadLivePrices();
+        void loadLivePrices(snapshot['live-prices'] as unknown as LivePricesResponse);
       }
-    }, 5000);
+    });
 
     return () => {
       cancelled = true;
       window.clearInterval(slowId);
-      window.clearInterval(fastId);
+      unsubscribe();
     };
   }, [loadLemonn, loadDhan, loadOutcomes, loadLivePrices]);
 

@@ -230,6 +230,10 @@ def test_cold_path_full_stop_then_be_after_025r():
     )
     cold = evaluate_scale_trail(pick, ltp=98.0, after_close=False)
     assert cold.get("hitLevel") == "sl"
+    assert cold.get("stopKind") == "INITIAL"
+    assert cold.get("label") == "INITIAL STOP HIT"
+    assert cold["exitState"]["legsFilled"][-1]["r"] == "INITIAL_SL"
+    assert cold["exitState"]["mfeR"] == 0.0
     assert cold["exitState"]["effectiveStop"] == 98.0
     assert cold["economicPnl"] == -200.0
     assert cold["rMultiple"] == -1.0
@@ -243,5 +247,39 @@ def test_cold_path_full_stop_then_be_after_025r():
     pulled["exitState"] = greened["exitState"]
     hit = evaluate_scale_trail(pulled, ltp=99.99, after_close=False)
     assert hit.get("hitLevel") == "sl"
+    assert hit.get("stopKind") == "TRAIL"
+    assert hit["exitState"]["legsFilled"][-1]["r"] == "TRAIL_SL"
     assert hit["economicPnl"] == 0.0
     assert hit["rMultiple"] == 0.0
+
+
+def test_excursions_never_use_the_wrong_sign():
+    from app.services.quant_desk_exit_policy import build_trade_outcome
+
+    losing = build_trade_outcome(
+        triggered=True,
+        realized_pnl=-200.0,
+        exit_reason="SL_HIT",
+        entry=100.0,
+        exit_price=98.0,
+        risk_per_share=2.0,
+        qty=100,
+        direction="LONG",
+        day_high=99.5,
+        day_low=98.0,
+    )
+    assert losing["mfeR"] == 0.0
+    assert losing["maeR"] == -1.0
+
+    winning = build_trade_outcome(
+        triggered=True,
+        realized_pnl=100.0,
+        exit_reason="EOD_SQUAREOFF",
+        entry=100.0,
+        exit_price=101.0,
+        risk_per_share=2.0,
+        qty=100,
+        direction="LONG",
+    )
+    assert winning["mfeR"] == 0.5
+    assert winning["maeR"] == 0.0

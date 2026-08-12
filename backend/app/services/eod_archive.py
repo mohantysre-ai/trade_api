@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 _ARCHIVE_DIR = os.path.join(
@@ -27,6 +27,25 @@ _ARCHIVE_DIR = os.path.join(
 def _archive_path(for_date: date) -> str:
     os.makedirs(_ARCHIVE_DIR, exist_ok=True)
     return os.path.join(_ARCHIVE_DIR, f"{for_date.isoformat()}.json")
+
+
+def pick_session_date(pick: dict[str, Any], fallback: date | None = None) -> date | None:
+    """Resolve the trading day carried by a persisted pick."""
+    for key in ("sessionDate", "tradeDate", "date"):
+        raw = str(pick.get(key) or "").strip()[:10]
+        if raw:
+            try:
+                return date.fromisoformat(raw)
+            except ValueError:
+                pass
+    for key in ("createdAt", "committedAt", "updatedAt"):
+        raw = str(pick.get(key) or "").strip()
+        if raw:
+            try:
+                return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+            except ValueError:
+                pass
+    return fallback
 
 
 def _atomic_write(path: str, payload: dict[str, Any]) -> None:
@@ -57,6 +76,7 @@ def archive_pick(key: str, pick: dict[str, Any], for_date: date) -> None:
     Call this from trade_outcome._load_persisted_picks() at the point where
     expired entries are currently `del`-eted — archive first, delete after.
     """
+    for_date = pick_session_date(pick, for_date) or for_date
     archive = load_archive(for_date)
     picks = archive.setdefault("intradayPicks", {})
     # Don't overwrite an already-archived (possibly more complete) entry
@@ -70,14 +90,20 @@ def archive_all_expiring(picks_map: dict[str, dict[str, Any]], expired_keys: lis
     """Batch version — archives every expiring key in one write instead of N writes."""
     if not expired_keys:
         return
-    archive = load_archive(for_date)
-    picks = archive.setdefault("intradayPicks", {})
+    by_day: dict[date, list[tuple[str, dict[str, Any]]]] = {}
     for key in expired_keys:
         p = picks_map.get(key)
-        if p and key not in picks:
-            picks[key] = p
-    archive["date"] = for_date.isoformat()
-    _atomic_write(_archive_path(for_date), archive)
+        if isinstance(p, dict):
+            pick_day = pick_session_date(p, for_date) or for_date
+            by_day.setdefault(pick_day, []).append((key, p))
+    for pick_day, rows in by_day.items():
+        archive = load_archive(pick_day)
+        picks = archive.setdefault("intradayPicks", {})
+        for key, p in rows:
+            if key not in picks:
+                picks[key] = p
+        archive["date"] = pick_day.isoformat()
+        _atomic_write(_archive_path(pick_day), archive)
 
 
 def list_archived_dates() -> list[str]:
