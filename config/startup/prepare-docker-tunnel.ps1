@@ -41,13 +41,23 @@ if (-not $credSrc -or -not (Test-Path $credSrc)) {
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 Copy-Item -Path $credSrc -Destination $CredDest -Force
 
-$hostnames = New-Object System.Collections.Generic.List[string]
-foreach ($m in [regex]::Matches($hostYaml, '(?m)^\s*-\s*hostname:\s*(\S+)\s*$')) {
+# Prefer host config hostnames/services. Map localhost → Docker services.
+# calendar.sigq.in → panchang-api:8088; other hostnames → frontend:3000 by default.
+$ingressPairs = New-Object System.Collections.Generic.List[object]
+foreach ($m in [regex]::Matches($hostYaml, '(?ms)^\s*-\s*hostname:\s*(\S+)\s*\r?\n\s*service:\s*(\S+)\s*$')) {
   $h = $m.Groups[1].Value.Trim()
-  if ($h -and -not $hostnames.Contains($h)) { [void]$hostnames.Add($h) }
+  $svc = $m.Groups[2].Value.Trim()
+  if (-not $h) { continue }
+  if ($svc -match '127\.0\.0\.1:8088' -or $svc -match 'localhost:8088') {
+    $svc = "http://panchang-api:8088"
+  } elseif ($svc -match '127\.0\.0\.1:3000' -or $svc -match 'localhost:3000') {
+    $svc = "http://frontend:3000"
+  }
+  [void]$ingressPairs.Add([pscustomobject]@{ Hostname = $h; Service = $svc })
 }
-if ($hostnames.Count -eq 0) {
-  foreach ($h in @("sigq.in", "www.sigq.in", "iros.sigq.in")) { [void]$hostnames.Add($h) }
+if ($ingressPairs.Count -eq 0) {
+  [void]$ingressPairs.Add([pscustomobject]@{ Hostname = "calendar.sigq.in"; Service = "http://panchang-api:8088" })
+  [void]$ingressPairs.Add([pscustomobject]@{ Hostname = "sigq.in"; Service = "http://frontend:3000" })
 }
 
 $sb = New-Object System.Text.StringBuilder
@@ -56,16 +66,17 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("credentials-file: /etc/cloudflared/credentials.json")
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("ingress:")
-foreach ($h in $hostnames) {
-  [void]$sb.AppendLine("  - hostname: $h")
-  [void]$sb.AppendLine("    service: http://frontend:3000")
+foreach ($pair in $ingressPairs) {
+  [void]$sb.AppendLine("  - hostname: $($pair.Hostname)")
+  [void]$sb.AppendLine("    service: $($pair.Service)")
 }
 [void]$sb.AppendLine("  - service: http_status:404")
 
 $utf8 = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($OutConfig, $sb.ToString(), $utf8)
 
-Write-Host "[OK] Docker tunnel config ready ($tunnelName -> frontend:3000)" -ForegroundColor Green
+$summary = ($ingressPairs | ForEach-Object { "$($_.Hostname)->$($_.Service)" }) -join ", "
+Write-Host "[OK] Docker tunnel config ready ($tunnelName: $summary)" -ForegroundColor Green
 Write-Host "     $OutConfig"
 Write-Host "     credentials: $CredDest"
 exit 0

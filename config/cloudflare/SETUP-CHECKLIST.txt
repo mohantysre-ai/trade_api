@@ -2,8 +2,10 @@
 # Domain registration stays at GoDaddy. DNS moves to Cloudflare.
 
 ## Status
-- Public primary URL: https://sigq.in (also www.sigq.in, iros.sigq.in)
-- start_app.bat starts backends + frontend + cloudflared and opens https://sigq.in
+- Public URLs:
+  - https://sigq.in → IROS desk (frontend:3000)
+  - https://calendar.sigq.in → Panchang platform (panchang-api:8088)
+- www.sigq.in / iros.sigq.in removed
 - Logo: iros-terminal/public/iros-logo.svg (+ png favicon)
 
 ## A. Cloudflare (browser) — once

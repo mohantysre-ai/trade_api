@@ -4,3 +4,12 @@ backend/app/services/last_market_snapshot.json
 logs/
 *.log.*
 config/cloudflare/credentials.json
+# Local build, test, QA, and runtime artifacts
+.tmp/
+.pytest_cache/
+.next/
+logs/
+*.bak
+*.tmp
+*.old
+*.orig

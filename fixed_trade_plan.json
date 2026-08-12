@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-11T07:14:29.976986+00:00",
+  "updatedAt": "2026-08-12T13:11:01.807996+00:00",
   "source": "intraday_session_engine",
   "sessionDate": "2026-08-11",
   "locked": true,
@@ -34,6 +34,24 @@
     "longGate": 0.55,
     "shortGate": 1.0
   },
+  "funnel": {
+    "universe": 500,
+    "filterReject": 391,
+    "gateReject": 118,
+    "longScored": 109,
+    "shortScored": 109,
+    "longMeanRevScored": 0,
+    "shortMeanRevScored": 0,
+    "unratedComponents": 0,
+    "candidatePool": 20,
+    "adopted": 10,
+    "funnelNote": "10+10 candidates -> adopt top 5+5 QUALIFIED by entry gate"
+  },
+  "rotation": "DAILY",
+  "priorSessionDate": "2026-08-10",
+  "exitMode": "SCALE_TRAIL",
+  "restoredFrom": "intraday_session.json",
+  "restoredAt": "2026-08-11T07:14:29.978003+00:00",
   "long": [
     {
       "rank": 1,
@@ -107,7 +125,73 @@
       "rewardRisk": 1.5,
       "status": "RUNNING",
       "sessionLocked": true,
-      "adopted": true
+      "adopted": true,
+      "outcome": {
+        "label": "SCALE COMPLETE",
+        "detail": "R -1.00 \u00b7 trail SL 1630.69 \u00b7 rem 0",
+        "hitLevel": "partial",
+        "ltp": 1625.0,
+        "pctChange": -1.57,
+        "resolvedAt": "2026-08-12T10:01:51.620840+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": "TRAIL_SL",
+              "qty": 60,
+              "price": 1630.69,
+              "pnl": -1212.6
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 1630.69,
+          "realizedPnl": -1212.6,
+          "unrealizedPnl": 0.0,
+          "economicPnl": -1212.6,
+          "rMultiple": -1.0,
+          "economicR": -1.0,
+          "pathR": -1.282,
+          "mfeR": 0.0,
+          "profitGuardActive": false,
+          "closed": true,
+          "mode": "SCALE_TRAIL",
+          "initialStop": 1630.69,
+          "totalQty": 60,
+          "riskPerShare": 20.21
+        },
+        "realizedPnl": -1212.6,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 1630.69,
+        "rMultiple": -1.0,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 60,
+            "price": 1630.69,
+            "pnl": -1212.6
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1630.69,
+        "realizedPnl": -1212.6,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -1212.6,
+        "rMultiple": -1.0,
+        "economicR": -1.0,
+        "pathR": -1.282,
+        "mfeR": 0.0,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1630.69,
+        "totalQty": 60,
+        "riskPerShare": 20.21
+      }
     },
     {
       "rank": 2,
@@ -329,7 +413,73 @@
       "rewardRisk": 1.5,
       "status": "RUNNING",
       "sessionLocked": true,
-      "adopted": true
+      "adopted": true,
+      "outcome": {
+        "label": "EOD SQUAREOFF",
+        "detail": "R -0.78 \u00b7 trail SL 238.13 \u00b7 rem 0",
+        "hitLevel": null,
+        "ltp": 239.05,
+        "pctChange": -1.34,
+        "resolvedAt": "2026-08-12T10:01:51.642261+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": "EOD_SQUAREOFF",
+              "qty": 412,
+              "price": 239.05,
+              "pnl": -1334.88
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 238.13,
+          "realizedPnl": -1334.88,
+          "unrealizedPnl": 0.0,
+          "economicPnl": -1334.88,
+          "rMultiple": -0.779,
+          "economicR": -0.779,
+          "pathR": -0.779,
+          "mfeR": -0.779,
+          "profitGuardActive": false,
+          "closed": true,
+          "mode": "SCALE_TRAIL",
+          "initialStop": 238.13,
+          "totalQty": 412,
+          "riskPerShare": 4.16
+        },
+        "realizedPnl": -1334.88,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 238.13,
+        "rMultiple": -0.779,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 412,
+            "price": 239.05,
+            "pnl": -1334.88
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 238.13,
+        "realizedPnl": -1334.88,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -1334.88,
+        "rMultiple": -0.779,
+        "economicR": -0.779,
+        "pathR": -0.779,
+        "mfeR": -0.779,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 238.13,
+        "totalQty": 412,
+        "riskPerShare": 4.16
+      }
     },
     {
       "rank": 5,
@@ -403,7 +553,97 @@
       "rewardRisk": 1.5,
       "status": "RUNNING",
       "sessionLocked": true,
-      "adopted": true
+      "adopted": true,
+      "outcome": {
+        "label": "SCALE COMPLETE",
+        "detail": "R +1.24 \u00b7 trail SL 560.38 \u00b7 rem 0",
+        "hitLevel": "partial",
+        "ltp": 547.7,
+        "pctChange": 2.52,
+        "resolvedAt": "2026-08-12T10:01:51.666870+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": 1.0,
+              "qty": 50,
+              "price": 555.15,
+              "pnl": 1045.0
+            },
+            {
+              "r": 1.5,
+              "qty": 42,
+              "price": 565.6,
+              "pnl": 1316.7
+            },
+            {
+              "r": "TRAIL_SL",
+              "qty": 75,
+              "price": 560.38,
+              "pnl": 1959.75
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 560.38,
+          "realizedPnl": 4321.45,
+          "unrealizedPnl": 0.0,
+          "economicPnl": 4321.45,
+          "rMultiple": 1.238,
+          "economicR": 1.238,
+          "pathR": 0.644,
+          "mfeR": 1.56,
+          "profitGuardActive": true,
+          "closed": true,
+          "mode": "SCALE_TRAIL",
+          "initialStop": 513.35,
+          "totalQty": 167,
+          "riskPerShare": 20.9
+        },
+        "realizedPnl": 4321.45,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 560.38,
+        "rMultiple": 1.238,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 50,
+            "price": 555.15,
+            "pnl": 1045.0
+          },
+          {
+            "r": 1.5,
+            "qty": 42,
+            "price": 565.6,
+            "pnl": 1316.7
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 75,
+            "price": 560.38,
+            "pnl": 1959.75
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 560.38,
+        "realizedPnl": 4321.45,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 4321.45,
+        "rMultiple": 1.238,
+        "economicR": 1.238,
+        "pathR": 0.644,
+        "mfeR": 1.56,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 513.35,
+        "totalQty": 167,
+        "riskPerShare": 20.9
+      }
     },
     {
       "rank": 1,
@@ -551,7 +791,109 @@
       "rewardRisk": 1.5,
       "status": "RUNNING",
       "sessionLocked": true,
-      "adopted": true
+      "adopted": true,
+      "outcome": {
+        "label": "SCALE COMPLETE",
+        "detail": "R +1.42 \u00b7 trail SL 2903.94 \u00b7 rem 0",
+        "hitLevel": "partial",
+        "ltp": 2970.1,
+        "pctChange": 7.21,
+        "resolvedAt": "2026-08-12T10:01:51.705809+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": 1.0,
+              "qty": 11,
+              "price": 2859.39,
+              "pnl": 979.99
+            },
+            {
+              "r": 1.5,
+              "qty": 9,
+              "price": 2903.94,
+              "pnl": 1202.76
+            },
+            {
+              "r": 2.0,
+              "qty": 5,
+              "price": 2948.48,
+              "pnl": 890.9
+            },
+            {
+              "r": "TRAIL_SL",
+              "qty": 11,
+              "price": 2903.94,
+              "pnl": 1470.04
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 2903.94,
+          "realizedPnl": 4543.69,
+          "unrealizedPnl": 0.0,
+          "economicPnl": 4543.69,
+          "rMultiple": 1.417,
+          "economicR": 1.417,
+          "pathR": 2.243,
+          "mfeR": 2.414,
+          "profitGuardActive": true,
+          "closed": true,
+          "mode": "SCALE_TRAIL",
+          "initialStop": 2681.21,
+          "totalQty": 36,
+          "riskPerShare": 89.09
+        },
+        "realizedPnl": 4543.69,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 2903.94,
+        "rMultiple": 1.417,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 11,
+            "price": 2859.39,
+            "pnl": 979.99
+          },
+          {
+            "r": 1.5,
+            "qty": 9,
+            "price": 2903.94,
+            "pnl": 1202.76
+          },
+          {
+            "r": 2.0,
+            "qty": 5,
+            "price": 2948.48,
+            "pnl": 890.9
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 11,
+            "price": 2903.94,
+            "pnl": 1470.04
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 2903.94,
+        "realizedPnl": 4543.69,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 4543.69,
+        "rMultiple": 1.417,
+        "economicR": 1.417,
+        "pathR": 2.243,
+        "mfeR": 2.414,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 2681.21,
+        "totalQty": 36,
+        "riskPerShare": 89.09
+      }
     }
   ],
   "short": [
@@ -627,7 +969,73 @@
       "rewardRisk": 1.5,
       "status": "RUNNING",
       "sessionLocked": true,
-      "adopted": true
+      "adopted": true,
+      "outcome": {
+        "label": "EOD SQUAREOFF",
+        "detail": "R -0.17 \u00b7 trail SL 1893.02 \u00b7 rem 0",
+        "hitLevel": null,
+        "ltp": 1850.0,
+        "pctChange": -0.48,
+        "resolvedAt": "2026-08-12T10:01:51.736681+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": "EOD_SQUAREOFF",
+              "qty": 54,
+              "price": 1850.0,
+              "pnl": -480.6
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 1893.02,
+          "realizedPnl": -480.6,
+          "unrealizedPnl": 0.0,
+          "economicPnl": -480.6,
+          "rMultiple": -0.171,
+          "economicR": -0.171,
+          "pathR": -0.171,
+          "mfeR": -0.171,
+          "profitGuardActive": false,
+          "closed": true,
+          "mode": "SCALE_TRAIL",
+          "initialStop": 1893.02,
+          "totalQty": 54,
+          "riskPerShare": 51.92
+        },
+        "realizedPnl": -480.6,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 1893.02,
+        "rMultiple": -0.171,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 54,
+            "price": 1850.0,
+            "pnl": -480.6
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1893.02,
+        "realizedPnl": -480.6,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -480.6,
+        "rMultiple": -0.171,
+        "economicR": -0.171,
+        "pathR": -0.171,
+        "mfeR": -0.171,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1893.02,
+        "totalQty": 54,
+        "riskPerShare": 51.92
+      }
     },
     {
       "rank": 2,
@@ -701,7 +1109,73 @@
       "rewardRisk": 1.5,
       "status": "RUNNING",
       "sessionLocked": true,
-      "adopted": true
+      "adopted": true,
+      "outcome": {
+        "label": "EOD SQUAREOFF",
+        "detail": "R +0.86 \u00b7 trail SL 278.24 \u00b7 rem 0",
+        "hitLevel": null,
+        "ltp": 276.15,
+        "pctChange": 1.76,
+        "resolvedAt": "2026-08-12T10:01:51.768530+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": "EOD_SQUAREOFF",
+              "qty": 355,
+              "price": 276.15,
+              "pnl": 1757.25
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 278.24,
+          "realizedPnl": 1757.25,
+          "unrealizedPnl": 0.0,
+          "economicPnl": 1757.25,
+          "rMultiple": 0.864,
+          "economicR": 0.864,
+          "pathR": 0.864,
+          "mfeR": 0.864,
+          "profitGuardActive": true,
+          "closed": true,
+          "mode": "SCALE_TRAIL",
+          "initialStop": 286.83,
+          "totalQty": 355,
+          "riskPerShare": 5.73
+        },
+        "realizedPnl": 1757.25,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 278.24,
+        "rMultiple": 0.864,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 355,
+            "price": 276.15,
+            "pnl": 1757.25
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 278.24,
+        "realizedPnl": 1757.25,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 1757.25,
+        "rMultiple": 0.864,
+        "economicR": 0.864,
+        "pathR": 0.864,
+        "mfeR": 0.864,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 286.83,
+        "totalQty": 355,
+        "riskPerShare": 5.73
+      }
     },
     {
       "rank": 3,
@@ -775,7 +1249,73 @@
       "rewardRisk": 1.5,
       "status": "RUNNING",
       "sessionLocked": true,
-      "adopted": true
+      "adopted": true,
+      "outcome": {
+        "label": "EOD SQUAREOFF",
+        "detail": "R -0.43 \u00b7 trail SL 1343.52 \u00b7 rem 0",
+        "hitLevel": null,
+        "ltp": 1329.0,
+        "pctChange": -0.84,
+        "resolvedAt": "2026-08-12T10:01:51.798009+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": "EOD_SQUAREOFF",
+              "qty": 75,
+              "price": 1329.0,
+              "pnl": -832.5
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 1343.52,
+          "realizedPnl": -832.5,
+          "unrealizedPnl": 0.0,
+          "economicPnl": -832.5,
+          "rMultiple": -0.433,
+          "economicR": -0.433,
+          "pathR": -0.433,
+          "mfeR": -0.433,
+          "profitGuardActive": false,
+          "closed": true,
+          "mode": "SCALE_TRAIL",
+          "initialStop": 1343.52,
+          "totalQty": 75,
+          "riskPerShare": 25.62
+        },
+        "realizedPnl": -832.5,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 1343.52,
+        "rMultiple": -0.433,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 75,
+            "price": 1329.0,
+            "pnl": -832.5
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1343.52,
+        "realizedPnl": -832.5,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -832.5,
+        "rMultiple": -0.433,
+        "economicR": -0.433,
+        "pathR": -0.433,
+        "mfeR": -0.433,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1343.52,
+        "totalQty": 75,
+        "riskPerShare": 25.62
+      }
     },
     {
       "rank": 4,
@@ -849,7 +1389,73 @@
       "rewardRisk": 1.5,
       "status": "RUNNING",
       "sessionLocked": true,
-      "adopted": true
+      "adopted": true,
+      "outcome": {
+        "label": "EOD SQUAREOFF",
+        "detail": "R -0.19 \u00b7 trail SL 143.11 \u00b7 rem 0",
+        "hitLevel": null,
+        "ltp": 140.6,
+        "pctChange": -0.43,
+        "resolvedAt": "2026-08-12T10:01:51.828166+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": "EOD_SQUAREOFF",
+              "qty": 714,
+              "price": 140.6,
+              "pnl": -428.4
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 143.11,
+          "realizedPnl": -428.4,
+          "unrealizedPnl": 0.0,
+          "economicPnl": -428.4,
+          "rMultiple": -0.193,
+          "economicR": -0.193,
+          "pathR": -0.193,
+          "mfeR": -0.193,
+          "profitGuardActive": false,
+          "closed": true,
+          "mode": "SCALE_TRAIL",
+          "initialStop": 143.11,
+          "totalQty": 714,
+          "riskPerShare": 3.11
+        },
+        "realizedPnl": -428.4,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 143.11,
+        "rMultiple": -0.193,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 714,
+            "price": 140.6,
+            "pnl": -428.4
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 143.11,
+        "realizedPnl": -428.4,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -428.4,
+        "rMultiple": -0.193,
+        "economicR": -0.193,
+        "pathR": -0.193,
+        "mfeR": -0.193,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 143.11,
+        "totalQty": 714,
+        "riskPerShare": 3.11
+      }
     },
     {
       "rank": 5,
@@ -923,25 +1529,73 @@
       "rewardRisk": 1.5,
       "status": "RUNNING",
       "sessionLocked": true,
-      "adopted": true
+      "adopted": true,
+      "outcome": {
+        "label": "EOD SQUAREOFF",
+        "detail": "R -0.01 \u00b7 trail SL 1107.92 \u00b7 rem 0",
+        "hitLevel": null,
+        "ltp": 1094.2,
+        "pctChange": -0.02,
+        "resolvedAt": "2026-08-12T10:01:51.855432+00:00",
+        "exitState": {
+          "legsFilled": [
+            {
+              "r": "EOD_SQUAREOFF",
+              "qty": 91,
+              "price": 1094.2,
+              "pnl": -18.2
+            }
+          ],
+          "remainingQty": 0,
+          "effectiveStop": 1107.92,
+          "realizedPnl": -18.2,
+          "unrealizedPnl": 0.0,
+          "economicPnl": -18.2,
+          "rMultiple": -0.014,
+          "economicR": -0.014,
+          "pathR": -0.014,
+          "mfeR": -0.014,
+          "profitGuardActive": false,
+          "closed": true,
+          "mode": "SCALE_TRAIL",
+          "initialStop": 1107.92,
+          "totalQty": 91,
+          "riskPerShare": 13.92
+        },
+        "realizedPnl": -18.2,
+        "unrealizedPnl": 0.0,
+        "remainingQty": 0,
+        "effectiveStop": 1107.92,
+        "rMultiple": -0.014,
+        "closed": true,
+        "scaleTrail": true,
+        "final": true
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 91,
+            "price": 1094.2,
+            "pnl": -18.2
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1107.92,
+        "realizedPnl": -18.2,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -18.2,
+        "rMultiple": -0.014,
+        "economicR": -0.014,
+        "pathR": -0.014,
+        "mfeR": -0.014,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1107.92,
+        "totalQty": 91,
+        "riskPerShare": 13.92
+      }
     }
-  ],
-  "funnel": {
-    "universe": 500,
-    "filterReject": 391,
-    "gateReject": 118,
-    "longScored": 109,
-    "shortScored": 109,
-    "longMeanRevScored": 0,
-    "shortMeanRevScored": 0,
-    "unratedComponents": 0,
-    "candidatePool": 20,
-    "adopted": 10,
-    "funnelNote": "10+10 candidates -> adopt top 5+5 QUALIFIED by entry gate"
-  },
-  "rotation": "DAILY",
-  "priorSessionDate": "2026-08-10",
-  "exitMode": "SCALE_TRAIL",
-  "restoredFrom": "intraday_session.json",
-  "restoredAt": "2026-08-11T07:14:29.978003+00:00"
+  ]
 }
