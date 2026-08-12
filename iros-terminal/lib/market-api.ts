@@ -235,7 +235,9 @@ export type FeedStatus = "idle" | "loading" | "live" | "offline";
 const MARKET_API_URL = process.env.NEXT_PUBLIC_MARKET_API_URL ?? "";
 
 const STALE_AFTER_MS = 300_000;
-const MACRO_POLL_MS = 60_000;
+const MACRO_POLL_OPEN_MS = 60_000;
+/** After cash close, still refresh India/global/commodities strip (slower). */
+const MACRO_POLL_CLOSED_MS = 180_000;
 
 function isNseCashSessionNow(d = new Date()): boolean {
   try {
@@ -255,6 +257,10 @@ function isNseCashSessionNow(d = new Date()): boolean {
   } catch {
     return false;
   }
+}
+
+function macroPollMs(d = new Date()): number {
+  return isNseCashSessionNow(d) ? MACRO_POLL_OPEN_MS : MACRO_POLL_CLOSED_MS;
 }
 
 export async function fetchRefreshMacros(): Promise<MarketDataResponse> {
@@ -420,19 +426,19 @@ export function useMarketData(pool?: string, _pollMs = 30_000) {
         setLastUpdatedAt(ts);
         lastUpdatedRef.current = ts;
 
-        if (isNseCashSessionNow()) {
-          try {
-            const live = await fetchRefreshMacros();
-            if (cancelled) return;
-            setData(live);
-            setStatus("live");
-            setError(null);
-            const liveTs = Date.now();
-            setLastUpdatedAt(liveTs);
-            lastUpdatedRef.current = liveTs;
-          } catch {
-            // Keep cached SNAPSHOT; interval poll will retry
-          }
+        // SNAPSHOT indexes strip: always attempt a light macro refresh after paint
+        // (cash session + after hours). India may be last-close; globals/commodities still move.
+        try {
+          const live = await fetchRefreshMacros();
+          if (cancelled) return;
+          setData(live);
+          setStatus("live");
+          setError(null);
+          const liveTs = Date.now();
+          setLastUpdatedAt(liveTs);
+          lastUpdatedRef.current = liveTs;
+        } catch {
+          // Keep cached SNAPSHOT; interval poll will retry
         }
       } catch (err) {
         if (cancelled) return;
@@ -447,46 +453,53 @@ export function useMarketData(pool?: string, _pollMs = 30_000) {
 
   useEffect(() => {
     let inFlight = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let stopped = false;
+
+    const scheduleNext = () => {
+      if (stopped) return;
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => {
+        void tick();
+      }, macroPollMs());
+    };
+
     const tick = async () => {
-      if (inFlight) return;
-      if (isNseCashSessionNow()) {
-        inFlight = true;
-        try {
-          const payload = await fetchRefreshMacros();
-          setData(payload);
-          setStatus("live");
-          setError(null);
-          const ts = Date.now();
-          setLastUpdatedAt(ts);
-          lastUpdatedRef.current = ts;
-        } catch {
-          // Keep last good SNAPSHOT; fall back to cached poll if very stale
-          const age = Date.now() - lastUpdatedRef.current;
-          if (age >= STALE_AFTER_MS) {
-            try {
-              await refresh(false);
-            } catch {
-              setStatus("offline");
-              setError("Feed unavailable");
-            }
-          }
-        } finally {
-          inFlight = false;
-        }
+      if (stopped || inFlight) {
+        scheduleNext();
         return;
       }
-      const age = Date.now() - lastUpdatedRef.current;
-      if (age >= STALE_AFTER_MS) {
-        try {
-          await refresh(false);
-        } catch {
-          setStatus("offline");
-          setError("Feed unavailable");
+      inFlight = true;
+      try {
+        const payload = await fetchRefreshMacros();
+        setData(payload);
+        setStatus("live");
+        setError(null);
+        const ts = Date.now();
+        setLastUpdatedAt(ts);
+        lastUpdatedRef.current = ts;
+      } catch {
+        // Keep last good SNAPSHOT; if very stale, re-read cached market-data
+        const age = Date.now() - lastUpdatedRef.current;
+        if (age >= STALE_AFTER_MS) {
+          try {
+            await refresh(false);
+          } catch {
+            setStatus("offline");
+            setError("Feed unavailable");
+          }
         }
+      } finally {
+        inFlight = false;
+        scheduleNext();
       }
     };
-    const id = setInterval(tick, MACRO_POLL_MS);
-    return () => clearInterval(id);
+
+    scheduleNext();
+    return () => {
+      stopped = true;
+      if (timer !== null) clearTimeout(timer);
+    };
   }, [refresh]);
 
   const isStale = useCallback(() => {
