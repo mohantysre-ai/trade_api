@@ -1,0 +1,205 @@
+from __future__ import annotations
+
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+from app.services import swing_session
+
+
+def qualified_row(symbol: str = "VALID", **overrides) -> dict:
+    intraday = {
+        "vwap": 99.0,
+        "ema9": 98.0,
+        "price_above_vwap": True,
+        "price_above_ema9": True,
+        "rsi": 62.0,
+        "oi_setup": "LONG_BUILDUP",
+        "pivot_r1_breakout": True,
+        "rsi_pivot_break": True,
+    }
+    intraday.update(overrides.pop("intraday", {}))
+    row = {
+        "ticker": symbol,
+        "symbol": symbol,
+        "deterministicSide": "BUY",
+        "riskAuditVerdict": "APPROVE",
+        "verdict": "APPROVE",
+        "passes_hard_filters": True,
+        "passes_quality_filters": True,
+        "ltp": 100.0,
+        "ltpRaw": 100.0,
+        "entryPrice": 100.0,
+        "stopLoss": 95.0,
+        "target1": 107.5,
+        "target2": 110.0,
+        "score": 25.0,
+        "volume": 1_000_000,
+        "intraday": intraday,
+    }
+    row.update(overrides)
+    return row
+
+
+def rejection_reasons(row: dict) -> list[str]:
+    eligible, _evidence, reasons = swing_session._evaluate_swing_buy_contract(row)
+    assert eligible is False
+    return reasons
+
+
+def test_approve_without_explicit_buy_is_rejected():
+    row = qualified_row()
+    row.pop("deterministicSide")
+    reasons = rejection_reasons(row)
+    assert "EXPLICIT_BUY_SIDE_REQUIRED:MISSING" in reasons
+
+
+def test_high_score_without_explicit_buy_is_rejected():
+    row = qualified_row(score=99.0)
+    row.pop("deterministicSide")
+    assert swing_session._stock_is_matrix_buy(row) is False
+
+
+def test_failed_hard_or_quality_filters_are_rejected():
+    assert "HARD_FILTERS_NOT_PASSED" in rejection_reasons(
+        qualified_row(passes_hard_filters=False)
+    )
+    assert "QUALITY_FILTERS_NOT_PASSED" in rejection_reasons(
+        qualified_row(passes_quality_filters=False)
+    )
+
+
+def test_bearish_side_oi_and_trend_anchors_are_rejected():
+    assert "EXPLICIT_BUY_SIDE_REQUIRED:SELL" in rejection_reasons(
+        qualified_row(deterministicSide="SELL")
+    )
+    assert "BULLISH_OI_REQUIRED:SHORT_BUILDUP" in rejection_reasons(
+        qualified_row(intraday={"oi_setup": "SHORT_BUILDUP"})
+    )
+    assert "ABOVE_VWAP_REQUIREMENT_FAILED" in rejection_reasons(
+        qualified_row(intraday={"price_above_vwap": False, "vwap": 101.0})
+    )
+    assert "ABOVE_EMA9_REQUIREMENT_FAILED" in rejection_reasons(
+        qualified_row(intraday={"price_above_ema9": False, "ema9": 101.0})
+    )
+
+
+def test_risk_approval_is_only_a_veto_pass_not_direction():
+    row = qualified_row(deterministicSide="SELL", riskAuditVerdict="APPROVE", verdict="APPROVE")
+    assert swing_session._stock_is_matrix_buy(row) is False
+    assert any(reason.startswith("RISK_AUDIT_VETO") for reason in rejection_reasons(
+        qualified_row(riskAuditVerdict="HOLD_FOR_DATA", verdict="HOLD_FOR_DATA")
+    ))
+
+
+def test_only_explicit_fully_qualified_buy_rows_enter_candidate_set():
+    approve_only = qualified_row("APPROVE_ONLY")
+    approve_only.pop("deterministicSide")
+    high_score = qualified_row("HIGH_SCORE", score=99.0)
+    high_score.pop("deterministicSide")
+    failed = qualified_row("FAILED", passes_quality_filters=False)
+    sell = qualified_row("SELLER", deterministicSide="SELL")
+    valid = qualified_row("VALID")
+    snapshot = {
+        "stocks": [approve_only, high_score, failed, sell, valid],
+        "terminalIntelligence": {
+            "ledger_stocks": [
+                {"ticker": "APPROVE_ONLY", "score": 100, "action": "BUY"},
+                {"ticker": "VALID", "score": 1, "action": "HOLD"},
+            ]
+        },
+    }
+    selected, source = swing_session._picks_from_asset_matrix(snapshot)
+    assert [row["symbol"] for row in selected] == ["VALID"]
+    assert source == "asset_matrix_deterministic_buy"
+
+
+def test_invalid_locked_rows_are_scrubbed_but_audit_and_execution_are_preserved(monkeypatch):
+    rhim = {
+        "symbol": "RHIM",
+        "direction": "LONG",
+        "verdict": "APPROVE",
+        "entryPrice": 398.1,
+        "approxQty": 502,
+        "deployedCapital": 199_846.2,
+    }
+    godrej = {
+        "symbol": "GODREJCP",
+        "direction": "LONG",
+        "verdict": "APPROVE",
+        "entryPrice": 927.2,
+    }
+    session = {
+        "locked": True,
+        "sessionDate": "2026-08-12",
+        "long": [rhim, godrej],
+        "short": [],
+        "capital": {"swingCapital": 1_000_000},
+    }
+    monkeypatch.setattr(swing_session, "intraday_locked_symbols", lambda _day: set())
+    monkeypatch.setattr(swing_session, "is_swing_desk_eligible", lambda *_args: True)
+    monkeypatch.setattr(
+        swing_session,
+        "_booked_execution_record",
+        lambda _day, symbol: {
+            "symbol": symbol,
+            "sessionDate": "2026-08-12",
+            "executionStatus": "TRIGGERED",
+            "triggered": True,
+            "realizedPnl": -6124.4,
+            "source": "test_book",
+        }
+        if symbol == "RHIM"
+        else None,
+    )
+
+    scrubbed, removed = swing_session._scrub_ineligible_swing_rows(session)
+
+    assert removed == ["RHIM", "GODREJCP"]
+    assert scrubbed["long"] == []
+    assert scrubbed["counts"]["total"] == 0
+    assert scrubbed["cashHeld"] is True
+    audit = {row["symbol"]: row for row in scrubbed["excludedInvalidSelections"]}
+    assert set(audit) == {"RHIM", "GODREJCP"}
+    assert audit["RHIM"]["originalSelection"] == rhim
+    assert audit["RHIM"]["preservedExecution"]["realizedPnl"] == -6124.4
+    assert scrubbed["preservedExecutionHistory"][0]["symbol"] == "RHIM"
+
+
+def test_concurrent_gets_cannot_alter_persisted_portfolio(monkeypatch, tmp_path: Path):
+    path = tmp_path / "swing_session.json"
+    payload = {
+        "locked": True,
+        "sessionDate": "2026-08-12",
+        "long": [qualified_row()],
+        "short": [],
+        "counts": {"long": 1, "short": 0, "total": 1},
+    }
+    swing_session._atomic_write(str(path), payload)
+    before = path.read_bytes()
+    monkeypatch.setattr(swing_session, "_SWING_SESSION_PATH", str(path))
+
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        results = list(pool.map(lambda _: swing_session.get_swing_session(live=False), range(40)))
+
+    assert path.read_bytes() == before
+    assert all(result == payload for result in results)
+    results[0]["long"][0]["symbol"] = "MUTATED"
+    assert results[1]["long"][0]["symbol"] == "VALID"
+
+
+def test_locked_position_contains_complete_selection_evidence(monkeypatch):
+    monkeypatch.setattr(swing_session, "is_swing_desk_eligible", lambda *_args: True)
+    row = swing_session._normalize_swing_row(qualified_row(), "2026-08-12")
+    assert row is not None
+    evidence = row["selectionEvidence"]
+    assert evidence["originalSide"] == "BUY"
+    assert evidence["passesHardFilters"] is True
+    assert evidence["passesQualityFilters"] is True
+    assert evidence["vwap"] == 99.0
+    assert evidence["ema9"] == 98.0
+    assert evidence["rsi"] == 62.0
+    assert evidence["oiSetup"] == "LONG_BUILDUP"
+    assert evidence["riskAuditVerdict"] == "APPROVE"
+    assert evidence["acceptanceReason"] == row["acceptanceReason"]
+    assert evidence["lockedAt"]
+    assert evidence["lockSource"]

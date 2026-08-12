@@ -4,566 +4,887 @@
   "book": "SWING",
   "sessionDate": "2026-08-12",
   "committedAt": "2026-08-12T04:20:52.785606+00:00",
-  "updatedAt": "2026-08-12T04:20:52.785606+00:00",
+  "updatedAt": "2026-08-12T14:46:27.036991+00:00",
   "executionPolicy": "MANUAL_ONLY",
   "source": "asset_matrix_buy",
   "rotation": "DAILY",
   "priorSessionDate": "2026-08-11",
-  "long": [
-    {
-      "symbol": "FINCABLES",
-      "name": "FINCABLES",
-      "direction": "LONG",
-      "book": "SWING",
-      "entryDate": "2026-08-12",
-      "entryPrice": 1344.75,
-      "buyAbove": 1344.75,
-      "stopLoss": 1320.28,
-      "target1": 1381.45,
-      "target2": 1418.16,
-      "riskPerShare": 24.47,
-      "rewardRisk": 3.0,
-      "expectedR": 3.0,
-      "entryQuality": "ENTRY_A",
-      "approxQty": 148,
-      "deployedCapital": 199023.0,
-      "score": 32.49,
-      "sector": null,
-      "scanLtp": 1344.75,
-      "currentPrice": 1344.75,
-      "status": "RUNNING",
-      "sessionLocked": true,
-      "source": "swing_session",
-      "levelsSource": "matrix_atr_pct",
-      "selectionReason": null,
-      "verdict": "APPROVE",
-      "dayChangePct": null,
-      "lineage": {
-        "source": "asset_matrix_buy",
-        "filterStage": "MATRIX_BUY",
-        "score": 32.49,
-        "scoreComponents": {
-          "liquidity_score": 2.7662164799999998,
-          "breakout_quality": 2.0225787284610615
-        },
-        "lockRank": 1,
-        "selectionReason": null,
-        "verdict": "APPROVE",
-        "sector": null,
-        "levelsSource": "matrix_atr_pct",
-        "triggeredAt": null,
-        "executedFills": null,
-        "exitPathTag": null
-      },
-      "maxLoss": 3621.56,
-      "sizingNote": "SWING_SLEEVE_10L",
-      "sleeveCapital": 1000000.0,
-      "slotNotional": 200000.0,
-      "exitPlan": {
-        "mode": "SCALE_TRAIL",
-        "direction": "LONG",
-        "entry": 1344.75,
-        "riskPerShare": 24.47,
-        "initialStop": 1320.28,
-        "legs": [
-          {
-            "r": 1.0,
-            "qtyPct": 0.2,
-            "qty": 30,
-            "price": 1369.22,
-            "trailStopAfter": 0.75
-          },
-          {
-            "r": 1.5,
-            "qtyPct": 0.2,
-            "qty": 30,
-            "price": 1381.45,
-            "trailStopAfter": 1.25
-          },
-          {
-            "r": 2.0,
-            "qtyPct": 0.2,
-            "qty": 29,
-            "price": 1393.69,
-            "trailStopAfter": 1.5
-          }
-        ],
-        "runnerQty": 59,
-        "runnerFrac": 0.4,
-        "trailRatchet": {
-          "0.25": 0.0,
-          "0.5": 0.25,
-          "0.75": 0.5,
-          "1.0": 0.75,
-          "1.25": 1.0,
-          "1.5": 1.25,
-          "2.0": 1.5,
-          "3.0": 2.25,
-          "4.0": 3.25,
-          "5.0": 4.25
-        },
-        "target1": 1381.45,
-        "target2": 1418.16,
-        "validRiskModel": true,
-        "stopRepaired": false,
-        "notes": [
-          "40pct_runner",
-          "monotonic_r_ratchet",
-          "be_at_0p25r",
-          "no_stop_loosen",
-          "book_pnl_authoritative"
-        ]
-      },
-      "riskModelValid": true,
-      "stopRepaired": false
-    },
-    {
-      "symbol": "NATIONALUM",
-      "name": "NATIONALUM",
-      "direction": "LONG",
-      "book": "SWING",
-      "entryDate": "2026-08-12",
-      "entryPrice": 419.0,
-      "buyAbove": 419.0,
-      "stopLoss": 407.6,
-      "target1": 436.1,
-      "target2": 453.2,
-      "riskPerShare": 11.4,
-      "rewardRisk": 3.0,
-      "expectedR": 3.0,
-      "entryQuality": "ENTRY_A",
-      "approxQty": 477,
-      "deployedCapital": 199863.0,
-      "score": 29.98,
-      "sector": null,
-      "scanLtp": 419.0,
-      "currentPrice": 419.0,
-      "status": "RUNNING",
-      "sessionLocked": true,
-      "source": "swing_session",
-      "levelsSource": "matrix_atr_pct",
-      "selectionReason": null,
-      "verdict": "APPROVE",
-      "dayChangePct": null,
-      "lineage": {
-        "source": "asset_matrix_buy",
-        "filterStage": "MATRIX_BUY",
-        "score": 29.98,
-        "scoreComponents": {
-          "liquidity_score": 20.0,
-          "breakout_quality": 10.869823546027563
-        },
-        "lockRank": 2,
-        "selectionReason": null,
-        "verdict": "APPROVE",
-        "sector": null,
-        "levelsSource": "matrix_atr_pct",
-        "triggeredAt": null,
-        "executedFills": null,
-        "exitPathTag": null
-      },
-      "maxLoss": 5437.8,
-      "sizingNote": "SWING_SLEEVE_10L",
-      "sleeveCapital": 1000000.0,
-      "slotNotional": 200000.0,
-      "exitPlan": {
-        "mode": "SCALE_TRAIL",
-        "direction": "LONG",
-        "entry": 419.0,
-        "riskPerShare": 11.4,
-        "initialStop": 407.6,
-        "legs": [
-          {
-            "r": 1.0,
-            "qtyPct": 0.2,
-            "qty": 96,
-            "price": 430.4,
-            "trailStopAfter": 0.75
-          },
-          {
-            "r": 1.5,
-            "qtyPct": 0.2,
-            "qty": 95,
-            "price": 436.1,
-            "trailStopAfter": 1.25
-          },
-          {
-            "r": 2.0,
-            "qtyPct": 0.2,
-            "qty": 95,
-            "price": 441.8,
-            "trailStopAfter": 1.5
-          }
-        ],
-        "runnerQty": 191,
-        "runnerFrac": 0.4,
-        "trailRatchet": {
-          "0.25": 0.0,
-          "0.5": 0.25,
-          "0.75": 0.5,
-          "1.0": 0.75,
-          "1.25": 1.0,
-          "1.5": 1.25,
-          "2.0": 1.5,
-          "3.0": 2.25,
-          "4.0": 3.25,
-          "5.0": 4.25
-        },
-        "target1": 436.1,
-        "target2": 453.2,
-        "validRiskModel": true,
-        "stopRepaired": false,
-        "notes": [
-          "40pct_runner",
-          "monotonic_r_ratchet",
-          "be_at_0p25r",
-          "no_stop_loosen",
-          "book_pnl_authoritative"
-        ]
-      },
-      "riskModelValid": true,
-      "stopRepaired": false
-    },
-    {
-      "symbol": "GODREJCP",
-      "name": "GODREJCP",
-      "direction": "LONG",
-      "book": "SWING",
-      "entryDate": "2026-08-12",
-      "entryPrice": 927.2,
-      "buyAbove": 927.2,
-      "stopLoss": 907.91,
-      "target1": 956.14,
-      "target2": 985.07,
-      "riskPerShare": 19.29,
-      "rewardRisk": 3.0,
-      "expectedR": 3.0,
-      "entryQuality": "ENTRY_A",
-      "approxQty": 215,
-      "deployedCapital": 199348.0,
-      "score": 28.02,
-      "sector": null,
-      "scanLtp": 927.2,
-      "currentPrice": 927.2,
-      "status": "RUNNING",
-      "sessionLocked": true,
-      "source": "swing_session",
-      "levelsSource": "matrix_atr_pct",
-      "selectionReason": null,
-      "verdict": "APPROVE",
-      "dayChangePct": null,
-      "lineage": {
-        "source": "asset_matrix_buy",
-        "filterStage": "MATRIX_BUY",
-        "score": 28.02,
-        "scoreComponents": {
-          "liquidity_score": 8.849410272,
-          "breakout_quality": 2.3296578727142983
-        },
-        "lockRank": 3,
-        "selectionReason": null,
-        "verdict": "APPROVE",
-        "sector": null,
-        "levelsSource": "matrix_atr_pct",
-        "triggeredAt": null,
-        "executedFills": null,
-        "exitPathTag": null
-      },
-      "maxLoss": 4147.35,
-      "sizingNote": "SWING_SLEEVE_10L",
-      "sleeveCapital": 1000000.0,
-      "slotNotional": 200000.0,
-      "exitPlan": {
-        "mode": "SCALE_TRAIL",
-        "direction": "LONG",
-        "entry": 927.2,
-        "riskPerShare": 19.29,
-        "initialStop": 907.91,
-        "legs": [
-          {
-            "r": 1.0,
-            "qtyPct": 0.2,
-            "qty": 43,
-            "price": 946.49,
-            "trailStopAfter": 0.75
-          },
-          {
-            "r": 1.5,
-            "qtyPct": 0.2,
-            "qty": 43,
-            "price": 956.14,
-            "trailStopAfter": 1.25
-          },
-          {
-            "r": 2.0,
-            "qtyPct": 0.2,
-            "qty": 43,
-            "price": 965.78,
-            "trailStopAfter": 1.5
-          }
-        ],
-        "runnerQty": 86,
-        "runnerFrac": 0.4,
-        "trailRatchet": {
-          "0.25": 0.0,
-          "0.5": 0.25,
-          "0.75": 0.5,
-          "1.0": 0.75,
-          "1.25": 1.0,
-          "1.5": 1.25,
-          "2.0": 1.5,
-          "3.0": 2.25,
-          "4.0": 3.25,
-          "5.0": 4.25
-        },
-        "target1": 956.14,
-        "target2": 985.07,
-        "validRiskModel": true,
-        "stopRepaired": false,
-        "notes": [
-          "40pct_runner",
-          "monotonic_r_ratchet",
-          "be_at_0p25r",
-          "no_stop_loosen",
-          "book_pnl_authoritative"
-        ]
-      },
-      "riskModelValid": true,
-      "stopRepaired": false
-    },
-    {
-      "symbol": "RHIM",
-      "name": "RHIM",
-      "direction": "LONG",
-      "book": "SWING",
-      "entryDate": "2026-08-12",
-      "entryPrice": 398.1,
-      "buyAbove": 398.1,
-      "stopLoss": 383.09,
-      "target1": 420.62,
-      "target2": 443.13,
-      "riskPerShare": 15.01,
-      "rewardRisk": 3.0,
-      "expectedR": 3.0,
-      "entryQuality": "ENTRY_A",
-      "approxQty": 502,
-      "deployedCapital": 199846.2,
-      "score": 24.21,
-      "sector": null,
-      "scanLtp": 398.1,
-      "currentPrice": 398.1,
-      "status": "RUNNING",
-      "sessionLocked": true,
-      "source": "swing_session",
-      "levelsSource": "matrix_atr_pct",
-      "selectionReason": null,
-      "verdict": "APPROVE",
-      "dayChangePct": null,
-      "lineage": {
-        "source": "asset_matrix_buy",
-        "filterStage": "MATRIX_BUY",
-        "score": 24.21,
-        "scoreComponents": {
-          "liquidity_score": 20.0,
-          "breakout_quality": 0.0
-        },
-        "lockRank": 4,
-        "selectionReason": null,
-        "verdict": "APPROVE",
-        "sector": null,
-        "levelsSource": "matrix_atr_pct",
-        "triggeredAt": null,
-        "executedFills": null,
-        "exitPathTag": null
-      },
-      "maxLoss": 7535.02,
-      "sizingNote": "SWING_SLEEVE_10L",
-      "sleeveCapital": 1000000.0,
-      "slotNotional": 200000.0,
-      "exitPlan": {
-        "mode": "SCALE_TRAIL",
-        "direction": "LONG",
-        "entry": 398.1,
-        "riskPerShare": 15.01,
-        "initialStop": 383.09,
-        "legs": [
-          {
-            "r": 1.0,
-            "qtyPct": 0.2,
-            "qty": 101,
-            "price": 413.11,
-            "trailStopAfter": 0.75
-          },
-          {
-            "r": 1.5,
-            "qtyPct": 0.2,
-            "qty": 100,
-            "price": 420.62,
-            "trailStopAfter": 1.25
-          },
-          {
-            "r": 2.0,
-            "qtyPct": 0.2,
-            "qty": 100,
-            "price": 428.12,
-            "trailStopAfter": 1.5
-          }
-        ],
-        "runnerQty": 201,
-        "runnerFrac": 0.4,
-        "trailRatchet": {
-          "0.25": 0.0,
-          "0.5": 0.25,
-          "0.75": 0.5,
-          "1.0": 0.75,
-          "1.25": 1.0,
-          "1.5": 1.25,
-          "2.0": 1.5,
-          "3.0": 2.25,
-          "4.0": 3.25,
-          "5.0": 4.25
-        },
-        "target1": 420.62,
-        "target2": 443.13,
-        "validRiskModel": true,
-        "stopRepaired": false,
-        "notes": [
-          "40pct_runner",
-          "monotonic_r_ratchet",
-          "be_at_0p25r",
-          "no_stop_loosen",
-          "book_pnl_authoritative"
-        ]
-      },
-      "riskModelValid": true,
-      "stopRepaired": false
-    },
-    {
-      "symbol": "PNB",
-      "name": "PNB",
-      "direction": "LONG",
-      "book": "SWING",
-      "entryDate": "2026-08-12",
-      "entryPrice": 117.73,
-      "buyAbove": 117.73,
-      "stopLoss": 113.36,
-      "target1": 124.29,
-      "target2": 130.84,
-      "riskPerShare": 4.37,
-      "rewardRisk": 3.0,
-      "expectedR": 3.0,
-      "entryQuality": "ENTRY_A",
-      "approxQty": 1698,
-      "deployedCapital": 199905.54,
-      "score": 19.2,
-      "sector": null,
-      "scanLtp": 117.73,
-      "currentPrice": 117.73,
-      "status": "RUNNING",
-      "sessionLocked": true,
-      "source": "swing_session",
-      "levelsSource": "matrix_atr_pct",
-      "selectionReason": null,
-      "verdict": "APPROVE",
-      "dayChangePct": null,
-      "lineage": {
-        "source": "asset_matrix_buy",
-        "filterStage": "MATRIX_BUY",
-        "score": 19.2,
-        "scoreComponents": {
-          "liquidity_score": 20.0,
-          "breakout_quality": 2.3585586097612543
-        },
-        "lockRank": 5,
-        "selectionReason": null,
-        "verdict": "APPROVE",
-        "sector": null,
-        "levelsSource": "matrix_atr_pct",
-        "triggeredAt": null,
-        "executedFills": null,
-        "exitPathTag": null
-      },
-      "maxLoss": 7420.26,
-      "sizingNote": "SWING_SLEEVE_10L",
-      "sleeveCapital": 1000000.0,
-      "slotNotional": 200000.0,
-      "exitPlan": {
-        "mode": "SCALE_TRAIL",
-        "direction": "LONG",
-        "entry": 117.73,
-        "riskPerShare": 4.37,
-        "initialStop": 113.36,
-        "legs": [
-          {
-            "r": 1.0,
-            "qtyPct": 0.2,
-            "qty": 340,
-            "price": 122.1,
-            "trailStopAfter": 0.75
-          },
-          {
-            "r": 1.5,
-            "qtyPct": 0.2,
-            "qty": 340,
-            "price": 124.29,
-            "trailStopAfter": 1.25
-          },
-          {
-            "r": 2.0,
-            "qtyPct": 0.2,
-            "qty": 339,
-            "price": 126.47,
-            "trailStopAfter": 1.5
-          }
-        ],
-        "runnerQty": 679,
-        "runnerFrac": 0.4,
-        "trailRatchet": {
-          "0.25": 0.0,
-          "0.5": 0.25,
-          "0.75": 0.5,
-          "1.0": 0.75,
-          "1.25": 1.0,
-          "1.5": 1.25,
-          "2.0": 1.5,
-          "3.0": 2.25,
-          "4.0": 3.25,
-          "5.0": 4.25
-        },
-        "target1": 124.29,
-        "target2": 130.84,
-        "validRiskModel": true,
-        "stopRepaired": false,
-        "notes": [
-          "40pct_runner",
-          "monotonic_r_ratchet",
-          "be_at_0p25r",
-          "no_stop_loosen",
-          "book_pnl_authoritative"
-        ]
-      },
-      "riskModelValid": true,
-      "stopRepaired": false
-    }
-  ],
+  "long": [],
   "short": [],
-  "skippedIncomplete": [],
+  "skippedIncomplete": [
+    "FINCABLES:HARD_FILTERS_NOT_PASSED|QUALITY_FILTERS_NOT_PASSED|ABOVE_VWAP_REQUIREMENT_FAILED|ABOVE_EMA9_REQUIREMENT_FAILED|BULLISH_OI_REQUIRED:MISSING|RSI_REQUIREMENT_FAILED:min=55|BREAKOUT_REQUIREMENT_FAILED",
+    "NATIONALUM:HARD_FILTERS_NOT_PASSED|QUALITY_FILTERS_NOT_PASSED|ABOVE_VWAP_REQUIREMENT_FAILED|ABOVE_EMA9_REQUIREMENT_FAILED|BULLISH_OI_REQUIRED:MISSING|RSI_REQUIREMENT_FAILED:min=55|BREAKOUT_REQUIREMENT_FAILED",
+    "GODREJCP:HARD_FILTERS_NOT_PASSED|QUALITY_FILTERS_NOT_PASSED|ABOVE_VWAP_REQUIREMENT_FAILED|ABOVE_EMA9_REQUIREMENT_FAILED|BULLISH_OI_REQUIRED:MISSING|RSI_REQUIREMENT_FAILED:min=55|BREAKOUT_REQUIREMENT_FAILED",
+    "RHIM:HARD_FILTERS_NOT_PASSED|QUALITY_FILTERS_NOT_PASSED|ABOVE_VWAP_REQUIREMENT_FAILED|ABOVE_EMA9_REQUIREMENT_FAILED|BULLISH_OI_REQUIRED:MISSING|RSI_REQUIREMENT_FAILED:min=55|BREAKOUT_REQUIREMENT_FAILED",
+    "PNB:HARD_FILTERS_NOT_PASSED|QUALITY_FILTERS_NOT_PASSED|ABOVE_VWAP_REQUIREMENT_FAILED|ABOVE_EMA9_REQUIREMENT_FAILED|BULLISH_OI_REQUIRED:MISSING|RSI_REQUIREMENT_FAILED:min=55|BREAKOUT_REQUIREMENT_FAILED"
+  ],
   "capital": {
     "swingCapital": 1000000.0,
     "riskFraction": 0.01,
-    "slots": 5,
-    "deployedCapital": 997985.74,
-    "remainingCapital": 2014.26,
-    "portfolioRisk": 28161.99
+    "slots": 0,
+    "deployedCapital": 0,
+    "remainingCapital": 1000000.0,
+    "portfolioRisk": 0
   },
   "counts": {
-    "long": 5,
+    "long": 0,
     "short": 0,
-    "total": 5
+    "total": 0
   },
   "deskGates": {
     "minPrice": 50.0,
     "rejectDvr": true
   },
-  "crossBookExcluded": []
+  "crossBookExcluded": [],
+  "excludedInvalidSelections": [
+    {
+      "symbol": "FINCABLES",
+      "sessionDate": "2026-08-12",
+      "status": "EXCLUDED_INVALID_SELECTION",
+      "contract": "DETERMINISTIC_BUY_V1",
+      "excludedAt": "2026-08-12T14:46:27.036991+00:00",
+      "rejectionReasons": [
+        "HARD_FILTERS_NOT_PASSED",
+        "QUALITY_FILTERS_NOT_PASSED",
+        "ABOVE_VWAP_REQUIREMENT_FAILED",
+        "ABOVE_EMA9_REQUIREMENT_FAILED",
+        "BULLISH_OI_REQUIRED:MISSING",
+        "RSI_REQUIREMENT_FAILED:min=55",
+        "BREAKOUT_REQUIREMENT_FAILED"
+      ],
+      "originalSelection": {
+        "symbol": "FINCABLES",
+        "name": "FINCABLES",
+        "direction": "LONG",
+        "book": "SWING",
+        "entryDate": "2026-08-12",
+        "entryPrice": 1344.75,
+        "buyAbove": 1344.75,
+        "stopLoss": 1320.28,
+        "target1": 1381.45,
+        "target2": 1418.16,
+        "riskPerShare": 24.47,
+        "rewardRisk": 3.0,
+        "expectedR": 3.0,
+        "entryQuality": "ENTRY_A",
+        "approxQty": 148,
+        "deployedCapital": 199023.0,
+        "score": 32.49,
+        "sector": null,
+        "scanLtp": 1344.75,
+        "currentPrice": 1344.75,
+        "status": "RUNNING",
+        "sessionLocked": true,
+        "source": "swing_session",
+        "levelsSource": "matrix_atr_pct",
+        "selectionReason": null,
+        "verdict": "APPROVE",
+        "dayChangePct": null,
+        "lineage": {
+          "source": "asset_matrix_buy",
+          "filterStage": "MATRIX_BUY",
+          "score": 32.49,
+          "scoreComponents": {
+            "liquidity_score": 2.7662164799999998,
+            "breakout_quality": 2.0225787284610615
+          },
+          "lockRank": 1,
+          "selectionReason": null,
+          "verdict": "APPROVE",
+          "sector": null,
+          "levelsSource": "matrix_atr_pct",
+          "triggeredAt": null,
+          "executedFills": null,
+          "exitPathTag": null
+        },
+        "maxLoss": 3621.56,
+        "sizingNote": "SWING_SLEEVE_10L",
+        "sleeveCapital": 1000000.0,
+        "slotNotional": 200000.0,
+        "exitPlan": {
+          "mode": "SCALE_TRAIL",
+          "direction": "LONG",
+          "entry": 1344.75,
+          "riskPerShare": 24.47,
+          "initialStop": 1320.28,
+          "legs": [
+            {
+              "r": 1.0,
+              "qtyPct": 0.2,
+              "qty": 30,
+              "price": 1369.22,
+              "trailStopAfter": 0.75
+            },
+            {
+              "r": 1.5,
+              "qtyPct": 0.2,
+              "qty": 30,
+              "price": 1381.45,
+              "trailStopAfter": 1.25
+            },
+            {
+              "r": 2.0,
+              "qtyPct": 0.2,
+              "qty": 29,
+              "price": 1393.69,
+              "trailStopAfter": 1.5
+            }
+          ],
+          "runnerQty": 59,
+          "runnerFrac": 0.4,
+          "trailRatchet": {
+            "0.25": 0.0,
+            "0.5": 0.25,
+            "0.75": 0.5,
+            "1.0": 0.75,
+            "1.25": 1.0,
+            "1.5": 1.25,
+            "2.0": 1.5,
+            "3.0": 2.25,
+            "4.0": 3.25,
+            "5.0": 4.25
+          },
+          "target1": 1381.45,
+          "target2": 1418.16,
+          "validRiskModel": true,
+          "stopRepaired": false,
+          "notes": [
+            "40pct_runner",
+            "monotonic_r_ratchet",
+            "be_at_0p25r",
+            "no_stop_loosen",
+            "book_pnl_authoritative"
+          ]
+        },
+        "riskModelValid": true,
+        "stopRepaired": false
+      },
+      "preservedExecution": {
+        "symbol": "FINCABLES",
+        "sessionDate": "2026-08-12",
+        "executionStatus": "TRIGGERED",
+        "executionBasis": "MODELED_PAPER",
+        "pnlKind": "REALIZED_MODELED",
+        "triggered": true,
+        "skipped": false,
+        "entryPrice": 1344.75,
+        "exitPrice": 1320.28,
+        "qty": 148,
+        "deployedCapital": 199023.0,
+        "realizedPnl": -3621.56,
+        "pnlPct": -1.82,
+        "exitReason": "TRAIL_SL_HIT",
+        "status": "TRAIL_SL_HIT",
+        "executedFills": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 148,
+            "price": 1320.28,
+            "pnl": -3621.56
+          }
+        ],
+        "source": "eod/book_swing.json"
+      }
+    },
+    {
+      "symbol": "NATIONALUM",
+      "sessionDate": "2026-08-12",
+      "status": "EXCLUDED_INVALID_SELECTION",
+      "contract": "DETERMINISTIC_BUY_V1",
+      "excludedAt": "2026-08-12T14:46:27.036991+00:00",
+      "rejectionReasons": [
+        "HARD_FILTERS_NOT_PASSED",
+        "QUALITY_FILTERS_NOT_PASSED",
+        "ABOVE_VWAP_REQUIREMENT_FAILED",
+        "ABOVE_EMA9_REQUIREMENT_FAILED",
+        "BULLISH_OI_REQUIRED:MISSING",
+        "RSI_REQUIREMENT_FAILED:min=55",
+        "BREAKOUT_REQUIREMENT_FAILED"
+      ],
+      "originalSelection": {
+        "symbol": "NATIONALUM",
+        "name": "NATIONALUM",
+        "direction": "LONG",
+        "book": "SWING",
+        "entryDate": "2026-08-12",
+        "entryPrice": 419.0,
+        "buyAbove": 419.0,
+        "stopLoss": 407.6,
+        "target1": 436.1,
+        "target2": 453.2,
+        "riskPerShare": 11.4,
+        "rewardRisk": 3.0,
+        "expectedR": 3.0,
+        "entryQuality": "ENTRY_A",
+        "approxQty": 477,
+        "deployedCapital": 199863.0,
+        "score": 29.98,
+        "sector": null,
+        "scanLtp": 419.0,
+        "currentPrice": 419.0,
+        "status": "RUNNING",
+        "sessionLocked": true,
+        "source": "swing_session",
+        "levelsSource": "matrix_atr_pct",
+        "selectionReason": null,
+        "verdict": "APPROVE",
+        "dayChangePct": null,
+        "lineage": {
+          "source": "asset_matrix_buy",
+          "filterStage": "MATRIX_BUY",
+          "score": 29.98,
+          "scoreComponents": {
+            "liquidity_score": 20.0,
+            "breakout_quality": 10.869823546027563
+          },
+          "lockRank": 2,
+          "selectionReason": null,
+          "verdict": "APPROVE",
+          "sector": null,
+          "levelsSource": "matrix_atr_pct",
+          "triggeredAt": null,
+          "executedFills": null,
+          "exitPathTag": null
+        },
+        "maxLoss": 5437.8,
+        "sizingNote": "SWING_SLEEVE_10L",
+        "sleeveCapital": 1000000.0,
+        "slotNotional": 200000.0,
+        "exitPlan": {
+          "mode": "SCALE_TRAIL",
+          "direction": "LONG",
+          "entry": 419.0,
+          "riskPerShare": 11.4,
+          "initialStop": 407.6,
+          "legs": [
+            {
+              "r": 1.0,
+              "qtyPct": 0.2,
+              "qty": 96,
+              "price": 430.4,
+              "trailStopAfter": 0.75
+            },
+            {
+              "r": 1.5,
+              "qtyPct": 0.2,
+              "qty": 95,
+              "price": 436.1,
+              "trailStopAfter": 1.25
+            },
+            {
+              "r": 2.0,
+              "qtyPct": 0.2,
+              "qty": 95,
+              "price": 441.8,
+              "trailStopAfter": 1.5
+            }
+          ],
+          "runnerQty": 191,
+          "runnerFrac": 0.4,
+          "trailRatchet": {
+            "0.25": 0.0,
+            "0.5": 0.25,
+            "0.75": 0.5,
+            "1.0": 0.75,
+            "1.25": 1.0,
+            "1.5": 1.25,
+            "2.0": 1.5,
+            "3.0": 2.25,
+            "4.0": 3.25,
+            "5.0": 4.25
+          },
+          "target1": 436.1,
+          "target2": 453.2,
+          "validRiskModel": true,
+          "stopRepaired": false,
+          "notes": [
+            "40pct_runner",
+            "monotonic_r_ratchet",
+            "be_at_0p25r",
+            "no_stop_loosen",
+            "book_pnl_authoritative"
+          ]
+        },
+        "riskModelValid": true,
+        "stopRepaired": false
+      },
+      "preservedExecution": {
+        "symbol": "NATIONALUM",
+        "sessionDate": "2026-08-12",
+        "executionStatus": "TRIGGERED",
+        "executionBasis": "MODELED_PAPER",
+        "pnlKind": "REALIZED_MODELED",
+        "triggered": true,
+        "skipped": false,
+        "entryPrice": 419.0,
+        "exitPrice": 420.0,
+        "qty": 477,
+        "deployedCapital": 199863.0,
+        "realizedPnl": 477.0,
+        "pnlPct": 0.24,
+        "exitReason": "EOD_SQUAREOFF",
+        "status": "EOD_SQUAREOFF",
+        "executedFills": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 477,
+            "price": 420.0,
+            "pnl": 477.0
+          }
+        ],
+        "source": "eod/book_swing.json"
+      }
+    },
+    {
+      "symbol": "GODREJCP",
+      "sessionDate": "2026-08-12",
+      "status": "EXCLUDED_INVALID_SELECTION",
+      "contract": "DETERMINISTIC_BUY_V1",
+      "excludedAt": "2026-08-12T14:46:27.036991+00:00",
+      "rejectionReasons": [
+        "HARD_FILTERS_NOT_PASSED",
+        "QUALITY_FILTERS_NOT_PASSED",
+        "ABOVE_VWAP_REQUIREMENT_FAILED",
+        "ABOVE_EMA9_REQUIREMENT_FAILED",
+        "BULLISH_OI_REQUIRED:MISSING",
+        "RSI_REQUIREMENT_FAILED:min=55",
+        "BREAKOUT_REQUIREMENT_FAILED"
+      ],
+      "originalSelection": {
+        "symbol": "GODREJCP",
+        "name": "GODREJCP",
+        "direction": "LONG",
+        "book": "SWING",
+        "entryDate": "2026-08-12",
+        "entryPrice": 927.2,
+        "buyAbove": 927.2,
+        "stopLoss": 907.91,
+        "target1": 956.14,
+        "target2": 985.07,
+        "riskPerShare": 19.29,
+        "rewardRisk": 3.0,
+        "expectedR": 3.0,
+        "entryQuality": "ENTRY_A",
+        "approxQty": 215,
+        "deployedCapital": 199348.0,
+        "score": 28.02,
+        "sector": null,
+        "scanLtp": 927.2,
+        "currentPrice": 927.2,
+        "status": "RUNNING",
+        "sessionLocked": true,
+        "source": "swing_session",
+        "levelsSource": "matrix_atr_pct",
+        "selectionReason": null,
+        "verdict": "APPROVE",
+        "dayChangePct": null,
+        "lineage": {
+          "source": "asset_matrix_buy",
+          "filterStage": "MATRIX_BUY",
+          "score": 28.02,
+          "scoreComponents": {
+            "liquidity_score": 8.849410272,
+            "breakout_quality": 2.3296578727142983
+          },
+          "lockRank": 3,
+          "selectionReason": null,
+          "verdict": "APPROVE",
+          "sector": null,
+          "levelsSource": "matrix_atr_pct",
+          "triggeredAt": null,
+          "executedFills": null,
+          "exitPathTag": null
+        },
+        "maxLoss": 4147.35,
+        "sizingNote": "SWING_SLEEVE_10L",
+        "sleeveCapital": 1000000.0,
+        "slotNotional": 200000.0,
+        "exitPlan": {
+          "mode": "SCALE_TRAIL",
+          "direction": "LONG",
+          "entry": 927.2,
+          "riskPerShare": 19.29,
+          "initialStop": 907.91,
+          "legs": [
+            {
+              "r": 1.0,
+              "qtyPct": 0.2,
+              "qty": 43,
+              "price": 946.49,
+              "trailStopAfter": 0.75
+            },
+            {
+              "r": 1.5,
+              "qtyPct": 0.2,
+              "qty": 43,
+              "price": 956.14,
+              "trailStopAfter": 1.25
+            },
+            {
+              "r": 2.0,
+              "qtyPct": 0.2,
+              "qty": 43,
+              "price": 965.78,
+              "trailStopAfter": 1.5
+            }
+          ],
+          "runnerQty": 86,
+          "runnerFrac": 0.4,
+          "trailRatchet": {
+            "0.25": 0.0,
+            "0.5": 0.25,
+            "0.75": 0.5,
+            "1.0": 0.75,
+            "1.25": 1.0,
+            "1.5": 1.25,
+            "2.0": 1.5,
+            "3.0": 2.25,
+            "4.0": 3.25,
+            "5.0": 4.25
+          },
+          "target1": 956.14,
+          "target2": 985.07,
+          "validRiskModel": true,
+          "stopRepaired": false,
+          "notes": [
+            "40pct_runner",
+            "monotonic_r_ratchet",
+            "be_at_0p25r",
+            "no_stop_loosen",
+            "book_pnl_authoritative"
+          ]
+        },
+        "riskModelValid": true,
+        "stopRepaired": false
+      },
+      "preservedExecution": {
+        "symbol": "GODREJCP",
+        "sessionDate": "2026-08-12",
+        "executionStatus": "NOT_TRIGGERED",
+        "executionBasis": "MODELED_PAPER",
+        "pnlKind": "REALIZED_MODELED",
+        "triggered": false,
+        "skipped": true,
+        "entryPrice": 927.2,
+        "exitPrice": 910.0,
+        "qty": 215,
+        "deployedCapital": 0.0,
+        "realizedPnl": 0.0,
+        "pnlPct": 0.0,
+        "exitReason": "SIGNAL_CONFLICT",
+        "status": "SIGNAL_CONFLICT",
+        "executedFills": null,
+        "source": "eod/book_swing.json"
+      }
+    },
+    {
+      "symbol": "RHIM",
+      "sessionDate": "2026-08-12",
+      "status": "EXCLUDED_INVALID_SELECTION",
+      "contract": "DETERMINISTIC_BUY_V1",
+      "excludedAt": "2026-08-12T14:46:27.036991+00:00",
+      "rejectionReasons": [
+        "HARD_FILTERS_NOT_PASSED",
+        "QUALITY_FILTERS_NOT_PASSED",
+        "ABOVE_VWAP_REQUIREMENT_FAILED",
+        "ABOVE_EMA9_REQUIREMENT_FAILED",
+        "BULLISH_OI_REQUIRED:MISSING",
+        "RSI_REQUIREMENT_FAILED:min=55",
+        "BREAKOUT_REQUIREMENT_FAILED"
+      ],
+      "originalSelection": {
+        "symbol": "RHIM",
+        "name": "RHIM",
+        "direction": "LONG",
+        "book": "SWING",
+        "entryDate": "2026-08-12",
+        "entryPrice": 398.1,
+        "buyAbove": 398.1,
+        "stopLoss": 383.09,
+        "target1": 420.62,
+        "target2": 443.13,
+        "riskPerShare": 15.01,
+        "rewardRisk": 3.0,
+        "expectedR": 3.0,
+        "entryQuality": "ENTRY_A",
+        "approxQty": 502,
+        "deployedCapital": 199846.2,
+        "score": 24.21,
+        "sector": null,
+        "scanLtp": 398.1,
+        "currentPrice": 398.1,
+        "status": "RUNNING",
+        "sessionLocked": true,
+        "source": "swing_session",
+        "levelsSource": "matrix_atr_pct",
+        "selectionReason": null,
+        "verdict": "APPROVE",
+        "dayChangePct": null,
+        "lineage": {
+          "source": "asset_matrix_buy",
+          "filterStage": "MATRIX_BUY",
+          "score": 24.21,
+          "scoreComponents": {
+            "liquidity_score": 20.0,
+            "breakout_quality": 0.0
+          },
+          "lockRank": 4,
+          "selectionReason": null,
+          "verdict": "APPROVE",
+          "sector": null,
+          "levelsSource": "matrix_atr_pct",
+          "triggeredAt": null,
+          "executedFills": null,
+          "exitPathTag": null
+        },
+        "maxLoss": 7535.02,
+        "sizingNote": "SWING_SLEEVE_10L",
+        "sleeveCapital": 1000000.0,
+        "slotNotional": 200000.0,
+        "exitPlan": {
+          "mode": "SCALE_TRAIL",
+          "direction": "LONG",
+          "entry": 398.1,
+          "riskPerShare": 15.01,
+          "initialStop": 383.09,
+          "legs": [
+            {
+              "r": 1.0,
+              "qtyPct": 0.2,
+              "qty": 101,
+              "price": 413.11,
+              "trailStopAfter": 0.75
+            },
+            {
+              "r": 1.5,
+              "qtyPct": 0.2,
+              "qty": 100,
+              "price": 420.62,
+              "trailStopAfter": 1.25
+            },
+            {
+              "r": 2.0,
+              "qtyPct": 0.2,
+              "qty": 100,
+              "price": 428.12,
+              "trailStopAfter": 1.5
+            }
+          ],
+          "runnerQty": 201,
+          "runnerFrac": 0.4,
+          "trailRatchet": {
+            "0.25": 0.0,
+            "0.5": 0.25,
+            "0.75": 0.5,
+            "1.0": 0.75,
+            "1.25": 1.0,
+            "1.5": 1.25,
+            "2.0": 1.5,
+            "3.0": 2.25,
+            "4.0": 3.25,
+            "5.0": 4.25
+          },
+          "target1": 420.62,
+          "target2": 443.13,
+          "validRiskModel": true,
+          "stopRepaired": false,
+          "notes": [
+            "40pct_runner",
+            "monotonic_r_ratchet",
+            "be_at_0p25r",
+            "no_stop_loosen",
+            "book_pnl_authoritative"
+          ]
+        },
+        "riskModelValid": true,
+        "stopRepaired": false
+      },
+      "preservedExecution": {
+        "symbol": "RHIM",
+        "sessionDate": "2026-08-12",
+        "executionStatus": "TRIGGERED",
+        "executionBasis": "MODELED_PAPER",
+        "pnlKind": "REALIZED_MODELED",
+        "triggered": true,
+        "skipped": false,
+        "entryPrice": 398.1,
+        "exitPrice": 385.9,
+        "qty": 502,
+        "deployedCapital": 199846.2,
+        "realizedPnl": -6124.4,
+        "pnlPct": -3.06,
+        "exitReason": "EOD_SQUAREOFF",
+        "status": "EOD_SQUAREOFF",
+        "executedFills": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 502,
+            "price": 385.9,
+            "pnl": -6124.4
+          }
+        ],
+        "source": "eod/book_swing.json"
+      }
+    },
+    {
+      "symbol": "PNB",
+      "sessionDate": "2026-08-12",
+      "status": "EXCLUDED_INVALID_SELECTION",
+      "contract": "DETERMINISTIC_BUY_V1",
+      "excludedAt": "2026-08-12T14:46:27.036991+00:00",
+      "rejectionReasons": [
+        "HARD_FILTERS_NOT_PASSED",
+        "QUALITY_FILTERS_NOT_PASSED",
+        "ABOVE_VWAP_REQUIREMENT_FAILED",
+        "ABOVE_EMA9_REQUIREMENT_FAILED",
+        "BULLISH_OI_REQUIRED:MISSING",
+        "RSI_REQUIREMENT_FAILED:min=55",
+        "BREAKOUT_REQUIREMENT_FAILED"
+      ],
+      "originalSelection": {
+        "symbol": "PNB",
+        "name": "PNB",
+        "direction": "LONG",
+        "book": "SWING",
+        "entryDate": "2026-08-12",
+        "entryPrice": 117.73,
+        "buyAbove": 117.73,
+        "stopLoss": 113.36,
+        "target1": 124.29,
+        "target2": 130.84,
+        "riskPerShare": 4.37,
+        "rewardRisk": 3.0,
+        "expectedR": 3.0,
+        "entryQuality": "ENTRY_A",
+        "approxQty": 1698,
+        "deployedCapital": 199905.54,
+        "score": 19.2,
+        "sector": null,
+        "scanLtp": 117.73,
+        "currentPrice": 117.73,
+        "status": "RUNNING",
+        "sessionLocked": true,
+        "source": "swing_session",
+        "levelsSource": "matrix_atr_pct",
+        "selectionReason": null,
+        "verdict": "APPROVE",
+        "dayChangePct": null,
+        "lineage": {
+          "source": "asset_matrix_buy",
+          "filterStage": "MATRIX_BUY",
+          "score": 19.2,
+          "scoreComponents": {
+            "liquidity_score": 20.0,
+            "breakout_quality": 2.3585586097612543
+          },
+          "lockRank": 5,
+          "selectionReason": null,
+          "verdict": "APPROVE",
+          "sector": null,
+          "levelsSource": "matrix_atr_pct",
+          "triggeredAt": null,
+          "executedFills": null,
+          "exitPathTag": null
+        },
+        "maxLoss": 7420.26,
+        "sizingNote": "SWING_SLEEVE_10L",
+        "sleeveCapital": 1000000.0,
+        "slotNotional": 200000.0,
+        "exitPlan": {
+          "mode": "SCALE_TRAIL",
+          "direction": "LONG",
+          "entry": 117.73,
+          "riskPerShare": 4.37,
+          "initialStop": 113.36,
+          "legs": [
+            {
+              "r": 1.0,
+              "qtyPct": 0.2,
+              "qty": 340,
+              "price": 122.1,
+              "trailStopAfter": 0.75
+            },
+            {
+              "r": 1.5,
+              "qtyPct": 0.2,
+              "qty": 340,
+              "price": 124.29,
+              "trailStopAfter": 1.25
+            },
+            {
+              "r": 2.0,
+              "qtyPct": 0.2,
+              "qty": 339,
+              "price": 126.47,
+              "trailStopAfter": 1.5
+            }
+          ],
+          "runnerQty": 679,
+          "runnerFrac": 0.4,
+          "trailRatchet": {
+            "0.25": 0.0,
+            "0.5": 0.25,
+            "0.75": 0.5,
+            "1.0": 0.75,
+            "1.25": 1.0,
+            "1.5": 1.25,
+            "2.0": 1.5,
+            "3.0": 2.25,
+            "4.0": 3.25,
+            "5.0": 4.25
+          },
+          "target1": 124.29,
+          "target2": 130.84,
+          "validRiskModel": true,
+          "stopRepaired": false,
+          "notes": [
+            "40pct_runner",
+            "monotonic_r_ratchet",
+            "be_at_0p25r",
+            "no_stop_loosen",
+            "book_pnl_authoritative"
+          ]
+        },
+        "riskModelValid": true,
+        "stopRepaired": false
+      },
+      "preservedExecution": {
+        "symbol": "PNB",
+        "sessionDate": "2026-08-12",
+        "executionStatus": "TRIGGERED",
+        "executionBasis": "MODELED_PAPER",
+        "pnlKind": "REALIZED_MODELED",
+        "triggered": true,
+        "skipped": false,
+        "entryPrice": 117.73,
+        "exitPrice": 118.98,
+        "qty": 1698,
+        "deployedCapital": 199905.54,
+        "realizedPnl": 2122.51,
+        "pnlPct": 1.06,
+        "exitReason": "EOD_SQUAREOFF",
+        "status": "EOD_SQUAREOFF",
+        "executedFills": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 1698,
+            "price": 118.98,
+            "pnl": 2122.51
+          }
+        ],
+        "source": "eod/book_swing.json"
+      }
+    }
+  ],
+  "preservedExecutionHistory": [
+    {
+      "symbol": "FINCABLES",
+      "sessionDate": "2026-08-12",
+      "executionStatus": "TRIGGERED",
+      "executionBasis": "MODELED_PAPER",
+      "pnlKind": "REALIZED_MODELED",
+      "triggered": true,
+      "skipped": false,
+      "entryPrice": 1344.75,
+      "exitPrice": 1320.28,
+      "qty": 148,
+      "deployedCapital": 199023.0,
+      "realizedPnl": -3621.56,
+      "pnlPct": -1.82,
+      "exitReason": "TRAIL_SL_HIT",
+      "status": "TRAIL_SL_HIT",
+      "executedFills": [
+        {
+          "r": "TRAIL_SL",
+          "qty": 148,
+          "price": 1320.28,
+          "pnl": -3621.56
+        }
+      ],
+      "source": "eod/book_swing.json"
+    },
+    {
+      "symbol": "NATIONALUM",
+      "sessionDate": "2026-08-12",
+      "executionStatus": "TRIGGERED",
+      "executionBasis": "MODELED_PAPER",
+      "pnlKind": "REALIZED_MODELED",
+      "triggered": true,
+      "skipped": false,
+      "entryPrice": 419.0,
+      "exitPrice": 420.0,
+      "qty": 477,
+      "deployedCapital": 199863.0,
+      "realizedPnl": 477.0,
+      "pnlPct": 0.24,
+      "exitReason": "EOD_SQUAREOFF",
+      "status": "EOD_SQUAREOFF",
+      "executedFills": [
+        {
+          "r": "EOD_SQUAREOFF",
+          "qty": 477,
+          "price": 420.0,
+          "pnl": 477.0
+        }
+      ],
+      "source": "eod/book_swing.json"
+    },
+    {
+      "symbol": "RHIM",
+      "sessionDate": "2026-08-12",
+      "executionStatus": "TRIGGERED",
+      "executionBasis": "MODELED_PAPER",
+      "pnlKind": "REALIZED_MODELED",
+      "triggered": true,
+      "skipped": false,
+      "entryPrice": 398.1,
+      "exitPrice": 385.9,
+      "qty": 502,
+      "deployedCapital": 199846.2,
+      "realizedPnl": -6124.4,
+      "pnlPct": -3.06,
+      "exitReason": "EOD_SQUAREOFF",
+      "status": "EOD_SQUAREOFF",
+      "executedFills": [
+        {
+          "r": "EOD_SQUAREOFF",
+          "qty": 502,
+          "price": 385.9,
+          "pnl": -6124.4
+        }
+      ],
+      "source": "eod/book_swing.json"
+    },
+    {
+      "symbol": "PNB",
+      "sessionDate": "2026-08-12",
+      "executionStatus": "TRIGGERED",
+      "executionBasis": "MODELED_PAPER",
+      "pnlKind": "REALIZED_MODELED",
+      "triggered": true,
+      "skipped": false,
+      "entryPrice": 117.73,
+      "exitPrice": 118.98,
+      "qty": 1698,
+      "deployedCapital": 199905.54,
+      "realizedPnl": 2122.51,
+      "pnlPct": 1.06,
+      "exitReason": "EOD_SQUAREOFF",
+      "status": "EOD_SQUAREOFF",
+      "executedFills": [
+        {
+          "r": "EOD_SQUAREOFF",
+          "qty": 1698,
+          "price": 118.98,
+          "pnl": 2122.51
+        }
+      ],
+      "source": "eod/book_swing.json"
+    }
+  ],
+  "selectionFinalized": true,
+  "selectionContract": "DETERMINISTIC_BUY_V1",
+  "scrubbedAt": "2026-08-12T14:46:27.036991+00:00",
+  "cashHeld": true,
+  "cashReason": "NO_ACTIVE_VALID_SWING_SELECTIONS"
 }

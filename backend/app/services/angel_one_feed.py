@@ -2720,6 +2720,22 @@ def _compute_deterministic_pipeline(all_stocks: list[dict[str, Any]]) -> list[di
         alpha_score = _calculate_alpha_score(metrics)
         stock["passes_hard_filters"] = passes
         stock["alpha_score"] = alpha_score
+        # Direction is an explicit deterministic output, never inferred later
+        # from alpha score, volume rank, ledger membership, or risk approval.
+        stock["deterministicSide"] = "BUY" if passes else None
+        stock["deterministicEligibility"] = {
+            "side": stock["deterministicSide"],
+            "passesHardFilters": passes,
+            "passesQualityFilters": stock.get("passes_quality_filters") is True,
+            "priceAboveVwap": metrics.get("price_above_vwap") is True,
+            "priceAboveEma9": metrics.get("price_above_ema9") is True,
+            "rsiPass": rsi_val >= MIN_RSI_PIVOT,
+            "breakoutPass": (
+                metrics.get("pivot_r1_breakout") is True
+                and metrics.get("rsi_pivot_break") is True
+            ),
+            "oiSetup": oi_setup,
+        }
 
         if passes:
             ranked_universe.append(stock)
@@ -2751,8 +2767,8 @@ def _execute_llm_risk_audit(
     """
     Stage 2: LLM Safety Audit.
 
-    Audits ONLY the top LLM_DISPLAY_COUNT ranked candidates (BUY display list).
-    Remaining ranked stocks keep quant scores with default APPROVE verdicts.
+    Audits ONLY the top LLM_DISPLAY_COUNT ranked candidates. Remaining display
+    rows keep quant scores but receive HOLD_FOR_DATA, never synthetic approval.
     """
     if not ranked_stocks:
         return []
@@ -2766,10 +2782,25 @@ def _execute_llm_risk_audit(
     if not provider or not api_key:
         for stock in audit_targets:
             stock["risk_flags"] = ["LLM unavailable -- news risk not audited"]
-            stock["verdict"] = "APPROVE"
+            stock["riskAuditVerdict"] = "HOLD_FOR_DATA"
+            stock["verdict"] = "HOLD_FOR_DATA"
+            stock["deskIcSummary"] = {
+                "deskDecision": "HOLD_FOR_DATA",
+                "conviction": None,
+                "oneLiner": "Risk audit unavailable; fail-closed hold.",
+                "source": "risk_audit",
+            }
             audited_by_ticker[stock["ticker"]] = stock
         return [
-            audited_by_ticker.get(row["ticker"], {**row, "risk_flags": ["Not in top LLM audit set"], "verdict": "APPROVE"})
+            audited_by_ticker.get(
+                row["ticker"],
+                {
+                    **row,
+                    "risk_flags": ["Not in top LLM audit set"],
+                    "riskAuditVerdict": "HOLD_FOR_DATA",
+                    "verdict": "HOLD_FOR_DATA",
+                },
+            )
             for row in ranked_stocks
         ]
     news_context = "\n".join([
@@ -2855,12 +2886,16 @@ def _execute_llm_risk_audit(
 
             for stock in audit_targets:
                 ticker = stock["ticker"]
-                audit = audits.get(ticker, {"risk_flags": [], "verdict": "APPROVE"})
+                audit = audits.get(ticker, {"risk_flags": ["Audit result missing"], "verdict": "HOLD_FOR_DATA"})
                 stock["risk_flags"] = audit.get("risk_flags", []) or ["None"]
-                stock["verdict"] = audit.get("verdict", "APPROVE")
-                desk_decision = str(audit.get("deskDecision") or stock["verdict"] or "APPROVE").upper()
+                audit_verdict = str(audit.get("verdict") or "HOLD_FOR_DATA").upper().strip()
+                if audit_verdict not in ("APPROVE", "REJECT", "HOLD_FOR_DATA"):
+                    audit_verdict = "HOLD_FOR_DATA"
+                stock["riskAuditVerdict"] = audit_verdict
+                stock["verdict"] = audit_verdict
+                desk_decision = str(audit.get("deskDecision") or audit_verdict).upper()
                 if desk_decision not in ("APPROVE", "REJECT", "HOLD_FOR_DATA"):
-                    desk_decision = str(stock["verdict"] or "APPROVE").upper()
+                    desk_decision = audit_verdict
                 stock["deskIcSummary"] = {
                     "deskDecision": desk_decision,
                     "conviction": None,
@@ -2885,7 +2920,14 @@ def _execute_llm_risk_audit(
         )
         for stock in audit_targets:
             stock["risk_flags"] = [flag_msg]
-            stock["verdict"] = "APPROVE"
+            stock["riskAuditVerdict"] = "HOLD_FOR_DATA"
+            stock["verdict"] = "HOLD_FOR_DATA"
+            stock["deskIcSummary"] = {
+                "deskDecision": "HOLD_FOR_DATA",
+                "conviction": None,
+                "oneLiner": flag_msg[:280],
+                "source": "risk_audit",
+            }
             audited_by_ticker[stock["ticker"]] = stock
 
     merged: list[dict[str, Any]] = []
@@ -2894,7 +2936,12 @@ def _execute_llm_risk_audit(
         if ticker in audited_by_ticker:
             merged.append(audited_by_ticker[ticker])
         else:
-            merged.append({**row, "risk_flags": ["Not in top LLM audit set"], "verdict": "APPROVE"})
+            merged.append({
+                **row,
+                "risk_flags": ["Not in top LLM audit set"],
+                "riskAuditVerdict": "HOLD_FOR_DATA",
+                "verdict": "HOLD_FOR_DATA",
+            })
     return merged
 
 
@@ -3275,6 +3322,11 @@ def _build_payload_from_live_data(
 
     reused_llm = False
     if can_reuse_ai:
+        cached_stock_by_ticker = {
+            str(row.get("ticker") or row.get("symbol") or "").upper(): row
+            for row in ((snapshot or {}).get("stocks") or [])
+            if isinstance(row, dict) and (row.get("ticker") or row.get("symbol"))
+        }
         verdict_by_ticker = {
             str(row.get("ticker")).upper(): row
             for row in ((existing_ti or {}).get("ledger_stocks") or [])
@@ -3284,15 +3336,32 @@ def _build_payload_from_live_data(
         for row in top_ranked:
             enriched = dict(row)
             ledger = verdict_by_ticker.get(str(row["ticker"]).upper())
-            if ledger:
-                enriched.setdefault("verdict", ledger.get("action") or "APPROVE")
-                enriched.setdefault("risk_flags", ["Reused snapshot AI verdict"])
-            elif row["ticker"] in top_llm_tickers:
-                enriched.setdefault("verdict", "APPROVE")
-                enriched.setdefault("risk_flags", ["Reused snapshot AI cache"])
-            else:
-                enriched.setdefault("verdict", "APPROVE")
-                enriched.setdefault("risk_flags", ["Not in top LLM audit set"])
+            cached_stock = cached_stock_by_ticker.get(str(row["ticker"]).upper())
+            audit_source = cached_stock or ledger or {}
+            cached_verdict = str(
+                audit_source.get("riskAuditVerdict")
+                or audit_source.get("verdict")
+                or ""
+            ).upper().strip()
+            if row["ticker"] not in top_llm_tickers:
+                cached_verdict = "HOLD_FOR_DATA"
+            elif cached_verdict not in ("APPROVE", "REJECT", "HOLD_FOR_DATA"):
+                cached_verdict = "HOLD_FOR_DATA"
+            enriched["riskAuditVerdict"] = cached_verdict
+            enriched["verdict"] = cached_verdict
+            enriched["risk_flags"] = list(audit_source.get("risk_flags") or [
+                "Reused cached risk audit" if cached_verdict != "HOLD_FOR_DATA"
+                else "No reusable risk audit; fail-closed hold"
+            ])
+            if isinstance(audit_source.get("deskIcSummary"), dict):
+                enriched["deskIcSummary"] = dict(audit_source["deskIcSummary"])
+            elif cached_verdict == "HOLD_FOR_DATA":
+                enriched["deskIcSummary"] = {
+                    "deskDecision": "HOLD_FOR_DATA",
+                    "conviction": None,
+                    "oneLiner": "No reusable risk audit; fail-closed hold.",
+                    "source": "risk_audit",
+                }
             final_audited.append(enriched)
         top_rows = final_audited[:_TI_TOP_SELECTION_COUNT]
         terminal_intel = existing_ti

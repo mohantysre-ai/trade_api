@@ -5,6 +5,34 @@ from app.services import swing_session
 from app.services import sector_rotation
 
 
+def _qualified_swing_raw(**overrides) -> dict:
+    intraday = {
+        "vwap": 99.0,
+        "ema9": 98.0,
+        "price_above_vwap": True,
+        "price_above_ema9": True,
+        "rsi": 62.0,
+        "oi_setup": "LONG_BUILDUP",
+        "pivot_r1_breakout": True,
+        "rsi_pivot_break": True,
+    }
+    raw = {
+        "symbol": "GOOD",
+        "deterministicSide": "BUY",
+        "riskAuditVerdict": "APPROVE",
+        "passes_hard_filters": True,
+        "passes_quality_filters": True,
+        "ltp": 100.0,
+        "entryPrice": 100.0,
+        "stopLoss": 95.0,
+        "target1": 107.5,
+        "target2": 110.0,
+        "intraday": intraday,
+    }
+    raw.update(overrides)
+    return raw
+
+
 def _candidate(symbol: str, direction: str, expected_r: float, *, sector: str = "OTHER", score: float = 75) -> dict:
     entry = 100.0
     risk = 2.0
@@ -76,17 +104,20 @@ def test_capital_and_risk_never_exceed_configuration():
 
 def test_swing_gate_rejects_expected_r_below_minimum(monkeypatch):
     monkeypatch.setattr(swing_session, "is_swing_desk_eligible", lambda *_: True)
-    raw = {"symbol": "LOWR", "entryPrice": 100, "stopLoss": 95, "target1": 104, "target2": 106}
+    raw = _qualified_swing_raw(symbol="LOWR", target1=104, target2=106)
     assert swing_session._normalize_swing_row(raw, "2026-08-12") is None
 
 
 def test_swing_grade_and_expected_r(monkeypatch):
     monkeypatch.setattr(swing_session, "is_swing_desk_eligible", lambda *_: True)
-    raw = {"symbol": "GOOD", "entryPrice": 100, "stopLoss": 95, "target1": 107.5, "target2": 110}
+    raw = _qualified_swing_raw()
     row = swing_session._normalize_swing_row(raw, "2026-08-12")
     assert row is not None
     assert row["expectedR"] == 2.0
     assert row["entryQuality"] == "ENTRY_A"
+    assert row["originalSide"] == "BUY"
+    assert row["riskAuditVerdict"] == "APPROVE"
+    assert row["selectionEvidence"]["accepted"] is True
 
 
 def test_persisted_swing_book_is_migrated_to_five_with_capital_recomputed():
