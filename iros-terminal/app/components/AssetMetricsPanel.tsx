@@ -89,7 +89,8 @@ type PositionRow = {
   oiSetup?: string | null;
   qualityAdjustedExpectedR?: number | null;
   /** Scale-trail plan and live state — from backend SCALE_TRAIL mode */
-  exitPlan?: { mode?: string; legs?: { r: number; label: string }[]; runnerQty?: number | null } | null;
+  exitPlan?: { mode?: string; notes?: string[]; policyVersion?: string; legs?: { r: number; label: string }[]; runnerQty?: number | null } | null;
+  bookedExitPlan?: { notes?: string[] } | null;
   exitState?: {
     legsFilled?: number[];
     remainingQty?: number | null;
@@ -1643,6 +1644,18 @@ export default function AssetMetricsPanel({
                           valueClass={pnlClass(
                             selectedRow.exitState.unrealizedPnl ?? selectedRow.unrealizedPnl
                           )}
+                        />
+                        <Kpi
+                          label="Policy"
+                          value={
+                            selectedRow.exitPlan?.notes?.includes('be_at_0p5r')
+                              ? selectedRow.exitPlan.notes.includes('max_stop_0p5pct')
+                                ? '0.5R BE · SL≤0.5%'
+                                : '0.5R BE'
+                              : selectedRow.exitPlan?.notes?.includes('be_at_0p25r')
+                                ? '0.25R BE (booked)'
+                                : selectedRow.exitPlan?.policyVersion || '—'
+                          }
                         />
                       </div>
                     </div>

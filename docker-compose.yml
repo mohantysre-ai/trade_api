@@ -40,6 +40,7 @@ services:
       SWING_CAPITAL: "1000000"
       SWING_SESSION_FILE: /app/state/swing_session.json
       SNAPSHOT_FILE: /app/state/trade_api_snapshot.json
+      MARKET_SNAPSHOT_FILE: /app/state/last_market_snapshot.json
       FIXED_PLAN_FILE: /app/state/fixed_trade_plan.json
       ALERT_HISTORY_FILE: /app/state/alert_history.json
       INTRADAY_SESSION_FILE: /app/state/intraday_session.json
@@ -82,6 +83,7 @@ services:
       TZ: Asia/Kolkata
       SWING_SESSION_FILE: /app/state/swing_session.json
       SNAPSHOT_FILE: /app/state/trade_api_snapshot.json
+      MARKET_SNAPSHOT_FILE: /app/state/last_market_snapshot.json
       FIXED_PLAN_FILE: /app/state/fixed_trade_plan.json
       ALERT_HISTORY_FILE: /app/state/alert_history.json
       INTRADAY_SESSION_FILE: /app/state/intraday_session.json

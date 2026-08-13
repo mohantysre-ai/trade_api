@@ -14,7 +14,7 @@ from typing import Any
 from .trade_outcome import get_alert_history, _today_ist
 from .eod_reference import get_close_mark_price, get_reference_price, generate_swing_analysis
 from .eod_intraday_report import _build_levels_diagnostic, _exit_reason_from_scale_eval
-from .exit_plan import attach_exit_plan, blended_pnl_from_state, format_scale_progress
+from .exit_plan import attach_exit_plan, blended_pnl_from_state, format_scale_progress, refresh_exit_policy
 from .quant_desk_exit_policy import build_trade_outcome
 
 log = logging.getLogger(__name__)
@@ -412,15 +412,18 @@ def _evaluate_swing_pick(
     work: dict[str, Any] | None = None
     plan = pick.get("exitPlan") if isinstance(pick.get("exitPlan"), dict) else None
     if plan and plan.get("mode") == "SCALE_TRAIL":
-        work = {
-            **pick,
-            "entryPrice": base_entry,
-            "approxQty": qty,
-            "direction": direction,
-            "stopLoss": sl or pick.get("stopLoss"),
-            "target1": t1 or pick.get("target1"),
-            "target2": t2 or pick.get("target2"),
-        }
+        work = refresh_exit_policy(
+            {
+                **pick,
+                "entryPrice": base_entry,
+                "approxQty": qty,
+                "direction": direction,
+                "stopLoss": sl or pick.get("stopLoss"),
+                "target1": t1 or pick.get("target1"),
+                "target2": t2 or pick.get("target2"),
+            },
+            keep_exit_state=True,
+        )
     else:
         risk = float(pick.get("riskPerShare") or 0)
         if base_entry > 0 and qty > 0 and (risk > 0 or sl > 0):

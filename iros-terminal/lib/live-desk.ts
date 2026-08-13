@@ -69,9 +69,17 @@ export async function fetchLiveDeskSnapshot(force = false): Promise<LiveDeskSnap
   if (!force && lastSnapshot && Date.now() - lastSnapshotAt < maxAge) return lastSnapshot;
   if (pendingSnapshot) return pendingSnapshot;
 
-  pendingSnapshot = Promise.all(LIVE_KEYS.map(async (key) => [key, await fetchDeskKey(key)] as const))
-    .then((entries) => {
-      const resources = Object.fromEntries(entries) as Record<LiveDeskKey, Record<string, unknown>>;
+  pendingSnapshot = Promise.allSettled(LIVE_KEYS.map((key) => fetchDeskKey(key)))
+    .then((results) => {
+      const resources = {} as Record<LiveDeskKey, Record<string, unknown>>;
+      LIVE_KEYS.forEach((key, index) => {
+        const result = results[index];
+        if (result.status === 'fulfilled') {
+          resources[key] = result.value;
+        } else {
+          resources[key] = lastGood.get(key) ?? {};
+        }
+      });
       const snapshot: LiveDeskSnapshot = {
         sequence: ++sequence,
         receivedAt: new Date().toISOString(),

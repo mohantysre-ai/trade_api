@@ -15,25 +15,29 @@ SCALE_LEGS: list[tuple[float, float]] = [
 ]
 RUNNER_FRAC = 0.40
 
-# Highest favourable excursion -> minimum locked R on remaining quantity.
-# The stop is monotonic and never loosens.
+# NSE hybrid trail, expressed in R (desk 1R = initial risk).
+# 0–0.5R: fixed initial SL (no ratchet below 0.5).
+# 0.5R: breakeven.  1R–1.5R: still BE so T1 can develop.
+# 2R: ATR×1.5 analogue → lock mfe−1.5 = 0.5R.
+# 3R+: structure analogue → tighter lock, still room to run.
+# Initial SL and trail gap are also capped at MAX_STOP_PCT (0.5%) of price.
+# Stop is monotonic and never loosens.
 TRAIL_RATCHET: dict[float, float] = {
-    0.25: 0.00,
-    0.50: 0.25,
-    0.75: 0.50,
-    1.00: 0.75,
-    1.25: 1.00,
-    1.50: 1.25,
-    2.00: 1.50,
-    3.00: 2.25,
-    4.00: 3.25,
-    5.00: 4.25,
+    0.50: 0.00,
+    1.00: 0.00,
+    1.50: 0.00,
+    2.00: 0.50,
+    3.00: 1.50,
+    4.00: 2.50,
+    5.00: 3.50,
 }
 
-PROFIT_GUARD_TRIGGER_R = 0.25
+PROFIT_GUARD_TRIGGER_R = 0.5
 PROFIT_GUARD_LOCK_R = 0.0
+MAX_STOP_PCT = 0.005
 REF_T1_R = 1.5
 REF_T2_R = 3.0
+EXIT_POLICY_VERSION = "0p5r_max_0p5pct"
 
 
 def allocate_leg_qty(total_qty: int, fracs: list[float] | None = None) -> list[int]:
@@ -68,6 +72,25 @@ def _initial_stop(entry: float, risk: float, direction: str) -> float:
     return round(entry - _sign(direction) * risk, 2)
 
 
+def cap_stop_risk(entry: float, risk: float) -> float:
+    """Hard cap: stop distance ≤ 0.5% of entry. Never widens a tighter stop."""
+    if entry <= 0 or risk <= 0:
+        return max(float(risk or 0), 0.0)
+    return min(float(risk), round(float(entry) * MAX_STOP_PCT, 6))
+
+
+def _tighter_stop(direction: str, current: float, candidate: float) -> float:
+    return min(current, candidate) if str(direction).upper() == "SHORT" else max(current, candidate)
+
+
+def _pct_trail_from_mfe(entry: float, risk: float, direction: str, r_now: float) -> float:
+    """Trail at most MAX_STOP_PCT behind the favourable extreme."""
+    mfe_px = entry + _sign(direction) * risk * max(float(r_now), 0.0)
+    if str(direction).upper() == "SHORT":
+        return round(mfe_px * (1.0 + MAX_STOP_PCT), 2)
+    return round(mfe_px * (1.0 - MAX_STOP_PCT), 2)
+
+
 def _valid_stop(entry: float, stop: float, direction: str) -> bool:
     """Hard invariant: LONG stop below entry; SHORT stop above entry."""
     return stop < entry if str(direction).upper() == "LONG" else stop > entry
@@ -95,12 +118,18 @@ def build_exit_plan(
             "notes": ["invalid_entry_risk_or_qty"],
         }
 
-    derived_stop = _initial_stop(entry, risk, direction)
     supplied_stop = float(initial_stop) if initial_stop is not None else None
-    # Never accept a stop on the wrong side of the market. Fall back to a
-    # direction-correct ATR/structure risk stop instead of creating inverted R.
-    hard_sl = round(supplied_stop, 2) if supplied_stop is not None and _valid_stop(entry, supplied_stop, direction) else derived_stop
     stop_repaired = supplied_stop is not None and not _valid_stop(entry, supplied_stop, direction)
+    stop_capped = False
+    if supplied_stop is not None and _valid_stop(entry, supplied_stop, direction):
+        # Keep locked-book stops as-is (do not retro-tighten open positions).
+        risk = abs(entry - supplied_stop)
+        hard_sl = round(supplied_stop, 2)
+    else:
+        capped = cap_stop_risk(entry, risk)
+        stop_capped = capped + 1e-12 < risk
+        risk = capped
+        hard_sl = _initial_stop(entry, risk, direction)
 
     lots = allocate_leg_qty(qty)
     legs: list[dict[str, Any]] = []
@@ -127,7 +156,16 @@ def build_exit_plan(
         "target2": _target_price(entry, risk, REF_T2_R, direction),
         "validRiskModel": True,
         "stopRepaired": stop_repaired,
-        "notes": ["40pct_runner", "monotonic_r_ratchet", "be_at_0p25r", "no_stop_loosen", "book_pnl_authoritative"],
+        "stopCapped": stop_capped,
+        "notes": [
+            "40pct_runner",
+            "monotonic_r_ratchet",
+            "be_at_0p5r",
+            "max_stop_0p5pct",
+            "nse_hybrid_trail",
+            "no_stop_loosen",
+            "book_pnl_authoritative",
+        ],
     }
 
 
@@ -168,6 +206,188 @@ def attach_exit_plan(row: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def exit_plan_is_current(plan: dict[str, Any] | None) -> bool:
+    if not isinstance(plan, dict) or plan.get("mode") != "SCALE_TRAIL":
+        return False
+    notes = plan.get("notes") or []
+    return "be_at_0p5r" in notes and "max_stop_0p5pct" in notes
+
+
+def refresh_exit_policy(row: dict[str, Any], *, keep_exit_state: bool = True) -> dict[str, Any]:
+    """Rebuild SCALE_TRAIL notes/ratchet to current desk policy.
+
+    Keeps locked initialStop and booked exitState. Does not invent PnL.
+    """
+    out = dict(row)
+    booked = out.get("exitPlan") if isinstance(out.get("exitPlan"), dict) else None
+    if keep_exit_state and isinstance(booked, dict) and not exit_plan_is_current(booked):
+        out["bookedExitPlan"] = {
+            "notes": list(booked.get("notes") or []),
+            "trailRatchet": dict(booked.get("trailRatchet") or {}),
+        }
+    attached = attach_exit_plan(out)
+    plan = attached.get("exitPlan")
+    if isinstance(plan, dict):
+        plan = dict(plan)
+        plan["policyVersion"] = EXIT_POLICY_VERSION
+        out["exitPlan"] = plan
+        if plan.get("target1") is not None:
+            out["target1"] = plan["target1"]
+        if plan.get("target2") is not None:
+            out["target2"] = plan["target2"]
+        out["riskPerShare"] = attached.get("riskPerShare", out.get("riskPerShare"))
+        out["riskModelValid"] = attached.get("riskModelValid")
+        out["stopRepaired"] = attached.get("stopRepaired")
+        closed = bool(out.get("closed") or str(out.get("status") or "").upper() == "CLOSED")
+        if not closed and attached.get("stopLoss") is not None:
+            out["stopLoss"] = attached["stopLoss"]
+    if keep_exit_state and isinstance(row.get("exitState"), dict):
+        out["exitState"] = row["exitState"]
+        closed = bool(row.get("closed") or str(row.get("status") or "").upper() == "CLOSED")
+        if closed:
+            state = row["exitState"]
+            if state.get("effectiveStop") is not None:
+                out["effectiveStop"] = state["effectiveStop"]
+            if state.get("remainingQty") is not None:
+                out["remainingQty"] = state["remainingQty"]
+    return out
+
+
+def apply_exit_policy_to_rows(rows: list[Any]) -> tuple[list[Any], bool]:
+    changed = False
+    out: list[Any] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            out.append(row)
+            continue
+        plan = row.get("exitPlan") if isinstance(row.get("exitPlan"), dict) else None
+        if exit_plan_is_current(plan):
+            out.append(row)
+            continue
+        if not row.get("entryPrice"):
+            out.append(row)
+            continue
+        if not (row.get("approxQty") or row.get("stopLoss") or row.get("riskPerShare")):
+            out.append(row)
+            continue
+        try:
+            out.append(refresh_exit_policy(row, keep_exit_state=True))
+            changed = True
+        except Exception:
+            out.append(row)
+    return out, changed
+
+
+def _row_initial_stop(row: dict[str, Any]) -> float | None:
+    plan = row.get("exitPlan") if isinstance(row.get("exitPlan"), dict) else {}
+    state = row.get("exitState") if isinstance(row.get("exitState"), dict) else {}
+    for candidate in (plan.get("initialStop"), state.get("initialStop"), row.get("stopLoss")):
+        stop = _fnum(candidate)
+        if stop is not None:
+            return stop
+    return None
+
+
+def _needs_path_overwrite(row: dict[str, Any]) -> bool:
+    state = row.get("exitState") if isinstance(row.get("exitState"), dict) else {}
+    if str(state.get("policyVersion") or "") == EXIT_POLICY_VERSION:
+        return False
+    status = str(row.get("executionStatus") or "").upper()
+    if status == "NOT_TRIGGERED":
+        return False
+    triggered = (
+        status == "TRIGGERED"
+        or bool(row.get("triggered"))
+        or bool(row.get("closed"))
+        or bool(state)
+    )
+    if not triggered:
+        return False
+    if not row.get("entryPrice"):
+        return False
+    return int(row.get("approxQty") or row.get("qty") or 0) > 0
+
+
+def overwrite_row_with_current_policy(
+    row: dict[str, Any],
+    quotes: dict[str, Any] | None = None,
+    *,
+    after_close: bool = False,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Replace booked 0.25R path prices with current 0.5R / 0.5% trail math."""
+    if not force and not _needs_path_overwrite(row):
+        return row
+    qty = int(row.get("approxQty") or row.get("qty") or 0)
+    if not row.get("entryPrice") or qty <= 0:
+        return row
+    mark, high, low = _row_path_marks(row, quotes)
+    if mark is None:
+        return row
+    work = {k: v for k, v in row.items() if k != "exitState"}
+    work["approxQty"] = qty
+    initial_stop = _row_initial_stop(row)
+    if initial_stop is not None:
+        work["stopLoss"] = initial_stop
+    work = refresh_exit_policy(work, keep_exit_state=False)
+    ev = evaluate_scale_trail_path(work, mark, high, low, after_close=after_close)
+    if not ev:
+        return work
+    state = ev.get("exitState") if isinstance(ev.get("exitState"), dict) else {}
+    closed = bool(ev.get("closed"))
+    pnl = round(float(ev.get("economicPnl") or 0), 2)
+    out = dict(work)
+    out["exitState"] = state
+    out["realizedPnl"] = ev.get("realizedPnl")
+    out["unrealizedPnl"] = ev.get("unrealizedPnl")
+    out["totalPnl"] = pnl
+    out["pnl"] = pnl
+    out["remainingQty"] = ev.get("remainingQty")
+    out["effectiveStop"] = ev.get("effectiveStop")
+    if ev.get("effectiveStop") is not None:
+        out["stopLoss"] = ev.get("effectiveStop")
+    out["closed"] = closed
+    out["status"] = "CLOSED" if closed else "RUNNING"
+    out["mfeR"] = state.get("mfeR") if state.get("mfeR") is not None else out.get("mfeR")
+    out["rMultiple"] = ev.get("rMultiple")
+    out["economicR"] = ev.get("economicR")
+    out["pathR"] = ev.get("pathR")
+    out["outcome"] = {
+        "label": ev.get("label"),
+        "detail": ev.get("detail"),
+        "hitLevel": ev.get("hitLevel"),
+        "ltp": ev.get("ltp"),
+        "pctChange": ev.get("pctChange"),
+        "scaleTrail": True,
+        "closed": closed,
+    }
+    if state.get("policyVersion") is None and isinstance(out.get("exitState"), dict):
+        out["exitState"] = {**state, "policyVersion": EXIT_POLICY_VERSION}
+    return out
+
+
+def overwrite_rows_with_current_policy(
+    rows: list[Any],
+    quotes: dict[str, Any] | None = None,
+    *,
+    after_close: bool = False,
+    force: bool = False,
+) -> tuple[list[Any], bool]:
+    changed = False
+    out: list[Any] = []
+    for row in rows or []:
+        if not isinstance(row, dict):
+            out.append(row)
+            continue
+        updated = overwrite_row_with_current_policy(
+            row, quotes, after_close=after_close, force=force,
+        )
+        if updated is not row:
+            changed = True
+        out.append(updated)
+    return out, changed
+
+
 def profit_guard_active(state: dict[str, Any] | None) -> bool:
     if not isinstance(state, dict):
         return False
@@ -199,16 +419,28 @@ def _mtm_pnl(direction: str, entry: float, exit_px: float, qty: int) -> float:
     return round(_sign(direction) * (exit_px - entry) * qty, 2)
 
 
-def _ratchet_stop(entry: float, risk: float, direction: str, current: float, r_now: float) -> float:
+def _ratchet_stop(
+    entry: float,
+    risk: float,
+    direction: str,
+    current: float,
+    r_now: float,
+    *,
+    trail_ratchet: dict[float, float] | None = None,
+    profit_guard_trigger: float | None = None,
+    use_pct_trail: bool = True,
+) -> float:
     stop = current
-    if r_now + 1e-9 >= PROFIT_GUARD_TRIGGER_R:
-        guarded = _stop_at_r(entry, risk, PROFIT_GUARD_LOCK_R, direction)
-        stop = min(stop, guarded) if direction == "SHORT" else max(stop, guarded)
-    for trigger, lock_r in TRAIL_RATCHET.items():
+    trigger_r = PROFIT_GUARD_TRIGGER_R if profit_guard_trigger is None else float(profit_guard_trigger)
+    ratchet = trail_ratchet if trail_ratchet is not None else TRAIL_RATCHET
+    if r_now + 1e-9 >= trigger_r:
+        stop = _tighter_stop(direction, stop, _stop_at_r(entry, risk, PROFIT_GUARD_LOCK_R, direction))
+        if use_pct_trail:
+            stop = _tighter_stop(direction, stop, _pct_trail_from_mfe(entry, risk, direction, r_now))
+    for trigger, lock_r in ratchet.items():
         if r_now + 1e-9 < trigger:
             break
-        new = _stop_at_r(entry, risk, lock_r, direction)
-        stop = min(stop, new) if direction == "SHORT" else max(stop, new)
+        stop = _tighter_stop(direction, stop, _stop_at_r(entry, risk, lock_r, direction))
     return round(stop, 2)
 
 
@@ -217,7 +449,15 @@ def _economic_r(total_pnl: float, entry: float, risk: float, qty: int) -> float:
     return round(total_pnl / denominator, 3) if denominator > 0 else 0.0
 
 
-def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, after_close: bool = False) -> dict[str, Any]:
+def evaluate_scale_trail(
+    pick: dict[str, Any],
+    ltp: float | None = None,
+    *,
+    after_close: bool = False,
+    trail_ratchet: dict[float, float] | None = None,
+    profit_guard_trigger: float | None = None,
+    use_pct_trail: bool = True,
+) -> dict[str, Any]:
     plan = pick.get("exitPlan") if isinstance(pick.get("exitPlan"), dict) else None
     if not plan or plan.get("mode") != "SCALE_TRAIL":
         return {}
@@ -244,8 +484,14 @@ def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, afte
     if not _valid_stop(entry, initial_stop, direction):
         initial_stop = _initial_stop(entry, risk, direction)
     effective_stop = float(prior.get("effectiveStop") or initial_stop)
-    if not _valid_stop(entry, effective_stop, direction) and effective_stop != entry:
-        effective_stop = initial_stop
+    if effective_stop != entry and not _valid_stop(entry, effective_stop, direction):
+        # Trail may sit at BE or on the profit side (LONG stop > entry).
+        profit_trail = (
+            (direction != "SHORT" and effective_stop > entry)
+            or (direction == "SHORT" and effective_stop < entry)
+        )
+        if not profit_trail:
+            effective_stop = initial_stop
 
     for leg in plan.get("legs", []):
         r_mult, leg_qty, leg_px = float(leg.get("r") or 0), int(leg.get("qty") or 0), float(leg.get("price") or 0)
@@ -266,7 +512,16 @@ def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, afte
     for cand in (prior_mfe, peak_leg):
         if cand is not None:
             peak_r = max(peak_r, float(cand))
-    effective_stop = _ratchet_stop(entry, risk, direction, effective_stop, peak_r)
+    effective_stop = _ratchet_stop(
+        entry,
+        risk,
+        direction,
+        effective_stop,
+        peak_r,
+        trail_ratchet=trail_ratchet,
+        profit_guard_trigger=profit_guard_trigger,
+        use_pct_trail=use_pct_trail,
+    )
 
     booked_qty = sum(int(x.get("qty") or 0) for x in legs_filled)
     remaining = max(0, total_qty - booked_qty)
@@ -274,7 +529,8 @@ def evaluate_scale_trail(pick: dict[str, Any], ltp: float | None = None, *, afte
     trail_hit = False
     square_off = False
 
-    guard_active = bool(prior.get("profitGuardActive")) or peak_r + 1e-9 >= PROFIT_GUARD_TRIGGER_R
+    guard_trigger = PROFIT_GUARD_TRIGGER_R if profit_guard_trigger is None else float(profit_guard_trigger)
+    guard_active = bool(prior.get("profitGuardActive")) or peak_r + 1e-9 >= guard_trigger
 
     if remaining > 0 and _stop_hit(effective_stop, ltp, direction):
         px = effective_stop
@@ -354,6 +610,9 @@ def evaluate_scale_trail_path(
     day_low: float | None = None,
     *,
     after_close: bool = True,
+    trail_ratchet: dict[float, float] | None = None,
+    profit_guard_trigger: float | None = None,
+    use_pct_trail: bool = True,
 ) -> dict[str, Any]:
     """Evaluate favourable excursion first, then adverse path against the ratcheted stop."""
     work = dict(pick)
@@ -362,14 +621,28 @@ def evaluate_scale_trail_path(
     lo = float(day_low) if day_low is not None else float(mark)
     fav = hi if direction == "LONG" else lo
     adv = lo if direction == "LONG" else hi
-    first = evaluate_scale_trail(work, fav, after_close=False)
+    first = evaluate_scale_trail(
+        work,
+        fav,
+        after_close=False,
+        trail_ratchet=trail_ratchet,
+        profit_guard_trigger=profit_guard_trigger,
+        use_pct_trail=use_pct_trail,
+    )
     if first.get("exitState"):
         work["exitState"] = first["exitState"]
     state = work.get("exitState") or {}
     stop = float(state.get("effectiveStop") or work.get("stopLoss") or 0)
     stop_crossed = stop > 0 and ((direction == "LONG" and adv <= stop) or (direction == "SHORT" and adv >= stop))
     eval_px = stop if stop_crossed else float(mark)
-    return evaluate_scale_trail(work, eval_px, after_close=after_close)
+    return evaluate_scale_trail(
+        work,
+        eval_px,
+        after_close=after_close,
+        trail_ratchet=trail_ratchet,
+        profit_guard_trigger=profit_guard_trigger,
+        use_pct_trail=use_pct_trail,
+    )
 
 
 def blended_pnl_from_state(
@@ -426,3 +699,60 @@ def format_scale_progress(
     if eff is not None:
         parts.append(f"trail SL {float(eff):.2f}")
     return " ".join(parts)
+
+
+def _fnum(value: Any) -> float | None:
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return None
+    if num != num:
+        return None
+    return num
+
+
+def _quote_high_low(quotes: dict[str, Any] | None, symbol: str) -> tuple[float | None, float | None]:
+    if not isinstance(quotes, dict) or not symbol:
+        return None, None
+    quote = quotes.get(symbol) or quotes.get(symbol.upper())
+    if not isinstance(quote, dict):
+        return None, None
+    return _fnum(quote.get("high") or quote.get("dayHigh")), _fnum(quote.get("low") or quote.get("dayLow"))
+
+
+def _row_path_marks(row: dict[str, Any], quotes: dict[str, Any] | None) -> tuple[float | None, float | None, float | None]:
+    symbol = str(row.get("symbol") or "").upper()
+    evidence = row.get("entryEvidence") if isinstance(row.get("entryEvidence"), dict) else {}
+    quote_high, quote_low = _quote_high_low(quotes, symbol)
+    mark = _fnum(
+        row.get("ltp")
+        or row.get("currentPrice")
+        or row.get("closeMark")
+        or row.get("exitPrice")
+        or evidence.get("ltp")
+    )
+    high = _fnum(row.get("sessionHigh") or row.get("dayHigh") or evidence.get("postEntryHigh") or quote_high)
+    low = _fnum(row.get("sessionLow") or row.get("dayLow") or evidence.get("postEntryLow") or quote_low)
+    if mark is None:
+        return None, None, None
+    if high is None:
+        high = mark
+    if low is None:
+        low = mark
+    entry = _fnum(row.get("entryPrice"))
+    plan = row.get("exitPlan") if isinstance(row.get("exitPlan"), dict) else {}
+    risk = _fnum(row.get("riskPerShare") or plan.get("riskPerShare"))
+    state = row.get("exitState") if isinstance(row.get("exitState"), dict) else {}
+    mfe = _fnum(state.get("mfeR") or row.get("mfeR"))
+    direction = str(row.get("direction") or "LONG").upper()
+    if entry and risk and mfe and mfe > 0:
+        fav = entry + (1 if direction != "SHORT" else -1) * risk * mfe
+        if direction == "SHORT":
+            low = min(low, fav, mark)
+        else:
+            high = max(high, fav, mark)
+    if high < low:
+        high, low = low, high
+    return mark, high, low
+
+

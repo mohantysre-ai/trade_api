@@ -82,14 +82,18 @@ def test_apply_replacement_restores_open_count():
         }
     ]
     with patch.object(eng, "entry_quality_gate", side_effect=_qualified_gate):
-        with patch("app.services.trade_outcome.emit_replacement_alerts", return_value=[]):
-            applied = eng.apply_replacements(
-                session, proposals, {}, {}, bypass_window=True
-            )
+        with patch.object(eng, "sync_fixed_plan_from_session"):
+            with patch("app.services.trade_outcome.emit_replacement_alerts", return_value=[]):
+                applied = eng.apply_replacements(
+                    session, proposals, {}, {}, bypass_window=True
+                )
     assert len(applied) == 1
     assert applied[0]["symbol"] == "NEWONE"
     assert applied[0]["source"] == "REPLACEMENT"
     assert applied[0]["replacedFrom"] == "LOSER"
+    assert applied[0]["triggered"] is True
+    assert applied[0]["executionStatus"] == "TRIGGERED"
+    assert applied[0]["lockObservedPrice"] == 200.0
     free = eng.compute_free_slots(session["long"], session["short"])
     assert free["openLong"] == 3
     assert free["long"] == max(0, eng.MAX_LONG_POSITIONS - 3)

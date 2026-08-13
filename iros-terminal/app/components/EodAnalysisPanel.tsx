@@ -62,6 +62,7 @@ type IntradayTrade = {
   exitReason: string;
   qty: number;
   deployedCapital: number;
+  plannedCapital?: number | null;
   pnl: number | null;
   pnlPct: number | null;
   missAnalysis: string | null;
@@ -87,7 +88,7 @@ type IntradayTrade = {
     initialStop?: number | null;
     closed?: boolean;
   } | null;
-  exitPlan?: { mode?: string; legs?: { r?: number }[] } | null;
+  exitPlan?: { mode?: string; notes?: string[]; policyVersion?: string; legs?: { r?: number }[] } | null;
   scaleTrail?: boolean;
   scaleProgress?: string | null;
   deskProgress?: string | null;
@@ -168,7 +169,7 @@ type SwingPick = {
   /** Scale-trail state — from backend SCALE_TRAIL mode */
   remainingQty?: number | null;
   effectiveStop?: number | null;
-  exitPlan?: { mode?: string; legs?: { r?: number }[] } | null;
+  exitPlan?: { mode?: string; notes?: string[]; policyVersion?: string; legs?: { r?: number }[] } | null;
   exitState?: {
     legsFilled?: Array<number | { r?: number | string }>;
     remainingQty?: number | null;
@@ -270,6 +271,16 @@ function statusBadge(status: string) {
   }
 }
 
+function policyTag(notes?: string[] | null): string | null {
+  if (!notes?.length) return null;
+  const parts: string[] = [];
+  if (notes.includes('be_at_0p5r')) parts.push('0.5R BE');
+  else if (notes.includes('be_at_1r')) parts.push('1R BE');
+  else if (notes.includes('be_at_0p25r')) parts.push('0.25R BE');
+  if (notes.includes('max_stop_0p5pct')) parts.push('SL≤0.5%');
+  return parts.length ? parts.join(' · ') : null;
+}
+
 function ScaleExitCell({
   scaleTrail,
   scaleProgress,
@@ -281,7 +292,7 @@ function ScaleExitCell({
 }: {
   scaleTrail?: boolean;
   scaleProgress?: string | null;
-  exitPlan?: { mode?: string } | null;
+  exitPlan?: { mode?: string; notes?: string[]; policyVersion?: string } | null;
   exitState?: {
     remainingQty?: number | null;
     effectiveStop?: number | null;
@@ -298,11 +309,15 @@ function ScaleExitCell({
   const rem = exitState?.remainingQty ?? remainingQty;
   const trail = exitState?.effectiveStop ?? effectiveStop;
   const stopLabel = exitState?.profitGuardActive === false ? 'initial SL' : 'trail SL';
+  const policy = policyTag(exitPlan?.notes) || exitPlan?.policyVersion || null;
   return (
     <div className="flex flex-col items-start gap-0.5 min-w-[9rem]">
       <span className="text-[8px] font-mono tabular-nums text-slate-700 whitespace-nowrap">
         {scaleProgress || 'SCALE_TRAIL'}
       </span>
+      {policy && (
+        <span className="text-[7px] text-emerald-700 font-bold tabular-nums">{policy}</span>
+      )}
       <span className="text-[7px] text-amber-700 font-bold tabular-nums">
         {rem != null ? `rem ${rem}${qty != null ? `/${qty}` : ''}` : null}
         {trail != null ? `${rem != null ? ' · ' : ''}${stopLabel} ${Number(trail).toFixed(2)}` : null}
@@ -506,8 +521,10 @@ type LivePriceRow = {
   remainingQty?: number | null;
   realizedPnl?: number | null;
   unrealizedPnl?: number | null;
+  triggered?: boolean | null;
+  executionStatus?: string | null;
   outcome?: { hitLevel?: string | null; ltp?: number | null; pctChange?: number | null; scaleTrail?: boolean; label?: string | null; pnl?: number | null } | null;
-  exitPlan?: { mode?: string } | null;
+  exitPlan?: { mode?: string; notes?: string[]; policyVersion?: string } | null;
   exitState?: { remainingQty?: number | null; effectiveStop?: number | null; realizedPnl?: number | null; unrealizedPnl?: number | null; closed?: boolean } | null;
 };
 
@@ -539,6 +556,8 @@ type LiveMark = {
   unrealizedPnl?: number | null;
   closed?: boolean | null;
   status?: string | null;
+  triggered?: boolean | null;
+  executionStatus?: string | null;
 };
 
 type LiveMarksState = {
@@ -561,6 +580,21 @@ function isLiveHardClose(mark: LiveMark | null | undefined): boolean {
     return true;
   }
   return Boolean(mark.closed) && !(Number(mark.remainingQty) > 0);
+}
+
+function isLiveSessionFill(mark: LiveMark | null | undefined): boolean {
+  if (!mark) return false;
+  if (mark.triggered === true) return true;
+  const exec = String(mark.executionStatus || '').toUpperCase();
+  if (exec === 'TRIGGERED' || exec === 'EXECUTED' || exec === 'FILLED') return true;
+  if (Number(mark.remainingQty) > 0) return true;
+  if (mark.closed === false) return true;
+  if (mark.realizedPnl != null && Number.isFinite(Number(mark.realizedPnl))) return true;
+  const status = String(mark.status || '').toUpperCase();
+  if (status.includes('RUNNING') || status.includes('STOP') || status.includes('TARGET') || status.includes('TRAIL')) {
+    return true;
+  }
+  return false;
 }
 
 function exitReasonFromHit(hit: string | null | undefined, fallback: string): string {
@@ -1102,6 +1136,8 @@ export default function EodAnalysisPanel({
               unrealizedPnl: row.unrealizedPnl ?? row.exitState?.unrealizedPnl ?? null,
               closed: row.closed ?? row.exitState?.closed ?? null,
               status: row.status ?? row.outcome?.label ?? null,
+              triggered: row.triggered ?? null,
+              executionStatus: row.executionStatus ?? null,
             };
             bySymbol[sym] = ltp;
           }
@@ -1121,20 +1157,22 @@ export default function EodAnalysisPanel({
           for (const row of rows || []) {
             const sym = String(row.symbol || '').toUpperCase();
             if (!sym) continue;
-            const ltp = Number(row.currentPrice ?? row.ltp);
+            const ltp = Number(row.currentPrice ?? row.ltp ?? row.entryPrice);
             if (!Number.isFinite(ltp) || ltp <= 0) continue;
-            bySymbol[sym] = ltp;
+            bySymbol[sym] = Number(row.currentPrice ?? row.ltp) > 0 ? Number(row.currentPrice ?? row.ltp) : ltp;
             const dir = String(row.direction || fallbackDir).toUpperCase();
             const key = markKey(sym, dir);
             const prev = byKey[key];
             byKey[key] = {
-              ltp,
-              hitLevel: prev?.hitLevel ?? null,
+              ltp: Number(row.currentPrice ?? row.ltp) > 0 ? Number(row.currentPrice ?? row.ltp) : (prev?.ltp ?? ltp),
+              hitLevel: prev?.hitLevel ?? (row.outcome?.hitLevel != null ? String(row.outcome.hitLevel) : null),
               remainingQty: row.remainingQty ?? row.exitState?.remainingQty ?? prev?.remainingQty ?? null,
               realizedPnl: row.realizedPnl ?? row.exitState?.realizedPnl ?? prev?.realizedPnl ?? null,
               unrealizedPnl: row.unrealizedPnl ?? row.exitState?.unrealizedPnl ?? prev?.unrealizedPnl ?? null,
               closed: row.closed ?? row.exitState?.closed ?? prev?.closed ?? null,
               status: row.status ?? prev?.status ?? null,
+              triggered: row.triggered ?? prev?.triggered ?? null,
+              executionStatus: row.executionStatus ?? prev?.executionStatus ?? null,
             };
           }
         };
@@ -1181,11 +1219,18 @@ export default function EodAnalysisPanel({
 
     let realised = 0;
     let unrealised = 0;
-    const trades = (intraday.trades || []).map((t) => {
-      const skipped = t.skipped || t.outcomeBucket === 'SKIPPED' || String(t.executionStatus || '').toUpperCase() === 'NOT_TRIGGERED';
-      if (skipped) {
+    const trades = (intraday.trades || []).map((rawT) => {
+      const sym = String(rawT.symbol || '').toUpperCase();
+      const dir = String(rawT.direction || 'LONG').toUpperCase();
+      const live = liveMarks.byKey[markKey(sym, dir)] || (liveMarks.bySymbol[sym] != null
+        ? { ltp: liveMarks.bySymbol[sym], hitLevel: null as string | null }
+        : null);
+      const bookSkip = Boolean(
+        rawT.skipped || rawT.outcomeBucket === 'SKIPPED' || String(rawT.executionStatus || '').toUpperCase() === 'NOT_TRIGGERED',
+      );
+      if (bookSkip && !isLiveSessionFill(live)) {
         return {
-          ...t,
+          ...rawT,
           deployedCapital: 0,
           pnl: 0,
           pnlPct: 0,
@@ -1197,11 +1242,15 @@ export default function EodAnalysisPanel({
           pnlKind: 'skipped' as const,
         };
       }
-      const sym = String(t.symbol || '').toUpperCase();
-      const dir = String(t.direction || 'LONG').toUpperCase();
-      const live = liveMarks.byKey[markKey(sym, dir)] || (liveMarks.bySymbol[sym] != null
-        ? { ltp: liveMarks.bySymbol[sym], hitLevel: null as string | null }
-        : null);
+      const t = bookSkip
+        ? {
+            ...rawT,
+            skipped: false,
+            executionStatus: 'TRIGGERED',
+            outcomeBucket: undefined,
+            deployedCapital: rawT.plannedCapital || rawT.deployedCapital || 0,
+          }
+        : rawT;
 
       const closedBook = isClosedBookLeg(t.exitReason);
       // SCALE_TRAIL / exitState: prefer live-prices economics while market is open.
@@ -1366,10 +1415,20 @@ export default function EodAnalysisPanel({
 
     let realised = 0;
     let unrealised = 0;
-    const picks = (swing.picks || []).map((p) => {
-      if (p.skipped || p.outcomeBucket === 'SKIPPED' || String(p.executionStatus || '').toUpperCase() === 'NOT_TRIGGERED') {
+    const picks = (swing.picks || []).map((rawP) => {
+      const sym = String(rawP.symbol || '').toUpperCase();
+      const dir = String(rawP.direction || 'LONG').toUpperCase();
+      const live =
+        liveMarks.byKey[markKey(sym, dir)] ||
+        (liveMarks.bySymbol[sym] != null
+          ? ({ ltp: liveMarks.bySymbol[sym], hitLevel: null } as LiveMark)
+          : null);
+      const bookSkip = Boolean(
+        rawP.skipped || rawP.outcomeBucket === 'SKIPPED' || String(rawP.executionStatus || '').toUpperCase() === 'NOT_TRIGGERED',
+      );
+      if (bookSkip && !isLiveSessionFill(live)) {
         return {
-          ...p,
+          ...rawP,
           deployedCapital: 0,
           pnl: 0,
           pnlPct: 0,
@@ -1380,13 +1439,15 @@ export default function EodAnalysisPanel({
           pnlKind: 'skipped' as const,
         };
       }
-      const sym = String(p.symbol || '').toUpperCase();
-      const dir = String(p.direction || 'LONG').toUpperCase();
-      const live =
-        liveMarks.byKey[markKey(sym, dir)] ||
-        (liveMarks.bySymbol[sym] != null
-          ? ({ ltp: liveMarks.bySymbol[sym], hitLevel: null } as LiveMark)
-          : null);
+      const p = bookSkip
+        ? {
+            ...rawP,
+            skipped: false,
+            executionStatus: 'TRIGGERED',
+            outcomeBucket: undefined,
+            deployedCapital: rawP.deployedCapital || 0,
+          }
+        : rawP;
       const liveLtp = live?.ltp ?? null;
       const closedBook = isClosedBookLeg(p.exitReason);
       const liveHard = isLiveHardClose(live);

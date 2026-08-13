@@ -9,16 +9,13 @@ from __future__ import annotations
 from typing import Any
 
 R_RATCHET: tuple[tuple[float, float], ...] = (
-    (0.25, 0.00),
-    (0.50, 0.25),
-    (0.75, 0.50),
-    (1.00, 0.75),
-    (1.25, 1.00),
-    (1.50, 1.25),
-    (2.00, 1.50),
-    (3.00, 2.25),
-    (4.00, 3.25),
-    (5.00, 4.25),
+    (0.50, 0.00),
+    (1.00, 0.00),
+    (1.50, 0.00),
+    (2.00, 0.50),
+    (3.00, 1.50),
+    (4.00, 2.50),
+    (5.00, 3.50),
 )
 
 SCALE_LEGS: tuple[tuple[float, float], ...] = (
@@ -276,11 +273,11 @@ def classify_taxonomy(
         if pnl > 0:
             factors.append("POSITIVE_EOD_SQUAREOFF")
             return "PARTIAL_FOLLOWTHROUGH", factors
-        if mfe is not None and mfe < 0.25 and pnl <= 0:
+        if mfe is not None and mfe < 1.0 and pnl <= 0:
             factors.append("NEGATIVE_OR_FLAT_EOD")
             factors.append("NO_FOLLOWTHROUGH")
             return "STALL", factors
-        if mfe is not None and mfe >= 0.25 and pnl <= 0:
+        if mfe is not None and mfe >= 1.0 and pnl <= 0:
             factors.append("INITIAL_MOVE_FADED")
             return "FAILED_BREAKOUT", factors
         factors.append("NEGATIVE_OR_FLAT_EOD")

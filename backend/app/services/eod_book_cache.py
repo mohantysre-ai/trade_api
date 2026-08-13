@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 log = logging.getLogger(__name__)
-BOOK_CACHE_SCHEMA_VERSION = 4
+BOOK_CACHE_SCHEMA_VERSION = 8
 
 
 def _day_dir(for_date) -> str:

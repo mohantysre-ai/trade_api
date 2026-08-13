@@ -605,6 +605,18 @@ export default function ForensicPanel({
     source?: string;
     cashHeld?: boolean;
     cashReason?: string;
+    hunting?: boolean;
+    selectionFinalized?: boolean;
+    huntWindow?: { huntStart?: string; huntEnd?: string };
+    entryHuntDiagnostics?: {
+      evaluated?: number;
+      qualified?: number;
+      universeSize?: number | null;
+      volumeScreened?: number;
+      displayPool?: number;
+      crossBookExcluded?: string[];
+      topRejectionReasons?: Array<{ reason?: string; count?: number }>;
+    };
     long?: Array<{
       symbol?: string;
       entryPrice?: number;
@@ -1062,11 +1074,21 @@ export default function ForensicPanel({
       String(swingSession?.sessionDate || '').slice(0, 10) === istToday &&
       (swingSession?.long?.length ?? 0) > 0,
   );
-  const cashHeldSwing = Boolean(
-    swingSession?.locked &&
-      String(swingSession?.sessionDate || '').slice(0, 10) === istToday &&
+  const todaySwingEmpty = Boolean(
+    String(swingSession?.sessionDate || '').slice(0, 10) === istToday &&
       (swingSession?.long?.length ?? 0) === 0 &&
-      swingSession?.cashHeld,
+      !lockedSwingMode,
+  );
+  const huntingSwing = Boolean(
+    todaySwingEmpty &&
+      (swingSession?.hunting || swingSession?.cashReason === 'WAITING_FOR_QUALIFIED_BUY_ENTRY'),
+  );
+  const cashHeldSwing = Boolean(
+    todaySwingEmpty &&
+      !huntingSwing &&
+      (swingSession?.cashHeld ||
+        Boolean(swingSession?.cashReason) ||
+        swingSession?.selectionFinalized),
   );
   const staleSwingLock = Boolean(
     swingSession?.locked &&
@@ -1100,6 +1122,7 @@ export default function ForensicPanel({
   };
 
   const portfolioDisplayRows: MatrixCardRow[] = useMemo(() => {
+    if (huntingSwing || cashHeldSwing) return [];
     if (!lockedSwingMode || !swingSession?.long?.length) return displayRows;
     const byTicker = new Map(displayRows.map((item) => [item.row.ticker.toUpperCase(), item]));
     return swingSession.long
@@ -1171,7 +1194,7 @@ export default function ForensicPanel({
         } satisfies MatrixCardRow;
       })
       .filter((x): x is MatrixCardRow => x != null);
-  }, [displayRows, lockedSwingMode, swingSession, tickerIntelMap, tickerNewsMap, trendlyneSummaries]);
+  }, [cashHeldSwing, displayRows, huntingSwing, lockedSwingMode, swingSession, tickerIntelMap, tickerNewsMap, trendlyneSummaries]);
 
   const tickerList = useMemo(
     () => portfolioDisplayRows.map((item) => item.row.ticker),
@@ -1231,6 +1254,18 @@ export default function ForensicPanel({
                   </>
                 )}
               </>
+            ) : huntingSwing ? (
+              <>
+                <span className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-800">
+                  HUNTING · {swingSession?.sessionDate}
+                </span>
+                {' · '}
+                {swingSession?.cashReason || 'WAITING_FOR_QUALIFIED_BUY_ENTRY'}
+                {' · '}lock when a fully qualified BUY appears
+                {swingSession?.huntWindow?.huntStart && swingSession?.huntWindow?.huntEnd
+                  ? ` · ${swingSession.huntWindow.huntStart}–${swingSession.huntWindow.huntEnd} IST`
+                  : ' · 09:45–14:45 IST'}
+              </>
             ) : cashHeldSwing ? (
               <>
                 <span className="inline-flex items-center rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
@@ -1238,7 +1273,7 @@ export default function ForensicPanel({
                 </span>
                 {' · '}
                 {swingSession?.cashReason || 'NO_ACTIVE_VALID_SWING_SELECTIONS'}
-                {' · '}auto-lock retries in 09:45–10:15 IST window
+                {' · '}entry hunt closed — no qualified BUY locked
               </>
             ) : staleSwingLock ? (
               <>
@@ -1261,13 +1296,26 @@ export default function ForensicPanel({
             {!lockedSwingMode && !staleSwingLock && dhanPickMap.size > 0 && (
               <> · Dhan LONG {dhanPickMap.size}</>
             )}
-            {!lockedSwingMode && !staleSwingLock && (
+            {!lockedSwingMode && !staleSwingLock && !huntingSwing && !cashHeldSwing && (
               <>
                 {' · '}BUY Picks {displayRows.length}
                 {institutionalMode && <> · max {INSTITUTIONAL_MATRIX_TOP_N}</>}
               </>
             )}
-            {' · '}Data Date {live?.updatedAt ? new Date(live.updatedAt).toISOString().slice(0, 10) : '—'}
+            {huntingSwing && (
+              <>
+                {' · '}Hunt {swingSession?.entryHuntDiagnostics?.qualified ?? 0}/
+                {swingSession?.entryHuntDiagnostics?.evaluated ?? '—'} qualified
+                {typeof swingSession?.entryHuntDiagnostics?.volumeScreened === 'number' &&
+                  typeof swingSession?.entryHuntDiagnostics?.universeSize === 'number' && (
+                    <>
+                      {' · '}screen {swingSession.entryHuntDiagnostics.volumeScreened}/
+                      {swingSession.entryHuntDiagnostics.universeSize}
+                    </>
+                  )}
+              </>
+            )}
+            {' · '}Data Date {live?.selectionMeta?.dataDate || '—'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -1554,7 +1602,50 @@ export default function ForensicPanel({
             </DeskCardTilt>
           );
         })}
-        {!portfolioDisplayRows.length && (
+        {!portfolioDisplayRows.length && (huntingSwing || cashHeldSwing) && (
+          <div className="col-span-full space-y-3 py-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                ['Universe', swingSession?.entryHuntDiagnostics?.universeSize ?? '—'],
+                ['Volume screen', swingSession?.entryHuntDiagnostics?.volumeScreened ?? '—'],
+                ['Evaluated', swingSession?.entryHuntDiagnostics?.evaluated ?? '—'],
+                ['Qualified BUY', swingSession?.entryHuntDiagnostics?.qualified ?? 0],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="rounded-lg border border-slate-200 bg-white/80 px-3 py-2">
+                  <div className="desk-panel-title text-slate-500">{label}</div>
+                  <div className="desk-metric-value text-slate-900 tabular-nums">{value}</div>
+                </div>
+              ))}
+            </div>
+            <p className="text-slate-700 text-[13px] font-semibold">
+              {huntingSwing
+                ? `Hunt open — ${swingSession?.entryHuntDiagnostics?.qualified ?? 0}/${swingSession?.entryHuntDiagnostics?.evaluated ?? '—'} qualified BUY`
+                : `Hunt closed — ${swingSession?.cashReason || 'NO_FULLY_QUALIFIED_EXPLICIT_BUY_CANDIDATES'}`}
+              {typeof swingSession?.entryHuntDiagnostics?.displayPool === 'number'
+                ? ` · matrix display ${swingSession.entryHuntDiagnostics.displayPool}`
+                : ''}
+            </p>
+            {(swingSession?.entryHuntDiagnostics?.topRejectionReasons?.length ?? 0) > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {(swingSession?.entryHuntDiagnostics?.topRejectionReasons ?? []).slice(0, 8).map((item) => (
+                  <span
+                    key={`${item.reason}-${item.count}`}
+                    className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900"
+                  >
+                    {item.reason || '—'} {item.count ?? 0}
+                  </span>
+                ))}
+              </div>
+            )}
+            {(swingSession?.entryHuntDiagnostics?.crossBookExcluded?.length ?? 0) > 0 && (
+              <p className="text-[11px] text-slate-500">
+                Cross-book excluded{' '}
+                {(swingSession?.entryHuntDiagnostics?.crossBookExcluded ?? []).join(' · ')}
+              </p>
+            )}
+          </div>
+        )}
+        {!portfolioDisplayRows.length && !huntingSwing && !cashHeldSwing && (
           <div className="col-span-full py-8 text-center">
             <p className="text-slate-700 text-[13px] font-semibold">
               {institutionalMode

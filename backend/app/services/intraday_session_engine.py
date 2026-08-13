@@ -22,7 +22,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from .exit_plan import attach_exit_plan, profit_guard_active
+from .exit_plan import (
+    apply_exit_policy_to_rows,
+    attach_exit_plan,
+    cap_stop_risk,
+    overwrite_rows_with_current_policy,
+    profit_guard_active,
+    refresh_exit_policy,
+)
 from .desk_clock import (
     basket_lock_allowed,
     basket_lock_block_message,
@@ -46,7 +53,10 @@ _SESSION_RESPONSE_CACHE_AT = 0.0
 _SESSION_RESPONSE_OPEN_TTL = float(os.environ.get("INTRADAY_RESPONSE_OPEN_TTL", "4"))
 _SESSION_RESPONSE_CLOSED_TTL = float(os.environ.get("INTRADAY_RESPONSE_CLOSED_TTL", "20"))
 
-_LAST_MARKET_SNAPSHOT = _BASE / "last_market_snapshot.json"
+def _market_snapshot_file() -> Path:
+    from .market_snapshot_store import readable_market_snapshot_path
+
+    return readable_market_snapshot_path()
 _SESSION_FILE = Path(
     os.environ.get(
         "INTRADAY_SESSION_FILE",
@@ -232,7 +242,7 @@ def _atomic_write(path: Path, payload: dict[str, Any]) -> None:
 
 def load_market_snapshot() -> dict[str, Any]:
     try:
-        return json.loads(_LAST_MARKET_SNAPSHOT.read_text(encoding="utf-8-sig"))
+        return json.loads(_market_snapshot_file().read_text(encoding="utf-8-sig"))
     except Exception as exc:
         log.warning("Failed to load market snapshot: %s", exc)
         return {}
@@ -243,9 +253,35 @@ def load_session() -> dict[str, Any]:
         from .json_atomic import load_json_with_fallback
 
         data = load_json_with_fallback(_SESSION_FILE)
-        return data if isinstance(data, dict) else {}
+        if not isinstance(data, dict):
+            return {}
+        return _ensure_current_exit_policy(data)
     except Exception:
         return {}
+
+
+def _ensure_current_exit_policy(session: dict[str, Any]) -> dict[str, Any]:
+    """Persist 0.5R / 0.5% trail onto disk books and overwrite booked 0.25R path prices."""
+    work = dict(session)
+    changed = False
+    for key in ("long", "short", "candidatePoolLong", "candidatePoolShort"):
+        rows = work.get(key)
+        if not isinstance(rows, list) or not rows:
+            continue
+        updated, row_changed = apply_exit_policy_to_rows(rows)
+        updated, path_changed = overwrite_rows_with_current_policy(updated, after_close=False)
+        if row_changed or path_changed:
+            work[key] = updated
+            changed = True
+    if not changed:
+        return session
+    try:
+        save_session(work)
+        sync_fixed_plan_from_session(work)
+    except Exception:
+        log.exception("intraday exit-policy migrate persist failed")
+        return work
+    return work
 
 
 def save_session(payload: dict[str, Any]) -> None:
@@ -1662,6 +1698,7 @@ def _factor_scores_meanrev(row: dict[str, Any], regime: dict[str, Any], directio
 def _build_levels(entry: float, atr_pct: float, direction: str) -> dict[str, float]:
     risk = entry * (atr_pct / 100.0) * ATR_STOP_MULT
     risk = max(risk, entry * 0.004)  # floor 0.4%
+    risk = cap_stop_risk(entry, risk)  # hard cap 0.5%
     if direction == "LONG":
         sl = entry - risk
         t1 = entry + risk * T1_R_LONG
@@ -2419,6 +2456,81 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
     }
 
 
+def _plan_row_from_session(row: dict[str, Any], direction: str, session_date: str) -> dict[str, Any]:
+    status = str(row.get("status") or "RUNNING")
+    return {
+        "symbol": row.get("symbol"),
+        "direction": direction,
+        "entryDate": session_date,
+        "approxQty": row.get("approxQty"),
+        "deployedCapital": row.get("deployedCapital"),
+        "entryPrice": row.get("entryPrice"),
+        "stopLoss": row.get("stopLoss"),
+        "target1": row.get("target1"),
+        "target2": row.get("target2"),
+        "riskPerShare": row.get("riskPerShare"),
+        "exitPlan": row.get("exitPlan"),
+        "scanLtp": row.get("ltp") or row.get("scanLtp"),
+        "currentPrice": row.get("ltp") or row.get("currentPrice"),
+        "score": row.get("score"),
+        "sector": row.get("sector"),
+        "rewardRisk": row.get("rewardRisk"),
+        "status": status,
+        "closed": bool(row.get("closed")),
+        "triggered": row.get("triggered"),
+        "triggeredAt": row.get("triggeredAt"),
+        "executionStatus": row.get("executionStatus"),
+        "plannedCapital": row.get("plannedCapital"),
+        "lockObservedPrice": row.get("lockObservedPrice"),
+        "realizedPnl": row.get("realizedPnl"),
+        "unrealizedPnl": row.get("unrealizedPnl"),
+        "exitState": row.get("exitState"),
+        "remainingQty": row.get("remainingQty"),
+        "effectiveStop": row.get("effectiveStop"),
+        "sessionLocked": True,
+        "adopted": True,
+        "source": row.get("source"),
+        "replacedFrom": row.get("replacedFrom"),
+        "replacedAt": row.get("replacedAt"),
+    }
+
+
+def sync_fixed_plan_from_session(session: dict[str, Any]) -> None:
+    """Mirror today's locked Intraday session into fixed_trade_plan.json."""
+    if not isinstance(session, dict) or not session.get("locked"):
+        return
+    session_date = str(session.get("sessionDate") or _ist_now().strftime("%Y-%m-%d"))[:10]
+    plan = {
+        "long": [
+            _plan_row_from_session(r, "LONG", session_date)
+            for r in (session.get("long") or [])
+            if isinstance(r, dict) and r.get("symbol")
+        ],
+        "short": [
+            _plan_row_from_session(r, "SHORT", session_date)
+            for r in (session.get("short") or [])
+            if isinstance(r, dict) and r.get("symbol")
+        ],
+        "updatedAt": session.get("updatedAt") or _utc_now_iso(),
+        "sessionDate": session_date,
+        "locked": True,
+        "executionPolicy": session.get("executionPolicy") or "MANUAL_ONLY",
+        "capital": session.get("capital"),
+        "regime": session.get("regime"),
+        "source": "intraday_session_engine",
+        "funnel": session.get("funnel"),
+        "rotation": "DAILY",
+        "priorSessionDate": session.get("priorSessionDate"),
+        "exitMode": "SCALE_TRAIL",
+    }
+    try:
+        from .trade_outcome import save_fixed_trade_plan
+
+        save_fixed_trade_plan(plan)
+    except Exception as exc:
+        log.warning("fixed plan sync failed: %s", exc)
+
+
 def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> dict[str, Any]:
     """Lock up to five qualified names total; cash is valid when edge is absent.
 
@@ -2592,80 +2704,9 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
     except Exception as exc:
         log.warning("Swing session auto-lock failed: %s", exc)
 
-    plan = {
-        "long": [
-            {
-                "symbol": r["symbol"],
-                "direction": "LONG",
-                "entryDate": session_date,
-                "approxQty": r.get("approxQty"),
-                "deployedCapital": r.get("deployedCapital"),
-                "entryPrice": r.get("entryPrice"),
-                "stopLoss": r.get("stopLoss"),
-                "target1": r.get("target1"),
-                "target2": r.get("target2"),
-                "riskPerShare": r.get("riskPerShare"),
-                "exitPlan": r.get("exitPlan"),
-                "scanLtp": r.get("ltp"),
-                "currentPrice": r.get("ltp"),
-                "score": r.get("score"),
-                "sector": r.get("sector"),
-                "rewardRisk": r.get("rewardRisk"),
-                "status": "RUNNING",
-                "triggered": r.get("triggered"),
-                "triggeredAt": r.get("triggeredAt"),
-                "executionStatus": r.get("executionStatus"),
-                "plannedCapital": r.get("plannedCapital"),
-                "lockObservedPrice": r.get("lockObservedPrice"),
-                "sessionLocked": True,
-                "adopted": True,
-            }
-            for r in long_rows
-        ],
-        "short": [
-            {
-                "symbol": r["symbol"],
-                "direction": "SHORT",
-                "entryDate": session_date,
-                "approxQty": r.get("approxQty"),
-                "deployedCapital": r.get("deployedCapital"),
-                "entryPrice": r.get("entryPrice"),
-                "stopLoss": r.get("stopLoss"),
-                "target1": r.get("target1"),
-                "target2": r.get("target2"),
-                "riskPerShare": r.get("riskPerShare"),
-                "exitPlan": r.get("exitPlan"),
-                "scanLtp": r.get("ltp"),
-                "currentPrice": r.get("ltp"),
-                "score": r.get("score"),
-                "sector": r.get("sector"),
-                "rewardRisk": r.get("rewardRisk"),
-                "status": "RUNNING",
-                "triggered": r.get("triggered"),
-                "triggeredAt": r.get("triggeredAt"),
-                "executionStatus": r.get("executionStatus"),
-                "plannedCapital": r.get("plannedCapital"),
-                "lockObservedPrice": r.get("lockObservedPrice"),
-                "sessionLocked": True,
-                "adopted": True,
-            }
-            for r in short_rows
-        ],
-        "updatedAt": committed_at,
-        "sessionDate": session_date,
-        "locked": True,
-        "executionPolicy": "MANUAL_ONLY",
-        "capital": capital,
-        "regime": candidates.get("regime"),
-        "source": "intraday_session_engine",
-        "funnel": f"{BASKET_SIZE}+{BASKET_SIZE} candidates → {LOCK_SIZE}+{LOCK_SIZE} locked",
-        "rotation": "DAILY",
-        "priorSessionDate": existing_date if stale_day else None,
-        "exitMode": "SCALE_TRAIL",
-    }
-    _atomic_write(_FIXED_PLAN_FILE, plan)
     session["fixedPlanSynced"] = True
-    save_session(session)  # persist fixedPlanSynced after plan write
+    save_session(session)
+    sync_fixed_plan_from_session(session)
     return session
 
 
@@ -3239,6 +3280,11 @@ def apply_replacements(
                 "oiAligned": gate.get("oiAligned"),
                 "ltp": entry,
                 "currentPrice": entry,
+                "plannedCapital": float(sizing.get("deployedCapital") or 0),
+                "lockObservedPrice": round(float(entry), 2),
+                "triggered": True,
+                "executionStatus": "TRIGGERED",
+                "triggeredAt": at,
             }
         )
         if direction == "LONG":
@@ -3301,6 +3347,10 @@ def apply_replacements(
         )
     session["events"] = events[-200:]
     session["updatedAt"] = _utc_now_iso()
+    try:
+        sync_fixed_plan_from_session(session)
+    except Exception as exc:
+        log.warning("replacement plan sync failed: %s", exc)
 
     try:
         from .trade_outcome import emit_replacement_alerts
@@ -3420,6 +3470,14 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
             out["exitState"] = live_row.get("exitState")
         if live_row and isinstance(live_row.get("outcome"), dict):
             out["outcome"] = live_row.get("outcome")
+        try:
+            refreshed = refresh_exit_policy(out, keep_exit_state=True)
+            if refreshed.get("exitPlan"):
+                out["exitPlan"] = refreshed.get("exitPlan")
+            if refreshed.get("bookedExitPlan"):
+                out["bookedExitPlan"] = refreshed.get("bookedExitPlan")
+        except Exception:
+            pass
         return out
 
     if ltp is not None and entry is not None and entry > 0:
@@ -3448,14 +3506,18 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
         out["effectiveStop"] = live_row.get("effectiveStop")
     if live_row and isinstance(live_row.get("exitState"), dict):
         out["exitState"] = live_row.get("exitState")
-    if live_row and isinstance(live_row.get("exitPlan"), dict):
-        out["exitPlan"] = live_row.get("exitPlan")
-    elif out.get("exitPlan") is None and out.get("approxQty"):
+    if out.get("approxQty"):
         try:
-            attached = attach_exit_plan(out)
-            out["exitPlan"] = attached.get("exitPlan")
+            attached = refresh_exit_policy(out, keep_exit_state=True)
+            if attached.get("exitPlan"):
+                out["exitPlan"] = attached.get("exitPlan")
+            if attached.get("bookedExitPlan"):
+                out["bookedExitPlan"] = attached.get("bookedExitPlan")
         except Exception:
-            pass
+            if live_row and isinstance(live_row.get("exitPlan"), dict):
+                out["exitPlan"] = live_row.get("exitPlan")
+    elif live_row and isinstance(live_row.get("exitPlan"), dict):
+        out["exitPlan"] = live_row.get("exitPlan")
 
     def _dist_pct(level: float | None) -> float | None:
         if ltp is None or level is None or ltp == 0:
@@ -3607,17 +3669,27 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
     try:
         session_day = datetime.fromisoformat(str(session.get("sessionDate"))).date()
         from .trade_outcome import _is_market_open
-        from .intraday_execution_evidence import persisted_entry_evidence, mark_not_triggered
+        from .intraday_execution_evidence import (
+            persisted_entry_evidence,
+            mark_not_triggered,
+            session_lock_fill_evidence,
+        )
 
         if session.get("locked") and not _is_market_open():
             def _reconcile(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 fixed: list[dict[str, Any]] = []
                 for row in rows:
-                    evidence = persisted_entry_evidence(
+                    session_fill = session_lock_fill_evidence(row)
+                    evidence = session_fill or persisted_entry_evidence(
                         row,
                         session_date=session_day,
                         committed_at=session.get("committedAt"),
                     )
+                    if session_fill:
+                        out = dict(row)
+                        out["entryEvidence"] = evidence
+                        fixed.append(out)
+                        continue
                     fixed.append(row if evidence.get("triggered") else mark_not_triggered(row, evidence))
                 return fixed
             long_rows = _reconcile(long_rows)

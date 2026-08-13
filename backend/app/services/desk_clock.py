@@ -211,3 +211,64 @@ def can_add_replacement(
     if not ok:
         return False, code
     return True, code
+
+
+def swing_entry_hunt_config() -> dict[str, Any]:
+    """SWING hunts a qualified BUY entry — not a 10:15 hard stop."""
+    return {
+        "huntStart": f"{_LOCK_START_H:02d}:{_LOCK_START_M:02d}",
+        "huntEnd": f"{_ROT_AFT_END_H:02d}:{_ROT_AFT_END_M:02d}",
+        "timezone": "Asia/Kolkata",
+        "rationale": (
+            "Hunt a fully qualified BUY from 09:45 IST; lock each entry when found; "
+            "do not cash-finalize at 10:15; hunt closes 14:45"
+        ),
+    }
+
+
+def swing_entry_hunt_allowed(
+    now: datetime | None = None,
+    *,
+    allow_manual_override: bool = False,
+) -> tuple[bool, str]:
+    """Return (allowed, reason_code) for SWING entry hunt / lock-when-found.
+
+    Opens 09:45 (post auction). Stays open through the cash session until
+    afternoon rotation end (14:45). Not a 10:15 hard stop.
+
+    reason_code: weekend | pre_lock | entry_hunt | after_hunt | manual_override
+    """
+    if allow_manual_override:
+        return True, "manual_override"
+
+    n = ist_now(now)
+    if n.weekday() >= 5:
+        return False, "weekend"
+
+    mins = _mins(n.hour, n.minute)
+    start = _mins(_LOCK_START_H, _LOCK_START_M)
+    end = _mins(_ROT_AFT_END_H, _ROT_AFT_END_M)
+    if end <= start:
+        end = start + 30
+    if mins < start:
+        return False, "pre_lock"
+    if mins < end:
+        return True, "entry_hunt"
+    return False, "after_hunt"
+
+
+def swing_entry_hunt_block_message(reason: str) -> str:
+    cfg = swing_entry_hunt_config()
+    if reason == "weekend":
+        return "Swing entry hunt disabled on weekends (NSE cash closed)."
+    if reason == "pre_lock":
+        return (
+            f"Pre-open / early auction — swing entry hunt opens {cfg['huntStart']} IST "
+            f"(wait for opening-range settle)."
+        )
+    if reason == "after_hunt":
+        return (
+            f"Swing entry hunt closed at {cfg['huntEnd']} IST — "
+            "no new names; empty book is cash-held."
+        )
+    return f"Swing entry hunt not allowed ({reason})."

@@ -96,6 +96,29 @@ def candle_entry_evidence(
     }
 
 
+_SESSION_FILL_STATUSES = frozenset({"TRIGGERED", "EXECUTED", "FILLED"})
+
+
+def session_lock_fill_evidence(pick: dict[str, Any]) -> dict[str, Any] | None:
+    """Honor a live locked-session fill so EOD Book matches the Intraday desk.
+
+    Candle reconstruction can miss a fill when lock LTP already sat on the
+    entry and later bars never trade back through that print. The persisted
+    session stamp is the execution source of truth for that name.
+    """
+    status = str(pick.get("executionStatus") or "").upper()
+    if pick.get("triggered") is not True and status not in _SESSION_FILL_STATUSES:
+        return None
+    entry = pick.get("entryPrice") or pick.get("lockObservedPrice")
+    return {
+        "triggered": True,
+        "triggeredAt": pick.get("triggeredAt"),
+        "triggerPrice": entry,
+        "triggerSource": "session_lock_fill",
+        "lockObservedPrice": pick.get("lockObservedPrice"),
+    }
+
+
 def persisted_entry_evidence(
     pick: dict[str, Any],
     *,

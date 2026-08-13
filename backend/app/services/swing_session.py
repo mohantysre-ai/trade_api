@@ -19,11 +19,16 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from .feed_scanner import SWING_MIN_PRICE, is_swing_desk_eligible
-from .exit_plan import attach_exit_plan, evaluate_scale_trail
+from .exit_plan import attach_exit_plan, cap_stop_risk, evaluate_scale_trail, refresh_exit_policy
+from .swing_prefilter import load_prefilter_symbols
 from .trade_outcome import _is_market_open
-from .desk_clock import basket_lock_allowed, basket_lock_block_message
+from .desk_clock import (
+    swing_entry_hunt_allowed,
+    swing_entry_hunt_block_message,
+    swing_entry_hunt_config,
+)
 from .desk_book_symbols import filter_rows_excluding, intraday_locked_symbols
-from .stock_quality import MIN_RSI_PIVOT
+from .stock_quality import MIN_RSI_PIVOT, MIN_TURNOVER_CR, MIN_VOLUME_MULTIPLIER
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +43,10 @@ _SWING_SESSION_PATH = os.environ.get(
     "SWING_SESSION_FILE",
     os.path.join(_REPO_ROOT, "swing_session.json"),
 )
-_SNAPSHOT_PATH = os.path.join(_SERVICES_DIR, "last_market_snapshot.json")
+def _matrix_snapshot_path() -> str:
+    from .market_snapshot_store import readable_market_snapshot_path
+
+    return str(readable_market_snapshot_path())
 _EOD_DATA_DIR = os.path.join(_APP_DIR, "data", "eod")
 
 SWING_CAPITAL = float(os.environ.get("SWING_CAPITAL", "1000000"))  # ₹10L sleeve
@@ -56,11 +64,13 @@ SWING_SELECTION_CONTRACT = "DETERMINISTIC_BUY_V1"
 _BULLISH_SIDES = frozenset({"BUY", "LONG"})
 _BULLISH_OI = frozenset({"LONG_BUILDUP", "SHORT_COVERING"})
 _RISK_APPROVALS = frozenset({"APPROVE", "APPROVED", "PASS", "PASSED", "CLEAR"})
+# Veto-only: missing / HOLD_FOR_DATA never supply direction and must not block a
+# quant BUY. LLM audits top 10 only; requiring APPROVE would make the volume-500
+# hunt unusable.
 _RISK_VETOES = frozenset({
     "REJECT",
     "REJECTED",
     "HOLD",
-    "HOLD_FOR_DATA",
     "SELL",
     "SHORT",
     "AVOID",
@@ -298,12 +308,118 @@ def _risk_audit_values(row: dict[str, Any]) -> list[str]:
     return values
 
 
+def _hydrate_swing_contract_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Replay deterministic pipeline flags from snapshot metrics when missing.
+
+    Does not invent BUY from score/APPROVE. Side is set only when hard filters
+    can be fully recomputed from metrics.
+    """
+    out = dict(row)
+    intra = dict(out["intraday"]) if isinstance(out.get("intraday"), dict) else {}
+    ltp = _parse_price(out.get("ltpRaw") or out.get("ltp") or intra.get("ltp"))
+    atr = _f(intra.get("atr_pct") or out.get("atr_pct"))
+    turnover = _f(intra.get("turnover_cr") or out.get("turnover_cr"))
+    vwap = _f(intra.get("vwap") or out.get("vwap"))
+    ema9 = _f(intra.get("ema9") or out.get("ema9"))
+    rsi = _f(intra.get("rsi") or out.get("rsi"))
+    vol = _f(intra.get("volume_multiplier") or out.get("volume_multiplier"))
+    spread = _f(intra.get("spread_pct") or out.get("spread_pct"))
+    wick = _f(intra.get("wick_noise_ratio") or out.get("wick_noise_ratio"))
+    oi = str(intra.get("oi_setup") or out.get("oi_setup") or "").upper().strip()
+    above_vwap = intra.get("price_above_vwap")
+    if not isinstance(above_vwap, bool) and ltp is not None and vwap is not None:
+        above_vwap = ltp > vwap
+        intra["price_above_vwap"] = above_vwap
+    above_ema9 = intra.get("price_above_ema9")
+    if not isinstance(above_ema9, bool) and ltp is not None and ema9 is not None:
+        above_ema9 = ltp > ema9
+        intra["price_above_ema9"] = above_ema9
+    quality = out.get("passes_quality_filters")
+    if not isinstance(quality, bool):
+        quality = intra.get("passes_quality_filters")
+    pivot = intra.get("pivot_r1_breakout")
+    if out.get("passes_hard_filters") is None and out.get("passesHardFilters") is None:
+        essentials = [atr, turnover, vwap, ltp, rsi, vol, spread, wick, above_ema9, pivot, quality]
+        if all(v is not None for v in essentials) and oi:
+            hard = all((
+                atr > 1.5,
+                turnover >= MIN_TURNOVER_CR,
+                ltp > vwap,
+                oi in _BULLISH_OI,
+                vol >= MIN_VOLUME_MULTIPLIER,
+                rsi >= MIN_RSI_PIVOT,
+                spread < 0.50,
+                wick < 0.70,
+                above_ema9 is True,
+                pivot is True,
+                quality is True,
+            ))
+            out["passes_hard_filters"] = hard
+            side, _src = _explicit_deterministic_side(out)
+            if side not in _BULLISH_SIDES and hard:
+                out["deterministicSide"] = "BUY"
+    if out.get("passes_quality_filters") is None and isinstance(quality, bool):
+        out["passes_quality_filters"] = quality
+    if intra:
+        out["intraday"] = intra
+    if vwap is not None:
+        out.setdefault("vwap", vwap)
+    if ema9 is not None:
+        out.setdefault("ema9", ema9)
+    return out
+
+
+_SWING_MATRIX_REFRESH_AT = 0.0
+_SWING_MATRIX_REFRESH_TTL = float(os.environ.get("SWING_MATRIX_REFRESH_TTL", "600"))
+
+
+def _snapshot_data_date(snap: dict[str, Any]) -> str:
+    meta = snap.get("selectionMeta") if isinstance(snap.get("selectionMeta"), dict) else {}
+    return str(meta.get("dataDate") or "")[:10]
+
+
+def _ensure_today_matrix_snapshot() -> None:
+    """During hunt, refresh Matrix if Docker/image snapshot is stale (not today IST)."""
+    global _SWING_MATRIX_REFRESH_AT
+    snap = _read_json(_matrix_snapshot_path()) or {}
+    today = _ist_today()
+    stocks = snap.get("stocks") if isinstance(snap.get("stocks"), list) else []
+    has_side = any(
+        isinstance(s, dict) and (s.get("deterministicSide") or s.get("passes_hard_filters") is not None)
+        for s in stocks[:8]
+    )
+    stale = (
+        not snap
+        or _snapshot_data_date(snap) != today
+        or snap.get("isSnapshotFallback") is True
+        or not has_side
+    )
+    if not stale:
+        return
+    now = time.monotonic()
+    if _SWING_MATRIX_REFRESH_AT and now - _SWING_MATRIX_REFRESH_AT < _SWING_MATRIX_REFRESH_TTL:
+        return
+    _SWING_MATRIX_REFRESH_AT = now
+    try:
+        result = _run_swing_matrix_refresh()
+        log.info("Swing hunt matrix refresh: success=%s", result.get("success") if isinstance(result, dict) else result)
+    except Exception as exc:
+        log.warning("Swing hunt matrix refresh failed: %s", exc)
+
+
+def _run_swing_matrix_refresh() -> dict[str, Any]:
+    from .angel_one_feed import run_scheduled_live_refresh
+
+    return run_scheduled_live_refresh(reason="swing_entry_hunt")
+
+
 def _evaluate_swing_buy_contract(
     row: dict[str, Any],
     *,
     intraday_symbols: set[str] | None = None,
 ) -> tuple[bool, dict[str, Any], list[str]]:
     """Evaluate the deterministic SWING BUY contract without mutating ``row``."""
+    row = _hydrate_swing_contract_row(row)
     symbol = str(row.get("symbol") or row.get("ticker") or "").upper().strip()
     original_side, side_source = _explicit_deterministic_side(row)
     passes_hard = _selection_bool(row, "passesHardFilters", "passes_hard_filters")
@@ -351,12 +467,8 @@ def _evaluate_swing_buy_contract(
         reasons.append(f"RSI_REQUIREMENT_FAILED:min={MIN_RSI_PIVOT:g}")
     if breakout_pass is not True:
         reasons.append("BREAKOUT_REQUIREMENT_FAILED")
-    if not risk_values:
-        reasons.append("RISK_AUDIT_VERDICT_MISSING")
-    elif any(value in _RISK_VETOES for value in risk_values):
+    if any(value in _RISK_VETOES for value in risk_values):
         reasons.append(f"RISK_AUDIT_VETO:{','.join(risk_values)}")
-    elif any(value not in _RISK_APPROVALS for value in risk_values):
-        reasons.append(f"RISK_AUDIT_NOT_APPROVED:{','.join(risk_values)}")
     if symbol and symbol in blocked:
         reasons.append("INTRADAY_PORTFOLIO_CONFLICT")
 
@@ -394,7 +506,13 @@ def _matrix_row_levels(row: dict[str, Any], entry: float) -> tuple[float, float,
     t1 = _parse_price(row.get("target1") or row.get("target_price"))
     t2 = _parse_price(row.get("target2"))
     if stop is not None and t1 is not None and stop < entry:
-        risk = abs(entry - stop)
+        raw_risk = abs(entry - stop)
+        risk = cap_stop_risk(entry, raw_risk)
+        stop = round(entry - risk, 2)
+        if abs(raw_risk - risk) > 1e-9:
+            t1 = round(entry + SWING_T1_R * risk, 2)
+            t2 = round(entry + SWING_T2_R * risk, 2)
+            return stop, t1, t2, risk, "matrix_explicit_levels_capped"
         if t2 is None:
             t2 = round(entry + SWING_T2_R * risk, 2)
         return stop, t1, t2, risk, "matrix_explicit_levels"
@@ -416,10 +534,12 @@ def _matrix_row_levels(row: dict[str, Any], entry: float) -> tuple[float, float,
         levels_src = "matrix_atr_pct"
 
     atr_abs = entry * (atr_pct / 100.0)
-    stop = round(entry - atr_abs, 2)
-    risk = abs(entry - stop)
+    risk = cap_stop_risk(entry, atr_abs)
+    stop = round(entry - risk, 2)
     t1 = round(entry + SWING_T1_R * risk, 2)
     t2 = round(entry + SWING_T2_R * risk, 2)
+    if abs(atr_abs - risk) > 1e-9:
+        levels_src = f"{levels_src}+max_stop_0p5pct"
     return stop, t1, t2, risk, levels_src
 
 
@@ -581,6 +701,50 @@ def _stock_is_matrix_buy(row: dict[str, Any]) -> bool:
     return eligible
 
 
+def _in_candle_screen(row: dict[str, Any]) -> bool:
+    """True when the row has real candle metrics (VWAP or RSI), not quote-only."""
+    intra = row.get("intraday") if isinstance(row.get("intraday"), dict) else {}
+    vwap = _f(intra.get("vwap") or row.get("vwap"))
+    rsi = _f(intra.get("rsi") or row.get("rsi"))
+    return (vwap is not None and vwap > 0) or (rsi is not None and rsi > 0)
+
+
+def _swing_screen_rows(snap: dict[str, Any]) -> list[dict[str, Any]]:
+    """Hunt universe: display stocks[] plus candle-screened stockQuotes.
+
+    Asset Matrix still shows top 50. Candle metrics are computed on the
+    volume-500 swing pool; quote-only names are skipped — no invented metrics.
+    """
+    stocks = snap.get("stocks") if isinstance(snap.get("stocks"), list) else []
+    quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
+    by_sym: dict[str, dict[str, Any]] = {}
+    for row in stocks:
+        if not isinstance(row, dict):
+            continue
+        sym = str(row.get("ticker") or row.get("symbol") or "").upper().strip()
+        if not sym:
+            continue
+        by_sym[sym] = row
+    for row in quotes.values():
+        if not isinstance(row, dict) or not _in_candle_screen(row):
+            continue
+        sym = str(row.get("ticker") or row.get("symbol") or "").upper().strip()
+        if not sym or sym in by_sym:
+            continue
+        by_sym[sym] = row
+    ranked = list(by_sym.values())
+    prefilter = load_prefilter_symbols()
+    ranked.sort(
+        key=lambda r: (
+            0 if str(r.get("ticker") or r.get("symbol") or "").upper().strip() in prefilter else 1,
+            -float(r.get("score") or r.get("alpha_score") or 0),
+            -float(r.get("volume") or 0),
+            str(r.get("ticker") or r.get("symbol") or ""),
+        )
+    )
+    return ranked
+
+
 def _picks_from_asset_matrix(
     snapshot: dict[str, Any] | None = None,
     *,
@@ -591,7 +755,7 @@ def _picks_from_asset_matrix(
     Ledger membership and display padding affect ordering/display only.  Neither
     can confer direction or eligibility.  Never reads dhanSwingPicks.
     """
-    snap = snapshot if isinstance(snapshot, dict) else _read_json(_SNAPSHOT_PATH)
+    snap = snapshot if isinstance(snapshot, dict) else _read_json(_matrix_snapshot_path())
     ti = snap.get("terminalIntelligence") if isinstance(snap.get("terminalIntelligence"), dict) else {}
     ledger = ti.get("ledger_stocks") if isinstance(ti.get("ledger_stocks"), list) else []
     stocks = snap.get("stocks") if isinstance(snap.get("stocks"), list) else []
@@ -688,12 +852,7 @@ def _picks_from_asset_matrix(
                 break
 
     if len(candidates) < SWING_MATRIX_LOCK_COUNT:
-        ranked = sorted(
-            [s for s in stocks if isinstance(s, dict)],
-            key=lambda r: float(r.get("score") or 0),
-            reverse=True,
-        )
-        for row in ranked:
+        for row in _swing_screen_rows(snap):
             sym = str(row.get("ticker") or row.get("symbol") or "").upper().strip()
             if not sym:
                 continue
@@ -856,7 +1015,9 @@ def _recompute_active_swing_totals(session: dict[str, Any]) -> None:
     session["capital"] = capital
     session["cashHeld"] = not active
     if not active:
-        session["cashReason"] = "NO_ACTIVE_VALID_SWING_SELECTIONS"
+        session["cashReason"] = session.get("cashReason") or "NO_ACTIVE_VALID_SWING_SELECTIONS"
+    else:
+        session.pop("cashReason", None)
 
 
 def _scrub_ineligible_swing_rows(session: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
@@ -1029,60 +1190,64 @@ def _enforce_swing_position_cap(session: dict[str, Any]) -> tuple[dict[str, Any]
     return sess, dropped
 
 
-def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False) -> dict[str, Any]:
-    """Snapshot fully qualified deterministic BUY rows into swing_session.json.
+def _swing_universe_diagnostics(
+    *,
+    exclude_symbols: set[str] | None = None,
+    snapshot: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Tally deterministic BUY contract rejections from the live snapshot."""
+    snap = snapshot if isinstance(snapshot, dict) else _read_json(_matrix_snapshot_path())
+    stocks = snap.get("stocks") if isinstance(snap.get("stocks"), list) else []
+    screen = _swing_screen_rows(snap)
+    blocked = {str(s).upper().strip() for s in (exclude_symbols or set()) if str(s).strip()}
+    reason_counts: dict[str, int] = {}
+    evaluated = 0
+    qualified = 0
+    for row in screen:
+        if not isinstance(row, dict):
+            continue
+        sym = str(row.get("ticker") or row.get("symbol") or "").upper().strip()
+        if not sym:
+            continue
+        evaluated += 1
+        ok, _evidence, reasons = _evaluate_swing_buy_contract(row, intraday_symbols=blocked)
+        if ok:
+            qualified += 1
+            continue
+        for reason in reasons:
+            reason_counts[str(reason)] = reason_counts.get(str(reason), 0) + 1
+    top = sorted(reason_counts.items(), key=lambda kv: kv[1], reverse=True)[:8]
+    try:
+        universe_size = int(snap.get("universeSize") or 0)
+    except (TypeError, ValueError):
+        universe_size = 0
+    try:
+        volume_screened = int(snap.get("volumeScreenedCount") or 0)
+    except (TypeError, ValueError):
+        volume_screened = 0
+    return {
+        "universeSize": universe_size or None,
+        "volumeScreened": volume_screened or len(screen),
+        "displayPool": len(stocks),
+        "evaluated": evaluated,
+        "qualified": qualified,
+        "crossBookExcluded": sorted(blocked),
+        "topRejectionReasons": [{"reason": k, "count": v} for k, v in top],
+    }
 
-    Daily rotation: a locked book from a prior IST sessionDate is treated as stale
-    and re-locked from fresh Matrix BUY cards (force), irrespective of P&L.
-    Never locks from dhanSwingPicks / ScanX.
 
-    Time gate: primary 09:45–10:15 IST (or late-start catch-up). Only
-    ``bypass_lock_window=True`` skips the clock. ``force`` rebuilds — does not open early.
-    """
-    existing = load_swing_session()
-    today = _ist_today()
-    existing_date = str(existing.get("sessionDate") or "").strip()[:10]
-    stale_day = bool(existing.get("locked") and existing_date and existing_date != today)
-    if stale_day and not force:
-        log.info(
-            "Swing sessionDate %s != today %s — forcing fresh deterministic BUY evaluation",
-            existing_date,
-            today,
-        )
-        force = True
-
-    if existing.get("locked") and not force and existing_date == today:
-        scrubbed, removed_gate = _scrub_ineligible_swing_rows(existing)
-        scrubbed, removed_cross = _scrub_cross_book_swing_rows(scrubbed)
-        scrubbed, removed_cap = _enforce_swing_position_cap(scrubbed)
-        removed = removed_gate + removed_cross + removed_cap
-        if removed:
-            scrubbed = _persist_swing_if_changed(existing, scrubbed)
-        return {
-            "success": True,
-            "alreadyLocked": True,
-            "scrubbed": removed,
-            "crossBookExcluded": removed_cross,
-            "capExcluded": removed_cap,
-            "session": scrubbed,
-        }
-
-    allowed, reason = basket_lock_allowed(allow_manual_override=bool(bypass_lock_window))
-    if not allowed:
-        return {
-            "success": False,
-            "error": basket_lock_block_message(reason),
-            "lockWindow": reason,
-            "session": existing,
-        }
-
-    exclude = intraday_locked_symbols(today)
-    raw_picks, snap_src = _picks_from_asset_matrix(exclude_symbols=exclude)
-    session_date = today
-    committed_at = _utc_now_iso()
+def _normalize_candidate_rows(
+    raw_picks: list[dict[str, Any]],
+    session_date: str,
+    *,
+    committed_at: str,
+    snap_src: str,
+    rank_start: int = 1,
+) -> tuple[list[dict[str, Any]], list[str]]:
     long_rows: list[dict[str, Any]] = []
     skipped: list[str] = []
-    for rank_idx, raw in enumerate(raw_picks, start=1):
+    for offset, raw in enumerate(raw_picks):
+        rank_idx = rank_start + offset
         sym = str(raw.get("symbol") or raw.get("ticker") or "?").upper().strip()
         entry = _parse_price(
             raw.get("entryPrice")
@@ -1106,17 +1271,268 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
                 skipped.append(sym or "?")
             continue
         long_rows.append(row)
+    return long_rows, skipped
 
-    if not long_rows:
-        cash_session = {
+
+def _size_new_swing_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Size each new name against full slot capacity so later fills do not resize."""
+    return [
+        attach_exit_plan(_size_swing_row(r, sleeve=SWING_CAPITAL, slots=SWING_MATRIX_LOCK_COUNT))
+        for r in rows[:SWING_MATRIX_LOCK_COUNT]
+    ]
+
+
+def _append_new_swing_entries(session: dict[str, Any]) -> dict[str, Any] | None:
+    """Lock newly qualified BUY names into remaining slots. Does not resize existing."""
+    existing_rows = [
+        r for r in (session.get("long") or [])
+        if isinstance(r, dict) and r.get("symbol") and not r.get("closed")
+    ]
+    remaining = SWING_MATRIX_LOCK_COUNT - len(existing_rows)
+    if remaining <= 0:
+        return None
+    today = str(session.get("sessionDate") or _ist_today())[:10]
+    existing_syms = {str(r.get("symbol") or "").upper().strip() for r in existing_rows}
+    exclude = set(intraday_locked_symbols(today)) | existing_syms
+    raw_picks, snap_src = _picks_from_asset_matrix(exclude_symbols=exclude)
+    committed_at = _utc_now_iso()
+    new_rows, skipped = _normalize_candidate_rows(
+        raw_picks,
+        today,
+        committed_at=committed_at,
+        snap_src=snap_src,
+        rank_start=len(existing_rows) + 1,
+    )
+    added = []
+    seen = set(existing_syms)
+    for row in _size_new_swing_rows(new_rows):
+        sym = str(row.get("symbol") or "").upper().strip()
+        if not sym or sym in seen:
+            continue
+        added.append(row)
+        seen.add(sym)
+        if len(added) >= remaining:
+            break
+    if not added:
+        return None
+    sess = dict(session)
+    closed_kept = [
+        r for r in (session.get("long") or [])
+        if isinstance(r, dict) and r.get("closed")
+    ]
+    sess["long"] = existing_rows + added + closed_kept
+    sess["short"] = [r for r in (session.get("short") or []) if isinstance(r, dict)]
+    sess["locked"] = True
+    sess["cashHeld"] = False
+    sess["updatedAt"] = committed_at
+    sess["source"] = snap_src
+    if skipped:
+        prev = list(sess.get("skippedIncomplete") or [])
+        for tag in skipped:
+            if tag not in prev:
+                prev.append(tag)
+        sess["skippedIncomplete"] = prev
+    _recompute_active_swing_totals(sess)
+    hunt_ok, _hunt_code = swing_entry_hunt_allowed()
+    active_n = len(_active_swing_rows(sess))
+    sess["hunting"] = bool(hunt_ok and active_n < SWING_MATRIX_LOCK_COUNT)
+    sess["selectionFinalized"] = not sess["hunting"]
+    _atomic_write(_SWING_SESSION_PATH, sess)
+    try:
+        from .trade_outcome import emit_book_lock_alerts
+
+        emit_book_lock_alerts(
+            book="SWING",
+            session_date=today,
+            long_rows=added,
+            short_rows=[],
+        )
+    except Exception as exc:
+        log.warning("Swing fill-up alerts failed: %s", exc)
+    log.info(
+        "Swing entry fill-up: +%d name(s) %s (total %d/%d)",
+        len(added),
+        [r.get("symbol") for r in added],
+        len(_active_swing_rows(sess)),
+        SWING_MATRIX_LOCK_COUNT,
+    )
+    return {
+        "success": True,
+        "alreadyLocked": True,
+        "filled": [str(r.get("symbol") or "").upper() for r in added],
+        "session": sess,
+    }
+
+
+def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False) -> dict[str, Any]:
+    """Lock a fully qualified BUY when found — hunt until 14:45, do not seal at 10:15.
+
+    Daily rotation: a locked book from a prior IST sessionDate is treated as stale
+    and re-locked from fresh Matrix BUY cards (force), irrespective of P&L.
+    Never locks from dhanSwingPicks / ScanX.
+
+    Time gate: entry hunt 09:45–14:45 IST. Empty books stay hunting until a
+    qualified entry appears; cash-held only after hunt close. Only
+    ``bypass_lock_window=True`` skips the clock. ``force`` rebuilds during hunt
+    — it does not open early and does not wipe a live book after 14:45.
+    """
+    existing = load_swing_session()
+    today = _ist_today()
+    existing_date = str(existing.get("sessionDate") or "").strip()[:10]
+    stale_day = bool(existing.get("locked") and existing_date and existing_date != today)
+    if stale_day and not force:
+        log.info(
+            "Swing sessionDate %s != today %s — forcing fresh deterministic BUY evaluation",
+            existing_date,
+            today,
+        )
+        force = True
+
+    hunt_ok, hunt_code = swing_entry_hunt_allowed(
+        allow_manual_override=bool(bypass_lock_window)
+    )
+    has_active = bool(
+        existing_date == today and _active_swing_rows(existing)
+    )
+
+    if existing.get("locked") and existing_date == today and has_active:
+        rebuild = bool(force and hunt_ok)
+        if not rebuild:
+            if hunt_ok:
+                filled = _append_new_swing_entries(existing)
+                if filled is not None:
+                    return filled
+            scrubbed, removed_gate = _scrub_ineligible_swing_rows(existing)
+            scrubbed, removed_cross = _scrub_cross_book_swing_rows(scrubbed)
+            scrubbed, removed_cap = _enforce_swing_position_cap(scrubbed)
+            removed = removed_gate + removed_cross + removed_cap
+            if removed:
+                scrubbed = _persist_swing_if_changed(existing, scrubbed)
+            return {
+                "success": True,
+                "alreadyLocked": True,
+                "scrubbed": removed,
+                "crossBookExcluded": removed_cross,
+                "capExcluded": removed_cap,
+                "session": scrubbed,
+            }
+
+    if not hunt_ok and hunt_code != "after_hunt":
+        return {
+            "success": False,
+            "error": swing_entry_hunt_block_message(hunt_code),
+            "lockWindow": hunt_code,
+            "huntWindow": swing_entry_hunt_config(),
+            "session": existing,
+        }
+
+    session_date = today
+    committed_at = _utc_now_iso()
+    exclude = intraday_locked_symbols(today)
+    skipped: list[str] = []
+    snap_src = "asset_matrix_deterministic_buy"
+    long_rows: list[dict[str, Any]] = []
+
+    if hunt_ok:
+        _ensure_today_matrix_snapshot()
+        raw_picks, snap_src = _picks_from_asset_matrix(exclude_symbols=exclude)
+        long_rows, skipped = _normalize_candidate_rows(
+            raw_picks,
+            session_date,
+            committed_at=committed_at,
+            snap_src=snap_src,
+        )
+
+    diagnostics = _swing_universe_diagnostics(exclude_symbols=exclude)
+    hunt_started = committed_at
+    if (
+        existing_date == today
+        and (existing.get("hunting") or existing.get("huntStartedAt"))
+    ):
+        hunt_started = str(existing.get("huntStartedAt") or existing.get("committedAt") or committed_at)
+
+    if long_rows:
+        sized = _size_new_swing_rows(long_rows)
+        deployed = round(sum(float(r.get("deployedCapital") or 0) for r in sized), 2)
+        portfolio_risk = round(sum(float(r.get("maxLoss") or 0) for r in sized), 2)
+        if deployed > SWING_CAPITAL + 0.01 or portfolio_risk > SWING_CAPITAL * SWING_MAX_PORTFOLIO_RISK + 0.01:
+            return {"success": False, "error": "SWING_CAPITAL_INVARIANT_VIOLATION", "session": existing}
+        still_hunting = hunt_ok and len(sized) < SWING_MATRIX_LOCK_COUNT
+        session = {
             "success": True,
             "locked": True,
-            "selectionFinalized": True,
-            "cashHeld": True,
+            "hunting": still_hunting,
+            "selectionFinalized": not still_hunting,
+            "cashHeld": False,
             "book": "SWING",
             "sessionDate": session_date,
             "committedAt": committed_at,
             "updatedAt": committed_at,
+            "huntStartedAt": hunt_started,
+            "executionPolicy": "MANUAL_ONLY",
+            "source": snap_src,
+            "selectionContract": SWING_SELECTION_CONTRACT,
+            "rotation": "DAILY",
+            "priorSessionDate": existing_date if stale_day else None,
+            "long": sized,
+            "short": [],
+            "skippedIncomplete": skipped,
+            "excludedInvalidSelections": copy.deepcopy(existing.get("excludedInvalidSelections") or []),
+            "preservedExecutionHistory": copy.deepcopy(existing.get("preservedExecutionHistory") or []),
+            "capital": {
+                "swingCapital": SWING_CAPITAL,
+                "riskFraction": SWING_RISK_FRACTION,
+                "slots": len(sized),
+                "deployedCapital": deployed,
+                "remainingCapital": round(max(0.0, SWING_CAPITAL - deployed), 2),
+                "portfolioRisk": portfolio_risk,
+            },
+            "counts": {"long": len(sized), "short": 0, "total": len(sized)},
+            "deskGates": {"minPrice": SWING_MIN_PRICE, "rejectDvr": True},
+            "crossBookExcluded": sorted(exclude),
+            "huntWindow": swing_entry_hunt_config(),
+            "entryHuntDiagnostics": diagnostics,
+        }
+        _atomic_write(_SWING_SESSION_PATH, session)
+        try:
+            from .trade_outcome import emit_book_lock_alerts
+
+            emit_book_lock_alerts(
+                book="SWING",
+                session_date=session_date,
+                long_rows=sized,
+                short_rows=[],
+            )
+        except Exception as exc:
+            log.warning("Swing lock alerts failed: %s", exc)
+        log.info(
+            "Locked swing session from %s: %d LONGs (%s)%s%s",
+            session["source"],
+            len(sized),
+            session_date,
+            f" rotated from {existing_date}" if stale_day else "",
+            f" excluded intradAy={sorted(exclude)}" if exclude else "",
+        )
+        return {
+            "success": True,
+            "alreadyLocked": False,
+            "rotated": stale_day,
+            "hunting": still_hunting,
+            "session": session,
+        }
+
+    if hunt_ok:
+        hunting_session = {
+            "success": True,
+            "locked": False,
+            "hunting": True,
+            "selectionFinalized": False,
+            "cashHeld": False,
+            "book": "SWING",
+            "sessionDate": session_date,
+            "committedAt": hunt_started,
+            "updatedAt": committed_at,
+            "huntStartedAt": hunt_started,
             "executionPolicy": "MANUAL_ONLY",
             "source": snap_src,
             "selectionContract": SWING_SELECTION_CONTRACT,
@@ -1138,44 +1554,45 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
             "counts": {"long": 0, "short": 0, "total": 0},
             "deskGates": {"minPrice": SWING_MIN_PRICE, "rejectDvr": True},
             "crossBookExcluded": sorted(exclude),
-            "cashReason": "NO_FULLY_QUALIFIED_EXPLICIT_BUY_CANDIDATES",
+            "cashReason": "WAITING_FOR_QUALIFIED_BUY_ENTRY",
+            "huntWindow": swing_entry_hunt_config(),
+            "entryHuntDiagnostics": diagnostics,
         }
-        _atomic_write(_SWING_SESSION_PATH, cash_session)
+        _atomic_write(_SWING_SESSION_PATH, hunting_session)
+        log.info(
+            "Swing entry hunt open for %s — no fully qualified BUY yet (evaluated=%s qualified=%s)",
+            session_date,
+            diagnostics.get("evaluated"),
+            diagnostics.get("qualified"),
+        )
         return {
             "success": True,
             "alreadyLocked": False,
-            "cashHeld": True,
-            "reason": "NO_FULLY_QUALIFIED_EXPLICIT_BUY_CANDIDATES",
+            "hunting": True,
+            "cashHeld": False,
+            "reason": "WAITING_FOR_QUALIFIED_BUY_ENTRY",
             "skipped": skipped,
-            "session": cash_session,
+            "session": hunting_session,
             "staleDay": stale_day,
         }
 
-    slots = max(1, min(SWING_MATRIX_LOCK_COUNT, len(long_rows)))
-    long_rows = [
-        attach_exit_plan(_size_swing_row(r, sleeve=SWING_CAPITAL, slots=slots))
-        for r in long_rows[:SWING_MATRIX_LOCK_COUNT]
-    ]
-    deployed = round(sum(float(r.get("deployedCapital") or 0) for r in long_rows), 2)
-    portfolio_risk = round(sum(float(r.get("maxLoss") or 0) for r in long_rows), 2)
-    if deployed > SWING_CAPITAL + 0.01 or portfolio_risk > SWING_CAPITAL * SWING_MAX_PORTFOLIO_RISK + 0.01:
-        return {"success": False, "error": "SWING_CAPITAL_INVARIANT_VIOLATION", "session": existing}
-
-    session = {
+    cash_session = {
         "success": True,
         "locked": True,
+        "hunting": False,
         "selectionFinalized": True,
-        "cashHeld": False,
+        "cashHeld": True,
         "book": "SWING",
         "sessionDate": session_date,
         "committedAt": committed_at,
         "updatedAt": committed_at,
+        "huntStartedAt": hunt_started,
         "executionPolicy": "MANUAL_ONLY",
         "source": snap_src,
         "selectionContract": SWING_SELECTION_CONTRACT,
         "rotation": "DAILY",
         "priorSessionDate": existing_date if stale_day else None,
-        "long": long_rows,
+        "long": [],
         "short": [],
         "skippedIncomplete": skipped,
         "excludedInvalidSelections": copy.deepcopy(existing.get("excludedInvalidSelections") or []),
@@ -1183,40 +1600,28 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
         "capital": {
             "swingCapital": SWING_CAPITAL,
             "riskFraction": SWING_RISK_FRACTION,
-            "slots": slots,
-            "deployedCapital": deployed,
-            "remainingCapital": round(max(0.0, SWING_CAPITAL - deployed), 2),
-            "portfolioRisk": portfolio_risk,
+            "slots": 0,
+            "deployedCapital": 0.0,
+            "remainingCapital": SWING_CAPITAL,
+            "portfolioRisk": 0.0,
         },
-        "counts": {"long": len(long_rows), "short": 0, "total": len(long_rows)},
+        "counts": {"long": 0, "short": 0, "total": 0},
         "deskGates": {"minPrice": SWING_MIN_PRICE, "rejectDvr": True},
         "crossBookExcluded": sorted(exclude),
+        "cashReason": "NO_FULLY_QUALIFIED_EXPLICIT_BUY_CANDIDATES",
+        "huntWindow": swing_entry_hunt_config(),
+        "entryHuntDiagnostics": diagnostics,
     }
-    _atomic_write(_SWING_SESSION_PATH, session)
-    try:
-        from .trade_outcome import emit_book_lock_alerts
-
-        emit_book_lock_alerts(
-            book="SWING",
-            session_date=session_date,
-            long_rows=long_rows,
-            short_rows=[],
-        )
-    except Exception as exc:
-        log.warning("Swing lock alerts failed: %s", exc)
-    log.info(
-        "Locked swing session from %s: %d LONGs (%s)%s%s",
-        session["source"],
-        len(long_rows),
-        session_date,
-        f" rotated from {existing_date}" if stale_day else "",
-        f" excluded intradAy={sorted(exclude)}" if exclude else "",
-    )
+    _atomic_write(_SWING_SESSION_PATH, cash_session)
     return {
         "success": True,
         "alreadyLocked": False,
-        "rotated": stale_day,
-        "session": session,
+        "cashHeld": True,
+        "hunting": False,
+        "reason": "NO_FULLY_QUALIFIED_EXPLICIT_BUY_CANDIDATES",
+        "skipped": skipped,
+        "session": cash_session,
+        "staleDay": stale_day,
     }
 
 
@@ -1230,19 +1635,22 @@ def _active_swing_rows(session: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def ensure_swing_session_locked(*, retry_empty: bool = False) -> dict[str, Any]:
-    """Idempotent lock — rotates automatically when sessionDate != IST today.
+    """Idempotent lock — hunt until a qualified BUY is found, then lock it.
 
-    ``retry_empty=True`` (scheduler catch-up) re-evaluates Asset Matrix BUY
-    candidates when today's book is cash-held with zero active names. Never
-    fabricates fills; only locks fully qualified deterministic BUY rows.
+    ``retry_empty=True`` (scheduler) re-evaluates Asset Matrix BUY candidates
+    while the entry hunt is open: hunting/cash-held empty books, and remaining
+    slots on a partial lock. Never fabricates fills; only locks fully qualified
+    deterministic BUY rows.
     """
     existing = load_swing_session()
     today = _ist_today()
     existing_date = str(existing.get("sessionDate") or "").strip()[:10]
     if existing.get("locked") and existing_date == today:
         if retry_empty and not _active_swing_rows(existing):
-            # Still in the lock window — try again for fresh BUY evidence.
             result = lock_swing_session(force=True)
+            return result.get("session") or existing
+        if retry_empty:
+            result = lock_swing_session(force=False)
             return result.get("session") or existing
         scrubbed, removed_gate = _scrub_ineligible_swing_rows(existing)
         scrubbed, removed_cross = _scrub_cross_book_swing_rows(scrubbed)
@@ -1250,7 +1658,9 @@ def ensure_swing_session_locked(*, retry_empty: bool = False) -> dict[str, Any]:
         if removed_gate or removed_cross or removed_cap:
             return _persist_swing_if_changed(existing, scrubbed)
         return scrubbed
-    # A new IST day always evaluates a fresh candidate set; no prior-day refill.
+    if existing.get("hunting") and existing_date == today:
+        result = lock_swing_session(force=False)
+        return result.get("session") or existing
     result = lock_swing_session(force=True if (existing.get("locked") and existing_date != today) else False)
     return result.get("session") or existing
 
@@ -1397,13 +1807,14 @@ def _enrich_swing_row_prices(
     except Exception:
         after_close = False
 
-    if not isinstance(out.get("exitPlan"), dict):
-        try:
-            attached = attach_exit_plan(out)
-            if isinstance(attached.get("exitPlan"), dict):
-                out["exitPlan"] = attached["exitPlan"]
-        except Exception:
-            pass
+    try:
+        attached = refresh_exit_policy(out, keep_exit_state=True)
+        if isinstance(attached.get("exitPlan"), dict):
+            out["exitPlan"] = attached["exitPlan"]
+        if attached.get("bookedExitPlan"):
+            out["bookedExitPlan"] = attached["bookedExitPlan"]
+    except Exception:
+        pass
 
     if isinstance(out.get("exitPlan"), dict) and ltp is not None:
         try:
@@ -1482,10 +1893,18 @@ def _compute_swing_session(*, live: bool = False) -> dict[str, Any]:
     """
     sess = load_swing_session()
     if not sess:
-        return {"locked": False, "long": [], "short": [], "counts": {"total": 0}}
+        return {
+            "locked": False,
+            "hunting": False,
+            "long": [],
+            "short": [],
+            "counts": {"total": 0},
+            "cashReason": None,
+            "entryHuntDiagnostics": None,
+        }
     if not live:
         return sess
-    snap = _read_json(_SNAPSHOT_PATH)
+    snap = _read_json(_matrix_snapshot_path())
     quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
     stocks_by: dict[str, Any] = {}
     for s in snap.get("stocks") or []:

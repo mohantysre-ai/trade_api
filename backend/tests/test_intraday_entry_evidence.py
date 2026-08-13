@@ -43,3 +43,29 @@ def test_valid_post_lock_crossing_records_timestamp():
     assert ev["triggeredAt"] == "2026-08-12T12:00:00+05:30"
     assert ev["postEntryHigh"] == 103
     assert ev["postEntryLow"] == 98
+
+
+def test_session_lock_fill_is_honored_when_candles_miss():
+    from app.services.intraday_execution_evidence import session_lock_fill_evidence
+
+    pick = {
+        "symbol": "NTPC",
+        "direction": "LONG",
+        "entryPrice": 340.75,
+        "lockObservedPrice": 340.75,
+        "triggered": True,
+        "executionStatus": "TRIGGERED",
+        "triggeredAt": "2026-08-13T04:24:22.018431+00:00",
+        "deployedCapital": 199679.5,
+    }
+    ev = session_lock_fill_evidence(pick)
+    assert ev is not None
+    assert ev["triggered"] is True
+    assert ev["triggerSource"] == "session_lock_fill"
+    assert session_lock_fill_evidence({"executionStatus": "PENDING_ENTRY", "triggered": False}) is None
+    candles = candle_entry_evidence(
+        pick, [], session_date=date(2026, 8, 13),
+        committed_at="2026-08-13T04:24:22.018431+00:00",
+    )
+    assert candles["triggered"] is False
+

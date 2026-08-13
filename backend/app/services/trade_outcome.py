@@ -19,18 +19,14 @@ from typing import Any
 from pathlib import Path
 import json as _json
 
-from .exit_plan import attach_exit_plan, evaluate_scale_trail
-
-# Import from the correct snapshot file that stores live market data (last_market_snapshot.json)
-_LAST_MARKET_SNAPSHOT = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "last_market_snapshot.json",
-)
+from .exit_plan import attach_exit_plan, evaluate_scale_trail, evaluate_scale_trail_path, exit_plan_is_current, refresh_exit_policy
 
 def _get_market_snapshot() -> dict | None:
     """Load the last market snapshot to get live prices."""
     try:
-        with open(_LAST_MARKET_SNAPSHOT, "r", encoding="utf-8-sig") as fh:
+        from .market_snapshot_store import readable_market_snapshot_path
+
+        with open(readable_market_snapshot_path(), "r", encoding="utf-8-sig") as fh:
             return json.load(fh)
     except Exception:
         return None
@@ -364,6 +360,100 @@ def _resolve_ltp(pick: dict[str, Any]) -> float:
     return float(ltp)
 
 
+def _quote_day_range(symbol: str) -> tuple[float | None, float | None]:
+    data = _get_market_snapshot() or {}
+    quotes = data.get("stockQuotes") if isinstance(data.get("stockQuotes"), dict) else {}
+    sources: list[dict[str, Any]] = []
+    q = quotes.get(str(symbol or "").upper())
+    if isinstance(q, dict):
+        sources.append(q)
+    for stock in data.get("stocks") or []:
+        if isinstance(stock, dict) and str(stock.get("ticker") or stock.get("symbol") or "").upper() == str(symbol or "").upper():
+            sources.append(stock)
+            break
+    hi = lo = None
+    for src in sources:
+        if hi is None:
+            for key in ("dayHigh", "high", "High"):
+                try:
+                    val = float(src[key]) if src.get(key) is not None else None
+                except (TypeError, ValueError, KeyError):
+                    val = None
+                if val is not None and val > 0:
+                    hi = val
+                    break
+        if lo is None:
+            for key in ("dayLow", "low", "Low"):
+                try:
+                    val = float(src[key]) if src.get(key) is not None else None
+                except (TypeError, ValueError, KeyError):
+                    val = None
+                if val is not None and val > 0:
+                    lo = val
+                    break
+    return hi, lo
+
+
+def _plausible_live_mark(
+    *,
+    entry: float,
+    risk: float,
+    last_mark: float | None,
+    new_mark: float,
+    direction: str,
+) -> bool:
+    """Reject one-poll spikes that would fake an initial stop."""
+    if new_mark <= 0:
+        return False
+    ref = last_mark if last_mark is not None and last_mark > 0 else entry
+    if ref <= 0:
+        return True
+    if abs(new_mark - ref) / ref > 0.08:
+        return False
+    if entry > 0 and risk > 0:
+        sign = -1 if str(direction).upper() == "SHORT" else 1
+        adverse_r = sign * (ref - new_mark) / risk
+        if adverse_r > 1.5:
+            return False
+    return True
+
+
+def _evaluate_live_scale_trail(pick: dict[str, Any], ltp: float, *, after_close: bool = False) -> dict[str, Any]:
+    """Favourable excursion first (session high/low + quote range), then stop."""
+    direction = str(pick.get("direction") or "LONG").upper()
+    entry = float(pick.get("entryPrice") or 0)
+    risk = float(pick.get("riskPerShare") or 0)
+    last_mark = None
+    for raw in (pick.get("ltp"), pick.get("currentPrice")):
+        try:
+            if raw is not None and float(raw) > 0:
+                last_mark = float(raw)
+                break
+        except (TypeError, ValueError):
+            continue
+    mark = float(ltp)
+    quote_hi, quote_lo = _quote_day_range(str(pick.get("symbol") or ""))
+    if not _plausible_live_mark(
+        entry=entry, risk=risk, last_mark=last_mark, new_mark=mark, direction=direction
+    ):
+        mark = float(last_mark or entry or mark)
+        quote_lo = None if direction == "LONG" else quote_lo
+        quote_hi = None if direction == "SHORT" else quote_hi
+    highs = [v for v in (pick.get("sessionHigh"), quote_hi, mark, last_mark) if isinstance(v, (int, float)) and v > 0]
+    lows = [v for v in (pick.get("sessionLow"), quote_lo, mark, last_mark) if isinstance(v, (int, float)) and v > 0]
+    session_high = max(highs) if highs else None
+    session_low = min(lows) if lows else None
+    if session_high is not None:
+        pick["sessionHigh"] = round(float(session_high), 2)
+    if session_low is not None:
+        pick["sessionLow"] = round(float(session_low), 2)
+    if session_high is not None or session_low is not None:
+        return evaluate_scale_trail_path(
+            pick, mark, session_high, session_low, after_close=after_close
+        )
+    return evaluate_scale_trail(pick, mark, after_close=after_close)
+
+
 def compute_outcome(pick: dict[str, Any]) -> dict[str, Any] | None:
     """Evaluate exits against LTP — scale-trail when exitPlan present, else binary T1/T2/SL."""
     entry = float(pick.get("entryPrice") or 0)
@@ -377,17 +467,20 @@ def compute_outcome(pick: dict[str, Any]) -> dict[str, Any] | None:
     pick["priceUpdatedAt"] = _utc_now()
 
     plan = pick.get("exitPlan") if isinstance(pick.get("exitPlan"), dict) else None
-    if (not plan or plan.get("mode") != "SCALE_TRAIL") and entry and (sl or pick.get("riskPerShare")) and pick.get("approxQty"):
-        enriched = attach_exit_plan(pick)
-        pick["exitPlan"] = enriched.get("exitPlan")
-        if enriched.get("target1") is not None:
-            pick["target1"] = enriched["target1"]
-        if enriched.get("target2") is not None:
-            pick["target2"] = enriched["target2"]
-        plan = pick.get("exitPlan")
+    if entry and (sl or pick.get("riskPerShare")) and pick.get("approxQty"):
+        if not plan or plan.get("mode") != "SCALE_TRAIL" or not exit_plan_is_current(plan):
+            enriched = refresh_exit_policy(pick, keep_exit_state=True)
+            pick["exitPlan"] = enriched.get("exitPlan")
+            if enriched.get("target1") is not None:
+                pick["target1"] = enriched["target1"]
+            if enriched.get("target2") is not None:
+                pick["target2"] = enriched["target2"]
+            if enriched.get("bookedExitPlan"):
+                pick["bookedExitPlan"] = enriched["bookedExitPlan"]
+            plan = pick.get("exitPlan")
 
     if plan and plan.get("mode") == "SCALE_TRAIL":
-        result = evaluate_scale_trail(pick, ltp, after_close=False)
+        result = _evaluate_live_scale_trail(pick, ltp, after_close=False)
         if result:
             if result.get("closed"):
                 result["resolvedAt"] = _utc_now()
@@ -414,6 +507,8 @@ def compute_outcome(pick: dict[str, Any]) -> dict[str, Any] | None:
                 "rMultiple": result.get("rMultiple"),
                 "closed": result.get("closed"),
                 "scaleTrail": True,
+                "sessionHigh": pick.get("sessionHigh"),
+                "sessionLow": pick.get("sessionLow"),
             }
 
     if not entry or not sl or not t1 or not t2:
@@ -495,7 +590,7 @@ def evaluate_outcome(pick: dict[str, Any], finalize_if_closed: bool = False) -> 
         existing = pick.get("outcome")
         if existing and existing.get("closed") and existing.get("final"):
             return existing
-        result = evaluate_scale_trail(pick, ltp, after_close=after_close)
+        result = _evaluate_live_scale_trail(pick, ltp, after_close=after_close)
         if result:
             if result.get("closed"):
                 result["resolvedAt"] = _utc_now()
@@ -519,6 +614,8 @@ def evaluate_outcome(pick: dict[str, Any], finalize_if_closed: bool = False) -> 
                 "closed": result.get("closed"),
                 "scaleTrail": True,
                 "final": result.get("final"),
+                "sessionHigh": pick.get("sessionHigh"),
+                "sessionLow": pick.get("sessionLow"),
             }
 
     if not after_close:
@@ -587,8 +684,89 @@ def load_fixed_trade_plan() -> dict[str, Any]:
         return {}
 
 
+def _session_date_str(payload: dict[str, Any] | None) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    raw = payload.get("sessionDate")
+    if raw:
+        return str(raw)[:10]
+    for side in ("long", "short"):
+        for row in payload.get(side) or []:
+            if not isinstance(row, dict):
+                continue
+            d = row.get("entryDate") or row.get("sessionDate")
+            if d:
+                return str(d)[:10]
+    return None
+
+
+def load_desk_live_book() -> tuple[dict[str, Any], str]:
+    """Today's locked Intraday session is SoT for live marks; plan is a same-day mirror."""
+    today = _today_ist()
+    sess: dict[str, Any] = {}
+    try:
+        from .intraday_session_engine import load_session
+
+        sess = load_session() or {}
+    except Exception:
+        sess = {}
+    sess_date = str(sess.get("sessionDate") or "")[:10]
+    if sess.get("locked") and sess_date == today:
+        return {
+            "long": [dict(r) for r in (sess.get("long") or []) if isinstance(r, dict)],
+            "short": [dict(r) for r in (sess.get("short") or []) if isinstance(r, dict)],
+            "updatedAt": sess.get("updatedAt") or _utc_now(),
+            "sessionDate": sess_date,
+            "source": "intraday_session",
+            "locked": True,
+        }, "intraday_session"
+    plan = load_fixed_trade_plan()
+    plan_date = _session_date_str(plan)
+    if plan and plan_date == today and (plan.get("long") or plan.get("short")):
+        return plan, "fixed_trade_plan"
+    return {
+        "long": [],
+        "short": [],
+        "updatedAt": _utc_now(),
+        "sessionDate": today,
+        "source": "none",
+        "locked": False,
+    }, "none"
+
+
 def save_fixed_trade_plan(payload: dict[str, Any]) -> None:
-    """Persist the fixed trade plan to JSON."""
+    """Persist the fixed trade plan to JSON.
+
+    Never clobber today's locked Intraday book with an older/other-day payload.
+    """
+    incoming_date = _session_date_str(payload)
+    today = _today_ist()
+    sess_date = ""
+    sess_locked = False
+    try:
+        from .intraday_session_engine import load_session
+
+        sess = load_session() or {}
+        sess_date = str(sess.get("sessionDate") or "")[:10]
+        sess_locked = bool(sess.get("locked"))
+    except Exception:
+        pass
+    if sess_locked and sess_date == today and (not incoming_date or incoming_date != today):
+        log.warning(
+            "Refusing to overwrite today's locked plan (%s) with payload date %s",
+            sess_date,
+            incoming_date,
+        )
+        return
+    existing = load_fixed_trade_plan()
+    existing_date = _session_date_str(existing)
+    if existing_date == today and incoming_date and incoming_date < today:
+        log.warning(
+            "Refusing to overwrite today's fixed plan (%s) with older payload (%s)",
+            existing_date,
+            incoming_date,
+        )
+        return
     try:
         _atomic_write(_FIXED_PLAN_FILE, payload)
     except Exception as exc:
@@ -843,27 +1021,12 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
     snapshot_prefetch = _get_market_snapshot() or {}
     snapshot_updated_prefetch = snapshot_prefetch.get("updatedAt", "")
 
-    fixed = load_fixed_trade_plan()
+    fixed, book_source = load_desk_live_book()
     plan_note = None
-    if not fixed or (not (fixed.get("long") or []) and not (fixed.get("short") or [])):
-        # Corrupt/missing plan must not kill the desk — fall back to locked session basket.
-        try:
-            from .intraday_session_engine import load_session
-
-            sess = load_session() or {}
-            long_fb = list(sess.get("long") or [])
-            short_fb = list(sess.get("short") or [])
-            if long_fb or short_fb:
-                fixed = {
-                    "long": long_fb,
-                    "short": short_fb,
-                    "updatedAt": sess.get("updatedAt") or _utc_now(),
-                    "source": "intraday_session_fallback",
-                }
-                plan_note = "Fixed plan missing/corrupt; pricing locked session basket"
-                log.error("%s (%s)", plan_note, _FIXED_PLAN_FILE)
-        except Exception as exc:
-            log.error("Session fallback after empty fixed plan failed: %s", exc)
+    if book_source == "intraday_session":
+        plan_note = "Live marks from today's locked Intraday session"
+    elif book_source == "none":
+        plan_note = "No same-day locked session or plan; Yahoo not attempted"
 
     if not fixed:
         return {
@@ -872,7 +1035,7 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
             "updatedAt": _utc_now(),
             "snapshotUpdatedAt": snapshot_updated_prefetch,
             "source": "none",
-            "priceSourcesNote": "No fixed plan; Yahoo not attempted",
+            "priceSourcesNote": plan_note or "No same-day desk book; Yahoo not attempted",
             "marketOpen": _is_market_open(),
             "sessionClosed": not _is_market_open(),
             "dataStale": True,
@@ -888,7 +1051,7 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
             "updatedAt": _utc_now(),
             "snapshotUpdatedAt": snapshot_updated_prefetch,
             "source": "none",
-            "priceSourcesNote": "Empty fixed plan; Yahoo not attempted",
+            "priceSourcesNote": plan_note or "Empty same-day desk book; Yahoo not attempted",
             "marketOpen": _is_market_open(),
             "sessionClosed": not _is_market_open(),
             "dataStale": True,
@@ -1082,6 +1245,10 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
                 entry["effectiveStop"] = outcome.get("effectiveStop")
             if isinstance(outcome.get("exitState"), dict):
                 entry["exitState"] = outcome["exitState"]
+            if outcome.get("sessionHigh") is not None:
+                entry["sessionHigh"] = p["sessionHigh"] = outcome["sessionHigh"]
+            if outcome.get("sessionLow") is not None:
+                entry["sessionLow"] = p["sessionLow"] = outcome["sessionLow"]
         else:
             entry["outcome"] = None
 
@@ -1106,13 +1273,14 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
     enriched_long = [enrich_pick(p) for p in long_plan]
     enriched_short = [enrich_pick(p) for p in short_plan]
 
-    if plan_changed:
+    if plan_changed and book_source == "fixed_trade_plan":
         # Preserve lock metadata when rewriting plan after outcomes
         merged_plan = {
             **{k: v for k, v in fixed.items() if k not in ("long", "short")},
             "long": long_plan,
             "short": short_plan,
             "updatedAt": _utc_now(),
+            "sessionDate": fixed.get("sessionDate") or _today_ist(),
         }
         save_fixed_trade_plan(merged_plan)
 
@@ -1131,7 +1299,8 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
         "updatedAt": _utc_now(),
         "snapshotUpdatedAt": snapshot_updated,
         "snapshotAgeSec": snapshot_age_sec,
-        "source": "fixed_plan" if not plan_note else "session_fallback",
+        "source": book_source,
+        "bookSource": book_source,
         "priceSourcesNote": (
             plan_note
             or (
@@ -1177,7 +1346,7 @@ def get_trade_outcomes() -> dict[str, Any]:
     """Return all picks with their latest outcomes for the API/frontend."""
     refresh_outcomes()
 
-    fixed = load_fixed_trade_plan()
+    fixed, book_source = load_desk_live_book()
     if fixed and (fixed.get("long") or fixed.get("short")):
         after_close = _is_after_market_close()
         plan_changed = False
@@ -1190,11 +1359,12 @@ def get_trade_outcomes() -> dict[str, Any]:
                 if outcome:
                     p["outcome"] = outcome
                     plan_changed = True
-        if plan_changed:
+        if plan_changed and book_source == "fixed_trade_plan":
             save_fixed_trade_plan(fixed)
         fixed["updatedAt"] = _utc_now()
         fixed["marketOpen"] = _is_market_open()
         fixed["sessionClosed"] = not fixed["marketOpen"]
+        fixed["bookSource"] = book_source
         return fixed
     
     picks = _load_persisted_picks()

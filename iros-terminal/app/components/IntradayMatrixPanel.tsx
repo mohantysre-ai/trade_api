@@ -340,6 +340,8 @@ type ExitLeg = { r: number; label?: string; qty?: number; price?: number };
 
 type ExitPlan = {
   mode?: string;
+  notes?: string[];
+  policyVersion?: string;
   legs?: ExitLeg[];
   runnerQty?: number | null;
 };
@@ -752,6 +754,10 @@ function exitProgressStr(exitPlan: ExitPlan | null | undefined, exitState: ExitS
   } : null);
   if (!state && !exitPlan) return null;
   const parts: string[] = [];
+  const notes = exitPlan?.notes ?? [];
+  if (notes.includes('be_at_0p5r')) parts.push('0.5R BE');
+  else if (notes.includes('be_at_0p25r')) parts.push('0.25R BE');
+  if (notes.includes('max_stop_0p5pct')) parts.push('SL≤0.5%');
   const legs = exitPlan?.legs ?? [];
   const filled = state?.legsFilled ?? [];
   const filledRs = new Set(

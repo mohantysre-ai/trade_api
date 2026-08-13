@@ -17,7 +17,7 @@ from datetime import date, datetime
 from typing import Any
 
 from .eod_archive import load_archive
-from .exit_plan import attach_exit_plan, blended_pnl_from_state, format_scale_progress
+from .exit_plan import attach_exit_plan, blended_pnl_from_state, format_scale_progress, overwrite_row_with_current_policy, refresh_exit_policy
 from .quant_desk_exit_policy import build_trade_outcome, classify_taxonomy
 import time
 import urllib.request
@@ -226,19 +226,29 @@ def _scale_trail_work_pick(pick: dict[str, Any]) -> dict[str, Any] | None:
     """Return pick with SCALE_TRAIL exitPlan, or None if binary fallback."""
     plan = pick.get("exitPlan") if isinstance(pick.get("exitPlan"), dict) else None
     if plan and plan.get("mode") == "SCALE_TRAIL":
-        return pick
+        work = {k: v for k, v in pick.items() if k != "exitState"}
+        initial = None
+        state = pick.get("exitState") if isinstance(pick.get("exitState"), dict) else {}
+        for candidate in (plan.get("initialStop"), state.get("initialStop"), pick.get("stopLoss")):
+            try:
+                if candidate is not None and float(candidate) > 0:
+                    initial = float(candidate)
+                    break
+            except (TypeError, ValueError):
+                continue
+        if initial is not None:
+            work["stopLoss"] = initial
+        return refresh_exit_policy(work, keep_exit_state=False)
     entry = float(pick.get("entryPrice") or 0)
     qty = int(pick.get("approxQty") or 0)
     risk = float(pick.get("riskPerShare") or 0)
     sl = float(pick.get("stopLoss") or 0)
     if entry <= 0 or qty <= 0 or (risk <= 0 and sl <= 0):
         return None
-    work = attach_exit_plan(pick)
+    work = attach_exit_plan({k: v for k, v in pick.items() if k != "exitState"})
     attached = work.get("exitPlan") if isinstance(work.get("exitPlan"), dict) else None
     if not attached or attached.get("mode") != "SCALE_TRAIL":
         return None
-    if isinstance(pick.get("exitState"), dict) and not work.get("exitState"):
-        work["exitState"] = pick["exitState"]
     return work
 
 
@@ -324,12 +334,54 @@ def _leg_pnl(pick: dict[str, Any], *, after_close: bool) -> tuple[str, float, fl
 
     work = _scale_trail_work_pick(pick)
     if work is not None:
-        # Strategy accounting must obey the persisted sequential SCALE_TRAIL
-        # state during the session as well as after close.  This is explicitly a
-        # paper-model execution ledger (not a broker fill claim).  Passing
-        # after_close=False advances scale legs/stops from the current tick but
-        # never performs an EOD square-off.
-        total_pnl, avg_exit, eval_result = blended_pnl_from_state(work, ltp, after_close=after_close)
+        work["ltp"] = ltp
+        work["currentPrice"] = ltp
+        if pick.get("dayHigh") is not None:
+            work["dayHigh"] = pick.get("dayHigh")
+            work.setdefault("sessionHigh", pick.get("dayHigh"))
+        if pick.get("dayLow") is not None:
+            work["dayLow"] = pick.get("dayLow")
+            work.setdefault("sessionLow", pick.get("dayLow"))
+        # Overwrite booked 0.25R path with current 0.5R / 0.5% trail using session H/L.
+        overwritten = overwrite_row_with_current_policy(work, after_close=False, force=True)
+        eval_state = overwritten.get("exitState") if isinstance(overwritten.get("exitState"), dict) else {}
+        if eval_state:
+            plan = overwritten.get("exitPlan") if isinstance(overwritten.get("exitPlan"), dict) else None
+            r_mult = overwritten.get("rMultiple")
+            scale_meta = {
+                "exitPlan": plan,
+                "exitState": eval_state,
+                "remainingQty": overwritten.get("remainingQty"),
+                "effectiveStop": overwritten.get("effectiveStop"),
+                "realizedPnl": overwritten.get("realizedPnl"),
+                "unrealizedPnl": overwritten.get("unrealizedPnl"),
+                "rMultiple": r_mult,
+                "scaleTrail": True,
+                "scaleProgress": format_scale_progress(
+                    plan, eval_state, r_multiple=float(r_mult) if r_mult is not None else None
+                ),
+            }
+            outcome = overwritten.get("outcome") if isinstance(overwritten.get("outcome"), dict) else {}
+            eval_result = {
+                "hitLevel": outcome.get("hitLevel"),
+                "label": outcome.get("label"),
+                "closed": overwritten.get("closed"),
+                "exitState": eval_state,
+                "stopKind": None,
+            }
+            reason = _exit_reason_from_scale_eval(eval_result)
+            if not overwritten.get("closed"):
+                reason = "OPEN"
+            exit_px = float(overwritten.get("ltp") or ltp)
+            if overwritten.get("closed") and overwritten.get("effectiveStop") is not None:
+                exit_px = float(overwritten["effectiveStop"])
+            return (
+                reason,
+                exit_px,
+                float(overwritten.get("totalPnl") or overwritten.get("pnl") or 0),
+                scale_meta,
+            )
+        total_pnl, avg_exit, eval_result = blended_pnl_from_state(work, ltp, after_close=False)
         if eval_result:
             state = eval_result.get("exitState") if isinstance(eval_result.get("exitState"), dict) else {}
             plan = work.get("exitPlan") if isinstance(work.get("exitPlan"), dict) else None
@@ -916,10 +968,26 @@ def generate_intraday_eod_report(
         ticker = str(pick.get("symbol") or "").upper()
         card = scorecards.get(ticker)
 
-        from .intraday_execution_evidence import persisted_entry_evidence
-        entry_evidence = persisted_entry_evidence(
+        from .intraday_execution_evidence import (
+            persisted_entry_evidence,
+            session_lock_fill_evidence,
+        )
+        candle_evidence = persisted_entry_evidence(
             pick, session_date=for_date, committed_at=committed_at
         )
+        session_fill = session_lock_fill_evidence(pick)
+        if session_fill is not None:
+            entry_evidence = dict(session_fill)
+            if candle_evidence.get("triggered"):
+                entry_evidence["postEntryHigh"] = candle_evidence.get("postEntryHigh")
+                entry_evidence["postEntryLow"] = candle_evidence.get("postEntryLow")
+                entry_evidence["candleTriggerAt"] = candle_evidence.get("triggeredAt")
+            else:
+                entry_evidence["candleSkipReason"] = candle_evidence.get("reason")
+            if float(pick.get("deployedCapital") or 0) <= 0:
+                pick["deployedCapital"] = float(pick.get("plannedCapital") or 0)
+        else:
+            entry_evidence = candle_evidence
         if not entry_evidence.get("triggered"):
             planned = float(pick.get("deployedCapital") or 0)
             skip_reason = entry_evidence.get("reason") or "ENTRY_NOT_CROSSED_POST_LOCK"

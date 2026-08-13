@@ -46,6 +46,56 @@ def rejection_reasons(row: dict) -> list[str]:
     return reasons
 
 
+def test_metrics_replay_sets_buy_when_hard_filters_compute():
+    row = {
+        "ticker": "REPLAY",
+        "symbol": "REPLAY",
+        "ltp": 120.0,
+        "ltpRaw": 120.0,
+        "riskAuditVerdict": "APPROVE",
+        "verdict": "APPROVE",
+        "passes_quality_filters": True,
+        "intraday": {
+            "atr_pct": 2.0,
+            "turnover_cr": 80.0,
+            "vwap": 118.0,
+            "ema9": 117.0,
+            "price_above_vwap": True,
+            "price_above_ema9": True,
+            "rsi": 62.0,
+            "oi_setup": "LONG_BUILDUP",
+            "volume_multiplier": 1.8,
+            "spread_pct": 0.05,
+            "wick_noise_ratio": 0.20,
+            "pivot_r1_breakout": True,
+            "rsi_pivot_break": True,
+            "passes_quality_filters": True,
+        },
+    }
+    eligible, evidence, reasons = swing_session._evaluate_swing_buy_contract(row)
+    assert evidence.get("deterministicSide") == "BUY"
+    assert eligible is True
+    assert reasons == []
+
+
+def test_stale_snapshot_triggers_hunt_refresh(monkeypatch):
+    calls = []
+    monkeypatch.setattr(swing_session, "_read_json", lambda _p: {
+        "selectionMeta": {"dataDate": "2026-08-03", "mode": "snapshot"},
+        "isSnapshotFallback": True,
+        "stocks": [{"ticker": "X"}],
+    })
+    monkeypatch.setattr(swing_session, "_ist_today", lambda: "2026-08-13")
+    monkeypatch.setattr(swing_session, "_SWING_MATRIX_REFRESH_AT", 0.0)
+    monkeypatch.setattr(
+        swing_session,
+        "_run_swing_matrix_refresh",
+        lambda: calls.append("swing_entry_hunt") or {"success": True},
+    )
+    swing_session._ensure_today_matrix_snapshot()
+    assert calls == ["swing_entry_hunt"]
+
+
 def test_approve_without_explicit_buy_is_rejected():
     row = qualified_row()
     row.pop("deterministicSide")
@@ -86,9 +136,57 @@ def test_bearish_side_oi_and_trend_anchors_are_rejected():
 def test_risk_approval_is_only_a_veto_pass_not_direction():
     row = qualified_row(deterministicSide="SELL", riskAuditVerdict="APPROVE", verdict="APPROVE")
     assert swing_session._stock_is_matrix_buy(row) is False
-    assert any(reason.startswith("RISK_AUDIT_VETO") for reason in rejection_reasons(
+    assert swing_session._stock_is_matrix_buy(
         qualified_row(riskAuditVerdict="HOLD_FOR_DATA", verdict="HOLD_FOR_DATA")
+    ) is True
+    assert any(reason.startswith("RISK_AUDIT_VETO") for reason in rejection_reasons(
+        qualified_row(riskAuditVerdict="REJECT", verdict="REJECT")
     ))
+
+
+def test_hunt_uses_volume_screen_beyond_display_50():
+    display = []
+    quotes: dict = {}
+    for i in range(50):
+        row = qualified_row(f"PAD{i}")
+        row.pop("deterministicSide")
+        row["passes_hard_filters"] = False
+        row["passes_quality_filters"] = False
+        row["ticker"] = f"PAD{i}"
+        row["symbol"] = f"PAD{i}"
+        display.append(row)
+        quotes[row["ticker"]] = row
+    overflow = qualified_row("OVERFLOW")
+    quotes["OVERFLOW"] = overflow
+    beyond = qualified_row("BEYOND200")
+    beyond["intraday"] = {
+        **overflow["intraday"],
+        "hard_filter_reasons": ["not in intraday candidate set"],
+    }
+    quotes["BEYOND200"] = beyond
+    outside = qualified_row("OUTSIDE500")
+    outside["intraday"] = {
+        **overflow["intraday"],
+        "vwap": 0.0,
+        "rsi": 0.0,
+        "hard_filter_reasons": ["not in intraday candidate set"],
+    }
+    quotes["OUTSIDE500"] = outside
+    snapshot = {
+        "universeSize": 500,
+        "volumeScreenedCount": 200,
+        "stocks": display,
+        "stockQuotes": quotes,
+    }
+    selected, source = swing_session._picks_from_asset_matrix(snapshot)
+    assert {row["symbol"] for row in selected} == {"OVERFLOW", "BEYOND200"}
+    assert source == "asset_matrix_deterministic_buy"
+    diag = swing_session._swing_universe_diagnostics(snapshot=snapshot)
+    assert diag["displayPool"] == 50
+    assert diag["evaluated"] == 52
+    assert diag["qualified"] == 2
+    assert diag["universeSize"] == 500
+    assert diag["volumeScreened"] == 200
 
 
 def test_only_explicit_fully_qualified_buy_rows_enter_candidate_set():

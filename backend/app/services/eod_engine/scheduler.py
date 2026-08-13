@@ -2,14 +2,15 @@
 
 Stages (weekdays, institutional open cadence):
   09:45+  Morning pre-work (Angel live + LLM day-lock) — post open-auction
-  09:45–10:15  Primary basket lock (intraday top-five total + swing); catch-up if app starts later
+  09:45–10:15  Primary intradAy basket lock; catch-up if app starts later
+  09:45–14:45  Swing entry hunt — lock each fully qualified BUY when found (not a 10:15 stop)
   12:00   Midday live refresh (quotes/candles; LLM stays day-locked)
   14:00   Afternoon live refresh (same)
   15:31   Fixed-plan close marks
   15:35   EOD analysis (deterministic)
   16:00+  EOD PM LLM commentary (once)
 
-Catch-up: if the app starts after 10:15, pending pre-work + lock still run once
+Catch-up: if the app starts after 10:15, pending pre-work + intradAy lock still run once
 until cash close — never before 09:45 (refuse stale pre-open books).
 """
 from __future__ import annotations
@@ -25,7 +26,7 @@ from zoneinfo import ZoneInfo
 
 from .ingestion import eod_day_dir
 from .runner import ensure_pm_llm_once, run_eod_analysis
-from ..desk_clock import basket_lock_allowed, lock_window_config
+from ..desk_clock import basket_lock_allowed, lock_window_config, swing_entry_hunt_allowed
 
 log = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
@@ -423,35 +424,23 @@ def _maybe_auto_commit(now: datetime) -> None:
 
 
 def _maybe_auto_swing_lock(now: datetime) -> None:
-    """Lock / refresh SWING independently of intradAy commit success.
+    """Hunt SWING independently of intradAy commit success.
 
-    Runs every tick inside the desk lock window until today has an active
-    swing book, or the window ends with an intentional cash-held empty book.
+    09:45–14:45: keep evaluating Asset Matrix BUY until a qualified entry is
+    found, then lock it (and fill remaining slots). Do not cash-finalize at 10:15.
+    After 14:45: seal an empty hunt as cash-held.
     """
     if not _AUTO_COMMIT:
         return
-    if not _in_commit_window(now):
-        # After the window: seal a pending cash-held attempt as done.
-        if _stage_done(now, "swing_lock"):
-            return
-        try:
-            from ..swing_session import load_swing_session
-
-            sess = load_swing_session()
-            day_key = now.strftime("%Y-%m-%d")
-            if (
-                sess.get("locked")
-                and str(sess.get("sessionDate") or "")[:10] == day_key
-                and sess.get("cashHeld")
-            ):
-                _mark_stage(now, "swing_lock", status="done", reason="cash_held_window_closed")
-        except Exception:
-            pass
-        return
-
+    hunt_ok, hunt_code = swing_entry_hunt_allowed(now)
     day_key = now.strftime("%Y-%m-%d")
     try:
-        from ..swing_session import ensure_swing_session_locked, load_swing_session
+        from ..swing_session import (
+            SWING_MATRIX_LOCK_COUNT,
+            ensure_swing_session_locked,
+            load_swing_session,
+            lock_swing_session,
+        )
 
         sess = load_swing_session()
         sess_date = str(sess.get("sessionDate") or "")[:10]
@@ -460,23 +449,67 @@ def _maybe_auto_swing_lock(now: datetime) -> None:
             for r in (sess.get("long") or [])
             if isinstance(r, dict) and r.get("symbol") and not r.get("closed")
         ]
-        if sess.get("locked") and sess_date == day_key and active:
+
+        if not hunt_ok:
+            if hunt_code != "after_hunt":
+                return
+            if sess_date == day_key and active:
+                if not _stage_done(now, "swing_lock"):
+                    _mark_stage(now, "swing_lock", status="done", count=len(active))
+                return
+            if _stage_done(now, "swing_lock"):
+                return
+            if sess_date == day_key and (sess.get("hunting") or sess.get("cashHeld") or not sess.get("locked")):
+                result = lock_swing_session(force=True)
+                _mark_stage(
+                    now,
+                    "swing_lock",
+                    status="done",
+                    reason=str(result.get("reason") or "cash_held_hunt_closed"),
+                    count=0,
+                )
+            return
+
+        if sess.get("locked") and sess_date == day_key and len(active) >= SWING_MATRIX_LOCK_COUNT:
             if not _stage_done(now, "swing_lock"):
                 _mark_stage(now, "swing_lock", status="done", count=len(active))
             return
 
         def _job() -> None:
             try:
-                # Always evaluate swing — do not wait on intradAy success.
                 result = ensure_swing_session_locked(retry_empty=True)
                 long_rows = [
                     r
                     for r in (result.get("long") or [])
                     if isinstance(r, dict) and r.get("symbol") and not r.get("closed")
                 ]
-                if long_rows:
+                if len(long_rows) >= SWING_MATRIX_LOCK_COUNT:
                     _mark_stage(now, "swing_lock", status="done", count=len(long_rows))
                     log.info("Auto swing lock: %d active name(s) for %s", len(long_rows), day_key)
+                    return
+                if long_rows:
+                    _mark_stage(
+                        now,
+                        "swing_lock",
+                        status="pending",
+                        reason="partial_lock_hunting_remaining_slots",
+                        count=len(long_rows),
+                    )
+                    log.info(
+                        "Auto swing lock: %d/%d name(s) for %s — hunting remaining slots",
+                        len(long_rows),
+                        SWING_MATRIX_LOCK_COUNT,
+                        day_key,
+                    )
+                    return
+                if result.get("hunting"):
+                    _mark_stage(
+                        now,
+                        "swing_lock",
+                        status="pending",
+                        reason=str(result.get("cashReason") or result.get("reason") or "waiting_for_entry"),
+                    )
+                    log.info("Auto swing hunt open for %s — waiting for qualified BUY entry", day_key)
                     return
                 if result.get("cashHeld") or result.get("locked"):
                     _mark_stage(
@@ -484,10 +517,6 @@ def _maybe_auto_swing_lock(now: datetime) -> None:
                         "swing_lock",
                         status="pending",
                         reason=str(result.get("cashReason") or "cash_held_no_buy"),
-                    )
-                    log.info(
-                        "Auto swing lock cash-held for %s — will retry while lock window open",
-                        day_key,
                     )
                     return
                 _mark_stage(
@@ -502,11 +531,10 @@ def _maybe_auto_swing_lock(now: datetime) -> None:
 
         if not _spawn_once(f"swing:{day_key}", _job):
             return
-        log.info("Scheduled auto swing lock for %s", day_key)
+        log.info("Scheduled auto swing entry hunt for %s", day_key)
     except Exception as exc:
         log.warning("Auto swing lock schedule error: %s", exc)
         _mark_stage(now, "swing_lock", status="error", error=str(exc))
-
 
 def _maybe_midday_refresh(now: datetime) -> None:
     """Live Angel refresh at configured times; LLM stays day-locked."""

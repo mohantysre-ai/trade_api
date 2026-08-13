@@ -84,8 +84,10 @@ NIFTY_500_CACHE_PATH = BASE_DIR / "nifty500_instruments.json"
 NIFTY_500_SYMBOLS_PATH = BASE_DIR.parent / "data" / "nifty500_symbols.json"
 NIFTY_500_LABEL = "Nifty 500"
 SCRIP_MASTER_URL = "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json"
-# Funnel: full Nifty 500 quotes → top N by volume for intraday screen (env: VOLUME_PRESELECT_LIMIT).
+# Funnel: full Nifty 500 quotes → top N by volume for Asset Matrix (env: VOLUME_PRESELECT_LIMIT).
+# Swing hunt candles default to the full 500 (env: SWING_CANDIDATE_LIMIT).
 VOLUME_PRESELECT_LIMIT = int(os.getenv("VOLUME_PRESELECT_LIMIT", "200"))
+SWING_CANDIDATE_LIMIT = int(os.getenv("SWING_CANDIDATE_LIMIT", "500"))
 _NSE_EQ_TOKEN_MAP: dict[str, tuple[str, str]] | None = None
 _NSE_EQ_TOKEN_MAP_LOADED_AT = 0.0
 _NSE_EQ_TOKEN_MAP_TTL_SECONDS = int(os.getenv("NSE_EQ_TOKEN_MAP_TTL_SECONDS", "86400"))
@@ -611,6 +613,7 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
         if isinstance(payload.get("selectionMeta"), dict):
             payload["selectionMeta"]["mode"] = "live"
             payload["selectionMeta"]["reason"] = f"Scheduled live refresh ({reason}); LLM day-locked."
+            payload["selectionMeta"]["dataDate"] = _ist_now().date().isoformat()
         _save_last_snapshot(payload)
         reused = _llm_locked_for_today(payload) or (
             bool(prior)
@@ -815,7 +818,9 @@ def _format_inr(value: float) -> str:
 
 
 def _snapshot_path() -> Path:
-    return SNAPSHOT_PATH
+    from .market_snapshot_store import market_snapshot_path
+
+    return market_snapshot_path()
 
 
 def _ist_now() -> datetime:
@@ -1234,9 +1239,9 @@ def refresh_nifty100_cache(client: AngelOneClient | None = None) -> dict[str, An
 
 def _payload_data_date(payload: dict[str, Any] | None = None) -> str:
     if payload:
-        updated_at = payload.get("updatedAt")
-        if isinstance(updated_at, str) and updated_at:
-            return updated_at[:10]
+        meta = payload.get("selectionMeta")
+        if isinstance(meta, dict) and meta.get("dataDate"):
+            return str(meta["dataDate"])[:10]
     return _ist_now().date().isoformat()
 
 
@@ -1413,13 +1418,16 @@ def _hydrate_dhan_swing_picks(
 
 
 def _load_last_snapshot() -> dict[str, Any] | None:
-    try:
-        payload = json.loads(_snapshot_path().read_text(encoding="utf-8"))
-        if isinstance(payload, dict):
-            return _normalize_snapshot(payload)
-        return None
-    except Exception:
-        return None
+    from .market_snapshot_store import readable_market_snapshot_path
+
+    for path in (_snapshot_path(), readable_market_snapshot_path()):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                return _normalize_snapshot(payload)
+        except Exception:
+            continue
+    return None
 
 
 def _save_last_snapshot(payload: dict[str, Any]) -> None:
@@ -1436,7 +1444,9 @@ def _save_last_snapshot(payload: dict[str, Any]) -> None:
     except Exception as exc:
         log.warning("dhanSwingPicks snapshot hydration failed: %s", exc)
     try:
-        _snapshot_path().write_text(json.dumps(_normalize_snapshot(payload), indent=2), encoding="utf-8")
+        path = _snapshot_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(_normalize_snapshot(payload), indent=2), encoding="utf-8")
     except Exception:
         pass
 
@@ -1496,13 +1506,13 @@ def _enrich_snapshot_with_fixed_plan(payload: dict[str, Any]) -> dict[str, Any]:
     falling back to entry price.
     """
     try:
-        from .trade_outcome import load_fixed_trade_plan
+        from .trade_outcome import load_desk_live_book
     except Exception:
         return payload
 
-    fixed = load_fixed_trade_plan()
+    book, _source = load_desk_live_book()
     symbols: list[str] = []
-    for p in (fixed.get("long") or []) + (fixed.get("short") or []):
+    for p in (book.get("long") or []) + (book.get("short") or []):
         s = (p.get("symbol") or "").upper()
         if s:
             symbols.append(s)
@@ -3243,7 +3253,9 @@ def _build_payload_from_live_data(
 
     candle_limit = int(os.getenv("INTRADAY_CANDIDATE_LIMIT", str(VOLUME_PRESELECT_LIMIT)))
     volume_limit = int(os.getenv("VOLUME_PRESELECT_LIMIT", str(VOLUME_PRESELECT_LIMIT)))
-    top_by_volume = _select_top_volume_stocks(all_stocks, volume_limit)
+    swing_limit = int(os.getenv("SWING_CANDIDATE_LIMIT", str(SWING_CANDIDATE_LIMIT)))
+    candle_limit = max(candle_limit, volume_limit, swing_limit)
+    top_by_volume = _select_top_volume_stocks(all_stocks, candle_limit)
     candidate_rows = top_by_volume[:candle_limit]
     candidate_keys = {row["ticker"] for row in candidate_rows}
     row_by_ticker = {row["ticker"]: row for row in all_stocks}
@@ -3420,8 +3432,8 @@ def _build_payload_from_live_data(
         "availablePools": [NIFTY_100_LABEL, "Nifty 500", LIVE_UNIVERSE_LABEL],
         "activePool": resolved_pool_name,
         "poolDescription": (
-            "Nifty 500 universe: live quotes on full index, intraday filters on top "
-            f"{volume_limit} volume leaders."
+            "Nifty 500 universe: live quotes on full index, swing candles on top "
+            f"{candle_limit} by volume, Asset Matrix volume screen {volume_limit}."
             if resolved_pool_name == NIFTY_500_LABEL
             else "Nifty 100 Angel One live universe ranked by your filter prompt."
             if resolved_pool_name == NIFTY_100_LABEL
@@ -3457,7 +3469,7 @@ def _build_payload_from_live_data(
         payload,
         mode="live",
         reason="Live refresh completed during the scheduled IST window.",
-        data_date=now.date().isoformat(),
+        data_date=_ist_now().date().isoformat(),
     )
 
     return payload
@@ -4021,6 +4033,29 @@ def create_app() -> FastAPI:
             return result
         except HTTPException:
             raise
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/swing-screener")
+    def swing_screener_get() -> dict[str, Any]:
+        """Cached swing pre-filter (Chartink unofficial or Yahoo). Lock gates unchanged."""
+        try:
+            from .swing_prefilter import load_prefilter_snapshot, refresh_swing_prefilter
+
+            snap = load_prefilter_snapshot()
+            if snap.get("symbols"):
+                return snap
+            return refresh_swing_prefilter(force=False)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.post("/api/swing-screener/refresh")
+    def swing_screener_refresh(force: bool = True) -> dict[str, Any]:
+        """Refresh Chartink/Yahoo swing pre-filter snapshot."""
+        try:
+            from .swing_prefilter import refresh_swing_prefilter
+
+            return refresh_swing_prefilter(force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -4684,8 +4719,9 @@ def _run_orchestrated_sequence(task_id: str, pool_name: str | None, custom_promp
             print(f"[ORCHESTRATION] {msg}")
 
         # 1. Immediately delete existing dashboard snapshot to start fresh
-        if SNAPSHOT_PATH.exists():
-            SNAPSHOT_PATH.unlink()
+        snap_path = _snapshot_path()
+        if snap_path.exists():
+            snap_path.unlink()
         
         payload: dict[str, Any] = {
             "success": True,

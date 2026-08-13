@@ -149,3 +149,126 @@ def test_ensure_retry_empty_force_relocks(monkeypatch):
     out = swing_session.ensure_swing_session_locked(retry_empty=True)
     assert calls == [{"force": True, "bypass": False}]
     assert out["long"][0]["symbol"] == "NEW"
+
+
+def _raw_buy_pick(symbol: str = "NEWBUY") -> dict:
+    return {
+        "ticker": symbol,
+        "symbol": symbol,
+        "deterministicSide": "BUY",
+        "riskAuditVerdict": "APPROVE",
+        "verdict": "APPROVE",
+        "passes_hard_filters": True,
+        "passes_quality_filters": True,
+        "ltp": 100.0,
+        "ltpRaw": 100.0,
+        "entryPrice": 100.0,
+        "stopLoss": 95.0,
+        "target1": 107.5,
+        "target2": 110.0,
+        "score": 25.0,
+        "intraday": {
+            "vwap": 99.0,
+            "ema9": 98.0,
+            "price_above_vwap": True,
+            "price_above_ema9": True,
+            "rsi": 62.0,
+            "oi_setup": "LONG_BUILDUP",
+            "pivot_r1_breakout": True,
+            "rsi_pivot_break": True,
+        },
+    }
+
+
+def _patch_hunt(monkeypatch, tmp_path, *, hunt_ok=True, hunt_code="entry_hunt", picks=None):
+    path = tmp_path / "swing_session.json"
+    monkeypatch.setattr(swing_session, "_SWING_SESSION_PATH", str(path))
+    monkeypatch.setattr(swing_session, "_ist_today", lambda: "2026-08-13")
+    monkeypatch.setattr(
+        swing_session,
+        "swing_entry_hunt_allowed",
+        lambda now=None, allow_manual_override=False: (
+            True,
+            "manual_override",
+        )
+        if allow_manual_override
+        else (hunt_ok, hunt_code),
+    )
+    monkeypatch.setattr(swing_session, "intraday_locked_symbols", lambda _day: set())
+    monkeypatch.setattr(swing_session, "is_swing_desk_eligible", lambda *_a, **_k: True)
+    monkeypatch.setattr(
+        swing_session,
+        "_swing_universe_diagnostics",
+        lambda **_k: {
+            "evaluated": 10,
+            "qualified": len(picks or []),
+            "crossBookExcluded": [],
+            "topRejectionReasons": [],
+        },
+    )
+    monkeypatch.setattr(
+        swing_session,
+        "_picks_from_asset_matrix",
+        lambda exclude_symbols=None: (list(picks or []), "test"),
+    )
+    monkeypatch.setattr(swing_session, "_ensure_today_matrix_snapshot", lambda: None)
+    return path
+
+
+def test_empty_during_hunt_is_not_cash_locked(monkeypatch, tmp_path: Path):
+    _patch_hunt(monkeypatch, tmp_path, hunt_ok=True, picks=[])
+    out = swing_session.lock_swing_session()
+    assert out["hunting"] is True
+    assert out["cashHeld"] is False
+    sess = out["session"]
+    assert sess["locked"] is False
+    assert sess["hunting"] is True
+    assert sess["cashHeld"] is False
+    assert sess["cashReason"] == "WAITING_FOR_QUALIFIED_BUY_ENTRY"
+    disk = swing_session.load_swing_session()
+    assert disk["locked"] is False
+    assert disk["hunting"] is True
+
+
+def test_empty_after_hunt_is_cash_held(monkeypatch, tmp_path: Path):
+    _patch_hunt(monkeypatch, tmp_path, hunt_ok=False, hunt_code="after_hunt", picks=[])
+    out = swing_session.lock_swing_session()
+    assert out["cashHeld"] is True
+    assert out["hunting"] is False
+    sess = out["session"]
+    assert sess["locked"] is True
+    assert sess["cashHeld"] is True
+    assert sess["hunting"] is False
+
+
+def test_qualified_buy_locks_during_hunt_after_1015(monkeypatch, tmp_path: Path):
+    _patch_hunt(monkeypatch, tmp_path, hunt_ok=True, picks=[_raw_buy_pick("ENTRY1")])
+    out = swing_session.lock_swing_session()
+    sess = out["session"]
+    assert sess["locked"] is True
+    assert sess["cashHeld"] is False
+    assert sess["long"][0]["symbol"] == "ENTRY1"
+    assert sess["long"][0]["slotNotional"] == round(swing_session.SWING_CAPITAL / swing_session.SWING_MATRIX_LOCK_COUNT, 2)
+
+
+def test_fill_up_appends_without_dropping_locked_name(monkeypatch, tmp_path: Path):
+    path = _patch_hunt(monkeypatch, tmp_path, hunt_ok=True, picks=[_raw_buy_pick("SECOND")])
+    first = _qualified_locked_row("FIRST")
+    swing_session._atomic_write(
+        str(path),
+        {
+            "locked": True,
+            "sessionDate": "2026-08-13",
+            "cashHeld": False,
+            "hunting": True,
+            "long": [first],
+            "short": [],
+            "counts": {"long": 1, "short": 0, "total": 1},
+        },
+    )
+    out = swing_session.lock_swing_session(force=False)
+    sess = out["session"]
+    symbols = [str(r.get("symbol")) for r in sess["long"]]
+    assert "FIRST" in symbols
+    assert "SECOND" in symbols
+    assert out.get("filled") == ["SECOND"]

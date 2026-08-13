@@ -1,41 +1,22 @@
 {
   "success": true,
   "locked": true,
+  "hunting": false,
+  "selectionFinalized": true,
+  "cashHeld": true,
   "book": "SWING",
-  "sessionDate": "2026-08-12",
-  "committedAt": "2026-08-12T04:20:52.785606+00:00",
-  "updatedAt": "2026-08-12T16:13:04.860412+00:00",
+  "sessionDate": "2026-08-13",
+  "committedAt": "2026-08-13T11:16:16.881292+00:00",
+  "updatedAt": "2026-08-13T11:17:09.444009+00:00",
+  "huntStartedAt": "2026-08-13T05:16:23.411670+00:00",
   "executionPolicy": "MANUAL_ONLY",
-  "source": "asset_matrix_buy",
+  "source": "asset_matrix_deterministic_buy",
+  "selectionContract": "DETERMINISTIC_BUY_V1",
   "rotation": "DAILY",
-  "priorSessionDate": "2026-08-11",
+  "priorSessionDate": null,
   "long": [],
   "short": [],
-  "skippedIncomplete": [
-    "FINCABLES:HARD_FILTERS_NOT_PASSED|QUALITY_FILTERS_NOT_PASSED|ABOVE_VWAP_REQUIREMENT_FAILED|ABOVE_EMA9_REQUIREMENT_FAILED|BULLISH_OI_REQUIRED:MISSING|RSI_REQUIREMENT_FAILED:min=55|BREAKOUT_REQUIREMENT_FAILED",
-    "NATIONALUM:HARD_FILTERS_NOT_PASSED|QUALITY_FILTERS_NOT_PASSED|ABOVE_VWAP_REQUIREMENT_FAILED|ABOVE_EMA9_REQUIREMENT_FAILED|BULLISH_OI_REQUIRED:MISSING|RSI_REQUIREMENT_FAILED:min=55|BREAKOUT_REQUIREMENT_FAILED",
-    "GODREJCP:HARD_FILTERS_NOT_PASSED|QUALITY_FILTERS_NOT_PASSED|ABOVE_VWAP_REQUIREMENT_FAILED|ABOVE_EMA9_REQUIREMENT_FAILED|BULLISH_OI_REQUIRED:MISSING|RSI_REQUIREMENT_FAILED:min=55|BREAKOUT_REQUIREMENT_FAILED",
-    "RHIM:HARD_FILTERS_NOT_PASSED|QUALITY_FILTERS_NOT_PASSED|ABOVE_VWAP_REQUIREMENT_FAILED|ABOVE_EMA9_REQUIREMENT_FAILED|BULLISH_OI_REQUIRED:MISSING|RSI_REQUIREMENT_FAILED:min=55|BREAKOUT_REQUIREMENT_FAILED",
-    "PNB:HARD_FILTERS_NOT_PASSED|QUALITY_FILTERS_NOT_PASSED|ABOVE_VWAP_REQUIREMENT_FAILED|ABOVE_EMA9_REQUIREMENT_FAILED|BULLISH_OI_REQUIRED:MISSING|RSI_REQUIREMENT_FAILED:min=55|BREAKOUT_REQUIREMENT_FAILED"
-  ],
-  "capital": {
-    "swingCapital": 1000000.0,
-    "riskFraction": 0.01,
-    "slots": 0,
-    "deployedCapital": 0,
-    "remainingCapital": 1000000.0,
-    "portfolioRisk": 0
-  },
-  "counts": {
-    "long": 0,
-    "short": 0,
-    "total": 0
-  },
-  "deskGates": {
-    "minPrice": 50.0,
-    "rejectDvr": true
-  },
-  "crossBookExcluded": [],
+  "skippedIncomplete": [],
   "excludedInvalidSelections": [
     {
       "symbol": "FINCABLES",
@@ -882,11 +863,101 @@
       "source": "eod/book_swing.json"
     }
   ],
-  "selectionFinalized": true,
-  "selectionContract": "DETERMINISTIC_BUY_V1",
-  "scrubbedAt": "2026-08-12T14:46:27.036991+00:00",
-  "cashHeld": true,
-  "cashReason": "NO_ACTIVE_VALID_SWING_SELECTIONS",
+  "capital": {
+    "swingCapital": 1000000.0,
+    "riskFraction": 0.01,
+    "slots": 0,
+    "deployedCapital": 0.0,
+    "remainingCapital": 1000000.0,
+    "portfolioRisk": 0.0
+  },
+  "counts": {
+    "long": 0,
+    "short": 0,
+    "total": 0
+  },
+  "deskGates": {
+    "minPrice": 50.0,
+    "rejectDvr": true
+  },
+  "crossBookExcluded": [
+    "AARTIIND",
+    "BIOCON",
+    "GAIL",
+    "ICICIBANK",
+    "JIOFIN",
+    "NESTLEIND",
+    "NTPC",
+    "PFC",
+    "SHRIRAMFIN",
+    "SONACOMS",
+    "SWIGGY",
+    "TATASTEEL",
+    "VEDL"
+  ],
+  "cashReason": "NO_FULLY_QUALIFIED_EXPLICIT_BUY_CANDIDATES",
+  "huntWindow": {
+    "huntStart": "09:45",
+    "huntEnd": "14:45",
+    "timezone": "Asia/Kolkata",
+    "rationale": "Hunt a fully qualified BUY from 09:45 IST; lock each entry when found; do not cash-finalize at 10:15; hunt closes 14:45"
+  },
+  "entryHuntDiagnostics": {
+    "universeSize": 500,
+    "volumeScreened": 200,
+    "displayPool": 50,
+    "evaluated": 173,
+    "qualified": 0,
+    "crossBookExcluded": [
+      "AARTIIND",
+      "BIOCON",
+      "GAIL",
+      "ICICIBANK",
+      "JIOFIN",
+      "NESTLEIND",
+      "NTPC",
+      "PFC",
+      "SHRIRAMFIN",
+      "SONACOMS",
+      "SWIGGY",
+      "TATASTEEL",
+      "VEDL"
+    ],
+    "topRejectionReasons": [
+      {
+        "reason": "EXPLICIT_BUY_SIDE_REQUIRED:MISSING",
+        "count": 173
+      },
+      {
+        "reason": "HARD_FILTERS_NOT_PASSED",
+        "count": 173
+      },
+      {
+        "reason": "QUALITY_FILTERS_NOT_PASSED",
+        "count": 173
+      },
+      {
+        "reason": "BREAKOUT_REQUIREMENT_FAILED",
+        "count": 156
+      },
+      {
+        "reason": "RSI_REQUIREMENT_FAILED:min=55",
+        "count": 135
+      },
+      {
+        "reason": "ABOVE_VWAP_REQUIREMENT_FAILED",
+        "count": 116
+      },
+      {
+        "reason": "ABOVE_EMA9_REQUIREMENT_FAILED",
+        "count": 103
+      },
+      {
+        "reason": "BULLISH_OI_REQUIRED:SHORT_BUILDUP",
+        "count": 64
+      }
+    ]
+  },
   "portfolio": {
     "swingCapital": 1000000.0,
     "realizedPnl": 0,
@@ -896,7 +967,7 @@
   },
   "priceOnly": true,
   "automation": {
-    "lastRefreshAt": "2026-08-12T16:13:04.860412+00:00",
+    "lastRefreshAt": "2026-08-13T11:17:09.444009+00:00",
     "source": "refresh_swing_session_state",
     "executionPolicy": "MANUAL_ONLY"
   }

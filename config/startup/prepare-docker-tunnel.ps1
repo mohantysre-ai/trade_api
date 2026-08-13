@@ -76,7 +76,7 @@ $utf8 = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($OutConfig, $sb.ToString(), $utf8)
 
 $summary = ($ingressPairs | ForEach-Object { "$($_.Hostname)->$($_.Service)" }) -join ", "
-Write-Host "[OK] Docker tunnel config ready ($tunnelName: $summary)" -ForegroundColor Green
+Write-Host "[OK] Docker tunnel config ready (${tunnelName}: $summary)" -ForegroundColor Green
 Write-Host "     $OutConfig"
 Write-Host "     credentials: $CredDest"
 exit 0
