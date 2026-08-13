@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,6 +33,8 @@ MIN_PROMOTER_HOLDING_PCT = float(os.getenv("MIN_PROMOTER_HOLDING_PCT", "60"))
 MIN_VOLUME_MULTIPLIER = float(os.getenv("MIN_VOLUME_MULTIPLIER", "1.5"))
 MIN_TURNOVER_CR = float(os.getenv("MIN_TURNOVER_CR", "50"))
 MIN_RSI_PIVOT = float(os.getenv("MIN_RSI_PIVOT", "55"))
+# Swing / matrix hard gate: already-extended names. Raised 3% → 6%.
+MAX_DAY_MOVE_PCT = float(os.getenv("MAX_DAY_MOVE_PCT", "6"))
 REQUIRE_PIVOT_R1_BREAKOUT = os.getenv("REQUIRE_PIVOT_R1_BREAKOUT", "true").strip().lower() in {
     "1",
     "true",
@@ -69,6 +72,59 @@ def risky_symbol_denylist() -> set[str]:
 
 def is_risky_symbol(symbol: str) -> bool:
     return symbol.upper() in risky_symbol_denylist()
+
+
+def parse_day_change_pct(*values: Any) -> float | None:
+    """Parse desk delta strings such as ``12.40 (+3.50%)`` or ``+3.50%``."""
+    for value in values:
+        if value is None or value == "":
+            continue
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            return float(value)
+        text = str(value).strip().replace(",", "")
+        if not text:
+            continue
+        paren = re.search(r"\(([+-]?\d+(?:\.\d+)?)%\)", text)
+        if paren:
+            return float(paren.group(1))
+        pct = re.search(r"([+-]?\d+(?:\.\d+)?)\s*%", text)
+        if pct:
+            return float(pct.group(1))
+        try:
+            return float(text)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def day_change_pct_from_prices(ltp: Any, close: Any) -> float | None:
+    try:
+        px = float(ltp)
+        prev = float(close)
+    except (TypeError, ValueError):
+        return None
+    if px <= 0 or prev <= 0:
+        return None
+    return (px - prev) / prev * 100.0
+
+
+def day_change_pct_from_row(row: dict[str, Any]) -> float | None:
+    parsed = parse_day_change_pct(
+        row.get("dayChangePct"),
+        row.get("delta"),
+        row.get("day_change_pct"),
+    )
+    if parsed is not None:
+        return parsed
+    intra = row.get("intraday") if isinstance(row.get("intraday"), dict) else {}
+    parsed = parse_day_change_pct(intra.get("day_change_pct"), intra.get("dayChangePct"))
+    if parsed is not None:
+        return parsed
+    ltp = row.get("ltpRaw") or row.get("ltp") or intra.get("ltp")
+    close = row.get("close") or intra.get("prev_close") or intra.get("close")
+    return day_change_pct_from_prices(ltp, close)
 
 
 def classic_pivots(prev_high: float, prev_low: float, prev_close: float) -> dict[str, float]:
@@ -241,6 +297,10 @@ def evaluate_short_term_quality(
     wick_noise = float(intraday.get("wick_noise_ratio") or 1.0)
     if wick_noise > 0.25:
         reasons.append("wick noise too high")
+
+    day_move = parse_day_change_pct(intraday.get("day_change_pct"), intraday.get("dayChangePct"))
+    if day_move is not None and day_move > MAX_DAY_MOVE_PCT:
+        reasons.append(f"day move over {MAX_DAY_MOVE_PCT:g}%")
 
     if REQUIRE_BULK_DEAL and not intraday.get("bulk_deal_signal"):
         reasons.append(

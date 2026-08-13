@@ -3,7 +3,7 @@
   "locked": true,
   "sessionDate": "2026-08-13",
   "committedAt": "2026-08-13T04:24:22.018431+00:00",
-  "updatedAt": "2026-08-13T11:22:03.948116+00:00",
+  "updatedAt": "2026-08-13T12:56:10.544262+00:00",
   "snapshotUpdatedAt": "2026-08-13T04:23:57.579722+00:00",
   "dataStale": false,
   "regime": {
@@ -7564,562 +7564,15 @@
   ],
   "events": [
     {
-      "type": "SESSION_COMMIT",
-      "at": "2026-08-13T04:24:22.018431+00:00",
-      "long": [
-        "NTPC",
-        "JIOFIN",
-        "AARTIIND"
-      ],
-      "short": [
-        "PFC",
-        "GAIL"
-      ],
-      "candidatePoolLong": [
-        "JIOFIN",
-        "AARTIIND",
-        "NTPC",
-        "NESTLEIND",
-        "GODREJCP",
-        "DELHIVERY",
-        "SONACOMS",
-        "SHRIRAMFIN",
-        "SWIGGY",
-        "ETERNAL"
-      ],
-      "candidatePoolShort": [
-        "BIOCON",
-        "GAIL",
-        "UNIONBANK",
-        "VEDL",
-        "LICI",
-        "TATASTEEL",
-        "BHEL",
-        "ICICIBANK",
-        "CGPOWER",
-        "PFC"
-      ],
-      "funnel": "10+10 \u2192 adopt 5 total",
-      "shortCashHeld": true,
-      "shortCashReason": "Portfolio 5/5 \u2014 cash held (regime=RISK_OFF nifty=-0.37)",
-      "sleeves": {
-        "momentumSlots": 6,
-        "meanRevSlots": 0,
-        "lockSize": 5,
-        "candidatePoolSize": 10,
-        "totalFilled": 5
-      },
-      "executionPolicy": "MANUAL_ONLY"
-    },
-    {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T05:16:22.683182+00:00",
-      "symbol": "AARTIIND",
-      "direction": "LONG",
-      "slotFreed": true
-    },
-    {
-      "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T05:16:22.683274+00:00",
-      "freeSlots": {
-        "long": 1,
-        "short": 1,
-        "total": 1,
-        "openLong": 2,
-        "openShort": 2,
-        "lockSize": 5
-      }
-    },
-    {
-      "type": "REPLACEMENT_APPLIED",
-      "at": "2026-08-13T05:16:22.783455+00:00",
-      "freeSlotsAfter": {
-        "long": 0,
-        "short": 0,
-        "total": 0,
-        "openLong": 3,
-        "openShort": 2,
-        "lockSize": 5
-      },
-      "applied": [
-        {
-          "symbol": "SONACOMS",
-          "direction": "LONG",
-          "replacedFrom": "AARTIIND",
-          "replacedAt": "2026-08-13T05:16:22.783244+00:00",
-          "entryPrice": 806.45,
-          "approxQty": 124,
-          "score": 55.4,
-          "source": "REPLACEMENT"
-        }
-      ]
-    },
-    {
-      "type": "POSITION_REPLACED",
-      "at": "2026-08-13T05:16:22.783244+00:00",
-      "symbol": "SONACOMS",
-      "direction": "LONG",
-      "replacedFrom": "AARTIIND"
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-13T05:17:23.791561+00:00",
-      "symbol": "GAIL",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T05:17:23.791943+00:00",
-      "freeSlots": {
-        "long": 0,
-        "short": 1,
-        "total": 1,
-        "openLong": 3,
-        "openShort": 1,
-        "lockSize": 5
-      }
-    },
-    {
-      "type": "REPLACEMENT_APPLIED",
-      "at": "2026-08-13T05:17:24.057156+00:00",
-      "freeSlotsAfter": {
-        "long": 0,
-        "short": 0,
-        "total": 0,
-        "openLong": 3,
-        "openShort": 2,
-        "lockSize": 5
-      },
-      "applied": [
-        {
-          "symbol": "VEDL",
-          "direction": "SHORT",
-          "replacedFrom": "GAIL",
-          "replacedAt": "2026-08-13T05:17:24.056983+00:00",
-          "entryPrice": 274.2,
-          "approxQty": 364,
-          "score": 60.6,
-          "source": "REPLACEMENT"
-        }
-      ]
-    },
-    {
-      "type": "POSITION_REPLACED",
-      "at": "2026-08-13T05:17:24.056983+00:00",
-      "symbol": "VEDL",
-      "direction": "SHORT",
-      "replacedFrom": "GAIL"
-    },
-    {
-      "type": "REPLACEMENT_PROPOSED",
-      "at": "2026-08-13T05:17:24.179079+00:00",
-      "freeSlots": {
-        "long": 0,
-        "short": 0,
-        "total": 0,
-        "openLong": 3,
-        "openShort": 2,
-        "lockSize": 5
-      },
-      "candidates": [
-        {
-          "symbol": "VEDL",
-          "direction": "SHORT",
-          "entryState": "QUALIFIED",
-          "score": 60.6,
-          "oiSetup": null,
-          "qualityAdjustedExpectedR": 1.493,
-          "proposalOnly": true
-        }
-      ]
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-13T05:56:18.628955+00:00",
-      "symbol": "JIOFIN",
-      "direction": "LONG",
-      "slotFreed": true
-    },
-    {
-      "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T05:56:18.628996+00:00",
-      "freeSlots": {
-        "long": 1,
-        "short": 1,
-        "total": 1,
-        "openLong": 2,
-        "openShort": 2,
-        "lockSize": 5
-      }
-    },
-    {
-      "type": "REPLACEMENT_APPLIED",
-      "at": "2026-08-13T05:56:18.683669+00:00",
-      "freeSlotsAfter": {
-        "long": 0,
-        "short": 0,
-        "total": 0,
-        "openLong": 3,
-        "openShort": 2,
-        "lockSize": 5
-      },
-      "applied": [
-        {
-          "symbol": "SHRIRAMFIN",
-          "direction": "LONG",
-          "replacedFrom": "JIOFIN",
-          "replacedAt": "2026-08-13T05:56:18.683547+00:00",
-          "entryPrice": 1132.9,
-          "approxQty": 88,
-          "score": 56.7,
-          "source": "REPLACEMENT"
-        }
-      ]
-    },
-    {
-      "type": "POSITION_REPLACED",
-      "at": "2026-08-13T05:56:18.683547+00:00",
-      "symbol": "SHRIRAMFIN",
-      "direction": "LONG",
-      "replacedFrom": "JIOFIN"
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-13T05:56:49.567469+00:00",
-      "symbol": "SHRIRAMFIN",
-      "direction": "LONG",
-      "slotFreed": true
-    },
-    {
-      "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T05:56:49.567539+00:00",
-      "freeSlots": {
-        "long": 1,
-        "short": 1,
-        "total": 1,
-        "openLong": 2,
-        "openShort": 2,
-        "lockSize": 5
-      }
-    },
-    {
-      "type": "REPLACEMENT_APPLIED",
-      "at": "2026-08-13T05:56:49.626014+00:00",
-      "freeSlotsAfter": {
-        "long": 0,
-        "short": 0,
-        "total": 0,
-        "openLong": 3,
-        "openShort": 2,
-        "lockSize": 5
-      },
-      "applied": [
-        {
-          "symbol": "SWIGGY",
-          "direction": "LONG",
-          "replacedFrom": "JIOFIN",
-          "replacedAt": "2026-08-13T05:56:49.625854+00:00",
-          "entryPrice": 281.95,
-          "approxQty": 354,
-          "score": 58.1,
-          "source": "REPLACEMENT"
-        }
-      ]
-    },
-    {
-      "type": "POSITION_REPLACED",
-      "at": "2026-08-13T05:56:49.625854+00:00",
-      "symbol": "SWIGGY",
-      "direction": "LONG",
-      "replacedFrom": "JIOFIN"
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-13T06:05:57.241728+00:00",
-      "symbol": "VEDL",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T06:05:57.241900+00:00",
-      "freeSlots": {
-        "long": 0,
-        "short": 1,
-        "total": 1,
-        "openLong": 3,
-        "openShort": 1,
-        "lockSize": 5
-      }
-    },
-    {
-      "type": "REPLACEMENT_APPLIED",
-      "at": "2026-08-13T06:05:57.300154+00:00",
-      "freeSlotsAfter": {
-        "long": 0,
-        "short": 0,
-        "total": 0,
-        "openLong": 3,
-        "openShort": 2,
-        "lockSize": 5
-      },
-      "applied": [
-        {
-          "symbol": "TATASTEEL",
-          "direction": "SHORT",
-          "replacedFrom": "GAIL",
-          "replacedAt": "2026-08-13T06:05:57.300034+00:00",
-          "entryPrice": 185.36,
-          "approxQty": 539,
-          "score": 63.1,
-          "source": "REPLACEMENT"
-        }
-      ]
-    },
-    {
-      "type": "POSITION_REPLACED",
-      "at": "2026-08-13T06:05:57.300034+00:00",
-      "symbol": "TATASTEEL",
-      "direction": "SHORT",
-      "replacedFrom": "GAIL"
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-13T06:18:28.606890+00:00",
-      "symbol": "NTPC",
-      "direction": "LONG",
-      "slotFreed": true
-    },
-    {
-      "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T06:18:28.606993+00:00",
-      "freeSlots": {
-        "long": 1,
-        "short": 1,
-        "total": 1,
-        "openLong": 2,
-        "openShort": 2,
-        "lockSize": 5
-      }
-    },
-    {
-      "type": "REPLACEMENT_APPLIED",
-      "at": "2026-08-13T06:18:28.677138+00:00",
-      "freeSlotsAfter": {
-        "long": 0,
-        "short": 0,
-        "total": 0,
-        "openLong": 3,
-        "openShort": 2,
-        "lockSize": 5
-      },
-      "applied": [
-        {
-          "symbol": "NESTLEIND",
-          "direction": "LONG",
-          "replacedFrom": "NTPC",
-          "replacedAt": "2026-08-13T06:18:28.677041+00:00",
-          "entryPrice": 1514.1,
-          "approxQty": 66,
-          "score": 55.5,
-          "source": "REPLACEMENT"
-        }
-      ]
-    },
-    {
-      "type": "POSITION_REPLACED",
-      "at": "2026-08-13T06:18:28.677041+00:00",
-      "symbol": "NESTLEIND",
-      "direction": "LONG",
-      "replacedFrom": "NTPC"
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-13T06:59:07.984802+00:00",
-      "symbol": "TATASTEEL",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T06:59:07.984852+00:00",
-      "freeSlots": {
-        "long": 0,
-        "short": 1,
-        "total": 1,
-        "openLong": 3,
-        "openShort": 1,
-        "lockSize": 5
-      }
-    },
-    {
-      "type": "REPLACEMENT_APPLIED",
-      "at": "2026-08-13T06:59:08.036169+00:00",
-      "freeSlotsAfter": {
-        "long": 0,
-        "short": 0,
-        "total": 0,
-        "openLong": 3,
-        "openShort": 2,
-        "lockSize": 5
-      },
-      "applied": [
-        {
-          "symbol": "BIOCON",
-          "direction": "SHORT",
-          "replacedFrom": "GAIL",
-          "replacedAt": "2026-08-13T06:59:08.036034+00:00",
-          "entryPrice": 421.65,
-          "approxQty": 237,
-          "score": 60.7,
-          "source": "REPLACEMENT"
-        }
-      ]
-    },
-    {
-      "type": "POSITION_REPLACED",
-      "at": "2026-08-13T06:59:08.036034+00:00",
-      "symbol": "BIOCON",
-      "direction": "SHORT",
-      "replacedFrom": "GAIL"
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-13T06:59:38.230902+00:00",
-      "symbol": "BIOCON",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T06:59:38.230933+00:00",
-      "freeSlots": {
-        "long": 0,
-        "short": 1,
-        "total": 1,
-        "openLong": 3,
-        "openShort": 1,
-        "lockSize": 5
-      }
-    },
-    {
-      "type": "REPLACEMENT_APPLIED",
-      "at": "2026-08-13T06:59:38.263320+00:00",
-      "freeSlotsAfter": {
-        "long": 0,
-        "short": 0,
-        "total": 0,
-        "openLong": 3,
-        "openShort": 2,
-        "lockSize": 5
-      },
-      "applied": [
-        {
-          "symbol": "ICICIBANK",
-          "direction": "SHORT",
-          "replacedFrom": "GAIL",
-          "replacedAt": "2026-08-13T06:59:38.263255+00:00",
-          "entryPrice": 1416.6,
-          "approxQty": 141,
-          "score": 65.9,
-          "source": "REPLACEMENT"
-        }
-      ]
-    },
-    {
-      "type": "POSITION_REPLACED",
-      "at": "2026-08-13T06:59:38.263255+00:00",
-      "symbol": "ICICIBANK",
-      "direction": "SHORT",
-      "replacedFrom": "GAIL"
-    },
-    {
-      "type": "REPLACEMENT_PROPOSED",
-      "at": "2026-08-13T06:59:38.338645+00:00",
-      "freeSlots": {
-        "long": 0,
-        "short": 0,
-        "total": 0,
-        "openLong": 3,
-        "openShort": 2,
-        "lockSize": 5
-      },
-      "candidates": [
-        {
-          "symbol": "ICICIBANK",
-          "direction": "SHORT",
-          "entryState": "QUALIFIED",
-          "score": 65.9,
-          "oiSetup": "SHORT_BUILDUP",
-          "qualityAdjustedExpectedR": 1.543,
-          "proposalOnly": true
-        }
-      ]
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-13T07:28:34.343322+00:00",
+      "at": "2026-08-13T12:26:44.131963+00:00",
       "symbol": "ICICIBANK",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T07:28:34.343358+00:00",
-      "freeSlots": {
-        "long": 0,
-        "short": 1,
-        "total": 1,
-        "openLong": 3,
-        "openShort": 1,
-        "lockSize": 5
-      }
-    },
-    {
-      "type": "CASH_HELD",
-      "at": "2026-08-13T08:00:33.690230+00:00",
-      "freeSlots": {
-        "long": 0,
-        "short": 1,
-        "total": 1,
-        "openLong": 3,
-        "openShort": 1,
-        "lockSize": 5
-      },
-      "reason": "prefer_cash_no_qualified"
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-13T10:01:36.517443+00:00",
-      "symbol": "SONACOMS",
-      "direction": "LONG",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-13T10:01:36.517456+00:00",
-      "symbol": "SWIGGY",
-      "direction": "LONG",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-13T10:01:36.517464+00:00",
-      "symbol": "NESTLEIND",
-      "direction": "LONG",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-13T10:01:36.517471+00:00",
-      "symbol": "PFC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T10:01:36.517500+00:00",
+      "at": "2026-08-13T12:26:44.132011+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8131,77 +7584,63 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:17:08.183231+00:00",
+      "at": "2026-08-13T12:27:44.752101+00:00",
       "symbol": "NTPC",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:17:08.183277+00:00",
+      "at": "2026-08-13T12:27:44.752176+00:00",
       "symbol": "SONACOMS",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:17:08.183311+00:00",
+      "at": "2026-08-13T12:27:44.752222+00:00",
       "symbol": "SHRIRAMFIN",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:17:08.183338+00:00",
+      "at": "2026-08-13T12:27:44.752266+00:00",
       "symbol": "SWIGGY",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:17:08.183367+00:00",
+      "at": "2026-08-13T12:27:44.752309+00:00",
       "symbol": "NESTLEIND",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:17:08.183398+00:00",
+      "at": "2026-08-13T12:27:44.752354+00:00",
       "symbol": "PFC",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:17:08.183428+00:00",
-      "symbol": "VEDL",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:17:08.183455+00:00",
+      "at": "2026-08-13T12:27:44.752401+00:00",
       "symbol": "TATASTEEL",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:17:08.183482+00:00",
-      "symbol": "BIOCON",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:17:08.183508+00:00",
+      "at": "2026-08-13T12:27:44.752445+00:00",
       "symbol": "ICICIBANK",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T11:17:08.183629+00:00",
+      "at": "2026-08-13T12:27:44.752553+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8213,63 +7652,63 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:18:37.309295+00:00",
+      "at": "2026-08-13T12:28:45.410678+00:00",
       "symbol": "NTPC",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:18:37.309381+00:00",
+      "at": "2026-08-13T12:28:45.410726+00:00",
       "symbol": "SONACOMS",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:18:37.309422+00:00",
+      "at": "2026-08-13T12:28:45.410756+00:00",
       "symbol": "SHRIRAMFIN",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:18:37.309460+00:00",
+      "at": "2026-08-13T12:28:45.410781+00:00",
       "symbol": "SWIGGY",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:18:37.309498+00:00",
+      "at": "2026-08-13T12:28:45.410804+00:00",
       "symbol": "NESTLEIND",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:18:37.309543+00:00",
+      "at": "2026-08-13T12:28:45.410829+00:00",
       "symbol": "PFC",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:18:37.309581+00:00",
+      "at": "2026-08-13T12:28:45.410853+00:00",
       "symbol": "TATASTEEL",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:18:37.309621+00:00",
+      "at": "2026-08-13T12:28:45.410879+00:00",
       "symbol": "ICICIBANK",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T11:18:37.309730+00:00",
+      "at": "2026-08-13T12:28:45.411030+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8281,63 +7720,63 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:19:38.224520+00:00",
+      "at": "2026-08-13T12:29:46.138588+00:00",
       "symbol": "NTPC",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:19:38.224578+00:00",
+      "at": "2026-08-13T12:29:46.138666+00:00",
       "symbol": "SONACOMS",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:19:38.224617+00:00",
+      "at": "2026-08-13T12:29:46.138722+00:00",
       "symbol": "SHRIRAMFIN",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:19:38.224656+00:00",
+      "at": "2026-08-13T12:29:46.138770+00:00",
       "symbol": "SWIGGY",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:19:38.224695+00:00",
+      "at": "2026-08-13T12:29:46.138899+00:00",
       "symbol": "NESTLEIND",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:19:38.224737+00:00",
+      "at": "2026-08-13T12:29:46.138958+00:00",
       "symbol": "PFC",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:19:38.224778+00:00",
+      "at": "2026-08-13T12:29:46.139008+00:00",
       "symbol": "TATASTEEL",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:19:38.224813+00:00",
+      "at": "2026-08-13T12:29:46.139059+00:00",
       "symbol": "ICICIBANK",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T11:19:38.224921+00:00",
+      "at": "2026-08-13T12:29:46.139184+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8349,63 +7788,63 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:20:48.423648+00:00",
+      "at": "2026-08-13T12:30:46.796711+00:00",
       "symbol": "NTPC",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:20:48.423701+00:00",
+      "at": "2026-08-13T12:30:46.796764+00:00",
       "symbol": "SONACOMS",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:20:48.423735+00:00",
+      "at": "2026-08-13T12:30:46.796795+00:00",
       "symbol": "SHRIRAMFIN",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:20:48.423764+00:00",
+      "at": "2026-08-13T12:30:46.796822+00:00",
       "symbol": "SWIGGY",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:20:48.423795+00:00",
+      "at": "2026-08-13T12:30:46.796845+00:00",
       "symbol": "NESTLEIND",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:20:48.423827+00:00",
+      "at": "2026-08-13T12:30:46.796869+00:00",
       "symbol": "PFC",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:20:48.423862+00:00",
+      "at": "2026-08-13T12:30:46.796894+00:00",
       "symbol": "TATASTEEL",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:20:48.423897+00:00",
+      "at": "2026-08-13T12:30:46.796922+00:00",
       "symbol": "ICICIBANK",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T11:20:48.423991+00:00",
+      "at": "2026-08-13T12:30:46.796993+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8417,63 +7856,1219 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:22:03.947775+00:00",
+      "at": "2026-08-13T12:31:47.495017+00:00",
       "symbol": "NTPC",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:22:03.947832+00:00",
+      "at": "2026-08-13T12:31:47.495055+00:00",
       "symbol": "SONACOMS",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:22:03.947858+00:00",
+      "at": "2026-08-13T12:31:47.495075+00:00",
       "symbol": "SHRIRAMFIN",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:22:03.947878+00:00",
+      "at": "2026-08-13T12:31:47.495103+00:00",
       "symbol": "SWIGGY",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:22:03.947901+00:00",
+      "at": "2026-08-13T12:31:47.495126+00:00",
       "symbol": "NESTLEIND",
       "direction": "LONG",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:22:03.947934+00:00",
+      "at": "2026-08-13T12:31:47.495152+00:00",
       "symbol": "PFC",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:22:03.947966+00:00",
+      "at": "2026-08-13T12:31:47.495179+00:00",
       "symbol": "TATASTEEL",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-13T11:22:03.947999+00:00",
+      "at": "2026-08-13T12:31:47.495199+00:00",
       "symbol": "ICICIBANK",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-13T11:22:03.948099+00:00",
+      "at": "2026-08-13T12:31:47.495262+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:32:48.259079+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:32:48.259140+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:32:48.259187+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:32:48.259229+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:32:48.259255+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:32:48.259282+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:32:48.259308+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:32:48.259334+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:32:48.259403+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:37:14.587422+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:37:14.587493+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:37:14.587529+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:37:14.587561+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:37:14.587591+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:37:14.587627+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:37:14.587662+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:37:14.587697+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:37:14.587814+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:38:23.357217+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:38:23.357253+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:38:23.357274+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:38:23.357293+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:38:23.357309+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:38:23.357326+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:38:23.357343+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:38:23.357359+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:38:23.357410+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:39:37.040516+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:39:37.040574+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:39:37.040605+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:39:37.040634+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:39:37.040657+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:39:37.040683+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:39:37.040709+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:39:37.040734+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:39:37.040812+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:40:37.714751+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:40:37.714807+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:40:37.714838+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:40:37.714864+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:40:37.714889+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:40:37.714914+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:40:37.714940+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:40:37.715016+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:40:37.715111+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:41:38.727551+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:41:38.727596+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:41:38.727624+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:41:38.727649+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:41:38.727671+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:41:38.727694+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:41:38.727718+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:41:38.727743+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:41:38.727809+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:42:39.679873+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:42:39.679932+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:42:39.679964+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:42:39.679994+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:42:39.680018+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:42:39.680044+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:42:39.680071+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:42:39.680096+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:42:39.680171+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:43:40.399529+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:43:40.399591+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:43:40.399629+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:43:40.399660+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:43:40.399689+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:43:40.399721+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:43:40.399754+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:43:40.399786+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:43:40.399876+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:44:41.132171+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:44:41.132242+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:44:41.132290+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:44:41.132333+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:44:41.132371+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:44:41.132413+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:44:41.132456+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:44:41.132496+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:44:41.132606+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:45:41.776706+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:45:41.776763+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:45:41.776799+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:45:41.776834+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:45:41.776866+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:45:41.776898+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:45:41.776933+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:45:41.776966+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:45:41.777052+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:46:42.599825+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:46:42.599985+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:46:42.600027+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:46:42.600058+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:46:42.600085+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:46:42.600117+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:46:42.600149+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:46:42.600178+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:46:42.600342+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:47:43.368177+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:47:43.368344+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:47:43.368382+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:47:43.368405+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:47:43.368425+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:47:43.368447+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:47:43.368469+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:47:43.368491+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:47:43.368572+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:48:44.262948+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:48:44.263100+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:48:44.263146+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:48:44.263190+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:48:44.263229+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:48:44.263271+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:48:44.263376+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:48:44.263624+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:48:44.264115+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:49:44.974144+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:49:44.974210+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:49:44.974255+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:49:44.974297+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:49:44.974337+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:49:44.974379+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:49:44.974420+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:49:44.974461+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:49:44.974572+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:54:08.337676+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:54:08.337747+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:54:08.337782+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:54:08.337814+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:54:08.337845+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:54:08.337871+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:54:08.337891+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:54:08.337915+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:54:08.338035+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:55:10.138659+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:55:10.138692+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:55:10.138711+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:55:10.138728+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:55:10.138743+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:55:10.138759+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:55:10.138775+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:55:10.138793+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:55:10.138845+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:56:10.544114+00:00",
+      "symbol": "NTPC",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:56:10.544140+00:00",
+      "symbol": "SONACOMS",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:56:10.544156+00:00",
+      "symbol": "SHRIRAMFIN",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:56:10.544168+00:00",
+      "symbol": "SWIGGY",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:56:10.544181+00:00",
+      "symbol": "NESTLEIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:56:10.544195+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:56:10.544208+00:00",
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-13T12:56:10.544221+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-13T12:56:10.544256+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,

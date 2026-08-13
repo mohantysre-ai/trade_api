@@ -54,3 +54,26 @@ def test_market_snapshot_path_honors_env(tmp_path, monkeypatch):
 def test_session_date_str_reads_entry_date_fallback():
     assert _session_date_str({"long": [{"entryDate": "2026-08-11"}]}) == "2026-08-11"
     assert _session_date_str({"sessionDate": "2026-08-13"}) == "2026-08-13"
+
+
+def test_dummy_quote_stub_is_not_reused_as_candle_cache():
+    from datetime import datetime, timezone
+
+    from app.services.angel_one_feed import _snapshot_intraday_cache
+
+    snap = {
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "stockQuotes": {
+            "REAL": {"intraday": {"vwap": 100.0, "rsi": 60.0}},
+            "DUMMY": {
+                "intraday": {
+                    "vwap": 0.0,
+                    "rsi": 0.0,
+                    "hard_filter_reasons": ["not in intraday candidate set"],
+                }
+            },
+        },
+    }
+    cache = _snapshot_intraday_cache(snap)
+    assert "REAL" in cache
+    assert "DUMMY" not in cache

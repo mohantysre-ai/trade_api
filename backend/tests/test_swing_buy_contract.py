@@ -96,6 +96,26 @@ def test_stale_snapshot_triggers_hunt_refresh(monkeypatch):
     assert calls == ["swing_entry_hunt"]
 
 
+def test_undersized_snapshot_triggers_nifty500_hunt_refresh(monkeypatch):
+    calls = []
+    monkeypatch.setattr(swing_session, "_read_json", lambda _p: {
+        "selectionMeta": {"dataDate": "2026-08-13", "mode": "live"},
+        "activePool": "Nifty 100",
+        "universeSize": 189,
+        "stockQuotes": {f"T{i}": {"ticker": f"T{i}"} for i in range(189)},
+        "stocks": [{"ticker": "X", "deterministicSide": "BUY", "passes_hard_filters": True}],
+    })
+    monkeypatch.setattr(swing_session, "_ist_today", lambda: "2026-08-13")
+    monkeypatch.setattr(swing_session, "_SWING_MATRIX_REFRESH_AT", 0.0)
+    monkeypatch.setattr(
+        swing_session,
+        "_run_swing_matrix_refresh",
+        lambda: calls.append("swing_entry_hunt") or {"success": True},
+    )
+    swing_session._ensure_today_matrix_snapshot()
+    assert calls == ["swing_entry_hunt"]
+
+
 def test_approve_without_explicit_buy_is_rejected():
     row = qualified_row()
     row.pop("deterministicSide")
@@ -183,7 +203,9 @@ def test_hunt_uses_volume_screen_beyond_display_50():
     assert source == "asset_matrix_deterministic_buy"
     diag = swing_session._swing_universe_diagnostics(snapshot=snapshot)
     assert diag["displayPool"] == 50
-    assert diag["evaluated"] == 52
+    assert diag["evaluated"] == 53
+    assert diag["candleMetrics"] == 52
+    assert diag["swingUniverse"] == "Nifty 500"
     assert diag["qualified"] == 2
     assert diag["universeSize"] == 500
     assert diag["volumeScreened"] == 200
@@ -285,6 +307,21 @@ def test_concurrent_gets_cannot_alter_persisted_portfolio(monkeypatch, tmp_path:
     assert results[1]["long"][0]["symbol"] == "VALID"
 
 
+def test_day_move_over_6pct_is_hard_rejected():
+    row = qualified_row(delta="8.10 (+6.20%)")
+    reasons = rejection_reasons(row)
+    assert any(r.startswith("DAY_MOVE_OVER_MAX") for r in reasons)
+
+
+def test_day_move_between_3_and_6pct_still_qualifies():
+    row = qualified_row(delta="5.40 (+4.80%)")
+    eligible, evidence, reasons = swing_session._evaluate_swing_buy_contract(row)
+    assert eligible is True
+    assert reasons == []
+    assert evidence["dayChangePct"] == 4.8
+    assert evidence["maxDayMovePct"] == 6.0
+
+
 def test_locked_position_contains_complete_selection_evidence(monkeypatch):
     monkeypatch.setattr(swing_session, "is_swing_desk_eligible", lambda *_args: True)
     row = swing_session._normalize_swing_row(qualified_row(), "2026-08-12")
@@ -301,3 +338,25 @@ def test_locked_position_contains_complete_selection_evidence(monkeypatch):
     assert evidence["acceptanceReason"] == row["acceptanceReason"]
     assert evidence["lockedAt"]
     assert evidence["lockSource"]
+
+
+def test_quote_universe_keeps_nifty500_names_on_nifty100_pool(monkeypatch):
+    from app.services import angel_one_feed
+    from app.utils.symbols import Instrument
+
+    def inst(key: str) -> Instrument:
+        return Instrument(key, "NSE", f"{key}-EQ", "1", key)
+
+    display = [inst("RELIANCE"), inst("TCS")]
+    swing = [inst("RELIANCE"), inst("NETWEB"), inst("SOLARINDS"), inst("SARDAEN")]
+
+    def fake_pool(name):
+        if name == "Nifty 500":
+            return swing, "Nifty 500"
+        return display, "Nifty 100"
+
+    monkeypatch.setattr(angel_one_feed, "_pool_watchlist", fake_pool)
+    universe, label = angel_one_feed._quote_universe("Nifty 100")
+    keys = {row.key for row in universe}
+    assert label == "Nifty 100"
+    assert keys == {"RELIANCE", "TCS", "NETWEB", "SOLARINDS", "SARDAEN"}

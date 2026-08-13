@@ -309,8 +309,8 @@
         ],
         "policyVersion": "0p5r_max_0p5pct"
       },
-      "scanLtp": 535.6,
-      "currentPrice": 535.6,
+      "scanLtp": 538.2,
+      "currentPrice": 538.2,
       "score": 59.1,
       "sector": "OTHER",
       "rewardRisk": 1.5,
@@ -1467,7 +1467,7 @@
       "replacedAt": "2026-08-13T06:59:38.263255+00:00"
     }
   ],
-  "updatedAt": "2026-08-13T11:20:12.383376+00:00",
+  "updatedAt": "2026-08-13T12:55:10.138855+00:00",
   "sessionDate": "2026-08-13",
   "locked": true,
   "executionPolicy": "MANUAL_ONLY",

@@ -28,7 +28,13 @@ from .desk_clock import (
     swing_entry_hunt_config,
 )
 from .desk_book_symbols import filter_rows_excluding, intraday_locked_symbols
-from .stock_quality import MIN_RSI_PIVOT, MIN_TURNOVER_CR, MIN_VOLUME_MULTIPLIER
+from .stock_quality import (
+    MAX_DAY_MOVE_PCT,
+    MIN_RSI_PIVOT,
+    MIN_TURNOVER_CR,
+    MIN_VOLUME_MULTIPLIER,
+    day_change_pct_from_row,
+)
 
 log = logging.getLogger(__name__)
 
@@ -325,6 +331,7 @@ def _hydrate_swing_contract_row(row: dict[str, Any]) -> dict[str, Any]:
     vol = _f(intra.get("volume_multiplier") or out.get("volume_multiplier"))
     spread = _f(intra.get("spread_pct") or out.get("spread_pct"))
     wick = _f(intra.get("wick_noise_ratio") or out.get("wick_noise_ratio"))
+    day_move = day_change_pct_from_row(out)
     oi = str(intra.get("oi_setup") or out.get("oi_setup") or "").upper().strip()
     above_vwap = intra.get("price_above_vwap")
     if not isinstance(above_vwap, bool) and ltp is not None and vwap is not None:
@@ -353,6 +360,7 @@ def _hydrate_swing_contract_row(row: dict[str, Any]) -> dict[str, Any]:
                 above_ema9 is True,
                 pivot is True,
                 quality is True,
+                day_move is None or day_move <= MAX_DAY_MOVE_PCT,
             ))
             out["passes_hard_filters"] = hard
             side, _src = _explicit_deterministic_side(out)
@@ -379,20 +387,28 @@ def _snapshot_data_date(snap: dict[str, Any]) -> str:
 
 
 def _ensure_today_matrix_snapshot() -> None:
-    """During hunt, refresh Matrix if Docker/image snapshot is stale (not today IST)."""
+    """During hunt, refresh Matrix if Docker/image snapshot is stale or undersized."""
     global _SWING_MATRIX_REFRESH_AT
     snap = _read_json(_matrix_snapshot_path()) or {}
     today = _ist_today()
     stocks = snap.get("stocks") if isinstance(snap.get("stocks"), list) else []
+    quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
     has_side = any(
         isinstance(s, dict) and (s.get("deterministicSide") or s.get("passes_hard_filters") is not None)
         for s in stocks[:8]
     )
+    try:
+        universe = int(snap.get("universeSize") or 0)
+    except (TypeError, ValueError):
+        universe = 0
+    universe = universe or len(quotes)
+    undersized = universe < 400
     stale = (
         not snap
         or _snapshot_data_date(snap) != today
         or snap.get("isSnapshotFallback") is True
         or not has_side
+        or undersized
     )
     if not stale:
         return
@@ -471,6 +487,9 @@ def _evaluate_swing_buy_contract(
         reasons.append(f"RISK_AUDIT_VETO:{','.join(risk_values)}")
     if symbol and symbol in blocked:
         reasons.append("INTRADAY_PORTFOLIO_CONFLICT")
+    day_move = day_change_pct_from_row(row)
+    if day_move is not None and day_move > MAX_DAY_MOVE_PCT:
+        reasons.append(f"DAY_MOVE_OVER_MAX:max={MAX_DAY_MOVE_PCT:g}")
 
     risk_verdict = risk_values[0] if risk_values else None
     evidence = {
@@ -496,6 +515,8 @@ def _evaluate_swing_buy_contract(
         "riskAuditVerdict": risk_verdict,
         "riskAuditDecisions": risk_values,
         "intradayConflict": bool(symbol and symbol in blocked),
+        "dayChangePct": day_move,
+        "maxDayMovePct": MAX_DAY_MOVE_PCT,
     }
     return not reasons, evidence, reasons
 
@@ -710,10 +731,10 @@ def _in_candle_screen(row: dict[str, Any]) -> bool:
 
 
 def _swing_screen_rows(snap: dict[str, Any]) -> list[dict[str, Any]]:
-    """Hunt universe: display stocks[] plus candle-screened stockQuotes.
+    """Hunt universe: display stocks[] plus every snapshot quote.
 
-    Asset Matrix still shows top 50. Candle metrics are computed on the
-    volume-500 swing pool; quote-only names are skipped — no invented metrics.
+    Asset Matrix still shows top 50. Missing VWAP/RSI fails the BUY contract
+    with an explicit rejection — names are not dropped before evaluation.
     """
     stocks = snap.get("stocks") if isinstance(snap.get("stocks"), list) else []
     quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
@@ -726,7 +747,7 @@ def _swing_screen_rows(snap: dict[str, Any]) -> list[dict[str, Any]]:
             continue
         by_sym[sym] = row
     for row in quotes.values():
-        if not isinstance(row, dict) or not _in_candle_screen(row):
+        if not isinstance(row, dict):
             continue
         sym = str(row.get("ticker") or row.get("symbol") or "").upper().strip()
         if not sym or sym in by_sym:
@@ -1203,6 +1224,7 @@ def _swing_universe_diagnostics(
     reason_counts: dict[str, int] = {}
     evaluated = 0
     qualified = 0
+    candle_metrics = 0
     for row in screen:
         if not isinstance(row, dict):
             continue
@@ -1210,6 +1232,8 @@ def _swing_universe_diagnostics(
         if not sym:
             continue
         evaluated += 1
+        if _in_candle_screen(row):
+            candle_metrics += 1
         ok, _evidence, reasons = _evaluate_swing_buy_contract(row, intraday_symbols=blocked)
         if ok:
             qualified += 1
@@ -1228,10 +1252,12 @@ def _swing_universe_diagnostics(
     return {
         "universeSize": universe_size or None,
         "volumeScreened": volume_screened or len(screen),
+        "candleMetrics": candle_metrics,
         "displayPool": len(stocks),
         "evaluated": evaluated,
         "qualified": qualified,
         "crossBookExcluded": sorted(blocked),
+        "swingUniverse": "Nifty 500",
         "topRejectionReasons": [{"reason": k, "count": v} for k, v in top],
     }
 

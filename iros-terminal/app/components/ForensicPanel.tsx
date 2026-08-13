@@ -613,8 +613,10 @@ export default function ForensicPanel({
       qualified?: number;
       universeSize?: number | null;
       volumeScreened?: number;
+      candleMetrics?: number;
       displayPool?: number;
       crossBookExcluded?: string[];
+      swingUniverse?: string;
       topRejectionReasons?: Array<{ reason?: string; count?: number }>;
     };
     long?: Array<{
@@ -1306,13 +1308,16 @@ export default function ForensicPanel({
               <>
                 {' · '}Hunt {swingSession?.entryHuntDiagnostics?.qualified ?? 0}/
                 {swingSession?.entryHuntDiagnostics?.evaluated ?? '—'} qualified
-                {typeof swingSession?.entryHuntDiagnostics?.volumeScreened === 'number' &&
+                {typeof swingSession?.entryHuntDiagnostics?.candleMetrics === 'number' &&
                   typeof swingSession?.entryHuntDiagnostics?.universeSize === 'number' && (
                     <>
-                      {' · '}screen {swingSession.entryHuntDiagnostics.volumeScreened}/
+                      {' · '}candles {swingSession.entryHuntDiagnostics.candleMetrics}/
                       {swingSession.entryHuntDiagnostics.universeSize}
                     </>
                   )}
+                {swingSession?.entryHuntDiagnostics?.swingUniverse
+                  ? ` · ${swingSession.entryHuntDiagnostics.swingUniverse}`
+                  : ' · Nifty 500'}
               </>
             )}
             {' · '}Data Date {live?.selectionMeta?.dataDate || '—'}
@@ -1604,10 +1609,11 @@ export default function ForensicPanel({
         })}
         {!portfolioDisplayRows.length && (huntingSwing || cashHeldSwing) && (
           <div className="col-span-full space-y-3 py-2">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {[
                 ['Universe', swingSession?.entryHuntDiagnostics?.universeSize ?? '—'],
-                ['Volume screen', swingSession?.entryHuntDiagnostics?.volumeScreened ?? '—'],
+                ['Hunt pool', swingSession?.entryHuntDiagnostics?.swingUniverse ?? 'Nifty 500'],
+                ['Candles', swingSession?.entryHuntDiagnostics?.candleMetrics ?? '—'],
                 ['Evaluated', swingSession?.entryHuntDiagnostics?.evaluated ?? '—'],
                 ['Qualified BUY', swingSession?.entryHuntDiagnostics?.qualified ?? 0],
               ].map(([label, value]) => (

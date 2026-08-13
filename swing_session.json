@@ -6,8 +6,8 @@
   "cashHeld": true,
   "book": "SWING",
   "sessionDate": "2026-08-13",
-  "committedAt": "2026-08-13T11:16:16.881292+00:00",
-  "updatedAt": "2026-08-13T11:17:09.444009+00:00",
+  "committedAt": "2026-08-13T12:54:08.824717+00:00",
+  "updatedAt": "2026-08-13T12:54:39.287311+00:00",
   "huntStartedAt": "2026-08-13T05:16:23.411670+00:00",
   "executionPolicy": "MANUAL_ONLY",
   "source": "asset_matrix_deterministic_buy",
@@ -903,10 +903,11 @@
     "rationale": "Hunt a fully qualified BUY from 09:45 IST; lock each entry when found; do not cash-finalize at 10:15; hunt closes 14:45"
   },
   "entryHuntDiagnostics": {
-    "universeSize": 500,
-    "volumeScreened": 200,
+    "universeSize": 189,
+    "volumeScreened": 189,
+    "candleMetrics": 189,
     "displayPool": 50,
-    "evaluated": 173,
+    "evaluated": 200,
     "qualified": 0,
     "crossBookExcluded": [
       "AARTIIND",
@@ -923,38 +924,39 @@
       "TATASTEEL",
       "VEDL"
     ],
+    "swingUniverse": "Nifty 500",
     "topRejectionReasons": [
       {
         "reason": "EXPLICIT_BUY_SIDE_REQUIRED:MISSING",
-        "count": 173
+        "count": 200
       },
       {
         "reason": "HARD_FILTERS_NOT_PASSED",
-        "count": 173
+        "count": 200
       },
       {
         "reason": "QUALITY_FILTERS_NOT_PASSED",
-        "count": 173
+        "count": 200
       },
       {
         "reason": "BREAKOUT_REQUIREMENT_FAILED",
-        "count": 156
+        "count": 179
       },
       {
         "reason": "RSI_REQUIREMENT_FAILED:min=55",
-        "count": 135
+        "count": 130
       },
       {
         "reason": "ABOVE_VWAP_REQUIREMENT_FAILED",
-        "count": 116
+        "count": 125
       },
       {
         "reason": "ABOVE_EMA9_REQUIREMENT_FAILED",
-        "count": 103
+        "count": 106
       },
       {
-        "reason": "BULLISH_OI_REQUIRED:SHORT_BUILDUP",
-        "count": 64
+        "reason": "BULLISH_OI_REQUIRED:NEUTRAL",
+        "count": 90
       }
     ]
   },
@@ -967,7 +969,7 @@
   },
   "priceOnly": true,
   "automation": {
-    "lastRefreshAt": "2026-08-13T11:17:09.444009+00:00",
+    "lastRefreshAt": "2026-08-13T12:54:39.287311+00:00",
     "source": "refresh_swing_session_state",
     "executionPolicy": "MANUAL_ONLY"
   }

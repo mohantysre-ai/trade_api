@@ -157,10 +157,24 @@ export default function NseSymbolSearchBar({ onSelect, selectedTicker }: NseSymb
   };
 
   return (
-    <div ref={rootRef} className="desk-nse-search desk-banner-warn--bar">
+    <div ref={rootRef} className={`desk-nse-search${open ? ' is-open' : ''}`}>
+      {open ? (
+        <button
+          type="button"
+          className="desk-nse-search-scrim"
+          aria-label="Dismiss symbol search"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setOpen(false);
+          }}
+        />
+      ) : null}
       <div className="desk-nse-search-inner">
         <span className="desk-nse-search-icon" aria-hidden>
-          ⌕
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <circle cx="11" cy="11" r="6.5" />
+            <path strokeLinecap="round" d="M16.2 16.2L21 21" />
+          </svg>
         </span>
         <input
           type="search"
@@ -178,16 +192,34 @@ export default function NseSymbolSearchBar({ onSelect, selectedTicker }: NseSymb
             loading
               ? 'Loading NSE symbols…'
               : error
-                ? 'Search unavailable — type ticker + Enter'
-                : `Search NSE (${symbols.length || '—'}) · Enter opens analysis`
+                ? 'Type ticker, then Enter'
+                : `Search NSE · ${symbols.length || '—'} symbols`
           }
           className="desk-nse-search-input"
           aria-label="Search NSE symbols"
           aria-autocomplete="list"
           aria-expanded={open}
+          aria-controls="desk-nse-search-listbox"
           autoComplete="off"
           spellCheck={false}
+          enterKeyHint="search"
         />
+        {query ? (
+          <button
+            type="button"
+            className="desk-nse-search-clear"
+            aria-label="Clear search"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setQuery('');
+              setOpen(true);
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+              <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        ) : null}
         {selectedTicker ? (
           <button
             type="button"
@@ -203,7 +235,7 @@ export default function NseSymbolSearchBar({ onSelect, selectedTicker }: NseSymb
         ) : null}
       </div>
       {open && (filtered.length > 0 || error) ? (
-        <ul className="desk-nse-search-menu" role="listbox">
+        <ul id="desk-nse-search-listbox" className="desk-nse-search-menu" role="listbox">
           {filtered.map((s, i) => (
             <li key={s.ticker} role="option" aria-selected={i === activeIdx}>
               <button
@@ -211,7 +243,6 @@ export default function NseSymbolSearchBar({ onSelect, selectedTicker }: NseSymb
                 className={`desk-nse-search-option ${i === activeIdx ? 'is-active' : ''}`}
                 onMouseEnter={() => setActiveIdx(i)}
                 onMouseDown={(e) => {
-                  // Prevent document mousedown from closing before selection
                   e.preventDefault();
                   pick(s.ticker);
                 }}

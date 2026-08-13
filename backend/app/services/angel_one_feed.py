@@ -40,11 +40,14 @@ from SmartApi import SmartConnect
 
 from .bulk_deals import load_bulk_deals
 from .stock_quality import (
+    MAX_DAY_MOVE_PCT,
     MIN_PROMOTER_HOLDING_PCT,
     MIN_RSI_PIVOT,
     MIN_TURNOVER_CR,
     MIN_VOLUME_MULTIPLIER,
     attach_pivot_metrics,
+    day_change_pct_from_prices,
+    day_change_pct_from_row,
     ensure_promoter_holdings,
     enrich_stock_quality,
 )
@@ -384,6 +387,24 @@ def _snapshot_age_seconds(snapshot: dict[str, Any] | None) -> float | None:
         return None
 
 
+def _intraday_metrics_usable(intraday: Any) -> bool:
+    """True when cached candle metrics are real, not a dummy quote-only stub."""
+    if not isinstance(intraday, dict):
+        return False
+    reasons = [str(r) for r in (intraday.get("hard_filter_reasons") or [])]
+    if any(r == "not in intraday candidate set" for r in reasons):
+        return False
+    try:
+        vwap = float(intraday.get("vwap")) if intraday.get("vwap") is not None else 0.0
+    except (TypeError, ValueError):
+        vwap = 0.0
+    try:
+        rsi = float(intraday.get("rsi")) if intraday.get("rsi") is not None else 0.0
+    except (TypeError, ValueError):
+        rsi = 0.0
+    return vwap > 0 or rsi > 0
+
+
 def _snapshot_intraday_cache(snapshot: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
     """Reuse intraday candle metrics from last_market_snapshot when still within TTL."""
     age = _snapshot_age_seconds(snapshot)
@@ -394,7 +415,7 @@ def _snapshot_intraday_cache(snapshot: dict[str, Any] | None) -> dict[str, dict[
         if not isinstance(row, dict):
             continue
         intraday = row.get("intraday")
-        if isinstance(intraday, dict) and intraday.get("vwap") is not None:
+        if _intraday_metrics_usable(intraday):
             cache[str(ticker)] = intraday
     return cache
 
@@ -840,13 +861,15 @@ def _within_refresh_window(now: datetime | None = None) -> bool:
 def _normalize_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
     payload["rawSources"] = _news_feed_sources()
     available_pools = [pool for pool in payload.get("availablePools", []) if pool != "Nifty 50"]
+    if NIFTY_500_LABEL not in available_pools:
+        available_pools.insert(0, NIFTY_500_LABEL)
     if NIFTY_100_LABEL not in available_pools:
-        available_pools.insert(0, NIFTY_100_LABEL)
+        available_pools.append(NIFTY_100_LABEL)
     if LIVE_UNIVERSE_LABEL not in available_pools:
         available_pools.append(LIVE_UNIVERSE_LABEL)
     payload["availablePools"] = available_pools
-    payload.setdefault("activePool", NIFTY_100_LABEL)
-    payload.setdefault("poolDescription", "Nifty 100 Angel One live universe ranked by your filter prompt.")
+    payload.setdefault("activePool", NIFTY_500_LABEL)
+    payload.setdefault("poolDescription", "Nifty 500 Angel One live universe; swing hunt uses the full index.")
     payload.setdefault("tickerNewsByTicker", {})
     return payload
 
@@ -1062,7 +1085,7 @@ def _ensure_nifty500_cache(client: AngelOneClient | None = None) -> list[Instrum
 
 
 def _pool_watchlist(pool_name: str | None) -> tuple[list[Instrument], str]:
-    resolved = pool_name or NIFTY_100_LABEL
+    resolved = pool_name or NIFTY_500_LABEL
 
     if resolved == "Nifty 50":
         resolved = NIFTY_100_LABEL
@@ -1105,6 +1128,24 @@ def _rotate_nifty500(nifty500: list[Instrument]) -> list[Instrument]:
     rotated = nifty500[idx:] + nifty500[:idx]
     window = rotated[:window_size]
     return [inst for inst in window if inst.key not in NIFTY_50_KEYS]
+
+
+def _quote_universe(pool_name: str | None) -> tuple[list[Instrument], str]:
+    """Always quote Nifty 500 so swing hunt is not clipped by the Matrix pool.
+
+    Nifty 100 / Live Universe still keep their display label. Missing 500-cache
+    falls back to the display watchlist.
+    """
+    display, label = _pool_watchlist(pool_name)
+    if label == NIFTY_500_LABEL:
+        return display, label
+    swing, swing_label = _pool_watchlist(NIFTY_500_LABEL)
+    if swing_label != NIFTY_500_LABEL or not swing:
+        return display, label
+    merged: dict[str, Instrument] = {inst.key: inst for inst in display}
+    for inst in swing:
+        merged.setdefault(inst.key, inst)
+    return list(merged.values()), label
 
 
 def refresh_nifty500_cache(client: AngelOneClient | None = None) -> dict[str, Any]:
@@ -2328,6 +2369,9 @@ def _intraday_metrics_from_quote(ltp: float, now: datetime, quote: dict[str, Any
         hard_filter_reasons.append("EMA angle below 45 degrees")
     if turnover_cr < 50.0:
         hard_filter_reasons.append("turnover under 50 Cr")
+    day_move_pct = day_change_pct_from_prices(ltp, close)
+    if day_move_pct is not None and day_move_pct > MAX_DAY_MOVE_PCT:
+        hard_filter_reasons.append(f"day move over {MAX_DAY_MOVE_PCT:g}%")
     
     passes_hard_filters = len(hard_filter_reasons) == 0
     trigger_point = "VWAP Bounce" if price_above_vwap else "15-min ORB" if ltp >= orb_high else "Flag Breakout"
@@ -2390,6 +2434,7 @@ def _intraday_metrics_from_quote(ltp: float, now: datetime, quote: dict[str, Any
         "liquidity_score": liquidity_score,
         "breakout_quality": breakout_quality,
         "sector_strength": sector_strength,
+        "day_change_pct": None if day_move_pct is None else round(day_move_pct, 2),
         "passes_hard_filters": passes_hard_filters,
         "hard_filter_reasons": hard_filter_reasons + ["metrics estimated from quote (candle API unavailable)"],
     }
@@ -2522,6 +2567,12 @@ def _intraday_metrics(
         hard_filter_reasons.append("EMA angle below 45 degrees")
     if turnover_cr < 50.0:
         hard_filter_reasons.append("turnover under 50 Cr")
+    prev_close = float((quote_fallback or {}).get("close") or 0)
+    if prev_close <= 0 and len(daily_candles) >= 2:
+        prev_close = float(daily_candles[-2].get("close") or 0)
+    day_move_pct = day_change_pct_from_prices(ltp, prev_close)
+    if day_move_pct is not None and day_move_pct > MAX_DAY_MOVE_PCT:
+        hard_filter_reasons.append(f"day move over {MAX_DAY_MOVE_PCT:g}%")
 
     passes_hard_filters = len(hard_filter_reasons) == 0
     trigger_point = "VWAP Bounce" if price_above_vwap else "15-min ORB" if ltp >= orb_high else "Flag Breakout"
@@ -2548,6 +2599,7 @@ def _intraday_metrics(
         "liquidity_score": liquidity_score,
         "breakout_quality": breakout_quality,
         "sector_strength": sector_strength,
+        "day_change_pct": None if day_move_pct is None else round(day_move_pct, 2),
         "passes_hard_filters": passes_hard_filters,
         "hard_filter_reasons": hard_filter_reasons,
     }
@@ -2689,9 +2741,10 @@ def _compute_deterministic_pipeline(all_stocks: list[dict[str, Any]]) -> list[di
     strictly separate to avoid circular scoring logic.
 
     Hard filter gates:
-      ATR > 3%  |  turnover > 50 Cr  |  LTP > VWAP
+      ATR > 1.5%  |  turnover > 50 Cr  |  LTP > VWAP
       OI in (LONG_BUILDUP, SHORT_COVERING)
-      vol_mult > 1.5  |  RSI > 55  |  spread < 0.10  |  wick < 0.40
+      vol_mult > 1.5  |  RSI > 55  |  spread < 0.50  |  wick < 0.70
+      day move <= 6%
 
     Alpha score uses: relative_volume, liquidity_score,
                       breakout_quality, sector_strength
@@ -2711,6 +2764,9 @@ def _compute_deterministic_pipeline(all_stocks: list[dict[str, Any]]) -> list[di
         rsi_val    = metrics.get("rsi", 50.0)
         spread     = metrics.get("spread_pct", 0.0)
         wick_noise = metrics.get("wick_noise_ratio", 0.0)
+        day_move   = day_change_pct_from_row(stock)
+        if day_move is None:
+            day_move = day_change_pct_from_prices(ltp, stock.get("close"))
 
         passes = all([
             atr > 1.5,
@@ -2724,6 +2780,7 @@ def _compute_deterministic_pipeline(all_stocks: list[dict[str, Any]]) -> list[di
             metrics.get("price_above_ema9", False),
             metrics.get("pivot_r1_breakout", False),
             stock.get("passes_quality_filters", False),
+            day_move is None or day_move <= MAX_DAY_MOVE_PCT,
         ])
 
         # Always compute alpha_score so every stock shows its quantitative signal strength
@@ -3203,7 +3260,7 @@ def _build_terminal_payload(
     news_items: list[dict[str, str]],
     macro_morning: list[dict[str, str]],
     macro_evening: list[dict[str, str]],
-    pool_name: str = NIFTY_100_LABEL,
+    pool_name: str = NIFTY_500_LABEL,
     custom_prompt: str | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, str | None]:
     return _select_dynamic_top_stocks(
@@ -3230,12 +3287,12 @@ def _build_payload_from_live_data(
 
     llm_config = _llm_config_canonical()
     now = _ist_now()
-    resolved_pool_name = pool_name or NIFTY_100_LABEL
+    resolved_pool_name = pool_name or NIFTY_500_LABEL
     snapshot = prior_snapshot if prior_snapshot is not None else _load_last_snapshot()
     intraday_cache = _snapshot_intraday_cache(snapshot)
 
     progress("Fetching live quotes...")
-    stock_universe, active_pool_label = _pool_watchlist(resolved_pool_name)
+    stock_universe, active_pool_label = _quote_universe(resolved_pool_name)
 
     stock_quotes_raw = client.fetch_batch_quotes(stock_universe)
     macro_raw = client.fetch_batch_quotes(list(MACRO_INSTRUMENTS))
@@ -3285,7 +3342,7 @@ def _build_payload_from_live_data(
     rows_to_fetch: list[dict[str, Any]] = []
     for row in candidate_rows:
         cached_intraday = intraday_cache.get(row["ticker"])
-        if cached_intraday:
+        if _intraday_metrics_usable(cached_intraday):
             row["intraday"] = cached_intraday
             stock_quotes[row["ticker"]] = row
         else:
@@ -3435,9 +3492,10 @@ def _build_payload_from_live_data(
             "Nifty 500 universe: live quotes on full index, swing candles on top "
             f"{candle_limit} by volume, Asset Matrix volume screen {volume_limit}."
             if resolved_pool_name == NIFTY_500_LABEL
-            else "Nifty 100 Angel One live universe ranked by your filter prompt."
-            if resolved_pool_name == NIFTY_100_LABEL
-            else f"Dynamic live universe label applied for {resolved_pool_name}."
+            else (
+                "Matrix pool "
+                f"{resolved_pool_name}; swing hunt still quotes the full Nifty 500."
+            )
         ),
         "universeSize": len(all_stocks),
         "volumeScreenedCount": len(candidate_rows),
@@ -3553,8 +3611,8 @@ def build_market_payload(
                 "error": "Live refresh was requested but the scheduled refresh window is not active and fallback is disabled.",
                 "rawSources": _news_feed_sources(),
                 "availablePools": [NIFTY_100_LABEL, "Nifty 500", LIVE_UNIVERSE_LABEL],
-                "activePool": pool_name or NIFTY_100_LABEL,
-                "poolDescription": "Nifty 100 Angel One live universe ranked by your filter prompt.",
+                "activePool": pool_name or NIFTY_500_LABEL,
+                "poolDescription": "Nifty 500 Angel One live universe; swing hunt uses the full index.",
                 "stocks": [],
                 "stockQuotes": {},
                 "macroDataStrip": {"morning": [], "evening": []},
@@ -3577,8 +3635,8 @@ def build_market_payload(
             "error": "No cached snapshot available. Live refresh runs only during the morning or evening IST windows.",
             "rawSources": _news_feed_sources(),
             "availablePools": [NIFTY_100_LABEL, "Nifty 500", LIVE_UNIVERSE_LABEL],
-            "activePool": pool_name or NIFTY_100_LABEL,
-            "poolDescription": "Nifty 100 Angel One live universe ranked by your filter prompt.",
+            "activePool": pool_name or NIFTY_500_LABEL,
+            "poolDescription": "Nifty 500 Angel One live universe; swing hunt uses the full index.",
             "stocks": [],
             "stockQuotes": {},
             "macroDataStrip": {"morning": [], "evening": []},
@@ -4751,8 +4809,8 @@ def _run_orchestrated_sequence(task_id: str, pool_name: str | None, custom_promp
 
         # Step 3: Update NIFTY TOP 5 GAINERS & LOSERS
         update_progress("Updating NIFTY TOP 5 GAINERS & LOSERS...", payload)
-        resolved_pool = pool_name or NIFTY_100_LABEL
-        stock_universe, pool_label = _pool_watchlist(resolved_pool)
+        resolved_pool = pool_name or NIFTY_500_LABEL
+        stock_universe, pool_label = _quote_universe(resolved_pool)
         stock_quotes_raw = client.fetch_batch_quotes(stock_universe)
         
         all_stocks = []
@@ -4871,7 +4929,7 @@ def main() -> int:
     parser.add_argument("--serve", action="store_true", help="Start FastAPI server")
     parser.add_argument("--once", action="store_true", help="Fetch once and print/save JSON")
     parser.add_argument("--output", help="Write JSON snapshot to this file")
-    parser.add_argument("--pool", default=None, help="Pool label. Defaults to Nifty 100; Live Universe is also supported.")
+    parser.add_argument("--pool", default=None, help="Pool label. Defaults to Nifty 500; Nifty 100 and Live Universe are also supported.")
     parser.add_argument("--prompt", default=None, help="Custom filter prompt override")
     parser.add_argument("--refresh-on-demand", action="store_true", help="Force a non-fallback live refresh and write snapshot")
     parser.add_argument("--orchestrate", action="store_true", help="Run the sequential orchestrated refresh sequence")
