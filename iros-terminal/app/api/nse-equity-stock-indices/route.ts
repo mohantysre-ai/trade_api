@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const NSE_INDEX = "NIFTY 200";
+const NSE_INDEX = "NIFTY 500";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
