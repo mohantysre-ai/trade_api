@@ -30,7 +30,7 @@ services:
       INTRADAY_FETCH_WORKERS: "1"
       CANDLE_MIN_INTERVAL_SECONDS: "1.1"
       CANDLE_RATE_LIMIT_RETRIES: "5"
-      # Complete-universe quotes: NSE primary, Angel missing-symbol fallback.
+      # Complete-universe quotes: NSE primary, Dhan bulk, then Angel fallback.
       MARKET_DATA_MIN_COVERAGE_PCT: "99"
       MARKET_DATA_MIN_CANDLE_COVERAGE_PCT: "95"
       NIFTY_CACHE_EXPECTED_MIN: "475"
