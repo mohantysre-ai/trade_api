@@ -997,8 +997,11 @@ async def summarize_with_gemini(ticker: str, company: str, articles: list[Ticker
         logger.warning("LLM quota exhausted, using rule-based summary for %s", ticker)
         return _rule_based_summary(ticker, company, articles)
 
-    primary_model = os.environ.get("LLM_MODEL", "gemini-2.5-flash")
-    fallback_models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"]
+    primary_model = os.environ.get("LLM_MODEL", "gemini-3.7-flash")
+    fallback_models = [
+        "gemini-3.7-flash",
+        "gemini-3.1-flash-lite",
+    ]
     model_list = [primary_model]
     for m in fallback_models:
         if m not in model_list:
@@ -1071,9 +1074,25 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
 
         except Exception as e:
             err_str = str(e).lower()
-            is_rate_limit = "429" in str(e) or "rate limit" in err_str or "quota" in err_str or "resource exhausted" in err_str
-            if is_rate_limit:
-                logger.warning("Model %s hit rate limit for %s, trying next model...", model, ticker)
+            is_rate_limit = (
+                "429" in str(e)
+                or "rate limit" in err_str
+                or "quota" in err_str
+                or "resource exhausted" in err_str
+            )
+            is_model_unavailable = (
+                "404" in str(e)
+                or "not_found" in err_str
+                or "no longer available" in err_str
+                or "model not found" in err_str
+            )
+            if is_rate_limit or is_model_unavailable:
+                logger.warning(
+                    "Gemini model %s unavailable for %s; trying next model: %s",
+                    model,
+                    ticker,
+                    e,
+                )
                 continue
             logger.error("Gemini summarization with model %s failed for %s: %s — falling back to rule-based summary", model, ticker, e)
             return _rule_based_summary(ticker, company, articles)
