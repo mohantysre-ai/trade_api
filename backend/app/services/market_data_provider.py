@@ -1,9 +1,8 @@
 """Provider-independent NSE equity registry and bulk quote failover.
 
-Dhan is preferred because one quote request supports the complete Nifty 500.
-Angel remains the fallback for symbols Dhan does not return.  The module is
-deliberately fail-closed: callers receive explicit coverage metadata and decide
-whether the universe is complete enough to publish.
+The official NSE Nifty 500 index payload is the primary quote source. Angel is
+used only for symbols NSE does not return. Dhan is limited to instrument-id and
+historical-candle recovery. The module is deliberately fail-closed.
 """
 
 from __future__ import annotations
@@ -26,8 +25,9 @@ DHAN_SCRIP_MASTER_URL = os.getenv(
     "DHAN_SCRIP_MASTER_URL",
     "https://images.dhan.co/api-data/api-scrip-master-detailed.csv",
 )
-DHAN_QUOTE_URL = os.getenv(
-    "DHAN_QUOTE_URL", "https://api.dhan.co/v2/marketfeed/quote"
+NSE_EQUITY_STOCK_INDICES_URL = os.getenv(
+    "NSE_EQUITY_STOCK_INDICES_URL",
+    "https://www.nseindia.com/api/equity-stock-indices?index=NIFTY%20500",
 )
 DHAN_DAILY_URL = os.getenv("DHAN_DAILY_URL", "https://api.dhan.co/v2/charts/historical")
 DHAN_INTRADAY_URL = os.getenv("DHAN_INTRADAY_URL", "https://api.dhan.co/v2/charts/intraday")
@@ -168,50 +168,49 @@ def fetch_dhan_candles(
     return [list(row) for row in zip(*arrays)]
 
 
-def _dhan_quote_to_canonical(raw: dict[str, Any]) -> dict[str, Any] | None:
-    ohlc = raw.get("ohlc") if isinstance(raw.get("ohlc"), dict) else {}
-    ltp = raw.get("last_price") if raw.get("last_price") is not None else raw.get("ltp")
-    if ltp in (None, ""):
+def _nse_quote_to_canonical(raw: dict[str, Any]) -> dict[str, Any] | None:
+    ltp = raw.get("lastPrice")
+    if ltp in (None, "", "-"):
         return None
     return {
         "ltp": ltp,
-        "open": ohlc.get("open", raw.get("open")),
-        "high": ohlc.get("high", raw.get("high")),
-        "low": ohlc.get("low", raw.get("low")),
-        "close": ohlc.get("close", raw.get("close")),
-        "tradeVolume": raw.get("volume", raw.get("trade_volume", 0)),
-        "opnInterest": raw.get("oi", 0),
-        "previousOI": raw.get("previous_oi", raw.get("prev_oi", 0)),
-        "quoteProvider": "dhan",
+        "open": raw.get("open"),
+        "high": raw.get("dayHigh"),
+        "low": raw.get("dayLow"),
+        "close": raw.get("previousClose"),
+        "tradeVolume": raw.get("totalTradedVolume", 0),
+        "totalTradedValue": raw.get("totalTradedValue", 0),
+        "percentChange": raw.get("pChange"),
+        "quoteProvider": "nse",
     }
 
 
-def fetch_dhan_bulk_quotes(symbols: Iterable[str]) -> dict[str, dict[str, Any]]:
-    """Fetch up to the complete Nifty 500 in one Dhan quote request."""
-    if not dhan_configured():
-        return {}
-    ids = load_dhan_security_ids()
-    wanted = {_norm(symbol): ids.get(_norm(symbol)) for symbol in symbols}
-    reverse = {security_id: symbol for symbol, security_id in wanted.items() if security_id}
-    if not reverse:
-        return {}
-    response = requests.post(
-        DHAN_QUOTE_URL,
-        headers=_dhan_headers(),
-        json={"NSE_EQ": list(reverse)},
-        timeout=(10, 30),
+def fetch_nse500_quotes(symbols: Iterable[str]) -> dict[str, dict[str, Any]]:
+    """Fetch the official NSE Nifty 500 snapshot used by the heat map."""
+    wanted = {_norm(symbol) for symbol in symbols if _norm(symbol)}
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://www.nseindia.com/market-data/live-equity-market",
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+        ),
+    }
+    session = requests.Session()
+    session.get("https://www.nseindia.com/", headers=headers, timeout=(5, 15))
+    response = session.get(
+        NSE_EQUITY_STOCK_INDICES_URL, headers=headers, timeout=(10, 30)
     )
     response.raise_for_status()
     payload = response.json()
-    data = payload.get("data") if isinstance(payload, dict) else {}
-    segment = data.get("NSE_EQ", {}) if isinstance(data, dict) else {}
+    rows = payload.get("data", []) if isinstance(payload, dict) else []
     out: dict[str, dict[str, Any]] = {}
-    for security_id, raw in segment.items():
+    for raw in rows if isinstance(rows, list) else []:
         if not isinstance(raw, dict):
             continue
-        symbol = reverse.get(str(security_id))
-        quote = _dhan_quote_to_canonical(raw)
-        if symbol and quote:
+        symbol = _norm(raw.get("symbol"))
+        quote = _nse_quote_to_canonical(raw)
+        if symbol in wanted and quote:
             out[symbol] = quote
     return out
 
@@ -240,15 +239,15 @@ def fetch_quotes_with_failover(
     symbols: Iterable[str],
     angel_fetch: Callable[[list[str]], dict[str, dict[str, Any]]],
 ) -> tuple[dict[str, dict[str, Any]], QuoteCoverage]:
-    """Dhan primary; fetch only missing symbols from Angel."""
+    """NSE primary; fetch only missing symbols from Angel."""
     ordered = list(dict.fromkeys(_norm(s) for s in symbols if _norm(s)))
     quotes: dict[str, dict[str, Any]] = {}
-    providers = {"dhan": 0, "angel": 0}
+    providers = {"nse": 0, "angel": 0}
     try:
-        quotes.update(fetch_dhan_bulk_quotes(ordered))
-        providers["dhan"] = len(quotes)
+        quotes.update(fetch_nse500_quotes(ordered))
+        providers["nse"] = len(quotes)
     except Exception as exc:
-        log.warning("Dhan bulk quote failed; using Angel fallback: %s", exc)
+        log.warning("NSE Nifty 500 quote fetch failed; using Angel fallback: %s", exc)
 
     missing = [symbol for symbol in ordered if symbol not in quotes]
     if missing:
