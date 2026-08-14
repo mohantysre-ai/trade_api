@@ -2224,7 +2224,7 @@ def _fetch_stock_quotes_with_coverage(
     client: AngelOneClient,
     instruments: list[Instrument],
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
-    """NSE Nifty 500 primary with Angel fallback for only missing symbols."""
+    """NSE primary, then Dhan bulk and Angel for only missing symbols."""
     by_key = {inst.key: inst for inst in instruments}
 
     def angel_missing(symbols: list[str]) -> dict[str, dict[str, Any]]:
