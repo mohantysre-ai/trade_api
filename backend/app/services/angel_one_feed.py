@@ -57,6 +57,12 @@ from .market_feeds import (
     fetch_global_macro,
     fetch_gift_nifty,
 )
+from .market_data_provider import (
+    dhan_configured,
+    fetch_dhan_candles,
+    fetch_quotes_with_failover,
+    load_dhan_security_ids,
+)
 from ..utils.symbols import MACRO_INSTRUMENTS, MOCK_TICKERS, NIFTY_50_KEYS, WATCHLIST, Instrument
 from .llm_client import _llm_config as _llm_config_canonical, _get_gemini_oauth_token, _llm_quota_available, _record_quota_error
 from .intelligence_engine import (
@@ -126,6 +132,12 @@ INTRADAY_CHUNK_SIZE = int(os.getenv("INTRADAY_CHUNK_SIZE", "5"))
 # Global candle throttle across all threads (Angel AB1021 / ~3–5 req/s soft limit).
 CANDLE_MIN_INTERVAL_SECONDS = float(os.getenv("CANDLE_MIN_INTERVAL_SECONDS", "1.1"))
 CANDLE_RATE_LIMIT_RETRIES = int(os.getenv("CANDLE_RATE_LIMIT_RETRIES", "5"))
+NIFTY_CACHE_EXPECTED_MIN = int(os.getenv("NIFTY_CACHE_EXPECTED_MIN", "475"))
+NIFTY_CACHE_MIN_COVERAGE_PCT = float(os.getenv("NIFTY_CACHE_MIN_COVERAGE_PCT", "99"))
+NIFTY_CACHE_MAX_AGE_SECONDS = int(os.getenv("NIFTY_CACHE_MAX_AGE_SECONDS", "86400"))
+MARKET_DATA_MIN_CANDLE_COVERAGE_PCT = float(
+    os.getenv("MARKET_DATA_MIN_CANDLE_COVERAGE_PCT", "95")
+)
 _CANDLE_THROTTLE_LOCK = threading.Lock()
 _CANDLE_LAST_CALL_MONO = 0.0
 _CANDLE_COOLDOWN_UNTIL_MONO = 0.0
@@ -387,6 +399,8 @@ def _snapshot_age_seconds(snapshot: dict[str, Any] | None) -> float | None:
 def _intraday_metrics_usable(intraday: Any) -> bool:
     """True when cached candle metrics are real, not a dummy quote-only stub."""
     if not isinstance(intraday, dict):
+        return False
+    if intraday.get("data_source") != "candles":
         return False
     reasons = [str(r) for r in (intraday.get("hard_filter_reasons") or [])]
     if any(r == "not in intraday candidate set" for r in reasons):
@@ -1071,24 +1085,65 @@ def _symbols_to_instruments(
     return instruments
 
 
+def _read_nifty500_cache_raw() -> dict[str, Any]:
+    try:
+        raw = json.loads(NIFTY_500_CACHE_PATH.read_text(encoding="utf-8-sig"))
+        return raw if isinstance(raw, dict) else {}
+    except Exception:
+        return {}
+
+
+def _nifty500_cache_health(raw: dict[str, Any]) -> dict[str, Any]:
+    instruments = raw.get("instruments") if isinstance(raw.get("instruments"), list) else []
+    source_count = int(raw.get("sourceSymbols") or raw.get("universeExpected") or 0)
+    resolved = len(instruments)
+    coverage = (resolved / source_count * 100.0) if source_count else 0.0
+    refreshed = raw.get("refreshedAt") or raw.get("exportedAtUtc")
+    try:
+        refreshed_dt = datetime.fromisoformat(str(refreshed).replace("Z", "+00:00"))
+        age = max(0.0, (datetime.now(timezone.utc) - refreshed_dt).total_seconds())
+    except Exception:
+        age = float("inf")
+    healthy = bool(
+        source_count >= NIFTY_CACHE_EXPECTED_MIN
+        and resolved >= NIFTY_CACHE_EXPECTED_MIN
+        and coverage >= NIFTY_CACHE_MIN_COVERAGE_PCT
+        and age <= NIFTY_CACHE_MAX_AGE_SECONDS
+        and raw.get("partial") is not True
+    )
+    return {
+        "healthy": healthy,
+        "expected": source_count,
+        "resolved": resolved,
+        "coveragePct": round(coverage, 2),
+        "ageSeconds": None if math.isinf(age) else round(age, 1),
+        "partial": bool(raw.get("partial", not healthy)),
+    }
+
+
 def _ensure_nifty500_cache(client: AngelOneClient | None = None) -> list[Instrument]:
-    cached = _load_watchlist_from_cache(NIFTY_500_CACHE_PATH)
-    if cached:
-        return cached
+    raw = _read_nifty500_cache_raw()
+    health = _nifty500_cache_health(raw)
+    if health["healthy"]:
+        return _load_watchlist_from_cache(NIFTY_500_CACHE_PATH)
     result = refresh_nifty500_cache(client=client)
     if result.get("success"):
         return _load_watchlist_from_cache(NIFTY_500_CACHE_PATH)
-    return []
+    raise RuntimeError(
+        "Nifty 500 cache is incomplete; selection aborted "
+        f"(resolved={health['resolved']}, expected={health['expected']}, "
+        f"coverage={health['coveragePct']}%). Refresh error: {result.get('error')}"
+    )
 
 
-def _pool_watchlist(pool_name: str | None) -> tuple[list[Instrument], str]:
+def _pool_watchlist(pool_name: str | None, client: AngelOneClient | None = None) -> tuple[list[Instrument], str]:
     resolved = pool_name or NIFTY_500_LABEL
 
     if resolved == "Nifty 50":
         resolved = NIFTY_100_LABEL
 
     if resolved == NIFTY_500_LABEL:
-        nifty500 = _ensure_nifty500_cache()
+        nifty500 = _ensure_nifty500_cache(client)
         if nifty500:
             return nifty500, NIFTY_500_LABEL
         logging.getLogger(__name__).warning(
@@ -1100,7 +1155,7 @@ def _pool_watchlist(pool_name: str | None) -> tuple[list[Instrument], str]:
     if resolved == NIFTY_100_LABEL:
         # Prefer Nifty 500 with daily rotation so different constituents
         # get surfaced each day instead of the same static Nifty 100 set.
-        nifty500 = _ensure_nifty500_cache()
+        nifty500 = _ensure_nifty500_cache(client)
         if nifty500:
             return _rotate_nifty500(nifty500), NIFTY_100_LABEL
         nifty100 = _load_watchlist_from_cache(NIFTY_100_CACHE_PATH)
@@ -1127,16 +1182,16 @@ def _rotate_nifty500(nifty500: list[Instrument]) -> list[Instrument]:
     return [inst for inst in window if inst.key not in NIFTY_50_KEYS]
 
 
-def _quote_universe(pool_name: str | None) -> tuple[list[Instrument], str]:
+def _quote_universe(pool_name: str | None, client: AngelOneClient | None = None) -> tuple[list[Instrument], str]:
     """Always quote Nifty 500 so swing hunt is not clipped by the Matrix pool.
 
     Nifty 100 / Live Universe still keep their display label. Missing 500-cache
     falls back to the display watchlist.
     """
-    display, label = _pool_watchlist(pool_name)
+    display, label = _pool_watchlist(pool_name, client)
     if label == NIFTY_500_LABEL:
         return display, label
-    swing, swing_label = _pool_watchlist(NIFTY_500_LABEL)
+    swing, swing_label = _pool_watchlist(NIFTY_500_LABEL, client)
     if swing_label != NIFTY_500_LABEL or not swing:
         return display, label
     merged: dict[str, Instrument] = {inst.key: inst for inst in display}
@@ -1156,8 +1211,17 @@ def refresh_nifty500_cache(client: AngelOneClient | None = None) -> dict[str, An
             return {"success": False, "error": "No Nifty 500 symbols available from NSE or seed file", "fetched": 0}
 
         _persist_nifty500_symbol_seed(symbols)
-        token_map = _load_nse_eq_token_map()
+        token_map = _load_nse_eq_token_map(force_refresh=True)
         resolved = _symbols_to_instruments(symbols, token_map, client=client)
+        resolved_keys = {inst.key for inst in resolved}
+        # Dhan's official master repairs symbols missing from Angel.  Prefixing
+        # the provider id prevents accidental use as an Angel token.
+        dhan_ids = load_dhan_security_ids(force=True)
+        for symbol in symbols:
+            key = symbol.upper()
+            if key not in resolved_keys and dhan_ids.get(key):
+                resolved.append(Instrument(key, "NSE", f"{key}-EQ", f"DHAN:{dhan_ids[key]}", key))
+                resolved_keys.add(key)
         if not resolved:
             return {"success": False, "error": "No instruments resolved for Nifty 500 universe", "fetched": 0}
 
@@ -1177,20 +1241,45 @@ def refresh_nifty500_cache(client: AngelOneClient | None = None) -> dict[str, An
                 "label": inst.label or inst.key,
             })
 
+        missing_symbols = sorted(set(str(s).upper() for s in symbols) - seen_keys)
+        coverage_pct = len(deduped) / len(symbols) * 100.0 if symbols else 0.0
+        healthy = bool(
+            len(symbols) >= NIFTY_CACHE_EXPECTED_MIN
+            and len(deduped) >= NIFTY_CACHE_EXPECTED_MIN
+            and coverage_pct >= NIFTY_CACHE_MIN_COVERAGE_PCT
+        )
         cache_blob = {
             "label": NIFTY_500_LABEL,
             "refreshedAt": datetime.now(timezone.utc).isoformat(),
             "count": len(deduped),
             "sourceSymbols": len(symbols),
+            "universeExpected": len(symbols),
+            "coveragePct": round(coverage_pct, 2),
+            "partial": not healthy,
+            "unresolved": missing_symbols,
             "instruments": deduped,
         }
+        if not healthy:
+            return {
+                "success": False,
+                "error": (
+                    f"Refusing partial Nifty 500 cache: {len(deduped)}/{len(symbols)} "
+                    f"resolved ({coverage_pct:.2f}%)"
+                ),
+                "fetched": len(deduped),
+                "sourceSymbols": len(symbols),
+                "missing": len(missing_symbols),
+                "missingSymbols": missing_symbols,
+            }
         try:
-            NIFTY_500_CACHE_PATH.write_text(json.dumps(cache_blob, indent=2), encoding="utf-8")
+            tmp_path = NIFTY_500_CACHE_PATH.with_suffix(".json.tmp")
+            tmp_path.write_text(json.dumps(cache_blob, indent=2), encoding="utf-8")
+            os.replace(tmp_path, NIFTY_500_CACHE_PATH)
         except Exception as exc_write:
             logging.getLogger(__name__).error("Failed to write Nifty 500 cache: %s", exc_write)
             return {"success": False, "error": f"Cache write failed: {exc_write}", "fetched": len(deduped)}
 
-        missing = len(symbols) - len(deduped)
+        missing = len(missing_symbols)
         if missing > 0:
             logging.getLogger(__name__).warning(
                 "Nifty 500 cache built with %d/%d symbols resolved (%d missing tokens).",
@@ -1969,6 +2058,14 @@ class AngelOneClient:
         todate: datetime,
     ) -> list[list[Any]]:
         log = logging.getLogger(__name__)
+        if symboltoken.startswith("DHAN:"):
+            try:
+                return fetch_dhan_candles(
+                    symboltoken.split(":", 1)[1], interval, fromdate, todate
+                )
+            except Exception as exc:
+                log.warning("Dhan candle request failed for %s: %s", symboltoken, exc)
+                return []
         params = {
             "exchange": exchange,
             "symboltoken": symboltoken,
@@ -2121,6 +2218,25 @@ def _fetch_batch_quotes_chunked(
 
 
 AngelOneClient.fetch_batch_quotes = _fetch_batch_quotes_chunked
+
+
+def _fetch_stock_quotes_with_coverage(
+    client: AngelOneClient,
+    instruments: list[Instrument],
+) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    """NSE primary, then Dhan bulk and Angel for only missing symbols."""
+    by_key = {inst.key: inst for inst in instruments}
+
+    def angel_missing(symbols: list[str]) -> dict[str, dict[str, Any]]:
+        eligible = [
+            by_key[symbol]
+            for symbol in symbols
+            if symbol in by_key and not str(by_key[symbol].token).startswith("DHAN:")
+        ]
+        return client.fetch_batch_quotes(eligible) if eligible else {}
+
+    quotes, coverage = fetch_quotes_with_failover(by_key, angel_missing)
+    return quotes, coverage.as_dict()
 
 
 def _build_stock_row(
@@ -2410,6 +2526,7 @@ def _intraday_metrics_from_quote(ltp: float, now: datetime, quote: dict[str, Any
     sector_strength = min(price_position * 20, 20.0)
 
     return {
+        "data_source": "quote",
         "atr_pct": round(daily_range_pct, 2),
         "volume_multiplier": round(volume_multiplier, 2),
         "today_volume": round(today_volume, 0),
@@ -2439,6 +2556,7 @@ def _intraday_metrics_from_quote(ltp: float, now: datetime, quote: dict[str, Any
 
 def _empty_intraday_metrics(reason: str) -> dict[str, Any]:
     return {
+        "data_source": "none",
         "atr_pct": 0.0,
         "volume_multiplier": 0.0,
         "today_volume": 0.0,
@@ -2477,8 +2595,19 @@ def _intraday_metrics(
         daily_from = (now - timedelta(days=45)).replace(hour=9, minute=15, second=0, microsecond=0)
         daily_to = now
 
-        daily_raw = client.fetch_candles(inst.exchange, inst.token, "ONE_DAY", daily_from, daily_to)
-        intraday_raw = client.fetch_candles(inst.exchange, inst.token, "FIVE_MINUTE", market_open, now)
+        dhan_id = load_dhan_security_ids().get(inst.key) if dhan_configured() else None
+        if dhan_id:
+            # Dhan is the primary chart provider: it avoids Angel's AB1021 burst
+            # limits while still letting Angel fill any Dhan master/data gap.
+            daily_raw = fetch_dhan_candles(dhan_id, "ONE_DAY", daily_from, daily_to)
+            intraday_raw = fetch_dhan_candles(dhan_id, "FIVE_MINUTE", market_open, now)
+        else:
+            daily_raw = []
+            intraday_raw = []
+        if not daily_raw:
+            daily_raw = client.fetch_candles(inst.exchange, inst.token, "ONE_DAY", daily_from, daily_to)
+        if not intraday_raw:
+            intraday_raw = client.fetch_candles(inst.exchange, inst.token, "FIVE_MINUTE", market_open, now)
 
         daily_candles = _parse_candle_rows(daily_raw)
         intraday_candles = _parse_candle_rows(intraday_raw)
@@ -2487,8 +2616,9 @@ def _intraday_metrics(
         intraday_candles = []
 
     if not daily_candles or not intraday_candles:
-        # Fallback: use quote data to compute best-effort metrics when candle API fails/returns empty
-        if quote_fallback is not None:
+        # Quote-derived indicators are opt-in only and never count as valid
+        # candle coverage. Production selection defaults to fail-closed.
+        if quote_fallback is not None and os.getenv("ALLOW_QUOTE_METRICS_FALLBACK", "0") == "1":
             return _intraday_metrics_from_quote(ltp, now, quote_fallback)
         return _empty_intraday_metrics("insufficient candle data")
 
@@ -2575,6 +2705,7 @@ def _intraday_metrics(
     trigger_point = "VWAP Bounce" if price_above_vwap else "15-min ORB" if ltp >= orb_high else "Flag Breakout"
 
     metrics = {
+        "data_source": "candles",
         "atr_pct": round(atr_pct, 2),
         "volume_multiplier": round(volume_multiplier, 2),
         "today_volume": round(today_volume, 0),
@@ -3289,9 +3420,16 @@ def _build_payload_from_live_data(
     intraday_cache = _snapshot_intraday_cache(snapshot)
 
     progress("Fetching live quotes...")
-    stock_universe, active_pool_label = _quote_universe(resolved_pool_name)
+    stock_universe, active_pool_label = _quote_universe(resolved_pool_name, client)
 
-    stock_quotes_raw = client.fetch_batch_quotes(stock_universe)
+    stock_quotes_raw, quote_coverage = _fetch_stock_quotes_with_coverage(client, stock_universe)
+    if not quote_coverage["selectionAllowed"]:
+        raise RuntimeError(
+            "Market quote coverage below required threshold: "
+            f"{quote_coverage['received']}/{quote_coverage['expected']} "
+            f"({quote_coverage['coveragePct']}%). Missing: "
+            f"{', '.join(quote_coverage['missingSymbols'][:25])}"
+        )
     macro_raw = client.fetch_batch_quotes(list(MACRO_INSTRUMENTS))
 
     all_stocks: list[dict[str, Any]] = []
@@ -3359,6 +3497,28 @@ def _build_payload_from_live_data(
             if original is not None:
                 original["intraday"] = metrics
                 stock_quotes[ticker] = original
+
+    candle_ready = sum(
+        1 for row in candidate_rows if _intraday_metrics_usable(row.get("intraday"))
+    )
+    candle_expected = len(candidate_rows)
+    candle_coverage_pct = round(
+        (candle_ready / candle_expected * 100.0) if candle_expected else 0.0, 2
+    )
+    quote_coverage["candles"] = {
+        "expected": candle_expected,
+        "received": candle_ready,
+        "coveragePct": candle_coverage_pct,
+        "selectionAllowed": bool(
+            candle_expected
+            and candle_coverage_pct >= MARKET_DATA_MIN_CANDLE_COVERAGE_PCT
+        ),
+    }
+    if not quote_coverage["candles"]["selectionAllowed"]:
+        raise RuntimeError(
+            "Candle coverage below required threshold: "
+            f"{candle_ready}/{candle_expected} ({candle_coverage_pct}%)"
+        )
 
     bulk_deal_map = load_bulk_deals()
     promoter_map = ensure_promoter_holdings([row["ticker"] for row in candidate_rows])
@@ -3496,6 +3656,7 @@ def _build_payload_from_live_data(
         ),
         "universeSize": len(all_stocks),
         "volumeScreenedCount": len(candidate_rows),
+        "marketDataCoverage": quote_coverage,
         "stocks": top_rows,
         "stockQuotes": stock_quotes,
         "macroDataStrip": {"morning": macro_morning, "evening": macro_evening},
@@ -4256,6 +4417,23 @@ def create_app() -> FastAPI:
             return {"success": result.get("success"), "pool": pool, "result": result}
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.get("/api/market-data/coverage")
+    def market_data_coverage() -> dict[str, Any]:
+        """Expose universe and quote coverage; missing symbols never disappear silently."""
+        raw = _read_nifty500_cache_raw()
+        snapshot = _load_last_snapshot() or {}
+        return {
+            "success": True,
+            "cache": _nifty500_cache_health(raw),
+            "cacheRefreshedAt": raw.get("refreshedAt") or raw.get("exportedAtUtc"),
+            "cacheMissingSymbols": raw.get("unresolved") or [],
+            "quotes": snapshot.get("marketDataCoverage") or {
+                "selectionAllowed": False,
+                "reason": "No coverage metadata in current snapshot",
+            },
+            "snapshotUpdatedAt": snapshot.get("updatedAt"),
+        }
 
     @app.get("/api/market-intelligence")
     def market_intelligence(pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:

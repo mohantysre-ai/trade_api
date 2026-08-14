@@ -226,13 +226,13 @@ function getNseHeatMapStocks(response: NseEquityStockIndicesResponse) {
   if (!Array.isArray(stocks)) return [];
   return stocks.filter((stock): stock is NseEquityStock => {
     if (stock === null || typeof stock !== 'object') return false;
-    return stock.symbol !== 'NIFTY 200' && typeof stock.pChange === 'number';
+    return stock.symbol !== 'NIFTY 500' && typeof stock.pChange === 'number';
   });
 }
 
 async function fetchNseEquityStockIndices() {
   const params = new URLSearchParams();
-  params.set('index', 'NIFTY 200');
+  params.set('index', 'NIFTY 500');
   const res = await fetch(`/api/nse-equity-stock-indices?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
