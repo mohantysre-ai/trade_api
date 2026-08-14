@@ -1303,5 +1303,18 @@
     "firedAt": "2026-08-14T06:34:38.157835+00:00",
     "book": "SWING",
     "action": "SELL"
+  },
+  {
+    "key": "RELIANCE:SHORT:partial",
+    "symbol": "RELIANCE",
+    "direction": "SHORT",
+    "hitLevel": "partial",
+    "label": "PARTIAL 1R",
+    "ltp": 1305.5,
+    "entryPrice": 1308.5,
+    "planDate": "2026-08-14",
+    "firedAt": "2026-08-14T07:31:34.510027+00:00",
+    "book": "INTRADAY",
+    "action": "BUY"
   }
 ]

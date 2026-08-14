@@ -3,7 +3,7 @@
   "locked": true,
   "sessionDate": "2026-08-14",
   "committedAt": "2026-08-14T04:29:28.642759+00:00",
-  "updatedAt": "2026-08-14T06:35:47.187240+00:00",
+  "updatedAt": "2026-08-14T15:20:10.802482+00:00",
   "snapshotUpdatedAt": "2026-08-14T04:29:11.868701+00:00",
   "dataStale": false,
   "regime": {
@@ -153,7 +153,7 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 2487.7,
+      "ltp": 2481.0,
       "scanLtp": 2486.9,
       "ltpSource": "live",
       "atrPct": 1.89,
@@ -257,7 +257,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": 0.03,
+      "pnlPct": 0.44,
       "slotFreed": true,
       "slotStatus": "REPLACEABLE",
       "exitState": {
@@ -297,7 +297,8 @@
         "totalQty": 80,
         "riskPerShare": 12.43,
         "policyVersion": "0p5r_max_0p5pct"
-      }
+      },
+      "currentPrice": 2481.0
     },
     {
       "rank": 4,
@@ -409,7 +410,7 @@
         "OI_PREFERRED",
         "OI_ALIGN_BONUS"
       ],
-      "ltp": 665.15,
+      "ltp": 665.4,
       "scanLtp": 661.8,
       "ltpSource": "live",
       "atrPct": 2.36,
@@ -513,7 +514,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": 0.51,
+      "pnlPct": 0.66,
       "slotFreed": true,
       "slotStatus": "REPLACEABLE",
       "exitState": {
@@ -559,7 +560,8 @@
         "totalQty": 302,
         "riskPerShare": 3.31,
         "policyVersion": "0p5r_max_0p5pct"
-      }
+      },
+      "currentPrice": 665.4
     },
     {
       "rank": 1,
@@ -665,7 +667,7 @@
         "OI_PREFERRED",
         "OI_ALIGN_BONUS"
       ],
-      "ltp": 1094.0,
+      "ltp": 1086.0,
       "scanLtp": 1095.6,
       "ltpSource": "live",
       "atrPct": 2.71,
@@ -754,7 +756,7 @@
       "replacedAt": "2026-08-14T04:30:00.901230+00:00",
       "oiSetup": "LONG_BUILDUP",
       "oiAligned": true,
-      "currentPrice": 1095.6,
+      "currentPrice": 1086.0,
       "plannedCapital": 199399.2,
       "lockObservedPrice": 1095.6,
       "triggered": true,
@@ -779,7 +781,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": -0.15,
+      "pnlPct": 0.0,
       "exitState": {
         "legsFilled": [
           {
@@ -917,7 +919,7 @@
         "OI_PREFERRED",
         "OI_ALIGN_BONUS"
       ],
-      "ltp": 1467.4,
+      "ltp": 1450.0,
       "scanLtp": 1467.5,
       "ltpSource": "live",
       "atrPct": 1.54,
@@ -1006,7 +1008,7 @@
       "replacedAt": "2026-08-14T04:30:00.901299+00:00",
       "oiSetup": "LONG_BUILDUP",
       "oiAligned": true,
-      "currentPrice": 1467.5,
+      "currentPrice": 1450.0,
       "plannedCapital": 199580.0,
       "lockObservedPrice": 1467.5,
       "triggered": true,
@@ -1031,7 +1033,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": -0.01,
+      "pnlPct": 0.0,
       "exitState": {
         "legsFilled": [
           {
@@ -1163,7 +1165,7 @@
         "OI_PREFERRED",
         "OI_ALIGN_BONUS"
       ],
-      "ltp": 167.84,
+      "ltp": 169.0,
       "scanLtp": 167.88,
       "ltpSource": "live",
       "atrPct": 3.07,
@@ -1252,7 +1254,7 @@
       "replacedAt": "2026-08-14T04:30:33.662279+00:00",
       "oiSetup": "LONG_BUILDUP",
       "oiAligned": true,
-      "currentPrice": 167.88,
+      "currentPrice": 169.0,
       "plannedCapital": 199945.08,
       "lockObservedPrice": 167.88,
       "triggered": true,
@@ -1277,7 +1279,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": -0.02,
+      "pnlPct": 0.0,
       "exitState": {
         "legsFilled": [
           {
@@ -1409,7 +1411,7 @@
         "OI_PREFERRED",
         "OI_ALIGN_BONUS"
       ],
-      "ltp": 280.85,
+      "ltp": 276.4,
       "scanLtp": 280.65,
       "ltpSource": "live",
       "atrPct": 4.11,
@@ -1498,7 +1500,7 @@
       "replacedAt": "2026-08-14T04:31:07.681530+00:00",
       "oiSetup": "LONG_BUILDUP",
       "oiAligned": true,
-      "currentPrice": 280.65,
+      "currentPrice": 276.4,
       "plannedCapital": 199822.8,
       "lockObservedPrice": 280.65,
       "triggered": true,
@@ -1523,7 +1525,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": 0.07,
+      "pnlPct": 0.4,
       "exitState": {
         "legsFilled": [
           {
@@ -1673,7 +1675,7 @@
         "OI_PREFERRED",
         "OI_ALIGN_BONUS"
       ],
-      "ltp": 726.7,
+      "ltp": 727.0,
       "scanLtp": 727.2,
       "ltpSource": "live",
       "atrPct": 1.24,
@@ -1762,7 +1764,7 @@
       "replacedAt": "2026-08-14T04:31:42.425757+00:00",
       "oiSetup": "LONG_BUILDUP",
       "oiAligned": true,
-      "currentPrice": 727.2,
+      "currentPrice": 727.0,
       "plannedCapital": 199980.0,
       "lockObservedPrice": 727.2,
       "triggered": true,
@@ -1787,7 +1789,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": -0.07,
+      "pnlPct": 0.0,
       "exitState": {
         "legsFilled": [
           {
@@ -1878,7 +1880,7 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 3003.3,
+      "ltp": 2992.0,
       "scanLtp": 2994.7,
       "ltpSource": "live",
       "atrPct": 2.37,
@@ -1967,7 +1969,7 @@
       "replacedAt": "2026-08-14T04:32:16.415864+00:00",
       "oiSetup": "LONG_BUILDUP",
       "oiAligned": true,
-      "currentPrice": 2994.7,
+      "currentPrice": 2992.0,
       "plannedCapital": 197650.2,
       "lockObservedPrice": 2994.7,
       "triggered": true,
@@ -1992,7 +1994,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": 0.29,
+      "pnlPct": 0.44,
       "exitState": {
         "legsFilled": [
           {
@@ -2139,7 +2141,7 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 139.59,
+      "ltp": 139.5,
       "scanLtp": 139.69,
       "ltpSource": "live",
       "atrPct": 0.95,
@@ -2243,7 +2245,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": 0.07,
+      "pnlPct": 0.16,
       "slotFreed": true,
       "slotStatus": "REPLACEABLE",
       "exitState": {
@@ -2277,7 +2279,8 @@
         "totalQty": 1431,
         "riskPerShare": 0.7,
         "policyVersion": "0p5r_max_0p5pct"
-      }
+      },
+      "currentPrice": 139.5
     },
     {
       "rank": 2,
@@ -2390,7 +2393,7 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 4315.0,
+      "ltp": 4314.5,
       "scanLtp": 4313.5,
       "ltpSource": "live",
       "atrPct": 0.95,
@@ -2494,7 +2497,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": -0.03,
+      "pnlPct": 0.0,
       "slotFreed": true,
       "slotStatus": "REPLACEABLE",
       "exitState": {
@@ -2522,7 +2525,8 @@
         "totalQty": 46,
         "riskPerShare": 21.57,
         "policyVersion": "0p5r_max_0p5pct"
-      }
+      },
+      "currentPrice": 4314.5
     },
     {
       "rank": 5,
@@ -2628,7 +2632,7 @@
         "OI_PREFERRED",
         "OI_ALIGN_BONUS"
       ],
-      "ltp": 167.55,
+      "ltp": 169.51,
       "scanLtp": 167.56,
       "ltpSource": "live",
       "atrPct": 3.53,
@@ -2732,7 +2736,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": 0.01,
+      "pnlPct": 0.4,
       "slotFreed": true,
       "slotStatus": "REPLACEABLE",
       "exitState": {
@@ -2772,7 +2776,8 @@
         "totalQty": 1193,
         "riskPerShare": 0.84,
         "policyVersion": "0p5r_max_0p5pct"
-      }
+      },
+      "currentPrice": 169.51
     },
     {
       "rank": 3,
@@ -2879,7 +2884,7 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 206.79,
+      "ltp": 205.28,
       "scanLtp": 205.75,
       "ltpSource": "live",
       "atrPct": 2.13,
@@ -2968,7 +2973,7 @@
       "replacedAt": "2026-08-14T04:30:00.901348+00:00",
       "oiSetup": "SHORT_BUILDUP",
       "oiAligned": true,
-      "currentPrice": 205.75,
+      "currentPrice": 205.28,
       "plannedCapital": 199989.0,
       "lockObservedPrice": 205.75,
       "triggered": true,
@@ -2993,7 +2998,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": -0.51,
+      "pnlPct": -0.5,
       "exitState": {
         "legsFilled": [
           {
@@ -3094,7 +3099,7 @@
         "OI_PREFERRED",
         "OI_ALIGN_BONUS"
       ],
-      "ltp": 1169.7,
+      "ltp": 1169.2,
       "scanLtp": 1168.6,
       "ltpSource": "live",
       "atrPct": 2.53,
@@ -3183,7 +3188,7 @@
       "replacedAt": "2026-08-14T04:30:00.901395+00:00",
       "oiSetup": "SHORT_BUILDUP",
       "oiAligned": true,
-      "currentPrice": 1168.6,
+      "currentPrice": 1169.2,
       "plannedCapital": 199830.6,
       "lockObservedPrice": 1168.6,
       "triggered": true,
@@ -3208,7 +3213,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": -0.09,
+      "pnlPct": 0.0,
       "exitState": {
         "legsFilled": [
           {
@@ -3340,7 +3345,7 @@
         "OI_PREFERRED",
         "OI_ALIGN_BONUS"
       ],
-      "ltp": 1304.4,
+      "ltp": 1308.7,
       "scanLtp": 1308.5,
       "ltpSource": "live",
       "atrPct": 1.57,
@@ -3400,7 +3405,7 @@
         "target1": 1298.69,
         "target2": 1288.88,
         "validRiskModel": true,
-        "stopRepaired": true,
+        "stopRepaired": false,
         "stopCapped": false,
         "notes": [
           "40pct_runner",
@@ -3429,7 +3434,7 @@
       "replacedAt": "2026-08-14T04:30:00.901439+00:00",
       "oiSetup": "SHORT_BUILDUP",
       "oiAligned": true,
-      "currentPrice": 1308.5,
+      "currentPrice": 1308.7,
       "plannedCapital": 198892.0,
       "lockObservedPrice": 1308.5,
       "triggered": true,
@@ -3438,23 +3443,23 @@
       "realizedPnl": 262.03,
       "unrealizedPnl": 0.0,
       "totalPnl": 262.03,
-      "pnl": 735.14,
+      "pnl": 262.03,
       "remainingQty": 0,
       "effectiveStop": 1308.01,
       "mfeR": 1.07,
-      "rMultiple": 0.74,
-      "economicR": 0.74,
-      "pathR": 0.673,
+      "rMultiple": 0.264,
+      "economicR": 0.264,
+      "pathR": 0.075,
       "outcome": {
-        "label": "PARTIAL 1R",
-        "detail": "R +0.74 \u00b7 trail SL 1308.01 \u00b7 rem 121",
-        "hitLevel": "partial",
-        "ltp": 1304.1,
-        "pctChange": 0.34,
+        "label": "TRAIL STOP HIT",
+        "detail": "R +0.26 \u00b7 trail SL 1308.01 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 1308.01,
+        "pctChange": 0.04,
         "scaleTrail": true,
-        "closed": false
+        "closed": true
       },
-      "pnlPct": 0.31,
+      "pnlPct": 0.13,
       "exitState": {
         "legsFilled": [
           {
@@ -3484,7 +3489,8 @@
         "mode": "SCALE_TRAIL",
         "initialStop": 1315.04,
         "totalQty": 152,
-        "riskPerShare": 6.54
+        "riskPerShare": 6.54,
+        "policyVersion": "0p5r_max_0p5pct"
       }
     },
     {
@@ -3597,7 +3603,7 @@
         "OI_PREFERRED",
         "OI_ALIGN_BONUS"
       ],
-      "ltp": 83.62,
+      "ltp": 84.0,
       "scanLtp": 84.24,
       "ltpSource": "live",
       "atrPct": 1.92,
@@ -3686,7 +3692,7 @@
       "replacedAt": "2026-08-14T04:30:33.662343+00:00",
       "oiSetup": "SHORT_BUILDUP",
       "oiAligned": true,
-      "currentPrice": 84.24,
+      "currentPrice": 84.0,
       "plannedCapital": 199985.76,
       "lockObservedPrice": 84.24,
       "triggered": true,
@@ -3711,7 +3717,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": 0.74,
+      "pnlPct": 0.77,
       "exitState": {
         "legsFilled": [
           {
@@ -3817,14 +3823,14 @@
         "OI_MISSING",
         "IN_PLAY"
       ],
-      "ltp": 2190.0,
+      "ltp": 2174.7,
       "scanLtp": 2198.1,
       "ltpSource": "live",
       "atrPct": 2.06,
       "status": "CLOSED",
       "closed": true,
       "entryPrice": 2198.1,
-      "stopLoss": 2196.73,
+      "stopLoss": 2177.83,
       "target1": 2181.61,
       "target2": 2165.13,
       "riskPerShare": 10.99,
@@ -3912,26 +3918,26 @@
       "triggered": true,
       "executionStatus": "TRIGGERED",
       "triggeredAt": "2026-08-14T04:31:42.425919+00:00",
-      "realizedPnl": 148.23,
+      "realizedPnl": 810.0,
       "unrealizedPnl": 0.0,
-      "totalPnl": 148.23,
-      "pnl": 386.91,
+      "totalPnl": 810.0,
+      "pnl": 866.34,
       "remainingQty": 0,
-      "effectiveStop": 2196.73,
-      "mfeR": 1.119,
-      "rMultiple": 0.782,
-      "economicR": 0.782,
-      "pathR": 0.728,
+      "effectiveStop": 2177.83,
+      "mfeR": 2.83,
+      "rMultiple": 1.752,
+      "economicR": 1.752,
+      "pathR": 2.129,
       "outcome": {
-        "label": "PARTIAL 1R",
-        "detail": "R +0.78 \u00b7 trail SL 2196.73 \u00b7 rem 36",
+        "label": "PARTIAL 2R",
+        "detail": "R +1.75 \u00b7 trail SL 2177.83 \u00b7 rem 18",
         "hitLevel": "partial",
-        "ltp": 2190.1,
-        "pctChange": 0.36,
+        "ltp": 2174.7,
+        "pctChange": 1.06,
         "scaleTrail": true,
         "closed": false
       },
-      "pnlPct": 0.37,
+      "pnlPct": 1.06,
       "exitState": {
         "legsFilled": [
           {
@@ -3941,21 +3947,33 @@
             "pnl": 98.91
           },
           {
+            "r": 1.5,
+            "qty": 9,
+            "price": 2181.61,
+            "pnl": 148.41
+          },
+          {
+            "r": 2.0,
+            "qty": 9,
+            "price": 2176.12,
+            "pnl": 197.82
+          },
+          {
             "r": "TRAIL_SL",
-            "qty": 36,
-            "price": 2196.73,
-            "pnl": 49.32
+            "qty": 18,
+            "price": 2177.83,
+            "pnl": 364.86
           }
         ],
         "remainingQty": 0,
-        "effectiveStop": 2196.73,
-        "realizedPnl": 148.23,
+        "effectiveStop": 2177.83,
+        "realizedPnl": 810.0,
         "unrealizedPnl": 0.0,
-        "economicPnl": 148.23,
-        "rMultiple": 0.3,
-        "economicR": 0.3,
-        "pathR": 0.125,
-        "mfeR": 1.119,
+        "economicPnl": 810.0,
+        "rMultiple": 1.638,
+        "economicR": 1.638,
+        "pathR": 1.844,
+        "mfeR": 2.83,
         "profitGuardActive": true,
         "closed": true,
         "mode": "SCALE_TRAIL",
@@ -7357,28 +7375,14 @@
   "events": [
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:31:46.845443+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:31:46.845460+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:31:46.845471+00:00",
+      "at": "2026-08-14T13:35:10.257145+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:31:46.845501+00:00",
+      "at": "2026-08-14T13:35:10.257203+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7390,28 +7394,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:32:59.812038+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:32:59.812085+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:32:59.812116+00:00",
+      "at": "2026-08-14T13:36:12.263908+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:32:59.812214+00:00",
+      "at": "2026-08-14T13:36:12.263974+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7423,28 +7413,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:34:11.123237+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:34:11.123268+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:34:11.123293+00:00",
+      "at": "2026-08-14T13:37:14.132094+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:34:11.123349+00:00",
+      "at": "2026-08-14T13:37:14.132172+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7456,28 +7432,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:37:36.663975+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:37:36.664031+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:37:36.664068+00:00",
+      "at": "2026-08-14T13:38:16.083151+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:37:36.664170+00:00",
+      "at": "2026-08-14T13:38:16.083207+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7489,28 +7451,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:38:37.164544+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:38:37.164655+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:38:37.164710+00:00",
+      "at": "2026-08-14T13:39:18.100416+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:38:37.164898+00:00",
+      "at": "2026-08-14T13:39:18.101867+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7522,28 +7470,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:39:45.305447+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:39:45.305513+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:39:45.305543+00:00",
+      "at": "2026-08-14T13:40:20.000895+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:39:45.305618+00:00",
+      "at": "2026-08-14T13:40:20.000954+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7555,28 +7489,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:40:53.056484+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:40:53.056517+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:40:53.056537+00:00",
+      "at": "2026-08-14T13:41:31.862141+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:40:53.056595+00:00",
+      "at": "2026-08-14T13:41:31.862198+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7588,28 +7508,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:41:54.225353+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:41:54.225381+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:41:54.225397+00:00",
+      "at": "2026-08-14T13:42:34.643208+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:41:54.225444+00:00",
+      "at": "2026-08-14T13:42:34.643295+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7621,28 +7527,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:43:05.192893+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:43:05.192909+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:43:05.192920+00:00",
+      "at": "2026-08-14T13:43:36.289469+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:43:05.192950+00:00",
+      "at": "2026-08-14T13:43:36.289523+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7654,28 +7546,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:44:16.257634+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:44:16.257672+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:44:16.257687+00:00",
+      "at": "2026-08-14T13:44:38.232807+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:44:16.257720+00:00",
+      "at": "2026-08-14T13:44:38.232876+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7687,28 +7565,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:45:22.209377+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:45:22.209399+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:45:22.209410+00:00",
+      "at": "2026-08-14T13:45:40.030070+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:45:22.209440+00:00",
+      "at": "2026-08-14T13:45:40.030156+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7720,28 +7584,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:46:29.740010+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:46:29.740026+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:46:29.740037+00:00",
+      "at": "2026-08-14T13:46:41.866146+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:46:29.740065+00:00",
+      "at": "2026-08-14T13:46:41.866204+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7753,28 +7603,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:47:35.907100+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:47:35.907116+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:47:35.907127+00:00",
+      "at": "2026-08-14T13:47:43.585653+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:47:35.907156+00:00",
+      "at": "2026-08-14T13:47:43.585716+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7786,28 +7622,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:48:42.551491+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:48:42.551506+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:48:42.551517+00:00",
+      "at": "2026-08-14T13:48:45.577092+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:48:42.551546+00:00",
+      "at": "2026-08-14T13:48:45.577185+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7819,28 +7641,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:49:49.811976+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:49:49.811991+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:49:49.812002+00:00",
+      "at": "2026-08-14T13:49:47.245711+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:49:49.812031+00:00",
+      "at": "2026-08-14T13:49:47.245773+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7852,28 +7660,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:50:55.067451+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:50:55.067467+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:50:55.067479+00:00",
+      "at": "2026-08-14T13:50:49.186157+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:50:55.067509+00:00",
+      "at": "2026-08-14T13:50:49.186286+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7885,28 +7679,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:51:58.391793+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:51:58.391807+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:51:58.391818+00:00",
+      "at": "2026-08-14T13:51:51.181331+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:51:58.391847+00:00",
+      "at": "2026-08-14T13:51:51.181399+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7918,28 +7698,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:53:04.832165+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:53:04.832181+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:53:04.832192+00:00",
+      "at": "2026-08-14T13:53:02.570537+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:53:04.832223+00:00",
+      "at": "2026-08-14T13:53:02.570603+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7951,28 +7717,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:54:11.419569+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:54:11.419585+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:54:11.419594+00:00",
+      "at": "2026-08-14T13:54:03.611055+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:54:11.419625+00:00",
+      "at": "2026-08-14T13:54:03.611112+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -7984,28 +7736,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:55:17.374146+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:55:17.374163+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:55:17.374173+00:00",
+      "at": "2026-08-14T13:55:04.924627+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:55:17.374205+00:00",
+      "at": "2026-08-14T13:55:04.924717+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8017,28 +7755,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:56:22.047798+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:56:22.047816+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:56:22.047828+00:00",
+      "at": "2026-08-14T13:56:06.500451+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:56:22.047858+00:00",
+      "at": "2026-08-14T13:56:06.500528+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8050,28 +7774,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:57:25.817467+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:57:25.817486+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:57:25.817497+00:00",
+      "at": "2026-08-14T13:57:08.191253+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:57:25.817527+00:00",
+      "at": "2026-08-14T13:57:08.191310+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8083,28 +7793,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:58:33.501414+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:58:33.501429+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:58:33.501439+00:00",
+      "at": "2026-08-14T13:58:10.030134+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:58:33.501469+00:00",
+      "at": "2026-08-14T13:58:10.030254+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8116,28 +7812,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:59:41.111225+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:59:41.111239+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T05:59:41.111250+00:00",
+      "at": "2026-08-14T13:59:12.048213+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T05:59:41.111278+00:00",
+      "at": "2026-08-14T13:59:12.048296+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8149,28 +7831,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:00:47.577399+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:00:47.577414+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:00:47.577425+00:00",
+      "at": "2026-08-14T14:00:13.783123+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:00:47.577455+00:00",
+      "at": "2026-08-14T14:00:13.783217+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8182,28 +7850,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:01:53.257737+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:01:53.257772+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:01:53.257818+00:00",
+      "at": "2026-08-14T14:01:15.827867+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:01:53.257877+00:00",
+      "at": "2026-08-14T14:01:15.827922+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8215,28 +7869,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:03:00.867875+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:03:00.867909+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:03:00.867925+00:00",
+      "at": "2026-08-14T14:02:17.944932+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:03:00.867967+00:00",
+      "at": "2026-08-14T14:02:17.945035+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8248,28 +7888,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:04:09.726902+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:04:09.726918+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:04:09.726929+00:00",
+      "at": "2026-08-14T14:03:19.790165+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:04:09.726958+00:00",
+      "at": "2026-08-14T14:03:19.790248+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8281,28 +7907,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:05:17.580724+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:05:17.580740+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:05:17.580751+00:00",
+      "at": "2026-08-14T14:04:31.971747+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:05:17.580801+00:00",
+      "at": "2026-08-14T14:04:31.971842+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8314,28 +7926,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:08:48.990757+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:08:48.990826+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:08:48.990865+00:00",
+      "at": "2026-08-14T14:05:34.186762+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:08:48.991005+00:00",
+      "at": "2026-08-14T14:05:34.186816+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8347,28 +7945,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:09:50.788747+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:09:50.788799+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:09:50.788830+00:00",
+      "at": "2026-08-14T14:06:35.856165+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:09:50.788913+00:00",
+      "at": "2026-08-14T14:06:35.856229+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8380,28 +7964,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:10:51.122995+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:10:51.123033+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:10:51.123372+00:00",
+      "at": "2026-08-14T14:07:37.497815+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:10:51.123568+00:00",
+      "at": "2026-08-14T14:07:37.497869+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8413,28 +7983,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:11:51.483948+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:11:51.484002+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:11:51.484039+00:00",
+      "at": "2026-08-14T14:08:39.534269+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:11:51.484189+00:00",
+      "at": "2026-08-14T14:08:39.534329+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8446,28 +8002,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:12:51.818422+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:12:51.818451+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:12:51.818468+00:00",
+      "at": "2026-08-14T14:09:41.411868+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:12:51.818518+00:00",
+      "at": "2026-08-14T14:09:41.411962+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8479,28 +8021,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:13:54.150496+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:13:54.150580+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:13:54.150604+00:00",
+      "at": "2026-08-14T14:10:43.402355+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:13:54.150674+00:00",
+      "at": "2026-08-14T14:10:43.402442+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8512,28 +8040,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:15:01.462432+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:15:01.462454+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:15:01.462468+00:00",
+      "at": "2026-08-14T14:11:45.433846+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:15:01.462507+00:00",
+      "at": "2026-08-14T14:11:45.433906+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8545,28 +8059,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:16:08.963306+00:00",
-      "symbol": "IOC",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:16:08.963329+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:16:08.963343+00:00",
+      "at": "2026-08-14T14:12:47.393773+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:16:08.963411+00:00",
+      "at": "2026-08-14T14:12:47.393831+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8578,21 +8078,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:17:15.493158+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:17:15.493195+00:00",
+      "at": "2026-08-14T14:13:49.803768+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:17:15.493254+00:00",
+      "at": "2026-08-14T14:13:49.803825+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8604,21 +8097,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:18:22.308765+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:18:22.308791+00:00",
+      "at": "2026-08-14T14:15:02.133916+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:18:22.308842+00:00",
+      "at": "2026-08-14T14:15:02.133972+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8630,21 +8116,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:19:29.956199+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:19:29.956221+00:00",
+      "at": "2026-08-14T14:16:04.214923+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:19:29.956263+00:00",
+      "at": "2026-08-14T14:16:04.214987+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8656,21 +8135,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:20:37.505087+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:20:37.505127+00:00",
+      "at": "2026-08-14T14:17:06.289709+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:20:37.505207+00:00",
+      "at": "2026-08-14T14:17:06.289774+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8682,21 +8154,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:21:48.219198+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:21:48.219230+00:00",
+      "at": "2026-08-14T14:18:08.065159+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:21:48.219293+00:00",
+      "at": "2026-08-14T14:18:08.065219+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8708,21 +8173,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:22:55.649453+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:22:55.649470+00:00",
+      "at": "2026-08-14T14:19:09.994352+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:22:55.649501+00:00",
+      "at": "2026-08-14T14:19:09.994413+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8734,21 +8192,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:24:02.691595+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:24:02.691621+00:00",
+      "at": "2026-08-14T14:20:11.929566+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:24:02.691675+00:00",
+      "at": "2026-08-14T14:20:11.929617+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8760,21 +8211,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:25:10.593810+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:25:10.593827+00:00",
+      "at": "2026-08-14T14:21:13.593121+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:25:10.593864+00:00",
+      "at": "2026-08-14T14:21:13.593177+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8786,21 +8230,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:26:18.017282+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:26:18.017298+00:00",
+      "at": "2026-08-14T14:22:15.466073+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:26:18.017328+00:00",
+      "at": "2026-08-14T14:22:15.466127+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8812,21 +8249,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:29:42.885858+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:29:42.885885+00:00",
+      "at": "2026-08-14T14:23:17.359935+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:29:42.885938+00:00",
+      "at": "2026-08-14T14:23:17.359999+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8838,21 +8268,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:31:09.492872+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:31:09.492889+00:00",
+      "at": "2026-08-14T14:24:19.624206+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:31:09.492937+00:00",
+      "at": "2026-08-14T14:24:19.624315+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8864,21 +8287,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:32:16.990415+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:32:16.990429+00:00",
+      "at": "2026-08-14T14:25:32.684676+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:32:16.990459+00:00",
+      "at": "2026-08-14T14:25:32.684737+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8890,21 +8306,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:33:26.893263+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:33:26.893280+00:00",
+      "at": "2026-08-14T14:26:34.791226+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:33:26.893317+00:00",
+      "at": "2026-08-14T14:26:34.791280+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8916,21 +8325,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:34:02.199216+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:34:02.199231+00:00",
+      "at": "2026-08-14T14:27:36.619279+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:34:02.199259+00:00",
+      "at": "2026-08-14T14:27:36.619333+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8942,21 +8344,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:34:37.421089+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:34:37.421102+00:00",
+      "at": "2026-08-14T14:28:38.482474+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:34:37.421133+00:00",
+      "at": "2026-08-14T14:28:38.482548+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8968,21 +8363,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:35:12.410979+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:35:12.410992+00:00",
+      "at": "2026-08-14T14:29:40.285995+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:35:12.411023+00:00",
+      "at": "2026-08-14T14:29:40.286048+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -8994,21 +8382,14 @@
     },
     {
       "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:35:47.146127+00:00",
-      "symbol": "RELIANCE",
-      "direction": "SHORT",
-      "slotFreed": true
-    },
-    {
-      "type": "POSITION_CLOSED",
-      "at": "2026-08-14T06:35:47.146151+00:00",
+      "at": "2026-08-14T14:30:42.190811+00:00",
       "symbol": "ANANDRATHI",
       "direction": "SHORT",
       "slotFreed": true
     },
     {
       "type": "CAPITAL_SLOT_FREED",
-      "at": "2026-08-14T06:35:47.146203+00:00",
+      "at": "2026-08-14T14:30:42.190894+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -9019,8 +8400,15 @@
       }
     },
     {
-      "type": "REPLACEMENT_PROPOSED",
-      "at": "2026-08-14T06:35:47.187224+00:00",
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:31:43.893054+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:31:43.893121+00:00",
       "freeSlots": {
         "long": 3,
         "short": 3,
@@ -9028,36 +8416,862 @@
         "openLong": 0,
         "openShort": 0,
         "lockSize": 5
-      },
-      "candidates": [
-        {
-          "symbol": "BLUESTARCO",
-          "direction": "LONG",
-          "entryState": "QUALIFIED",
-          "score": 57.2,
-          "oiSetup": "LONG_BUILDUP",
-          "qualityAdjustedExpectedR": 1.549,
-          "proposalOnly": true
-        },
-        {
-          "symbol": "DIVISLAB",
-          "direction": "SHORT",
-          "entryState": "QUALIFIED",
-          "score": 66.5,
-          "oiSetup": "SHORT_BUILDUP",
-          "qualityAdjustedExpectedR": 1.462,
-          "proposalOnly": true
-        },
-        {
-          "symbol": "BPCL",
-          "direction": "SHORT",
-          "entryState": "QUALIFIED",
-          "score": 65.4,
-          "oiSetup": "SHORT_BUILDUP",
-          "qualityAdjustedExpectedR": 1.386,
-          "proposalOnly": true
-        }
-      ]
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:32:45.719133+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:32:45.719201+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:33:47.785551+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:33:47.785607+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:34:49.528461+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:34:49.528520+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:35:51.263999+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:35:51.264107+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:37:03.902123+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:37:03.902181+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:38:05.244547+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:38:05.244606+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:39:07.045891+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:39:07.045947+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:40:08.677446+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:40:08.677506+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:41:10.424790+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:41:10.424853+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:42:12.081963+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:42:12.082016+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:43:13.973781+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:43:13.973854+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:44:15.832940+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:44:15.833016+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:45:17.914083+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:45:17.914186+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:46:19.802692+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:46:19.802814+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:47:32.079113+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:47:32.079179+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:48:33.971344+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:48:33.971482+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:49:35.605627+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:49:35.605686+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:50:37.399377+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:50:37.399467+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:51:39.097108+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:51:39.097164+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:52:40.853761+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:52:40.853815+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:53:42.666396+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:53:42.666454+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:54:44.461639+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:54:44.461735+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:55:46.330166+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:55:46.330222+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:56:47.948672+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:56:47.948808+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:57:52.203039+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:57:52.207596+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T14:59:06.396690+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T14:59:06.396774+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:00:08.825477+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:00:08.825551+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:01:11.415969+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:01:11.416096+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:02:13.960070+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:02:13.960140+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:03:16.664077+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:03:16.664452+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:04:19.041661+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:04:19.041743+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:05:21.513367+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:05:21.513442+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:06:35.530042+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:06:35.530207+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:07:36.829085+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:07:36.829182+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:08:39.304380+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:08:39.304454+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:09:41.810428+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:09:41.810505+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:10:43.997180+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:10:43.997253+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:11:46.500256+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:11:46.500360+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:12:49.043884+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:12:49.044009+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:14:00.004513+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:14:00.004609+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:15:14.767229+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:15:14.767392+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:16:28.329779+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:16:28.329924+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:17:42.035680+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:17:42.035899+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:18:56.721774+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:18:56.722041+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-14T15:20:10.802387+00:00",
+      "symbol": "ANANDRATHI",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-14T15:20:10.802470+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
     }
   ],
   "funnel": {
@@ -9303,5 +9517,6 @@
       "replaceReason": "FREE_SLOT",
       "proposalOnly": true
     }
-  ]
+  ],
+  "closeMarksFrozenAt": "2026-08-14T10:01:07.373825+00:00"
 }
