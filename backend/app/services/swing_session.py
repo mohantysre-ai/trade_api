@@ -1091,6 +1091,9 @@ def _scrub_ineligible_swing_rows(session: dict[str, Any]) -> tuple[dict[str, Any
             if not isinstance(row, dict):
                 continue
             symbol = str(row.get("symbol") or "?").upper().strip() or "?"
+            if row.get("closed"):
+                target.append(row)
+                continue
             entry = _f(row.get("entryPrice") or row.get("scanLtp") or row.get("currentPrice"))
             eligible, _evidence, reasons = _evaluate_swing_buy_contract(
                 row,
@@ -1149,8 +1152,14 @@ def _scrub_cross_book_swing_rows(session: dict[str, Any]) -> tuple[dict[str, Any
         return session, []
     original_long = [r for r in (session.get("long") or []) if isinstance(r, dict)]
     original_short = [r for r in (session.get("short") or []) if isinstance(r, dict)]
-    long_kept, dropped_long = filter_rows_excluding(original_long, blocked)
-    short_kept, dropped_short = filter_rows_excluding(original_short, blocked)
+    open_long = [r for r in original_long if not r.get("closed")]
+    closed_long = [r for r in original_long if r.get("closed")]
+    open_short = [r for r in original_short if not r.get("closed")]
+    closed_short = [r for r in original_short if r.get("closed")]
+    long_kept, dropped_long = filter_rows_excluding(open_long, blocked)
+    short_kept, dropped_short = filter_rows_excluding(open_short, blocked)
+    long_kept = closed_long + long_kept
+    short_kept = closed_short + short_kept
     removed = sorted(set(dropped_long + dropped_short))
     if not removed:
         return session, []
@@ -1340,8 +1349,93 @@ def _size_new_swing_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
+def _row_status_label(row: dict[str, Any]) -> str:
+    outcome = row.get("outcome") if isinstance(row.get("outcome"), dict) else {}
+    return str(row.get("status") or outcome.get("label") or "").upper()
+
+
+def _unique_swing_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One row per symbol for the session day.
+
+    Same-day re-entry of a closed name is dropped. If clones exist, keep the
+    first stop-out (INITIAL/TRAIL STOP HIT) over SCALE COMPLETE mislabels,
+    else the first closed copy, else the latest open row.
+    """
+    groups: dict[str, list[dict[str, Any]]] = {}
+    order: list[str] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        sym = str(row.get("symbol") or "").upper().strip()
+        if not sym:
+            continue
+        if sym not in groups:
+            groups[sym] = []
+            order.append(sym)
+        groups[sym].append(row)
+    unique: list[dict[str, Any]] = []
+    for sym in order:
+        copies = groups[sym]
+        closed = [r for r in copies if r.get("closed")]
+        opens = [r for r in copies if not r.get("closed")]
+        if closed:
+            stop = [r for r in closed if "STOP HIT" in _row_status_label(r)]
+            unique.append((stop or closed)[0])
+            continue
+        unique.append(opens[-1] if opens else copies[0])
+    return unique
+
+
+def _swing_occupied_symbols(session: dict[str, Any]) -> set[str]:
+    """Symbols already in today's swing book (open, closed, or preserved)."""
+    occupied: set[str] = set()
+    day = str(session.get("sessionDate") or "")[:10]
+    for side in ("long", "short"):
+        for row in session.get(side) or []:
+            if not isinstance(row, dict):
+                continue
+            sym = str(row.get("symbol") or "").upper().strip()
+            if sym:
+                occupied.add(sym)
+    for item in session.get("preservedExecutionHistory") or []:
+        if not isinstance(item, dict):
+            continue
+        item_day = str(item.get("sessionDate") or "")[:10]
+        if day and item_day and item_day != day:
+            continue
+        sym = str(item.get("symbol") or "").upper().strip()
+        if sym:
+            occupied.add(sym)
+    return occupied
+
+
+def _dedupe_swing_session_rows(session: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Collapse duplicate symbols in long/short. Returns (session, dropped symbols)."""
+    dropped: list[str] = []
+    sess = session
+    for side in ("long", "short"):
+        rows = [r for r in (session.get(side) or []) if isinstance(r, dict)]
+        unique = _unique_swing_rows(rows)
+        if len(unique) == len(rows):
+            continue
+        if sess is session:
+            sess = dict(session)
+        kept = {id(r) for r in unique}
+        for row in rows:
+            if id(row) in kept:
+                continue
+            dropped.append(str(row.get("symbol") or "?").upper())
+        sess[side] = unique
+    if sess is session:
+        return session, []
+    _recompute_active_swing_totals(sess)
+    sess["updatedAt"] = _utc_now_iso()
+    return sess, dropped
+
+
 def _append_new_swing_entries(session: dict[str, Any]) -> dict[str, Any] | None:
     """Lock newly qualified BUY names into remaining slots. Does not resize existing."""
+    session, _dupes = _dedupe_swing_session_rows(session)
     existing_rows = [
         r for r in (session.get("long") or [])
         if isinstance(r, dict) and r.get("symbol") and not r.get("closed")
@@ -1350,7 +1444,7 @@ def _append_new_swing_entries(session: dict[str, Any]) -> dict[str, Any] | None:
     if remaining <= 0:
         return None
     today = str(session.get("sessionDate") or _ist_today())[:10]
-    existing_syms = {str(r.get("symbol") or "").upper().strip() for r in existing_rows}
+    existing_syms = _swing_occupied_symbols(session)
     exclude = set(intraday_locked_symbols(today)) | existing_syms
     raw_picks, snap_src = _picks_from_asset_matrix(exclude_symbols=exclude)
     committed_at = _utc_now_iso()
@@ -1378,7 +1472,7 @@ def _append_new_swing_entries(session: dict[str, Any]) -> dict[str, Any] | None:
         r for r in (session.get("long") or [])
         if isinstance(r, dict) and r.get("closed")
     ]
-    sess["long"] = existing_rows + added + closed_kept
+    sess["long"] = _unique_swing_rows(existing_rows + added + closed_kept)
     sess["short"] = [r for r in (session.get("short") or []) if isinstance(r, dict)]
     sess["locked"] = True
     sess["cashHeld"] = False
@@ -1449,21 +1543,27 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
     hunt_ok, hunt_code = swing_entry_hunt_allowed(
         allow_manual_override=bool(bypass_lock_window)
     )
-    has_active = bool(
-        existing_date == today and _active_swing_rows(existing)
+    has_today_book = bool(
+        existing.get("locked")
+        and existing_date == today
+        and any(
+            isinstance(r, dict) and r.get("symbol")
+            for r in (existing.get("long") or []) + (existing.get("short") or [])
+        )
     )
 
-    if existing.get("locked") and existing_date == today and has_active:
+    if has_today_book:
         rebuild = bool(force and hunt_ok)
         if not rebuild:
             if hunt_ok:
                 filled = _append_new_swing_entries(existing)
                 if filled is not None:
                     return filled
-            scrubbed, removed_gate = _scrub_ineligible_swing_rows(existing)
+            scrubbed, removed_dup = _dedupe_swing_session_rows(existing)
+            scrubbed, removed_gate = _scrub_ineligible_swing_rows(scrubbed)
             scrubbed, removed_cross = _scrub_cross_book_swing_rows(scrubbed)
             scrubbed, removed_cap = _enforce_swing_position_cap(scrubbed)
-            removed = removed_gate + removed_cross + removed_cap
+            removed = removed_dup + removed_gate + removed_cross + removed_cap
             if removed:
                 scrubbed = _persist_swing_if_changed(existing, scrubbed)
             return {
@@ -1705,15 +1805,20 @@ def ensure_swing_session_locked(*, retry_empty: bool = False) -> dict[str, Any]:
     existing_date = str(existing.get("sessionDate") or "").strip()[:10]
     if existing.get("locked") and existing_date == today:
         if retry_empty and not _active_swing_rows(existing):
-            result = lock_swing_session(force=True)
+            has_names = any(
+                isinstance(r, dict) and r.get("symbol")
+                for r in (existing.get("long") or []) + (existing.get("short") or [])
+            )
+            result = lock_swing_session(force=not has_names)
             return result.get("session") or existing
         if retry_empty:
             result = lock_swing_session(force=False)
             return result.get("session") or existing
-        scrubbed, removed_gate = _scrub_ineligible_swing_rows(existing)
+        scrubbed, removed_dup = _dedupe_swing_session_rows(existing)
+        scrubbed, removed_gate = _scrub_ineligible_swing_rows(scrubbed)
         scrubbed, removed_cross = _scrub_cross_book_swing_rows(scrubbed)
         scrubbed, removed_cap = _enforce_swing_position_cap(scrubbed)
-        if removed_gate or removed_cross or removed_cap:
+        if removed_dup or removed_gate or removed_cross or removed_cap:
             return _persist_swing_if_changed(existing, scrubbed)
         return scrubbed
     if existing.get("hunting") and existing_date == today:
@@ -1739,17 +1844,24 @@ def refresh_swing_session_state() -> dict[str, Any]:
 
     live = _compute_swing_session(live=True)
     changed = False
+    sess, dupes = _dedupe_swing_session_rows(sess)
+    if dupes:
+        changed = True
     for side in ("long", "short"):
-        orig_rows = [r for r in (sess.get(side) or []) if isinstance(r, dict)]
+        orig_rows = _unique_swing_rows(
+            [r for r in (sess.get(side) or []) if isinstance(r, dict)]
+        )
         live_by = {
             str(r.get("symbol") or "").upper(): r
-            for r in (live.get(side) or [])
-            if isinstance(r, dict) and r.get("symbol")
+            for r in _unique_swing_rows(
+                [r for r in (live.get(side) or []) if isinstance(r, dict)]
+            )
+            if r.get("symbol")
         }
         updated_rows: list[dict[str, Any]] = []
         for row in orig_rows:
             symbol = str(row.get("symbol") or "").upper()
-            if row.get("closed"):
+            if row.get("closed") or str((row.get("exitState") or {}).get("pathReplay") or ""):
                 updated_rows.append(row)
                 continue
             live_row = live_by.get(symbol)
@@ -1814,6 +1926,9 @@ def _enrich_swing_row_prices(
 ) -> dict[str, Any]:
     """Price-only MTM — never mutate symbol / levels / lock fields."""
     out = dict(row)
+    replay = str((out.get("exitState") or {}).get("pathReplay") or "")
+    if replay:
+        return out
     symbol = str(out.get("symbol") or "").upper()
     ltp = None
     ltp_source = "none"
@@ -1874,7 +1989,10 @@ def _enrich_swing_row_prices(
     except Exception:
         pass
 
-    if isinstance(out.get("exitPlan"), dict) and ltp is not None:
+    already_closed = bool(out.get("closed"))
+    if already_closed:
+        pass
+    elif isinstance(out.get("exitPlan"), dict) and ltp is not None:
         try:
             ev = evaluate_scale_trail(out, ltp, after_close=after_close)
             if ev:
@@ -1947,7 +2065,8 @@ def get_swing_session(*, live: bool = False) -> dict[str, Any]:
 def _compute_swing_session(*, live: bool = False) -> dict[str, Any]:
     """Return locked swing session; with live=True enrich LTP/Δ only.
 
-    Read-only: never scrubs, resizes, or writes swing_session.json.
+    Read-only vs disk: never writes swing_session.json. Duplicate symbols are
+    collapsed in the response so the desk shows one card per name.
     """
     sess = load_swing_session()
     if not sess:
@@ -1960,6 +2079,15 @@ def _compute_swing_session(*, live: bool = False) -> dict[str, Any]:
             "cashReason": None,
             "entryHuntDiagnostics": None,
         }
+    sess = dict(sess)
+    long_rows = [r for r in (sess.get("long") or []) if isinstance(r, dict)]
+    short_rows = [r for r in (sess.get("short") or []) if isinstance(r, dict)]
+    unique_long = _unique_swing_rows(long_rows)
+    unique_short = _unique_swing_rows(short_rows)
+    sess["long"] = unique_long
+    sess["short"] = unique_short
+    if len(unique_long) != len(long_rows) or len(unique_short) != len(short_rows):
+        _recompute_active_swing_totals(sess)
     if not live:
         return sess
     snap = _read_json(_matrix_snapshot_path())

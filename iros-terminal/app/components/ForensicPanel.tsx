@@ -583,6 +583,42 @@ function StrengthMeter({ score }: { score: number }) {
 
 const DEFAULT_POOLS = ['Nifty 500', 'Nifty 100', 'Live Universe'] as const;
 
+type SwingLongPosition = {
+  symbol?: string;
+  closed?: boolean;
+  status?: string | null;
+  outcome?: { label?: string | null } | null;
+};
+
+function uniqueSwingLongPositions<T extends SwingLongPosition>(rows: T[] | undefined): T[] {
+  if (!rows?.length) return [];
+  const groups = new Map<string, T[]>();
+  const order: string[] = [];
+  for (const pos of rows) {
+    const sym = String(pos.symbol || '').toUpperCase();
+    if (!sym) continue;
+    if (!groups.has(sym)) {
+      groups.set(sym, []);
+      order.push(sym);
+    }
+    groups.get(sym)!.push(pos);
+  }
+  return order.map((sym) => {
+    const copies = groups.get(sym)!;
+    const closed = copies.filter((row) => row.closed);
+    const opens = copies.filter((row) => !row.closed);
+    if (closed.length) {
+      const stop = closed.find((row) =>
+        String(row.status || row.outcome?.label || '')
+          .toUpperCase()
+          .includes('STOP HIT'),
+      );
+      return stop ?? closed[0];
+    }
+    return opens[opens.length - 1] ?? copies[0];
+  });
+}
+
 export default function ForensicPanel({
   onSelect,
   liveMarket,
@@ -1127,7 +1163,7 @@ export default function ForensicPanel({
     if (huntingSwing || cashHeldSwing) return [];
     if (!lockedSwingMode || !swingSession?.long?.length) return displayRows;
     const byTicker = new Map(displayRows.map((item) => [item.row.ticker.toUpperCase(), item]));
-    return swingSession.long
+    return uniqueSwingLongPositions(swingSession.long)
       .map((pos) => {
         const sym = String(pos.symbol || '').toUpperCase();
         if (!sym) return null;

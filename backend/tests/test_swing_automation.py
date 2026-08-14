@@ -151,6 +151,35 @@ def test_ensure_retry_empty_force_relocks(monkeypatch):
     assert out["long"][0]["symbol"] == "NEW"
 
 
+def test_closed_today_book_is_not_force_relocked(monkeypatch):
+    calls: list[dict] = []
+    closed = _qualified_locked_row("BLS")
+    closed["closed"] = True
+    closed["status"] = "INITIAL STOP HIT"
+    monkeypatch.setattr(
+        swing_session,
+        "load_swing_session",
+        lambda: {
+            "locked": True,
+            "sessionDate": "2026-08-13",
+            "cashHeld": False,
+            "long": [closed],
+            "short": [],
+        },
+    )
+    monkeypatch.setattr(swing_session, "_ist_today", lambda: "2026-08-13")
+
+    def _lock(*, force: bool = False, bypass_lock_window: bool = False):
+        calls.append({"force": force, "bypass": bypass_lock_window})
+        return {"success": True, "session": {"locked": True, "long": [closed], "short": []}}
+
+    monkeypatch.setattr(swing_session, "lock_swing_session", _lock)
+    out = swing_session.ensure_swing_session_locked(retry_empty=True)
+    assert calls == [{"force": False, "bypass": False}]
+    assert out["long"][0]["symbol"] == "BLS"
+    assert out["long"][0]["closed"] is True
+
+
 def _raw_buy_pick(symbol: str = "NEWBUY") -> dict:
     return {
         "ticker": symbol,
@@ -272,3 +301,86 @@ def test_fill_up_appends_without_dropping_locked_name(monkeypatch, tmp_path: Pat
     assert "FIRST" in symbols
     assert "SECOND" in symbols
     assert out.get("filled") == ["SECOND"]
+
+
+def test_unique_swing_rows_collapses_closed_clones_and_reentry():
+    rows = [
+        {"symbol": "BLS", "closed": False, "status": "RUNNING"},
+        {"symbol": "MINDACORP", "closed": False, "status": "RUNNING"},
+        {"symbol": "MINDACORP", "closed": True, "status": "SCALE COMPLETE"},
+        {"symbol": "MINDACORP", "closed": True, "status": "INITIAL STOP HIT"},
+    ]
+    unique = swing_session._unique_swing_rows(rows)
+    assert [r["symbol"] for r in unique] == ["BLS", "MINDACORP"]
+    assert unique[1]["closed"] is True
+    assert unique[1]["status"] == "INITIAL STOP HIT"
+
+
+def test_fill_up_does_not_readd_closed_symbol(monkeypatch, tmp_path: Path):
+    path = _patch_hunt(monkeypatch, tmp_path, hunt_ok=True, picks=[_raw_buy_pick("MINDACORP")])
+    closed = _qualified_locked_row("MINDACORP")
+    closed["closed"] = True
+    closed["status"] = "INITIAL STOP HIT"
+    open_other = _qualified_locked_row("BLS")
+    swing_session._atomic_write(
+        str(path),
+        {
+            "locked": True,
+            "sessionDate": "2026-08-13",
+            "cashHeld": False,
+            "hunting": True,
+            "long": [open_other, closed],
+            "short": [],
+            "counts": {"long": 2, "short": 0, "total": 2},
+        },
+    )
+    filled = swing_session._append_new_swing_entries(swing_session.load_swing_session())
+    assert filled is None
+    disk = swing_session.load_swing_session()
+    minda = [r for r in disk["long"] if str(r.get("symbol")) == "MINDACORP"]
+    assert len(minda) == 1
+    assert minda[0]["closed"] is True
+    assert minda[0]["status"] == "INITIAL STOP HIT"
+
+
+def test_refresh_does_not_copy_closed_label_onto_open_row(monkeypatch, tmp_path: Path):
+    path = tmp_path / "swing_session.json"
+    open_row = _qualified_locked_row("BLS")
+    closed = _qualified_locked_row("MINDACORP")
+    closed["closed"] = True
+    closed["status"] = "INITIAL STOP HIT"
+    clone = {**closed, "status": "SCALE COMPLETE"}
+    session = {
+        "locked": True,
+        "sessionDate": "2026-08-13",
+        "long": [open_row, clone, closed],
+        "short": [],
+        "executionPolicy": "MANUAL_ONLY",
+        "counts": {"long": 3, "short": 0, "total": 3},
+    }
+    swing_session._atomic_write(str(path), session)
+    monkeypatch.setattr(swing_session, "_SWING_SESSION_PATH", str(path))
+    monkeypatch.setattr(swing_session, "_ist_today", lambda: "2026-08-13")
+    monkeypatch.setattr(swing_session, "_is_market_open", lambda: True)
+    monkeypatch.setattr(
+        swing_session,
+        "_compute_swing_session",
+        lambda live=False: {
+            **session,
+            "long": [
+                {**open_row, "ltp": 101.0, "currentPrice": 101.0, "unrealizedPnl": 100.0},
+                {**clone, "ltp": 730.0},
+                {**closed, "ltp": 730.0},
+            ],
+            "portfolio": {"totalPnl": -500.0, "realizedPnl": -500.0, "unrealizedPnl": 100.0},
+        },
+    )
+
+    refreshed = swing_session.refresh_swing_session_state()
+    minda = [r for r in refreshed["long"] if str(r.get("symbol")) == "MINDACORP"]
+    assert len(minda) == 1
+    assert minda[0]["status"] == "INITIAL STOP HIT"
+    assert minda[0]["closed"] is True
+    bls = [r for r in refreshed["long"] if str(r.get("symbol")) == "BLS"]
+    assert len(bls) == 1
+    assert bls[0].get("closed") is not True
