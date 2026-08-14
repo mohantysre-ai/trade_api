@@ -101,8 +101,8 @@ Set `INTRADAY_CANDIDATE_LIMIT` in `.env` if you want to cap how many of those vo
 
 The official NSE Nifty 500 index snapshot (the same endpoint used by the heat
 map) is the primary bulk-quote provider. Missing rows immediately fall back to
-one Dhan bulk request, then Angel One for anything still absent. Dhan also
-provides historical candles and instrument-id recovery:
+the unauthenticated Dhan ScanX bulk endpoint, then Angel One for anything still
+absent. Dhan broker credentials are only needed for historical candles:
 
 ```env
 DHAN_CLIENT_ID=your_dhan_client_id
