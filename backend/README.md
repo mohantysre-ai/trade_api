@@ -96,6 +96,29 @@ Set `REQUIRE_BULK_DEAL` (default `false`) to require an NSE bulk/block deal befo
 Set `MIN_BULK_DEAL_VALUE_CR` (default `5`) and `BULK_DEAL_LOOKBACK_HOURS` (default `24`) for bulk/block deal detection thresholds.
 Set `BULK_DEAL_CACHE_TTL_SECONDS` (default `3600`) to control how often NSE bulk/block deals are refreshed.
 Set `INTRADAY_CANDIDATE_LIMIT` in `.env` if you want to cap how many of those volume leaders are candle-screened before the LLM ranking pass (defaults to `VOLUME_PRESELECT_LIMIT`).
+
+### Complete-universe market data
+
+The official NSE Nifty 500 index snapshot (the same endpoint used by the heat
+map) is the primary bulk-quote provider. Missing rows immediately fall back to
+the unauthenticated Dhan ScanX bulk endpoint, then Angel One for anything still
+absent. Dhan broker credentials are only needed for historical candles:
+
+```env
+DHAN_CLIENT_ID=your_dhan_client_id
+DHAN_ACCESS_TOKEN=your_dhan_access_token
+MARKET_DATA_MIN_COVERAGE_PCT=99
+MARKET_DATA_MIN_CANDLE_COVERAGE_PCT=95
+NIFTY_CACHE_EXPECTED_MIN=475
+NIFTY_CACHE_MIN_COVERAGE_PCT=99
+NIFTY_CACHE_MAX_AGE_SECONDS=86400
+```
+
+The service refuses to publish a new deterministic selection when quote or
+candle coverage is below the configured threshold. Quote-derived placeholder
+indicators are disabled by default. Inspect cache, provider counts and missing
+symbols at `GET /api/market-data/coverage`. A partial cache is never allowed to
+overwrite the last valid cache.
 Nifty 500 symbols are stored in [`app/data/nifty500_symbols.json`](app/data/nifty500_symbols.json) and resolved to Angel One tokens in `nifty500_instruments.json` via `POST /api/refresh-instrument-cache`.
 The backend refreshes live Angel One data and LLM-selected top 20 only during the IST refresh windows around **08:00-08:30** and **16:00-16:30**. Outside those windows it serves the last saved snapshot.
 Manual refreshes are still allowed and will reuse the last saved snapshot when live or LLM refreshes are unavailable.
