@@ -57,7 +57,7 @@ Optional LLM news summary:
 - Set `LLM_PROVIDER=openai` for OpenAI-compatible endpoints or `LLM_PROVIDER=gemini` for Gemini.
 - Set `REDACTED` or `REDACTED` to your Gemini API key.
 - Optionally set `LLM_API_URL` for OpenAI; leave blank for Gemini when using the `google-genai` client.
-- Set `LLM_MODEL=gemini-2.5-flash` or `gemini-2.5-pro` for richer analysis.
+- Set `LLM_MODEL=gemini-3.7-flash` for production analysis or `gemini-3.1-flash-lite` for lower-cost, high-volume summaries.
 - For Gemini, install the Python client with `pip install google-genai`.
 
 New AI analysis endpoints:
