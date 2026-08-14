@@ -44,8 +44,8 @@ def test_pace_volume_multiplier_scales_for_elapsed_session():
 
 
 def test_loosened_angle_and_wick_can_pass_together():
-    assert MIN_EMA_ANGLE_DEG == 20.0
-    assert MAX_WICK_NOISE_RATIO == 0.45
+    assert MIN_EMA_ANGLE_DEG == 10.0
+    assert MAX_WICK_NOISE_RATIO == 0.55
     ok, reasons = evaluate_short_term_quality("BDL", _quality_intra(), 72.0)
     assert ok is True
     assert reasons == []
@@ -54,15 +54,35 @@ def test_loosened_angle_and_wick_can_pass_together():
 def test_legacy_tight_wick_and_angle_no_longer_veto_alone():
     ok, reasons = evaluate_short_term_quality(
         "FLUOROCHEM",
-        _quality_intra(ema_angle_deg=21.0, wick_noise_ratio=0.44),
+        _quality_intra(ema_angle_deg=12.5, wick_noise_ratio=0.54),
         72.0,
     )
     assert ok is True
     assert reasons == []
     _fail, fail_reasons = evaluate_short_term_quality(
         "NOISE",
-        _quality_intra(ema_angle_deg=19.0, wick_noise_ratio=0.46),
+        _quality_intra(ema_angle_deg=9.0, wick_noise_ratio=0.56),
         72.0,
     )
-    assert "EMA angle below 20 degrees" in fail_reasons
+    assert "EMA angle below 10 degrees" in fail_reasons
     assert "wick noise too high" in fail_reasons
+
+
+def test_cash_neutral_oi_can_pass():
+    ok, reasons = evaluate_short_term_quality(
+        "NETWEB",
+        _quality_intra(oi_setup="NEUTRAL", oi=0, prev_oi=0),
+        72.0,
+    )
+    assert ok is True
+    assert reasons == []
+
+
+def test_fo_neutral_oi_still_fails():
+    ok, reasons = evaluate_short_term_quality(
+        "BLS",
+        _quality_intra(oi_setup="NEUTRAL", oi=1_000_000, prev_oi=1_000_000),
+        72.0,
+    )
+    assert ok is False
+    assert any("OI setup not bullish" in r for r in reasons)

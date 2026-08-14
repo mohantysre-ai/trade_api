@@ -16,6 +16,14 @@ def qualified_row(symbol: str = "VALID", **overrides) -> dict:
         "oi_setup": "LONG_BUILDUP",
         "pivot_r1_breakout": True,
         "rsi_pivot_break": True,
+        "atr_pct": 2.0,
+        "turnover_cr": 80.0,
+        "volume_multiplier": 1.8,
+        "volume_pace_adjusted": True,
+        "spread_pct": 0.05,
+        "wick_noise_ratio": 0.20,
+        "ema_angle_deg": 25.0,
+        "promoter_holding_pct": 72.0,
     }
     intraday.update(overrides.pop("intraday", {}))
     row = {
@@ -34,6 +42,7 @@ def qualified_row(symbol: str = "VALID", **overrides) -> dict:
         "target2": 110.0,
         "score": 25.0,
         "volume": 1_000_000,
+        "promoter_holding_pct": 72.0,
         "intraday": intraday,
     }
     row.update(overrides)
@@ -69,6 +78,8 @@ def test_metrics_replay_sets_buy_when_hard_filters_compute():
             "wick_noise_ratio": 0.20,
             "pivot_r1_breakout": True,
             "rsi_pivot_break": True,
+            "ema_angle_deg": 25.0,
+            "promoter_holding_pct": 72.0,
             "passes_quality_filters": True,
         },
     }
@@ -119,6 +130,7 @@ def test_undersized_snapshot_triggers_nifty500_hunt_refresh(monkeypatch):
 def test_approve_without_explicit_buy_is_rejected():
     row = qualified_row()
     row.pop("deterministicSide")
+    row["intraday"] = {"vwap": 99.0}
     reasons = rejection_reasons(row)
     assert "EXPLICIT_BUY_SIDE_REQUIRED:MISSING" in reasons
 
@@ -126,16 +138,16 @@ def test_approve_without_explicit_buy_is_rejected():
 def test_high_score_without_explicit_buy_is_rejected():
     row = qualified_row(score=99.0)
     row.pop("deterministicSide")
+    row["intraday"] = {"rsi": 62.0}
     assert swing_session._stock_is_matrix_buy(row) is False
 
 
 def test_failed_hard_or_quality_filters_are_rejected():
-    assert "HARD_FILTERS_NOT_PASSED" in rejection_reasons(
-        qualified_row(passes_hard_filters=False)
-    )
-    assert "QUALITY_FILTERS_NOT_PASSED" in rejection_reasons(
-        qualified_row(passes_quality_filters=False)
-    )
+    spread_fail = qualified_row(intraday={"spread_pct": 0.80})
+    assert "HARD_FILTERS_NOT_PASSED" in rejection_reasons(spread_fail)
+    promoter_fail = qualified_row(promoter_holding_pct=40.0)
+    promoter_fail["intraday"]["promoter_holding_pct"] = 40.0
+    assert "QUALITY_FILTERS_NOT_PASSED" in rejection_reasons(promoter_fail)
 
 
 def test_bearish_side_oi_and_trend_anchors_are_rejected():
@@ -172,6 +184,7 @@ def test_hunt_uses_volume_screen_beyond_display_50():
         row.pop("deterministicSide")
         row["passes_hard_filters"] = False
         row["passes_quality_filters"] = False
+        row["intraday"] = {**row["intraday"], "rsi": 40.0, "price_above_vwap": False}
         row["ticker"] = f"PAD{i}"
         row["symbol"] = f"PAD{i}"
         display.append(row)
@@ -214,9 +227,12 @@ def test_hunt_uses_volume_screen_beyond_display_50():
 def test_only_explicit_fully_qualified_buy_rows_enter_candidate_set():
     approve_only = qualified_row("APPROVE_ONLY")
     approve_only.pop("deterministicSide")
+    approve_only["intraday"] = {"vwap": 99.0}
     high_score = qualified_row("HIGH_SCORE", score=99.0)
     high_score.pop("deterministicSide")
-    failed = qualified_row("FAILED", passes_quality_filters=False)
+    high_score["intraday"] = {"rsi": 99.0}
+    failed = qualified_row("FAILED", promoter_holding_pct=40.0)
+    failed["intraday"]["promoter_holding_pct"] = 40.0
     sell = qualified_row("SELLER", deterministicSide="SELL")
     valid = qualified_row("VALID")
     snapshot = {
@@ -338,6 +354,34 @@ def test_locked_position_contains_complete_selection_evidence(monkeypatch):
     assert evidence["acceptanceReason"] == row["acceptanceReason"]
     assert evidence["lockedAt"]
     assert evidence["lockSource"]
+
+
+def test_stale_false_flags_are_recomputed_from_metrics():
+    row = qualified_row("FLUOROCHEM")
+    row.pop("deterministicSide")
+    row["passes_hard_filters"] = False
+    row["passes_quality_filters"] = False
+    row["intraday"] = {
+        **row["intraday"],
+        "passes_hard_filters": False,
+        "passes_quality_filters": False,
+        "ema_angle_deg": 12.5,
+        "wick_noise_ratio": 0.54,
+        "volume_multiplier": 1.15,
+        "quality_filter_reasons": ["EMA angle below 45 degrees"],
+    }
+    eligible, evidence, reasons = swing_session._evaluate_swing_buy_contract(row)
+    assert evidence.get("deterministicSide") == "BUY"
+    assert eligible is True
+    assert reasons == []
+
+
+def test_cash_neutral_oi_qualifies_when_metrics_pass():
+    row = qualified_row("NETWEB", intraday={"oi_setup": "NEUTRAL", "oi": 0, "prev_oi": 0})
+    eligible, evidence, reasons = swing_session._evaluate_swing_buy_contract(row)
+    assert eligible is True
+    assert reasons == []
+    assert evidence["oiSetup"] == "NEUTRAL"
 
 
 def test_quote_universe_keeps_nifty500_names_on_nifty100_pool(monkeypatch):

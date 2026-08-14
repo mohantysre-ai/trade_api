@@ -30,10 +30,15 @@ from .desk_clock import (
 from .desk_book_symbols import filter_rows_excluding, intraday_locked_symbols
 from .stock_quality import (
     MAX_DAY_MOVE_PCT,
+    MAX_WICK_NOISE_RATIO,
+    MIN_EMA_ANGLE_DEG,
     MIN_RSI_PIVOT,
     MIN_TURNOVER_CR,
     MIN_VOLUME_MULTIPLIER,
     day_change_pct_from_row,
+    evaluate_short_term_quality,
+    oi_setup_allows_buy,
+    pace_volume_multiplier,
 )
 
 log = logging.getLogger(__name__)
@@ -68,7 +73,6 @@ SWING_MAX_SINGLE_RISK = float(os.environ.get("SWING_MAX_SINGLE_TRADE_RISK", "0.0
 SWING_MAX_PORTFOLIO_RISK = float(os.environ.get("SWING_MAX_PORTFOLIO_RISK", "0.05"))
 SWING_SELECTION_CONTRACT = "DETERMINISTIC_BUY_V1"
 _BULLISH_SIDES = frozenset({"BUY", "LONG"})
-_BULLISH_OI = frozenset({"LONG_BUILDUP", "SHORT_COVERING"})
 _RISK_APPROVALS = frozenset({"APPROVE", "APPROVED", "PASS", "PASSED", "CLEAR"})
 # Veto-only: missing / HOLD_FOR_DATA never supply direction and must not block a
 # quant BUY. LLM audits top 10 only; requiring APPROVE would make the volume-500
@@ -315,7 +319,7 @@ def _risk_audit_values(row: dict[str, Any]) -> list[str]:
 
 
 def _hydrate_swing_contract_row(row: dict[str, Any]) -> dict[str, Any]:
-    """Replay deterministic pipeline flags from snapshot metrics when missing.
+    """Recompute quality/hard/BUY from live metrics. Ignore stale snapshot flags.
 
     Does not invent BUY from score/APPROVE. Side is set only when hard filters
     can be fully recomputed from metrics.
@@ -330,9 +334,25 @@ def _hydrate_swing_contract_row(row: dict[str, Any]) -> dict[str, Any]:
     rsi = _f(intra.get("rsi") or out.get("rsi"))
     vol = _f(intra.get("volume_multiplier") or out.get("volume_multiplier"))
     spread = _f(intra.get("spread_pct") or out.get("spread_pct"))
+    if spread is None:
+        spread = 0.0
     wick = _f(intra.get("wick_noise_ratio") or out.get("wick_noise_ratio"))
+    ema_angle = _f(intra.get("ema_angle_deg") or out.get("ema_angle_deg")) or 0.0
     day_move = day_change_pct_from_row(out)
-    oi = str(intra.get("oi_setup") or out.get("oi_setup") or "").upper().strip()
+    oi_setup = str(intra.get("oi_setup") or out.get("oi_setup") or "").upper().strip()
+    oi_val = _f(intra.get("oi") if intra.get("oi") is not None else out.get("oi")) or 0.0
+    prev_oi = _f(intra.get("prev_oi") if intra.get("prev_oi") is not None else out.get("prev_oi")) or 0.0
+    if intra.get("oi") is None and out.get("oi") is not None:
+        intra["oi"] = out.get("oi")
+    if intra.get("prev_oi") is None and out.get("prev_oi") is not None:
+        intra["prev_oi"] = out.get("prev_oi")
+    if not intra.get("volume_pace_adjusted"):
+        today_vol = _f(intra.get("today_volume") or out.get("today_volume"))
+        avg_vol = _f(intra.get("avg_daily_volume_20") or out.get("avg_daily_volume_20"))
+        if today_vol is not None and avg_vol is not None and avg_vol > 0:
+            vol = pace_volume_multiplier(today_vol, avg_vol)
+            intra["volume_multiplier"] = vol
+            intra["volume_pace_adjusted"] = True
     above_vwap = intra.get("price_above_vwap")
     if not isinstance(above_vwap, bool) and ltp is not None and vwap is not None:
         above_vwap = ltp > vwap
@@ -341,33 +361,43 @@ def _hydrate_swing_contract_row(row: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(above_ema9, bool) and ltp is not None and ema9 is not None:
         above_ema9 = ltp > ema9
         intra["price_above_ema9"] = above_ema9
-    quality = out.get("passes_quality_filters")
-    if not isinstance(quality, bool):
-        quality = intra.get("passes_quality_filters")
     pivot = intra.get("pivot_r1_breakout")
-    if out.get("passes_hard_filters") is None and out.get("passesHardFilters") is None:
-        essentials = [atr, turnover, vwap, ltp, rsi, vol, spread, wick, above_ema9, pivot, quality]
-        if all(v is not None for v in essentials) and oi:
-            hard = all((
-                atr > 1.5,
-                turnover >= MIN_TURNOVER_CR,
-                ltp > vwap,
-                oi in _BULLISH_OI,
-                vol >= MIN_VOLUME_MULTIPLIER,
-                rsi >= MIN_RSI_PIVOT,
-                spread < 0.50,
-                wick < 0.70,
-                above_ema9 is True,
-                pivot is True,
-                quality is True,
-                day_move is None or day_move <= MAX_DAY_MOVE_PCT,
-            ))
-            out["passes_hard_filters"] = hard
-            side, _src = _explicit_deterministic_side(out)
-            if side not in _BULLISH_SIDES and hard:
-                out["deterministicSide"] = "BUY"
-    if out.get("passes_quality_filters") is None and isinstance(quality, bool):
-        out["passes_quality_filters"] = quality
+    promoter = _f(intra.get("promoter_holding_pct") or out.get("promoter_holding_pct"))
+    symbol = str(out.get("symbol") or out.get("ticker") or "").upper().strip()
+    if day_move is not None:
+        intra.setdefault("day_change_pct", day_move)
+    can_recompute = all(
+        v is not None for v in (atr, turnover, vwap, ltp, rsi, vol, wick, above_ema9, pivot)
+    )
+    if can_recompute:
+        quality_ok, quality_reasons = evaluate_short_term_quality(symbol or "UNKNOWN", intra, promoter)
+        intra["passes_quality_filters"] = quality_ok
+        intra["quality_filter_reasons"] = quality_reasons
+        out["passes_quality_filters"] = quality_ok
+        hard = all((
+            atr > 1.5,
+            turnover >= MIN_TURNOVER_CR,
+            ltp > vwap,
+            oi_setup_allows_buy(oi_setup, oi=oi_val, prev_oi=prev_oi),
+            vol >= MIN_VOLUME_MULTIPLIER,
+            rsi >= MIN_RSI_PIVOT,
+            spread < 0.50,
+            wick <= MAX_WICK_NOISE_RATIO,
+            ema_angle > MIN_EMA_ANGLE_DEG,
+            above_ema9 is True,
+            pivot is True,
+            quality_ok is True,
+            day_move is None or day_move <= MAX_DAY_MOVE_PCT,
+        ))
+        out["passes_hard_filters"] = hard
+        intra["passes_hard_filters"] = hard
+        side, _src = _explicit_deterministic_side(out)
+        if hard and not side:
+            out["deterministicSide"] = "BUY"
+    elif out.get("passes_quality_filters") is None:
+        quality = intra.get("passes_quality_filters")
+        if isinstance(quality, bool):
+            out["passes_quality_filters"] = quality
     if intra:
         out["intraday"] = intra
     if vwap is not None:
@@ -477,7 +507,9 @@ def _evaluate_swing_buy_contract(
         reasons.append("ABOVE_VWAP_REQUIREMENT_FAILED")
     if above_ema9 is not True or ema9 is None or selection_price is None or selection_price <= ema9:
         reasons.append("ABOVE_EMA9_REQUIREMENT_FAILED")
-    if oi_setup not in _BULLISH_OI:
+    oi_val = _f(_selection_value(row, "oi", "oi")) or 0.0
+    prev_oi = _f(_selection_value(row, "prevOi", "prev_oi")) or 0.0
+    if not oi_setup_allows_buy(oi_setup, oi=oi_val, prev_oi=prev_oi):
         reasons.append(f"BULLISH_OI_REQUIRED:{oi_setup or 'MISSING'}")
     if rsi is None or rsi < MIN_RSI_PIVOT:
         reasons.append(f"RSI_REQUIREMENT_FAILED:min={MIN_RSI_PIVOT:g}")

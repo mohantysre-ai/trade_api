@@ -31,12 +31,12 @@ BASE_DIR = Path(__file__).resolve().parent
 PROMOTER_HOLDINGS_PATH = BASE_DIR.parent / "data" / "promoter_holdings.json"
 
 MIN_PROMOTER_HOLDING_PCT = float(os.getenv("MIN_PROMOTER_HOLDING_PCT", "60"))
-MIN_VOLUME_MULTIPLIER = float(os.getenv("MIN_VOLUME_MULTIPLIER", "1.5"))
+MIN_VOLUME_MULTIPLIER = float(os.getenv("MIN_VOLUME_MULTIPLIER", "1.0"))
 MIN_TURNOVER_CR = float(os.getenv("MIN_TURNOVER_CR", "50"))
 MIN_RSI_PIVOT = float(os.getenv("MIN_RSI_PIVOT", "55"))
-# Slight loosen: 45° / 0.25 wick left the hunt empty (no name passed both).
-MIN_EMA_ANGLE_DEG = float(os.getenv("MIN_EMA_ANGLE_DEG", "20"))
-MAX_WICK_NOISE_RATIO = float(os.getenv("MAX_WICK_NOISE_RATIO", "0.45"))
+# Hunt was empty at 45° / 0.25 and still empty at 20° / 0.45.
+MIN_EMA_ANGLE_DEG = float(os.getenv("MIN_EMA_ANGLE_DEG", "10"))
+MAX_WICK_NOISE_RATIO = float(os.getenv("MAX_WICK_NOISE_RATIO", "0.55"))
 # Swing / matrix hard gate: already-extended names. Raised 3% → 6%.
 MAX_DAY_MOVE_PCT = float(os.getenv("MAX_DAY_MOVE_PCT", "6"))
 _IST = ZoneInfo("Asia/Kolkata")
@@ -109,6 +109,28 @@ def pace_volume_multiplier(
     if expected <= 0:
         return 0.0
     return float(today_volume) / expected
+
+
+_BEARISH_OI = frozenset({"SHORT_BUILDUP", "LONG_UNWINDING"})
+_BULLISH_OI = frozenset({"LONG_BUILDUP", "SHORT_COVERING"})
+
+
+def oi_setup_allows_buy(
+    oi_setup: str,
+    *,
+    oi: float = 0.0,
+    prev_oi: float = 0.0,
+) -> bool:
+    """Bullish F&O OI, or cash name with no OI series (NEUTRAL)."""
+    setup = str(oi_setup or "").upper().strip()
+    if setup in _BULLISH_OI:
+        return True
+    if setup in _BEARISH_OI:
+        return False
+    try:
+        return float(oi or 0) <= 0 and float(prev_oi or 0) <= 0
+    except (TypeError, ValueError):
+        return False
 
 
 def parse_day_change_pct(*values: Any) -> float | None:
@@ -324,7 +346,11 @@ def evaluate_short_term_quality(
         reasons.append(f"turnover under {MIN_TURNOVER_CR:g} Cr")
 
     oi_setup = str(intraday.get("oi_setup") or "NEUTRAL")
-    if oi_setup not in {"LONG_BUILDUP", "SHORT_COVERING"}:
+    if not oi_setup_allows_buy(
+        oi_setup,
+        oi=float(intraday.get("oi") or 0),
+        prev_oi=float(intraday.get("prev_oi") or 0),
+    ):
         reasons.append(f"OI setup not bullish ({oi_setup})")
 
     ema_angle = float(intraday.get("ema_angle_deg") or 0)
@@ -357,7 +383,13 @@ def enrich_stock_quality(
     ticker = str(stock.get("ticker") or "").upper()
     intraday = dict(stock.get("intraday") or {})
     promoter_pct = promoter_map.get(ticker)
+    if promoter_pct is None:
+        promoter_pct = stock.get("promoter_holding_pct")
     intraday["promoter_holding_pct"] = promoter_pct
+    if intraday.get("oi") is None and stock.get("oi") is not None:
+        intraday["oi"] = stock.get("oi")
+    if intraday.get("prev_oi") is None and stock.get("prev_oi") is not None:
+        intraday["prev_oi"] = stock.get("prev_oi")
     attach_bulk_deal_metrics(intraday, (bulk_deal_map or {}).get(ticker))
 
     passes_quality, quality_reasons = evaluate_short_term_quality(ticker, intraday, promoter_pct)

@@ -52,6 +52,7 @@ from .stock_quality import (
     day_change_pct_from_row,
     ensure_promoter_holdings,
     enrich_stock_quality,
+    oi_setup_allows_buy,
     pace_volume_multiplier,
 )
 from .market_feeds import (
@@ -2430,11 +2431,14 @@ def _intraday_metrics_from_quote(ltp: float, now: datetime, quote: dict[str, Any
         "trigger_point": trigger_point,
         "rsi": 50.0,
         "oi_setup": oi_setup,
+        "oi": current_oi,
+        "prev_oi": prev_oi_val,
         "relative_volume": relative_volume,
         "liquidity_score": liquidity_score,
         "breakout_quality": breakout_quality,
         "sector_strength": sector_strength,
         "day_change_pct": None if day_move_pct is None else round(day_move_pct, 2),
+        "volume_pace_adjusted": False,
         "passes_hard_filters": passes_hard_filters,
         "hard_filter_reasons": hard_filter_reasons + ["metrics estimated from quote (candle API unavailable)"],
     }
@@ -2595,11 +2599,14 @@ def _intraday_metrics(
         "trigger_point": trigger_point,
         "rsi": rsi_val,
         "oi_setup": oi_setup,
+        "oi": current_oi,
+        "prev_oi": prev_oi_val,
         "relative_volume": relative_volume,
         "liquidity_score": liquidity_score,
         "breakout_quality": breakout_quality,
         "sector_strength": sector_strength,
         "day_change_pct": None if day_move_pct is None else round(day_move_pct, 2),
+        "volume_pace_adjusted": True,
         "passes_hard_filters": passes_hard_filters,
         "hard_filter_reasons": hard_filter_reasons,
     }
@@ -2742,9 +2749,9 @@ def _compute_deterministic_pipeline(all_stocks: list[dict[str, Any]]) -> list[di
 
     Hard filter gates:
       ATR > 1.5%  |  turnover > 50 Cr  |  LTP > VWAP
-      OI in (LONG_BUILDUP, SHORT_COVERING)
-      vol_mult > 1.5  |  RSI > 55  |  spread < 0.50  |  wick < 0.70
-      day move <= 6%
+      OI bullish, or cash NEUTRAL with no OI series
+      vol_mult >= 1.0 expected-by-now  |  RSI > 55  |  spread < 0.50
+      wick <= MAX_WICK_NOISE_RATIO  |  day move <= 6%
 
     Alpha score uses: relative_volume, liquidity_score,
                       breakout_quality, sector_strength
@@ -2772,11 +2779,15 @@ def _compute_deterministic_pipeline(all_stocks: list[dict[str, Any]]) -> list[di
             atr > 1.5,
             turnover >= MIN_TURNOVER_CR,
             ltp > vwap_val,
-            oi_setup in ("LONG_BUILDUP", "SHORT_COVERING"),
+            oi_setup_allows_buy(
+                str(oi_setup or ""),
+                oi=float(metrics.get("oi") or stock.get("oi") or 0),
+                prev_oi=float(metrics.get("prev_oi") or stock.get("prev_oi") or 0),
+            ),
             vol_mult >= MIN_VOLUME_MULTIPLIER,
             rsi_val >= MIN_RSI_PIVOT,
             spread < 0.50,
-            wick_noise < 0.70,
+            wick_noise <= MAX_WICK_NOISE_RATIO,
             metrics.get("price_above_ema9", False),
             metrics.get("pivot_r1_breakout", False),
             stock.get("passes_quality_filters", False),
