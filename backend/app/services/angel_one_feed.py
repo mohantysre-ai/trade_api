@@ -76,12 +76,9 @@ ORCHESTRATION_DELAY = 30
 
 
 BASE_DIR = Path(__file__).resolve().parent
-# Load the project-root .env (backend/.env) as the single source of truth,
-# overriding any values already in the environment or in the stale duplicate
-# at backend/app/services/.env. override=True ensures the intended file wins.
-load_dotenv(BASE_DIR.parent.parent / ".env", override=True)
-load_dotenv(BASE_DIR.parent / ".env", override=True)
-load_dotenv(BASE_DIR / ".env", override=True)
+# Load only backend/.env for local development. Explicit process/container
+# environment variables retain precedence over values from the file.
+load_dotenv(BASE_DIR.parent.parent / ".env", override=False)
 
 NIFTY_500_CACHE_PATH = BASE_DIR / "nifty500_instruments.json"
 NIFTY_500_SYMBOLS_PATH = BASE_DIR.parent / "data" / "nifty500_symbols.json"
@@ -119,7 +116,7 @@ AI_CACHE_TTL_SECONDS = int(os.getenv("AI_CACHE_TTL_SECONDS", "900"))
 # unless forceLlmRefresh=true. Live Angel/Yahoo/RSS still refresh every cycle.
 MARKET_PREWORK_STAMP_PATH = BASE_DIR.parent / "data" / "morning_prework_stamp.json"
 # Angel historical (getCandleData) rate-limits hard (AB1021). Keep workers low.
-INTRADAY_FETCH_WORKERS = int(os.getenv("INTRADAY_FETCH_WORKERS", "2"))
+INTRADAY_FETCH_WORKERS = int(os.getenv("INTRADAY_FETCH_WORKERS", "1"))
 NIFTY_100_LABEL = "Nifty 100"
 NIFTY_100_CACHE_PATH = BASE_DIR / "nifty100_instruments.json"
 ANGEL_API_TIMEOUT_SECONDS = int(os.getenv("ANGEL_API_TIMEOUT_SECONDS", "24"))
@@ -127,8 +124,8 @@ LLM_CALL_TIMEOUT_SECONDS = min(max(1, int(os.getenv("LLM_CALL_TIMEOUT_SECONDS", 
 QUOTE_CHUNK_SIZE = int(os.getenv("QUOTE_CHUNK_SIZE", "10"))
 INTRADAY_CHUNK_SIZE = int(os.getenv("INTRADAY_CHUNK_SIZE", "5"))
 # Global candle throttle across all threads (Angel AB1021 / ~3–5 req/s soft limit).
-CANDLE_MIN_INTERVAL_SECONDS = float(os.getenv("CANDLE_MIN_INTERVAL_SECONDS", "0.35"))
-CANDLE_RATE_LIMIT_RETRIES = int(os.getenv("CANDLE_RATE_LIMIT_RETRIES", "3"))
+CANDLE_MIN_INTERVAL_SECONDS = float(os.getenv("CANDLE_MIN_INTERVAL_SECONDS", "1.1"))
+CANDLE_RATE_LIMIT_RETRIES = int(os.getenv("CANDLE_RATE_LIMIT_RETRIES", "5"))
 _CANDLE_THROTTLE_LOCK = threading.Lock()
 _CANDLE_LAST_CALL_MONO = 0.0
 _CANDLE_COOLDOWN_UNTIL_MONO = 0.0
