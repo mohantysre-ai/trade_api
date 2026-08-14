@@ -14,6 +14,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -33,8 +34,13 @@ MIN_PROMOTER_HOLDING_PCT = float(os.getenv("MIN_PROMOTER_HOLDING_PCT", "60"))
 MIN_VOLUME_MULTIPLIER = float(os.getenv("MIN_VOLUME_MULTIPLIER", "1.5"))
 MIN_TURNOVER_CR = float(os.getenv("MIN_TURNOVER_CR", "50"))
 MIN_RSI_PIVOT = float(os.getenv("MIN_RSI_PIVOT", "55"))
+# Slight loosen: 45° / 0.25 wick left the hunt empty (no name passed both).
+MIN_EMA_ANGLE_DEG = float(os.getenv("MIN_EMA_ANGLE_DEG", "20"))
+MAX_WICK_NOISE_RATIO = float(os.getenv("MAX_WICK_NOISE_RATIO", "0.45"))
 # Swing / matrix hard gate: already-extended names. Raised 3% → 6%.
 MAX_DAY_MOVE_PCT = float(os.getenv("MAX_DAY_MOVE_PCT", "6"))
+_IST = ZoneInfo("Asia/Kolkata")
+NSE_CASH_SESSION_MINUTES = 375.0
 REQUIRE_PIVOT_R1_BREAKOUT = os.getenv("REQUIRE_PIVOT_R1_BREAKOUT", "true").strip().lower() in {
     "1",
     "true",
@@ -72,6 +78,37 @@ def risky_symbol_denylist() -> set[str]:
 
 def is_risky_symbol(symbol: str) -> bool:
     return symbol.upper() in risky_symbol_denylist()
+
+
+def session_elapsed_fraction(now: datetime | None = None) -> float:
+    """NSE cash session fraction elapsed (09:15–15:30 IST). Floor 15 minutes."""
+    clock = now or datetime.now(tz=_IST)
+    if clock.tzinfo is None:
+        clock = clock.replace(tzinfo=_IST)
+    else:
+        clock = clock.astimezone(_IST)
+    start = clock.replace(hour=9, minute=15, second=0, microsecond=0)
+    end = clock.replace(hour=15, minute=30, second=0, microsecond=0)
+    if clock <= start:
+        return 15.0 / NSE_CASH_SESSION_MINUTES
+    if clock >= end:
+        return 1.0
+    elapsed = (clock - start).total_seconds() / 60.0
+    return min(1.0, max(elapsed, 15.0) / NSE_CASH_SESSION_MINUTES)
+
+
+def pace_volume_multiplier(
+    today_volume: float,
+    avg_daily_volume: float,
+    now: datetime | None = None,
+) -> float:
+    """Today's volume vs expected volume by this clock time (not full-day average)."""
+    if avg_daily_volume <= 0:
+        return 0.0
+    expected = avg_daily_volume * session_elapsed_fraction(now)
+    if expected <= 0:
+        return 0.0
+    return float(today_volume) / expected
 
 
 def parse_day_change_pct(*values: Any) -> float | None:
@@ -291,11 +328,11 @@ def evaluate_short_term_quality(
         reasons.append(f"OI setup not bullish ({oi_setup})")
 
     ema_angle = float(intraday.get("ema_angle_deg") or 0)
-    if ema_angle <= 45.0:
-        reasons.append("EMA angle below 45 degrees")
+    if ema_angle <= MIN_EMA_ANGLE_DEG:
+        reasons.append(f"EMA angle below {MIN_EMA_ANGLE_DEG:g} degrees")
 
     wick_noise = float(intraday.get("wick_noise_ratio") or 1.0)
-    if wick_noise > 0.25:
+    if wick_noise > MAX_WICK_NOISE_RATIO:
         reasons.append("wick noise too high")
 
     day_move = parse_day_change_pct(intraday.get("day_change_pct"), intraday.get("dayChangePct"))

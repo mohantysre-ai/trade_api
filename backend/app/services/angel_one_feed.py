@@ -41,6 +41,8 @@ from SmartApi import SmartConnect
 from .bulk_deals import load_bulk_deals
 from .stock_quality import (
     MAX_DAY_MOVE_PCT,
+    MAX_WICK_NOISE_RATIO,
+    MIN_EMA_ANGLE_DEG,
     MIN_PROMOTER_HOLDING_PCT,
     MIN_RSI_PIVOT,
     MIN_TURNOVER_CR,
@@ -50,6 +52,7 @@ from .stock_quality import (
     day_change_pct_from_row,
     ensure_promoter_holdings,
     enrich_stock_quality,
+    pace_volume_multiplier,
 )
 from .market_feeds import (
     fetch_domestic_index_macro,
@@ -2354,16 +2357,16 @@ def _intraday_metrics_from_quote(ltp: float, now: datetime, quote: dict[str, Any
     hard_filter_reasons: list[str] = []
     if daily_range_pct <= 1.5:
         hard_filter_reasons.append("ATR under 1.5%")
-    if volume_multiplier <= 3.0:
-        hard_filter_reasons.append("opening volume under 3.0x")
+    if volume_multiplier < MIN_VOLUME_MULTIPLIER:
+        hard_filter_reasons.append(f"volume under {MIN_VOLUME_MULTIPLIER:g}x expected")
     if wick_noise_ratio > 0.70:
         hard_filter_reasons.append("wick noise too high")
     if not price_above_vwap:
         hard_filter_reasons.append("below VWAP")
     if not price_above_ema9:
         hard_filter_reasons.append("below EMA9")
-    if ema_angle_deg <= 45.0:
-        hard_filter_reasons.append("EMA angle below 45 degrees")
+    if ema_angle_deg <= MIN_EMA_ANGLE_DEG:
+        hard_filter_reasons.append(f"EMA angle below {MIN_EMA_ANGLE_DEG:g} degrees")
     if turnover_cr < 50.0:
         hard_filter_reasons.append("turnover under 50 Cr")
     day_move_pct = day_change_pct_from_prices(ltp, close)
@@ -2498,7 +2501,7 @@ def _intraday_metrics(
     atr_pct = _atr_percent(daily_candles)
 
     today_volume = sum(row["volume"] for row in intraday_candles)
-    volume_multiplier = (today_volume / avg_daily_volume_20) if avg_daily_volume_20 > 0 else 0.0
+    volume_multiplier = pace_volume_multiplier(today_volume, avg_daily_volume_20, now)
 
     vwap = _vwap(intraday_candles)
     closes = [row["close"] for row in intraday_candles]
@@ -2552,16 +2555,16 @@ def _intraday_metrics(
     hard_filter_reasons: list[str] = []
     if atr_pct <= 3.0:
         hard_filter_reasons.append("ATR under 3.0%")
-    if volume_multiplier <= 3.0:
-        hard_filter_reasons.append("opening volume under 3.0x")
-    if wick_noise_ratio > 0.25:
+    if volume_multiplier < MIN_VOLUME_MULTIPLIER:
+        hard_filter_reasons.append(f"volume under {MIN_VOLUME_MULTIPLIER:g}x expected")
+    if wick_noise_ratio > MAX_WICK_NOISE_RATIO:
         hard_filter_reasons.append("wick noise too high")
     if not price_above_vwap:
         hard_filter_reasons.append("below VWAP")
     if not price_above_ema9:
         hard_filter_reasons.append("below EMA9")
-    if ema_angle_deg <= 45.0:
-        hard_filter_reasons.append("EMA angle below 45 degrees")
+    if ema_angle_deg <= MIN_EMA_ANGLE_DEG:
+        hard_filter_reasons.append(f"EMA angle below {MIN_EMA_ANGLE_DEG:g} degrees")
     if turnover_cr < 50.0:
         hard_filter_reasons.append("turnover under 50 Cr")
     prev_close = float((quote_fallback or {}).get("close") or 0)

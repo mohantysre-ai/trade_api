@@ -1,14 +1,14 @@
 {
   "success": true,
-  "locked": true,
-  "hunting": false,
-  "selectionFinalized": true,
-  "cashHeld": true,
+  "locked": false,
+  "hunting": true,
+  "selectionFinalized": false,
+  "cashHeld": false,
   "book": "SWING",
-  "sessionDate": "2026-08-13",
-  "committedAt": "2026-08-13T12:54:08.824717+00:00",
-  "updatedAt": "2026-08-13T12:54:39.287311+00:00",
-  "huntStartedAt": "2026-08-13T05:16:23.411670+00:00",
+  "sessionDate": "2026-08-14",
+  "committedAt": "2026-08-14T04:15:25.218870+00:00",
+  "updatedAt": "2026-08-14T06:14:28.192835+00:00",
+  "huntStartedAt": "2026-08-14T04:15:25.218870+00:00",
   "executionPolicy": "MANUAL_ONLY",
   "source": "asset_matrix_deterministic_buy",
   "selectionContract": "DETERMINISTIC_BUY_V1",
@@ -881,21 +881,24 @@
     "rejectDvr": true
   },
   "crossBookExcluded": [
-    "AARTIIND",
-    "BIOCON",
-    "GAIL",
-    "ICICIBANK",
-    "JIOFIN",
-    "NESTLEIND",
-    "NTPC",
-    "PFC",
-    "SHRIRAMFIN",
-    "SONACOMS",
+    "ADANIPOWER",
+    "ANANDRATHI",
+    "BAJFINANCE",
+    "CIPLA",
+    "DLF",
+    "HDFCAMC",
+    "HDFCBANK",
+    "INFY",
+    "IOC",
+    "MOTHERSON",
+    "NMDC",
+    "RELIANCE",
+    "SAIL",
     "SWIGGY",
-    "TATASTEEL",
-    "VEDL"
+    "TRENT",
+    "TVSMOTOR"
   ],
-  "cashReason": "NO_FULLY_QUALIFIED_EXPLICIT_BUY_CANDIDATES",
+  "cashReason": "WAITING_FOR_QUALIFIED_BUY_ENTRY",
   "huntWindow": {
     "huntStart": "09:45",
     "huntEnd": "14:45",
@@ -903,74 +906,64 @@
     "rationale": "Hunt a fully qualified BUY from 09:45 IST; lock each entry when found; do not cash-finalize at 10:15; hunt closes 14:45"
   },
   "entryHuntDiagnostics": {
-    "universeSize": 189,
-    "volumeScreened": 189,
-    "candleMetrics": 189,
+    "universeSize": 500,
+    "volumeScreened": 500,
+    "candleMetrics": 490,
     "displayPool": 50,
-    "evaluated": 200,
+    "evaluated": 500,
     "qualified": 0,
     "crossBookExcluded": [
-      "AARTIIND",
-      "BIOCON",
-      "GAIL",
-      "ICICIBANK",
-      "JIOFIN",
-      "NESTLEIND",
-      "NTPC",
-      "PFC",
-      "SHRIRAMFIN",
-      "SONACOMS",
+      "ADANIPOWER",
+      "ANANDRATHI",
+      "BAJFINANCE",
+      "CIPLA",
+      "DLF",
+      "HDFCAMC",
+      "HDFCBANK",
+      "INFY",
+      "IOC",
+      "MOTHERSON",
+      "NMDC",
+      "RELIANCE",
+      "SAIL",
       "SWIGGY",
-      "TATASTEEL",
-      "VEDL"
+      "TRENT",
+      "TVSMOTOR"
     ],
     "swingUniverse": "Nifty 500",
     "topRejectionReasons": [
       {
         "reason": "EXPLICIT_BUY_SIDE_REQUIRED:MISSING",
-        "count": 200
+        "count": 500
       },
       {
         "reason": "HARD_FILTERS_NOT_PASSED",
-        "count": 200
+        "count": 500
       },
       {
         "reason": "QUALITY_FILTERS_NOT_PASSED",
-        "count": 200
+        "count": 500
       },
       {
         "reason": "BREAKOUT_REQUIREMENT_FAILED",
-        "count": 179
-      },
-      {
-        "reason": "RSI_REQUIREMENT_FAILED:min=55",
-        "count": 130
+        "count": 473
       },
       {
         "reason": "ABOVE_VWAP_REQUIREMENT_FAILED",
-        "count": 125
+        "count": 379
       },
       {
         "reason": "ABOVE_EMA9_REQUIREMENT_FAILED",
-        "count": 106
+        "count": 367
+      },
+      {
+        "reason": "RSI_REQUIREMENT_FAILED:min=55",
+        "count": 359
       },
       {
         "reason": "BULLISH_OI_REQUIRED:NEUTRAL",
-        "count": 90
+        "count": 222
       }
     ]
-  },
-  "portfolio": {
-    "swingCapital": 1000000.0,
-    "realizedPnl": 0,
-    "unrealizedPnl": 0,
-    "totalPnl": 0,
-    "lockedCount": 0
-  },
-  "priceOnly": true,
-  "automation": {
-    "lastRefreshAt": "2026-08-13T12:54:39.287311+00:00",
-    "source": "refresh_swing_session_state",
-    "executionPolicy": "MANUAL_ONLY"
   }
 }
