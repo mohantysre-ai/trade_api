@@ -25,6 +25,9 @@ DHAN_SCRIP_MASTER_URL = os.getenv(
     "DHAN_SCRIP_MASTER_URL",
     "https://images.dhan.co/api-data/api-scrip-master-detailed.csv",
 )
+DHAN_QUOTE_URL = os.getenv(
+    "DHAN_QUOTE_URL", "https://api.dhan.co/v2/marketfeed/quote"
+)
 NSE_EQUITY_STOCK_INDICES_URL = os.getenv(
     "NSE_EQUITY_STOCK_INDICES_URL",
     "https://www.nseindia.com/api/equity-stock-indices?index=NIFTY%20500",
@@ -185,6 +188,24 @@ def _nse_quote_to_canonical(raw: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _dhan_quote_to_canonical(raw: dict[str, Any]) -> dict[str, Any] | None:
+    ohlc = raw.get("ohlc") if isinstance(raw.get("ohlc"), dict) else {}
+    ltp = raw.get("last_price") if raw.get("last_price") is not None else raw.get("ltp")
+    if ltp in (None, ""):
+        return None
+    return {
+        "ltp": ltp,
+        "open": ohlc.get("open", raw.get("open")),
+        "high": ohlc.get("high", raw.get("high")),
+        "low": ohlc.get("low", raw.get("low")),
+        "close": ohlc.get("close", raw.get("close")),
+        "tradeVolume": raw.get("volume", raw.get("trade_volume", 0)),
+        "opnInterest": raw.get("oi", 0),
+        "previousOI": raw.get("previous_oi", raw.get("prev_oi", 0)),
+        "quoteProvider": "dhan",
+    }
+
+
 def fetch_nse500_quotes(symbols: Iterable[str]) -> dict[str, dict[str, Any]]:
     """Fetch the official NSE Nifty 500 snapshot used by the heat map."""
     wanted = {_norm(symbol) for symbol in symbols if _norm(symbol)}
@@ -215,6 +236,36 @@ def fetch_nse500_quotes(symbols: Iterable[str]) -> dict[str, dict[str, Any]]:
     return out
 
 
+def fetch_dhan_bulk_quotes(symbols: Iterable[str]) -> dict[str, dict[str, Any]]:
+    """Fetch only NSE symbols missing from the primary NSE snapshot."""
+    if not dhan_configured():
+        return {}
+    ids = load_dhan_security_ids()
+    wanted = {_norm(symbol): ids.get(_norm(symbol)) for symbol in symbols}
+    reverse = {security_id: symbol for symbol, security_id in wanted.items() if security_id}
+    if not reverse:
+        return {}
+    response = requests.post(
+        DHAN_QUOTE_URL,
+        headers=_dhan_headers(),
+        json={"NSE_EQ": list(reverse)},
+        timeout=(10, 30),
+    )
+    response.raise_for_status()
+    payload = response.json()
+    data = payload.get("data") if isinstance(payload, dict) else {}
+    segment = data.get("NSE_EQ", {}) if isinstance(data, dict) else {}
+    out: dict[str, dict[str, Any]] = {}
+    for security_id, raw in segment.items():
+        if not isinstance(raw, dict):
+            continue
+        symbol = reverse.get(str(security_id))
+        quote = _dhan_quote_to_canonical(raw)
+        if symbol and quote:
+            out[symbol] = quote
+    return out
+
+
 @dataclass(frozen=True)
 class QuoteCoverage:
     expected: int
@@ -239,15 +290,26 @@ def fetch_quotes_with_failover(
     symbols: Iterable[str],
     angel_fetch: Callable[[list[str]], dict[str, dict[str, Any]]],
 ) -> tuple[dict[str, dict[str, Any]], QuoteCoverage]:
-    """NSE primary; fetch only missing symbols from Angel."""
+    """NSE primary, Dhan missing-symbol fallback, then Angel final fallback."""
     ordered = list(dict.fromkeys(_norm(s) for s in symbols if _norm(s)))
     quotes: dict[str, dict[str, Any]] = {}
-    providers = {"nse": 0, "angel": 0}
+    providers = {"nse": 0, "dhan": 0, "angel": 0}
     try:
         quotes.update(fetch_nse500_quotes(ordered))
         providers["nse"] = len(quotes)
     except Exception as exc:
-        log.warning("NSE Nifty 500 quote fetch failed; using Angel fallback: %s", exc)
+        log.warning("NSE Nifty 500 quote fetch failed; using Dhan fallback: %s", exc)
+
+    missing = [symbol for symbol in ordered if symbol not in quotes]
+    if missing:
+        try:
+            dhan = fetch_dhan_bulk_quotes(missing)
+            for symbol, quote in dhan.items():
+                if symbol not in quotes and isinstance(quote, dict):
+                    quotes[symbol] = quote
+                    providers["dhan"] += 1
+        except Exception as exc:
+            log.warning("Dhan bulk quote fallback failed; using Angel: %s", exc)
 
     missing = [symbol for symbol in ordered if symbol not in quotes]
     if missing:
