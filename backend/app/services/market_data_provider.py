@@ -23,10 +23,12 @@ log = logging.getLogger(__name__)
 
 DHAN_SCRIP_MASTER_URL = os.getenv(
     "DHAN_SCRIP_MASTER_URL",
-    "https://images.dhan.co/api-data/api-scrip-master-detailed.csv",
+    # The compact master contains SEM_TRADING_SYMBOL; the newer detailed file
+    # contains company display names instead and cannot reliably map NSE tickers.
+    "https://images.dhan.co/api-data/api-scrip-master.csv",
 )
-DHAN_QUOTE_URL = os.getenv(
-    "DHAN_QUOTE_URL", "https://api.dhan.co/v2/marketfeed/quote"
+DHAN_SCANX_URL = os.getenv(
+    "DHAN_SCANX_URL", "https://ow-scanx-analytics.dhan.co/customscan/fetchdt"
 )
 NSE_EQUITY_STOCK_INDICES_URL = os.getenv(
     "NSE_EQUITY_STOCK_INDICES_URL",
@@ -189,20 +191,24 @@ def _nse_quote_to_canonical(raw: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _dhan_quote_to_canonical(raw: dict[str, Any]) -> dict[str, Any] | None:
-    ohlc = raw.get("ohlc") if isinstance(raw.get("ohlc"), dict) else {}
-    ltp = raw.get("last_price") if raw.get("last_price") is not None else raw.get("ltp")
+    ltp = raw.get("Ltp") if raw.get("Ltp") is not None else raw.get("last_price")
     if ltp in (None, ""):
         return None
+    change = raw.get("Pchange")
+    try:
+        previous_close = float(ltp) - float(change)
+    except (TypeError, ValueError):
+        previous_close = None
     return {
         "ltp": ltp,
-        "open": ohlc.get("open", raw.get("open")),
-        "high": ohlc.get("high", raw.get("high")),
-        "low": ohlc.get("low", raw.get("low")),
-        "close": ohlc.get("close", raw.get("close")),
-        "tradeVolume": raw.get("volume", raw.get("trade_volume", 0)),
-        "opnInterest": raw.get("oi", 0),
-        "previousOI": raw.get("previous_oi", raw.get("prev_oi", 0)),
-        "quoteProvider": "dhan",
+        "open": None,
+        "high": None,
+        "low": None,
+        "close": previous_close,
+        "tradeVolume": raw.get("Volume", 0),
+        "percentChange": raw.get("PPerchange"),
+        "securityId": str(raw.get("Sid") or ""),
+        "quoteProvider": "dhan_scanx",
     }
 
 
@@ -237,32 +243,53 @@ def fetch_nse500_quotes(symbols: Iterable[str]) -> dict[str, dict[str, Any]]:
 
 
 def fetch_dhan_bulk_quotes(symbols: Iterable[str]) -> dict[str, dict[str, Any]]:
-    """Fetch only NSE symbols missing from the primary NSE snapshot."""
-    if not dhan_configured():
-        return {}
+    """Fetch NSE-missing quotes from Dhan ScanX without broker authentication."""
     ids = load_dhan_security_ids()
     wanted = {_norm(symbol): ids.get(_norm(symbol)) for symbol in symbols}
     reverse = {security_id: symbol for symbol, security_id in wanted.items() if security_id}
     if not reverse:
         return {}
-    response = requests.post(
-        DHAN_QUOTE_URL,
-        headers=_dhan_headers(),
-        json={"NSE_EQ": list(reverse)},
-        timeout=(10, 30),
-    )
-    response.raise_for_status()
-    payload = response.json()
-    data = payload.get("data") if isinstance(payload, dict) else {}
-    segment = data.get("NSE_EQ", {}) if isinstance(data, dict) else {}
+    headers = {
+        "Content-Type": "application/json; charset=UTF-8",
+        "Origin": "https://dhan.co",
+        "Referer": "https://dhan.co/",
+    }
     out: dict[str, dict[str, Any]] = {}
-    for security_id, raw in segment.items():
-        if not isinstance(raw, dict):
-            continue
-        symbol = reverse.get(str(security_id))
-        quote = _dhan_quote_to_canonical(raw)
-        if symbol and quote:
-            out[symbol] = quote
+    page = 1
+    total_pages = 1
+    while page <= total_pages and page <= 20 and len(out) < len(reverse):
+        body = {
+            "data": {
+                "sort": "Volume",
+                "sorder": "desc",
+                "count": 1000,
+                "pgno": page,
+                "params": [
+                    {"field": "Seg", "op": "", "val": "E"},
+                    {"field": "Exch", "op": "", "val": "NSE"},
+                ],
+                "fields": ["Isin", "DispSym", "Sid", "Ltp", "Volume", "Pchange", "PPerchange"],
+            }
+        }
+        response = requests.post(
+            DHAN_SCANX_URL, headers=headers, json=body, timeout=(10, 30)
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict) or payload.get("code") != 0:
+            raise RuntimeError(f"Dhan ScanX error: {payload}")
+        try:
+            total_pages = max(1, int(payload.get("tot_pg") or 1))
+        except (TypeError, ValueError):
+            total_pages = 1
+        for raw in payload.get("data", []):
+            if not isinstance(raw, dict):
+                continue
+            symbol = reverse.get(str(raw.get("Sid") or ""))
+            quote = _dhan_quote_to_canonical(raw)
+            if symbol and quote:
+                out[symbol] = quote
+        page += 1
     return out
 
 
