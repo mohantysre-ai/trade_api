@@ -99,9 +99,10 @@ Set `INTRADAY_CANDIDATE_LIMIT` in `.env` if you want to cap how many of those vo
 
 ### Complete-universe market data
 
-For production Nifty 500 coverage, configure Dhan as the primary bulk-quote
-provider. Angel One is automatically used only for symbols missing from the
-Dhan response:
+The official NSE Nifty 500 index snapshot (the same endpoint used by the heat
+map) is the primary bulk-quote provider. Angel One is automatically used only
+for symbols missing from the NSE response. Configure Dhan only for reliable
+historical candles and instrument-id recovery:
 
 ```env
 DHAN_CLIENT_ID=your_dhan_client_id
