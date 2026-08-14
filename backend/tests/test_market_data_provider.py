@@ -35,25 +35,56 @@ def test_quote_failover_fetches_only_symbols_missing_from_nse(monkeypatch):
         "fetch_nse500_quotes",
         lambda symbols: {"AAA": {"ltp": 10, "quoteProvider": "nse"}},
     )
+    monkeypatch.setattr(
+        provider,
+        "fetch_dhan_bulk_quotes",
+        lambda symbols: {"BBB": {"ltp": 20, "quoteProvider": "dhan"}},
+    )
     requested = []
 
     def angel_fetch(symbols):
         requested.extend(symbols)
-        return {"BBB": {"ltp": 20}}
+        return {}
 
     quotes, coverage = provider.fetch_quotes_with_failover(
         ["AAA", "BBB"], angel_fetch
     )
-    assert requested == ["BBB"]
+    assert requested == []
     assert set(quotes) == {"AAA", "BBB"}
-    assert quotes["BBB"]["quoteProvider"] == "angel"
+    assert quotes["BBB"]["quoteProvider"] == "dhan"
     assert coverage.selection_allowed is True
-    assert coverage.providers == {"nse": 1, "angel": 1}
+    assert coverage.providers == {"nse": 1, "dhan": 1, "angel": 0}
+
+
+def test_angel_receives_only_symbols_missing_from_nse_and_dhan(monkeypatch):
+    monkeypatch.setattr(
+        provider,
+        "fetch_nse500_quotes",
+        lambda symbols: {"AAA": {"ltp": 10, "quoteProvider": "nse"}},
+    )
+    monkeypatch.setattr(
+        provider,
+        "fetch_dhan_bulk_quotes",
+        lambda symbols: {"BBB": {"ltp": 20, "quoteProvider": "dhan"}},
+    )
+    requested = []
+
+    def angel_fetch(symbols):
+        requested.extend(symbols)
+        return {"CCC": {"ltp": 30}}
+
+    quotes, coverage = provider.fetch_quotes_with_failover(
+        ["AAA", "BBB", "CCC"], angel_fetch
+    )
+    assert requested == ["CCC"]
+    assert set(quotes) == {"AAA", "BBB", "CCC"}
+    assert coverage.providers == {"nse": 1, "dhan": 1, "angel": 1}
 
 
 def test_quote_coverage_fails_closed(monkeypatch):
     monkeypatch.setattr(provider, "MARKET_DATA_MIN_COVERAGE_PCT", 99.0)
     monkeypatch.setattr(provider, "fetch_nse500_quotes", lambda symbols: {})
+    monkeypatch.setattr(provider, "fetch_dhan_bulk_quotes", lambda symbols: {})
     quotes, coverage = provider.fetch_quotes_with_failover(
         ["AAA", "BBB", "CCC"], lambda symbols: {"AAA": {"ltp": 10}}
     )
