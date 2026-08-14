@@ -3,13 +3,17 @@ from datetime import datetime
 from app.services import market_data_provider as provider
 
 
-def test_dhan_quote_is_normalized_to_existing_market_shape():
-    quote = provider._dhan_quote_to_canonical(
+def test_nse_quote_is_normalized_to_existing_market_shape():
+    quote = provider._nse_quote_to_canonical(
         {
-            "last_price": 123.45,
-            "volume": 999,
-            "oi": 42,
-            "ohlc": {"open": 120, "high": 125, "low": 119, "close": 121},
+            "lastPrice": 123.45,
+            "open": 120,
+            "dayHigh": 125,
+            "dayLow": 119,
+            "previousClose": 121,
+            "totalTradedVolume": 999,
+            "totalTradedValue": 123000,
+            "pChange": 2.02,
         }
     )
     assert quote == {
@@ -19,17 +23,17 @@ def test_dhan_quote_is_normalized_to_existing_market_shape():
         "low": 119,
         "close": 121,
         "tradeVolume": 999,
-        "opnInterest": 42,
-        "previousOI": 0,
-        "quoteProvider": "dhan",
+        "totalTradedValue": 123000,
+        "percentChange": 2.02,
+        "quoteProvider": "nse",
     }
 
 
-def test_quote_failover_fetches_only_symbols_missing_from_dhan(monkeypatch):
+def test_quote_failover_fetches_only_symbols_missing_from_nse(monkeypatch):
     monkeypatch.setattr(
         provider,
-        "fetch_dhan_bulk_quotes",
-        lambda symbols: {"AAA": {"ltp": 10, "quoteProvider": "dhan"}},
+        "fetch_nse500_quotes",
+        lambda symbols: {"AAA": {"ltp": 10, "quoteProvider": "nse"}},
     )
     requested = []
 
@@ -44,12 +48,12 @@ def test_quote_failover_fetches_only_symbols_missing_from_dhan(monkeypatch):
     assert set(quotes) == {"AAA", "BBB"}
     assert quotes["BBB"]["quoteProvider"] == "angel"
     assert coverage.selection_allowed is True
-    assert coverage.providers == {"dhan": 1, "angel": 1}
+    assert coverage.providers == {"nse": 1, "angel": 1}
 
 
 def test_quote_coverage_fails_closed(monkeypatch):
     monkeypatch.setattr(provider, "MARKET_DATA_MIN_COVERAGE_PCT", 99.0)
-    monkeypatch.setattr(provider, "fetch_dhan_bulk_quotes", lambda symbols: {})
+    monkeypatch.setattr(provider, "fetch_nse500_quotes", lambda symbols: {})
     quotes, coverage = provider.fetch_quotes_with_failover(
         ["AAA", "BBB", "CCC"], lambda symbols: {"AAA": {"ltp": 10}}
     )
