@@ -29,6 +29,23 @@ def test_nse_quote_is_normalized_to_existing_market_shape():
     }
 
 
+def test_scanx_quote_is_normalized_without_credentials():
+    quote = provider._dhan_quote_to_canonical(
+        {"Sid": 3812, "Ltp": 102.28, "Pchange": 5.53, "PPerchange": 5.71, "Volume": 111249116}
+    )
+    assert quote == {
+        "ltp": 102.28,
+        "open": None,
+        "high": None,
+        "low": None,
+        "close": 96.75,
+        "tradeVolume": 111249116,
+        "percentChange": 5.71,
+        "securityId": "3812",
+        "quoteProvider": "dhan_scanx",
+    }
+
+
 def test_quote_failover_fetches_only_symbols_missing_from_nse(monkeypatch):
     monkeypatch.setattr(
         provider,
