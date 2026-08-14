@@ -30,6 +30,12 @@ services:
       INTRADAY_FETCH_WORKERS: "1"
       CANDLE_MIN_INTERVAL_SECONDS: "1.1"
       CANDLE_RATE_LIMIT_RETRIES: "5"
+      # Complete-universe market data: Dhan primary, Angel missing-symbol fallback.
+      MARKET_DATA_MIN_COVERAGE_PCT: "99"
+      MARKET_DATA_MIN_CANDLE_COVERAGE_PCT: "95"
+      NIFTY_CACHE_EXPECTED_MIN: "475"
+      NIFTY_CACHE_MIN_COVERAGE_PCT: "99"
+      NIFTY_CACHE_MAX_AGE_SECONDS: "86400"
       DESK_AUTO_ENABLED: "1"
       DESK_AUTO_COMMIT: "1"
       DESK_COMMIT_DELAY_MIN: "0"
