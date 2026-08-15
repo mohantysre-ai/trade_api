@@ -10,7 +10,6 @@ const nextConfig: NextConfig = {
     "127.0.0.1",
     "localhost:3000",
     "127.0.0.1:3000",
-    "iros.sigq.in",
     "sigq.in",
     "*.replit.dev",
     "*.sisko.replit.dev",

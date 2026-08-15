@@ -42,13 +42,15 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 Copy-Item -Path $credSrc -Destination $CredDest -Force
 
 # Prefer host config hostnames/services. Map localhost → Docker services.
-# calendar.sigq.in → panchang-api:8088; other hostnames → frontend:3000 by default.
+# calendar.sigq.in → panchang-api:8089; other hostnames → frontend:3000 by default.
 $ingressPairs = New-Object System.Collections.Generic.List[object]
 foreach ($m in [regex]::Matches($hostYaml, '(?ms)^\s*-\s*hostname:\s*(\S+)\s*\r?\n\s*service:\s*(\S+)\s*$')) {
   $h = $m.Groups[1].Value.Trim()
   $svc = $m.Groups[2].Value.Trim()
   if (-not $h) { continue }
-  if ($svc -match '127\.0\.0\.1:8088' -or $svc -match 'localhost:8088') {
+  if ($svc -match '127\.0\.0\.1:8089' -or $svc -match 'localhost:8089') {
+    $svc = "http://panchang-api:8089"
+  } elseif ($svc -match '127\.0\.0\.1:8088' -or $svc -match 'localhost:8088') {
     $svc = "http://panchang-api:8088"
   } elseif ($svc -match '127\.0\.0\.1:3000' -or $svc -match 'localhost:3000') {
     $svc = "http://frontend:3000"
@@ -56,7 +58,7 @@ foreach ($m in [regex]::Matches($hostYaml, '(?ms)^\s*-\s*hostname:\s*(\S+)\s*\r?
   [void]$ingressPairs.Add([pscustomobject]@{ Hostname = $h; Service = $svc })
 }
 if ($ingressPairs.Count -eq 0) {
-  [void]$ingressPairs.Add([pscustomobject]@{ Hostname = "calendar.sigq.in"; Service = "http://panchang-api:8088" })
+  [void]$ingressPairs.Add([pscustomobject]@{ Hostname = "calendar.sigq.in"; Service = "http://panchang-api:8089" })
   [void]$ingressPairs.Add([pscustomobject]@{ Hostname = "sigq.in"; Service = "http://frontend:3000" })
 }
 

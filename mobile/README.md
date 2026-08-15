@@ -117,7 +117,7 @@ npx capacitor-assets generate
 ## Changing the desk URL
 
 ```bat
-set ALPHIX_DESK_URL=https://iros.sigq.in
+set ALPHIX_DESK_URL=https://sigq.in
 npx cap sync
 ```
 

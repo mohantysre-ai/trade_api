@@ -4,7 +4,7 @@ credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
   - hostname: calendar.sigq.in
-    service: http://panchang-api:8088
+    service: http://panchang-api:8089
   - hostname: sigq.in
     service: http://frontend:3000
   - service: http_status:404

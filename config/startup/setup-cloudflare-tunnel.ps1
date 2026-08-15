@@ -1,13 +1,13 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  One-time Cloudflare Tunnel setup for IROS desk on iros.sigq.in
+  One-time Cloudflare Tunnel setup for IROS desk on sigq.in
 
 .DESCRIPTION
   1) Ensures cloudflared is available
   2) Opens browser login (you must approve + select sigq.in zone)
   3) Creates tunnel "iros-desk" if missing
-  4) Routes DNS iros.sigq.in -> tunnel
+  4) Routes DNS sigq.in -> tunnel
   5) Writes %USERPROFILE%\.cloudflared\config.yml
 
 .NOTES
@@ -19,7 +19,7 @@
 
 $ErrorActionPreference = "Stop"
 $TunnelName = "iros-desk"
-$Hostname = "iros.sigq.in"
+$Hostname = "sigq.in"
 $LocalService = "http://127.0.0.1:3000"
 $CloudflaredDir = Join-Path $env:USERPROFILE ".cloudflared"
 $ConfigPath = Join-Path $CloudflaredDir "config.yml"

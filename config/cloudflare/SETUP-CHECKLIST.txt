@@ -1,11 +1,11 @@
-# Cloudflare / GoDaddy checklist for IROS (iros.sigq.in)
+# Cloudflare / GoDaddy checklist for IROS (sigq.in)
 # Domain registration stays at GoDaddy. DNS moves to Cloudflare.
 
 ## Status
 - Public URLs:
   - https://sigq.in → IROS desk (frontend:3000)
-  - https://calendar.sigq.in → Panchang platform (panchang-api:8088)
-- www.sigq.in / iros.sigq.in removed
+  - https://calendar.sigq.in → Panchang platform (panchang-api:8089)
+- Legacy subdomain references removed; public URL is sigq.in
 - Logo: iros-terminal/public/iros-logo.svg (+ png favicon)
 
 ## A. Cloudflare (browser) — once
@@ -27,13 +27,13 @@
 ## C. This PC — after Cloudflare shows Active
 1. Double-click: config\startup\setup-cloudflare-tunnel.bat
    - Browser opens for Cloudflare login — authorize zone sigq.in
-   - Creates tunnel iros-desk + DNS for iros.sigq.in
+   - Creates tunnel iros-desk + DNS for sigq.in
 2. Start app: config\startup\start_app.bat
 3. Start tunnel: config\startup\start-tunnel.bat
-4. Open https://iros.sigq.in
+4. Open https://sigq.in
 
 ## D. Security (recommended)
-Cloudflare Zero Trust → Access → Application → protect iros.sigq.in (email login)
+Cloudflare Zero Trust → Access → Application → protect sigq.in (email login)
 
 ## Notes
 - cloudflared is installed (winget: Cloudflare.cloudflared)

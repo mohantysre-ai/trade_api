@@ -24,7 +24,6 @@ const config: CapacitorConfig = {
     allowNavigation: [
       "sigq.in",
       "www.sigq.in",
-      "iros.sigq.in",
       "*.sigq.in",
       "localhost",
       "127.0.0.1",
