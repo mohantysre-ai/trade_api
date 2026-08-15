@@ -20,11 +20,15 @@ docker compose up -d --build
 |--------|------|
 | `start-app.bat` | manual / native start (venv + Next) |
 | `start-docker.bat` | Docker start (build if needed + healthy + tunnel) |
+| `start-from-hub.bat` | **other machines** — pull Hub images, then start |
+| `push-docker-hub.bat` | build + push Hub images (`smohanty010620/*`) |
 | `rebuild-docker.bat` | **after code changes** — no-cache rebuild, recreate, delete old images |
 | `docker-refresh.bat` | Docker on-demand data refresh |
 | `refresh-data.bat` | manual on-demand refresh (native or Docker on `:8000`) |
 
-Flags: `start-docker.bat --no-build` / `--no-open`. `rebuild-docker.bat --cached` (faster). Stop: `config\startup\stop_docker.bat`.
+Flags: `start-docker.bat --no-build` / `--pull` / `--no-open`. `rebuild-docker.bat --cached` (faster). Stop: `config\startup\stop_docker.bat`.
+
+Hub images (no secrets inside): `smohanty010620/iros-market-api`, `smohanty010620/iros-frontend`, `smohanty010620/cloudflared`. The cloudflared image already runs `tunnel … run iros-desk`. Copy `backend/.env` and `config/cloudflare/credentials.json` onto each machine.
 
 ### After every code change (Docker)
 
@@ -63,27 +67,24 @@ docker-refresh.bat --pool "Nifty 500"
 ```
 
 Or use the UI **Refresh** button at http://localhost:3000.
-## Ship to a cloud VM
+## Other machine / Hub pull
 
-1. Install Docker on the VM (`curl -fsSL https://get.docker.com | sh`).
-2. Copy the repo (or push images to a registry).
-3. Place `backend/.env` on the VM (never commit secrets).
-4. Run:
+On the build PC after image changes:
 
-```bash
-docker compose up -d --build
+```bat
+push-docker-hub.bat
 ```
 
-### Optional: push images to a registry
+On every other machine (repo + secrets only — no local compile):
 
-```bash
-docker tag iros-market-api:latest YOUR_REGISTRY/iros-market-api:latest
-docker tag iros-frontend:latest YOUR_REGISTRY/iros-frontend:latest
-docker push YOUR_REGISTRY/iros-market-api:latest
-docker push YOUR_REGISTRY/iros-frontend:latest
+1. Copy `backend/.env` and `config/cloudflare/credentials.json` (gitignored).
+2. Run:
+
+```bat
+start-from-hub.bat
 ```
 
-On the VM, set `image:` in compose to those tags and `docker compose pull && docker compose up -d`.
+That is `docker compose --profile tunnel pull && up -d`. Do not bake credentials into the image.
 
 ## Persistence
 

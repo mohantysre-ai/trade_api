@@ -8,7 +8,8 @@ REM Cloudflare Tunnel runs as container iros-cloudflared (not host cloudflared).
 REM
 REM Usage:
 REM   start_docker.bat              build + start + wait healthy
-REM   start_docker.bat --no-build   start only (reuse images)
+REM   start_docker.bat --no-build   start only (reuse local images)
+REM   start_docker.bat --pull       pull Hub images, then start (other machines)
 REM   start_docker.bat --no-open    do not open browser
 REM ============================================================
 
@@ -21,9 +22,14 @@ if "%PROJECT_ROOT:~-1%"=="\" set "PROJECT_ROOT=%PROJECT_ROOT:~0,-1%"
 set "PATH=%PATH%;C:\Program Files\Docker\Docker\resources\bin"
 
 set DO_BUILD=1
+set DO_PULL=0
 set DO_OPEN=1
 for %%A in (%*) do (
     if /i "%%~A"=="--no-build" set DO_BUILD=0
+    if /i "%%~A"=="--pull" (
+        set DO_BUILD=0
+        set DO_PULL=1
+    )
     if /i "%%~A"=="--no-open" set DO_OPEN=0
 )
 
@@ -93,7 +99,18 @@ if errorlevel 1 (
 echo.
 
 pushd "%PROJECT_ROOT%"
-if %DO_BUILD% equ 1 (
+if %DO_PULL% equ 1 (
+    echo [*] docker compose %COMPOSE_PROFILES% pull ...
+    docker compose %COMPOSE_PROFILES% pull
+    if errorlevel 1 (
+        echo [FAIL] docker compose pull failed — docker login, or run push-docker-hub.bat on the build PC.
+        popd
+        if not "%IROS_NO_PAUSE%"=="1" pause
+        exit /b 1
+    )
+    echo [*] docker compose %COMPOSE_PROFILES% up -d ...
+    docker compose %COMPOSE_PROFILES% up -d
+) else if %DO_BUILD% equ 1 (
     echo [*] docker compose %COMPOSE_PROFILES% up -d --build ...
     echo     ^(first build can take several minutes^)
     docker compose %COMPOSE_PROFILES% up -d --build
