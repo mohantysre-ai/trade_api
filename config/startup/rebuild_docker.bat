@@ -85,10 +85,10 @@ echo.
 echo [3/5] Building new images...
 if %NO_CACHE% equ 1 (
     echo     mode: --no-cache ^(full rebuild^)
-    docker compose build --no-cache --pull
+    docker compose --profile tunnel build --no-cache --pull
 ) else (
     echo     mode: cached layers
-    docker compose build --pull
+    docker compose --profile tunnel build --pull
 )
 set BUILD_CODE=%ERRORLEVEL%
 if %BUILD_CODE% neq 0 (

@@ -35,7 +35,7 @@
     "Google \u00b7 Startup Funding",
     "Google \u00b7 Mutual Funds"
   ],
-  "updatedAt": "2026-08-14T15:12:39.960112+00:00",
+  "updatedAt": "2026-08-15T18:29:20.951151+00:00",
   "mockTickers": [
     "AWFI"
   ],
@@ -51947,8 +51947,8 @@
       {
         "label": "NIFTY IT",
         "val": "31,357.75",
-        "delta": "25.15 (+0.08%)",
-        "state": "POSITIVE",
+        "delta": "96.15 (-0.31%)",
+        "state": "NEGATIVE",
         "sparkline": [
           28724.75,
           28532.25,
@@ -51979,7 +51979,7 @@
       {
         "label": "NIFTY PHARMA",
         "val": "26,445.55",
-        "delta": "316.95 (-1.18%)",
+        "delta": "241.25 (-0.90%)",
         "state": "NEGATIVE",
         "sparkline": [
           25907.0996,
@@ -52031,9 +52031,9 @@
       },
       {
         "label": "USD / INR Spot",
-        "val": "95.42",
-        "delta": "0.02 (-0.02%)",
-        "state": "NEGATIVE",
+        "val": "95.43",
+        "delta": "0.00 (+0.00%)",
+        "state": "POSITIVE",
         "sparkline": [
           96.2989,
           96.4253,
@@ -52058,13 +52058,14 @@
           95.3967,
           95.3799,
           95.3443,
-          95.415
+          95.4012,
+          95.43
         ]
       },
       {
         "label": "India VIX",
         "val": "11.30",
-        "delta": "0.38 (-3.29%)",
+        "delta": "0.12 (-1.01%)",
         "state": "NEGATIVE",
         "sparkline": [
           13.75,
@@ -52090,13 +52091,13 @@
           11.86,
           11.69,
           11.42,
-          11.305
+          11.31
         ]
       },
       {
         "label": "GIFT NIFTY",
-        "val": "24,401.00",
-        "delta": "-0.12%",
+        "val": "24,423.00",
+        "delta": "-0.03%",
         "state": "NEGATIVE",
         "sparkline": []
       }
@@ -52201,8 +52202,8 @@
       {
         "label": "NIFTY IT Close",
         "val": "31,357.75",
-        "delta": "25.15 (+0.08%)",
-        "state": "POSITIVE",
+        "delta": "96.15 (-0.31%)",
+        "state": "NEGATIVE",
         "sparkline": [
           28724.75,
           28532.25,
@@ -52233,7 +52234,7 @@
       {
         "label": "NIFTY PHARMA Close",
         "val": "26,445.55",
-        "delta": "316.95 (-1.18%)",
+        "delta": "241.25 (-0.90%)",
         "state": "NEGATIVE",
         "sparkline": [
           25907.0996,
@@ -52285,9 +52286,9 @@
       },
       {
         "label": "USD / INR Spot Close",
-        "val": "95.42",
-        "delta": "0.02 (-0.02%)",
-        "state": "NEGATIVE",
+        "val": "95.43",
+        "delta": "0.00 (+0.00%)",
+        "state": "POSITIVE",
         "sparkline": [
           96.2989,
           96.4253,
@@ -52312,13 +52313,14 @@
           95.3967,
           95.3799,
           95.3443,
-          95.415
+          95.4012,
+          95.43
         ]
       },
       {
         "label": "India VIX Close",
         "val": "11.30",
-        "delta": "0.38 (-3.29%)",
+        "delta": "0.12 (-1.01%)",
         "state": "NEGATIVE",
         "sparkline": [
           13.75,
@@ -52344,13 +52346,13 @@
           11.86,
           11.69,
           11.42,
-          11.305
+          11.31
         ]
       },
       {
         "label": "GIFT NIFTY Close",
-        "val": "24,401.00",
-        "delta": "-0.12%",
+        "val": "24,423.00",
+        "delta": "-0.03%",
         "state": "NEGATIVE",
         "sparkline": []
       }
@@ -52360,13 +52362,12 @@
     "indices": [
       {
         "label": "DJI (US 30)",
-        "val": "53,756.99",
-        "delta": "83.00 (-0.15%)",
+        "val": "53,732.41",
+        "delta": "107.58 (-0.20%)",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
         "sparkline": [
-          52508.2695,
           52658.6406,
           52552.9688,
           52146.4219,
@@ -52389,18 +52390,17 @@
           53791.8516,
           53770.2695,
           53839.9883,
-          53751.0508
+          53732.4102
         ]
       },
       {
         "label": "S&P 500",
-        "val": "7,788.46",
-        "delta": "10.53 (-0.14%)",
+        "val": "7,785.76",
+        "delta": "13.23 (-0.17%)",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
         "sparkline": [
-          7543.5898,
           7572.3999,
           7533.77,
           7457.6899,
@@ -52423,18 +52423,17 @@
           7728.2002,
           7748.5,
           7798.9902,
-          7788.3398
+          7785.7598
         ]
       },
       {
         "label": "NASDAQ 100",
-        "val": "30,010.25",
-        "delta": "74.26 (-0.25%)",
+        "val": "30,046.14",
+        "delta": "38.36 (-0.13%)",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
         "sparkline": [
-          29586.2891,
           29502.5996,
           29025.7695,
           28592.6602,
@@ -52457,7 +52456,7 @@
           29525.4805,
           29742.5996,
           30084.5,
-          30015.8887
+          30046.1406
         ]
       },
       {
@@ -52488,13 +52487,14 @@
           65606.7109,
           66970.2188,
           67524.0625,
-          68308.5938
+          68308.5938,
+          68713.7969
         ]
       },
       {
         "label": "HANG SENG",
         "val": "25,116.85",
-        "delta": "323.35 (-1.27%)",
+        "delta": "279.65 (-1.10%)",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
@@ -52528,8 +52528,8 @@
       {
         "label": "SHANGHAI COMP",
         "val": "3,927.18",
-        "delta": "19.50 (-0.49%)",
-        "state": "NEGATIVE",
+        "delta": "0.21 (+0.01%)",
+        "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live",
         "sparkline": [
@@ -52556,13 +52556,13 @@
           3934.093,
           3946.675,
           3926.9651,
-          3927.1765
+          3927.177
         ]
       },
       {
         "label": "DAX",
-        "val": "26,447.99",
-        "delta": "148.25 (+0.56%)",
+        "val": "26,440.31",
+        "delta": "140.57 (+0.53%)",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live",
@@ -52590,13 +52590,13 @@
           26391.4199,
           26331.0703,
           26299.7402,
-          26435.2207
+          26440.3105
         ]
       },
       {
         "label": "CAC 40",
-        "val": "8,649.92",
-        "delta": "0.64 (-0.01%)",
+        "val": "8,636.80",
+        "delta": "13.76 (-0.16%)",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
@@ -52624,13 +52624,13 @@
           8714.9404,
           8674.9404,
           8650.5596,
-          8646.5303
+          8636.7998
         ]
       },
       {
         "label": "FTSE 100",
-        "val": "10,754.12",
-        "delta": "18.55 (-0.17%)",
+        "val": "10,750.11",
+        "delta": "22.56 (-0.21%)",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
@@ -52658,14 +52658,14 @@
           10844.2002,
           10833.2002,
           10772.7002,
-          10754.0703
+          10750.0996
         ]
       },
       {
         "label": "EURO STOXX 50",
-        "val": "6,546.08",
-        "delta": "0.61 (+0.01%)",
-        "state": "POSITIVE",
+        "val": "6,539.59",
+        "delta": "5.88 (-0.09%)",
+        "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
         "sparkline": [
@@ -52692,13 +52692,13 @@
           6551.2202,
           6533.9902,
           6545.4702,
-          6544.71
+          6539.5898
         ]
       },
       {
         "label": "S&P/ASX 200",
         "val": "9,115.20",
-        "delta": "94.20 (-1.02%)",
+        "delta": "73.30 (-0.80%)",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
@@ -52725,13 +52725,14 @@
           9232.5996,
           9250.5996,
           9209.4004,
-          9188.5
+          9188.5,
+          9115.2002
         ]
       },
       {
         "label": "BOVESPA",
-        "val": "165,404.42",
-        "delta": "1,696.53 (-1.02%)",
+        "val": "166,934.20",
+        "delta": "166.75 (-0.10%)",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
@@ -52759,20 +52760,19 @@
           167875.0,
           167491.0,
           167101.0,
-          165612.6094
+          166934.0
         ]
       }
     ],
     "commodities": [
       {
         "label": "GOLD",
-        "val": "$4,444.40/oz",
-        "delta": "24.00 (+0.54%)",
+        "val": "$4,437.30/oz",
+        "delta": "16.90 (+0.38%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          4061.1001,
           4044.0,
           3985.6001,
           4012.7,
@@ -52795,18 +52795,17 @@
           4383.0,
           4408.8999,
           4363.6001,
-          4438.7998
+          4380.3999
         ]
       },
       {
         "label": "SILVER",
-        "val": "$65.50/oz",
-        "delta": "0.51 (+0.78%)",
+        "val": "$65.11/oz",
+        "delta": "0.12 (+0.18%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          58.772,
           57.11,
           55.898,
           56.038,
@@ -52829,18 +52828,17 @@
           64.769,
           65.555,
           64.873,
-          65.415
+          64.988
         ]
       },
       {
         "label": "BRENT CRUDE OIL",
-        "val": "$87.80 / bbl",
-        "delta": "0.73 (+0.84%)",
+        "val": "$88.52 / bbl",
+        "delta": "1.45 (+1.67%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          84.73,
           84.95,
           84.23,
           88.1,
@@ -52863,18 +52861,17 @@
           88.91,
           88.98,
           87.07,
-          87.86
+          88.52
         ]
       },
       {
         "label": "WTI CRUDE",
-        "val": "$81.61 / bbl",
-        "delta": "0.36 (+0.44%)",
+        "val": "$82.40 / bbl",
+        "delta": "1.15 (+1.42%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          79.34,
           79.6,
           78.95,
           82.49,
@@ -52897,18 +52894,17 @@
           83.2,
           83.27,
           81.25,
-          81.74
+          82.4
         ]
       },
       {
         "label": "NATURAL GAS",
-        "val": "$2.774 / MMBtu",
-        "delta": "0.05 (+1.72%)",
+        "val": "$2.733 / MMBtu",
+        "delta": "0.01 (+0.22%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          2.904,
           2.924,
           2.858,
           2.911,
@@ -52931,18 +52927,17 @@
           2.767,
           2.804,
           2.727,
-          2.777
+          2.733
         ]
       },
       {
         "label": "BITCOIN",
-        "val": "$62,650.10",
-        "delta": "2,397.77 (-3.69%)",
+        "val": "$62,971.98",
+        "delta": "2,075.89 (-3.19%)",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          63789.2812,
           63899.4609,
           64796.6016,
           64690.8047,
@@ -52971,18 +52966,18 @@
           63551.875,
           63402.4336,
           63402.1719,
-          62591.6719
+          62975.5938,
+          62971.1719
         ]
       },
       {
         "label": "COPPER",
-        "val": "$6.60",
-        "delta": "0.01 (-0.13%)",
-        "state": "NEGATIVE",
+        "val": "$6.61",
+        "delta": "0.01 (+0.08%)",
+        "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          6.33,
           6.2935,
           6.296,
           6.22,
@@ -53005,18 +53000,17 @@
           6.612,
           6.597,
           6.5925,
-          6.6035
+          6.5995
         ]
       },
       {
         "label": "PLATINUM",
-        "val": "$1,756.40/oz",
-        "delta": "24.20 (+1.40%)",
+        "val": "$1,756.90/oz",
+        "delta": "24.70 (+1.43%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          1631.5,
           1631.5,
           1635.7,
           1605.8,
@@ -53039,18 +53033,17 @@
           1745.8,
           1761.1,
           1725.2,
-          1753.4
+          1750.0
         ]
       },
       {
         "label": "PALLADIUM",
-        "val": "$1,324.00/oz",
-        "delta": "1.90 (-0.14%)",
+        "val": "$1,325.50/oz",
+        "delta": "0.40 (-0.03%)",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          1298.6,
           1283.2,
           1263.5,
           1244.0,
@@ -53078,13 +53071,12 @@
       },
       {
         "label": "WHEAT",
-        "val": "$688.75",
-        "delta": "20.50 (+3.07%)",
+        "val": "$689.50",
+        "delta": "21.25 (+3.18%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          631.25,
           677.5,
           674.75,
           682.75,
@@ -53107,7 +53099,7 @@
           630.25,
           652.75,
           652.75,
-          688.25
+          674.75
         ]
       }
     ]
@@ -57775,14 +57767,14 @@
     "source": "scannerPicks-persisted",
     "picks": [
       {
-        "symbol": "E2E",
-        "name": "E2E Networks",
+        "symbol": "STYLEBAAZA",
+        "name": "Baazar Style Retail",
         "direction": "LONG",
-        "buyAbove": 666.75,
-        "stopLoss": 632.8,
-        "target1": 717.67,
-        "target2": 768.6,
-        "riskPerShare": 33.95,
+        "buyAbove": 365.25,
+        "stopLoss": 349.53,
+        "target1": 388.83,
+        "target2": 412.41,
+        "riskPerShare": 15.72,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57791,14 +57783,14 @@
         "scanLtp": null
       },
       {
-        "symbol": "BECTORFOOD",
-        "name": "Mrs. Bectors Food",
+        "symbol": "HONASA",
+        "name": "Mamaearth",
         "direction": "LONG",
-        "buyAbove": 242.75,
-        "stopLoss": 232.53,
-        "target1": 258.08,
-        "target2": 273.41,
-        "riskPerShare": 10.22,
+        "buyAbove": 502.8,
+        "stopLoss": 486.75,
+        "target1": 526.88,
+        "target2": 550.95,
+        "riskPerShare": 16.05,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57807,14 +57799,14 @@
         "scanLtp": null
       },
       {
-        "symbol": "UTLSOLAR",
-        "name": "Fujiyama Power Systems",
+        "symbol": "HAL",
+        "name": "Hindustan Aeronautics",
         "direction": "LONG",
-        "buyAbove": 424.9,
-        "stopLoss": 405.92,
-        "target1": 453.37,
-        "target2": 481.84,
-        "riskPerShare": 18.98,
+        "buyAbove": 5029.9,
+        "stopLoss": 4917.27,
+        "target1": 5198.84,
+        "target2": 5367.79,
+        "riskPerShare": 112.63,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57823,14 +57815,110 @@
         "scanLtp": null
       },
       {
-        "symbol": "MOTHERSON",
-        "name": "Samvardhana Motherson International",
+        "symbol": "PRAKASH",
+        "name": "Prakash Industries",
         "direction": "LONG",
-        "buyAbove": 168.88,
-        "stopLoss": 164.0,
-        "target1": 176.2,
-        "target2": 183.52,
-        "riskPerShare": 4.88,
+        "buyAbove": 137.68,
+        "stopLoss": 131.94,
+        "target1": 146.29,
+        "target2": 154.9,
+        "riskPerShare": 5.74,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "LODHA",
+        "name": "Lodha Developers",
+        "direction": "LONG",
+        "buyAbove": 1243.9,
+        "stopLoss": 1202.94,
+        "target1": 1305.34,
+        "target2": 1366.78,
+        "riskPerShare": 40.96,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "ANANTRAJ",
+        "name": "Anant Raj",
+        "direction": "LONG",
+        "buyAbove": 629.95,
+        "stopLoss": 610.09,
+        "target1": 659.74,
+        "target2": 689.53,
+        "riskPerShare": 19.86,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "M&M",
+        "name": "Mahindra & Mahindra",
+        "direction": "LONG",
+        "buyAbove": 3428.3,
+        "stopLoss": 3354.75,
+        "target1": 3538.62,
+        "target2": 3648.95,
+        "riskPerShare": 73.55,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "NYKAA",
+        "name": "Nykaa",
+        "direction": "LONG",
+        "buyAbove": 331.0,
+        "stopLoss": 323.0,
+        "target1": 343.0,
+        "target2": 355.0,
+        "riskPerShare": 8.0,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "APOLLOHOSP",
+        "name": "Apollo Hospitals",
+        "direction": "LONG",
+        "buyAbove": 8920.5,
+        "stopLoss": 8740.41,
+        "target1": 9190.64,
+        "target2": 9460.77,
+        "riskPerShare": 180.09,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "BEL",
+        "name": "Bharat Electronics",
+        "direction": "LONG",
+        "buyAbove": 410.8,
+        "stopLoss": 403.74,
+        "target1": 421.39,
+        "target2": 431.98,
+        "riskPerShare": 7.06,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57839,7 +57927,7 @@
         "scanLtp": null
       }
     ],
-    "updatedAt": "2026-08-14T15:12:43.798377+00:00",
+    "updatedAt": "2026-08-15T18:28:44.891566+00:00",
     "isMock": false,
     "fromPersisted": true
   },
@@ -57848,6 +57936,6 @@
     "reason": "Scheduled live refresh (desk_midday_midday_1400); LLM day-locked.",
     "dataDate": "2026-08-14"
   },
-  "macrosRefreshedAt": "2026-08-14T15:12:39.960112+00:00",
+  "macrosRefreshedAt": "2026-08-15T18:29:20.951151+00:00",
   "closeMarksRefreshedAt": "2026-08-14T10:05:25.028666+00:00"
 }

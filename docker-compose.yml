@@ -1,7 +1,13 @@
 # Alphix / IROS Terminal — production compose stack
+# Hub images (same on every machine): smohanty010620/iros-market-api, iros-frontend, cloudflared
+#
+# This PC (after code changes):  rebuild-docker.bat   then  push-docker-hub.bat
+# Other PCs (pull only):         start-from-hub.bat
+#   requires backend/.env and config/cloudflare/credentials.json (never in the image)
+#
 # Usage:
 #   1. Ensure backend/.env exists (Angel + LLM secrets)
-#   2. docker compose up -d --build
+#   2. docker compose --profile tunnel pull && docker compose --profile tunnel up -d
 #   3. Open http://localhost:3000
 
 services:
@@ -9,7 +15,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    image: iros-market-api:latest
+    image: smohanty010620/iros-market-api:latest
     container_name: iros-market-api
     restart: unless-stopped
     env_file:
@@ -79,7 +85,7 @@ services:
         condition: service_healthy
 
   ai-news:
-    image: iros-market-api:latest
+    image: smohanty010620/iros-market-api:latest
     container_name: iros-ai-news
     build:
       context: .
@@ -129,7 +135,7 @@ services:
     build:
       context: ./iros-terminal
       dockerfile: Dockerfile
-    image: iros-frontend:latest
+    image: smohanty010620/iros-frontend:latest
     container_name: iros-frontend
     restart: unless-stopped
     environment:
@@ -158,14 +164,16 @@ services:
       start_period: 45s
       retries: 3
 
-  # Cloudflare Tunnel inside the stack (sigq.in → frontend:3000 on the compose network).
-  # Enabled via --profile tunnel after prepare-docker-tunnel.ps1 writes credentials.
+  # Cloudflare Tunnel — Hub image has `tunnel run` baked in (official image only prints version).
+  # Credentials are mounted, never baked. Enabled via --profile tunnel.
   cloudflared:
     profiles: ["tunnel"]
-    image: cloudflare/cloudflared:latest
+    build:
+      context: ./config/cloudflare
+      dockerfile: Dockerfile
+    image: smohanty010620/cloudflared:latest
     container_name: iros-cloudflared
     restart: unless-stopped
-    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
     volumes:
       - ./config/cloudflare/config.docker.yml:/etc/cloudflared/config.yml:ro
       - ./config/cloudflare/credentials.json:/etc/cloudflared/credentials.json:ro
