@@ -24,6 +24,29 @@ $LocalService = "http://127.0.0.1:3000"
 $CloudflaredDir = Join-Path $env:USERPROFILE ".cloudflared"
 $ConfigPath = Join-Path $CloudflaredDir "config.yml"
 
+function Refresh-Path {
+  $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+  $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+  $combined = @()
+  if ($machinePath) { $combined += $machinePath -split ';' | Where-Object { $_ } }
+  if ($userPath) { $combined += $userPath -split ';' | Where-Object { $_ } }
+  $env:Path = ($combined | Select-Object -Unique) -join ';'
+}
+
+function Install-Cloudflared {
+  if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    throw "cloudflared not found and winget is unavailable. Install Cloudflare Tunnel manually from https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation or run: winget install Cloudflare.cloudflared"
+  }
+
+  Write-Host "cloudflared not found. Installing via winget..." -ForegroundColor Yellow
+  & winget install --id Cloudflare.cloudflared --accept-source-agreements --accept-package-agreements --silent
+  if ($LASTEXITCODE -ne 0) {
+    throw "cloudflared installation failed via winget. Install manually with: winget install Cloudflare.cloudflared"
+  }
+
+  Refresh-Path
+}
+
 function Find-Cloudflared {
   $candidates = @(
     (Get-Command cloudflared -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source),
@@ -31,7 +54,15 @@ function Find-Cloudflared {
     "${env:ProgramFiles(x86)}\cloudflared\cloudflared.exe"
   ) | Where-Object { $_ -and (Test-Path $_) }
   if (-not $candidates) {
-    throw "cloudflared not found. Install with: winget install Cloudflare.cloudflared"
+    Install-Cloudflared
+    $candidates = @(
+      (Get-Command cloudflared -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source),
+      "$env:ProgramFiles\cloudflared\cloudflared.exe",
+      "${env:ProgramFiles(x86)}\cloudflared\cloudflared.exe"
+    ) | Where-Object { $_ -and (Test-Path $_) }
+  }
+  if (-not $candidates) {
+    throw "cloudflared still not found after installation. Check PATH or install manually with: winget install Cloudflare.cloudflared"
   }
   return $candidates[0]
 }
