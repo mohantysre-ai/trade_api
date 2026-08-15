@@ -1316,5 +1316,31 @@
     "firedAt": "2026-08-14T07:31:34.510027+00:00",
     "book": "INTRADAY",
     "action": "BUY"
+  },
+  {
+    "key": "BLS:LONG:partial:SWING",
+    "symbol": "BLS",
+    "direction": "LONG",
+    "hitLevel": "partial",
+    "label": "INITIAL STOP HIT",
+    "ltp": 276.04,
+    "entryPrice": 277.43,
+    "planDate": "2026-08-15",
+    "firedAt": "2026-08-15T17:36:56.918041+00:00",
+    "book": "SWING",
+    "action": "SELL"
+  },
+  {
+    "key": "MINDACORP:LONG:sl:SWING",
+    "symbol": "MINDACORP",
+    "direction": "LONG",
+    "hitLevel": "sl",
+    "label": "TRAIL STOP HIT",
+    "ltp": 751.23,
+    "entryPrice": 745.55,
+    "planDate": "2026-08-15",
+    "firedAt": "2026-08-15T17:36:56.918135+00:00",
+    "book": "SWING",
+    "action": "SELL"
   }
 ]
