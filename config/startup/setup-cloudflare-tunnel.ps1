@@ -22,7 +22,7 @@ $TunnelName = "iros-desk"
 $CloudflaredDir = Join-Path $env:USERPROFILE ".cloudflared"
 $ConfigPath = Join-Path $CloudflaredDir "config.yml"
 $Ingress = @(
-  @{ Hostname = "calendar.sigq.in"; Service = "http://127.0.0.1:8089" },
+  @{ Hostname = "calendar.sigq.in"; Service = "http://127.0.0.1:8088" },
   @{ Hostname = "sigq.in"; Service = "http://127.0.0.1:3000" }
 )
 
