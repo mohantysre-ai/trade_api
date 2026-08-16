@@ -35,7 +35,7 @@
     "Google \u00b7 Startup Funding",
     "Google \u00b7 Mutual Funds"
   ],
-  "updatedAt": "2026-08-15T19:10:34.331579+00:00",
+  "updatedAt": "2026-08-16T08:03:24.513243+00:00",
   "mockTickers": [
     "AWFI"
   ],
@@ -52065,7 +52065,7 @@
       {
         "label": "India VIX",
         "val": "11.30",
-        "delta": "0.12 (-1.01%)",
+        "delta": "0.11 (-0.99%)",
         "state": "NEGATIVE",
         "sparkline": [
           13.75,
@@ -52320,7 +52320,7 @@
       {
         "label": "India VIX Close",
         "val": "11.30",
-        "delta": "0.12 (-1.01%)",
+        "delta": "0.11 (-0.99%)",
         "state": "NEGATIVE",
         "sparkline": [
           13.75,
@@ -52494,7 +52494,7 @@
       {
         "label": "HANG SENG",
         "val": "25,116.85",
-        "delta": "279.65 (-1.10%)",
+        "delta": "279.66 (-1.10%)",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
@@ -52773,7 +52773,6 @@
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          4044.0,
           3985.6001,
           4012.7,
           4010.3,
@@ -52795,7 +52794,7 @@
           4383.0,
           4408.8999,
           4363.6001,
-          4380.3999
+          4437.2998
         ]
       },
       {
@@ -52806,7 +52805,6 @@
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          57.11,
           55.898,
           56.038,
           56.802,
@@ -52828,7 +52826,7 @@
           64.769,
           65.555,
           64.873,
-          64.988
+          65.108
         ]
       },
       {
@@ -52839,7 +52837,6 @@
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          84.95,
           84.23,
           88.1,
           89.22,
@@ -52872,7 +52869,6 @@
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          79.6,
           78.95,
           82.49,
           83.23,
@@ -52905,7 +52901,6 @@
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          2.924,
           2.858,
           2.911,
           2.86,
@@ -52932,13 +52927,12 @@
       },
       {
         "label": "BITCOIN",
-        "val": "$63,011.99",
-        "delta": "2,035.88 (-3.13%)",
+        "val": "$62,994.67",
+        "delta": "2,053.20 (-3.16%)",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          63899.4609,
           64796.6016,
           64690.8047,
           65230.0273,
@@ -52967,7 +52961,8 @@
           63402.4336,
           63402.1719,
           62975.5938,
-          63011.9883
+          63024.3203,
+          62991.2188
         ]
       },
       {
@@ -52978,7 +52973,6 @@
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          6.2935,
           6.296,
           6.22,
           6.299,
@@ -53000,7 +52994,7 @@
           6.612,
           6.597,
           6.5925,
-          6.5995
+          6.613
         ]
       },
       {
@@ -53011,7 +53005,6 @@
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          1631.5,
           1635.7,
           1605.8,
           1592.2,
@@ -53033,7 +53026,7 @@
           1745.8,
           1761.1,
           1725.2,
-          1750.0
+          1756.9
         ]
       },
       {
@@ -53044,7 +53037,6 @@
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          1283.2,
           1263.5,
           1244.0,
           1261.0,
@@ -53066,7 +53058,7 @@
           1366.1,
           1370.2,
           1322.6,
-          1322.5
+          1325.5
         ]
       },
       {
@@ -53077,7 +53069,6 @@
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          677.5,
           674.75,
           682.75,
           674.0,
@@ -53099,7 +53090,7 @@
           630.25,
           652.75,
           652.75,
-          674.75
+          689.5
         ]
       }
     ]
@@ -57927,7 +57918,7 @@
         "scanLtp": null
       }
     ],
-    "updatedAt": "2026-08-15T19:10:34.387343+00:00",
+    "updatedAt": "2026-08-16T08:01:01.107871+00:00",
     "isMock": false,
     "fromPersisted": true
   },
@@ -57936,6 +57927,6 @@
     "reason": "Scheduled live refresh (desk_midday_midday_1400); LLM day-locked.",
     "dataDate": "2026-08-14"
   },
-  "macrosRefreshedAt": "2026-08-15T19:10:34.331579+00:00",
+  "macrosRefreshedAt": "2026-08-16T08:03:24.513243+00:00",
   "closeMarksRefreshedAt": "2026-08-14T10:05:25.028666+00:00"
 }
