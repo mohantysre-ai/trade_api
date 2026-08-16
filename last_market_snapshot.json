@@ -35,7 +35,7 @@
     "Google \u00b7 Startup Funding",
     "Google \u00b7 Mutual Funds"
   ],
-  "updatedAt": "2026-08-16T08:09:08.366074+00:00",
+  "updatedAt": "2026-08-16T09:54:16.879718+00:00",
   "mockTickers": [
     "AWFI"
   ],
@@ -52927,8 +52927,8 @@
       },
       {
         "label": "BITCOIN",
-        "val": "$62,997.72",
-        "delta": "2,050.15 (-3.15%)",
+        "val": "$62,936.99",
+        "delta": "2,110.88 (-3.25%)",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
@@ -52962,7 +52962,7 @@
           63402.1719,
           62975.5938,
           63024.3203,
-          62997.7188
+          62945.0391
         ]
       },
       {
@@ -57918,7 +57918,7 @@
         "scanLtp": null
       }
     ],
-    "updatedAt": "2026-08-16T08:09:08.434504+00:00",
+    "updatedAt": "2026-08-16T09:51:00.424100+00:00",
     "isMock": false,
     "fromPersisted": true
   },
@@ -57927,6 +57927,6 @@
     "reason": "Scheduled live refresh (desk_midday_midday_1400); LLM day-locked.",
     "dataDate": "2026-08-14"
   },
-  "macrosRefreshedAt": "2026-08-16T08:09:08.366074+00:00",
+  "macrosRefreshedAt": "2026-08-16T09:54:16.879718+00:00",
   "closeMarksRefreshedAt": "2026-08-14T10:05:25.028666+00:00"
 }
