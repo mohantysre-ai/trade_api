@@ -7,7 +7,7 @@
   1) Ensures cloudflared is available
   2) Opens browser login (you must approve + select sigq.in zone)
   3) Creates tunnel "iros-desk" if missing
-  4) Routes DNS sigq.in -> tunnel
+  4) Routes DNS calendar.sigq.in and sigq.in -> tunnel
   5) Writes %USERPROFILE%\.cloudflared\config.yml
 
 .NOTES
@@ -19,10 +19,12 @@
 
 $ErrorActionPreference = "Stop"
 $TunnelName = "iros-desk"
-$Hostname = "sigq.in"
-$LocalService = "http://127.0.0.1:3000"
 $CloudflaredDir = Join-Path $env:USERPROFILE ".cloudflared"
 $ConfigPath = Join-Path $CloudflaredDir "config.yml"
+$Ingress = @(
+  @{ Hostname = "calendar.sigq.in"; Service = "http://127.0.0.1:8088" },
+  @{ Hostname = "sigq.in"; Service = "http://127.0.0.1:3000" }
+)
 
 function Refresh-Path {
   $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
@@ -127,25 +129,31 @@ if (-not (Test-Path $credFile)) {
 }
 
 Write-Host ""
-Write-Host "=== STEP 3: DNS route $Hostname ===" -ForegroundColor Yellow
-& $cf tunnel route dns $TunnelName $Hostname
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "DNS route command returned non-zero. If record already exists, you can continue." -ForegroundColor Yellow
+Write-Host "=== STEP 3: DNS routes ===" -ForegroundColor Yellow
+foreach ($route in $Ingress) {
+  Write-Host "Routing $($route.Hostname) -> $TunnelName"
+  & $cf tunnel route dns $TunnelName $route.Hostname
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "DNS route command returned non-zero. If record already exists, you can continue." -ForegroundColor Yellow
+  }
 }
 
 Write-Host ""
 Write-Host "=== STEP 4: Write config.yml ===" -ForegroundColor Yellow
 # YAML needs forward slashes or escaped backslashes; use forward slashes for cloudflared on Windows
 $credPosix = $credFile -replace '\\', '/'
-$config = @"
-tunnel: $TunnelName
-credentials-file: $credPosix
-
-ingress:
-  - hostname: $Hostname
-    service: $LocalService
-  - service: http_status:404
-"@
+$configLines = @(
+  "tunnel: $TunnelName",
+  "credentials-file: $credPosix",
+  "",
+  "ingress:"
+)
+foreach ($route in $Ingress) {
+  $configLines += "  - hostname: $($route.Hostname)"
+  $configLines += "    service: $($route.Service)"
+}
+$configLines += "  - service: http_status:404"
+$config = $configLines -join [Environment]::NewLine
 Set-Content -Path $ConfigPath -Value $config -Encoding UTF8
 Write-Host "[OK] Wrote $ConfigPath" -ForegroundColor Green
 Write-Host $config
@@ -156,7 +164,8 @@ Write-Host " Setup complete"
 Write-Host "========================================" -ForegroundColor Green
 Write-Host "1. Start IROS:  config\startup\start_app.bat"
 Write-Host "2. Start tunnel: config\startup\start-tunnel.bat"
-Write-Host "3. Open: https://$Hostname"
+Write-Host "3. Open: https://sigq.in"
+Write-Host "4. Calendar: https://calendar.sigq.in"
 Write-Host ""
-Write-Host "Optional: Cloudflare Zero Trust -> Access -> protect $Hostname with email login."
+Write-Host "Optional: Cloudflare Zero Trust -> Access -> protect sigq.in/calendar.sigq.in with email login."
 Write-Host ""
