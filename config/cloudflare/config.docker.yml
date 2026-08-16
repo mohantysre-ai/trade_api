@@ -3,6 +3,8 @@ tunnel: iros-desk
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
-  - hostname: iros.sigq.in
+  - hostname: calendar.sigq.in
+    service: http://panchang-api:8089
+  - hostname: sigq.in
     service: http://frontend:3000
   - service: http_status:404
