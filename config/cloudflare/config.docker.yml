@@ -3,8 +3,6 @@ tunnel: iros-desk
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
-  - hostname: calendar.sigq.in
-    service: http://host.docker.internal:8088
-  - hostname: sigq.in
+  - hostname: iros.sigq.in
     service: http://frontend:3000
   - service: http_status:404
