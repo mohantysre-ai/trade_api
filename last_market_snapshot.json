@@ -35,7 +35,7 @@
     "Google \u00b7 Startup Funding",
     "Google \u00b7 Mutual Funds"
   ],
-  "updatedAt": "2026-08-16T09:54:16.879718+00:00",
+  "updatedAt": "2026-08-17T11:02:58.644553+00:00",
   "mockTickers": [
     "AWFI"
   ],
@@ -51850,13 +51850,10 @@
     "morning": [
       {
         "label": "Nifty 50",
-        "val": "24,366.00",
-        "delta": "29.85 (-0.12%)",
+        "val": "24,287.65",
+        "delta": "78.35 (-0.32%)",
         "state": "NEGATIVE",
         "sparkline": [
-          24052.0508,
-          24078.5,
-          24072.75,
           24334.3008,
           24238.5,
           24187.6992,
@@ -51877,18 +51874,16 @@
           24471.6992,
           24435.9492,
           24395.8496,
-          24366.0
+          24366.0,
+          24287.6504
         ]
       },
       {
         "label": "Sensex",
-        "val": "78,009.25",
-        "delta": "70.71 (-0.09%)",
+        "val": "77,728.16",
+        "delta": "281.09 (-0.36%)",
         "state": "NEGATIVE",
         "sparkline": [
-          77054.9375,
-          77185.4297,
-          77186.8672,
           78151.4531,
           77708.5234,
           77470.1094,
@@ -51909,18 +51904,16 @@
           78154.25,
           77966.3516,
           78079.9609,
-          78009.25
+          78009.25,
+          77728.1562
         ]
       },
       {
         "label": "Nifty Bank",
-        "val": "57,491.10",
-        "delta": "144.15 (-0.25%)",
-        "state": "NEGATIVE",
+        "val": "57,497.80",
+        "delta": "6.70 (+0.01%)",
+        "state": "POSITIVE",
         "sparkline": [
-          57462.3008,
-          57757.8516,
-          57582.25,
           58521.3984,
           57945.0,
           57835.3516,
@@ -51941,18 +51934,16 @@
           57446.25,
           57885.8516,
           57635.25,
-          57491.1016
+          57491.1016,
+          57497.8008
         ]
       },
       {
         "label": "NIFTY IT",
-        "val": "31,357.75",
-        "delta": "96.15 (-0.31%)",
+        "val": "30,807.80",
+        "delta": "549.95 (-1.75%)",
         "state": "NEGATIVE",
         "sparkline": [
-          28724.75,
-          28532.25,
-          28722.5996,
           29226.5996,
           29161.9004,
           28984.4004,
@@ -51973,18 +51964,16 @@
           31823.1504,
           31332.5508,
           31453.9004,
-          31357.75
+          31357.75,
+          30807.8008
         ]
       },
       {
         "label": "NIFTY PHARMA",
-        "val": "26,445.55",
-        "delta": "241.25 (-0.90%)",
+        "val": "26,341.55",
+        "delta": "104.00 (-0.39%)",
         "state": "NEGATIVE",
         "sparkline": [
-          25907.0996,
-          26003.5996,
-          26008.0508,
           25645.0,
           26003.1504,
           26092.8496,
@@ -52005,7 +51994,8 @@
           26750.4492,
           26762.5,
           26686.8008,
-          26445.5508
+          26445.5508,
+          26341.5508
         ]
       },
       {
@@ -52014,30 +52004,24 @@
         "delta": "70.05 (+0.35%)",
         "state": "POSITIVE",
         "sparkline": [
-          62766.3984,
-          62943.1992,
-          62686.75,
           62428.0508
         ]
       },
       {
         "label": "NIFTY SMALLCAP",
-        "val": "19,738.55",
-        "delta": "136.55 (-0.69%)",
-        "state": "NEGATIVE",
+        "val": "19,809.25",
+        "delta": "70.70 (+0.36%)",
+        "state": "POSITIVE",
         "sparkline": [
-          19738.5508
+          19809.25
         ]
       },
       {
         "label": "USD / INR Spot",
-        "val": "95.43",
-        "delta": "0.00 (+0.00%)",
+        "val": "95.59",
+        "delta": "0.18 (+0.19%)",
         "state": "POSITIVE",
         "sparkline": [
-          96.2989,
-          96.4253,
-          96.4986,
           96.6522,
           96.2848,
           96.4896,
@@ -52059,18 +52043,15 @@
           95.3799,
           95.3443,
           95.4012,
-          95.43
+          95.592
         ]
       },
       {
         "label": "India VIX",
-        "val": "11.30",
-        "delta": "0.11 (-0.99%)",
-        "state": "NEGATIVE",
+        "val": "11.32",
+        "delta": "0.02 (+0.18%)",
+        "state": "POSITIVE",
         "sparkline": [
-          13.75,
-          13.27,
-          12.88,
           13.15,
           12.98,
           12.6,
@@ -52091,13 +52072,14 @@
           11.86,
           11.69,
           11.42,
-          11.31
+          11.31,
+          11.325
         ]
       },
       {
         "label": "GIFT NIFTY",
-        "val": "24,423.00",
-        "delta": "-0.03%",
+        "val": "24,370.50",
+        "delta": "-0.02%",
         "state": "NEGATIVE",
         "sparkline": []
       }
@@ -52105,13 +52087,10 @@
     "evening": [
       {
         "label": "Nifty 50 Close",
-        "val": "24,366.00",
-        "delta": "29.85 (-0.12%)",
+        "val": "24,287.65",
+        "delta": "78.35 (-0.32%)",
         "state": "NEGATIVE",
         "sparkline": [
-          24052.0508,
-          24078.5,
-          24072.75,
           24334.3008,
           24238.5,
           24187.6992,
@@ -52132,18 +52111,16 @@
           24471.6992,
           24435.9492,
           24395.8496,
-          24366.0
+          24366.0,
+          24287.6504
         ]
       },
       {
         "label": "Sensex Close",
-        "val": "78,009.25",
-        "delta": "70.71 (-0.09%)",
+        "val": "77,728.16",
+        "delta": "281.09 (-0.36%)",
         "state": "NEGATIVE",
         "sparkline": [
-          77054.9375,
-          77185.4297,
-          77186.8672,
           78151.4531,
           77708.5234,
           77470.1094,
@@ -52164,18 +52141,16 @@
           78154.25,
           77966.3516,
           78079.9609,
-          78009.25
+          78009.25,
+          77728.1562
         ]
       },
       {
         "label": "Nifty Bank Close",
-        "val": "57,491.10",
-        "delta": "144.15 (-0.25%)",
-        "state": "NEGATIVE",
+        "val": "57,497.80",
+        "delta": "6.70 (+0.01%)",
+        "state": "POSITIVE",
         "sparkline": [
-          57462.3008,
-          57757.8516,
-          57582.25,
           58521.3984,
           57945.0,
           57835.3516,
@@ -52196,18 +52171,16 @@
           57446.25,
           57885.8516,
           57635.25,
-          57491.1016
+          57491.1016,
+          57497.8008
         ]
       },
       {
         "label": "NIFTY IT Close",
-        "val": "31,357.75",
-        "delta": "96.15 (-0.31%)",
+        "val": "30,807.80",
+        "delta": "549.95 (-1.75%)",
         "state": "NEGATIVE",
         "sparkline": [
-          28724.75,
-          28532.25,
-          28722.5996,
           29226.5996,
           29161.9004,
           28984.4004,
@@ -52228,18 +52201,16 @@
           31823.1504,
           31332.5508,
           31453.9004,
-          31357.75
+          31357.75,
+          30807.8008
         ]
       },
       {
         "label": "NIFTY PHARMA Close",
-        "val": "26,445.55",
-        "delta": "241.25 (-0.90%)",
+        "val": "26,341.55",
+        "delta": "104.00 (-0.39%)",
         "state": "NEGATIVE",
         "sparkline": [
-          25907.0996,
-          26003.5996,
-          26008.0508,
           25645.0,
           26003.1504,
           26092.8496,
@@ -52260,7 +52231,8 @@
           26750.4492,
           26762.5,
           26686.8008,
-          26445.5508
+          26445.5508,
+          26341.5508
         ]
       },
       {
@@ -52269,30 +52241,24 @@
         "delta": "70.05 (+0.35%)",
         "state": "POSITIVE",
         "sparkline": [
-          62766.3984,
-          62943.1992,
-          62686.75,
           62428.0508
         ]
       },
       {
         "label": "NIFTY SMALLCAP Close",
-        "val": "19,738.55",
-        "delta": "136.55 (-0.69%)",
-        "state": "NEGATIVE",
+        "val": "19,809.25",
+        "delta": "70.70 (+0.36%)",
+        "state": "POSITIVE",
         "sparkline": [
-          19738.5508
+          19809.25
         ]
       },
       {
         "label": "USD / INR Spot Close",
-        "val": "95.43",
-        "delta": "0.00 (+0.00%)",
+        "val": "95.59",
+        "delta": "0.18 (+0.19%)",
         "state": "POSITIVE",
         "sparkline": [
-          96.2989,
-          96.4253,
-          96.4986,
           96.6522,
           96.2848,
           96.4896,
@@ -52314,18 +52280,15 @@
           95.3799,
           95.3443,
           95.4012,
-          95.43
+          95.592
         ]
       },
       {
         "label": "India VIX Close",
-        "val": "11.30",
-        "delta": "0.11 (-0.99%)",
-        "state": "NEGATIVE",
+        "val": "11.32",
+        "delta": "0.02 (+0.18%)",
+        "state": "POSITIVE",
         "sparkline": [
-          13.75,
-          13.27,
-          12.88,
           13.15,
           12.98,
           12.6,
@@ -52346,13 +52309,14 @@
           11.86,
           11.69,
           11.42,
-          11.31
+          11.31,
+          11.325
         ]
       },
       {
         "label": "GIFT NIFTY Close",
-        "val": "24,423.00",
-        "delta": "-0.03%",
+        "val": "24,370.50",
+        "delta": "-0.02%",
         "state": "NEGATIVE",
         "sparkline": []
       }
@@ -52363,7 +52327,7 @@
       {
         "label": "DJI (US 30)",
         "val": "53,732.41",
-        "delta": "107.58 (-0.20%)",
+        "delta": "107.59 (-0.20%)",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
@@ -52461,15 +52425,12 @@
       },
       {
         "label": "NIKKEI 225",
-        "val": "68,713.80",
-        "delta": "405.21 (+0.59%)",
+        "val": "69,220.25",
+        "delta": "506.45 (+0.74%)",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live",
         "sparkline": [
-          67743.5,
-          68751.5078,
-          66835.5391,
           64141.1211,
           66232.1875,
           66115.6016,
@@ -52488,20 +52449,18 @@
           66970.2188,
           67524.0625,
           68308.5938,
-          68713.7969
+          68713.7969,
+          69220.25
         ]
       },
       {
         "label": "HANG SENG",
-        "val": "25,116.85",
-        "delta": "279.66 (-1.10%)",
-        "state": "NEGATIVE",
+        "val": "25,453.23",
+        "delta": "336.38 (+1.34%)",
+        "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live",
         "sparkline": [
-          24340.7305,
-          24681.0996,
-          25008.5996,
           24562.2402,
           25143.0508,
           25132.2891,
@@ -52522,20 +52481,18 @@
           25652.8203,
           25440.1699,
           25396.5098,
-          25116.8496
+          25116.8496,
+          25453.2305
         ]
       },
       {
         "label": "SHANGHAI COMP",
-        "val": "3,927.18",
-        "delta": "0.21 (+0.01%)",
+        "val": "3,982.65",
+        "delta": "55.48 (+1.41%)",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live",
         "sparkline": [
-          3967.126,
-          3955.5779,
-          3882.4131,
           3764.155,
           3796.281,
           3864.3669,
@@ -52556,20 +52513,18 @@
           3934.093,
           3946.675,
           3926.9651,
-          3927.177
+          3927.177,
+          3982.6536
         ]
       },
       {
         "label": "DAX",
-        "val": "26,440.31",
-        "delta": "140.57 (+0.53%)",
+        "val": "26,463.38",
+        "delta": "23.07 (+0.09%)",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live",
         "sparkline": [
-          25147.0293,
-          24999.5293,
-          24915.4902,
           24830.9805,
           24846.6895,
           25011.3496,
@@ -52590,20 +52545,18 @@
           26391.4199,
           26331.0703,
           26299.7402,
-          26440.3105
+          26440.3105,
+          26463.0195
         ]
       },
       {
         "label": "CAC 40",
-        "val": "8,636.80",
-        "delta": "13.76 (-0.16%)",
+        "val": "8,630.14",
+        "delta": "6.65 (-0.08%)",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
         "sparkline": [
-          8366.8496,
-          8382.4297,
-          8377.8604,
           8338.8096,
           8340.1104,
           8363.1396,
@@ -52624,20 +52577,18 @@
           8714.9404,
           8674.9404,
           8650.5596,
-          8636.7998
+          8636.7998,
+          8630.79
         ]
       },
       {
         "label": "FTSE 100",
-        "val": "10,750.11",
-        "delta": "22.56 (-0.21%)",
-        "state": "NEGATIVE",
+        "val": "10,769.59",
+        "delta": "19.48 (+0.18%)",
+        "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live",
         "sparkline": [
-          10529.4004,
-          10515.9004,
-          10572.2002,
           10600.4004,
           10524.7998,
           10585.9004,
@@ -52658,20 +52609,18 @@
           10844.2002,
           10833.2002,
           10772.7002,
-          10750.0996
+          10750.0996,
+          10767.2998
         ]
       },
       {
         "label": "EURO STOXX 50",
-        "val": "6,539.59",
-        "delta": "5.88 (-0.09%)",
-        "state": "NEGATIVE",
+        "val": "6,562.44",
+        "delta": "22.85 (+0.35%)",
+        "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live",
         "sparkline": [
-          6280.1899,
-          6265.5801,
-          6283.6099,
           6230.8701,
           6227.3999,
           6285.6299,
@@ -52692,20 +52641,18 @@
           6551.2202,
           6533.9902,
           6545.4702,
-          6539.5898
+          6539.5898,
+          6562.98
         ]
       },
       {
         "label": "S&P/ASX 200",
-        "val": "9,115.20",
-        "delta": "73.30 (-0.80%)",
+        "val": "9,073.20",
+        "delta": "42.00 (-0.46%)",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
         "sparkline": [
-          8808.5,
-          8841.0996,
-          8840.7002,
           8796.7002,
           8791.2998,
           8793.2998,
@@ -52726,13 +52673,14 @@
           9250.5996,
           9209.4004,
           9188.5,
-          9115.2002
+          9115.2002,
+          9073.2002
         ]
       },
       {
         "label": "BOVESPA",
         "val": "166,934.20",
-        "delta": "166.75 (-0.10%)",
+        "delta": "166.80 (-0.10%)",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
@@ -52767,13 +52715,12 @@
     "commodities": [
       {
         "label": "GOLD",
-        "val": "$4,437.30/oz",
-        "delta": "16.90 (+0.38%)",
+        "val": "$4,454.70/oz",
+        "delta": "17.40 (+0.39%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          3985.6001,
           4012.7,
           4010.3,
           4071.1001,
@@ -52794,18 +52741,18 @@
           4383.0,
           4408.8999,
           4363.6001,
-          4437.2998
+          4380.3999,
+          4453.6001
         ]
       },
       {
         "label": "SILVER",
-        "val": "$65.11/oz",
-        "delta": "0.12 (+0.18%)",
+        "val": "$65.77/oz",
+        "delta": "0.66 (+1.02%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          55.898,
           56.038,
           56.802,
           58.835,
@@ -52826,18 +52773,18 @@
           64.769,
           65.555,
           64.873,
-          65.108
+          64.988,
+          65.72
         ]
       },
       {
         "label": "BRENT CRUDE OIL",
-        "val": "$88.52 / bbl",
-        "delta": "1.45 (+1.67%)",
+        "val": "$89.12 / bbl",
+        "delta": "0.60 (+0.68%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          84.23,
           88.1,
           89.22,
           91.01,
@@ -52858,18 +52805,18 @@
           88.91,
           88.98,
           87.07,
-          88.52
+          88.52,
+          89.29
         ]
       },
       {
         "label": "WTI CRUDE",
-        "val": "$82.40 / bbl",
-        "delta": "1.15 (+1.42%)",
+        "val": "$82.65 / bbl",
+        "delta": "0.25 (+0.30%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          78.95,
           82.49,
           83.23,
           84.91,
@@ -52890,18 +52837,18 @@
           83.2,
           83.27,
           81.25,
-          82.4
+          82.4,
+          82.87
         ]
       },
       {
         "label": "NATURAL GAS",
-        "val": "$2.733 / MMBtu",
-        "delta": "0.01 (+0.22%)",
-        "state": "POSITIVE",
+        "val": "$2.656 / MMBtu",
+        "delta": "0.08 (-2.82%)",
+        "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          2.858,
           2.911,
           2.86,
           2.865,
@@ -52922,18 +52869,18 @@
           2.767,
           2.804,
           2.727,
-          2.733
+          2.733,
+          2.661
         ]
       },
       {
         "label": "BITCOIN",
-        "val": "$62,936.99",
-        "delta": "2,110.88 (-3.25%)",
+        "val": "$63,628.81",
+        "delta": "1,419.06 (-2.18%)",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          64796.6016,
           64690.8047,
           65230.0273,
           66505.125,
@@ -52962,18 +52909,18 @@
           63402.1719,
           62975.5938,
           63024.3203,
-          62945.0391
+          62818.6523,
+          63617.5
         ]
       },
       {
         "label": "COPPER",
-        "val": "$6.61",
-        "delta": "0.01 (+0.08%)",
+        "val": "$6.69",
+        "delta": "0.07 (+1.13%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          6.296,
           6.22,
           6.299,
           6.511,
@@ -52994,18 +52941,18 @@
           6.612,
           6.597,
           6.5925,
-          6.613
+          6.5995,
+          6.689
         ]
       },
       {
         "label": "PLATINUM",
-        "val": "$1,756.90/oz",
-        "delta": "24.70 (+1.43%)",
+        "val": "$1,768.40/oz",
+        "delta": "11.50 (+0.65%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          1635.7,
           1605.8,
           1592.2,
           1626.1,
@@ -53026,18 +52973,18 @@
           1745.8,
           1761.1,
           1725.2,
-          1756.9
+          1750.0,
+          1768.5
         ]
       },
       {
         "label": "PALLADIUM",
-        "val": "$1,325.50/oz",
-        "delta": "0.40 (-0.03%)",
-        "state": "NEGATIVE",
+        "val": "$1,332.00/oz",
+        "delta": "6.50 (+0.49%)",
+        "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          1263.5,
           1244.0,
           1261.0,
           1279.5,
@@ -53058,18 +53005,18 @@
           1366.1,
           1370.2,
           1322.6,
-          1325.5
+          1322.5,
+          1333.0
         ]
       },
       {
         "label": "WHEAT",
-        "val": "$689.50",
-        "delta": "21.25 (+3.18%)",
-        "state": "POSITIVE",
+        "val": "$682.75",
+        "delta": "6.75 (-0.98%)",
+        "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          674.75,
           682.75,
           674.0,
           678.0,
@@ -53090,7 +53037,8 @@
           630.25,
           652.75,
           652.75,
-          689.5
+          674.75,
+          682.75
         ]
       }
     ]
@@ -57750,6 +57698,95 @@
         "penny_or_dvr": false,
         "min_price": 50.0
       }
+    },
+    "GMBREW": {
+      "ticker": "GMBREW",
+      "deskDecision": "HOLD_FOR_DATA",
+      "conviction": 14,
+      "oneLiner": "Deterministic desk screen: HOLD_FOR_DATA.",
+      "criteria": [
+        {
+          "id": "price_floor",
+          "label": "Price floor",
+          "status": "INSUFFICIENT",
+          "detail": "LTP missing from snapshot \u2014 cannot verify institutional price floor.",
+          "sourceFields": [
+            "ltp"
+          ]
+        },
+        {
+          "id": "instrument_quality",
+          "label": "Instrument quality",
+          "status": "PASS",
+          "detail": "GMBREW clears DVR / denylist screen.",
+          "sourceFields": [
+            "ticker"
+          ]
+        },
+        {
+          "id": "liquidity_turnover",
+          "label": "Liquidity / turnover",
+          "status": "INSUFFICIENT",
+          "detail": "Turnover Cr not in FactPack.",
+          "sourceFields": [
+            "turnover_cr"
+          ]
+        },
+        {
+          "id": "technical_alignment",
+          "label": "Technical alignment",
+          "status": "INSUFFICIENT",
+          "detail": "No hard-filter / quality / RSI fields in FactPack.",
+          "sourceFields": [
+            "passes_hard_filters",
+            "rsi"
+          ]
+        },
+        {
+          "id": "governance_promoter",
+          "label": "Governance / promoter",
+          "status": "INSUFFICIENT",
+          "detail": "Promoter holding % not in FactPack.",
+          "sourceFields": [
+            "promoter_holding_pct"
+          ]
+        },
+        {
+          "id": "news_event_risk",
+          "label": "News / event risk",
+          "status": "INSUFFICIENT",
+          "detail": "No news / risk_flags in FactPack for event screen.",
+          "sourceFields": [
+            "risk_flags",
+            "news_risk_flags"
+          ]
+        },
+        {
+          "id": "portfolio_fit",
+          "label": "Portfolio fit",
+          "status": "INSUFFICIENT",
+          "detail": "ATR% / alpha_score missing \u2014 cannot size fat-book fit.",
+          "sourceFields": [
+            "atr_pct",
+            "alpha_score"
+          ]
+        }
+      ],
+      "categoryScores": {
+        "liquidity": 40,
+        "technical": 40,
+        "governance": 70,
+        "eventRisk": 40,
+        "portfolioFit": 40
+      },
+      "source": "deterministic",
+      "llmUsed": false,
+      "generatedAt": "2026-08-16T15:29:39.049747+00:00",
+      "factPack": {
+        "ltp": null,
+        "penny_or_dvr": false,
+        "min_price": 50.0
+      }
     }
   },
   "isSnapshotFallback": false,
@@ -57758,14 +57795,14 @@
     "source": "scannerPicks-persisted",
     "picks": [
       {
-        "symbol": "STYLEBAAZA",
-        "name": "Baazar Style Retail",
+        "symbol": "UNIONBANK",
+        "name": "Union Bank of India",
         "direction": "LONG",
-        "buyAbove": 365.25,
-        "stopLoss": 349.53,
-        "target1": 388.83,
-        "target2": 412.41,
-        "riskPerShare": 15.72,
+        "buyAbove": 188.9,
+        "stopLoss": 184.09,
+        "target1": 196.12,
+        "target2": 203.33,
+        "riskPerShare": 4.81,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57774,14 +57811,14 @@
         "scanLtp": null
       },
       {
-        "symbol": "HONASA",
-        "name": "Mamaearth",
+        "symbol": "LAURUSLABS",
+        "name": "Laurus Labs",
         "direction": "LONG",
-        "buyAbove": 502.8,
-        "stopLoss": 486.75,
-        "target1": 526.88,
-        "target2": 550.95,
-        "riskPerShare": 16.05,
+        "buyAbove": 1809.7,
+        "stopLoss": 1767.55,
+        "target1": 1872.92,
+        "target2": 1936.15,
+        "riskPerShare": 42.15,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57790,14 +57827,14 @@
         "scanLtp": null
       },
       {
-        "symbol": "HAL",
-        "name": "Hindustan Aeronautics",
+        "symbol": "UNOMINDA",
+        "name": "UNO Minda",
         "direction": "LONG",
-        "buyAbove": 5029.9,
-        "stopLoss": 4917.27,
-        "target1": 5198.84,
-        "target2": 5367.79,
-        "riskPerShare": 112.63,
+        "buyAbove": 1269.9,
+        "stopLoss": 1238.44,
+        "target1": 1317.09,
+        "target2": 1364.28,
+        "riskPerShare": 31.46,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57806,14 +57843,14 @@
         "scanLtp": null
       },
       {
-        "symbol": "PRAKASH",
-        "name": "Prakash Industries",
+        "symbol": "BHEL",
+        "name": "Bharat Heavy Electricals",
         "direction": "LONG",
-        "buyAbove": 137.68,
-        "stopLoss": 131.94,
-        "target1": 146.29,
-        "target2": 154.9,
-        "riskPerShare": 5.74,
+        "buyAbove": 435.95,
+        "stopLoss": 423.63,
+        "target1": 454.43,
+        "target2": 472.91,
+        "riskPerShare": 12.32,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57822,14 +57859,14 @@
         "scanLtp": null
       },
       {
-        "symbol": "LODHA",
-        "name": "Lodha Developers",
+        "symbol": "UJJIVANSFB",
+        "name": "Ujjivan Small Finance Bank",
         "direction": "LONG",
-        "buyAbove": 1243.9,
-        "stopLoss": 1202.94,
-        "target1": 1305.34,
-        "target2": 1366.78,
-        "riskPerShare": 40.96,
+        "buyAbove": 72.21,
+        "stopLoss": 69.86,
+        "target1": 75.73,
+        "target2": 79.26,
+        "riskPerShare": 2.35,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57838,14 +57875,14 @@
         "scanLtp": null
       },
       {
-        "symbol": "ANANTRAJ",
-        "name": "Anant Raj",
+        "symbol": "OIL",
+        "name": "Oil India",
         "direction": "LONG",
-        "buyAbove": 629.95,
-        "stopLoss": 610.09,
-        "target1": 659.74,
-        "target2": 689.53,
-        "riskPerShare": 19.86,
+        "buyAbove": 474.65,
+        "stopLoss": 461.94,
+        "target1": 493.71,
+        "target2": 512.78,
+        "riskPerShare": 12.71,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57854,14 +57891,14 @@
         "scanLtp": null
       },
       {
-        "symbol": "M&M",
-        "name": "Mahindra & Mahindra",
+        "symbol": "PGEL",
+        "name": "PG Electroplast",
         "direction": "LONG",
-        "buyAbove": 3428.3,
-        "stopLoss": 3354.75,
-        "target1": 3538.62,
-        "target2": 3648.95,
-        "riskPerShare": 73.55,
+        "buyAbove": 614.0,
+        "stopLoss": 593.57,
+        "target1": 644.64,
+        "target2": 675.29,
+        "riskPerShare": 20.43,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57870,14 +57907,14 @@
         "scanLtp": null
       },
       {
-        "symbol": "NYKAA",
-        "name": "Nykaa",
+        "symbol": "LT",
+        "name": "Larsen & Toubro",
         "direction": "LONG",
-        "buyAbove": 331.0,
-        "stopLoss": 323.0,
-        "target1": 343.0,
-        "target2": 355.0,
-        "riskPerShare": 8.0,
+        "buyAbove": 4086.7,
+        "stopLoss": 4024.61,
+        "target1": 4179.84,
+        "target2": 4272.97,
+        "riskPerShare": 62.09,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57886,14 +57923,14 @@
         "scanLtp": null
       },
       {
-        "symbol": "APOLLOHOSP",
-        "name": "Apollo Hospitals",
+        "symbol": "SANGINITA",
+        "name": "Sanginita Chemicals",
         "direction": "LONG",
-        "buyAbove": 8920.5,
-        "stopLoss": 8740.41,
-        "target1": 9190.64,
-        "target2": 9460.77,
-        "riskPerShare": 180.09,
+        "buyAbove": 56.7,
+        "stopLoss": 55.42,
+        "target1": 58.62,
+        "target2": 60.54,
+        "riskPerShare": 1.28,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57902,14 +57939,14 @@
         "scanLtp": null
       },
       {
-        "symbol": "BEL",
-        "name": "Bharat Electronics",
+        "symbol": "MEESHO",
+        "name": "Meesho",
         "direction": "LONG",
-        "buyAbove": 410.8,
-        "stopLoss": 403.74,
-        "target1": 421.39,
-        "target2": 431.98,
-        "riskPerShare": 7.06,
+        "buyAbove": 193.82,
+        "stopLoss": 187.78,
+        "target1": 202.88,
+        "target2": 211.94,
+        "riskPerShare": 6.04,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57918,7 +57955,7 @@
         "scanLtp": null
       }
     ],
-    "updatedAt": "2026-08-16T09:51:00.424100+00:00",
+    "updatedAt": "2026-08-17T10:59:39.142529+00:00",
     "isMock": false,
     "fromPersisted": true
   },
@@ -57927,6 +57964,6 @@
     "reason": "Scheduled live refresh (desk_midday_midday_1400); LLM day-locked.",
     "dataDate": "2026-08-14"
   },
-  "macrosRefreshedAt": "2026-08-16T09:54:16.879718+00:00",
+  "macrosRefreshedAt": "2026-08-17T11:02:58.644553+00:00",
   "closeMarksRefreshedAt": "2026-08-14T10:05:25.028666+00:00"
 }
