@@ -1,9 +1,11 @@
 # Alphix / IROS Terminal — production compose stack
-# Hub images (same on every machine): smohanty010620/iros-market-api, iros-frontend, cloudflared
+# Hub images (same on every machine): smohanty010620/iros-market-api, iros-frontend, cloudflared, iros-desk-state
+# iros-desk-state is a JSON snapshot image (Hub has no volumes). Packed by push-docker-hub.bat.
 #
 # This PC (after code changes):  rebuild-docker.bat   then  push-docker-hub.bat
 # Other PCs (pull only):         start-from-hub.bat
 #   requires backend/.env and config/cloudflare/credentials.json (never in the image)
+#   desk JSON is seeded from iros-desk-state (last push) into ./ before up
 #
 # Usage:
 #   1. Ensure backend/.env exists (Angel + LLM secrets)
@@ -165,6 +167,15 @@ services:
       timeout: 5s
       start_period: 45s
       retries: 3
+
+  # Desk JSON snapshot — not a running service. Built/pushed so other PCs can seed /app/state.
+  desk-state:
+    profiles: ["desk-state"]
+    build:
+      context: ./config/docker/desk-state
+      dockerfile: Dockerfile
+    image: smohanty010620/iros-desk-state:latest
+    command: ["true"]
 
   # Cloudflare Tunnel — Hub image has `tunnel run` baked in (official image only prints version).
   # Credentials are mounted, never baked. Enabled via --profile tunnel.

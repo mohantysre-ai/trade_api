@@ -28,7 +28,9 @@ docker compose up -d --build
 
 Flags: `start-docker.bat --no-build` / `--pull` / `--no-open`. `rebuild-docker.bat --cached` (faster). Stop: `config\startup\stop_docker.bat`.
 
-Hub images (no secrets inside): `smohanty010620/iros-market-api`, `smohanty010620/iros-frontend`, `smohanty010620/cloudflared`. The cloudflared image already runs `tunnel … run iros-desk`. Copy `backend/.env` and `config/cloudflare/credentials.json` onto each machine.
+Hub images (no secrets inside): `smohanty010620/iros-market-api`, `smohanty010620/iros-frontend`, `smohanty010620/cloudflared`, `smohanty010620/iros-desk-state`. The cloudflared image already runs `tunnel … run iros-desk`. Copy `backend/.env` and `config/cloudflare/credentials.json` onto each machine.
+
+**Desk JSON across PCs:** Docker Hub cannot store volumes. `push-docker-hub.bat` packs `intraday_session.json`, `swing_session.json`, `last_market_snapshot.json`, plan, alerts, and `trade_api_snapshot.json` into `iros-desk-state`. `start-from-hub.bat` pulls that image and writes the files into the repo (bind-mounted as `/app/state`) **before** compose up. Last push wins. Do not run two desks live at once.
 
 ### After every code change (Docker)
 
@@ -84,15 +86,16 @@ On every other machine (repo + secrets only — no local compile):
 start-from-hub.bat
 ```
 
-That is `docker compose --profile tunnel pull && up -d`. Do not bake credentials into the image.
+That is: seed desk JSON from `iros-desk-state`, then `docker compose --profile tunnel pull && up -d`. Do not bake credentials into the image.
 
 ## Persistence
 
-Named volumes keep JSON state across restarts (source code is not mounted):
+Named volumes keep JSON state **on that PC** across restarts (source code is not mounted):
 
 - `iros-backend-data` → `/app/backend/app/data`
 - `iros-eod-archive` → `/app/backend/app/services/eod_archive`
-- `iros-desk-state` → `/app/state` (`trade_api_snapshot.json`, plan, alerts, session)
+
+Desk lock / price JSON lives on the **host repo** bind `./:/app/state`. Cross-machine copy is the `iros-desk-state` Hub image (see above), not a Hub volume.
 
 ## Image size notes
 

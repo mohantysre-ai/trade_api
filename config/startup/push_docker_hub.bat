@@ -6,6 +6,7 @@ REM Images:
 REM   smohanty010620/iros-market-api
 REM   smohanty010620/iros-frontend
 REM   smohanty010620/cloudflared   (tunnel run baked in; no secrets)
+REM   smohanty010620/iros-desk-state  (desk JSON snapshot — Hub has no volumes)
 REM
 REM Does NOT push credentials.json or backend/.env
 REM ============================================================
@@ -40,8 +41,17 @@ echo.
 
 pushd "%PROJECT_ROOT%"
 
-echo [*] Building stack images ^(including cloudflared^)...
-docker compose --profile tunnel build
+echo [*] Packing desk JSON into iros-desk-state seed...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%pack-desk-state.ps1"
+if errorlevel 1 (
+    echo [FAIL] pack-desk-state failed
+    popd
+    if not "%IROS_NO_PAUSE%"=="1" pause
+    exit /b 1
+)
+
+echo [*] Building stack images ^(including cloudflared + desk-state^)...
+docker compose --profile tunnel --profile desk-state build
 if errorlevel 1 (
     echo [FAIL] build failed
     popd
@@ -60,6 +70,10 @@ if errorlevel 1 goto :pushfail
 
 echo [*] Pushing %HUB%/cloudflared:latest ...
 docker push %HUB%/cloudflared:latest
+if errorlevel 1 goto :pushfail
+
+echo [*] Pushing %HUB%/iros-desk-state:latest ...
+docker push %HUB%/iros-desk-state:latest
 if errorlevel 1 goto :pushfail
 
 popd

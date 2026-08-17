@@ -100,6 +100,14 @@ echo.
 
 pushd "%PROJECT_ROOT%"
 if %DO_PULL% equ 1 (
+    echo [*] Seeding desk JSON from Hub image iros-desk-state ...
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%seed-desk-state-from-hub.ps1"
+    if errorlevel 1 (
+        echo [FAIL] desk-state seed failed — docker login, or run push-docker-hub.bat on the live desk.
+        popd
+        if not "%IROS_NO_PAUSE%"=="1" pause
+        exit /b 1
+    )
     echo [*] docker compose %COMPOSE_PROFILES% pull ...
     docker compose %COMPOSE_PROFILES% pull
     if errorlevel 1 (
