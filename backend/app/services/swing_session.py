@@ -471,17 +471,27 @@ def _ensure_today_matrix_snapshot() -> tuple[bool, str]:
         return True, reason
     now = time.monotonic()
     if _SWING_MATRIX_REFRESH_AT and now - _SWING_MATRIX_REFRESH_AT < _SWING_MATRIX_REFRESH_TTL:
+        if quotes_stale:
+            return False, "MATRIX_QUOTES_STALE"
         if ready:
             return True, reason
         return False, reason
-    _SWING_MATRIX_REFRESH_AT = now
     try:
         result = _run_swing_matrix_refresh()
         log.info("Swing hunt matrix refresh: success=%s", result.get("success") if isinstance(result, dict) else result)
+        if isinstance(result, dict) and result.get("success") is True:
+            _SWING_MATRIX_REFRESH_AT = time.monotonic()
     except Exception as exc:
         log.warning("Swing hunt matrix refresh failed: %s", exc)
     refreshed = _read_json(_matrix_snapshot_path()) or {}
     ready, reason = _matrix_snapshot_ready_for_today(refreshed)
+    age_after = _snapshot_age_sec(refreshed)
+    still_quotes_stale = bool(
+        _is_market_open() and (age_after is None or age_after > _SWING_MATRIX_REFRESH_TTL)
+    )
+    if still_quotes_stale:
+        log.warning("Swing hunt quotes still stale after refresh")
+        return False, "MATRIX_QUOTES_STALE"
     if not ready:
         log.warning("Swing hunt remains fail-closed after refresh: %s", reason)
     return ready, reason

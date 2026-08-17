@@ -2517,11 +2517,19 @@ def _maybe_refresh_live_snapshot(*, reason: str) -> dict[str, Any]:
         return snap
     if (now - _SNAP_REFRESH_LAST) < _SNAP_REFRESH_MIN_GAP_SEC:
         return snap
-    _SNAP_REFRESH_LAST = now
     try:
-        run_scheduled_live_refresh(reason=reason)
+        result = run_scheduled_live_refresh(reason=reason)
     except Exception:
         log.exception("intraday live snapshot refresh failed (%s)", reason)
+        return load_market_snapshot()
+    if not isinstance(result, dict) or result.get("success") is not True:
+        log.warning(
+            "intraday live snapshot refresh unsuccessful (%s): %s",
+            reason,
+            result.get("error") if isinstance(result, dict) else result,
+        )
+        return load_market_snapshot()
+    _SNAP_REFRESH_LAST = time.monotonic()
     return load_market_snapshot()
 
 
@@ -3743,11 +3751,12 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
         market_open_now = bool(_rth_open())
     except Exception:
         market_open_now = False
-    if persist and market_open_now:
+    if market_open_now:
         snap = _maybe_refresh_live_snapshot(reason="intraday_replacement_hunt")
     quotes = snap.get("stockQuotes") or {}
     if market_open_now:
         regime = detect_regime(snap)
+        session["regime"] = regime
     else:
         regime = session.get("regime") or detect_regime(snap)
     if persist and snap.get("updatedAt"):

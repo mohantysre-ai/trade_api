@@ -226,3 +226,63 @@ def test_apply_uses_hunt_pools_not_lock_pool():
     assert applied[0]["symbol"] == "FRESH"
     lock_syms = {str(c.get("symbol")) for c in session["candidatePoolLong"]}
     assert "FRESH" not in lock_syms
+
+
+def _stale_snap() -> dict:
+    return {"updatedAt": "2020-01-01T00:00:00+00:00", "stockQuotes": {}}
+
+
+def test_maybe_refresh_does_not_stamp_gap_on_failure(monkeypatch):
+    eng._SNAP_REFRESH_LAST = 0.0
+    monkeypatch.setattr("app.services.trade_outcome._is_market_open", lambda: True)
+    monkeypatch.setattr(eng, "load_market_snapshot", _stale_snap)
+    monkeypatch.setattr(
+        "app.services.angel_one_feed.run_scheduled_live_refresh",
+        lambda **_k: {"success": False, "error": "angel down"},
+    )
+    eng._maybe_refresh_live_snapshot(reason="test")
+    assert eng._SNAP_REFRESH_LAST == 0.0
+
+
+def test_maybe_refresh_does_not_stamp_gap_on_exception(monkeypatch):
+    eng._SNAP_REFRESH_LAST = 0.0
+    monkeypatch.setattr("app.services.trade_outcome._is_market_open", lambda: True)
+    monkeypatch.setattr(eng, "load_market_snapshot", _stale_snap)
+
+    def _boom(**_k):
+        raise RuntimeError("angel timeout")
+
+    monkeypatch.setattr("app.services.angel_one_feed.run_scheduled_live_refresh", _boom)
+    eng._maybe_refresh_live_snapshot(reason="test")
+    assert eng._SNAP_REFRESH_LAST == 0.0
+
+
+def test_maybe_refresh_stamps_gap_only_after_success(monkeypatch):
+    eng._SNAP_REFRESH_LAST = 0.0
+    monkeypatch.setattr("app.services.trade_outcome._is_market_open", lambda: True)
+    monkeypatch.setattr(eng, "load_market_snapshot", _stale_snap)
+    monkeypatch.setattr(
+        "app.services.angel_one_feed.run_scheduled_live_refresh",
+        lambda **_k: {"success": True},
+    )
+    eng._maybe_refresh_live_snapshot(reason="test")
+    assert eng._SNAP_REFRESH_LAST > 0.0
+
+
+def test_get_poll_refreshes_snapshot_and_stamps_live_regime(monkeypatch):
+    refreshes: list[str] = []
+    session = {"locked": False, "regime": {"label": "LOCK"}}
+    monkeypatch.setattr("app.services.trade_outcome._is_market_open", lambda: True)
+    monkeypatch.setattr(eng, "load_session", lambda: session)
+    monkeypatch.setattr(eng, "load_market_snapshot", _stale_snap)
+
+    def _refresh(*, reason: str):
+        refreshes.append(reason)
+        return {"updatedAt": "2026-08-17T09:07:00+00:00", "stockQuotes": {}}
+
+    monkeypatch.setattr(eng, "_maybe_refresh_live_snapshot", _refresh)
+    monkeypatch.setattr(eng, "detect_regime", lambda _snap: {"label": "LIVE"})
+    out = eng._compute_session(include_live=False, persist=False)
+    assert refreshes == ["intraday_replacement_hunt"]
+    assert out["regime"]["label"] == "LIVE"
+    assert session["regime"]["label"] == "LIVE"

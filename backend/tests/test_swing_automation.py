@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import datetime, timezone
+from time import monotonic
 
 from app.services import swing_session
 from app.services.exit_plan import attach_exit_plan
@@ -469,6 +471,40 @@ def test_ensure_refreshes_when_today_quotes_stale(monkeypatch):
     swing_session._SWING_MATRIX_REFRESH_AT = 0.0
     monkeypatch.setattr(swing_session, "_is_market_open", lambda: True)
     monkeypatch.setattr(swing_session, "_ist_today", lambda: "2026-08-17")
+    stale = {
+        "updatedAt": "2026-08-17T04:48:00+00:00",
+        "selectionMeta": {"dataDate": "2026-08-17"},
+        "universeSize": 500,
+        "stocks": [{"deterministicSide": "BUY"} for _ in range(8)],
+        "stockQuotes": {f"T{i}": {"ltp": 100} for i in range(500)},
+    }
+    fresh = {**stale, "updatedAt": datetime.now(timezone.utc).isoformat()}
+    reads: list[str] = []
+
+    def _read(*_a, **_k):
+        if not reads:
+            reads.append("stale")
+            return stale
+        reads.append("fresh")
+        return fresh
+
+    monkeypatch.setattr(swing_session, "_read_json", _read)
+    calls: list[str] = []
+    monkeypatch.setattr(
+        swing_session,
+        "_run_swing_matrix_refresh",
+        lambda: calls.append("refresh") or {"success": True},
+    )
+    ready, reason = swing_session._ensure_today_matrix_snapshot()
+    assert ready is True
+    assert reason == "READY"
+    assert calls == ["refresh"]
+
+
+def test_ensure_cooldown_does_not_fill_on_stale_quotes(monkeypatch):
+    swing_session._SWING_MATRIX_REFRESH_AT = monotonic()
+    monkeypatch.setattr(swing_session, "_is_market_open", lambda: True)
+    monkeypatch.setattr(swing_session, "_ist_today", lambda: "2026-08-17")
     snap = {
         "updatedAt": "2026-08-17T04:48:00+00:00",
         "selectionMeta": {"dataDate": "2026-08-17"},
@@ -483,6 +519,7 @@ def test_ensure_refreshes_when_today_quotes_stale(monkeypatch):
         "_run_swing_matrix_refresh",
         lambda: calls.append("refresh") or {"success": True},
     )
-    ready, _reason = swing_session._ensure_today_matrix_snapshot()
-    assert ready is True
-    assert calls == ["refresh"]
+    ready, reason = swing_session._ensure_today_matrix_snapshot()
+    assert ready is False
+    assert reason == "MATRIX_QUOTES_STALE"
+    assert calls == []
