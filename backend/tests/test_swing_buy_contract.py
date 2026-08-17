@@ -394,7 +394,7 @@ def test_quote_universe_keeps_nifty500_names_on_nifty100_pool(monkeypatch):
     display = [inst("RELIANCE"), inst("TCS")]
     swing = [inst("RELIANCE"), inst("NETWEB"), inst("SOLARINDS"), inst("SARDAEN")]
 
-    def fake_pool(name):
+    def fake_pool(name, _client=None):
         if name == "Nifty 500":
             return swing, "Nifty 500"
         return display, "Nifty 100"
@@ -404,3 +404,96 @@ def test_quote_universe_keeps_nifty500_names_on_nifty100_pool(monkeypatch):
     keys = {row.key for row in universe}
     assert label == "Nifty 100"
     assert keys == {"RELIANCE", "TCS", "NETWEB", "SOLARINDS", "SARDAEN"}
+
+
+def test_dhan_long_without_matrix_buy_does_not_enter():
+    scanner_flags = {
+        "ticker": "SCANXLONG",
+        "symbol": "SCANXLONG",
+        "passes_hard_filters": True,
+        "passes_quality_filters": True,
+        "ltp": 100.0,
+        "ltpRaw": 100.0,
+        "intraday": {
+            "vwap": 99.0,
+            "ema9": 98.0,
+            "price_above_vwap": True,
+            "price_above_ema9": True,
+            "rsi": 62.0,
+            "oi_setup": "LONG_BUILDUP",
+            "pivot_r1_breakout": True,
+            "rsi_pivot_break": True,
+            "passes_hard_filters": True,
+            "passes_quality_filters": True,
+        },
+    }
+    snapshot = {
+        "stocks": [scanner_flags],
+        "stockQuotes": {"SCANXLONG": scanner_flags},
+        "dhanSwingPicks": {
+            "source": "scannerPicks-persisted",
+            "picks": [
+                {
+                    "symbol": "SCANXLONG",
+                    "direction": "LONG",
+                    "buyAbove": 101.0,
+                    "stopLoss": 95.0,
+                    "target1": 110.0,
+                }
+            ],
+        },
+    }
+    selected, source = swing_session._picks_from_asset_matrix(snapshot)
+    assert selected == []
+    assert source == "asset_matrix_deterministic_buy"
+
+
+def test_dhan_recommended_matrix_buy_enters_when_score_rank_would_miss_it():
+    display = []
+    quotes: dict = {}
+    for i in range(50):
+        row = qualified_row(f"PAD{i}")
+        row.pop("deterministicSide")
+        row["passes_hard_filters"] = False
+        row["passes_quality_filters"] = False
+        row["intraday"] = {**row["intraday"], "rsi": 40.0, "price_above_vwap": False}
+        row["ticker"] = f"PAD{i}"
+        row["symbol"] = f"PAD{i}"
+        display.append(row)
+        quotes[row["ticker"]] = row
+    gated = qualified_row("DHANBUY", score=1.0)
+    quotes["DHANBUY"] = gated
+    snapshot = {
+        "stocks": display,
+        "stockQuotes": quotes,
+        "dhanSwingPicks": {
+            "picks": [
+                {
+                    "symbol": "DHANBUY",
+                    "direction": "LONG",
+                    "buyAbove": 999.0,
+                    "stopLoss": 1.0,
+                    "target1": 2000.0,
+                }
+            ],
+        },
+    }
+    selected, source = swing_session._picks_from_asset_matrix(snapshot)
+    assert [row["symbol"] for row in selected] == ["DHANBUY"]
+    assert selected[0]["_candidateSource"] == "dhan_recommendation_gated"
+    assert selected[0].get("buyAbove") != 999.0
+    assert source == "asset_matrix_deterministic_buy"
+
+
+def test_dhan_pick_missing_from_matrix_is_ignored():
+    valid = qualified_row("VALID")
+    snapshot = {
+        "stocks": [valid],
+        "stockQuotes": {"VALID": valid},
+        "dhanSwingPicks": {
+            "picks": [{"symbol": "STYLEBAAZA", "direction": "LONG", "buyAbove": 50.0}],
+        },
+    }
+    selected, _source = swing_session._picks_from_asset_matrix(snapshot)
+    assert [row["symbol"] for row in selected] == ["VALID"]
+    assert selected[0]["_candidateSource"] == "asset_matrix_deterministic_buy"

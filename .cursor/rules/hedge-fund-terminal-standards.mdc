@@ -13,11 +13,11 @@ Professional Bloomberg-like desk: **facts from data only**. Never invent metrics
 |-------|----------|-------|
 | Frontend | `iros-terminal/` | TypeScript, modern Next.js UI |
 | Backend | `backend/` | Python API integrations |
-| Persistence | JSON snapshots only | No database — read/write cached JSON under `backend/app/data/` etc. |
+| Persistence | JSON snapshots only | No database. Live Intraday/Swing and EOD Book for the **same IST date** must list the same symbols and P&L. |
 
 ## Asset Matrix pipeline
 
-Display funnel: **500 → 200 → 50 → ≥10 BUY** candidates. LLM enrichment (verdict + news) runs on the **top 10 only** — do not expand LLM scope without explicit request.
+Display funnel: **500 → 200 → 50 → ≥10 BUY** candidates. LLM enrichment (verdict + news) runs on the **top 10 only** — do not expand LLM scope without explicit request. DHAN / ScanX recommended names may enter the Swing hunt only after the same deterministic Matrix BUY contract; scanner LONG does not confer side.
 
 ## Agent workflow
 

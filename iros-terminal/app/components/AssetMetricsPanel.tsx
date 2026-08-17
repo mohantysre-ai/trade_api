@@ -1032,6 +1032,14 @@ export default function AssetMetricsPanel({
     session?.cashHeld === true ||
     session?.portfolio?.cashHeld === true ||
     replacementBlocked === 'prefer_cash_no_qualified';
+  const realizedPnl = session?.portfolio?.realizedPnl ?? null;
+  const unrealizedPnl = session?.portfolio?.unrealizedPnl ?? null;
+  const sessionPnl =
+    realizedPnl == null && unrealizedPnl == null ? null : (realizedPnl ?? 0) + (unrealizedPnl ?? 0);
+  const closedNameCount = [...(session?.long || []), ...(session?.short || [])].filter(
+    (r) => r.closed || String(r.status || '').toUpperCase().includes('CLOSED'),
+  ).length;
+  const openNameCount = (freeSlots?.openLong ?? 0) + (freeSlots?.openShort ?? 0);
 
   const emptyHint = showLockedBasket
     ? lockedToday
@@ -1073,6 +1081,11 @@ export default function AssetMetricsPanel({
                 </StatusPill>
               ) : (
                 <StatusPill>UNLOCKED</StatusPill>
+              )}
+              {showLockedBasket && (
+                <StatusPill tone="desk-pill--muted">
+                  {openNameCount} OPEN · {closedNameCount} CLOSED
+                </StatusPill>
               )}
               {session?.rotationPending && (
                 <StatusPill tone="desk-pill--warn" title={session.rotationError || ''}>
@@ -1178,13 +1191,18 @@ export default function AssetMetricsPanel({
         <Kpi label="Net" value={inr(session?.portfolio?.netExposure ?? null)} />
         <Kpi
           label="Unrealized P&L"
-          value={pnlFmt(session?.portfolio?.unrealizedPnl)}
-          valueClass={pnlClass(session?.portfolio?.unrealizedPnl)}
+          value={pnlFmt(unrealizedPnl)}
+          valueClass={pnlClass(unrealizedPnl)}
         />
         <Kpi
           label="Realized P&L"
-          value={pnlFmt(session?.portfolio?.realizedPnl)}
-          valueClass={pnlClass(session?.portfolio?.realizedPnl)}
+          value={pnlFmt(realizedPnl)}
+          valueClass={pnlClass(realizedPnl)}
+        />
+        <Kpi
+          label="Session P&L"
+          value={pnlFmt(sessionPnl)}
+          valueClass={pnlClass(sessionPnl)}
         />
         <Kpi
           label="Risk scale L"

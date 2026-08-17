@@ -842,6 +842,24 @@ def _swing_screen_rows(snap: dict[str, Any]) -> list[dict[str, Any]]:
     return ranked
 
 
+def _dhan_recommended_symbols(snap: dict[str, Any]) -> list[str]:
+    """Ticker list from snapshot dhanSwingPicks. Side/levels on those rows are ignored."""
+    block = snap.get("dhanSwingPicks")
+    if not isinstance(block, dict):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for pick in block.get("picks") or []:
+        if not isinstance(pick, dict):
+            continue
+        sym = str(pick.get("symbol") or pick.get("ticker") or "").upper().strip()
+        if not sym or sym in seen:
+            continue
+        seen.add(sym)
+        out.append(sym)
+    return out
+
+
 def _picks_from_asset_matrix(
     snapshot: dict[str, Any] | None = None,
     *,
@@ -850,7 +868,11 @@ def _picks_from_asset_matrix(
     """Return only fully qualified deterministic BUY rows.
 
     Ledger membership and display padding affect ordering/display only.  Neither
-    can confer direction or eligibility.  Never reads dhanSwingPicks.
+    can confer direction or eligibility.
+
+    DHAN / ScanX names are extra hunt tickers only.  Each is evaluated against
+    the same Matrix BUY contract using stocks[] / stockQuotes facts.  Scanner
+    LONG, buyAbove, or ScanX levels never confer side or eligibility.
     """
     snap = snapshot if isinstance(snapshot, dict) else _read_json(_matrix_snapshot_path())
     ti = snap.get("terminalIntelligence") if isinstance(snap.get("terminalIntelligence"), dict) else {}
@@ -947,6 +969,34 @@ def _picks_from_asset_matrix(
             candidates.append(merged)
             if len(candidates) >= SWING_MATRIX_LOCK_COUNT:
                 break
+
+    if len(candidates) < SWING_MATRIX_LOCK_COUNT:
+        for sym in _dhan_recommended_symbols(snap):
+            if len(candidates) >= SWING_MATRIX_LOCK_COUNT:
+                break
+            if sym in blocked:
+                skipped_cross += 1
+                continue
+            if not sym or sym in seen:
+                continue
+            stock = by_ticker.get(sym)
+            quote = quotes.get(sym) if isinstance(quotes.get(sym), dict) else None
+            if not isinstance(stock, dict) and not isinstance(quote, dict):
+                continue
+            base = dict(stock) if isinstance(stock, dict) else dict(quote)
+            merged = _merge_quote(
+                {
+                    **base,
+                    "_candidateSource": "dhan_recommendation_gated",
+                    "symbol": sym,
+                    "ticker": sym,
+                },
+                sym,
+            )
+            if not _stock_is_matrix_buy(merged):
+                continue
+            seen.add(sym)
+            candidates.append(merged)
 
     if len(candidates) < SWING_MATRIX_LOCK_COUNT:
         for row in _swing_screen_rows(snap):
@@ -1569,7 +1619,8 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
 
     Daily rotation: a locked book from a prior IST sessionDate is treated as stale
     and re-locked from fresh Matrix BUY cards (force), irrespective of P&L.
-    Never locks from dhanSwingPicks / ScanX.
+    DHAN recommended tickers may fill remaining hunt slots only after the same
+    Matrix BUY contract; ScanX LONG never confers side.
 
     Time gate: entry hunt 09:45–14:45 IST. Empty books stay hunting until a
     qualified entry appears; cash-held only after hunt close. Only

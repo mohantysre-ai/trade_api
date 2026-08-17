@@ -3,8 +3,8 @@
   "locked": true,
   "sessionDate": "2026-08-17",
   "committedAt": "2026-08-17T04:48:31.878165+00:00",
-  "updatedAt": "2026-08-17T07:21:56.601880+00:00",
-  "snapshotUpdatedAt": "2026-08-17T04:48:11.937956+00:00",
+  "updatedAt": "2026-08-17T10:03:37.841610+00:00",
+  "snapshotUpdatedAt": "2026-08-17T10:03:03.557423+00:00",
   "dataStale": false,
   "regime": {
     "label": "RISK_OFF",
@@ -153,7 +153,7 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 1219.7,
+      "ltp": 1223.0,
       "scanLtp": 1253.8,
       "ltpSource": "live",
       "atrPct": 3.42,
@@ -257,7 +257,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": -2.72,
+      "pnlPct": 1.18,
       "slotFreed": true,
       "slotStatus": "REPLACEABLE",
       "exitState": {
@@ -303,7 +303,8 @@
         "totalQty": 159,
         "riskPerShare": 6.27,
         "policyVersion": "0p5r_max_0p5pct"
-      }
+      },
+      "currentPrice": 1223.0
     },
     {
       "rank": 5,
@@ -416,7 +417,7 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 116.12,
+      "ltp": 117.32,
       "scanLtp": 118.37,
       "ltpSource": "live",
       "atrPct": 0.81,
@@ -520,7 +521,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": -1.9,
+      "pnlPct": 0.0,
       "slotFreed": true,
       "slotStatus": "REPLACEABLE",
       "exitState": {
@@ -548,7 +549,8 @@
         "totalQty": 1689,
         "riskPerShare": 0.59,
         "policyVersion": "0p5r_max_0p5pct"
-      }
+      },
+      "currentPrice": 117.32
     },
     {
       "rank": 1,
@@ -651,7 +653,7 @@
       "entryFlags": [
         "OI_MISSING"
       ],
-      "ltp": 2577.0,
+      "ltp": 2569.7,
       "scanLtp": 2582.4,
       "ltpSource": "live",
       "atrPct": 2.53,
@@ -735,7 +737,7 @@
       "replacedAt": "2026-08-17T05:25:21.835268+00:00",
       "oiSetup": null,
       "oiAligned": null,
-      "currentPrice": 2582.4,
+      "currentPrice": 2569.7,
       "plannedCapital": 98131.2,
       "lockObservedPrice": 2582.4,
       "triggered": true,
@@ -760,7 +762,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": -0.21,
+      "pnlPct": 0.45,
       "exitState": {
         "legsFilled": [
           {
@@ -907,7 +909,7 @@
       "entryFlags": [
         "OI_MISSING"
       ],
-      "ltp": 725.0,
+      "ltp": 729.0,
       "scanLtp": 727.7,
       "ltpSource": "live",
       "atrPct": 1.25,
@@ -996,7 +998,7 @@
       "replacedAt": "2026-08-17T05:25:52.936400+00:00",
       "oiSetup": null,
       "oiAligned": null,
-      "currentPrice": 727.7,
+      "currentPrice": 729.0,
       "plannedCapital": 99694.9,
       "lockObservedPrice": 727.7,
       "triggered": true,
@@ -1021,7 +1023,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": -0.37,
+      "pnlPct": 0.0,
       "exitState": {
         "legsFilled": [
           {
@@ -1159,7 +1161,7 @@
         "OI_PREFERRED",
         "OI_ALIGN_BONUS"
       ],
-      "ltp": 1408.8,
+      "ltp": 1415.3,
       "scanLtp": 1411.9,
       "ltpSource": "live",
       "atrPct": 1.58,
@@ -1248,7 +1250,7 @@
       "replacedAt": "2026-08-17T05:26:23.546509+00:00",
       "oiSetup": "LONG_BUILDUP",
       "oiAligned": true,
-      "currentPrice": 1411.9,
+      "currentPrice": 1415.3,
       "plannedCapital": 199077.9,
       "lockObservedPrice": 1411.9,
       "triggered": true,
@@ -1273,7 +1275,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": -0.22,
+      "pnlPct": 0.16,
       "exitState": {
         "legsFilled": [
           {
@@ -1414,7 +1416,7 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 330.95,
+      "ltp": 330.2,
       "scanLtp": 333.45,
       "ltpSource": "live",
       "atrPct": 2.55,
@@ -1518,7 +1520,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": 0.75,
+      "pnlPct": 0.78,
       "slotFreed": true,
       "slotStatus": "REPLACEABLE",
       "exitState": {
@@ -1564,7 +1566,8 @@
         "totalQty": 599,
         "riskPerShare": 1.67,
         "policyVersion": "0p5r_max_0p5pct"
-      }
+      },
+      "currentPrice": 330.2
     },
     {
       "rank": 2,
@@ -1671,7 +1674,7 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 374.95,
+      "ltp": 374.4,
       "scanLtp": 376.75,
       "ltpSource": "live",
       "atrPct": 0.95,
@@ -1775,7 +1778,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": 0.48,
+      "pnlPct": 0.74,
       "slotFreed": true,
       "slotStatus": "REPLACEABLE",
       "exitState": {
@@ -1821,7 +1824,8 @@
         "totalQty": 530,
         "riskPerShare": 1.88,
         "policyVersion": "0p5r_max_0p5pct"
-      }
+      },
+      "currentPrice": 374.4
     },
     {
       "rank": 3,
@@ -1928,7 +1932,7 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 138.95,
+      "ltp": 138.61,
       "scanLtp": 139.34,
       "ltpSource": "live",
       "atrPct": 1.43,
@@ -2032,7 +2036,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": 0.28,
+      "pnlPct": 0.48,
       "slotFreed": true,
       "slotStatus": "REPLACEABLE",
       "exitState": {
@@ -2072,7 +2076,8 @@
         "totalQty": 1435,
         "riskPerShare": 0.7,
         "policyVersion": "0p5r_max_0p5pct"
-      }
+      },
+      "currentPrice": 138.61
     },
     {
       "rank": 2,
@@ -2181,7 +2186,7 @@
       "entryFlags": [
         "OI_MISSING"
       ],
-      "ltp": 269.0,
+      "ltp": 269.7,
       "scanLtp": 268.15,
       "ltpSource": "live",
       "atrPct": 2.7,
@@ -2265,7 +2270,7 @@
       "replacedAt": "2026-08-17T05:25:21.835533+00:00",
       "oiSetup": null,
       "oiAligned": null,
-      "currentPrice": 268.15,
+      "currentPrice": 269.7,
       "plannedCapital": 99751.8,
       "lockObservedPrice": 268.15,
       "triggered": true,
@@ -2290,7 +2295,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": -0.32,
+      "pnlPct": 0.18,
       "exitState": {
         "legsFilled": [
           {
@@ -2431,7 +2436,7 @@
       "entryFlags": [
         "OI_MISSING"
       ],
-      "ltp": 1614.8,
+      "ltp": 1610.0,
       "scanLtp": 1630.1,
       "ltpSource": "live",
       "atrPct": 2.3,
@@ -2515,7 +2520,7 @@
       "replacedAt": "2026-08-17T05:25:21.835720+00:00",
       "oiSetup": null,
       "oiAligned": null,
-      "currentPrice": 1630.1,
+      "currentPrice": 1610.0,
       "plannedCapital": 99436.1,
       "lockObservedPrice": 1630.1,
       "triggered": true,
@@ -2540,7 +2545,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": 0.94,
+      "pnlPct": 0.88,
       "exitState": {
         "legsFilled": [
           {
@@ -2690,7 +2695,7 @@
         "OI_PREFERRED",
         "OI_ALIGN_BONUS"
       ],
-      "ltp": 4046.2,
+      "ltp": 4086.7,
       "scanLtp": 4064.0,
       "ltpSource": "live",
       "atrPct": 1.53,
@@ -2779,7 +2784,7 @@
       "replacedAt": "2026-08-17T05:25:52.936560+00:00",
       "oiSetup": "SHORT_BUILDUP",
       "oiAligned": true,
-      "currentPrice": 4064.0,
+      "currentPrice": 4086.7,
       "plannedCapital": 199136.0,
       "lockObservedPrice": 4064.0,
       "triggered": true,
@@ -2804,7 +2809,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": 0.44,
+      "pnlPct": 0.52,
       "exitState": {
         "legsFilled": [
           {
@@ -2946,7 +2951,7 @@
         "OI_MISSING",
         "IN_PLAY"
       ],
-      "ltp": 1305.9,
+      "ltp": 1316.0,
       "scanLtp": 1311.8,
       "ltpSource": "live",
       "atrPct": 1.6,
@@ -3035,7 +3040,7 @@
       "replacedAt": "2026-08-17T05:25:52.936675+00:00",
       "oiSetup": null,
       "oiAligned": null,
-      "currentPrice": 1311.8,
+      "currentPrice": 1316.0,
       "plannedCapital": 99696.8,
       "lockObservedPrice": 1311.8,
       "triggered": true,
@@ -3060,7 +3065,7 @@
         "scaleTrail": true,
         "closed": true
       },
-      "pnlPct": 0.45,
+      "pnlPct": 0.67,
       "exitState": {
         "legsFilled": [
           {
@@ -8688,5 +8693,6 @@
       "replaceReason": "FREE_SLOT",
       "proposalOnly": true
     }
-  ]
+  ],
+  "closeMarksFrozenAt": "2026-08-17T10:03:37.841610+00:00"
 }
