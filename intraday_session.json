@@ -3,7 +3,7 @@
   "locked": true,
   "sessionDate": "2026-08-17",
   "committedAt": "2026-08-17T04:48:31.878165+00:00",
-  "updatedAt": "2026-08-17T04:48:31.878165+00:00",
+  "updatedAt": "2026-08-17T05:30:42.147613+00:00",
   "snapshotUpdatedAt": "2026-08-17T04:48:11.937956+00:00",
   "dataStale": false,
   "regime": {
@@ -153,14 +153,14 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 1253.8,
+      "ltp": 1219.7,
       "scanLtp": 1253.8,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 3.42,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 1253.8,
-      "stopLoss": 1247.53,
+      "stopLoss": 1276.68,
       "target1": 1263.2,
       "target2": 1272.61,
       "riskPerShare": 6.27,
@@ -180,26 +180,26 @@
           {
             "r": 1.0,
             "qtyPct": 0.2,
-            "qty": 8,
+            "qty": 32,
             "price": 1260.07,
             "trailStopAfter": 0.0
           },
           {
             "r": 1.5,
             "qtyPct": 0.2,
-            "qty": 8,
+            "qty": 32,
             "price": 1263.2,
             "trailStopAfter": 0.0
           },
           {
             "r": 2.0,
             "qtyPct": 0.2,
-            "qty": 8,
+            "qty": 32,
             "price": 1266.34,
             "trailStopAfter": 0.5
           }
         ],
-        "runnerQty": 15,
+        "runnerQty": 63,
         "runnerFrac": 0.4,
         "trailRatchet": {
           "0.5": 0.0,
@@ -223,7 +223,8 @@
           "nse_hybrid_trail",
           "no_stop_loosen",
           "book_pnl_authoritative"
-        ]
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
       },
       "riskModelValid": true,
       "stopRepaired": false,
@@ -236,7 +237,73 @@
       "lockObservedPrice": 1253.8,
       "triggered": true,
       "executionStatus": "TRIGGERED",
-      "triggeredAt": "2026-08-17T04:48:31.878165+00:00"
+      "triggeredAt": "2026-08-17T04:48:31.878165+00:00",
+      "realizedPnl": 2344.16,
+      "unrealizedPnl": 0.0,
+      "totalPnl": 2344.16,
+      "pnl": 2344.16,
+      "remainingQty": 0,
+      "effectiveStop": 1276.68,
+      "mfeR": 4.673,
+      "rMultiple": 2.351,
+      "economicR": 2.351,
+      "pathR": 3.649,
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +2.35 \u00b7 trail SL 1276.68 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 1276.68,
+        "pctChange": 1.82,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "pnlPct": -2.72,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 32,
+            "price": 1260.07,
+            "pnl": 200.64
+          },
+          {
+            "r": 1.5,
+            "qty": 32,
+            "price": 1263.2,
+            "pnl": 300.8
+          },
+          {
+            "r": 2.0,
+            "qty": 32,
+            "price": 1266.34,
+            "pnl": 401.28
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 63,
+            "price": 1276.68,
+            "pnl": 1441.44
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1276.68,
+        "realizedPnl": 2344.16,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 2344.16,
+        "rMultiple": 2.351,
+        "economicR": 2.351,
+        "pathR": 3.649,
+        "mfeR": 4.673,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1247.53,
+        "totalQty": 159,
+        "riskPerShare": 6.27,
+        "policyVersion": "0p5r_max_0p5pct"
+      }
     },
     {
       "rank": 5,
@@ -349,14 +416,14 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 118.37,
+      "ltp": 116.12,
       "scanLtp": 118.37,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 0.81,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 118.37,
-      "stopLoss": 117.78,
+      "stopLoss": 118.37,
       "target1": 119.26,
       "target2": 120.14,
       "riskPerShare": 0.59,
@@ -376,26 +443,26 @@
           {
             "r": 1.0,
             "qtyPct": 0.2,
-            "qty": 85,
+            "qty": 338,
             "price": 118.96,
             "trailStopAfter": 0.0
           },
           {
             "r": 1.5,
             "qtyPct": 0.2,
-            "qty": 84,
+            "qty": 338,
             "price": 119.26,
             "trailStopAfter": 0.0
           },
           {
             "r": 2.0,
             "qtyPct": 0.2,
-            "qty": 84,
+            "qty": 338,
             "price": 119.55,
             "trailStopAfter": 0.5
           }
         ],
-        "runnerQty": 169,
+        "runnerQty": 675,
         "runnerFrac": 0.4,
         "trailRatchet": {
           "0.5": 0.0,
@@ -419,7 +486,8 @@
           "nse_hybrid_trail",
           "no_stop_loosen",
           "book_pnl_authoritative"
-        ]
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
       },
       "riskModelValid": true,
       "stopRepaired": false,
@@ -432,7 +500,812 @@
       "lockObservedPrice": 118.37,
       "triggered": true,
       "executionStatus": "TRIGGERED",
-      "triggeredAt": "2026-08-17T04:48:31.878165+00:00"
+      "triggeredAt": "2026-08-17T04:48:31.878165+00:00",
+      "realizedPnl": 0.0,
+      "unrealizedPnl": 0.0,
+      "totalPnl": 0.0,
+      "pnl": 0.0,
+      "remainingQty": 0,
+      "effectiveStop": 118.37,
+      "mfeR": 0.898,
+      "rMultiple": 0.0,
+      "economicR": 0.0,
+      "pathR": 0.0,
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +0.00 \u00b7 trail SL 118.37 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 118.37,
+        "pctChange": 0.0,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "pnlPct": -1.9,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 1689,
+            "price": 118.37,
+            "pnl": 0.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 118.37,
+        "realizedPnl": 0.0,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 0.0,
+        "rMultiple": 0.0,
+        "economicR": 0.0,
+        "pathR": 0.0,
+        "mfeR": 0.898,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 117.78,
+        "totalQty": 1689,
+        "riskPerShare": 0.59,
+        "policyVersion": "0p5r_max_0p5pct"
+      }
+    },
+    {
+      "rank": 1,
+      "symbol": "MAZDOCK",
+      "name": "MAZDOCK",
+      "direction": "LONG",
+      "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "score": 62.3,
+      "scorePctRank": 83.3,
+      "intradayRetPctRank": 70.4,
+      "meanrevScore": null,
+      "gapPct": 0.0,
+      "intradayRet": 0.443,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": 0.8434072345390934,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 2584.62,
+      "orbHigh": 2584.3,
+      "orbLow": 2554.0,
+      "orbPosPct": 93.72937293729346,
+      "turnoverCr": 101.54,
+      "wickNoiseRatio": 0.348,
+      "factorBreakdown": {
+        "regime": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 58.4,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 0.843,
+          "niftyChangePct": -0.4,
+          "gapPct": 0.0,
+          "intradayRet": 0.443
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 58.6,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 49.1,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 2584.62
+        },
+        "volume": {
+          "score": 34.6,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 1.73,
+          "rvolRaw": 0.46,
+          "cumVolFracHeuristic": 0.268
+        },
+        "breakout": {
+          "score": 43.1,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 2584.3,
+          "orbLow": 2554.0,
+          "orbVelocityPct": 0.14,
+          "orbPosPct": 93.7,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 93.0,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 86.7,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.491,
+      "entryFlags": [
+        "OI_MISSING"
+      ],
+      "ltp": 2577.0,
+      "scanLtp": 2582.4,
+      "ltpSource": "live",
+      "atrPct": 2.53,
+      "status": "CLOSED",
+      "closed": true,
+      "entryPrice": 2582.4,
+      "stopLoss": 2590.68,
+      "target1": 2601.77,
+      "target2": 2621.13,
+      "riskPerShare": 12.91,
+      "rewardRisk": 1.5,
+      "approxQty": 38,
+      "deployedCapital": 98131.2,
+      "maxLoss": 490.58,
+      "riskScale": 0.7,
+      "effectiveRiskFraction": 0.007,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 2582.4,
+        "riskPerShare": 12.91,
+        "initialStop": 2569.49,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 8,
+            "price": 2595.31,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 8,
+            "price": 2601.77,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 7,
+            "price": 2608.22,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 15,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 2601.77,
+        "target2": 2621.13,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "riskModelValid": true,
+      "stopRepaired": false,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "adopted": true,
+      "adoptReason": "REPLACEMENT_FREE_SLOT",
+      "source": "REPLACEMENT",
+      "replacedFrom": null,
+      "replacedAt": "2026-08-17T05:25:21.835268+00:00",
+      "oiSetup": null,
+      "oiAligned": null,
+      "currentPrice": 2582.4,
+      "plannedCapital": 98131.2,
+      "lockObservedPrice": 2582.4,
+      "triggered": true,
+      "executionStatus": "TRIGGERED",
+      "triggeredAt": "2026-08-17T05:25:21.835268+00:00",
+      "realizedPnl": 440.4,
+      "unrealizedPnl": 0.0,
+      "totalPnl": 440.4,
+      "pnl": 440.4,
+      "remainingQty": 0,
+      "effectiveStop": 2590.68,
+      "mfeR": 1.65,
+      "rMultiple": 0.898,
+      "economicR": 0.898,
+      "pathR": 0.641,
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +0.90 \u00b7 trail SL 2590.68 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 2590.68,
+        "pctChange": 0.32,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "pnlPct": -0.21,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 8,
+            "price": 2595.31,
+            "pnl": 103.28
+          },
+          {
+            "r": 1.5,
+            "qty": 8,
+            "price": 2601.77,
+            "pnl": 154.96
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 22,
+            "price": 2590.68,
+            "pnl": 182.16
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 2590.68,
+        "realizedPnl": 440.4,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 440.4,
+        "rMultiple": 0.898,
+        "economicR": 0.898,
+        "pathR": 0.641,
+        "mfeR": 1.65,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 2569.49,
+        "totalQty": 38,
+        "riskPerShare": 12.91,
+        "policyVersion": "0p5r_max_0p5pct"
+      }
+    },
+    {
+      "rank": 1,
+      "symbol": "HDFCBANK",
+      "name": "HDFCBANK",
+      "direction": "LONG",
+      "sector": "BANKING",
+      "sleeve": "MOMENTUM",
+      "score": 59.3,
+      "scorePctRank": 71.9,
+      "intradayRetPctRank": 67.5,
+      "meanrevScore": null,
+      "gapPct": 0.0,
+      "intradayRet": 0.372,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": 0.7724137931034546,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 726.96,
+      "orbHigh": 727.0,
+      "orbLow": 723.5,
+      "orbPosPct": 100.0,
+      "turnoverCr": 1057.7,
+      "wickNoiseRatio": 0.541,
+      "factorBreakdown": {
+        "regime": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 57.7,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 0.772,
+          "niftyChangePct": -0.4,
+          "gapPct": 0.0,
+          "intradayRet": 0.372
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 46.3,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 51.0,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 726.96
+        },
+        "volume": {
+          "score": 35.5,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 1.776,
+          "rvolRaw": 0.63,
+          "cumVolFracHeuristic": 0.268
+        },
+        "breakout": {
+          "score": 51.7,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 727.0,
+          "orbLow": 723.5,
+          "orbVelocityPct": 0.1,
+          "orbPosPct": 100.0,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 73.8,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 49.9,
+          "weight": 5.0,
+          "rated": true,
+          "index": "NIFTY BANK",
+          "sectorChangePct": -0.39,
+          "stockVsSectorPct": 0.762,
+          "leader": true,
+          "stale": false,
+          "updatedAt": "2026-08-17T04:47:55.097806+00:00"
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.499,
+      "entryFlags": [
+        "OI_MISSING"
+      ],
+      "ltp": 725.0,
+      "scanLtp": 727.7,
+      "ltpSource": "live",
+      "atrPct": 1.25,
+      "status": "CLOSED",
+      "closed": true,
+      "entryPrice": 727.7,
+      "stopLoss": 727.7,
+      "target1": 733.16,
+      "target2": 738.62,
+      "riskPerShare": 3.64,
+      "rewardRisk": 1.5,
+      "approxQty": 137,
+      "deployedCapital": 99694.9,
+      "maxLoss": 498.68,
+      "riskScale": 0.7,
+      "effectiveRiskFraction": 0.007,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 727.7,
+        "riskPerShare": 3.64,
+        "initialStop": 724.06,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 28,
+            "price": 731.34,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 27,
+            "price": 733.16,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 27,
+            "price": 734.98,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 55,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 733.16,
+        "target2": 738.62,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "riskModelValid": true,
+      "stopRepaired": false,
+      "open": 725.0,
+      "close": 725.0,
+      "ltpRaw": 727.0,
+      "oi": 0.0,
+      "prev_oi": 0.0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "adopted": true,
+      "adoptReason": "REPLACEMENT_FREE_SLOT",
+      "source": "REPLACEMENT",
+      "replacedFrom": "GODREJIND",
+      "replacedAt": "2026-08-17T05:25:52.936400+00:00",
+      "oiSetup": null,
+      "oiAligned": null,
+      "currentPrice": 727.7,
+      "plannedCapital": 99694.9,
+      "lockObservedPrice": 727.7,
+      "triggered": true,
+      "executionStatus": "TRIGGERED",
+      "triggeredAt": "2026-08-17T05:25:52.936400+00:00",
+      "realizedPnl": 0.0,
+      "unrealizedPnl": 0.0,
+      "totalPnl": 0.0,
+      "pnl": 0.0,
+      "remainingQty": 0,
+      "effectiveStop": 727.7,
+      "mfeR": 0.522,
+      "rMultiple": 0.0,
+      "economicR": 0.0,
+      "pathR": 0.0,
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +0.00 \u00b7 trail SL 727.70 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 727.7,
+        "pctChange": 0.0,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "pnlPct": -0.37,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 137,
+            "price": 727.7,
+            "pnl": 0.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 727.7,
+        "realizedPnl": 0.0,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 0.0,
+        "rMultiple": 0.0,
+        "economicR": 0.0,
+        "pathR": 0.0,
+        "mfeR": 0.522,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 724.06,
+        "totalQty": 137,
+        "riskPerShare": 3.64,
+        "policyVersion": "0p5r_max_0p5pct"
+      }
+    },
+    {
+      "rank": 1,
+      "symbol": "ICICIBANK",
+      "name": "ICICIBANK",
+      "direction": "LONG",
+      "sector": "BANKING",
+      "sleeve": "MOMENTUM",
+      "score": 57.4,
+      "scorePctRank": 67.0,
+      "intradayRetPctRank": 73.9,
+      "meanrevScore": null,
+      "gapPct": -0.27,
+      "intradayRet": 0.634,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": 1.0343549536707122,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 1408.22,
+      "orbHigh": 1410.5,
+      "orbLow": 1401.0,
+      "orbPosPct": 100.0,
+      "turnoverCr": 103.92,
+      "wickNoiseRatio": 0.468,
+      "factorBreakdown": {
+        "regime": {
+          "score": 55.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 60.3,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 1.034,
+          "niftyChangePct": -0.4,
+          "gapPct": -0.27,
+          "intradayRet": 0.634
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 52.6,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 52.6,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 1408.22
+        },
+        "volume": {
+          "score": 4.6,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 0.229,
+          "rvolRaw": 0.06,
+          "cumVolFracHeuristic": 0.268
+        },
+        "breakout": {
+          "score": 49.3,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1410.5,
+          "orbLow": 1401.0,
+          "orbVelocityPct": 0.03,
+          "orbPosPct": 100.0,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 78.7,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 49.9,
+          "weight": 5.0,
+          "rated": true,
+          "index": "NIFTY BANK",
+          "sectorChangePct": -0.39,
+          "stockVsSectorPct": 0.753,
+          "leader": true,
+          "stale": false,
+          "updatedAt": "2026-08-17T04:47:55.097806+00:00"
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.548,
+      "entryFlags": [
+        "FNO_OI",
+        "OI_LONG_BUILDUP",
+        "OI_PREFERRED",
+        "OI_ALIGN_BONUS"
+      ],
+      "ltp": 1408.8,
+      "scanLtp": 1411.9,
+      "ltpSource": "live",
+      "atrPct": 1.58,
+      "status": "CLOSED",
+      "closed": true,
+      "entryPrice": 1411.9,
+      "stopLoss": 1412.9,
+      "target1": 1422.49,
+      "target2": 1433.08,
+      "riskPerShare": 7.06,
+      "rewardRisk": 1.5,
+      "approxQty": 141,
+      "deployedCapital": 199077.9,
+      "maxLoss": 995.46,
+      "riskScale": 0.7,
+      "effectiveRiskFraction": 0.007,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 1411.9,
+        "riskPerShare": 7.06,
+        "initialStop": 1404.84,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 28,
+            "price": 1418.96,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 28,
+            "price": 1422.49,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 28,
+            "price": 1426.02,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 57,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 1422.49,
+        "target2": 1433.08,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "riskModelValid": true,
+      "stopRepaired": false,
+      "open": 1403.0,
+      "close": 1406.8,
+      "ltpRaw": 1411.9,
+      "oi": 162339800.0,
+      "prev_oi": 0.0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "adopted": true,
+      "adoptReason": "REPLACEMENT_FREE_SLOT",
+      "source": "REPLACEMENT",
+      "replacedFrom": "GODREJIND",
+      "replacedAt": "2026-08-17T05:26:23.546509+00:00",
+      "oiSetup": "LONG_BUILDUP",
+      "oiAligned": true,
+      "currentPrice": 1411.9,
+      "plannedCapital": 199077.9,
+      "lockObservedPrice": 1411.9,
+      "triggered": true,
+      "executionStatus": "TRIGGERED",
+      "triggeredAt": "2026-08-17T05:26:23.546509+00:00",
+      "realizedPnl": 310.68,
+      "unrealizedPnl": 0.0,
+      "totalPnl": 310.68,
+      "pnl": 310.68,
+      "remainingQty": 0,
+      "effectiveStop": 1412.9,
+      "mfeR": 1.147,
+      "rMultiple": 0.312,
+      "economicR": 0.312,
+      "pathR": 0.142,
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +0.31 \u00b7 trail SL 1412.90 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 1412.9,
+        "pctChange": 0.07,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "pnlPct": -0.22,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 28,
+            "price": 1418.96,
+            "pnl": 197.68
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 113,
+            "price": 1412.9,
+            "pnl": 113.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1412.9,
+        "realizedPnl": 310.68,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 310.68,
+        "rMultiple": 0.312,
+        "economicR": 0.312,
+        "pathR": 0.142,
+        "mfeR": 1.147,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1404.84,
+        "totalQty": 141,
+        "riskPerShare": 7.06,
+        "policyVersion": "0p5r_max_0p5pct"
+      }
     }
   ],
   "short": [
@@ -541,14 +1414,14 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 333.45,
+      "ltp": 330.15,
       "scanLtp": 333.45,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 2.55,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 333.45,
-      "stopLoss": 335.12,
+      "stopLoss": 330.69,
       "target1": 330.94,
       "target2": 328.44,
       "riskPerShare": 1.67,
@@ -562,32 +1435,32 @@
         "mode": "SCALE_TRAIL",
         "direction": "SHORT",
         "entry": 333.45,
-        "riskPerShare": 1.67,
+        "riskPerShare": 1.6672,
         "initialStop": 335.12,
         "legs": [
           {
             "r": 1.0,
             "qtyPct": 0.2,
-            "qty": 30,
+            "qty": 120,
             "price": 331.78,
             "trailStopAfter": 0.0
           },
           {
             "r": 1.5,
             "qtyPct": 0.2,
-            "qty": 30,
-            "price": 330.94,
+            "qty": 120,
+            "price": 330.95,
             "trailStopAfter": 0.0
           },
           {
             "r": 2.0,
             "qtyPct": 0.2,
-            "qty": 30,
-            "price": 330.11,
+            "qty": 120,
+            "price": 330.12,
             "trailStopAfter": 0.5
           }
         ],
-        "runnerQty": 59,
+        "runnerQty": 239,
         "runnerFrac": 0.4,
         "trailRatchet": {
           "0.5": 0.0,
@@ -598,11 +1471,11 @@
           "4.0": 2.5,
           "5.0": 3.5
         },
-        "target1": 330.94,
-        "target2": 328.44,
+        "target1": 330.95,
+        "target2": 328.45,
         "validRiskModel": true,
-        "stopRepaired": false,
-        "stopCapped": false,
+        "stopRepaired": true,
+        "stopCapped": true,
         "notes": [
           "40pct_runner",
           "monotonic_r_ratchet",
@@ -611,7 +1484,8 @@
           "nse_hybrid_trail",
           "no_stop_loosen",
           "book_pnl_authoritative"
-        ]
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
       },
       "riskModelValid": true,
       "stopRepaired": false,
@@ -624,7 +1498,72 @@
       "lockObservedPrice": 333.45,
       "triggered": true,
       "executionStatus": "TRIGGERED",
-      "triggeredAt": "2026-08-17T04:48:31.878165+00:00"
+      "triggeredAt": "2026-08-17T04:48:31.878165+00:00",
+      "realizedPnl": 1562.04,
+      "unrealizedPnl": 0.0,
+      "totalPnl": 1562.04,
+      "pnl": 1667.2,
+      "remainingQty": 0,
+      "effectiveStop": 330.69,
+      "mfeR": 2.635,
+      "rMultiple": 1.667,
+      "economicR": 1.667,
+      "pathR": 1.916,
+      "outcome": {
+        "label": "PARTIAL 2R",
+        "detail": "R +1.67 \u00b7 trail SL 330.69 \u00b7 rem 239",
+        "hitLevel": "partial",
+        "ltp": 330.25,
+        "pctChange": 0.96,
+        "scaleTrail": true,
+        "closed": false
+      },
+      "pnlPct": 0.99,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 120,
+            "price": 331.78,
+            "pnl": 200.4
+          },
+          {
+            "r": 1.5,
+            "qty": 120,
+            "price": 330.94,
+            "pnl": 301.2
+          },
+          {
+            "r": 2.0,
+            "qty": 120,
+            "price": 330.11,
+            "pnl": 400.8
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 239,
+            "price": 330.69,
+            "pnl": 659.64
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 330.69,
+        "realizedPnl": 1562.04,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 1562.04,
+        "rMultiple": 1.562,
+        "economicR": 1.562,
+        "pathR": 1.653,
+        "mfeR": 2.635,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 335.12,
+        "totalQty": 599,
+        "riskPerShare": 1.67
+      }
     },
     {
       "rank": 2,
@@ -731,14 +1670,14 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 376.75,
+      "ltp": 374.95,
       "scanLtp": 376.75,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 0.95,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 376.75,
-      "stopLoss": 378.63,
+      "stopLoss": 374.01,
       "target1": 373.93,
       "target2": 371.11,
       "riskPerShare": 1.88,
@@ -758,26 +1697,26 @@
           {
             "r": 1.0,
             "qtyPct": 0.2,
-            "qty": 27,
+            "qty": 106,
             "price": 374.87,
             "trailStopAfter": 0.0
           },
           {
             "r": 1.5,
             "qtyPct": 0.2,
-            "qty": 26,
+            "qty": 106,
             "price": 373.93,
             "trailStopAfter": 0.0
           },
           {
             "r": 2.0,
             "qtyPct": 0.2,
-            "qty": 26,
+            "qty": 106,
             "price": 372.99,
             "trailStopAfter": 0.5
           }
         ],
-        "runnerQty": 53,
+        "runnerQty": 212,
         "runnerFrac": 0.4,
         "trailRatchet": {
           "0.5": 0.0,
@@ -801,7 +1740,8 @@
           "nse_hybrid_trail",
           "no_stop_loosen",
           "book_pnl_authoritative"
-        ]
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
       },
       "riskModelValid": true,
       "stopRepaired": false,
@@ -814,7 +1754,73 @@
       "lockObservedPrice": 376.75,
       "triggered": true,
       "executionStatus": "TRIGGERED",
-      "triggeredAt": "2026-08-17T04:48:31.878165+00:00"
+      "triggeredAt": "2026-08-17T04:48:31.878165+00:00",
+      "realizedPnl": 1477.64,
+      "unrealizedPnl": 0.0,
+      "totalPnl": 1477.64,
+      "pnl": 1477.64,
+      "remainingQty": 0,
+      "effectiveStop": 374.01,
+      "mfeR": 2.447,
+      "rMultiple": 1.483,
+      "economicR": 1.483,
+      "pathR": 1.457,
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +1.48 \u00b7 trail SL 374.01 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 374.01,
+        "pctChange": 0.73,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "pnlPct": 0.48,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 106,
+            "price": 374.87,
+            "pnl": 199.28
+          },
+          {
+            "r": 1.5,
+            "qty": 106,
+            "price": 373.93,
+            "pnl": 298.92
+          },
+          {
+            "r": 2.0,
+            "qty": 106,
+            "price": 372.99,
+            "pnl": 398.56
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 212,
+            "price": 374.01,
+            "pnl": 580.88
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 374.01,
+        "realizedPnl": 1477.64,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 1477.64,
+        "rMultiple": 1.483,
+        "economicR": 1.483,
+        "pathR": 1.457,
+        "mfeR": 2.447,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 378.63,
+        "totalQty": 530,
+        "riskPerShare": 1.88,
+        "policyVersion": "0p5r_max_0p5pct"
+      }
     },
     {
       "rank": 3,
@@ -921,14 +1927,14 @@
         "OI_ALIGN_BONUS",
         "IN_PLAY"
       ],
-      "ltp": 139.34,
+      "ltp": 138.53,
       "scanLtp": 139.34,
-      "ltpSource": null,
+      "ltpSource": "live",
       "atrPct": 1.43,
-      "status": "RUNNING",
-      "closed": false,
+      "status": "CLOSED",
+      "closed": true,
       "entryPrice": 139.34,
-      "stopLoss": 140.04,
+      "stopLoss": 138.81,
       "target1": 138.29,
       "target2": 137.24,
       "riskPerShare": 0.7,
@@ -942,32 +1948,32 @@
         "mode": "SCALE_TRAIL",
         "direction": "SHORT",
         "entry": 139.34,
-        "riskPerShare": 0.7,
+        "riskPerShare": 0.6967,
         "initialStop": 140.04,
         "legs": [
           {
             "r": 1.0,
             "qtyPct": 0.2,
-            "qty": 72,
+            "qty": 287,
             "price": 138.64,
             "trailStopAfter": 0.0
           },
           {
             "r": 1.5,
             "qtyPct": 0.2,
-            "qty": 72,
+            "qty": 287,
             "price": 138.29,
             "trailStopAfter": 0.0
           },
           {
             "r": 2.0,
             "qtyPct": 0.2,
-            "qty": 71,
-            "price": 137.94,
+            "qty": 287,
+            "price": 137.95,
             "trailStopAfter": 0.5
           }
         ],
-        "runnerQty": 143,
+        "runnerQty": 574,
         "runnerFrac": 0.4,
         "trailRatchet": {
           "0.5": 0.0,
@@ -979,10 +1985,10 @@
           "5.0": 3.5
         },
         "target1": 138.29,
-        "target2": 137.24,
+        "target2": 137.25,
         "validRiskModel": true,
-        "stopRepaired": false,
-        "stopCapped": false,
+        "stopRepaired": true,
+        "stopCapped": true,
         "notes": [
           "40pct_runner",
           "monotonic_r_ratchet",
@@ -991,7 +1997,8 @@
           "nse_hybrid_trail",
           "no_stop_loosen",
           "book_pnl_authoritative"
-        ]
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
       },
       "riskModelValid": true,
       "stopRepaired": false,
@@ -1004,7 +2011,1089 @@
       "lockObservedPrice": 139.34,
       "triggered": true,
       "executionStatus": "TRIGGERED",
-      "triggeredAt": "2026-08-17T04:48:31.878165+00:00"
+      "triggeredAt": "2026-08-17T04:48:31.878165+00:00",
+      "realizedPnl": 958.58,
+      "unrealizedPnl": 0.0,
+      "totalPnl": 958.58,
+      "pnl": 1234.1,
+      "remainingQty": 0,
+      "effectiveStop": 138.81,
+      "mfeR": 1.743,
+      "rMultiple": 1.229,
+      "economicR": 1.229,
+      "pathR": 1.214,
+      "outcome": {
+        "label": "PARTIAL 1.5R",
+        "detail": "R +1.23 \u00b7 trail SL 138.81 \u00b7 rem 861",
+        "hitLevel": "partial",
+        "ltp": 138.49,
+        "pctChange": 0.61,
+        "scaleTrail": true,
+        "closed": false
+      },
+      "pnlPct": 0.58,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 287,
+            "price": 138.64,
+            "pnl": 200.9
+          },
+          {
+            "r": 1.5,
+            "qty": 287,
+            "price": 138.29,
+            "pnl": 301.35
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 861,
+            "price": 138.81,
+            "pnl": 456.33
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 138.81,
+        "realizedPnl": 958.58,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 958.58,
+        "rMultiple": 0.954,
+        "economicR": 0.954,
+        "pathR": 0.757,
+        "mfeR": 1.743,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 140.04,
+        "totalQty": 1435,
+        "riskPerShare": 0.7
+      }
+    },
+    {
+      "rank": 2,
+      "symbol": "VEDL",
+      "name": "VEDL",
+      "direction": "SHORT",
+      "sector": "METALS",
+      "sleeve": "MOMENTUM",
+      "score": 55.6,
+      "scorePctRank": 23.2,
+      "intradayRetPctRank": 31.0,
+      "meanrevScore": null,
+      "gapPct": -0.406,
+      "intradayRet": -0.685,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": -0.28518518518519365,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 268.37,
+      "orbHigh": 270.0,
+      "orbLow": 266.65,
+      "orbPosPct": 44.77611940298477,
+      "turnoverCr": 58.86,
+      "wickNoiseRatio": 0.611,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 52.9,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": -0.285,
+          "niftyChangePct": -0.4,
+          "gapPct": -0.406,
+          "intradayRet": -0.685
+        },
+        "trend": {
+          "score": 15.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 55.3,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 50.8,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 268.37
+        },
+        "volume": {
+          "score": 14.9,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 0.744,
+          "rvolRaw": 0.2,
+          "cumVolFracHeuristic": 0.268
+        },
+        "breakout": {
+          "score": 57.9,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 270.0,
+          "orbLow": 266.65,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 44.8,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 95.5,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 54.6,
+          "weight": 5.0,
+          "rated": true,
+          "index": "NIFTY METAL",
+          "sectorChangePct": 0.16,
+          "stockVsSectorPct": -1.248,
+          "leader": true,
+          "stale": false,
+          "updatedAt": "2026-08-17T04:47:55.097806+00:00"
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.492,
+      "entryFlags": [
+        "OI_MISSING"
+      ],
+      "ltp": 269.0,
+      "scanLtp": 268.15,
+      "ltpSource": "live",
+      "atrPct": 2.7,
+      "status": "CLOSED",
+      "closed": true,
+      "entryPrice": 268.15,
+      "stopLoss": 267.88,
+      "target1": 266.14,
+      "target2": 264.13,
+      "riskPerShare": 1.34,
+      "rewardRisk": 1.5,
+      "approxQty": 372,
+      "deployedCapital": 99751.8,
+      "maxLoss": 498.48,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 268.15,
+        "riskPerShare": 1.34,
+        "initialStop": 269.49,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 75,
+            "price": 266.81,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 74,
+            "price": 266.14,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 74,
+            "price": 265.47,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 149,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 266.14,
+        "target2": 264.13,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "riskModelValid": true,
+      "stopRepaired": false,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "adopted": true,
+      "adoptReason": "REPLACEMENT_FREE_SLOT",
+      "source": "REPLACEMENT",
+      "replacedFrom": "TMPV",
+      "replacedAt": "2026-08-17T05:25:21.835533+00:00",
+      "oiSetup": null,
+      "oiAligned": null,
+      "currentPrice": 268.15,
+      "plannedCapital": 99751.8,
+      "lockObservedPrice": 268.15,
+      "triggered": true,
+      "executionStatus": "TRIGGERED",
+      "triggeredAt": "2026-08-17T05:25:21.835533+00:00",
+      "realizedPnl": 180.69,
+      "unrealizedPnl": 0.0,
+      "totalPnl": 180.69,
+      "pnl": 180.69,
+      "remainingQty": 0,
+      "effectiveStop": 267.88,
+      "mfeR": 1.194,
+      "rMultiple": 0.362,
+      "economicR": 0.362,
+      "pathR": 0.201,
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +0.36 \u00b7 trail SL 267.88 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 267.88,
+        "pctChange": 0.1,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "pnlPct": -0.32,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 75,
+            "price": 266.81,
+            "pnl": 100.5
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 297,
+            "price": 267.88,
+            "pnl": 80.19
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 267.88,
+        "realizedPnl": 180.69,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 180.69,
+        "rMultiple": 0.362,
+        "economicR": 0.362,
+        "pathR": 0.201,
+        "mfeR": 1.194,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 269.49,
+        "totalQty": 372,
+        "riskPerShare": 1.34,
+        "policyVersion": "0p5r_max_0p5pct"
+      }
+    },
+    {
+      "rank": 3,
+      "symbol": "TECHM",
+      "name": "TECHM",
+      "direction": "SHORT",
+      "sector": "IT",
+      "sleeve": "MOMENTUM",
+      "score": 64.8,
+      "scorePctRank": 54.2,
+      "intradayRetPctRank": 45.8,
+      "meanrevScore": null,
+      "gapPct": -0.244,
+      "intradayRet": -0.3,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": 0.10030581039754799,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 1632.53,
+      "orbHigh": 1652.0,
+      "orbLow": 1628.2,
+      "orbPosPct": 7.983193277310366,
+      "turnoverCr": 54.98,
+      "wickNoiseRatio": 0.486,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 49.0,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 0.1,
+          "niftyChangePct": -0.4,
+          "gapPct": -0.244,
+          "intradayRet": -0.3
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 44.8,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 51.5,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 1632.53
+        },
+        "volume": {
+          "score": 9.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 0.449,
+          "rvolRaw": 0.12,
+          "cumVolFracHeuristic": 0.268
+        },
+        "breakout": {
+          "score": 67.1,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1652.0,
+          "orbLow": 1628.2,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 8.0,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 89.5,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 59.0,
+          "weight": 5.0,
+          "rated": true,
+          "index": "NIFTY IT",
+          "sectorChangePct": -1.25,
+          "stockVsSectorPct": 0.707,
+          "leader": false,
+          "stale": false,
+          "updatedAt": "2026-08-17T04:47:55.097806+00:00"
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.485,
+      "entryFlags": [
+        "OI_MISSING"
+      ],
+      "ltp": 1610.7,
+      "scanLtp": 1630.1,
+      "ltpSource": "live",
+      "atrPct": 2.3,
+      "status": "CLOSED",
+      "closed": true,
+      "entryPrice": 1630.1,
+      "stopLoss": 1615.84,
+      "target1": 1617.87,
+      "target2": 1605.65,
+      "riskPerShare": 8.15,
+      "rewardRisk": 1.5,
+      "approxQty": 61,
+      "deployedCapital": 99436.1,
+      "maxLoss": 497.15,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 1630.1,
+        "riskPerShare": 8.15,
+        "initialStop": 1638.25,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 12,
+            "price": 1621.95,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 12,
+            "price": 1617.88,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 12,
+            "price": 1613.8,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 25,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 1617.88,
+        "target2": 1605.65,
+        "validRiskModel": true,
+        "stopRepaired": true,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "riskModelValid": true,
+      "stopRepaired": false,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "adopted": true,
+      "adoptReason": "REPLACEMENT_FREE_SLOT",
+      "source": "REPLACEMENT",
+      "replacedFrom": "PFC",
+      "replacedAt": "2026-08-17T05:25:21.835720+00:00",
+      "oiSetup": null,
+      "oiAligned": null,
+      "currentPrice": 1630.1,
+      "plannedCapital": 99436.1,
+      "lockObservedPrice": 1630.1,
+      "triggered": true,
+      "executionStatus": "TRIGGERED",
+      "triggeredAt": "2026-08-17T05:25:21.835720+00:00",
+      "realizedPnl": 796.66,
+      "unrealizedPnl": 0.0,
+      "totalPnl": 796.66,
+      "pnl": 935.16,
+      "remainingQty": 0,
+      "effectiveStop": 1615.84,
+      "mfeR": 2.736,
+      "rMultiple": 1.881,
+      "economicR": 1.881,
+      "pathR": 2.429,
+      "outcome": {
+        "label": "PARTIAL 2R",
+        "detail": "R +1.88 \u00b7 trail SL 1615.84 \u00b7 rem 25",
+        "hitLevel": "partial",
+        "ltp": 1610.3,
+        "pctChange": 1.21,
+        "scaleTrail": true,
+        "closed": false
+      },
+      "pnlPct": 1.19,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 12,
+            "price": 1621.95,
+            "pnl": 97.8
+          },
+          {
+            "r": 1.5,
+            "qty": 12,
+            "price": 1617.87,
+            "pnl": 146.76
+          },
+          {
+            "r": 2.0,
+            "qty": 12,
+            "price": 1613.8,
+            "pnl": 195.6
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 25,
+            "price": 1615.84,
+            "pnl": 356.5
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1615.84,
+        "realizedPnl": 796.66,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 796.66,
+        "rMultiple": 1.602,
+        "economicR": 1.602,
+        "pathR": 1.75,
+        "mfeR": 2.736,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1638.25,
+        "totalQty": 61,
+        "riskPerShare": 8.15
+      }
+    },
+    {
+      "rank": 2,
+      "symbol": "LT",
+      "name": "LT",
+      "direction": "SHORT",
+      "sector": "INFRA",
+      "sleeve": "MOMENTUM",
+      "score": 62.5,
+      "scorePctRank": 45.8,
+      "intradayRetPctRank": 53.7,
+      "meanrevScore": null,
+      "gapPct": -0.049,
+      "intradayRet": -0.116,
+      "inPlay": false,
+      "inPlayReason": "not in play",
+      "rsVsIndexPct": 0.284483987514444,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 4052.93,
+      "orbHigh": 4072.5,
+      "orbLow": 4041.8,
+      "orbPosPct": 72.31270358306172,
+      "turnoverCr": 58.84,
+      "wickNoiseRatio": 0.517,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 47.2,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 0.284,
+          "niftyChangePct": -0.4,
+          "gapPct": -0.049,
+          "intradayRet": -0.116
+        },
+        "trend": {
+          "score": 85.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 49.2,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 47.3,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 4052.93
+        },
+        "volume": {
+          "score": 6.7,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 0.334,
+          "rvolRaw": 0.09,
+          "cumVolFracHeuristic": 0.268
+        },
+        "breakout": {
+          "score": 62.1,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 4072.5,
+          "orbLow": 4041.8,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 72.3,
+          "inPlay": false,
+          "inPlayReason": "not in play",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 78.0,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 45.8,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.546,
+      "entryFlags": [
+        "FNO_OI",
+        "OI_SHORT_BUILDUP",
+        "OI_PREFERRED",
+        "OI_ALIGN_BONUS"
+      ],
+      "ltp": 4030.5,
+      "scanLtp": 4064.0,
+      "ltpSource": "live",
+      "atrPct": 1.53,
+      "status": "CLOSED",
+      "closed": true,
+      "entryPrice": 4064.0,
+      "stopLoss": 4046.13,
+      "target1": 4033.52,
+      "target2": 4003.04,
+      "riskPerShare": 20.32,
+      "rewardRisk": 1.5,
+      "approxQty": 49,
+      "deployedCapital": 199136.0,
+      "maxLoss": 995.68,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 4064.0,
+        "riskPerShare": 20.32,
+        "initialStop": 4084.32,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 10,
+            "price": 4043.68,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 10,
+            "price": 4033.52,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 10,
+            "price": 4023.36,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 19,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 4033.52,
+        "target2": 4003.04,
+        "validRiskModel": true,
+        "stopRepaired": true,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "riskModelValid": true,
+      "stopRepaired": false,
+      "open": 4068.7,
+      "close": 4070.7,
+      "ltpRaw": 4064.0,
+      "oi": 23238600.0,
+      "prev_oi": 0.0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "adopted": true,
+      "adoptReason": "REPLACEMENT_FREE_SLOT",
+      "source": "REPLACEMENT",
+      "replacedFrom": "PFC",
+      "replacedAt": "2026-08-17T05:25:52.936560+00:00",
+      "oiSetup": "SHORT_BUILDUP",
+      "oiAligned": true,
+      "currentPrice": 4064.0,
+      "plannedCapital": 199136.0,
+      "lockObservedPrice": 4064.0,
+      "triggered": true,
+      "executionStatus": "TRIGGERED",
+      "triggeredAt": "2026-08-17T05:25:52.936560+00:00",
+      "realizedPnl": 1026.23,
+      "unrealizedPnl": 0.0,
+      "totalPnl": 1026.23,
+      "pnl": 1479.5,
+      "remainingQty": 0,
+      "effectiveStop": 4046.13,
+      "mfeR": 1.87,
+      "rMultiple": 1.486,
+      "economicR": 1.486,
+      "pathR": 1.649,
+      "outcome": {
+        "label": "PARTIAL 1.5R",
+        "detail": "R +1.49 \u00b7 trail SL 4046.13 \u00b7 rem 29",
+        "hitLevel": "partial",
+        "ltp": 4030.5,
+        "pctChange": 0.82,
+        "scaleTrail": true,
+        "closed": false
+      },
+      "pnlPct": 0.82,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 10,
+            "price": 4043.68,
+            "pnl": 203.2
+          },
+          {
+            "r": 1.5,
+            "qty": 10,
+            "price": 4033.52,
+            "pnl": 304.8
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 29,
+            "price": 4046.13,
+            "pnl": 518.23
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 4046.13,
+        "realizedPnl": 1026.23,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 1026.23,
+        "rMultiple": 1.031,
+        "economicR": 1.031,
+        "pathR": 0.879,
+        "mfeR": 1.87,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 4084.32,
+        "totalQty": 49,
+        "riskPerShare": 20.32
+      }
+    },
+    {
+      "rank": 3,
+      "symbol": "RELIANCE",
+      "name": "RELIANCE",
+      "direction": "SHORT",
+      "sector": "ENERGY",
+      "sleeve": "MOMENTUM",
+      "score": 58.2,
+      "scorePctRank": 32.5,
+      "intradayRetPctRank": 41.9,
+      "meanrevScore": null,
+      "gapPct": 0.0,
+      "intradayRet": -0.395,
+      "inPlay": true,
+      "inPlayReason": "rvolTime 2.30\u00d7 \u2265 2.0",
+      "rsVsIndexPct": 0.005163249810171244,
+      "overextended": false,
+      "vwapMode": "TREND",
+      "vwap": 1307.58,
+      "orbHigh": 1317.5,
+      "orbLow": 1307.2,
+      "orbPosPct": 44.6601941747566,
+      "turnoverCr": 900.62,
+      "wickNoiseRatio": 0.574,
+      "factorBreakdown": {
+        "regime": {
+          "score": 100.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "relativeStrength": {
+          "score": 49.9,
+          "weight": 15.0,
+          "rated": true,
+          "rsVsIndexPct": 0.005,
+          "niftyChangePct": -0.4,
+          "gapPct": 0.0,
+          "intradayRet": -0.395
+        },
+        "trend": {
+          "score": 15.0,
+          "weight": 15.0,
+          "rated": true
+        },
+        "momentum": {
+          "score": 51.8,
+          "weight": 10.0,
+          "rated": true,
+          "overextended": false
+        },
+        "vwap": {
+          "score": 46.8,
+          "weight": 10.0,
+          "rated": true,
+          "vwapMode": "TREND",
+          "vwapZ": null,
+          "vwapSource": "snapshot",
+          "vwap": 1307.58
+        },
+        "volume": {
+          "score": 46.0,
+          "weight": 10.0,
+          "rated": true,
+          "rvolTime": 2.3,
+          "rvolRaw": 0.81,
+          "cumVolFracHeuristic": 0.268
+        },
+        "breakout": {
+          "score": 66.6,
+          "weight": 10.0,
+          "rated": true,
+          "orbHigh": 1317.5,
+          "orbLow": 1307.2,
+          "orbVelocityPct": 0.0,
+          "orbPosPct": 44.7,
+          "inPlay": true,
+          "inPlayReason": "rvolTime 2.30\u00d7 \u2265 2.0",
+          "orbDecay": 1.0
+        },
+        "volatility": {
+          "score": 79.0,
+          "weight": 5.0,
+          "rated": true
+        },
+        "sector": {
+          "score": 67.2,
+          "weight": 5.0,
+          "rated": true
+        },
+        "liquidity": {
+          "score": 100.0,
+          "weight": 5.0,
+          "rated": true
+        }
+      },
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "qualityAdjustedExpectedR": 1.481,
+      "entryFlags": [
+        "OI_MISSING",
+        "IN_PLAY"
+      ],
+      "ltp": 1300.1,
+      "scanLtp": 1311.8,
+      "ltpSource": "live",
+      "atrPct": 1.6,
+      "status": "CLOSED",
+      "closed": true,
+      "entryPrice": 1311.8,
+      "stopLoss": 1305.6,
+      "target1": 1301.96,
+      "target2": 1292.12,
+      "riskPerShare": 6.56,
+      "rewardRisk": 1.5,
+      "approxQty": 76,
+      "deployedCapital": 99696.8,
+      "maxLoss": 498.56,
+      "riskScale": 1.0,
+      "effectiveRiskFraction": 0.01,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 1311.8,
+        "riskPerShare": 6.559,
+        "initialStop": 1318.36,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 15,
+            "price": 1305.24,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 15,
+            "price": 1301.96,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 15,
+            "price": 1298.68,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 31,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 1301.96,
+        "target2": 1292.12,
+        "validRiskModel": true,
+        "stopRepaired": true,
+        "stopCapped": true,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "riskModelValid": true,
+      "stopRepaired": false,
+      "open": 1317.0,
+      "close": 1317.0,
+      "ltpRaw": 1310.0,
+      "oi": 0.0,
+      "prev_oi": 0.0,
+      "slotFreed": true,
+      "slotStatus": "REPLACEABLE",
+      "adopted": true,
+      "adoptReason": "REPLACEMENT_FREE_SLOT",
+      "source": "REPLACEMENT",
+      "replacedFrom": "IOC",
+      "replacedAt": "2026-08-17T05:25:52.936675+00:00",
+      "oiSetup": null,
+      "oiAligned": null,
+      "currentPrice": 1311.8,
+      "plannedCapital": 99696.8,
+      "lockObservedPrice": 1311.8,
+      "triggered": true,
+      "executionStatus": "TRIGGERED",
+      "triggeredAt": "2026-08-17T05:25:52.936675+00:00",
+      "realizedPnl": 531.2,
+      "unrealizedPnl": 0.0,
+      "totalPnl": 531.2,
+      "pnl": 788.8,
+      "remainingQty": 0,
+      "effectiveStop": 1305.6,
+      "mfeR": 1.936,
+      "rMultiple": 1.582,
+      "economicR": 1.582,
+      "pathR": 1.799,
+      "outcome": {
+        "label": "PARTIAL 1.5R",
+        "detail": "R +1.58 \u00b7 trail SL 1305.60 \u00b7 rem 46",
+        "hitLevel": "partial",
+        "ltp": 1300.0,
+        "pctChange": 0.9,
+        "scaleTrail": true,
+        "closed": false
+      },
+      "pnlPct": 0.89,
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 15,
+            "price": 1305.24,
+            "pnl": 98.4
+          },
+          {
+            "r": 1.5,
+            "qty": 15,
+            "price": 1301.96,
+            "pnl": 147.6
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 46,
+            "price": 1305.6,
+            "pnl": 285.2
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1305.6,
+        "realizedPnl": 531.2,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 531.2,
+        "rMultiple": 1.065,
+        "economicR": 1.065,
+        "pathR": 0.945,
+        "mfeR": 1.936,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1318.36,
+        "totalQty": 76,
+        "riskPerShare": 6.56
+      }
     }
   ],
   "candidatePoolLong": [
@@ -4690,6 +6779,739 @@
         "totalFilled": 5
       },
       "executionPolicy": "MANUAL_ONLY"
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:25:21.767782+00:00",
+      "symbol": "TMPV",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:25:21.767813+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:25:21.767835+00:00",
+      "symbol": "IOC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-17T05:25:21.767883+00:00",
+      "freeSlots": {
+        "long": 1,
+        "short": 3,
+        "total": 3,
+        "openLong": 2,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "REPLACEMENT_APPLIED",
+      "at": "2026-08-17T05:25:21.835870+00:00",
+      "freeSlotsAfter": {
+        "long": 0,
+        "short": 0,
+        "total": 0,
+        "openLong": 3,
+        "openShort": 2,
+        "lockSize": 5
+      },
+      "applied": [
+        {
+          "symbol": "MAZDOCK",
+          "direction": "LONG",
+          "replacedFrom": null,
+          "replacedAt": "2026-08-17T05:25:21.835268+00:00",
+          "entryPrice": 2582.4,
+          "approxQty": 38,
+          "score": 62.3,
+          "source": "REPLACEMENT"
+        },
+        {
+          "symbol": "VEDL",
+          "direction": "SHORT",
+          "replacedFrom": "TMPV",
+          "replacedAt": "2026-08-17T05:25:21.835533+00:00",
+          "entryPrice": 268.15,
+          "approxQty": 372,
+          "score": 55.6,
+          "source": "REPLACEMENT"
+        },
+        {
+          "symbol": "TECHM",
+          "direction": "SHORT",
+          "replacedFrom": "PFC",
+          "replacedAt": "2026-08-17T05:25:21.835720+00:00",
+          "entryPrice": 1630.1,
+          "approxQty": 61,
+          "score": 64.8,
+          "source": "REPLACEMENT"
+        }
+      ]
+    },
+    {
+      "type": "POSITION_REPLACED",
+      "at": "2026-08-17T05:25:21.835268+00:00",
+      "symbol": "MAZDOCK",
+      "direction": "LONG",
+      "replacedFrom": null
+    },
+    {
+      "type": "POSITION_REPLACED",
+      "at": "2026-08-17T05:25:21.835533+00:00",
+      "symbol": "VEDL",
+      "direction": "SHORT",
+      "replacedFrom": "TMPV"
+    },
+    {
+      "type": "POSITION_REPLACED",
+      "at": "2026-08-17T05:25:21.835720+00:00",
+      "symbol": "TECHM",
+      "direction": "SHORT",
+      "replacedFrom": "PFC"
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:25:52.886803+00:00",
+      "symbol": "GODREJIND",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:25:52.886827+00:00",
+      "symbol": "PNB",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:25:52.886841+00:00",
+      "symbol": "MAZDOCK",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:25:52.886855+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:25:52.886868+00:00",
+      "symbol": "IOC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:25:52.886879+00:00",
+      "symbol": "VEDL",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:25:52.886891+00:00",
+      "symbol": "TECHM",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-17T05:25:52.886921+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 2,
+        "total": 4,
+        "openLong": 0,
+        "openShort": 1,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "REPLACEMENT_APPLIED",
+      "at": "2026-08-17T05:25:52.936805+00:00",
+      "freeSlotsAfter": {
+        "long": 1,
+        "short": 0,
+        "total": 1,
+        "openLong": 1,
+        "openShort": 3,
+        "lockSize": 5
+      },
+      "applied": [
+        {
+          "symbol": "HDFCBANK",
+          "direction": "LONG",
+          "replacedFrom": "GODREJIND",
+          "replacedAt": "2026-08-17T05:25:52.936400+00:00",
+          "entryPrice": 727.7,
+          "approxQty": 137,
+          "score": 59.3,
+          "source": "REPLACEMENT"
+        },
+        {
+          "symbol": "LT",
+          "direction": "SHORT",
+          "replacedFrom": "PFC",
+          "replacedAt": "2026-08-17T05:25:52.936560+00:00",
+          "entryPrice": 4064.0,
+          "approxQty": 49,
+          "score": 62.5,
+          "source": "REPLACEMENT"
+        },
+        {
+          "symbol": "RELIANCE",
+          "direction": "SHORT",
+          "replacedFrom": "IOC",
+          "replacedAt": "2026-08-17T05:25:52.936675+00:00",
+          "entryPrice": 1311.8,
+          "approxQty": 76,
+          "score": 58.2,
+          "source": "REPLACEMENT"
+        }
+      ]
+    },
+    {
+      "type": "POSITION_REPLACED",
+      "at": "2026-08-17T05:25:52.936400+00:00",
+      "symbol": "HDFCBANK",
+      "direction": "LONG",
+      "replacedFrom": "GODREJIND"
+    },
+    {
+      "type": "POSITION_REPLACED",
+      "at": "2026-08-17T05:25:52.936560+00:00",
+      "symbol": "LT",
+      "direction": "SHORT",
+      "replacedFrom": "PFC"
+    },
+    {
+      "type": "POSITION_REPLACED",
+      "at": "2026-08-17T05:25:52.936675+00:00",
+      "symbol": "RELIANCE",
+      "direction": "SHORT",
+      "replacedFrom": "IOC"
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:26:23.483685+00:00",
+      "symbol": "HDFCBANK",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:26:23.483705+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:26:23.483718+00:00",
+      "symbol": "IOC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:26:23.483730+00:00",
+      "symbol": "LT",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:26:23.483740+00:00",
+      "symbol": "RELIANCE",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-17T05:26:23.483770+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 1,
+        "total": 3,
+        "openLong": 0,
+        "openShort": 2,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "REPLACEMENT_APPLIED",
+      "at": "2026-08-17T05:26:23.546582+00:00",
+      "freeSlotsAfter": {
+        "long": 2,
+        "short": 1,
+        "total": 2,
+        "openLong": 1,
+        "openShort": 2,
+        "lockSize": 5
+      },
+      "applied": [
+        {
+          "symbol": "ICICIBANK",
+          "direction": "LONG",
+          "replacedFrom": "GODREJIND",
+          "replacedAt": "2026-08-17T05:26:23.546509+00:00",
+          "entryPrice": 1411.9,
+          "approxQty": 141,
+          "score": 57.4,
+          "source": "REPLACEMENT"
+        }
+      ]
+    },
+    {
+      "type": "POSITION_REPLACED",
+      "at": "2026-08-17T05:26:23.546509+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "LONG",
+      "replacedFrom": "GODREJIND"
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:26:56.096710+00:00",
+      "symbol": "ICICIBANK",
+      "direction": "LONG",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:26:56.096727+00:00",
+      "symbol": "TMPV",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:26:56.096738+00:00",
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:26:56.096747+00:00",
+      "symbol": "IOC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:26:56.096757+00:00",
+      "symbol": "TECHM",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:26:56.096767+00:00",
+      "symbol": "LT",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:26:56.096775+00:00",
+      "symbol": "RELIANCE",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-17T05:26:56.096802+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:27:28.293951+00:00",
+      "symbol": "TMPV",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:27:28.293965+00:00",
+      "symbol": "IOC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:27:28.293975+00:00",
+      "symbol": "TECHM",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:27:28.293983+00:00",
+      "symbol": "LT",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:27:28.293991+00:00",
+      "symbol": "RELIANCE",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-17T05:27:28.294017+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:28:01.547750+00:00",
+      "symbol": "TMPV",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:28:01.547764+00:00",
+      "symbol": "IOC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:28:01.547775+00:00",
+      "symbol": "TECHM",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:28:01.547785+00:00",
+      "symbol": "LT",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:28:01.547795+00:00",
+      "symbol": "RELIANCE",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-17T05:28:01.547820+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:28:33.644068+00:00",
+      "symbol": "TMPV",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:28:33.644085+00:00",
+      "symbol": "IOC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:28:33.644095+00:00",
+      "symbol": "TECHM",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:28:33.644104+00:00",
+      "symbol": "LT",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:28:33.644112+00:00",
+      "symbol": "RELIANCE",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-17T05:28:33.644140+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:29:05.762549+00:00",
+      "symbol": "TMPV",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:29:05.762562+00:00",
+      "symbol": "IOC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:29:05.762570+00:00",
+      "symbol": "TECHM",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:29:05.762577+00:00",
+      "symbol": "LT",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:29:05.762584+00:00",
+      "symbol": "RELIANCE",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-17T05:29:05.762607+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:29:37.812714+00:00",
+      "symbol": "TMPV",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:29:37.812728+00:00",
+      "symbol": "IOC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:29:37.812738+00:00",
+      "symbol": "TECHM",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:29:37.812747+00:00",
+      "symbol": "LT",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:29:37.812756+00:00",
+      "symbol": "RELIANCE",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-17T05:29:37.812781+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:30:09.966476+00:00",
+      "symbol": "TMPV",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:30:09.966490+00:00",
+      "symbol": "IOC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:30:09.966498+00:00",
+      "symbol": "TECHM",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:30:09.966506+00:00",
+      "symbol": "LT",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:30:09.966514+00:00",
+      "symbol": "RELIANCE",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-17T05:30:09.966537+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:30:42.119617+00:00",
+      "symbol": "TMPV",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:30:42.119630+00:00",
+      "symbol": "IOC",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:30:42.119641+00:00",
+      "symbol": "TECHM",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:30:42.119650+00:00",
+      "symbol": "LT",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "POSITION_CLOSED",
+      "at": "2026-08-17T05:30:42.119659+00:00",
+      "symbol": "RELIANCE",
+      "direction": "SHORT",
+      "slotFreed": true
+    },
+    {
+      "type": "CAPITAL_SLOT_FREED",
+      "at": "2026-08-17T05:30:42.119682+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      }
+    },
+    {
+      "type": "REPLACEMENT_PROPOSED",
+      "at": "2026-08-17T05:30:42.147601+00:00",
+      "freeSlots": {
+        "long": 3,
+        "short": 3,
+        "total": 5,
+        "openLong": 0,
+        "openShort": 0,
+        "lockSize": 5
+      },
+      "candidates": [
+        {
+          "symbol": "DMART",
+          "direction": "LONG",
+          "entryState": "QUALIFIED",
+          "score": 61.2,
+          "oiSetup": "LONG_BUILDUP",
+          "qualityAdjustedExpectedR": 1.551,
+          "proposalOnly": true
+        },
+        {
+          "symbol": "CDSL",
+          "direction": "LONG",
+          "entryState": "QUALIFIED",
+          "score": 57.7,
+          "oiSetup": "LONG_BUILDUP",
+          "qualityAdjustedExpectedR": 1.55,
+          "proposalOnly": true
+        },
+        {
+          "symbol": "COFORGE",
+          "direction": "LONG",
+          "entryState": "QUALIFIED",
+          "score": 57.2,
+          "oiSetup": "LONG_BUILDUP",
+          "qualityAdjustedExpectedR": 1.549,
+          "proposalOnly": true
+        }
+      ]
     }
   ],
   "funnel": {
@@ -4728,5 +7550,173 @@
   "priorSessionDate": "2026-08-14",
   "rotated": true,
   "shortCashHeld": false,
-  "shortCashReason": null
+  "shortCashReason": null,
+  "freeSlots": {
+    "long": 3,
+    "short": 3,
+    "total": 5,
+    "openLong": 0,
+    "openShort": 0,
+    "lockSize": 5
+  },
+  "replacementsApplied": [
+    {
+      "symbol": "MAZDOCK",
+      "direction": "LONG",
+      "replacedFrom": null,
+      "replacedAt": "2026-08-17T05:25:21.835268+00:00",
+      "entryPrice": 2582.4,
+      "approxQty": 38,
+      "score": 62.3,
+      "source": "REPLACEMENT"
+    },
+    {
+      "symbol": "VEDL",
+      "direction": "SHORT",
+      "replacedFrom": "TMPV",
+      "replacedAt": "2026-08-17T05:25:21.835533+00:00",
+      "entryPrice": 268.15,
+      "approxQty": 372,
+      "score": 55.6,
+      "source": "REPLACEMENT"
+    },
+    {
+      "symbol": "TECHM",
+      "direction": "SHORT",
+      "replacedFrom": "PFC",
+      "replacedAt": "2026-08-17T05:25:21.835720+00:00",
+      "entryPrice": 1630.1,
+      "approxQty": 61,
+      "score": 64.8,
+      "source": "REPLACEMENT"
+    },
+    {
+      "symbol": "HDFCBANK",
+      "direction": "LONG",
+      "replacedFrom": "GODREJIND",
+      "replacedAt": "2026-08-17T05:25:52.936400+00:00",
+      "entryPrice": 727.7,
+      "approxQty": 137,
+      "score": 59.3,
+      "source": "REPLACEMENT"
+    },
+    {
+      "symbol": "LT",
+      "direction": "SHORT",
+      "replacedFrom": "PFC",
+      "replacedAt": "2026-08-17T05:25:52.936560+00:00",
+      "entryPrice": 4064.0,
+      "approxQty": 49,
+      "score": 62.5,
+      "source": "REPLACEMENT"
+    },
+    {
+      "symbol": "RELIANCE",
+      "direction": "SHORT",
+      "replacedFrom": "IOC",
+      "replacedAt": "2026-08-17T05:25:52.936675+00:00",
+      "entryPrice": 1311.8,
+      "approxQty": 76,
+      "score": 58.2,
+      "source": "REPLACEMENT"
+    },
+    {
+      "symbol": "ICICIBANK",
+      "direction": "LONG",
+      "replacedFrom": "GODREJIND",
+      "replacedAt": "2026-08-17T05:26:23.546509+00:00",
+      "entryPrice": 1411.9,
+      "approxQty": 141,
+      "score": 57.4,
+      "source": "REPLACEMENT"
+    }
+  ],
+  "lastAppliedReplacementKey": [
+    "ICICIBANK:LONG"
+  ],
+  "lastReplacementAppliedAt": "2026-08-17T05:26:23.546582+00:00",
+  "lastReplacementKey": [
+    "CDSL:LONG",
+    "COFORGE:LONG",
+    "DMART:LONG"
+  ],
+  "lastReplacementProposals": [
+    {
+      "symbol": "DMART",
+      "direction": "LONG",
+      "score": 61.2,
+      "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "flags": [
+        "FNO_OI",
+        "OI_LONG_BUILDUP",
+        "OI_PREFERRED",
+        "OI_ALIGN_BONUS",
+        "IN_PLAY"
+      ],
+      "ltpSource": null,
+      "dayMovePct": -0.324,
+      "qualityAdjustedExpectedR": 1.551,
+      "ltp": 4061.6,
+      "rewardRisk": 1.5,
+      "inPlay": true,
+      "oiSetup": "LONG_BUILDUP",
+      "oiAligned": true,
+      "replaceReason": "FREE_SLOT",
+      "proposalOnly": true
+    },
+    {
+      "symbol": "CDSL",
+      "direction": "LONG",
+      "score": 57.7,
+      "sector": "OTHER",
+      "sleeve": "MOMENTUM",
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "flags": [
+        "FNO_OI",
+        "OI_LONG_BUILDUP",
+        "OI_PREFERRED",
+        "OI_ALIGN_BONUS",
+        "IN_PLAY"
+      ],
+      "ltpSource": null,
+      "dayMovePct": -0.731,
+      "qualityAdjustedExpectedR": 1.55,
+      "ltp": 1345.1,
+      "rewardRisk": 1.5,
+      "inPlay": true,
+      "oiSetup": "LONG_BUILDUP",
+      "oiAligned": true,
+      "replaceReason": "FREE_SLOT",
+      "proposalOnly": true
+    },
+    {
+      "symbol": "COFORGE",
+      "direction": "LONG",
+      "score": 57.2,
+      "sector": "IT",
+      "sleeve": "MOMENTUM",
+      "entryState": "QUALIFIED",
+      "excludeReason": null,
+      "flags": [
+        "FNO_OI",
+        "OI_LONG_BUILDUP",
+        "OI_PREFERRED",
+        "OI_ALIGN_BONUS"
+      ],
+      "ltpSource": null,
+      "dayMovePct": -0.978,
+      "qualityAdjustedExpectedR": 1.549,
+      "ltp": 1812.1,
+      "rewardRisk": 1.5,
+      "inPlay": false,
+      "oiSetup": "LONG_BUILDUP",
+      "oiAligned": true,
+      "replaceReason": "FREE_SLOT",
+      "proposalOnly": true
+    }
+  ]
 }
