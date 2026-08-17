@@ -7,7 +7,7 @@
   "book": "SWING",
   "sessionDate": "2026-08-17",
   "committedAt": "2026-08-17T04:52:29.960133+00:00",
-  "updatedAt": "2026-08-17T05:30:42.313186+00:00",
+  "updatedAt": "2026-08-17T06:06:20.337555+00:00",
   "huntStartedAt": "2026-08-17T04:52:29.960133+00:00",
   "executionPolicy": "MANUAL_ONLY",
   "source": "asset_matrix_deterministic_buy",
@@ -1622,13 +1622,13 @@
   "portfolio": {
     "swingCapital": 1000000.0,
     "realizedPnl": -998.02,
-    "unrealizedPnl": -2778.66,
-    "totalPnl": -3776.68,
+    "unrealizedPnl": -3317.16,
+    "totalPnl": -4315.18,
     "lockedCount": 1
   },
   "priceOnly": true,
   "automation": {
-    "lastRefreshAt": "2026-08-17T05:30:42.313186+00:00",
+    "lastRefreshAt": "2026-08-17T06:06:20.337555+00:00",
     "source": "refresh_swing_session_state",
     "executionPolicy": "MANUAL_ONLY"
   }

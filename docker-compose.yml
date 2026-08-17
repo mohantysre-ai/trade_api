@@ -33,9 +33,11 @@ services:
       MARKET_PREWORK_MINUTE: "45"
       MARKET_PREWORK_POOL: "Nifty 500"
       # Angel historical API is aggressively rate-limited (AB1021).
+      # After AB1021, skip further getCandleData for ANGEL_CANDLE_CIRCUIT_SECONDS.
       INTRADAY_FETCH_WORKERS: "1"
       CANDLE_MIN_INTERVAL_SECONDS: "1.1"
-      CANDLE_RATE_LIMIT_RETRIES: "5"
+      CANDLE_RATE_LIMIT_RETRIES: "0"
+      ANGEL_CANDLE_CIRCUIT_SECONDS: "120"
       # Complete-universe quotes: NSE primary, Dhan bulk, then Angel fallback.
       MARKET_DATA_MIN_COVERAGE_PCT: "99"
       MARKET_DATA_MIN_CANDLE_COVERAGE_PCT: "95"

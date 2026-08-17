@@ -61,13 +61,14 @@ def test_closed_swing_live_snapshot_uses_book_pnl_and_skips(monkeypatch):
 
     result = swing_session._compute_swing_session(live=True)
 
-    assert result["long"][0]["totalPnl"] == -100
-    assert result["long"][1]["status"] == "SIGNAL_CONFLICT"
-    assert result["long"][1]["deployedCapital"] == 0
+    assert result["long"] == []
+    assert result["closedPositions"][0]["totalPnl"] == -100
+    assert result["closedPositions"][1]["status"] == "SIGNAL_CONFLICT"
+    assert result["closedPositions"][1]["deployedCapital"] == 0
     assert result["portfolio"] == {
         "swingCapital": 1_000_000,
         "realizedPnl": -100.0,
         "unrealizedPnl": 0.0,
         "totalPnl": -100.0,
-        "lockedCount": 2,
+        "lockedCount": 0,
     }
