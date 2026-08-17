@@ -1,5 +1,5 @@
 @echo off
-REM One-time Cloudflare Tunnel setup for iros.sigq.in
+REM One-time Cloudflare Tunnel setup for sigq.in
 cd /d "%~dp0"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0setup-cloudflare-tunnel.ps1"
 if errorlevel 1 (

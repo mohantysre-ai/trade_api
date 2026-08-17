@@ -2,18 +2,18 @@
   "success": true,
   "locked": true,
   "hunting": true,
-  "selectionFinalized": true,
+  "selectionFinalized": false,
   "cashHeld": false,
   "book": "SWING",
-  "sessionDate": "2026-08-14",
-  "committedAt": "2026-08-14T07:21:09.979159+00:00",
-  "updatedAt": "2026-08-14T07:26:15.142187+00:00",
-  "huntStartedAt": "2026-08-14T04:15:25.218870+00:00",
+  "sessionDate": "2026-08-17",
+  "committedAt": "2026-08-17T04:52:29.960133+00:00",
+  "updatedAt": "2026-08-17T05:08:31.638593+00:00",
+  "huntStartedAt": "2026-08-17T04:52:29.960133+00:00",
   "executionPolicy": "MANUAL_ONLY",
   "source": "asset_matrix_deterministic_buy",
   "selectionContract": "DETERMINISTIC_BUY_V1",
   "rotation": "DAILY",
-  "priorSessionDate": null,
+  "priorSessionDate": "2026-08-14",
   "long": [
     {
       "symbol": "BLS",
@@ -22,27 +22,27 @@
       "deterministicSide": "BUY",
       "direction": "LONG",
       "book": "SWING",
-      "entryDate": "2026-08-14",
-      "entryPrice": 277.43,
-      "buyAbove": 277.43,
-      "stopLoss": 276.04,
-      "target1": 279.51,
-      "target2": 281.6,
+      "entryDate": "2026-08-17",
+      "entryPrice": 278.19,
+      "buyAbove": 278.19,
+      "stopLoss": 276.8,
+      "target1": 280.27,
+      "target2": 282.36,
       "riskPerShare": 1.39,
       "rewardRisk": 3.0,
       "expectedR": 3.0,
       "entryQuality": "ENTRY_A",
-      "approxQty": 720,
-      "deployedCapital": 199749.6,
+      "approxQty": 718,
+      "deployedCapital": 199740.42,
       "score": null,
       "sector": null,
-      "scanLtp": 277.43,
-      "currentPrice": 271.0,
+      "scanLtp": 278.19,
+      "currentPrice": 274.63,
       "status": "INITIAL STOP HIT",
       "sessionLocked": true,
       "source": "swing_session",
       "lockSource": "asset_matrix_deterministic_buy",
-      "lockedAt": "2026-08-14T07:21:09.979159+00:00",
+      "lockedAt": "2026-08-17T04:52:29.960133+00:00",
       "levelsSource": "matrix_atr_pct+max_stop_0p5pct",
       "selectionReason": "Explicit deterministic BUY/LONG; hard and quality filters passed; price above VWAP and EMA9; RSI and breakout confirmed; bullish OI confirmed; risk audit passed; no intraday-book conflict.",
       "acceptanceReason": "Explicit deterministic BUY/LONG; hard and quality filters passed; price above VWAP and EMA9; RSI and breakout confirmed; bullish OI confirmed; risk audit passed; no intraday-book conflict.",
@@ -62,7 +62,7 @@
         "canonicalDirection": "LONG",
         "passesHardFilters": true,
         "passesQualityFilters": true,
-        "selectionPrice": 277.43,
+        "selectionPrice": 278.19,
         "vwap": 268.58,
         "ema9": 268.71,
         "priceAboveVwap": true,
@@ -79,11 +79,11 @@
           "HOLD_FOR_DATA"
         ],
         "intradayConflict": false,
-        "dayChangePct": 2.5,
+        "dayChangePct": 2.78,
         "maxDayMovePct": 6.0,
         "accepted": true,
         "acceptanceReason": "Explicit deterministic BUY/LONG; hard and quality filters passed; price above VWAP and EMA9; RSI and breakout confirmed; bullish OI confirmed; risk audit passed; no intraday-book conflict.",
-        "lockedAt": "2026-08-14T07:21:09.979159+00:00",
+        "lockedAt": "2026-08-17T04:52:29.960133+00:00",
         "lockSource": "asset_matrix_deterministic_buy"
       },
       "dayChangePct": null,
@@ -95,52 +95,52 @@
           "liquidity_score": 20.0,
           "breakout_quality": 2.4056284434472563
         },
-        "lockRank": 2,
+        "lockRank": 1,
         "selectionReason": "Explicit deterministic BUY/LONG; hard and quality filters passed; price above VWAP and EMA9; RSI and breakout confirmed; bullish OI confirmed; risk audit passed; no intraday-book conflict.",
         "acceptanceReason": "Explicit deterministic BUY/LONG; hard and quality filters passed; price above VWAP and EMA9; RSI and breakout confirmed; bullish OI confirmed; risk audit passed; no intraday-book conflict.",
         "originalSide": "BUY",
         "riskAuditVerdict": "HOLD_FOR_DATA",
         "sector": null,
         "levelsSource": "matrix_atr_pct+max_stop_0p5pct",
-        "lockedAt": "2026-08-14T07:21:09.979159+00:00",
+        "lockedAt": "2026-08-17T04:52:29.960133+00:00",
         "triggeredAt": null,
         "executedFills": null,
         "exitPathTag": null
       },
-      "maxLoss": 998.75,
+      "maxLoss": 998.7,
       "sizingNote": "SWING_SLEEVE_10L",
       "sleeveCapital": 1000000.0,
       "slotNotional": 200000.0,
       "exitPlan": {
         "mode": "SCALE_TRAIL",
         "direction": "LONG",
-        "entry": 277.43,
+        "entry": 278.19,
         "riskPerShare": 1.39,
-        "initialStop": 276.04,
+        "initialStop": 276.8,
         "legs": [
           {
             "r": 1.0,
             "qtyPct": 0.2,
             "qty": 144,
-            "price": 278.82,
+            "price": 279.58,
             "trailStopAfter": 0.0
           },
           {
             "r": 1.5,
             "qtyPct": 0.2,
             "qty": 144,
-            "price": 279.51,
+            "price": 280.27,
             "trailStopAfter": 0.0
           },
           {
             "r": 2.0,
             "qtyPct": 0.2,
-            "qty": 144,
-            "price": 280.21,
+            "qty": 143,
+            "price": 280.97,
             "trailStopAfter": 0.5
           }
         ],
-        "runnerQty": 288,
+        "runnerQty": 287,
         "runnerFrac": 0.4,
         "trailRatchet": {
           "0.5": 0.0,
@@ -151,8 +151,8 @@
           "4.0": 2.5,
           "5.0": 3.5
         },
-        "target1": 279.51,
-        "target2": 281.6,
+        "target1": 280.27,
+        "target2": 282.36,
         "validRiskModel": true,
         "stopRepaired": false,
         "stopCapped": false,
@@ -169,282 +169,53 @@
       },
       "riskModelValid": true,
       "stopRepaired": false,
-      "ltp": 271.0,
-      "ltpSource": "candle_path_10am",
-      "realizedPnl": -1000.8,
+      "ltp": 274.63,
+      "ltpSource": "live",
+      "realizedPnl": -998.02,
       "unrealizedPnl": 0.0,
-      "unrealizedPnlPct": -0.1,
-      "totalPnl": -1000.8,
-      "outcome": {
-        "label": "INITIAL STOP HIT",
-        "detail": "R -1.00 \u00b7 trail SL 276.04 \u00b7 rem 0",
-        "hitLevel": "partial",
-        "ltp": 276.04,
-        "pctChange": -0.5,
-        "scaleTrail": true,
-        "closed": true
-      },
-      "effectiveStop": 276.04,
-      "remainingQty": 0,
+      "unrealizedPnlPct": -1.28,
+      "totalPnl": -998.02,
       "exitState": {
         "legsFilled": [
           {
             "r": "INITIAL_SL",
-            "qty": 720,
-            "price": 276.04,
-            "pnl": -1000.8
+            "qty": 718,
+            "price": 276.8,
+            "pnl": -998.02
           }
         ],
         "remainingQty": 0,
-        "effectiveStop": 276.04,
-        "realizedPnl": -1000.8,
+        "effectiveStop": 276.8,
+        "realizedPnl": -998.02,
         "unrealizedPnl": 0.0,
-        "economicPnl": -1000.8,
+        "economicPnl": -998.02,
         "rMultiple": -1.0,
         "economicR": -1.0,
-        "pathR": -1.0,
+        "pathR": -2.561,
         "mfeR": 0.0,
         "profitGuardActive": false,
         "closed": true,
         "mode": "SCALE_TRAIL",
-        "initialStop": 276.04,
-        "totalQty": 720,
-        "riskPerShare": 1.39,
-        "pathReplay": "FROM_10AM_CANDLES",
-        "pathReplayWindow": "10:00-10:15"
+        "initialStop": 276.8,
+        "totalQty": 718,
+        "riskPerShare": 1.39
       },
-      "closed": true,
-      "mfeR": 0.0,
-      "rMultiple": -1.0,
-      "economicR": -1.0,
-      "pathR": -1.0
-    },
-    {
-      "symbol": "MINDACORP",
-      "name": "MINDACORP",
-      "originalSide": "BUY",
-      "deterministicSide": "BUY",
-      "direction": "LONG",
-      "book": "SWING",
-      "entryDate": "2026-08-14",
-      "entryPrice": 745.55,
-      "buyAbove": 745.55,
-      "stopLoss": 741.82,
-      "target1": 751.14,
-      "target2": 756.74,
-      "riskPerShare": 3.73,
-      "rewardRisk": 3.0,
-      "expectedR": 3.0,
-      "entryQuality": "ENTRY_A",
-      "approxQty": 268,
-      "deployedCapital": 199807.4,
-      "score": null,
-      "sector": null,
-      "scanLtp": 745.55,
-      "currentPrice": 753.5,
-      "status": "TRAIL STOP HIT",
-      "sessionLocked": true,
-      "source": "swing_session",
-      "lockSource": "asset_matrix_deterministic_buy",
-      "lockedAt": "2026-08-14T06:35:47.578256+00:00",
-      "levelsSource": "matrix_atr_pct+max_stop_0p5pct",
-      "selectionReason": "Explicit deterministic BUY/LONG; hard and quality filters passed; price above VWAP and EMA9; RSI and breakout confirmed; bullish OI confirmed; risk audit passed; no intraday-book conflict.",
-      "acceptanceReason": "Explicit deterministic BUY/LONG; hard and quality filters passed; price above VWAP and EMA9; RSI and breakout confirmed; bullish OI confirmed; risk audit passed; no intraday-book conflict.",
-      "passesHardFilters": true,
-      "passesQualityFilters": true,
-      "vwap": 745.42,
-      "ema9": 743.08,
-      "rsi": 60.26,
-      "oiSetup": "NEUTRAL",
-      "riskAuditVerdict": "HOLD_FOR_DATA",
-      "verdict": "HOLD_FOR_DATA",
-      "selectionEvidence": {
-        "contract": "DETERMINISTIC_BUY_V1",
-        "originalSide": "BUY",
-        "sideSource": "deterministicSide",
-        "deterministicSide": "BUY",
-        "canonicalDirection": "LONG",
-        "passesHardFilters": true,
-        "passesQualityFilters": true,
-        "selectionPrice": 745.55,
-        "vwap": 745.42,
-        "ema9": 743.08,
-        "priceAboveVwap": true,
-        "priceAboveEma9": true,
-        "rsi": 60.26,
-        "rsiThreshold": 55.0,
-        "rsiPass": true,
-        "oiSetup": "NEUTRAL",
-        "pivotR1Breakout": true,
-        "rsiPivotBreak": true,
-        "breakoutPass": true,
-        "riskAuditVerdict": "HOLD_FOR_DATA",
-        "riskAuditDecisions": [
-          "HOLD_FOR_DATA"
-        ],
-        "intradayConflict": false,
-        "dayChangePct": 4.7,
-        "maxDayMovePct": 6.0,
-        "accepted": true,
-        "acceptanceReason": "Explicit deterministic BUY/LONG; hard and quality filters passed; price above VWAP and EMA9; RSI and breakout confirmed; bullish OI confirmed; risk audit passed; no intraday-book conflict.",
-        "lockedAt": "2026-08-14T06:35:47.578256+00:00",
-        "lockSource": "asset_matrix_deterministic_buy"
-      },
-      "dayChangePct": null,
-      "lineage": {
-        "source": "asset_matrix_deterministic_buy",
-        "filterStage": "DETERMINISTIC_BUY_V1",
-        "score": null,
-        "scoreComponents": {
-          "liquidity_score": 20.0,
-          "breakout_quality": 5.825480287400109
-        },
-        "lockRank": 2,
-        "selectionReason": "Explicit deterministic BUY/LONG; hard and quality filters passed; price above VWAP and EMA9; RSI and breakout confirmed; bullish OI confirmed; risk audit passed; no intraday-book conflict.",
-        "acceptanceReason": "Explicit deterministic BUY/LONG; hard and quality filters passed; price above VWAP and EMA9; RSI and breakout confirmed; bullish OI confirmed; risk audit passed; no intraday-book conflict.",
-        "originalSide": "BUY",
-        "riskAuditVerdict": "HOLD_FOR_DATA",
-        "sector": null,
-        "levelsSource": "matrix_atr_pct+max_stop_0p5pct",
-        "lockedAt": "2026-08-14T06:35:47.578256+00:00",
-        "triggeredAt": null,
-        "executedFills": null,
-        "exitPathTag": null
-      },
-      "maxLoss": 999.04,
-      "sizingNote": "SWING_SLEEVE_10L",
-      "sleeveCapital": 1000000.0,
-      "slotNotional": 200000.0,
-      "exitPlan": {
-        "mode": "SCALE_TRAIL",
-        "direction": "LONG",
-        "entry": 745.55,
-        "riskPerShare": 3.73,
-        "initialStop": 741.82,
-        "legs": [
-          {
-            "r": 1.0,
-            "qtyPct": 0.2,
-            "qty": 54,
-            "price": 749.28,
-            "trailStopAfter": 0.0
-          },
-          {
-            "r": 1.5,
-            "qtyPct": 0.2,
-            "qty": 54,
-            "price": 751.14,
-            "trailStopAfter": 0.0
-          },
-          {
-            "r": 2.0,
-            "qtyPct": 0.2,
-            "qty": 53,
-            "price": 753.01,
-            "trailStopAfter": 0.5
-          }
-        ],
-        "runnerQty": 107,
-        "runnerFrac": 0.4,
-        "trailRatchet": {
-          "0.5": 0.0,
-          "1.0": 0.0,
-          "1.5": 0.0,
-          "2.0": 0.5,
-          "3.0": 1.5,
-          "4.0": 2.5,
-          "5.0": 3.5
-        },
-        "target1": 751.14,
-        "target2": 756.74,
-        "validRiskModel": true,
-        "stopRepaired": false,
-        "stopCapped": false,
-        "notes": [
-          "40pct_runner",
-          "monotonic_r_ratchet",
-          "be_at_0p5r",
-          "max_stop_0p5pct",
-          "nse_hybrid_trail",
-          "no_stop_loosen",
-          "book_pnl_authoritative"
-        ],
-        "policyVersion": "0p5r_max_0p5pct"
-      },
-      "riskModelValid": true,
-      "stopRepaired": false,
-      "exitState": {
-        "legsFilled": [
-          {
-            "r": 1.0,
-            "qty": 54,
-            "price": 749.28,
-            "pnl": 201.42
-          },
-          {
-            "r": 1.5,
-            "qty": 54,
-            "price": 751.14,
-            "pnl": 301.86
-          },
-          {
-            "r": 2.0,
-            "qty": 53,
-            "price": 753.01,
-            "pnl": 395.38
-          },
-          {
-            "r": "TRAIL_SL",
-            "qty": 107,
-            "price": 751.23,
-            "pnl": 607.76
-          }
-        ],
-        "remainingQty": 0,
-        "effectiveStop": 751.23,
-        "realizedPnl": 1506.42,
-        "unrealizedPnl": 0.0,
-        "economicPnl": 1506.42,
-        "rMultiple": 1.507,
-        "economicR": 1.507,
-        "pathR": 1.523,
-        "mfeR": 2.534,
-        "profitGuardActive": true,
-        "closed": true,
-        "mode": "SCALE_TRAIL",
-        "initialStop": 741.82,
-        "totalQty": 268,
-        "riskPerShare": 3.73,
-        "pathReplay": "FROM_10AM_CANDLES",
-        "pathReplayWindow": "10:00-10:15"
-      },
-      "realizedPnl": 1506.42,
-      "unrealizedPnl": 0.0,
-      "totalPnl": 1506.42,
-      "remainingQty": 0,
-      "effectiveStop": 751.23,
-      "ltp": 753.5,
-      "ltpSource": "candle_path_10am",
-      "closed": true,
-      "mfeR": 2.534,
-      "rMultiple": 1.507,
-      "economicR": 1.507,
-      "pathR": 1.523,
       "outcome": {
-        "label": "TRAIL STOP HIT",
-        "detail": "R +1.51 \u00b7 trail SL 751.23 \u00b7 rem 0",
+        "label": "INITIAL STOP HIT",
+        "detail": "R -1.00 \u00b7 trail SL 276.80 \u00b7 rem 0",
         "hitLevel": "sl",
-        "ltp": 751.23,
-        "pctChange": 0.76,
+        "ltp": 274.63,
+        "pctChange": -1.28,
         "scaleTrail": true,
         "closed": true
-      }
+      },
+      "effectiveStop": 276.8,
+      "remainingQty": 0,
+      "closed": true
     }
   ],
   "short": [],
-  "skippedIncomplete": [
-    "MINDACORP:ABOVE_VWAP_REQUIREMENT_FAILED|ABOVE_EMA9_REQUIREMENT_FAILED"
-  ],
+  "skippedIncomplete": [],
   "excludedInvalidSelections": [
     {
       "symbol": "FINCABLES",
@@ -1771,37 +1542,26 @@
   "capital": {
     "swingCapital": 1000000.0,
     "riskFraction": 0.01,
-    "slots": 2,
-    "deployedCapital": 399557.0,
-    "remainingCapital": 600443.0,
-    "portfolioRisk": 1997.79
+    "slots": 1,
+    "deployedCapital": 199740.42,
+    "remainingCapital": 800259.58,
+    "portfolioRisk": 998.7
   },
   "counts": {
-    "long": 2,
+    "long": 1,
     "short": 0,
-    "total": 2
+    "total": 1
   },
   "deskGates": {
     "minPrice": 50.0,
     "rejectDvr": true
   },
   "crossBookExcluded": [
-    "ADANIPOWER",
-    "ANANDRATHI",
-    "BAJFINANCE",
-    "CIPLA",
-    "DLF",
-    "HDFCAMC",
-    "HDFCBANK",
-    "INFY",
+    "GODREJIND",
     "IOC",
-    "MOTHERSON",
-    "NMDC",
-    "RELIANCE",
-    "SAIL",
-    "SWIGGY",
-    "TRENT",
-    "TVSMOTOR"
+    "PFC",
+    "PNB",
+    "TMPV"
   ],
   "huntWindow": {
     "huntStart": "09:45",
@@ -1812,41 +1572,30 @@
   "entryHuntDiagnostics": {
     "universeSize": 500,
     "volumeScreened": 500,
-    "candleMetrics": 490,
+    "candleMetrics": 491,
     "displayPool": 50,
     "evaluated": 500,
-    "qualified": 2,
+    "qualified": 1,
     "crossBookExcluded": [
-      "ADANIPOWER",
-      "ANANDRATHI",
-      "BAJFINANCE",
-      "CIPLA",
-      "DLF",
-      "HDFCAMC",
-      "HDFCBANK",
-      "INFY",
+      "GODREJIND",
       "IOC",
-      "MOTHERSON",
-      "NMDC",
-      "RELIANCE",
-      "SAIL",
-      "SWIGGY",
-      "TRENT",
-      "TVSMOTOR"
+      "PFC",
+      "PNB",
+      "TMPV"
     ],
     "swingUniverse": "Nifty 500",
     "topRejectionReasons": [
       {
         "reason": "EXPLICIT_BUY_SIDE_REQUIRED:MISSING",
-        "count": 498
+        "count": 499
       },
       {
         "reason": "HARD_FILTERS_NOT_PASSED",
-        "count": 498
+        "count": 499
       },
       {
         "reason": "QUALITY_FILTERS_NOT_PASSED",
-        "count": 498
+        "count": 497
       },
       {
         "reason": "BREAKOUT_REQUIREMENT_FAILED",
@@ -1854,11 +1603,11 @@
       },
       {
         "reason": "ABOVE_VWAP_REQUIREMENT_FAILED",
-        "count": 415
+        "count": 406
       },
       {
         "reason": "ABOVE_EMA9_REQUIREMENT_FAILED",
-        "count": 398
+        "count": 395
       },
       {
         "reason": "RSI_REQUIREMENT_FAILED:min=55",
@@ -1866,22 +1615,21 @@
       },
       {
         "reason": "BULLISH_OI_REQUIRED:SHORT_BUILDUP",
-        "count": 186
+        "count": 187
       }
     ]
   },
   "portfolio": {
     "swingCapital": 1000000.0,
-    "realizedPnl": 505.62,
-    "unrealizedPnl": 0.0,
-    "totalPnl": 505.62,
-    "lockedCount": 2
+    "realizedPnl": -998.02,
+    "unrealizedPnl": -2570.44,
+    "totalPnl": -3568.46,
+    "lockedCount": 1
   },
   "priceOnly": true,
   "automation": {
-    "lastRefreshAt": "2026-08-14T07:26:15.142187+00:00",
-    "source": "replay_swing_from_10am_candles",
+    "lastRefreshAt": "2026-08-17T05:08:31.638593+00:00",
+    "source": "refresh_swing_session_state",
     "executionPolicy": "MANUAL_ONLY"
-  },
-  "scrubbedAt": "2026-08-14T07:21:43.602231+00:00"
+  }
 }

@@ -1,13 +1,13 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  One-time Cloudflare Tunnel setup for IROS desk on iros.sigq.in
+  One-time Cloudflare Tunnel setup for IROS desk on sigq.in
 
 .DESCRIPTION
   1) Ensures cloudflared is available
   2) Opens browser login (you must approve + select sigq.in zone)
   3) Creates tunnel "iros-desk" if missing
-  4) Routes DNS iros.sigq.in -> tunnel
+  4) Routes DNS calendar.sigq.in and sigq.in -> tunnel
   5) Writes %USERPROFILE%\.cloudflared\config.yml
 
 .NOTES
@@ -19,10 +19,35 @@
 
 $ErrorActionPreference = "Stop"
 $TunnelName = "iros-desk"
-$Hostname = "iros.sigq.in"
-$LocalService = "http://127.0.0.1:3000"
 $CloudflaredDir = Join-Path $env:USERPROFILE ".cloudflared"
 $ConfigPath = Join-Path $CloudflaredDir "config.yml"
+$Ingress = @(
+  @{ Hostname = "calendar.sigq.in"; Service = "http://127.0.0.1:8088" },
+  @{ Hostname = "sigq.in"; Service = "http://127.0.0.1:3000" }
+)
+
+function Refresh-Path {
+  $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+  $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+  $combined = @()
+  if ($machinePath) { $combined += $machinePath -split ';' | Where-Object { $_ } }
+  if ($userPath) { $combined += $userPath -split ';' | Where-Object { $_ } }
+  $env:Path = ($combined | Select-Object -Unique) -join ';'
+}
+
+function Install-Cloudflared {
+  if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    throw "cloudflared not found and winget is unavailable. Install Cloudflare Tunnel manually from https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation or run: winget install Cloudflare.cloudflared"
+  }
+
+  Write-Host "cloudflared not found. Installing via winget..." -ForegroundColor Yellow
+  & winget install --id Cloudflare.cloudflared --accept-source-agreements --accept-package-agreements --silent
+  if ($LASTEXITCODE -ne 0) {
+    throw "cloudflared installation failed via winget. Install manually with: winget install Cloudflare.cloudflared"
+  }
+
+  Refresh-Path
+}
 
 function Find-Cloudflared {
   $candidates = @(
@@ -31,7 +56,15 @@ function Find-Cloudflared {
     "${env:ProgramFiles(x86)}\cloudflared\cloudflared.exe"
   ) | Where-Object { $_ -and (Test-Path $_) }
   if (-not $candidates) {
-    throw "cloudflared not found. Install with: winget install Cloudflare.cloudflared"
+    Install-Cloudflared
+    $candidates = @(
+      (Get-Command cloudflared -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source),
+      "$env:ProgramFiles\cloudflared\cloudflared.exe",
+      "${env:ProgramFiles(x86)}\cloudflared\cloudflared.exe"
+    ) | Where-Object { $_ -and (Test-Path $_) }
+  }
+  if (-not $candidates) {
+    throw "cloudflared still not found after installation. Check PATH or install manually with: winget install Cloudflare.cloudflared"
   }
   return $candidates[0]
 }
@@ -96,25 +129,31 @@ if (-not (Test-Path $credFile)) {
 }
 
 Write-Host ""
-Write-Host "=== STEP 3: DNS route $Hostname ===" -ForegroundColor Yellow
-& $cf tunnel route dns $TunnelName $Hostname
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "DNS route command returned non-zero. If record already exists, you can continue." -ForegroundColor Yellow
+Write-Host "=== STEP 3: DNS routes ===" -ForegroundColor Yellow
+foreach ($route in $Ingress) {
+  Write-Host "Routing $($route.Hostname) -> $TunnelName"
+  & $cf tunnel route dns $TunnelName $route.Hostname
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "DNS route command returned non-zero. If record already exists, you can continue." -ForegroundColor Yellow
+  }
 }
 
 Write-Host ""
 Write-Host "=== STEP 4: Write config.yml ===" -ForegroundColor Yellow
 # YAML needs forward slashes or escaped backslashes; use forward slashes for cloudflared on Windows
 $credPosix = $credFile -replace '\\', '/'
-$config = @"
-tunnel: $TunnelName
-credentials-file: $credPosix
-
-ingress:
-  - hostname: $Hostname
-    service: $LocalService
-  - service: http_status:404
-"@
+$configLines = @(
+  "tunnel: $TunnelName",
+  "credentials-file: $credPosix",
+  "",
+  "ingress:"
+)
+foreach ($route in $Ingress) {
+  $configLines += "  - hostname: $($route.Hostname)"
+  $configLines += "    service: $($route.Service)"
+}
+$configLines += "  - service: http_status:404"
+$config = $configLines -join [Environment]::NewLine
 Set-Content -Path $ConfigPath -Value $config -Encoding UTF8
 Write-Host "[OK] Wrote $ConfigPath" -ForegroundColor Green
 Write-Host $config
@@ -125,7 +164,8 @@ Write-Host " Setup complete"
 Write-Host "========================================" -ForegroundColor Green
 Write-Host "1. Start IROS:  config\startup\start_app.bat"
 Write-Host "2. Start tunnel: config\startup\start-tunnel.bat"
-Write-Host "3. Open: https://$Hostname"
+Write-Host "3. Open: https://sigq.in"
+Write-Host "4. Calendar: https://calendar.sigq.in"
 Write-Host ""
-Write-Host "Optional: Cloudflare Zero Trust -> Access -> protect $Hostname with email login."
+Write-Host "Optional: Cloudflare Zero Trust -> Access -> protect sigq.in/calendar.sigq.in with email login."
 Write-Host ""
