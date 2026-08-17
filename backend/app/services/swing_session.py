@@ -416,6 +416,22 @@ def _snapshot_data_date(snap: dict[str, Any]) -> str:
     return str(meta.get("dataDate") or "")[:10]
 
 
+def _snapshot_age_sec(snap: dict[str, Any]) -> float | None:
+    iso = snap.get("updatedAt") or snap.get("asOf")
+    if not iso:
+        meta = snap.get("selectionMeta") if isinstance(snap.get("selectionMeta"), dict) else {}
+        iso = meta.get("updatedAt") or meta.get("asOf")
+    if not iso:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return max(0.0, (datetime.now(timezone.utc) - dt.astimezone(timezone.utc)).total_seconds())
+    except Exception:
+        return None
+
+
 def _matrix_snapshot_ready_for_today(snap: dict[str, Any]) -> tuple[bool, str]:
     """Return whether Matrix is safe to use for today's swing selection."""
     today = _ist_today()
@@ -445,15 +461,18 @@ def _matrix_snapshot_ready_for_today(snap: dict[str, Any]) -> tuple[bool, str]:
 
 
 def _ensure_today_matrix_snapshot() -> tuple[bool, str]:
-    """Refresh stale Matrix and fail closed unless the replacement is valid today."""
+    """Refresh Matrix unless today's file is already fresh enough during RTH."""
     global _SWING_MATRIX_REFRESH_AT
     snap = _read_json(_matrix_snapshot_path()) or {}
-    today = _ist_today()
     ready, reason = _matrix_snapshot_ready_for_today(snap)
-    if ready:
+    age = _snapshot_age_sec(snap)
+    quotes_stale = bool(_is_market_open() and (age is None or age > _SWING_MATRIX_REFRESH_TTL))
+    if ready and not quotes_stale:
         return True, reason
     now = time.monotonic()
     if _SWING_MATRIX_REFRESH_AT and now - _SWING_MATRIX_REFRESH_AT < _SWING_MATRIX_REFRESH_TTL:
+        if ready:
+            return True, reason
         return False, reason
     _SWING_MATRIX_REFRESH_AT = now
     try:
@@ -1457,6 +1476,10 @@ def _append_new_swing_entries(session: dict[str, Any]) -> dict[str, Any] | None:
     ]
     remaining = SWING_MATRIX_LOCK_COUNT - len(existing_rows)
     if remaining <= 0:
+        return None
+    matrix_state = _ensure_today_matrix_snapshot()
+    if isinstance(matrix_state, tuple) and matrix_state[0] is False:
+        log.info("Swing fill-up skipped — matrix not ready: %s", matrix_state[1])
         return None
     today = str(session.get("sessionDate") or _ist_today())[:10]
     existing_syms = _swing_occupied_symbols(session)

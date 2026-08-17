@@ -155,3 +155,74 @@ def test_no_qualified_leaves_session_unchanged():
         applied = eng.apply_replacements(session, proposals, {}, {}, bypass_window=True)
     assert applied == []
     assert [r["symbol"] for r in session["long"]] == ["LOSER"]
+
+
+def test_replacement_source_pools_live_ignores_lock_pool(monkeypatch):
+    eng._HUNT_POOL_CACHE.update({"key": "", "at": 0.0, "long": [], "short": []})
+    monkeypatch.setattr(
+        "app.services.trade_outcome._is_market_open",
+        lambda: True,
+    )
+
+    def _hunt(snap, *, include_full_hunt=False):
+        assert include_full_hunt is True
+        return {
+            "replacementHuntLong": [_pool_cand("FRESH")],
+            "replacementHuntShort": [],
+        }
+
+    monkeypatch.setattr(eng, "generate_candidates", _hunt)
+    session = {"candidatePoolLong": [_pool_cand("STALE")], "candidatePoolShort": []}
+    long_p, _short_p, src = eng._replacement_source_pools(session, {"updatedAt": "live-1"})
+    assert src == "live_universe_hunt"
+    assert long_p[0]["symbol"] == "FRESH"
+
+
+def test_replacement_source_pools_closed_uses_lock_pool(monkeypatch):
+    eng._HUNT_POOL_CACHE.update({"key": "", "at": 0.0, "long": [], "short": []})
+    monkeypatch.setattr(
+        "app.services.trade_outcome._is_market_open",
+        lambda: False,
+    )
+    session = {"candidatePoolLong": [_pool_cand("STALE")], "candidatePoolShort": []}
+    long_p, _short_p, src = eng._replacement_source_pools(session, {"updatedAt": "x"})
+    assert src == "lock_pool"
+    assert long_p[0]["symbol"] == "STALE"
+
+
+def test_apply_uses_hunt_pools_not_lock_pool():
+    session = {
+        "locked": True,
+        "sessionDate": "2026-08-11",
+        "long": [_closed_long("LOSER"), _open_long("KEEP1"), _open_long("KEEP2", "BANK")],
+        "short": [],
+        "candidatePoolLong": [_pool_cand("STALE")],
+        "candidatePoolShort": [],
+        "events": [],
+    }
+    proposals = [
+        {
+            "symbol": "FRESH",
+            "direction": "LONG",
+            "score": 70,
+            "entryState": eng.ENTRY_QUALIFIED,
+            "ltp": 200.0,
+            "proposalOnly": True,
+        }
+    ]
+    hunt = [_pool_cand("FRESH")]
+    with patch.object(eng, "entry_quality_gate", side_effect=_qualified_gate):
+        with patch.object(eng, "sync_fixed_plan_from_session"):
+            with patch("app.services.trade_outcome.emit_replacement_alerts", return_value=[]):
+                applied = eng.apply_replacements(
+                    session,
+                    proposals,
+                    {},
+                    {},
+                    bypass_window=True,
+                    hunt_pools=(hunt, []),
+                )
+    assert len(applied) == 1
+    assert applied[0]["symbol"] == "FRESH"
+    lock_syms = {str(c.get("symbol")) for c in session["candidatePoolLong"]}
+    assert "FRESH" not in lock_syms

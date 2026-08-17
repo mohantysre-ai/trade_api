@@ -35,7 +35,7 @@
     "Google \u00b7 Startup Funding",
     "Google \u00b7 Mutual Funds"
   ],
-  "updatedAt": "2026-08-17T07:06:40.969224+00:00",
+  "updatedAt": "2026-08-17T08:45:01.971400+00:00",
   "mockTickers": [
     "AWFI"
   ],
@@ -22264,9 +22264,9 @@
       "ticker": "GODREJIND",
       "name": "GODREJIND",
       "capSize": "Nifty 500",
-      "ltp": "\u20b91,213.00",
-      "ltpRaw": 1213.0,
-      "delta": "39.50 (-3.15%)",
+      "ltp": "\u20b91,227.20",
+      "ltpRaw": 1227.2,
+      "delta": "25.30 (-2.02%)",
       "state": "NEGATIVE",
       "volume": null,
       "open": 1225.8,
@@ -23625,10 +23625,10 @@
       "ticker": "HDFCBANK",
       "name": "HDFCBANK",
       "capSize": "Nifty 500",
-      "ltp": "\u20b9725.30",
-      "ltpRaw": 725.3,
-      "delta": "1.70 (-0.23%)",
-      "state": "NEGATIVE",
+      "ltp": "\u20b9727.60",
+      "ltpRaw": 727.6,
+      "delta": "0.60 (+0.08%)",
+      "state": "POSITIVE",
       "volume": null,
       "open": 727.05,
       "high": 729.15,
@@ -25228,13 +25228,13 @@
       "ticker": "ICICIBANK",
       "name": "ICICIBANK",
       "capSize": "Nifty 500",
-      "ltp": "\u20b91,416.40",
-      "ltpRaw": 1416.4,
-      "delta": "0.60 (-0.04%)",
-      "state": "NEGATIVE",
+      "ltp": "\u20b91,419.10",
+      "ltpRaw": 1419.1,
+      "delta": "2.10 (+0.15%)",
+      "state": "POSITIVE",
       "volume": null,
       "open": 1418.0,
-      "high": 1420.0,
+      "high": 1422.0,
       "low": 1407.0,
       "close": 1417.0,
       "oi": 0.0,
@@ -27381,9 +27381,9 @@
       "ticker": "IOC",
       "name": "IOC",
       "capSize": "Nifty 500",
-      "ltp": "\u20b9138.50",
-      "ltpRaw": 138.5,
-      "delta": "0.90 (-0.65%)",
+      "ltp": "\u20b9138.75",
+      "ltpRaw": 138.75,
+      "delta": "0.65 (-0.47%)",
       "state": "NEGATIVE",
       "volume": null,
       "open": 139.2,
@@ -32626,13 +32626,13 @@
       "ticker": "LT",
       "name": "LT",
       "capSize": "Nifty 500",
-      "ltp": "\u20b94,064.30",
-      "ltpRaw": 4064.3,
-      "delta": "7.30 (+0.18%)",
+      "ltp": "\u20b94,059.70",
+      "ltpRaw": 4059.7,
+      "delta": "2.70 (+0.07%)",
       "state": "POSITIVE",
       "volume": null,
       "open": 4041.0,
-      "high": 4065.0,
+      "high": 4070.0,
       "low": 4026.0,
       "close": 4057.0,
       "oi": 0.0,
@@ -33993,14 +33993,14 @@
       "ticker": "MAZDOCK",
       "name": "MAZDOCK",
       "capSize": "Nifty 500",
-      "ltp": "\u20b92,575.00",
-      "ltpRaw": 2575.0,
-      "delta": "5.00 (-0.19%)",
+      "ltp": "\u20b92,564.70",
+      "ltpRaw": 2564.7,
+      "delta": "15.30 (-0.59%)",
       "state": "NEGATIVE",
       "volume": null,
       "open": 2594.9,
       "high": 2619.5,
-      "low": 2568.0,
+      "low": 2563.1,
       "close": 2580.0,
       "oi": 0.0,
       "prev_oi": 0.0,
@@ -38790,9 +38790,9 @@
       "ticker": "PFC",
       "name": "PFC",
       "capSize": "Nifty 500",
-      "ltp": "\u20b9373.85",
-      "ltpRaw": 373.85,
-      "delta": "2.15 (-0.57%)",
+      "ltp": "\u20b9375.00",
+      "ltpRaw": 375.0,
+      "delta": "1.00 (-0.27%)",
       "state": "NEGATIVE",
       "volume": null,
       "open": 376.0,
@@ -39588,13 +39588,13 @@
       "ticker": "PNB",
       "name": "PNB",
       "capSize": "Nifty 500",
-      "ltp": "\u20b9116.73",
-      "ltpRaw": 116.73,
-      "delta": "1.27 (-1.08%)",
+      "ltp": "\u20b9117.65",
+      "ltpRaw": 117.65,
+      "delta": "0.35 (-0.30%)",
       "state": "NEGATIVE",
       "volume": null,
       "open": 117.11,
-      "high": 117.39,
+      "high": 117.94,
       "low": 115.32,
       "close": 118.0,
       "oi": 0.0,
@@ -41547,13 +41547,13 @@
       "ticker": "RELIANCE",
       "name": "RELIANCE",
       "capSize": "Nifty 500",
-      "ltp": "\u20b91,305.60",
-      "ltpRaw": 1305.6,
-      "delta": "4.40 (-0.34%)",
-      "state": "NEGATIVE",
+      "ltp": "\u20b91,315.10",
+      "ltpRaw": 1315.1,
+      "delta": "5.10 (+0.39%)",
+      "state": "POSITIVE",
       "volume": null,
       "open": 1314.0,
-      "high": 1314.1,
+      "high": 1319.1,
       "low": 1298.1,
       "close": 1310.0,
       "oi": 0.0,
@@ -46728,9 +46728,9 @@
       "ticker": "TECHM",
       "name": "TECHM",
       "capSize": "Nifty 500",
-      "ltp": "\u20b91,612.80",
-      "ltpRaw": 1612.8,
-      "delta": "20.00 (-1.22%)",
+      "ltp": "\u20b91,605.00",
+      "ltpRaw": 1605.0,
+      "delta": "27.80 (-1.70%)",
       "state": "NEGATIVE",
       "volume": null,
       "open": 1621.0,
@@ -47819,9 +47819,9 @@
       "ticker": "TMPV",
       "name": "TMPV",
       "capSize": "Nifty 500",
-      "ltp": "\u20b9332.35",
-      "ltpRaw": 332.35,
-      "delta": "2.15 (-0.64%)",
+      "ltp": "\u20b9331.55",
+      "ltpRaw": 331.55,
+      "delta": "2.95 (-0.88%)",
       "state": "NEGATIVE",
       "volume": null,
       "open": 334.0,
@@ -49516,9 +49516,9 @@
       "ticker": "VEDL",
       "name": "VEDL",
       "capSize": "Nifty 500",
-      "ltp": "\u20b9269.25",
-      "ltpRaw": 269.25,
-      "delta": "1.75 (+0.65%)",
+      "ltp": "\u20b9270.00",
+      "ltpRaw": 270.0,
+      "delta": "2.50 (+0.93%)",
       "state": "POSITIVE",
       "volume": null,
       "open": 268.0,
@@ -51157,8 +51157,8 @@
     "morning": [
       {
         "label": "Nifty 50",
-        "val": "24,295.05",
-        "delta": "70.95 (-0.29%)",
+        "val": "24,336.60",
+        "delta": "29.40 (-0.12%)",
         "state": "NEGATIVE",
         "sparkline": [
           24334.3008,
@@ -51182,13 +51182,13 @@
           24435.9492,
           24395.8496,
           24366.0,
-          24294.3008
+          24336.3496
         ]
       },
       {
         "label": "Sensex",
-        "val": "77,695.95",
-        "delta": "313.30 (-0.40%)",
+        "val": "77,821.93",
+        "delta": "187.32 (-0.24%)",
         "state": "NEGATIVE",
         "sparkline": [
           78151.4531,
@@ -51212,14 +51212,14 @@
           77966.3516,
           78079.9609,
           78009.25,
-          77652.0938
+          77859.0312
         ]
       },
       {
         "label": "Nifty Bank",
-        "val": "57,350.55",
-        "delta": "140.55 (-0.24%)",
-        "state": "NEGATIVE",
+        "val": "57,595.00",
+        "delta": "103.90 (+0.18%)",
+        "state": "POSITIVE",
         "sparkline": [
           58521.3984,
           57945.0,
@@ -51242,13 +51242,13 @@
           57885.8516,
           57635.25,
           57491.1016,
-          57350.4492
+          57575.1484
         ]
       },
       {
         "label": "NIFTY IT",
-        "val": "30,915.75",
-        "delta": "442.00 (-1.41%)",
+        "val": "30,882.65",
+        "delta": "475.10 (-1.52%)",
         "state": "NEGATIVE",
         "sparkline": [
           29226.5996,
@@ -51272,13 +51272,13 @@
           31332.5508,
           31453.9004,
           31357.75,
-          30916.9004
+          30878.9492
         ]
       },
       {
         "label": "NIFTY PHARMA",
-        "val": "26,350.55",
-        "delta": "95.00 (-0.36%)",
+        "val": "26,379.05",
+        "delta": "66.50 (-0.25%)",
         "state": "NEGATIVE",
         "sparkline": [
           25645.0,
@@ -51302,7 +51302,7 @@
           26762.5,
           26686.8008,
           26445.5508,
-          26349.8496
+          26376.5996
         ]
       },
       {
@@ -51316,11 +51316,11 @@
       },
       {
         "label": "NIFTY SMALLCAP",
-        "val": "19,791.35",
-        "delta": "52.80 (+0.27%)",
+        "val": "19,791.70",
+        "delta": "53.15 (+0.27%)",
         "state": "POSITIVE",
         "sparkline": [
-          19791.9004
+          19788.8496
         ]
       },
       {
@@ -51350,13 +51350,13 @@
           95.3799,
           95.3443,
           95.4012,
-          95.5975
+          95.6025
         ]
       },
       {
         "label": "India VIX",
-        "val": "11.47",
-        "delta": "0.17 (+1.46%)",
+        "val": "11.39",
+        "delta": "0.09 (+0.80%)",
         "state": "POSITIVE",
         "sparkline": [
           13.15,
@@ -51380,13 +51380,13 @@
           11.69,
           11.42,
           11.31,
-          11.4625
+          11.39
         ]
       },
       {
         "label": "GIFT NIFTY",
-        "val": "24,341.50",
-        "delta": "-0.33%",
+        "val": "24,399.00",
+        "delta": "-0.09%",
         "state": "NEGATIVE",
         "sparkline": []
       }
@@ -51394,8 +51394,8 @@
     "evening": [
       {
         "label": "Nifty 50 Close",
-        "val": "24,295.05",
-        "delta": "70.95 (-0.29%)",
+        "val": "24,336.60",
+        "delta": "29.40 (-0.12%)",
         "state": "NEGATIVE",
         "sparkline": [
           24334.3008,
@@ -51419,13 +51419,13 @@
           24435.9492,
           24395.8496,
           24366.0,
-          24294.3008
+          24336.3496
         ]
       },
       {
         "label": "Sensex Close",
-        "val": "77,695.95",
-        "delta": "313.30 (-0.40%)",
+        "val": "77,821.93",
+        "delta": "187.32 (-0.24%)",
         "state": "NEGATIVE",
         "sparkline": [
           78151.4531,
@@ -51449,14 +51449,14 @@
           77966.3516,
           78079.9609,
           78009.25,
-          77652.0938
+          77859.0312
         ]
       },
       {
         "label": "Nifty Bank Close",
-        "val": "57,350.55",
-        "delta": "140.55 (-0.24%)",
-        "state": "NEGATIVE",
+        "val": "57,595.00",
+        "delta": "103.90 (+0.18%)",
+        "state": "POSITIVE",
         "sparkline": [
           58521.3984,
           57945.0,
@@ -51479,13 +51479,13 @@
           57885.8516,
           57635.25,
           57491.1016,
-          57350.4492
+          57575.1484
         ]
       },
       {
         "label": "NIFTY IT Close",
-        "val": "30,915.75",
-        "delta": "442.00 (-1.41%)",
+        "val": "30,882.65",
+        "delta": "475.10 (-1.52%)",
         "state": "NEGATIVE",
         "sparkline": [
           29226.5996,
@@ -51509,13 +51509,13 @@
           31332.5508,
           31453.9004,
           31357.75,
-          30916.9004
+          30878.9492
         ]
       },
       {
         "label": "NIFTY PHARMA Close",
-        "val": "26,350.55",
-        "delta": "95.00 (-0.36%)",
+        "val": "26,379.05",
+        "delta": "66.50 (-0.25%)",
         "state": "NEGATIVE",
         "sparkline": [
           25645.0,
@@ -51539,7 +51539,7 @@
           26762.5,
           26686.8008,
           26445.5508,
-          26349.8496
+          26376.5996
         ]
       },
       {
@@ -51553,11 +51553,11 @@
       },
       {
         "label": "NIFTY SMALLCAP Close",
-        "val": "19,791.35",
-        "delta": "52.80 (+0.27%)",
+        "val": "19,791.70",
+        "delta": "53.15 (+0.27%)",
         "state": "POSITIVE",
         "sparkline": [
-          19791.9004
+          19788.8496
         ]
       },
       {
@@ -51587,13 +51587,13 @@
           95.3799,
           95.3443,
           95.4012,
-          95.5975
+          95.6025
         ]
       },
       {
         "label": "India VIX Close",
-        "val": "11.47",
-        "delta": "0.17 (+1.46%)",
+        "val": "11.39",
+        "delta": "0.09 (+0.80%)",
         "state": "POSITIVE",
         "sparkline": [
           13.15,
@@ -51617,13 +51617,13 @@
           11.69,
           11.42,
           11.31,
-          11.4625
+          11.39
         ]
       },
       {
         "label": "GIFT NIFTY Close",
-        "val": "24,341.50",
-        "delta": "-0.33%",
+        "val": "24,399.00",
+        "delta": "-0.09%",
         "state": "NEGATIVE",
         "sparkline": []
       }
@@ -51762,8 +51762,8 @@
       },
       {
         "label": "HANG SENG",
-        "val": "25,550.72",
-        "delta": "433.87 (+1.73%)",
+        "val": "25,453.23",
+        "delta": "336.38 (+1.34%)",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live",
@@ -51789,13 +51789,13 @@
           25440.1699,
           25396.5098,
           25116.8496,
-          25550.7207
+          25453.2305
         ]
       },
       {
         "label": "SHANGHAI COMP",
-        "val": "3,981.04",
-        "delta": "53.86 (+1.37%)",
+        "val": "3,982.65",
+        "delta": "55.48 (+1.41%)",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live",
@@ -51821,13 +51821,13 @@
           3946.675,
           3926.9651,
           3927.177,
-          3981.04
+          3982.6536
         ]
       },
       {
         "label": "DAX",
-        "val": "26,440.31",
-        "delta": "140.61 (+0.53%)",
+        "val": "26,441.63",
+        "delta": "1.32 (+0.00%)",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live",
@@ -51852,13 +51852,14 @@
           26391.4199,
           26331.0703,
           26299.7402,
-          26440.3105
+          26440.3105,
+          26439.1191
         ]
       },
       {
         "label": "CAC 40",
-        "val": "8,636.80",
-        "delta": "13.76 (-0.16%)",
+        "val": "8,626.76",
+        "delta": "10.03 (-0.12%)",
         "state": "NEGATIVE",
         "group": "index",
         "source": "yahoo_finance_live",
@@ -51883,13 +51884,14 @@
           8714.9404,
           8674.9404,
           8650.5596,
-          8636.7998
+          8636.7998,
+          8626.1396
         ]
       },
       {
         "label": "FTSE 100",
-        "val": "10,750.11",
-        "delta": "0.00 (+0.00%)",
+        "val": "10,772.28",
+        "delta": "22.17 (+0.21%)",
         "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live",
@@ -51914,14 +51916,15 @@
           10844.2002,
           10833.2002,
           10772.7002,
-          10750.0996
+          10750.0996,
+          10770.6602
         ]
       },
       {
         "label": "EURO STOXX 50",
-        "val": "6,539.59",
-        "delta": "5.88 (-0.09%)",
-        "state": "NEGATIVE",
+        "val": "6,557.67",
+        "delta": "18.08 (+0.28%)",
+        "state": "POSITIVE",
         "group": "index",
         "source": "yahoo_finance_live",
         "sparkline": [
@@ -51945,7 +51948,8 @@
           6551.2202,
           6533.9902,
           6545.4702,
-          6539.5898
+          6539.5898,
+          6557.0601
         ]
       },
       {
@@ -52018,8 +52022,8 @@
     "commodities": [
       {
         "label": "GOLD",
-        "val": "$4,458.60/oz",
-        "delta": "21.30 (+0.48%)",
+        "val": "$4,457.60/oz",
+        "delta": "20.30 (+0.46%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
@@ -52045,13 +52049,13 @@
           4408.8999,
           4363.6001,
           4380.3999,
-          4458.6001
+          4457.7998
         ]
       },
       {
         "label": "SILVER",
-        "val": "$66.06/oz",
-        "delta": "0.95 (+1.46%)",
+        "val": "$65.73/oz",
+        "delta": "0.62 (+0.96%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
@@ -52077,14 +52081,14 @@
           65.555,
           64.873,
           64.988,
-          66.06
+          65.745
         ]
       },
       {
         "label": "BRENT CRUDE OIL",
-        "val": "$88.41 / bbl",
-        "delta": "0.11 (-0.12%)",
-        "state": "NEGATIVE",
+        "val": "$88.74 / bbl",
+        "delta": "0.22 (+0.25%)",
+        "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
@@ -52109,13 +52113,13 @@
           88.98,
           87.07,
           88.52,
-          88.41
+          88.76
         ]
       },
       {
         "label": "WTI CRUDE",
-        "val": "$81.85 / bbl",
-        "delta": "0.55 (-0.67%)",
+        "val": "$82.08 / bbl",
+        "delta": "0.32 (-0.39%)",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
@@ -52141,13 +52145,13 @@
           83.27,
           81.25,
           82.4,
-          81.85
+          82.13
         ]
       },
       {
         "label": "NATURAL GAS",
-        "val": "$2.648 / MMBtu",
-        "delta": "0.08 (-3.11%)",
+        "val": "$2.646 / MMBtu",
+        "delta": "0.09 (-3.18%)",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
@@ -52173,18 +52177,17 @@
           2.804,
           2.727,
           2.733,
-          2.648
+          2.645
         ]
       },
       {
         "label": "BITCOIN",
-        "val": "$63,534.46",
-        "delta": "1,513.41 (-2.33%)",
+        "val": "$63,352.89",
+        "delta": "1,694.98 (-2.61%)",
         "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
-          64796.6016,
           64690.8047,
           65230.0273,
           66505.125,
@@ -52213,13 +52216,14 @@
           63402.1719,
           62975.5938,
           63024.3203,
-          63534.4609
+          62818.6523,
+          63346.4883
         ]
       },
       {
         "label": "COPPER",
-        "val": "$6.72",
-        "delta": "0.11 (+1.67%)",
+        "val": "$6.69",
+        "delta": "0.07 (+1.10%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
@@ -52245,13 +52249,13 @@
           6.597,
           6.5925,
           6.5995,
-          6.7235
+          6.6855
         ]
       },
       {
         "label": "PLATINUM",
-        "val": "$1,773.90/oz",
-        "delta": "17.00 (+0.97%)",
+        "val": "$1,769.30/oz",
+        "delta": "12.40 (+0.71%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
@@ -52277,13 +52281,13 @@
           1761.1,
           1725.2,
           1750.0,
-          1773.9
+          1769.9
         ]
       },
       {
         "label": "PALLADIUM",
-        "val": "$1,335.50/oz",
-        "delta": "10.00 (+0.75%)",
+        "val": "$1,339.00/oz",
+        "delta": "13.50 (+1.02%)",
         "state": "POSITIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
@@ -52309,14 +52313,14 @@
           1370.2,
           1322.6,
           1322.5,
-          1335.5
+          1339.0
         ]
       },
       {
         "label": "WHEAT",
-        "val": "$690.00",
-        "delta": "0.50 (+0.07%)",
-        "state": "POSITIVE",
+        "val": "$686.75",
+        "delta": "2.75 (-0.40%)",
+        "state": "NEGATIVE",
         "group": "commodity",
         "source": "yahoo_finance_live",
         "sparkline": [
@@ -52341,12 +52345,246 @@
           652.75,
           652.75,
           674.75,
-          690.5
+          687.25
         ]
       }
     ]
   },
   "news": [
+    {
+      "source": "News18 Business",
+      "title": "Real Estate: Homes Between Rs 1.5 Crore and Rs 3 Crore Emerge as Sweet Spot, Account for 37% of Housing Sales",
+      "link": "https://www.news18.com/business/real-estate/real-estate-homes-between-rs-1-5-crore-and-rs-3-crore-emerge-as-sweet-spot-account-for-37-of-housing-sales-10277362.html",
+      "summary": "According to JLL, housing sales in the Rs 1.5-3 crore price bracket jump 58% year-on-year to 51,231 units in H1 2026.",
+      "publishedAt": "2026-08-17T08:41:43+00:00",
+      "sentiment": "Neutral",
+      "category": "Market"
+    },
+    {
+      "source": "Livemint Markets",
+      "title": "India's steel pipe makers tap West Asia as all eyes on energy transport",
+      "link": "https://www.livemint.com/market/steel-pipe-stocks-west-asia-oil-gas-pipeline-demand-welspun-corp-jindal-saw-man-industries-ratnamani-11786944806720.html",
+      "summary": "Geopolitical tensions are pushing West Asian countries to invest in new pipelines and safer overland energy routes, opening up a growth opportunity for Indian pipe makers. Welspun Corp, Jindal Saw, Man Industries and Ratnamani Metals are expanding in the region to tap this demand.",
+      "publishedAt": "2026-08-17T08:39:50+00:00",
+      "sentiment": "Neutral",
+      "category": "Market"
+    },
+    {
+      "source": "Livemint Opinion",
+      "title": "Brave new world: How an obsession with tech-enabled efficiency could turn us into zombies",
+      "link": "https://www.livemint.com/opinion/online-views/brave-new-world-tech-enabled-efficiency-obsession-zombies-driverless-cars-ai-artificial-intelligence-11786888585118.html",
+      "summary": "Efficiency is not the be-all and end-all of every human endeavour, but technologists seem bent on taking it to an extreme. It may be a good idea to be a luddite if technology insists on stripping our choices away and pushing us to lead soulless lives.",
+      "publishedAt": "2026-08-17T08:31:11+00:00",
+      "sentiment": "Neutral",
+      "category": "Market"
+    },
+    {
+      "source": "Livemint Companies",
+      "title": "Global PE fund Permira may lead race to acquire $150-200 mn stake in Cloudnine Hospitals",
+      "link": "https://www.livemint.com/companies/news/permira-cloudnine-hospitals-stake-deal-private-equity-11786942652788.html",
+      "summary": "The likely deal will be secondary in nature, with existing investor True North looking to sell its over decade-old stake in Cloudnine",
+      "publishedAt": "2026-08-17T08:30:30+00:00",
+      "sentiment": "Neutral",
+      "category": "Global"
+    },
+    {
+      "source": "Livemint Money",
+      "title": "Invesco mutual fund: 3 international schemes resume existing SIPs from August 18, but new registrations remain shut",
+      "link": "https://www.livemint.com/money/personal-finance/invesco-mutual-fund-3-international-schemes-resume-existing-sips-from-august-18-but-new-registrations-remain-shut-11786954395030.html",
+      "summary": "Invesco Mutual Fund is reopening select existing SIPs and STPs in three international fund-of-funds from 18 August. The reopening comes as overseas investment limits continue to restrict fresh investments in international mutual funds.",
+      "publishedAt": "2026-08-17T08:27:39+00:00",
+      "sentiment": "Neutral",
+      "category": "Economy"
+    },
+    {
+      "source": "Livemint Markets",
+      "title": "Vijay Kedia portfolio: Arihant Capital sees over 90% upside in this infra stock. Should you buy?",
+      "link": "https://www.livemint.com/market/stock-market-news/vijay-kedia-portfolio-arihant-capital-sees-over-90-upside-in-this-infra-stock-should-you-buy-11786952782416.html",
+      "summary": "SPML Infra shares rose over 2% after Arihant Capital initiated a Buy rating with a target price of \u20b9366, expecting revenue growth supported by a strong order book of \u20b95,369 crore and improved financials, marking a significant turnaround for the infrastructure company.",
+      "publishedAt": "2026-08-17T08:21:06+00:00",
+      "sentiment": "Bullish",
+      "category": "Earnings"
+    },
+    {
+      "source": "Inc42",
+      "title": "Snabbit Ropes In Klydo Cofounder Pradeep Yadav To Helm Operations",
+      "link": "https://inc42.com/buzz/snabbit-ropes-in-klydo-cofounder-pradeep-yadav-to-helm-operations/",
+      "summary": "Quick home services soonicorn Snabbit has roped in fashion-focused quick commerce startup Klydo\u2019s cofounder Pradeep Yadav as head of operations,&#8230;",
+      "publishedAt": "2026-08-17T08:15:46+00:00",
+      "sentiment": "Neutral",
+      "category": "Corporate"
+    },
+    {
+      "source": "Livemint Markets",
+      "title": "Reliance shares briefly slip below \u20b91,300 amid volatility: Buy the dip or wait?",
+      "link": "https://www.livemint.com/market/stock-market-news/reliance-shares-briefly-slip-below-1-300-amid-volatility-buy-the-dip-or-wait-11786950918125.html",
+      "summary": "Year-to-date, Reliance share price is down over 16% compared to a nearly 9% decline in the benchmark Sensex. The heavyweight stock hit a 52-week low of \u20b91,250.55 on 24 July after hitting a 52-week high of \u20b91,611.20 on 5 January this year.",
+      "publishedAt": "2026-08-17T08:12:30+00:00",
+      "sentiment": "Neutral",
+      "category": "Global"
+    },
+    {
+      "source": "News18 Markets",
+      "title": "Market Update: Sensex Recovers Over 360 Points From Day's Low, Nifty Rises Above 24,300",
+      "link": "https://www.news18.com/business/markets/sensex-falls-295-points-nifty-opens-below-24350-as-iran-us-tensions-weigh-on-sentiment-10276929.html",
+      "summary": "The Sensex was at 77,864.64, down 144.61 points or 0.19%, as of 1:32 pm, while the Nifty 50 stood at 24,348.05, down 17.95 points or 0.07%.",
+      "publishedAt": "2026-08-17T08:06:20+00:00",
+      "sentiment": "Neutral",
+      "category": "Global"
+    },
+    {
+      "source": "Fortune India",
+      "title": "India\u2019s deeptech funding hits record high as capital shifts to frontier technologies: Report - Fortune India",
+      "link": "https://news.google.com/rss/articles/CBMi1wFBVV95cUxOSnZYbFlvVzJERTBIUjZDMUJVZ1pMNVM1S05lLWN2R244SkhpU0RIUHV3YjVjaHhBaGJNMmY3UTlCRGoyYmFhY1QxV09Obk1ZQmp1SDhmOV90VTlaMW9SdlhaSFRzZUpSTFljdkZCdUNXcm9ibGwyS19lVlhWYlpXOXRmdjdLTV95SHE5YkJwWTUyaDJhZjROWXJxeGhmdDFnTk15ZXMwMlpOZFFsZmV2MlVDcjJ6V1dyOXp5bTRGVnAzT0RJQzRual9mbzdCbWtiWHJ0eFJld9IB5AFBVV95cUxPYmYyMDNFUlZIV3lRc2U1YWQ1aEFtNVd0SG40MDI5ZHJfbUpUTGJlbXBOUjkyY2RrRldkUHlud1YzeERxSlBvWmRUa01nSDBhbDZoYmNPNy04czM3blFWSlIySmVHQWliSzJLUkRmSjFoeHNYZ19YYnplWjZqUmVWbDIwMGJ4aXhPdE1oR1RkZHRyNVRZQ3A2RW8yNUJhM2JKQjdBMVlyY0MxaDZHbTIyVFNvbzB2Nlk4Z0JoY2RTUm5KRjh5aFQwWmNEOThtbkRHNWN2am5RamJYdUVPYlNtOVdSaFY?oc=5",
+      "summary": "India\u2019s deeptech funding hits record high as capital shifts to frontier technologies: Report&nbsp;&nbsp;Fortune India",
+      "publishedAt": "2026-08-17T07:52:39+00:00",
+      "sentiment": "Bullish",
+      "category": "Corporate"
+    },
+    {
+      "source": "Sahi",
+      "title": "Shiprocket IPO Allotment Status: Check GMP & Listing Date - Sahi",
+      "link": "https://news.google.com/rss/articles/CBMiakFVX3lxTE45QVFOLU9aMkhWMW9heDRHYm5ESzVtdUZ0VE04MFBhY1R4ZkpGT0J2WjdMbWVMUzVrRnpRT3FRNEhtZXBvYjRDUjFhYlVFRk9oMnFsQmR5dDMxNm1EOFVfcjNxRVRqZ19CT2c?oc=5",
+      "summary": "Shiprocket IPO Allotment Status: Check GMP & Listing Date&nbsp;&nbsp;Sahi",
+      "publishedAt": "2026-08-17T07:51:44+00:00",
+      "sentiment": "Neutral",
+      "category": "Corporate"
+    },
+    {
+      "source": "Crude Oil Prices Today | OilPrice.com",
+      "title": "Indian Oil Giant Secures U.S. License to Return to Venezuela - Crude Oil Prices Today | OilPrice.com",
+      "link": "https://news.google.com/rss/articles/CBMitAFBVV95cUxNTUI3Z2tRUndIVi1oYjY0QXM3V1pNbk5Gb0cxODVXLVZXUnZkdktqNmwzeXhrYkdpYTR3dG5OOVhKZGdwMDlvcFVmdmhJazV2V01BMDdOUXRVX3ZfNmdRZXlsdHdyR2d0OVhvTVV4SDBNSDZheEhJbWFQXzUtMUkxdGRNRlNKQ194ZFhXU2JtaUg3MzIzYUJxOG0wdFRTNnN4Q2ViUGFlT0hyRHphaEN2SEZmaDbSAboBQVVfeXFMTXFDZFlQX2x4S0NMRWtyNUJyTXlMWVkwNEdlb3pRYVpwRmI0aThGeGhCSi1iMXpEbU1nQmRrb3JlYUhzaHo3Q2hPQWxFM3NKVGtaaENhTFJ2ZDFIQ0dQTzFqdFZTNE1rX1ItSGtVYmNfeTQ1U3g0X3Q1cTU0aFJlaFE3SDc3ME9rb1VPckpXYTIwaUlIWHlnMlZhemR1a3dCN01LUWpaSkVlTzBnOTFrdURoeVVpa1IxUlRn?oc=5",
+      "summary": "Indian Oil Giant Secures U.S. License to Return to Venezuela&nbsp;&nbsp;Crude Oil Prices Today | OilPrice.com",
+      "publishedAt": "2026-08-17T07:50:00+00:00",
+      "sentiment": "Neutral",
+      "category": "Commodity"
+    },
+    {
+      "source": "Livemint Markets",
+      "title": "Baazar Style Retail shares hit 5% upper circuit on reports of Aditya Halwasia buying company shares worth \u20b9163 crore",
+      "link": "https://www.livemint.com/market/stock-market-news/baazar-style-retail-shares-hit-5-upper-circuit-on-reports-of-aditya-halwasia-buying-company-shares-worth-163-crore-11786948034095.html",
+      "summary": "Bazaar Style Retail shares opened at \u20b9384.45 apiece today, as compared to previous close of \u20b9366.15 on Friday last week.",
+      "publishedAt": "2026-08-17T07:38:49+00:00",
+      "sentiment": "Neutral",
+      "category": "Market"
+    },
+    {
+      "source": "Inc42",
+      "title": "PhysicsWallah Jumps 9.5% After Q1 Results, JPMorgan & JM Financial Upgrade Rating",
+      "link": "https://inc42.com/buzz/physicswallah-jumps-9-5-after-q1-results-jpmorgan-jm-financial-upgrade-rating/",
+      "summary": "Shares of edtech company Physics Wallah rallied as much as 9.5% to an intraday high of \u20b9128.35 apiece on the&#8230;",
+      "publishedAt": "2026-08-17T07:36:58+00:00",
+      "sentiment": "Bullish",
+      "category": "Earnings"
+    },
+    {
+      "source": "Indian Express Business",
+      "title": "Initial drug tests of 2 more Air India pilots \u2018non-negative\u2019, confirmatory test results awaited",
+      "link": "https://indianexpress.com/article/business/air-india-pilots-drug-tests-results-awaited-non-negative-confirmatory-10836843/",
+      "summary": "",
+      "publishedAt": "2026-08-17T07:36:36+00:00",
+      "sentiment": "Neutral",
+      "category": "Earnings"
+    },
+    {
+      "source": "Livemint Money",
+      "title": "Sold ESOP shares after moving abroad? ITAT Mumbai says exercise-date FMV can be treated as cost of acquisition",
+      "link": "https://www.livemint.com/money/personal-finance/sold-esop-shares-after-moving-abroad-itat-mumbai-says-exercise-date-fmv-can-be-treated-as-cost-of-acquisition-11786951347296.html",
+      "summary": "A UK-based employee sold 1,540 ESOP shares for nearly \u20b926 lakh but reported a \u20b91 lakh short-term capital loss using the shares' FMV as cost. The Mumbai ITAT ruled that the FMV on the ESOP exercise date can be treated as the cost of acquisition, even when the ESOP benefit was not taxed in India.&amp;nbsp;",
+      "publishedAt": "2026-08-17T07:30:25+00:00",
+      "sentiment": "Neutral",
+      "category": "Corporate"
+    },
+    {
+      "source": "The Economic Times",
+      "title": "Sensex Today | Nifty50 | Stock Market LIVE Updates: Sensex falls over 200 pts, Nifty below 24,350; IT, PS... - The Economic Times",
+      "link": "https://news.google.com/rss/articles/CBMilgJBVV95cUxQX2dlV2VwYUlWUk9udEMwYmcxWjFJc0E5dUJDX3NNRzJuRjRHUml1VVU4VjRkSzROdVg4M2RHYWFVazdGSVFFZW9MUjl0a2VaOWZ1cm0zZ3g2cGJQNEpGMVRxTERQWFZ0R1Nmbng2aG5wUTFrWnZnZlAxcjhlVFVoWlBHc1V3OEVDdUJtX1NMLS1tOTVDVEV0NlJsY0wtTVZleVBPN2I2bFVRRFh3LW9waTFpTjFxV0JKM0RDYTB4VllTWUtPWlZfRFltR2NiSUFwNTRSdFdwTWFiTUtfcGtTQTlzMk1LS1NxaUNuZ1NKbndJNGRqUUR4U200RWZXbUlGZHhQeFUyWVFfSGNlcVFIcXhEVVktZ9IBmwJBVV95cUxPWVFMZTJYZ2pJckRwWkJET01sczN4TW1qWFFNdkNVWkltNmxSN0U1b01qcXBMbnFzbWRuaUhQeGZxUVZjMW9XUkkzQ18yUWJOZmxSM1VnOUhnR2l2dWpjaEtJckJiZkw0MkpCVlJLZDV0bVNuR1NJcnVURlgyOFpVYTByWE85X2w4clRNXzZuSlJzalg5NWNsLUN1WnUzdndjN2V2TDFqV0FmRFVMQkNRYnVZZDRaUjhtRVBIYWw1UmtFcHNENWZZZGVvR1dYMVh5cFZFQVRWQWhxQzl4bkxPX0syOHFXXy15RmpaaUtXbFpYa3Z1a1p2dTdjWk9BRWdJZHpFSTdQS0UyNC1IMVFkV05wLWUzbFBzdzY4?oc=5",
+      "summary": "Sensex Today | Nifty50 | Stock Market LIVE Updates: Sensex falls over 200 pts, Nifty below 24,350; IT, PS...&nbsp;&nbsp;The Economic TimesSensex falls 500 pts, Nifty below 24,250: Elevated crude oil prices among key factors behind market...&nbsp;&nbsp;Moneycontrol.comSensex rises 400 pts from day's low, Nifty above 24,350: Key reasons behind sharp market recovery&nbsp;&nbsp;Moneycontrol.comStock M",
+      "publishedAt": "2026-08-17T07:20:30+00:00",
+      "sentiment": "Neutral",
+      "category": "Earnings"
+    },
+    {
+      "source": "Moneycontrol.com",
+      "title": "$60 crude, not $150? Julius Baer\u2019s Mark Matthews sees oil falling and rupee pressure easing - Moneycontrol.com",
+      "link": "https://news.google.com/rss/articles/CBMi7AFBVV95cUxPYXZSUTZUNjVXdTdvbDBFeTdyUEhfTENxdHYza1BoZC1PYVlnWkg1NVFEdkcxQndkb29VSll2U0xtMG9YZmlrM2h4ZXlDdTNrYkdmclpITTZIS0c1cFFtTU5xODhYbWFXTmxsNF9JTU9fTFczQTEtTVIwT1RQVW5lLTdzUEk4OTBXMjlIUk5ETTRSaUJkaFc4U0x3V0ZxU1ZGaVJxMk1rOTUxNlVzcHRtWnRtMkI5d2d3MWcxZXloY2dWR2x4dC1wVXg2eXhCZDJLb29pd0hBRWxldzJ4UGlPVjR0U25xTlNMV0pVatIB7AFBVV95cUxPYXZSUTZUNjVXdTdvbDBFeTdyUEhfTENxdHYza1BoZC1PYVlnWkg1NVFEdkcxQndkb29VSll2U0xtMG9YZmlrM2h4ZXlDdTNrYkdmclpITTZIS0c1cFFtTU5xODhYbWFXTmxsNF9JTU9fTFczQTEtTVIwT1RQVW5lLTdzUEk4OTBXMjlIUk5ETTRSaUJkaFc4U0x3V0ZxU1ZGaVJxMk1rOTUxNlVzcHRtWnRtMkI5d2d3MWcxZXloY2dWR2x4dC1wVXg2eXhCZDJLb29pd0hBRWxldzJ4UGlPVjR0U25xTlNMV0pVag?oc=5",
+      "summary": "$60 crude, not $150? Julius Baer\u2019s Mark Matthews sees oil falling and rupee pressure easing&nbsp;&nbsp;Moneycontrol.com",
+      "publishedAt": "2026-08-17T07:12:42+00:00",
+      "sentiment": "Neutral",
+      "category": "Commodity"
+    },
+    {
+      "source": "News18 Business",
+      "title": "Suryoday Small Finance Bank Hikes FD Rates; Senior Citizens Can Earn Up to 8.50%",
+      "link": "https://www.news18.com/business/banking-finance/suryoday-small-finance-bank-hikes-fd-rates-senior-citizens-can-earn-up-to-8-50-ws-l-10277281.html",
+      "summary": "Under the revised rates, regular customers can earn up to 8.25% per annum on select fixed deposit tenures, while senior citizens can earn up to 8.50% per annum.",
+      "publishedAt": "2026-08-17T07:09:25+00:00",
+      "sentiment": "Neutral",
+      "category": "Regulatory"
+    },
+    {
+      "source": "Open Magazine",
+      "title": "India\u2019s Bank NPAs at Record Low: What Will the New Banking Reforms Committee Do? - Open Magazine",
+      "link": "https://news.google.com/rss/articles/CBMisAFBVV95cUxOMUZUUVFLTWtMVzVKU3RDNXpQV1BrQkdKTHh3dm9JYS1aVzZERUhLby1qOTJiUkh0TzdqRWN2bWVXNzR1dzZ6cmx0cF9scmZGbjk3U0VsaDJ5R195TEFTWDYwNlN0NC10V3NUTW1HZEpfYlJ0MndLeGRLZXlkN2hnOGZ2azVDYm9RU0pzSWZLTmRKTU9Pa3VXV2lhUUFZdnhVYk4xQkhiMXlqZzRPOEJ3Qw?oc=5",
+      "summary": "India\u2019s Bank NPAs at Record Low: What Will the New Banking Reforms Committee Do?&nbsp;&nbsp;Open Magazine",
+      "publishedAt": "2026-08-17T07:06:17+00:00",
+      "sentiment": "Bearish",
+      "category": "Regulatory"
+    },
+    {
+      "source": "Firstpost",
+      "title": "FPIs reverse course on India: Is the worst of the selling over? - Firstpost",
+      "link": "https://news.google.com/rss/articles/CBMirwFBVV95cUxQQjZkNUEzazBOOTBnLXA1NG1odUl4Y1phVlpLTkplVXl6bXVHUGlEZmlvREJ6VUp0bFdiSXg1N05pbk1NbUhzbllmanpsOUFWOGR4blBpTFc4WUtrakRTc21vSzJjUk53VGYxVlJtN1V1UlV3Y0VKRk9BZ0lfWDRmeVEzNks4XzE4X21zYU1HOWVhVnNTelFCRFZkekUwSGhhME9kZFFjYWl6d0RuaDZv0gG0AUFVX3lxTE5xV3FLbHBsSkZ6R1kzOTV3bUp0dHRhbDFES2ZFTXQ5VkNoTTZVR2FOb1hVOUFpN3UwRWUybTBnY3hvWW9kUkJKaFJCUnRCcTluTldMX0pJS1lwbmdzQWNwYk1FaVFTZkhfOXRnRmV3SDVnYURUNzY2aUYwSVJQZHNSelI4UjBzZXJ3bWM0eTBuV2k1RnhkcnQ3ZmN0WmJJRmhVN1pTTGRTUzBoWGFEa2tXYW5rNg?oc=5",
+      "summary": "FPIs reverse course on India: Is the worst of the selling over?&nbsp;&nbsp;Firstpost",
+      "publishedAt": "2026-08-17T07:06:03+00:00",
+      "sentiment": "Neutral",
+      "category": "Market"
+    },
+    {
+      "source": "bfsi.economictimes.indiatimes.com",
+      "title": "NPA is at the lowest ever Indian banking has seen, says FM Nirmala Sitharaman - bfsi.economictimes.indiatimes.com",
+      "link": "https://news.google.com/rss/articles/CBMi2AFBVV95cUxPZE1MNldOcTNFS01xNTNWdnBFaVdzVjFBdkNFOXlMT1NLV0s2X3BLclYxZE56bGlFdDhlMnJFUFFTY05FZGUyWEpzY1IwQXBkU1RiTXFqVUpZOXBQNTlsOEwxVEUweExyX1ktcU51YjV1X1gyNVZ5eEd2VjhVNUFib3BCNVZ0aTk2Q1JTZ284YW9SQjMyaHpfdlhCSk1qLTE0YXBpWlN6YW9FaWFYa3pDVmlfRWY4QWlaS2tUZDRDRmhGMFlqQTVrMFZNNmNlOFkyRDhlS1pnZWvSAdgBQVVfeXFMT2RNTDZXTnEzRUtNcTUzVnZwRWlXc1YxQXZDRTl5TE9TS1dLNl9wS3JWMWROemxpRXQ4ZTJyRVBRU2NORWRlMlhKc2NSMEFwZFNUYk1xalVKWTlwUDU5bDhMMVRFMHhMcl9ZLXFOdWI1dV9YMjVWeXhHdlY4VTVBYm9wQjVWdGk5NkNSU2dvOGFvUkIzMmh6X3ZYQkpNai0xNGFwaVpTemFvRWlhWGt6Q1ZpX0VmOEFpWktrVGQ0Q0ZoRjBZakE1azBWTTZjZThZMkQ4ZUtaZ2Vr?oc=5",
+      "summary": "NPA is at the lowest ever Indian banking has seen, says FM Nirmala Sitharaman&nbsp;&nbsp;bfsi.economictimes.indiatimes.com",
+      "publishedAt": "2026-08-17T07:02:54+00:00",
+      "sentiment": "Bearish",
+      "category": "Regulatory"
+    },
+    {
+      "source": "Livemint Companies",
+      "title": "Anthropic IPO valuation hinges on $190-200 billion 2028 revenue forecast, sources say",
+      "link": "https://www.livemint.com/companies/anthropic-ipo-valuation-hinges-on-190-200-billion-2028-revenue-forecast-sources-say-11786950086691.html",
+      "summary": "ANTHROPIC-IPO:Anthropic IPO valuation hinges on $190-200 billion 2028 revenue forecast, sources say",
+      "publishedAt": "2026-08-17T07:01:26+00:00",
+      "sentiment": "Neutral",
+      "category": "Earnings"
+    },
+    {
+      "source": "Livemint Opinion",
+      "title": "Dovish views on inflation are abundant but the arguments being made are unconvincing",
+      "link": "https://www.livemint.com/opinion/online-views/dovish-views-on-inflation-arguments-unconvincing-monetary-policy-interest-rates-11786888415856.html",
+      "summary": "Those keen on an easy money policy argue that price instability isn\u2019t a problem in India. While their reasons may sound coherent, the case they make for lower rates of interest usually falls flat. Here's why.",
+      "publishedAt": "2026-08-17T07:01:09+00:00",
+      "sentiment": "Neutral",
+      "category": "Economy"
+    },
+    {
+      "source": "News18 Business",
+      "title": "Sebi Chief Calls for Collective Cyber Resilience as Threats Grow More Sophisticated",
+      "link": "https://www.news18.com/business/markets/sebi-chief-calls-for-collective-cyber-resilience-as-threats-grow-more-sophisticated-ws-l-10277274.html",
+      "summary": "Pandey says key question for financial institutions is no longer whether a cyberattack will occur, but how quickly they can detect, contain, recover from and learn from incident.",
+      "publishedAt": "2026-08-17T06:39:15+00:00",
+      "sentiment": "Neutral",
+      "category": "Regulatory"
+    },
+    {
+      "source": "BusinessLine",
+      "title": "Gold Rate Today, Aug 17: Check latest Gold prices in Mumbai, Ahmedabad, Chennai Delhi, Bengaluru, Hyderabad, Kolkata & Other Cities - BusinessLine",
+      "link": "https://news.google.com/rss/articles/CBMiiAJBVV95cUxNM0N3RHlEc090ZWl2ZWtjcDNLRlRXeG5TLXRkUkVEVUo4bllUQlZNNjQyb2pXV0Q2MkRXWWw4YzlJcjNDY2JLcGNsUHBsRzRueHRkSVZFWmZaQUxEWTRGMEZsLU5VUk1nY1NVaHZxRlNUdllaclRBdU11Ykx0UUtWcUh5X255b2RZUWVTWW1qQ0V4aS1kVkI0aE9ES2lOS0pXY1o0LUVfcGIzTGNwTVJGSEdFek02eGdaT1F6UVZuTV9vdGE4UGdqNXRWX3ZlZ0djb1k4cng4NnlfaVRzaDlLWXNKeEVmY2t0TTc3WEJuc0NzdUJlSFhsMHJzaHdtWGhCcW5ITjRDQzPSAY8CQVVfeXFMTi1vSXZKYmgxMVVJY3R3TWlYN2VPd25yVDQxVTNpS2xTakR0eEF2OUs4UWJGSTh3OVlwQlQyMjk4ZjNwSXZyWmRieEF5Yy1HMm5WU3pqa2QwZXhRQnNfWWtRWTJSSUVURjdueXVfY0NjTWRaLVphbUx1cWpuX0VNNVptYjFqb0xrc3JhaHJINkMwSmtDSXRiUXBOZ0c4V1J3ZlZ0ZXhnMTJVVlppT1hBTm42UUUzWHh4a0Y1UXhvNVpvaklVLWUySVVWRnNKWXluZmhkOXFCOWFqOWZ1UEkzWHA0MURUbzVXSWd0TkgtdGw0MzNYX0JKbXdNM1RFZlBuOFZMTXBtOXF4a3JTenJURQ?oc=5",
+      "summary": "Gold Rate Today, Aug 17: Check latest Gold prices in Mumbai, Ahmedabad, Chennai Delhi, Bengaluru, Hyderabad, Kolkata & Other Cities&nbsp;&nbsp;BusinessLine",
+      "publishedAt": "2026-08-17T06:35:52+00:00",
+      "sentiment": "Neutral",
+      "category": "Commodity"
+    },
     {
       "source": "News18 Business",
       "title": "FM Nirmala Sitharaman Says Govt To Set Up High-Powered Panel On Banking Reforms For Viksit Bharat",
@@ -52366,15 +52604,6 @@
       "category": "Corporate"
     },
     {
-      "source": "NDTV Profit",
-      "title": "Crude Oil May Fall To $60 A Barrel; India To Benefit, Says Julius Baer's Mark Matthews - NDTV Profit",
-      "link": "https://news.google.com/rss/articles/CBMizgFBVV95cUxPWnRULWFDQVlqdVMzajVyUXBmSXhpUmlKZWJfLWNLcmZhWldrQW96akdJbnB4ZWplUFI5a0l1ZzJsakV4TkRETTZ0ai1JT1FtR1JLS3NvaUFMaTljN3IxcFhDQlJJNVZadzVrc0Fjb0Z4TENESU1nRkhiOXFzbGMwNWRUS3h2YmFPa2hDVVNUd0pVUDhIVTQxQndVc092NS1zYkVQcUVEbmx0QjVqQXF0TC1LUXRxMkRLaHZLcDZ5SnMzdGJzTjdCS1lPZmI1Z9IB1gFBVV95cUxQdWlTd0lZZXU1SnA0akI4UGNKUEJiQnNoaGxyYzQzTVl1alRRUEdvZTYzaEJ0OHY2RFNIVTY0Wjc4STlnUEZWU2hHRkd3Q3k4TkxRdXU0and0NjRFN3lyYlJmNmd1cDJ2ZU9LdHBYMnhYSnYyYU1wTTlvRjhKdld5RHhSVmVIcWJYdXV5MmVaVUwzeXltSGVlcjN4cWRERkFwLV9IdFBORE5UbEljZHRSUnllN2ZPQkw3R21KNGVvQ1JWVTh3Y1Q0RDA1R1A4WmlYbHM4Y0Vn?oc=5",
-      "summary": "Crude Oil May Fall To $60 A Barrel; India To Benefit, Says Julius Baer's Mark Matthews&nbsp;&nbsp;NDTV Profit",
-      "publishedAt": "2026-08-17T06:29:05+00:00",
-      "sentiment": "Neutral",
-      "category": "Earnings"
-    },
-    {
       "source": "Fortune India",
       "title": "Bank NPAs at historic low, time for fresh reforms: Nirmala Sitharaman at PSB Confluence - Fortune India",
       "link": "https://news.google.com/rss/articles/CBMi3wFBVV95cUxONkxVMlZpa1E3dExHWnBELU1JNEl1aFd6Z3NxNHpuS25VMXBVaHJLLS1tYzZyczBjeHdLd29zRXR0MWg5VWU3TGUyYTRzUGVURmpNYlJ5LW1XNUVsaXE0d2wtUzMyRXhzSXZIcnRFZ1kwSFQyelpyN2gwc0lubnpoRElwVjByMTg2RUtLUjIzTXBPck9MUFJVX3Q5d05KQ1QtRlYzeEs1TVBraU5XVXVNWnVJRms4MlZFUXNucm1VRFZoSFpXMmtfeTVfVzJPNjV4MWFFTXJfTVVwa25PeFVn0gHsAUFVX3lxTE9iOGQ2MzJWVVpqTGw1NGhqMTZuNTg5U3RCQ3pZYU9xcDAzQ1JCQ21zSVRIel9zVWNrdTJOT25YY3RibHJ3NUZ4QllURkhIRlUyLUltT2ZDbmVXa192NV9xMUF6d3RTVHExTXVQMEJ2NTYwVVlJVVlERjQ1dDNacXRpUVU0Mk5BUHhBaG82TXlnS2QwaFRERHZ3aVVoTmZTNjZxQ3Rvd0F1b1p6U2QtU0Q3ZE02YWp0QnBBVG03d3ktM1J1bDMxZlExVnFfelV4THNzNGpZNlJSLXV0T25XbGNLaTBENVhfYnpaa25j?oc=5",
@@ -52382,6 +52611,33 @@
       "publishedAt": "2026-08-17T06:27:56+00:00",
       "sentiment": "Bearish",
       "category": "Regulatory"
+    },
+    {
+      "source": "Inc42",
+      "title": "Karnataka HC Quashes Sessions Court Orders To Defreeze Jar\u2019s Accounts",
+      "link": "https://inc42.com/buzz/karnataka-hc-quashes-sessions-court-orders-to-defreeze-jars-accounts/",
+      "summary": "The Karnataka High Court has quashed three Sessions Court orders directing the release of gold and silver and defreezing of&#8230;",
+      "publishedAt": "2026-08-17T06:11:17+00:00",
+      "sentiment": "Neutral",
+      "category": "Regulatory"
+    },
+    {
+      "source": "thehindu.com",
+      "title": "Price taker to price setter: India\u2019s commodity derivatives market - thehindu.com",
+      "link": "https://news.google.com/rss/articles/CBMiuAFBVV95cUxPaTFzVGlfMkdjMXJnZFZhOEJocm5TWDY0Z0ZLcXFkZG9IR3BUZFF0MHJwYi1nS3loNUN1QmREWmJHT3Y1SnlUenljVk5KQ3I0THBYZUZlLXQ2T2MtakVkM2VsUVdMMHBjZXV5aHVQdjNrNzlMMzRJZzRWNVBBdXdMWXpoRXhidVhQUkQzR2N5VWd2c2F2RmhpT0FoczZqd3lnMzBZY05tM05hc2NJdDI3ZmlZeExpT2to0gG_AUFVX3lxTE1obDhnX05GNUFyb01PZHZwNXhNUzRWYnVSNnhUMHJQZFgwSEVicWpyLU9CVVBvZDg0LTRrUEhVYkJVTnRXN0xSWEE4ZEpNRzhuQTZXa0xPMGpWT2tVa21QWUdSc0xVamhqc2lCczNiRFpVVV85ZGRLUE5yWmlKVzk1SVdRQ3pYaHIzcE5EVktVaUJXdkxXSW5tWTZKMlVmVEgxQ21QcHRLQk1aOGV3T3hvMUxqWlJZU0RwNEQxQXRV?oc=5",
+      "summary": "Price taker to price setter: India\u2019s commodity derivatives market&nbsp;&nbsp;thehindu.com",
+      "publishedAt": "2026-08-17T06:08:05+00:00",
+      "sentiment": "Neutral",
+      "category": "Commodity"
+    },
+    {
+      "source": "Inc42",
+      "title": "Zaggle Plunges 20% To Hit Lower Circuit After Q1 Profit Slump",
+      "link": "https://inc42.com/buzz/zaggle-plunges-20-to-hit-lower-circuit-after-q1-profit-slump/",
+      "summary": "Shares of fintech SaaS company Zaggle Prepaid Ocean Services plunged 20% during the intraday trading today to \u20b9160.45 apiece, hitting&#8230;",
+      "publishedAt": "2026-08-17T06:00:01+00:00",
+      "sentiment": "Bearish",
+      "category": "Earnings"
     },
     {
       "source": "Livemint Companies",
@@ -52393,40 +52649,13 @@
       "category": "Corporate"
     },
     {
-      "source": "Livemint Markets",
-      "title": "Behari Lal Engineering IPO allotment today. GMP signals 29% listing pop. How to check status online?",
-      "link": "https://www.livemint.com/market/ipo/behari-lal-engineering-ipo-allotment-today-gmp-signals-29-listing-pop-how-to-check-status-online-11786943306004.html",
-      "summary": "The shares of Behari Lal Engineering is commanding a strong premium of \u20b984 in the grey market, as per websites tracking the unlisted market.",
-      "publishedAt": "2026-08-17T05:57:37+00:00",
+      "source": "FXStreet",
+      "title": "Indian Rupee steadies as US Dollar declines on reducing Fed rate hike bets - FXStreet",
+      "link": "https://news.google.com/rss/articles/CBMitwFBVV95cUxQVkRkYkRKd1k2NlBSYzBFc1RQWUVzRkE5TnYxRGRKUGRxNmdBWXZkNi0xcUF5azhtV0Noa0h1Q3Nlekhfcm9rS01tQUlxM1h1cGdfb18yYnV6TFVoNEpxQXZ2bEJxekR3dlJObndJN0RXV2JUcWZsNEFSNUE4QXNLNWNMY2sxRVc2TzZLdWJvNWJ3aWpoZ1poRUQ5RnNDUFF1YUVKM29wU2MwLXA5Z0VER1F5VlFVelE?oc=5",
+      "summary": "Indian Rupee steadies as US Dollar declines on reducing Fed rate hike bets&nbsp;&nbsp;FXStreet",
+      "publishedAt": "2026-08-17T05:56:02+00:00",
       "sentiment": "Neutral",
-      "category": "Market"
-    },
-    {
-      "source": "Livemint Markets",
-      "title": "Horizon Industrial Parks IPO Day 1 LIVE: GMP, review, subscription, other details of Blackstone-backe \u20b92600 crore IPO",
-      "link": "https://www.livemint.com/market/ipo/horizon-industrial-parks-ipo-day-1-live-gmp-review-subscription-other-details-of-blackstone-backe-rs-2600-crore-ipo-11786940478449.html",
-      "summary": "Horizon Industrial Parks IPO GMP: According to market observers, the company shares are available at a premium of \u20b94 in the grey market today",
-      "publishedAt": "2026-08-17T05:56:57+00:00",
-      "sentiment": "Neutral",
-      "category": "Market"
-    },
-    {
-      "source": "Livemint Markets",
-      "title": "Q&amp;T Foods IPO share allotment in focus today: GMP, steps to check allotment status online",
-      "link": "https://www.livemint.com/market/ipo/qt-foods-ipo-share-allotment-in-focus-today-gmp-steps-to-check-allotment-status-online-11786942257421.html",
-      "summary": "Share allotment of the Q&amp;amp;T Foods IPO is expected to be finalised on Monday, 17 August. The IPO of bakery products manufacturer and seller concluded with an overall subscription of 1.42 times on Friday, 14 August.",
-      "publishedAt": "2026-08-17T05:55:25+00:00",
-      "sentiment": "Neutral",
-      "category": "Earnings"
-    },
-    {
-      "source": "Livemint Markets",
-      "title": "Ashok Leyland\u2019s demand is on the right track, but margins lag",
-      "link": "https://www.livemint.com/market/mark-to-market/ashok-leyland-q1-results-share-price-margin-market-share-11786939635130.html",
-      "summary": "Demand is holding up and several growth engines are gaining traction, but a sharp margin squeeze and falling M&amp;amp;HCV market share leave investors waiting for a broader recovery.",
-      "publishedAt": "2026-08-17T05:52:01+00:00",
-      "sentiment": "Bullish",
-      "category": "Market"
+      "category": "Commodity"
     },
     {
       "source": "Livemint Money",
@@ -52438,31 +52667,13 @@
       "category": "Earnings"
     },
     {
-      "source": "News18 Business",
+      "source": "News18 Markets",
       "title": "Why Is Share Market Falling Today? Know Key Reasons Behind Sensex, Nifty Decline on August 17",
       "link": "https://www.news18.com/business/markets/why-is-share-market-falling-today-know-key-reasons-behind-sensex-nifty-decline-on-august-17-10276986.html",
       "summary": "As of 11:02 am, the BSE Sensex was down 512.76 points, or 0.66%, at 77,496.49, while the NSE Nifty was trading at 24,236.05, down 129.95 points, or 0.53%.",
       "publishedAt": "2026-08-17T05:36:47+00:00",
       "sentiment": "Neutral",
       "category": "Global"
-    },
-    {
-      "source": "chshyd.in",
-      "title": "Gold and Silver Rates Today: Why Prices Are Rising Again and What Buyers Should Know - chshyd.in",
-      "link": "https://news.google.com/rss/articles/CBMiZEFVX3lxTFBpTmEtODljNVU5bldWWlI2VU1KNkw4aWlMX20tUFlOQ25Sb2NBYTR6MlhMQ3BydDdLckQ5VEk2V0FrYVprbDhNV2QzcmxJZFVLZEoyTElTbDhMemYtOHM3R0djWXg?oc=5",
-      "summary": "Gold and Silver Rates Today: Why Prices Are Rising Again and What Buyers Should Know&nbsp;&nbsp;chshyd.in",
-      "publishedAt": "2026-08-17T05:36:43+00:00",
-      "sentiment": "Neutral",
-      "category": "Commodity"
-    },
-    {
-      "source": "News18 Markets",
-      "title": "Market Update: Sensex Falls Over 500 Points, Nifty Slips Below 24,250; IT, PSU Banks Drag",
-      "link": "https://www.news18.com/business/markets/sensex-falls-295-points-nifty-opens-below-24350-as-iran-us-tensions-weigh-on-sentiment-10276929.html",
-      "summary": "As of 11:02 am, the BSE Sensex fell 512.76 points, or 0.66%, at 77,496.49, while the NSE Nifty was trading at 24,236.05, down 129.95 points, or 0.53%.",
-      "publishedAt": "2026-08-17T05:35:51+00:00",
-      "sentiment": "Bearish",
-      "category": "Regulatory"
     },
     {
       "source": "Indian Infrastructure Magazine",
@@ -52474,15 +52685,6 @@
       "category": "Economy"
     },
     {
-      "source": "News18 Business",
-      "title": "Dhoot Transmission IPO Lists at 37.8% Premium: Should You Buy, Sell Or Hold?",
-      "link": "https://www.news18.com/business/ipo/dhoot-transmission-ipo-lists-at-37-8-premium-should-you-buy-sell-or-hold-10277109.html",
-      "summary": "Dhoot Transmission IPO Listing: Its shares have been listed at Rs 1,200 apiece on the NSE, compared with its issue price of Rs 871.",
-      "publishedAt": "2026-08-17T05:31:03+00:00",
-      "sentiment": "Neutral",
-      "category": "Market"
-    },
-    {
       "source": "Livemint Money",
       "title": "RBI loan rules 2026: Banks may need borrower consent to change loan benchmark; know what happens to your EMI",
       "link": "https://www.livemint.com/money/personal-finance/rbi-loan-rules-2026-banks-may-need-borrower-consent-to-change-loan-benchmark-know-what-happens-to-your-emi-11786943217011.html",
@@ -52492,220 +52694,22 @@
       "category": "Regulatory"
     },
     {
-      "source": "Rediff",
-      "title": "Stock Markets Today: Sensex, Nifty Decline Amid Rising Crude Oil Prices, West Asia Tensions - Rediff",
+      "source": "rediff.com",
+      "title": "Stock Markets Today: Sensex, Nifty Decline Amid Rising Crude Oil Prices, West Asia Tensions - rediff.com",
       "link": "https://news.google.com/rss/articles/CBMi4AFBVV95cUxOcGw3WkpLQnJZMmZYcGJaYUI2RHBERzVheExPOG56ZXBrZGRTMWM2VVJfVFRBVnc4THAxUW1jSHVxMlJ0ZzNaSUZGT0hqT3M0dDl4enhZaHYzT3Q1WEtxZ2dZaE5fcUZ1U0QyeEJfdnRTZmdyQ0ZhWEVYdlh1NXFkdWVUTEpXQmdQREpFaDZTcWpveElCU0JpRVpleXNRczduZEpvZDczWE1kSXotZWJWdHNWdzBtWjJWTGJ4ekI1RzhiUHY3S1NtOGx5Y0J2aUZGTnlqZ0JnMG9ibnpCU181dNIB4wFBVV95cUxOcWxPMW1Sbnc3aWd1dHp6OWw5ZEhWNFBpS0Q2UGxyZFRKWkR6T3IybnRIQmwzdGZob1JhLVdtVERsSTFiQ2pJZmc5bjk1U3B6Z0pjcjczZkFLMG9kaUFJd0thbV9JVXFNaWk3bnBPSzhZMkVrcGJQSVQ1eEYxZTRKc0xBTUdiWElWUy1zMkFlYWQyZVM1TjA0YWRTeG54eWZJRjFlWnFOdjBlel9nMHlEUHpKTDRMd0JuRVVmWTM2NDE2VnJDSXc0ZWhUNFJ2TDVjZDIzemVXOXJsenNnTU5LamZYOA?oc=5",
-      "summary": "Stock Markets Today: Sensex, Nifty Decline Amid Rising Crude Oil Prices, West Asia Tensions&nbsp;&nbsp;Rediff",
+      "summary": "Stock Markets Today: Sensex, Nifty Decline Amid Rising Crude Oil Prices, West Asia Tensions&nbsp;&nbsp;rediff.com",
       "publishedAt": "2026-08-17T05:23:23+00:00",
       "sentiment": "Neutral",
       "category": "Commodity"
     },
     {
-      "source": "Livemint Money",
-      "title": "AI has changed investing. Or has it changed investors?",
-      "link": "https://www.livemint.com/money/personal-finance/ai-investing-financial-adviser-portfolio-review-11786890865119.html",
-      "summary": "In the age of AI, what additional value does a financial adviser really bring?",
-      "publishedAt": "2026-08-17T05:19:20+00:00",
-      "sentiment": "Neutral",
-      "category": "Economy"
-    },
-    {
       "source": "TradingView",
       "title": "Nifty 50, Sensex prediction today: Check how Indian stock market is expected to trade on 17 August - TradingView",
       "link": "https://news.google.com/rss/articles/CBMi6AFBVV95cUxOZUNCVGpRS1lVaFNCVDlIdThZTWsxamFqYzZ0SFJwTm4teHFKSXZXaFhWblN0WUFRbzk3S1I0VmxNZUNReDFQcVFMa2ZEd1ljblhaZlBCMW9FVW8ybmhUS1NfLS1sSWxKOWhyenExYUJFNGkzYzc3LUFEdHZXWjR4Z2ZtOWp6YUVsZ2tRelVGdTdKbzl4ajB0VUJpZHk5cDUxUl9rNm5MbmhWbDlLdWc2a2o4cWJFdGs1XzcxU21SOUEyS0otVnBVSUcwVVNsaW9leHBYZjhmdEhZYVlaN1NZQzhCRzlRY3c2?oc=5",
-      "summary": "Nifty 50, Sensex prediction today: Check how Indian stock market is expected to trade on 17 August&nbsp;&nbsp;TradingViewSensex falls 500 pts, Nifty below 24,250: Elevated crude oil prices among key factors behind market...&nbsp;&nbsp;Moneycontrol.comStock Market LIVE Updates, Sensex Today: Sensex Drops 500 Points Amid Negative Global Cues&nbsp;&nbsp;NDTV",
+      "summary": "Nifty 50, Sensex prediction today: Check how Indian stock market is expected to trade on 17 August&nbsp;&nbsp;TradingViewAhead of Market: 10 things that will decide stock market action on Monday&nbsp;&nbsp;The Economic TimesIndian Stocks Open Mixed as Rupee Weakens and Oil Holds Above $80&nbsp;&nbsp;Investing.com IndiaFirst Tick: Top global cues to watch in today's trade&nbsp;&nbsp;Moneycontrol.co",
       "publishedAt": "2026-08-17T05:09:00+00:00",
       "sentiment": "Neutral",
-      "category": "Commodity"
-    },
-    {
-      "source": "YourStory",
-      "title": "6 Books that explore the connection between art and emotions",
-      "link": "https://yourstory.com/2026/07/books-connection-art-emotions",
-      "summary": "Discover 6 books that explore how art connects with emotions, revealing creativity, human experiences, and the feelings behind every masterpiece.",
-      "publishedAt": "2026-08-17T05:05:00+00:00",
-      "sentiment": "Neutral",
-      "category": "Corporate"
-    },
-    {
-      "source": "Reuters",
-      "title": "India RBI's heavy FX footprint revives memories of a tightly managed rupee - Reuters",
-      "link": "https://news.google.com/rss/articles/CBMitwFBVV95cUxOQjE3TGZfaGdTbHJZNEZ4VmgzQWFmSGNRWTdJUERnbWE4YjVxd2dKWWhJaG1xWE9sb1pJRXVNLUFvbUdldEdxbFNQT3hBb3VWV2E5X0plbHFWbzZRS3NqUUMtZkRLdVFVQWRuTHlLTjlQWnpXYS1hSjBieWdzTFNSVVlhZWpYU1U5VV9qWXBhdWJCalZNZ3M5NHotakZDQUVPc05EMVlWR3RkbDUtQXFqOUJCOHFXdXM?oc=5",
-      "summary": "India RBI's heavy FX footprint revives memories of a tightly managed rupee&nbsp;&nbsp;Reuters",
-      "publishedAt": "2026-08-17T05:02:00+00:00",
-      "sentiment": "Neutral",
-      "category": "Regulatory"
-    },
-    {
-      "source": "India Today",
-      "title": "Shiprocket IPO shows 33% listing gains: Have you been allotted shares? Check here - India Today",
-      "link": "https://news.google.com/rss/articles/CBMi4gFBVV95cUxOSTRMYlJ5amV1TVhOSjlYOGdqMWR5UVhpSTd4enUydmRwUlpObzJLR3V1dUN6MzlrQUdoSFBJcHFNWC11UF9hWmlXbk9kRGFXbDlNMzdpZk1nUk4zUWtyUkNxdkYtMVBZbi1VMnJDLUdZbnhta3VKZnlPeGhESEZWZVZVTFVjekQ5X3c0dkVsV1pLUXl1RW5XYzR3Yk1BS0xsS1NuRTFZNnNyVXJ2Ym1qeDZFNXZKMHU5R1RsaWt2d3BkeHFQWWxJc1NUOWFYZ0hHa1pUQ3BoM3ota3ZVeWd1LTR30gHnAUFVX3lxTE1oeG9tOC1IVzJad3dYYW1VZF9QOGEwekJWcWtodjV0QlZoVlY1dlVHa0NsMGNsT013MkJVWjhSUTNaQWxRdHBBQ21uTDBhREtVcE9YZlBSTGZIbTdDUDhLSm5pa3lTcEJKOFBya0Q5SXhLR3ducG5IdThZN2psXzM0MVFlSE8tdmYzdjVvXzVaVGZoX0lra3FrRGxlXzNTVHlScElmSWFyek4yRUpLOUhTY3hGS2VqdGk2N0hvcnRIWF9hZG1VN0QtZDgwYTBKMWRsenpuTGtfUGFHSXp0MzlkVk9HT25FUQ?oc=5",
-      "summary": "Shiprocket IPO shows 33% listing gains: Have you been allotted shares? Check here&nbsp;&nbsp;India Today",
-      "publishedAt": "2026-08-17T04:50:53+00:00",
-      "sentiment": "Bullish",
-      "category": "Corporate"
-    },
-    {
-      "source": "FXStreet",
-      "title": "Indian Rupee holds ground despite RBI ending FCNR forex swap window early - FXStreet",
-      "link": "https://news.google.com/rss/articles/CBMitwFBVV95cUxQVkRkYkRKd1k2NlBSYzBFc1RQWUVzRkE5TnYxRGRKUGRxNmdBWXZkNi0xcUF5azhtV0Noa0h1Q3Nlekhfcm9rS01tQUlxM1h1cGdfb18yYnV6TFVoNEpxQXZ2bEJxekR3dlJObndJN0RXV2JUcWZsNEFSNUE4QXNLNWNMY2sxRVc2TzZLdWJvNWJ3aWpoZ1poRUQ5RnNDUFF1YUVKM29wU2MwLXA5Z0VER1F5VlFVelE?oc=5",
-      "summary": "Indian Rupee holds ground despite RBI ending FCNR forex swap window early&nbsp;&nbsp;FXStreet",
-      "publishedAt": "2026-08-17T04:40:31+00:00",
-      "sentiment": "Neutral",
-      "category": "Regulatory"
-    },
-    {
-      "source": "DT Next",
-      "title": "Rupee falls 17 paise to 95.59 against US dollar in early trade - DT Next",
-      "link": "https://news.google.com/rss/articles/CBMingFBVV95cUxON1pKODFLS0NIWktTWmRfZlliaGx4SVlhQjdGVHI3ZlRNZEtCbjFWV3dvdzNTcFZYREVjQ1VVeS1xd1pUU3RVMFQxX0t1SksxVUIwZXJMUzVsNC11NDRMR1F1YzduZG5nMTNMdmhES2FfYjUwcExFMzc1MWF6N0JYaUpRbUNvYW1NYWlNM1dQMGpSRGVOZFJDWG9lZ2NiZ9IBqwFBVV95cUxQMExvQ1lLTVl4S3hVZndJanp2YjgtNkNfZ2JFZGgzSHlNS3ZTSi1RM3lMakJYSVVKX3p3akhoTjlPX08xeFprTEc3LVI0R3VGZ0E1YTItOGkwbW5CTVJpRWJhNW9lSHZ0MW16LWozMHp4dWdkcUxyWUUxcm01SndHbkhUNmtMeDRrNWpPV1ZISEI1WksxMHZ3SS15N2VIWE9mYVB3LWZndllObms?oc=5",
-      "summary": "Rupee falls 17 paise to 95.59 against US dollar in early trade&nbsp;&nbsp;DT Next",
-      "publishedAt": "2026-08-17T04:38:58+00:00",
-      "sentiment": "Bullish",
-      "category": "Commodity"
-    },
-    {
-      "source": "FXStreet",
-      "title": "Gold price in India: Rates on August 17 - FXStreet",
-      "link": "https://news.google.com/rss/articles/CBMipgFBVV95cUxPaHVyQk5icFVfWnlCcExKN3NyR2F4QmI3Sm53clJpY1lJTnNHenNJZG1UWS1ENmd0ODhUNkZ0eXFtaFVzZ1VjckxoMkV1OUNreE5HYkUxcmRLclhiTVVLVllWR1BIQW1WaEtHaU5Xc2pkenZrRzFjX1AzWFlJSmlpUnBrLVZneFl0cTFYX1Zpa1pjd3JxT3ZoLVJnb093UU42blEtQklB?oc=5",
-      "summary": "Gold price in India: Rates on August 17&nbsp;&nbsp;FXStreet",
-      "publishedAt": "2026-08-17T04:35:35+00:00",
-      "sentiment": "Neutral",
-      "category": "Commodity"
-    },
-    {
-      "source": "livemint.com",
-      "title": "Molbio Diagnostics IPO listing: Shares debut at a 21% premium, defying weak stock market sentiment - livemint.com",
-      "link": "https://news.google.com/rss/articles/CBMi5gFBVV95cUxQWklicHcyM3BnZjRkWUhWOU9MZmd0OHQ5UGwwN3Z5YnQtQ08tdXFrWUctVVNHenA4SHg3eGE5WlVhT194Y25kU1NGY1hIMmtTanNWRHVlaGp3SEpPVGtrSU8wVU0wQjVqMjhRVXpRdllBd1VmN2dQbElyeGJtanI3ZHhnNk1OeDhsVDczTFJud0tnRXNmZjZhbnkyMldaRDYtS1VWWXN6TkNSVDNxTngtQ2M2X0V1bnJWSDVab1BpZ1c2WXpQeWk3OVBISkV5ZWR6UHA3RldLa1lYSGVVQ3p3SURDaG4xQdIB6wFBVV95cUxNOTd2d2ZUamF1VERkd2E1bHhwaFllS1FwNXlmUUxBT0VveG1ha01YdGRpMURwU0FsREdYc0R0TGZ3VDE4UGVhZXNsOXFaZVJsbVB3MThYbGVOQktvdkEwUHoxWHZfRG5va01zcWJiRHNJLUxkSmZuQ182SHhQR2I3SzhWU3dtNnhnR1dEckJCX3BYdTl0dXlhQVFmUGE5TjZ6WVhWSERmeGV4MnNVUzFkWDJqSVRiV2dMNUZMRmhsdG01WWU3XzhaVXIxVnZpRkw0cW1DRk45c2hTWkJ4MWlMU1owWnpvS3FHTGU0?oc=5",
-      "summary": "Molbio Diagnostics IPO listing: Shares debut at a 21% premium, defying weak stock market sentiment&nbsp;&nbsp;livemint.com",
-      "publishedAt": "2026-08-17T04:30:37+00:00",
-      "sentiment": "Neutral",
-      "category": "Corporate"
-    },
-    {
-      "source": "ET Datacenters",
-      "title": "Indian Spacetech: Three in Four Startups Await First Equity Funding - ET Datacenters",
-      "link": "https://news.google.com/rss/articles/CBMingJBVV95cUxNVVZhZHB5NVJlUG50WDZraXlCVmNrT3l3X2RDVVpWTlNNeE0xTngtOFhFZzBLZlhHTDI4RUp0ZTdzRUJ3bGxFWUFpZnVwWU9iSFhiYjZyUDEzLTBZby03X0NJUXVLa0tjaGxRdEU5TnEwV1Q4SUVWaDlubnh5aVhONXdULVowN21WUlpmM3dKNG9LMHNLdVRvNWctWE9VQk5lNGpDWjJuNk94QnFzUkNaSkVQTUhZai1sR0VHNFdhNVcxbWt1LUY5YkdObV81aWlxVmFfaFo4bDllcW5zR184ZjgtREVLQ2RMMkVHQUZDQ29ZVU1tSGRVUko5cFh2bHNOVW9mOGxFS0VMMXQ2N1FiSGw1X3JNb01JMjdVOVJR?oc=5",
-      "summary": "Indian Spacetech: Three in Four Startups Await First Equity Funding&nbsp;&nbsp;ET Datacenters",
-      "publishedAt": "2026-08-17T04:29:21+00:00",
-      "sentiment": "Neutral",
-      "category": "Corporate"
-    },
-    {
-      "source": "News18 Business",
-      "title": "Sovereign Gold Bonds: 223% Return in 5 Years; RBI Announces Early Redemption for SGB 2021-22 Series-V",
-      "link": "https://www.news18.com/business/savings-and-investments/sovereign-gold-bonds-223-return-in-5-years-rbi-announces-early-redemption-for-sgb-2021-22-series-v-10276962.html",
-      "summary": "The redemption has been permitted today, August 17, 2026, and the price has been fixed at Rs 15,295 per unit, which is a 222.67% gain over the discounted issue price of Rs 4,740.",
-      "publishedAt": "2026-08-17T04:27:17+00:00",
-      "sentiment": "Neutral",
-      "category": "Regulatory"
-    },
-    {
-      "source": "Moneycontrol.com",
-      "title": "Molbio Diagnostics shares list at 21% premium over IPO price on NSE, BSE - Moneycontrol.com",
-      "link": "https://news.google.com/rss/articles/CBMiywFBVV95cUxPa3NkU2hzem0yRmFCejBIaTZJMnpFSEZzN1lzeGFPaE1tQ01SRE5EdWtWUmRuTS1aME9zaTdwbHNzQ1ljQVZYY1hPSGR6NGt6QkJhd19uRzBQQkZ4bkRhQk14RVdjVFFVRHZSTG5BcThKTXBGNnpZc2ZzdmF2bThVWFcyRXdBQy1wdE9WR1FrNDJNeVFDOGZrYl82N0JVMWszbDlMSTVCNENpSVkyZ3pSZV91RmpHc0p5c1dfRkFTQUxGVWxYNS1FWXZJc9IB0AFBVV95cUxNcVA4NkZzS1JzV1E5MS1wY0xHQXFNTnk5SXhkSU5BOXNRZkxKdV9Uc1dBMWxkNWJhME5rdF9ySHBFWnZiRW5FY1BGZ0FjSnhzRFJ2V0QyanZCc3hWV1dIMHg4NHE2ZTdocDkxdHhZZzZPTTFVSzNNSExvR1lHTXBVUkNrNFVkOWpHMmd2WG9pam50bmlDa1JETk5EWmhNc19pQ1ZLQkdjXzUtSG5pZjhMdkxQNThoSGZQREpyOHZvajVNUDJyOVdrcmh0MFNFcVBo?oc=5",
-      "summary": "Molbio Diagnostics shares list at 21% premium over IPO price on NSE, BSE&nbsp;&nbsp;Moneycontrol.com",
-      "publishedAt": "2026-08-17T04:23:03+00:00",
-      "sentiment": "Neutral",
-      "category": "Corporate"
-    },
-    {
-      "source": "Business Standard",
-      "title": "India competing for FII flows since 12 mths: Jignesh Desai, Centrum Broking - Business Standard",
-      "link": "https://news.google.com/rss/articles/CBMi1wFBVV95cUxOTU1Id09UU1BNeXlHUVJEekF3aEdQb0JpWU5PWV9MYUpYZnVnM2FVNUdIUUlkV3Z5TUxudDNibTdnbWV0RXo1THlXMkItT2pDekhrTURzM1Qxb2FtaU5Xb2llRmUyc0lUVkY0ZlJlQkdkaGtmWHpYVzgtX2FEeVNZSmI1Wk5UZEJhbmdXaFJLeE51ZFptcV9BS05iZ0pQcDcxbEtYajMwVGVKblFaMW9jMFRzMGJHMEFRd29CY1dMUWlyWklENDNnMmFXY2JrSy1aN0Y1U2JQQdIB3AFBVV95cUxQRVZlZXM3RTVTVXI2TmpxSGM1RTFTNXVJSGNwbVFQOEQxVGx1VjVNaFhmRFItUW9TZlJBMVlvRWtQenhBaDhTLXJac1FhZXpFZVZaM24zdXJqVHVtUUF5ZWJLNnlzcmpLZGk0VUpFWE14THY5dVVNNnljT3UtVkd3V29VZ29UUkpGNGxoZ0hfVlZydlNyR0hfc2pHcHB5d09NeDJ3Um9fdmlJSzdBMWJlTTVXQUdBMGlfd0g2WDVXR2h5bEJNVElvaWNwX2JvbkpRb1Fnb2c5R3gtamR4?oc=5",
-      "summary": "India competing for FII flows since 12 mths: Jignesh Desai, Centrum Broking&nbsp;&nbsp;Business Standard",
-      "publishedAt": "2026-08-17T04:00:13+00:00",
-      "sentiment": "Neutral",
-      "category": "Economy"
-    },
-    {
-      "source": "Livemint Money",
-      "title": "Gold, silver prices today, 17 August: Check retail rates of 24K, 22K gold, 999 silver in Delhi, Mumbai and Kolkata",
-      "link": "https://www.livemint.com/money/personal-finance/gold-silver-prices-today-17-august-check-retail-rates-of-24k-22k-gold-999-silver-in-delhi-mumbai-and-kolkata-11786315322158.html",
-      "summary": "Gold and silver prices today, 17 August: Check the latest 24K, 22K gold and 999 silver retail rates across Delhi, Mumbai, Kolkata and other major Indian cities, along with MCX market updates.",
-      "publishedAt": "2026-08-17T03:59:28+00:00",
-      "sentiment": "Neutral",
-      "category": "Commodity"
-    },
-    {
-      "source": "livemint.com",
-      "title": "Gold, silver prices today, 17 August: Check retail rates of 24K, 22K gold, 999 silver in Delhi, Mumbai and Kolkata - livemint.com",
-      "link": "https://news.google.com/rss/articles/CBMihwJBVV95cUxQSDA1U2lhdTctRGxUQS1lQU41UHQ4OTBmUjJOa3NIeUdmclo5RTdXMlVkQk9XYlpUMS1ETkxHbEFJbElTZjNmbmxPVGdLWklncnJuUzVQYldWcmJmR0xqbl83eGlPNjlRZmp1NTk0a1FEMjBaeEtZdEJhZC1sQ20ybFpxenVNcEYxamVrZnRXRGhrZU1GbTNuTmR4c3h2WFRNMHVlQVFMc2VqYjFXcFRVSjhwN2Q5RXFRUEpfZjFfYl9UbUkzc2xWWS1fWldzd2RkbE5tM1lDWG9BbG9pN2NGYkNDTS1KMzR2YS1KeHVUd1ZFbDk0d2stb21aamtQal8tNGFMUUo2VdIBjAJBVV95cUxOZmxpcmlEb2htaTFyNkxOQlRCQTNCN2ZnSzVLTzAxOG5pTFF1MkhPeWJ4QVVuU0R5dWc2NjYyZ2NLWGo0YWQyLXFEVXRuTzZzOFBPRGdVRk0ydEozOFFpSDM4dzlCVXF2bjFvMnNuUTlCZENOb3Y2a3VqZDFadVlfTlFqajBYUi1XS0NIMEdOSmpIOTR5YjdmRUtBcHhjOS02dUJ2b0p6VXdSWmRSeGs2dXNiazVOOXAyX1FjZy1hbVc3Q0l3UGRSNk1UWkd2U2dYTk5CbkZFUmlOaFkzcWlhbE5LcnVZcGFHNTdKZS1mVmtoV21GQ3k5UmsxYTJYWXJISGJQdFlqNHVXdFhS?oc=5",
-      "summary": "Gold, silver prices today, 17 August: Check retail rates of 24K, 22K gold, 999 silver in Delhi, Mumbai and Kolkata&nbsp;&nbsp;livemint.com",
-      "publishedAt": "2026-08-17T03:59:28+00:00",
-      "sentiment": "Neutral",
-      "category": "Commodity"
-    },
-    {
-      "source": "Moneycontrol.com",
-      "title": "Rupee opens 5 paise lower at 95.48 against the dollar, early closure of FCNR-B window in focus - Moneycontrol.com",
-      "link": "https://news.google.com/rss/articles/CBMi7AFBVV95cUxPME5FTklJeFdkcWhTamZZemZkazNQaU9VaXViVS1DSEhOdFdLNHFhb0ZxVUJYTjg5ZzVqNV9qcWp3TDZNd2NJb3FmV3RmVlFlNm8zZlFDZS1RdFFUQzJjQ2w1UnprcHZZblR0UjB4ZkNrQW5CVmxsUmh6NmlsQktvb0lNemx1TWVJX014TVFlaHJDT1VFYmktV2RxelMxZHBUUXg2Zmw2VjRxRDE0bUZtMnZINmkyTFlTdWkxaElOeUEzMnVOWVB5YUowYWhrNWtHMTR6UjhvaDBoakJ5VFhPSFRkc1dnaU1tcWlCRNIB8gFBVV95cUxNX196enhFQ21aZEc3SUJmcXhxZjdFT3N4RzhGNEIyX1Z6M3BkVjlIRHAwOVAxUFVyUk1YTmVOLTNEMzNvdnhsR0VFVGsySWRPYy1Yclp3LWxxTFVyTGJYdEdVVXRKb0dWTHcwZUFmektVYlQxWG4zaXJ3T210MzMzb05kRC1FZy1OQ0xaM2tUejZpalQ5ZWNsakp0WXBtTU0yRjF6WDhqTWhYYUVDNVdPcUdTUGZPcm54QXdReUZYNDNiaDZkSVhITnUyNmpIZ0tiNjlfVWFwWXY3NFNGa2p1UlQzQkRxVzN3eGRWb1JqN1hIZw?oc=5",
-      "summary": "Rupee opens 5 paise lower at 95.48 against the dollar, early closure of FCNR-B window in focus&nbsp;&nbsp;Moneycontrol.com",
-      "publishedAt": "2026-08-17T03:43:04+00:00",
-      "sentiment": "Bullish",
-      "category": "Commodity"
-    },
-    {
-      "source": "NDTV Profit",
-      "title": "Dhoot Transmission IPO Listing Today: Check Expected Listing Price And Gain Based On Latest GMP - NDTV Profit",
-      "link": "https://news.google.com/rss/articles/CBMi1AFBVV95cUxQYm9femhOd1NuX2VMRDlyN2FGZUM3dFhkWkRIWjJoTXN3VWRlRjFWOUNHTW1WUFNuVnJLcWFTbU1sSVNZOXFvZExObGkwTERSYVQwLXdudXF0SEdHVk9yVWJSTlplZVNOWnMxYmM4RVc4bFkwdnlkVm5wdTluQXdrZUJ5bGRHa1VfT3d6Tkx5NUZyZWl3VkFUN282dFVTOGJ2THFqdEpZcDhQZEVoRGc3ODVMQXFhYi1zNm5NY0FVcEJDWldQaDhKeWtKaHphUVIyLVJyaNIB3AFBVV95cUxNNllzQkQxX1dVamp5NG5nUUhfSC16M05aRzJiZWtXUUE3VmJ0RFBTSnlwZEY1TWlkQUlqQVFIV05GQldjeVNnLXhWNHBJM1hTdU9vd2w1RmJzX3lTcmI0bmc1a3JxaGhCYWJ2YkNYaElIQ1Zvakx6VW5BcXNFM1g4bjBZcDdaSkE3R3B1R1dwTWNJTHg3cE51bVZVX3MwcEk2dEFMQVRTQ2I0TG8teHlCUHc3R3JFRFVTMk45TndjRFI2QS1tVFZ1MmFCXzZXTWowNmJmc0wxcGhzV2xV?oc=5",
-      "summary": "Dhoot Transmission IPO Listing Today: Check Expected Listing Price And Gain Based On Latest GMP&nbsp;&nbsp;NDTV Profit",
-      "publishedAt": "2026-08-17T03:00:16+00:00",
-      "sentiment": "Neutral",
       "category": "Earnings"
-    },
-    {
-      "source": "Indian Express Business",
-      "title": "Behind new agriculture DISCOMs: Debt, farm subsidy and privatisation concerns",
-      "link": "https://indianexpress.com/article/business/commodities-discom-restructuring-agricultural-power-subsidies-privatisation-debt-10836425/",
-      "summary": "",
-      "publishedAt": "2026-08-17T02:46:29+00:00",
-      "sentiment": "Neutral",
-      "category": "Market"
-    },
-    {
-      "source": "Daily Pioneer",
-      "title": "Punjab & Sind Bank Plans QIP to Reduce Government Stake, Meet SEBI MPS Norms - Daily Pioneer",
-      "link": "https://news.google.com/rss/articles/CBMivAFBVV95cUxOTXpRc3NXM0lJd2VyT180Vl9YcnN3dWJCODZTdDUxVFFSd3V2OUxPc09UNzNHQ2EzWG9rWFQ3UDJ6SkxJSzVDTzI4VHNPbnhZaERoWV9uSVg4bDQwNjQwV282MjV0Rml5LUpDdDNSWmZsaDRhMzN3WDlvT3dqNmdNd0tOXzdoMmV3bEMyVHNzQV91RlA5U2FZWkh4dENQanVRMjRRV3JzTXN6TWl0RkhSQ3B1VWp3SklfcFkyQg?oc=5",
-      "summary": "Punjab & Sind Bank Plans QIP to Reduce Government Stake, Meet SEBI MPS Norms&nbsp;&nbsp;Daily Pioneer",
-      "publishedAt": "2026-08-17T02:26:50+00:00",
-      "sentiment": "Neutral",
-      "category": "Regulatory"
-    },
-    {
-      "source": "News18 Markets",
-      "title": "Gift Nifty Falls 34 Points, Signals Muted Start For Markets As Iran-US Tensions Keep Oil Prices Elevated",
-      "link": "https://www.news18.com/business/markets/gift-nifty-falls-34-points-signals-muted-start-for-markets-as-iran-us-tensions-keep-oil-prices-elevated-10276822.html",
-      "summary": "The Gift Nifty points to a cautious start for Indian equity markets on Monday, with the index trading at 24,396.5, down 34.5 points or 0.14% as of 7:37 am.",
-      "publishedAt": "2026-08-17T02:18:13+00:00",
-      "sentiment": "Neutral",
-      "category": "Commodity"
-    },
-    {
-      "source": "Livemint Opinion",
-      "title": "Sapta Dhaara: seven streams of high-priority policy attention for India to achieve Viksit Bharat by 2047",
-      "link": "https://www.livemint.com/opinion/online-views/sapta-dhaara-seven-streams-high-priority-policy-attention-india-viksit-bharat-by-2047-11786886918853.html",
-      "summary": "The Prime Minister\u2019s emphasis on seven focal endeavours for developed-nation status by 2047 offers India a well streamlined set of national imperatives. Education would have to play the role of a talent tributary to each stream.",
-      "publishedAt": "2026-08-17T02:00:25+00:00",
-      "sentiment": "Neutral",
-      "category": "Economy"
-    },
-    {
-      "source": "YourStory",
-      "title": "7 IPOs eye Rs 6,400 Cr this week",
-      "link": "https://yourstory.com/2026/08/7-ipos-eye-6400-cr-this-week",
-      "summary": "India\u2019s IPO rush is showing no signs of slowing. Starting today, seven companies are set to raise over Rs 6,400 crore through initial public offerings.",
-      "publishedAt": "2026-08-17T02:00:00+00:00",
-      "sentiment": "Neutral",
-      "category": "Corporate"
-    },
-    {
-      "source": "timesofindia.indiatimes.com",
-      "title": "Oil prices hold steady as Hormuz nears zero traffic while Iran-US talks on Strait opening stalls - timesofindia.indiatimes.com",
-      "link": "https://news.google.com/rss/articles/CBMilgJBVV95cUxNUjFmckl3Tks0MEFYTGZvRHJTbnR3S293Mm9sZDNmM2hKWWZqYkp4QlIyVWJwTDA0VVg5WkwzaHU4OVpmclB0SVRTSFBLUkRuSkU5RVY2WGswdlktUHgwbHAtU0lnc0tXZmxsWTZvYm9QTWNrNVRGZWV6SHQzZFFjNUFiT25GMTNYRWlaZGI0MTA2U1gxWE41N0pZa3dpUnJzS05IZlI5UEcwakRLZ0hmUjFwT0lPMzV2Y2R5bzdLQ3oyZGhtSUJ4OHBzbE9ER0pLUXM4cThOTW84VENXMmw4U1JCOGtCUnJ2WXFwN1RGaXpyQ0FNYk1rOFc0UHBrdExKU01YVllaTzVmZ0txWkFQSktycC1od9IBmwJBVV95cUxNYUxyT1g5dGowZFo5a2ZqV2pVOFZIZEt3N3BWdmpEOThpVWQ5N3lIMWdBMUFPRUV5TkxGRlRnd3pLczItUXVsc0lGdUZyUDZCbWRaT2hWZHl6bmVPRDQzSmZCblk0TTZZU1hKRDNvbXNSd1lJRkYzNlFBMGxzSDJ2UEplaklVNVhDdnhMRUQxNHlGMlJnNV9GbGh4V2I4ZGlRRk5uYVgxYUNWTFRnMDI4RE82SkJ2WWhqNFFqMGllbEJwRDBoZDNDQ0hfRnRwREd2bk1saGRXQTZnWEpNTGxtLTRfRWp0bVdKX2ZHd2pkNFFjcnBiWURrMmJ3NkFtWF9WYWFOM2pKUDI4b1EyYWhPNXdiS1NFeWg0cDgw?oc=5",
-      "summary": "Oil prices hold steady as Hormuz nears zero traffic while Iran-US talks on Strait opening stalls&nbsp;&nbsp;timesofindia.indiatimes.com",
-      "publishedAt": "2026-08-17T02:00:00+00:00",
-      "sentiment": "Neutral",
-      "category": "Commodity"
     }
   ],
   "llmProvider": "gemini",
@@ -53160,9 +53164,9 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For TMPV, participation is read through volume multiplier N/Ax and turnover N/A Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. TMPV is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "TMPV forensic screen: Beneish M Score: -0.53, Altman Z Score: 2.55, Ocf Ebitda Ratio: 0.58, Mansfield Relative Strength: 0.68.",
-      "why_interested": "TMPV is in the active terminal universe with LTP \u20b9332.50, 2.00 (-0.60%) move, and volume N/A. Intraday setup: no intraday metrics.",
+      "why_interested": "TMPV is in the active terminal universe with LTP \u20b9332.15, 2.35 (-0.70%) move, and volume N/A. Intraday setup: no intraday metrics.",
       "future_revenue_model": "Forward model for TMPV is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for TMPV: LTP \u20b9332.50, delta 2.00 (-0.60%), volume N/A, score 0.0, action cohort selection.",
+      "current_model": "Current model for TMPV: LTP \u20b9332.15, delta 2.35 (-0.70%), volume N/A, score 0.0, action cohort selection.",
       "ledger_stocks": [],
       "active_scoring_matrix": {
         "beneish_m_score": "-0.53",
@@ -53173,7 +53177,7 @@
       "active_seven_ic_gates": {
         "q1_fund_buying": "TMPV volume multiplier is N/Ax; institutional participation is inferred from turnover and price follow-through.",
         "q2_liquidity_delivery": "TMPV turnover is N/A Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "TMPV price action is 2.00 (-0.60%); catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q3_catalyst_validation": "TMPV price action is 2.35 (-0.70%); catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
         "q5_risk_reward": "TMPV risk/reward is driven by score 0.0, ATR N/A%, and execution level N/A.",
         "q6_quantitative_milestone": "TMPV quantitative milestone: hard-filter watch with score 0.0.",
@@ -53181,7 +53185,7 @@
       },
       "active_risk_calc": {
         "ticker_score": 0.0,
-        "delta_pct": -0.6,
+        "delta_pct": -0.7,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
         "volume_multiplier": 0.0,
@@ -53193,7 +53197,7 @@
         "risk_flag": "HIGH_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta -0.60% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger intraday trigger; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta -0.70% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger intraday trigger; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
         "momentum_factor": "Near VWAP/EMA9; score 0.0.",
         "liquidity_factor": "Turnover data unavailable.",
@@ -53509,21 +53513,21 @@
       "news_catalysts_card": "Market context for HDFCBANK: Top market catalysts were not available from the current news feed.",
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For HDFCBANK, participation is read through volume multiplier N/Ax and turnover N/A Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. HDFCBANK is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "HDFCBANK forensic screen: Beneish M Score: -0.53, Altman Z Score: 2.55, Ocf Ebitda Ratio: 0.58, Mansfield Relative Strength: 0.68.",
-      "why_interested": "HDFCBANK is in the active terminal universe with LTP \u20b9725.40, 1.60 (-0.22%) move, and volume N/A. Intraday setup: no intraday metrics.",
+      "forensic_screen_card": "HDFCBANK forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.05, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
+      "why_interested": "HDFCBANK is in the active terminal universe with LTP \u20b9728.35, 1.35 (+0.19%) move, and volume N/A. Intraday setup: no intraday metrics.",
       "future_revenue_model": "Forward model for HDFCBANK is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for HDFCBANK: LTP \u20b9725.40, delta 1.60 (-0.22%), volume N/A, score 0.0, action cohort selection.",
+      "current_model": "Current model for HDFCBANK: LTP \u20b9728.35, delta 1.35 (+0.19%), volume N/A, score 0.0, action cohort selection.",
       "ledger_stocks": [],
       "active_scoring_matrix": {
-        "beneish_m_score": "-0.53",
-        "altman_z_score": "2.55",
-        "ocf_ebitda_ratio": "0.58",
-        "mansfield_relative_strength": "0.68"
+        "beneish_m_score": "-0.37",
+        "altman_z_score": "3.05",
+        "ocf_ebitda_ratio": "0.70",
+        "mansfield_relative_strength": "0.78"
       },
       "active_seven_ic_gates": {
         "q1_fund_buying": "HDFCBANK volume multiplier is N/Ax; institutional participation is inferred from turnover and price follow-through.",
         "q2_liquidity_delivery": "HDFCBANK turnover is N/A Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "HDFCBANK price action is 1.60 (-0.22%); catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q3_catalyst_validation": "HDFCBANK price action is 1.35 (+0.19%); catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
         "q5_risk_reward": "HDFCBANK risk/reward is driven by score 0.0, ATR N/A%, and execution level N/A.",
         "q6_quantitative_milestone": "HDFCBANK quantitative milestone: hard-filter watch with score 0.0.",
@@ -53531,7 +53535,7 @@
       },
       "active_risk_calc": {
         "ticker_score": 0.0,
-        "delta_pct": -0.22,
+        "delta_pct": 0.19,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
         "volume_multiplier": 0.0,
@@ -53543,7 +53547,7 @@
         "risk_flag": "HIGH_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta -0.22% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger intraday trigger; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta 0.19% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger intraday trigger; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
         "momentum_factor": "Near VWAP/EMA9; score 0.0.",
         "liquidity_factor": "Turnover data unavailable.",
@@ -54060,9 +54064,9 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For VEDL, participation is read through volume multiplier N/Ax and turnover N/A Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. VEDL is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "VEDL forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.05, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
-      "why_interested": "VEDL is in the active terminal universe with LTP \u20b9269.85, 2.35 (+0.88%) move, and volume N/A. Intraday setup: no intraday metrics.",
+      "why_interested": "VEDL is in the active terminal universe with LTP \u20b9269.90, 2.40 (+0.90%) move, and volume N/A. Intraday setup: no intraday metrics.",
       "future_revenue_model": "Forward model for VEDL is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for VEDL: LTP \u20b9269.85, delta 2.35 (+0.88%), volume N/A, score 0.0, action cohort selection.",
+      "current_model": "Current model for VEDL: LTP \u20b9269.90, delta 2.40 (+0.90%), volume N/A, score 0.0, action cohort selection.",
       "ledger_stocks": [],
       "active_scoring_matrix": {
         "beneish_m_score": "-0.37",
@@ -54073,7 +54077,7 @@
       "active_seven_ic_gates": {
         "q1_fund_buying": "VEDL volume multiplier is N/Ax; institutional participation is inferred from turnover and price follow-through.",
         "q2_liquidity_delivery": "VEDL turnover is N/A Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "VEDL price action is 2.35 (+0.88%); catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q3_catalyst_validation": "VEDL price action is 2.40 (+0.90%); catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
         "q5_risk_reward": "VEDL risk/reward is driven by score 0.0, ATR N/A%, and execution level N/A.",
         "q6_quantitative_milestone": "VEDL quantitative milestone: hard-filter watch with score 0.0.",
@@ -54081,7 +54085,7 @@
       },
       "active_risk_calc": {
         "ticker_score": 0.0,
-        "delta_pct": 0.88,
+        "delta_pct": 0.9,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
         "volume_multiplier": 0.0,
@@ -54093,7 +54097,7 @@
         "risk_flag": "HIGH_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta 0.88% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger intraday trigger; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta 0.90% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger intraday trigger; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
         "momentum_factor": "Near VWAP/EMA9; score 0.0.",
         "liquidity_factor": "Turnover data unavailable.",
@@ -54509,21 +54513,21 @@
       "news_catalysts_card": "Market context for PNB: Top market catalysts were not available from the current news feed.",
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For PNB, participation is read through volume multiplier N/Ax and turnover N/A Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. PNB is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "PNB forensic screen: Beneish M Score: -0.53, Altman Z Score: 2.54, Ocf Ebitda Ratio: 0.58, Mansfield Relative Strength: 0.68.",
-      "why_interested": "PNB is in the active terminal universe with LTP \u20b9116.10, 1.90 (-1.61%) move, and volume N/A. Intraday setup: no intraday metrics.",
+      "forensic_screen_card": "PNB forensic screen: Beneish M Score: -0.53, Altman Z Score: 2.55, Ocf Ebitda Ratio: 0.58, Mansfield Relative Strength: 0.68.",
+      "why_interested": "PNB is in the active terminal universe with LTP \u20b9117.67, 0.33 (-0.28%) move, and volume N/A. Intraday setup: no intraday metrics.",
       "future_revenue_model": "Forward model for PNB is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for PNB: LTP \u20b9116.10, delta 1.90 (-1.61%), volume N/A, score 0.0, action cohort selection.",
+      "current_model": "Current model for PNB: LTP \u20b9117.67, delta 0.33 (-0.28%), volume N/A, score 0.0, action cohort selection.",
       "ledger_stocks": [],
       "active_scoring_matrix": {
         "beneish_m_score": "-0.53",
-        "altman_z_score": "2.54",
+        "altman_z_score": "2.55",
         "ocf_ebitda_ratio": "0.58",
         "mansfield_relative_strength": "0.68"
       },
       "active_seven_ic_gates": {
         "q1_fund_buying": "PNB volume multiplier is N/Ax; institutional participation is inferred from turnover and price follow-through.",
         "q2_liquidity_delivery": "PNB turnover is N/A Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "PNB price action is 1.90 (-1.61%); catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q3_catalyst_validation": "PNB price action is 0.33 (-0.28%); catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
         "q5_risk_reward": "PNB risk/reward is driven by score 0.0, ATR N/A%, and execution level N/A.",
         "q6_quantitative_milestone": "PNB quantitative milestone: hard-filter watch with score 0.0.",
@@ -54531,7 +54535,7 @@
       },
       "active_risk_calc": {
         "ticker_score": 0.0,
-        "delta_pct": -1.61,
+        "delta_pct": -0.28,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
         "volume_multiplier": 0.0,
@@ -54539,11 +54543,11 @@
         "signal_quality": "live-derived",
         "win_loss_ratio": "1.0:1",
         "kelly_policy_max": "0.0%",
-        "risk_flag_score": 68.0,
+        "risk_flag_score": 66.0,
         "risk_flag": "HIGH_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta -1.61% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger intraday trigger; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta -0.28% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger intraday trigger; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
         "momentum_factor": "Near VWAP/EMA9; score 0.0.",
         "liquidity_factor": "Turnover data unavailable.",
@@ -54959,21 +54963,21 @@
       "news_catalysts_card": "Market context for RELIANCE: Top market catalysts were not available from the current news feed.",
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For RELIANCE, participation is read through volume multiplier N/Ax and turnover N/A Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. RELIANCE is evaluated against this backdrop using live price, volume, and intraday structure.",
-      "forensic_screen_card": "RELIANCE forensic screen: Beneish M Score: -0.53, Altman Z Score: 2.55, Ocf Ebitda Ratio: 0.58, Mansfield Relative Strength: 0.68.",
-      "why_interested": "RELIANCE is in the active terminal universe with LTP \u20b91,300.90, 9.10 (-0.69%) move, and volume N/A. Intraday setup: no intraday metrics.",
+      "forensic_screen_card": "RELIANCE forensic screen: Beneish M Score: -0.37, Altman Z Score: 3.05, Ocf Ebitda Ratio: 0.70, Mansfield Relative Strength: 0.78.",
+      "why_interested": "RELIANCE is in the active terminal universe with LTP \u20b91,316.00, 6.00 (+0.46%) move, and volume N/A. Intraday setup: no intraday metrics.",
       "future_revenue_model": "Forward model for RELIANCE is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for RELIANCE: LTP \u20b91,300.90, delta 9.10 (-0.69%), volume N/A, score 0.0, action cohort selection.",
+      "current_model": "Current model for RELIANCE: LTP \u20b91,316.00, delta 6.00 (+0.46%), volume N/A, score 0.0, action cohort selection.",
       "ledger_stocks": [],
       "active_scoring_matrix": {
-        "beneish_m_score": "-0.53",
-        "altman_z_score": "2.55",
-        "ocf_ebitda_ratio": "0.58",
-        "mansfield_relative_strength": "0.68"
+        "beneish_m_score": "-0.37",
+        "altman_z_score": "3.05",
+        "ocf_ebitda_ratio": "0.70",
+        "mansfield_relative_strength": "0.78"
       },
       "active_seven_ic_gates": {
         "q1_fund_buying": "RELIANCE volume multiplier is N/Ax; institutional participation is inferred from turnover and price follow-through.",
         "q2_liquidity_delivery": "RELIANCE turnover is N/A Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "RELIANCE price action is 9.10 (-0.69%); catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q3_catalyst_validation": "RELIANCE price action is 6.00 (+0.46%); catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
         "q5_risk_reward": "RELIANCE risk/reward is driven by score 0.0, ATR N/A%, and execution level N/A.",
         "q6_quantitative_milestone": "RELIANCE quantitative milestone: hard-filter watch with score 0.0.",
@@ -54981,7 +54985,7 @@
       },
       "active_risk_calc": {
         "ticker_score": 0.0,
-        "delta_pct": -0.69,
+        "delta_pct": 0.46,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
         "volume_multiplier": 0.0,
@@ -54993,7 +54997,7 @@
         "risk_flag": "HIGH_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta -0.69% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger intraday trigger; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta 0.46% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger intraday trigger; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
         "momentum_factor": "Near VWAP/EMA9; score 0.0.",
         "liquidity_factor": "Turnover data unavailable.",
@@ -55060,9 +55064,9 @@
       "insider_insti_activity_card": "Institutional activity inferred from volume spikes and price momentum across the selected cohort. Large-block prints and accumulation patterns are consistent with mid-cap institutional rotation. For IOC, participation is read through volume multiplier N/Ax and turnover N/A Cr.",
       "macro_anchors_card": "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks. The current environment reflects cautious equity allocation with sector-specific headwinds. IOC is evaluated against this backdrop using live price, volume, and intraday structure.",
       "forensic_screen_card": "IOC forensic screen: Beneish M Score: -0.53, Altman Z Score: 2.55, Ocf Ebitda Ratio: 0.58, Mansfield Relative Strength: 0.68.",
-      "why_interested": "IOC is in the active terminal universe with LTP \u20b9138.46, 0.94 (-0.67%) move, and volume N/A. Intraday setup: no intraday metrics.",
+      "why_interested": "IOC is in the active terminal universe with LTP \u20b9138.92, 0.48 (-0.34%) move, and volume N/A. Intraday setup: no intraday metrics.",
       "future_revenue_model": "Forward model for IOC is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-      "current_model": "Current model for IOC: LTP \u20b9138.46, delta 0.94 (-0.67%), volume N/A, score 0.0, action cohort selection.",
+      "current_model": "Current model for IOC: LTP \u20b9138.92, delta 0.48 (-0.34%), volume N/A, score 0.0, action cohort selection.",
       "ledger_stocks": [],
       "active_scoring_matrix": {
         "beneish_m_score": "-0.53",
@@ -55073,7 +55077,7 @@
       "active_seven_ic_gates": {
         "q1_fund_buying": "IOC volume multiplier is N/Ax; institutional participation is inferred from turnover and price follow-through.",
         "q2_liquidity_delivery": "IOC turnover is N/A Cr; liquidity quality is watch-list level.",
-        "q3_catalyst_validation": "IOC price action is 0.94 (-0.67%); catalyst validation depends on follow-through above VWAP/EMA9.",
+        "q3_catalyst_validation": "IOC price action is 0.48 (-0.34%); catalyst validation depends on follow-through above VWAP/EMA9.",
         "q4_bear_thesis": "Bear thesis is monitored via breakdown risk, volume climax, and failure to sustain intraday VWAP/EMA9.",
         "q5_risk_reward": "IOC risk/reward is driven by score 0.0, ATR N/A%, and execution level N/A.",
         "q6_quantitative_milestone": "IOC quantitative milestone: hard-filter watch with score 0.0.",
@@ -55081,7 +55085,7 @@
       },
       "active_risk_calc": {
         "ticker_score": 0.0,
-        "delta_pct": -0.67,
+        "delta_pct": -0.34,
         "atr_pct": 0.0,
         "turnover_cr": 0.0,
         "volume_multiplier": 0.0,
@@ -55093,7 +55097,7 @@
         "risk_flag": "HIGH_RISK"
       },
       "active_factor_hub": {
-        "selection_reason": "mixed trend around intraday anchors; delta -0.67% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger intraday trigger; watch-list hard-filter state.",
+        "selection_reason": "mixed trend around intraday anchors; delta -0.34% with score 0.0; volume 0.00x with limited turnover visibility; contained volatility; trigger intraday trigger; watch-list hard-filter state.",
         "dominant_factors": "liquidity and mean-reversion around intraday anchors",
         "momentum_factor": "Near VWAP/EMA9; score 0.0.",
         "liquidity_factor": "Turnover data unavailable.",
@@ -57267,7 +57271,7 @@
       }
     }
   },
-  "isSnapshotFallback": false,
+  "isSnapshotFallback": true,
   "llmLockedForDate": "2026-08-17",
   "dhanSwingPicks": {
     "source": "scannerPicks-persisted",
@@ -57276,10 +57280,10 @@
         "symbol": "MOREPENLAB",
         "name": "Morepen Laboratories",
         "direction": "LONG",
-        "buyAbove": 88.15,
-        "stopLoss": 83.52,
-        "target1": 95.09,
-        "target2": 102.04,
+        "buyAbove": 88.6,
+        "stopLoss": 83.97,
+        "target1": 95.54,
+        "target2": 102.49,
         "riskPerShare": 4.63,
         "rrT2": 3.0,
         "rsi": null,
@@ -57292,10 +57296,10 @@
         "symbol": "AZAD",
         "name": "Azad Engineering",
         "direction": "LONG",
-        "buyAbove": 2945.0,
-        "stopLoss": 2838.39,
-        "target1": 3104.91,
-        "target2": 3264.83,
+        "buyAbove": 2899.0,
+        "stopLoss": 2792.39,
+        "target1": 3058.91,
+        "target2": 3218.83,
         "riskPerShare": 106.61,
         "rrT2": 3.0,
         "rsi": null,
@@ -57308,10 +57312,10 @@
         "symbol": "SHADOWFAX",
         "name": "Shadowfax Technologies",
         "direction": "LONG",
-        "buyAbove": 259.9,
-        "stopLoss": 248.13,
-        "target1": 277.55,
-        "target2": 295.21,
+        "buyAbove": 262.5,
+        "stopLoss": 250.73,
+        "target1": 280.15,
+        "target2": 297.81,
         "riskPerShare": 11.77,
         "rrT2": 3.0,
         "rsi": null,
@@ -57324,10 +57328,10 @@
         "symbol": "GPPL",
         "name": "Gujarat Pipavav Port",
         "direction": "LONG",
-        "buyAbove": 159.87,
-        "stopLoss": 156.37,
-        "target1": 165.12,
-        "target2": 170.37,
+        "buyAbove": 159.88,
+        "stopLoss": 156.38,
+        "target1": 165.13,
+        "target2": 170.38,
         "riskPerShare": 3.5,
         "rrT2": 3.0,
         "rsi": null,
@@ -57340,10 +57344,10 @@
         "symbol": "HINDCOPPER",
         "name": "Hindustan Copper",
         "direction": "LONG",
-        "buyAbove": 554.0,
-        "stopLoss": 533.79,
-        "target1": 584.32,
-        "target2": 614.63,
+        "buyAbove": 569.0,
+        "stopLoss": 548.79,
+        "target1": 599.32,
+        "target2": 629.63,
         "riskPerShare": 20.21,
         "rrT2": 3.0,
         "rsi": null,
@@ -57356,10 +57360,10 @@
         "symbol": "BHEL",
         "name": "Bharat Heavy Electricals",
         "direction": "LONG",
-        "buyAbove": 430.75,
-        "stopLoss": 418.58,
-        "target1": 449.0,
-        "target2": 467.26,
+        "buyAbove": 433.4,
+        "stopLoss": 421.23,
+        "target1": 451.65,
+        "target2": 469.91,
         "riskPerShare": 12.17,
         "rrT2": 3.0,
         "rsi": null,
@@ -57404,10 +57408,10 @@
         "symbol": "RUBICON",
         "name": "Rubicon Research",
         "direction": "LONG",
-        "buyAbove": 1745.9,
-        "stopLoss": 1681.85,
-        "target1": 1841.98,
-        "target2": 1938.05,
+        "buyAbove": 1782.0,
+        "stopLoss": 1717.95,
+        "target1": 1878.08,
+        "target2": 1974.15,
         "riskPerShare": 64.05,
         "rrT2": 3.0,
         "rsi": null,
@@ -57420,10 +57424,10 @@
         "symbol": "BALUFORGE",
         "name": "Balu Forge Industries",
         "direction": "LONG",
-        "buyAbove": 529.0,
-        "stopLoss": 510.1,
-        "target1": 557.35,
-        "target2": 585.7,
+        "buyAbove": 516.6,
+        "stopLoss": 497.7,
+        "target1": 544.95,
+        "target2": 573.3,
         "riskPerShare": 18.9,
         "rrT2": 3.0,
         "rsi": null,
@@ -57436,10 +57440,10 @@
         "symbol": "FINCABLES",
         "name": "Finolex Cables",
         "direction": "LONG",
-        "buyAbove": 1317.35,
-        "stopLoss": 1266.03,
-        "target1": 1394.33,
-        "target2": 1471.31,
+        "buyAbove": 1315.05,
+        "stopLoss": 1263.73,
+        "target1": 1392.03,
+        "target2": 1469.01,
         "riskPerShare": 51.32,
         "rrT2": 3.0,
         "rsi": null,
@@ -57452,10 +57456,10 @@
         "symbol": "DEVYANI",
         "name": "Devyani International",
         "direction": "LONG",
-        "buyAbove": 143.64,
-        "stopLoss": 137.94,
-        "target1": 152.19,
-        "target2": 160.74,
+        "buyAbove": 144.19,
+        "stopLoss": 138.49,
+        "target1": 152.74,
+        "target2": 161.29,
         "riskPerShare": 5.7,
         "rrT2": 3.0,
         "rsi": null,
@@ -57500,10 +57504,10 @@
         "symbol": "TRIVENI",
         "name": "Triveni Engineering & Industries",
         "direction": "LONG",
-        "buyAbove": 281.45,
-        "stopLoss": 269.23,
-        "target1": 299.78,
-        "target2": 318.11,
+        "buyAbove": 281.47,
+        "stopLoss": 269.25,
+        "target1": 299.8,
+        "target2": 318.13,
         "riskPerShare": 12.22,
         "rrT2": 3.0,
         "rsi": null,
@@ -57516,10 +57520,10 @@
         "symbol": "URBANCO",
         "name": "Urban Company",
         "direction": "LONG",
-        "buyAbove": 143.89,
-        "stopLoss": 138.41,
-        "target1": 152.11,
-        "target2": 160.33,
+        "buyAbove": 144.88,
+        "stopLoss": 139.4,
+        "target1": 153.1,
+        "target2": 161.32,
         "riskPerShare": 5.48,
         "rrT2": 3.0,
         "rsi": null,
@@ -57532,10 +57536,10 @@
         "symbol": "SHRIRAMFIN",
         "name": "Shriram Finance",
         "direction": "LONG",
-        "buyAbove": 1126.6,
-        "stopLoss": 1098.13,
-        "target1": 1169.3,
-        "target2": 1212.01,
+        "buyAbove": 1127.5,
+        "stopLoss": 1099.03,
+        "target1": 1170.2,
+        "target2": 1212.91,
         "riskPerShare": 28.47,
         "rrT2": 3.0,
         "rsi": null,
@@ -57548,10 +57552,10 @@
         "symbol": "SONACOMS",
         "name": "Sona BLW Precision Forgings",
         "direction": "LONG",
-        "buyAbove": 811.65,
-        "stopLoss": 789.76,
-        "target1": 844.49,
-        "target2": 877.32,
+        "buyAbove": 810.2,
+        "stopLoss": 788.31,
+        "target1": 843.04,
+        "target2": 875.87,
         "riskPerShare": 21.89,
         "rrT2": 3.0,
         "rsi": null,
@@ -57564,10 +57568,10 @@
         "symbol": "BECTORFOOD",
         "name": "Mrs. Bectors Food",
         "direction": "LONG",
-        "buyAbove": 245.04,
-        "stopLoss": 234.95,
-        "target1": 260.18,
-        "target2": 275.31,
+        "buyAbove": 247.89,
+        "stopLoss": 237.8,
+        "target1": 263.02,
+        "target2": 278.16,
         "riskPerShare": 10.09,
         "rrT2": 3.0,
         "rsi": null,
@@ -57580,10 +57584,10 @@
         "symbol": "TDPOWERSYS",
         "name": "TD Power Systems",
         "direction": "LONG",
-        "buyAbove": 1562.0,
-        "stopLoss": 1489.09,
-        "target1": 1671.37,
-        "target2": 1780.73,
+        "buyAbove": 1544.7,
+        "stopLoss": 1471.79,
+        "target1": 1654.07,
+        "target2": 1763.43,
         "riskPerShare": 72.91,
         "rrT2": 3.0,
         "rsi": null,
@@ -57596,10 +57600,10 @@
         "symbol": "ROLEXRINGS",
         "name": "Rolex Rings",
         "direction": "LONG",
-        "buyAbove": 179.79,
-        "stopLoss": 172.31,
-        "target1": 191.01,
-        "target2": 202.23,
+        "buyAbove": 180.22,
+        "stopLoss": 172.74,
+        "target1": 191.44,
+        "target2": 202.66,
         "riskPerShare": 7.48,
         "rrT2": 3.0,
         "rsi": null,
@@ -57612,10 +57616,10 @@
         "symbol": "PREMIERPOL",
         "name": "Premier Polyfilm",
         "direction": "LONG",
-        "buyAbove": 82.7,
-        "stopLoss": 78.44,
-        "target1": 89.09,
-        "target2": 95.48,
+        "buyAbove": 83.45,
+        "stopLoss": 79.19,
+        "target1": 89.84,
+        "target2": 96.23,
         "riskPerShare": 4.26,
         "rrT2": 3.0,
         "rsi": null,
@@ -57628,10 +57632,10 @@
         "symbol": "HAL",
         "name": "Hindustan Aeronautics",
         "direction": "LONG",
-        "buyAbove": 5098.1,
-        "stopLoss": 4985.47,
-        "target1": 5267.05,
-        "target2": 5435.99,
+        "buyAbove": 5088.0,
+        "stopLoss": 4975.37,
+        "target1": 5256.94,
+        "target2": 5425.89,
         "riskPerShare": 112.63,
         "rrT2": 3.0,
         "rsi": null,
@@ -57644,10 +57648,10 @@
         "symbol": "JUBLFOOD",
         "name": "Jubilant FoodWorks",
         "direction": "LONG",
-        "buyAbove": 510.35,
-        "stopLoss": 494.04,
-        "target1": 534.82,
-        "target2": 559.28,
+        "buyAbove": 511.6,
+        "stopLoss": 495.29,
+        "target1": 536.07,
+        "target2": 560.53,
         "riskPerShare": 16.31,
         "rrT2": 3.0,
         "rsi": null,
@@ -57660,10 +57664,10 @@
         "symbol": "ETERNAL",
         "name": "Eternal",
         "direction": "LONG",
-        "buyAbove": 319.8,
-        "stopLoss": 311.12,
-        "target1": 332.82,
-        "target2": 345.84,
+        "buyAbove": 320.45,
+        "stopLoss": 311.77,
+        "target1": 333.47,
+        "target2": 346.49,
         "riskPerShare": 8.68,
         "rrT2": 3.0,
         "rsi": null,
@@ -57676,10 +57680,10 @@
         "symbol": "MOL",
         "name": "Meghmani Organics",
         "direction": "LONG",
-        "buyAbove": 63.27,
-        "stopLoss": 60.39,
-        "target1": 67.59,
-        "target2": 71.91,
+        "buyAbove": 63.09,
+        "stopLoss": 60.21,
+        "target1": 67.41,
+        "target2": 71.73,
         "riskPerShare": 2.88,
         "rrT2": 3.0,
         "rsi": null,
@@ -57692,10 +57696,10 @@
         "symbol": "UFLEX",
         "name": "UFLEX",
         "direction": "LONG",
-        "buyAbove": 585.35,
-        "stopLoss": 569.63,
-        "target1": 608.93,
-        "target2": 632.51,
+        "buyAbove": 586.05,
+        "stopLoss": 570.33,
+        "target1": 609.63,
+        "target2": 633.21,
         "riskPerShare": 15.72,
         "rrT2": 3.0,
         "rsi": null,
@@ -57756,10 +57760,10 @@
         "symbol": "GKSL",
         "name": "Gujarat Kidney and Super Speciality",
         "direction": "LONG",
-        "buyAbove": 148.0,
-        "stopLoss": 143.74,
-        "target1": 154.39,
-        "target2": 160.78,
+        "buyAbove": 150.39,
+        "stopLoss": 146.13,
+        "target1": 156.78,
+        "target2": 163.17,
         "riskPerShare": 4.26,
         "rrT2": 3.0,
         "rsi": null,
@@ -57804,10 +57808,10 @@
         "symbol": "NETWEB",
         "name": "Netweb Technologies",
         "direction": "LONG",
-        "buyAbove": 5222.0,
-        "stopLoss": 5012.98,
-        "target1": 5535.53,
-        "target2": 5849.06,
+        "buyAbove": 5210.9,
+        "stopLoss": 5001.88,
+        "target1": 5524.43,
+        "target2": 5837.96,
         "riskPerShare": 209.02,
         "rrT2": 3.0,
         "rsi": null,
@@ -57820,10 +57824,10 @@
         "symbol": "HAPPSTMNDS",
         "name": "Happiest Minds Technologies",
         "direction": "LONG",
-        "buyAbove": 413.85,
-        "stopLoss": 397.85,
-        "target1": 437.85,
-        "target2": 461.85,
+        "buyAbove": 428.5,
+        "stopLoss": 412.5,
+        "target1": 452.5,
+        "target2": 476.5,
         "riskPerShare": 16.0,
         "rrT2": 3.0,
         "rsi": null,
@@ -57836,10 +57840,10 @@
         "symbol": "SETL",
         "name": "Standard Engineering Technology",
         "direction": "LONG",
-        "buyAbove": 311.4,
-        "stopLoss": 298.02,
-        "target1": 331.47,
-        "target2": 351.54,
+        "buyAbove": 310.0,
+        "stopLoss": 296.62,
+        "target1": 330.07,
+        "target2": 350.14,
         "riskPerShare": 13.38,
         "rrT2": 3.0,
         "rsi": null,
@@ -57852,11 +57856,235 @@
         "symbol": "GNFC",
         "name": "Gujarat Narmada Valley Fert & Chem",
         "direction": "LONG",
-        "buyAbove": 583.95,
-        "stopLoss": 569.85,
-        "target1": 605.1,
-        "target2": 626.25,
+        "buyAbove": 584.65,
+        "stopLoss": 570.55,
+        "target1": 605.8,
+        "target2": 626.95,
         "riskPerShare": 14.1,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "DECNGOLD",
+        "name": "Deccan Gold Mines",
+        "direction": "LONG",
+        "buyAbove": 231.8,
+        "stopLoss": 220.12,
+        "target1": 249.32,
+        "target2": 266.84,
+        "riskPerShare": 11.68,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "PNB",
+        "name": "Punjab National Bank",
+        "direction": "LONG",
+        "buyAbove": 117.73,
+        "stopLoss": 115.56,
+        "target1": 120.98,
+        "target2": 124.24,
+        "riskPerShare": 2.17,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "UJJIVANSFB",
+        "name": "Ujjivan Small Finance Bank",
+        "direction": "LONG",
+        "buyAbove": 72.21,
+        "stopLoss": 69.79,
+        "target1": 75.84,
+        "target2": 79.47,
+        "riskPerShare": 2.42,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "TEMBO",
+        "name": "Tembo Global Industries",
+        "direction": "LONG",
+        "buyAbove": 62.6,
+        "stopLoss": 59.34,
+        "target1": 67.49,
+        "target2": 72.38,
+        "riskPerShare": 3.26,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "CHENNPETRO",
+        "name": "Chennai Petroleum Corporation",
+        "direction": "LONG",
+        "buyAbove": 1372.8,
+        "stopLoss": 1302.39,
+        "target1": 1478.41,
+        "target2": 1584.03,
+        "riskPerShare": 70.41,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "VGUARD",
+        "name": "V-Guard Industries",
+        "direction": "LONG",
+        "buyAbove": 336.15,
+        "stopLoss": 324.76,
+        "target1": 353.23,
+        "target2": 370.32,
+        "riskPerShare": 11.39,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "EPL",
+        "name": "EPL",
+        "direction": "LONG",
+        "buyAbove": 248.08,
+        "stopLoss": 239.74,
+        "target1": 260.59,
+        "target2": 273.1,
+        "riskPerShare": 8.34,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "UNIONBANK",
+        "name": "Union Bank of India",
+        "direction": "LONG",
+        "buyAbove": 189.96,
+        "stopLoss": 185.23,
+        "target1": 197.06,
+        "target2": 204.15,
+        "riskPerShare": 4.73,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "M&M",
+        "name": "Mahindra & Mahindra",
+        "direction": "LONG",
+        "buyAbove": 3412.1,
+        "stopLoss": 3338.55,
+        "target1": 3522.42,
+        "target2": 3632.75,
+        "riskPerShare": 73.55,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "HINDALCO",
+        "name": "Hindalco Industries",
+        "direction": "LONG",
+        "buyAbove": 1052.4,
+        "stopLoss": 1027.13,
+        "target1": 1090.31,
+        "target2": 1128.21,
+        "riskPerShare": 25.27,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "FILATEX",
+        "name": "Filatex India",
+        "direction": "LONG",
+        "buyAbove": 82.9,
+        "stopLoss": 79.05,
+        "target1": 88.68,
+        "target2": 94.45,
+        "riskPerShare": 3.85,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "NAUKRI",
+        "name": "Info Edge",
+        "direction": "LONG",
+        "buyAbove": 1366.5,
+        "stopLoss": 1325.66,
+        "target1": 1427.76,
+        "target2": 1489.02,
+        "riskPerShare": 40.84,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "UNOMINDA",
+        "name": "UNO Minda",
+        "direction": "LONG",
+        "buyAbove": 1265.9,
+        "stopLoss": 1234.79,
+        "target1": 1312.57,
+        "target2": 1359.23,
+        "riskPerShare": 31.11,
+        "rrT2": 3.0,
+        "rsi": null,
+        "deliveryPct": null,
+        "score": null,
+        "reasons": null,
+        "scanLtp": null
+      },
+      {
+        "symbol": "LGEINDIA",
+        "name": "LG Electronics",
+        "direction": "LONG",
+        "buyAbove": 1684.8,
+        "stopLoss": 1642.64,
+        "target1": 1748.04,
+        "target2": 1811.28,
+        "riskPerShare": 42.16,
         "rrT2": 3.0,
         "rsi": null,
         "deliveryPct": null,
@@ -57865,15 +58093,15 @@
         "scanLtp": null
       }
     ],
-    "updatedAt": "2026-08-17T07:05:20.576989+00:00",
+    "updatedAt": "2026-08-17T08:45:04.264703+00:00",
     "isMock": false,
     "fromPersisted": true
   },
   "selectionMeta": {
     "mode": "live",
-    "reason": "Scheduled live refresh (desk_midday_midday_1200); LLM day-locked.",
+    "reason": "Scheduled live refresh (desk_midday_midday_1400); LLM day-locked.",
     "dataDate": "2026-08-17"
   },
-  "macrosRefreshedAt": "2026-08-17T07:06:40.969224+00:00",
+  "macrosRefreshedAt": "2026-08-17T08:29:13.262861+00:00",
   "closeMarksRefreshedAt": "2026-08-14T10:05:25.028666+00:00"
 }

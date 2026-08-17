@@ -275,5 +275,31 @@
     "firedAt": "2026-08-17T05:26:43.910586+00:00",
     "book": "INTRADAY",
     "action": "BUY"
+  },
+  {
+    "key": "ENTRY1:LONG:lock:SWING:2026-08-13",
+    "symbol": "ENTRY1",
+    "direction": "LONG",
+    "hitLevel": "buy",
+    "label": "SWING PICK \u00b7 BUY",
+    "ltp": 100.0,
+    "entryPrice": 100.0,
+    "planDate": "2026-08-13",
+    "firedAt": "2026-08-17T08:56:56.680625+00:00",
+    "book": "SWING",
+    "action": "BUY"
+  },
+  {
+    "key": "SECOND:LONG:lock:SWING:2026-08-13",
+    "symbol": "SECOND",
+    "direction": "LONG",
+    "hitLevel": "buy",
+    "label": "SWING PICK \u00b7 BUY",
+    "ltp": 100.0,
+    "entryPrice": 100.0,
+    "planDate": "2026-08-13",
+    "firedAt": "2026-08-17T08:56:56.815147+00:00",
+    "book": "SWING",
+    "action": "BUY"
   }
 ]

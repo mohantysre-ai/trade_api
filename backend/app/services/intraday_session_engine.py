@@ -52,6 +52,11 @@ _SESSION_RESPONSE_CACHE: dict[str, Any] | None = None
 _SESSION_RESPONSE_CACHE_AT = 0.0
 _SESSION_RESPONSE_OPEN_TTL = float(os.environ.get("INTRADAY_RESPONSE_OPEN_TTL", "4"))
 _SESSION_RESPONSE_CLOSED_TTL = float(os.environ.get("INTRADAY_RESPONSE_CLOSED_TTL", "20"))
+# Live replacement hunt: rescore Nifty 500 QUALIFIED names; do not reuse 10:18 lock pools.
+_HUNT_TTL_SEC = float(os.environ.get("INTRADAY_HUNT_TTL", "30"))
+_SNAP_REFRESH_MIN_GAP_SEC = float(os.environ.get("INTRADAY_HUNT_REFRESH_GAP_SEC", "120"))
+_HUNT_POOL_CACHE: dict[str, Any] = {"key": "", "at": 0.0, "long": [], "short": []}
+_SNAP_REFRESH_LAST = 0.0
 
 def _market_snapshot_file() -> Path:
     from .market_snapshot_store import readable_market_snapshot_path
@@ -2146,7 +2151,11 @@ def _construct_dual_sleeve(
     return picked
 
 
-def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
+def generate_candidates(
+    snapshot: dict[str, Any] | None = None,
+    *,
+    include_full_hunt: bool = False,
+) -> dict[str, Any]:
     snap = snapshot if snapshot is not None else load_market_snapshot()
     updated_at = snap.get("updatedAt")
     snap_dt = _parse_iso(updated_at)
@@ -2318,7 +2327,7 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
     deployed = round(sum(float(r.get("deployedCapital") or 0) for r in [*adopt_long, *adopt_short]), 2)
     portfolio_risk = round(sum(float(r.get("maxLoss") or 0) for r in [*adopt_long, *adopt_short]), 2)
 
-    return {
+    body = {
         "success": True,
         "updatedAt": _utc_now_iso(),
         "snapshotUpdatedAt": updated_at,
@@ -2454,6 +2463,93 @@ def generate_candidates(snapshot: dict[str, Any] | None = None) -> dict[str, Any
         "executionPolicy": "MANUAL_ONLY",
         "locked": False,
     }
+    if include_full_hunt:
+
+        def _qualified_hunt(
+            mom: list[dict[str, Any]],
+            mr: list[dict[str, Any]],
+            direction: str,
+        ) -> list[dict[str, Any]]:
+            seen: set[str] = set()
+            out: list[dict[str, Any]] = []
+            for bucket in (mom, mr):
+                for row in bucket:
+                    if not isinstance(row, dict):
+                        continue
+                    if row.get("entryState") != ENTRY_QUALIFIED:
+                        continue
+                    sym = str(row.get("symbol") or "").upper()
+                    if not sym or sym in seen:
+                        continue
+                    seen.add(sym)
+                    item = dict(row)
+                    item["direction"] = direction
+                    out.append(item)
+            return out
+
+        body["replacementHuntLong"] = _qualified_hunt(long_scored, long_mr, "LONG")
+        body["replacementHuntShort"] = _qualified_hunt(short_scored, short_mr, "SHORT")
+    return body
+
+
+def _maybe_refresh_live_snapshot(*, reason: str) -> dict[str, Any]:
+    """During RTH, pull a fresh Angel snapshot when quotes are older than SNAPSHOT_STALE_SEC.
+
+    Inline import: angel_one_feed imports this module for routes.
+    """
+    global _SNAP_REFRESH_LAST
+    from .angel_one_feed import run_scheduled_live_refresh
+    from .trade_outcome import _is_market_open
+
+    snap = load_market_snapshot()
+    if not _is_market_open():
+        return snap
+    snap_dt = _parse_iso(str(snap.get("updatedAt") or snap.get("asOf") or "") or None)
+    if snap_dt is not None:
+        age = max(
+            0.0,
+            (datetime.now(timezone.utc) - snap_dt.astimezone(timezone.utc)).total_seconds(),
+        )
+    else:
+        age = float(SNAPSHOT_STALE_SEC) + 1.0
+    now = time.monotonic()
+    if age <= SNAPSHOT_STALE_SEC:
+        return snap
+    if (now - _SNAP_REFRESH_LAST) < _SNAP_REFRESH_MIN_GAP_SEC:
+        return snap
+    _SNAP_REFRESH_LAST = now
+    try:
+        run_scheduled_live_refresh(reason=reason)
+    except Exception:
+        log.exception("intraday live snapshot refresh failed (%s)", reason)
+    return load_market_snapshot()
+
+
+def _replacement_source_pools(
+    session: dict[str, Any],
+    snap: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
+    """Market hours: QUALIFIED names from a live Nifty 500 hunt. After hours: morning lock pools."""
+    from .trade_outcome import _is_market_open
+
+    lock_long = list(session.get("candidatePoolLong") or [])
+    lock_short = list(session.get("candidatePoolShort") or [])
+    if not _is_market_open():
+        return lock_long, lock_short, "lock_pool"
+    key = str(snap.get("updatedAt") or "")
+    now = time.monotonic()
+    cache = _HUNT_POOL_CACHE
+    if cache["key"] == key and cache["at"] and (now - float(cache["at"])) < _HUNT_TTL_SEC:
+        return list(cache["long"] or []), list(cache["short"] or []), "live_universe_hunt"
+    try:
+        hunt = generate_candidates(snap, include_full_hunt=True)
+    except Exception:
+        log.exception("live replacement hunt failed — using morning lock pool")
+        return lock_long, lock_short, "lock_pool_error"
+    long_p = list(hunt.get("replacementHuntLong") or [])
+    short_p = list(hunt.get("replacementHuntShort") or [])
+    _HUNT_POOL_CACHE.update({"key": key, "at": now, "long": long_p, "short": short_p})
+    return long_p, short_p, "live_universe_hunt"
 
 
 def _plan_row_from_session(row: dict[str, Any], direction: str, session_date: str) -> dict[str, Any]:
@@ -2889,9 +2985,13 @@ def propose_replacements(
     quotes: dict[str, Any],
     live_map: dict[str, dict[str, Any]],
     regime: dict[str, Any] | None = None,
+    *,
+    hunt_pools: tuple[list[dict[str, Any]], list[dict[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Propose replacements for freed capital slots from locked candidate pools.
+    """Propose replacements for freed capital slots.
 
+    During RTH, hunt_pools is the live Nifty 500 QUALIFIED set. After hours
+    (or when hunt_pools is omitted) uses the morning lock pools.
     Prefer cash over weak / exhausted / stale candidates. Proposal-only — does not mutate.
     Uses entry_quality_gate (EXHAUSTED / STALE / NO_EDGE / WAIT_RETEST skipped).
     No revenge replace of SL'd symbols (closed set excluded). Sector caps enforced.
@@ -2971,9 +3071,14 @@ def propose_replacements(
                     merged[k] = live.get(k)
         return merged
 
+    if hunt_pools is not None:
+        pool_long_raw, pool_short_raw = hunt_pools
+    else:
+        pool_long_raw = session.get("candidatePoolLong")
+        pool_short_raw = session.get("candidatePoolShort")
     side_specs = (
-        ("LONG", free["long"], _pool_rows(session.get("candidatePoolLong"))),
-        ("SHORT", free["short"], _pool_rows(session.get("candidatePoolShort"))),
+        ("LONG", free["long"], _pool_rows(pool_long_raw)),
+        ("SHORT", free["short"], _pool_rows(pool_short_raw)),
     )
     for direction, slots, pool in side_specs:
         if slots <= 0 or not pool:
@@ -3071,6 +3176,7 @@ def apply_replacements(
     regime: dict[str, Any] | None = None,
     *,
     bypass_window: bool = False,
+    hunt_pools: tuple[list[dict[str, Any]], list[dict[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
     """Mutate session: append sized open rows for QUALIFIED free-slot proposals.
 
@@ -3113,15 +3219,20 @@ def apply_replacements(
     exclude = already_open | closed_syms | prior_applied
     sector_counts = _open_sector_counts(long_rows, short_rows)
 
+    if hunt_pools is not None:
+        pool_long_raw, pool_short_raw = hunt_pools
+    else:
+        pool_long_raw = session.get("candidatePoolLong") or []
+        pool_short_raw = session.get("candidatePoolShort") or []
     pool_by_side = {
         "LONG": {
             str(c.get("symbol") or "").upper(): c
-            for c in (session.get("candidatePoolLong") or [])
+            for c in pool_long_raw
             if isinstance(c, dict) and c.get("symbol")
         },
         "SHORT": {
             str(c.get("symbol") or "").upper(): c
-            for c in (session.get("candidatePoolShort") or [])
+            for c in pool_short_raw
             if isinstance(c, dict) and c.get("symbol")
         },
     }
@@ -3626,8 +3737,21 @@ def refresh_session_state() -> dict[str, Any]:
 def _compute_session(include_live: bool = True, *, persist: bool = False) -> dict[str, Any]:
     session = load_session()
     snap = load_market_snapshot()
+    try:
+        from .trade_outcome import _is_market_open as _rth_open
+
+        market_open_now = bool(_rth_open())
+    except Exception:
+        market_open_now = False
+    if persist and market_open_now:
+        snap = _maybe_refresh_live_snapshot(reason="intraday_replacement_hunt")
     quotes = snap.get("stockQuotes") or {}
-    regime = session.get("regime") or detect_regime(snap)
+    if market_open_now:
+        regime = detect_regime(snap)
+    else:
+        regime = session.get("regime") or detect_regime(snap)
+    if persist and snap.get("updatedAt"):
+        session["snapshotUpdatedAt"] = snap.get("updatedAt")
     capital = session.get("capital") or {
         "longCapital": LONG_CAPITAL,
         "shortCapital": SHORT_CAPITAL,
@@ -3805,6 +3929,8 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
     replacement_blocked_reason: str | None = None
     replacement_candidates: list[dict[str, Any]] = []
     cash_held = False
+    hunt_pools: tuple[list[dict[str, Any]], list[dict[str, Any]]] | None = None
+    replacement_hunt_source = "lock_pool"
     rot_ok, rot_code = rotation_window_allowed()
     rot_cfg = rotation_window_config()
     if not session.get("locked"):
@@ -3819,6 +3945,17 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
         elif free_slots["total"] <= 0:
             replacement_blocked_reason = "no_free_slots"
         else:
+            if market_open_now:
+                try:
+                    long_p, short_p, replacement_hunt_source = _replacement_source_pools(
+                        {**session, "long": long_rows, "short": short_rows},
+                        snap,
+                    )
+                    hunt_pools = (long_p, short_p)
+                except Exception as exc:
+                    log.warning("replacement hunt pools failed: %s", exc)
+                    hunt_pools = None
+                    replacement_hunt_source = "lock_pool_error"
             try:
                 replacement_candidates = propose_replacements(
                     {
@@ -3829,7 +3966,10 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
                     quotes,
                     live_map,
                     regime,
+                    hunt_pools=hunt_pools,
                 )
+                for c in replacement_candidates:
+                    c["huntSource"] = replacement_hunt_source
                 if not replacement_candidates:
                     replacement_blocked_reason = "prefer_cash_no_qualified"
                     cash_held = True
@@ -3852,6 +3992,7 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
                 quotes,
                 live_map,
                 regime,
+                hunt_pools=hunt_pools,
             )
             if applied_rows:
                 save_session(session)
@@ -3918,6 +4059,7 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
                                     "qualityAdjustedExpectedR": c.get(
                                         "qualityAdjustedExpectedR"
                                     ),
+                                    "huntSource": c.get("huntSource"),
                                     "proposalOnly": True,
                                 }
                                 for c in replacement_candidates
@@ -4026,7 +4168,11 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
         "sessionDate": session.get("sessionDate"),
         "committedAt": session.get("committedAt"),
         "updatedAt": live_meta.get("updatedAt") or session.get("updatedAt") or _utc_now_iso(),
-        "snapshotUpdatedAt": live_meta.get("snapshotUpdatedAt") or session.get("snapshotUpdatedAt") or snap.get("updatedAt"),
+        "snapshotUpdatedAt": (
+            snap.get("updatedAt")
+            if market_open
+            else (live_meta.get("snapshotUpdatedAt") or session.get("snapshotUpdatedAt") or snap.get("updatedAt"))
+        ),
         "marketOpen": market_open,
         "sessionClosed": session_closed,
         "closeMarksFrozenAt": session.get("closeMarksFrozenAt"),
@@ -4042,6 +4188,7 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
         "replacementsApplied": session.get("replacementsApplied") or replacements_applied,
         "lastReplacementAppliedAt": session.get("lastReplacementAppliedAt"),
         "replacementBlockedReason": replacement_blocked_reason,
+        "replacementHuntSource": replacement_hunt_source,
         "replacementCutoffIst": (
             f"{_hhmm_to_minutes(REPLACEMENT_CUTOFF_HHMM) // 60:02d}:"
             f"{_hhmm_to_minutes(REPLACEMENT_CUTOFF_HHMM) % 60:02d}"
