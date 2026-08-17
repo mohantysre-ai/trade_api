@@ -416,10 +416,8 @@ def _snapshot_data_date(snap: dict[str, Any]) -> str:
     return str(meta.get("dataDate") or "")[:10]
 
 
-def _ensure_today_matrix_snapshot() -> None:
-    """During hunt, refresh Matrix if Docker/image snapshot is stale or undersized."""
-    global _SWING_MATRIX_REFRESH_AT
-    snap = _read_json(_matrix_snapshot_path()) or {}
+def _matrix_snapshot_ready_for_today(snap: dict[str, Any]) -> tuple[bool, str]:
+    """Return whether Matrix is safe to use for today's swing selection."""
     today = _ist_today()
     stocks = snap.get("stocks") if isinstance(snap.get("stocks"), list) else []
     quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
@@ -432,25 +430,42 @@ def _ensure_today_matrix_snapshot() -> None:
     except (TypeError, ValueError):
         universe = 0
     universe = universe or len(quotes)
-    undersized = universe < 400
-    stale = (
-        not snap
-        or _snapshot_data_date(snap) != today
-        or snap.get("isSnapshotFallback") is True
-        or not has_side
-        or undersized
-    )
-    if not stale:
-        return
+    data_date = _snapshot_data_date(snap)
+    if not snap:
+        return False, "MATRIX_SNAPSHOT_MISSING"
+    if data_date != today:
+        return False, f"MATRIX_DATA_DATE_STALE:{data_date or 'MISSING'}"
+    if snap.get("isSnapshotFallback") is True:
+        return False, "MATRIX_SNAPSHOT_FALLBACK"
+    if universe < 400:
+        return False, f"MATRIX_UNIVERSE_UNDERSIZED:{universe}"
+    if not has_side:
+        return False, "MATRIX_DETERMINISTIC_EVIDENCE_MISSING"
+    return True, "READY"
+
+
+def _ensure_today_matrix_snapshot() -> tuple[bool, str]:
+    """Refresh stale Matrix and fail closed unless the replacement is valid today."""
+    global _SWING_MATRIX_REFRESH_AT
+    snap = _read_json(_matrix_snapshot_path()) or {}
+    today = _ist_today()
+    ready, reason = _matrix_snapshot_ready_for_today(snap)
+    if ready:
+        return True, reason
     now = time.monotonic()
     if _SWING_MATRIX_REFRESH_AT and now - _SWING_MATRIX_REFRESH_AT < _SWING_MATRIX_REFRESH_TTL:
-        return
+        return False, reason
     _SWING_MATRIX_REFRESH_AT = now
     try:
         result = _run_swing_matrix_refresh()
         log.info("Swing hunt matrix refresh: success=%s", result.get("success") if isinstance(result, dict) else result)
     except Exception as exc:
         log.warning("Swing hunt matrix refresh failed: %s", exc)
+    refreshed = _read_json(_matrix_snapshot_path()) or {}
+    ready, reason = _matrix_snapshot_ready_for_today(refreshed)
+    if not ready:
+        log.warning("Swing hunt remains fail-closed after refresh: %s", reason)
+    return ready, reason
 
 
 def _run_swing_matrix_refresh() -> dict[str, Any]:
@@ -1592,14 +1607,20 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
     long_rows: list[dict[str, Any]] = []
 
     if hunt_ok:
-        _ensure_today_matrix_snapshot()
-        raw_picks, snap_src = _picks_from_asset_matrix(exclude_symbols=exclude)
-        long_rows, skipped = _normalize_candidate_rows(
-            raw_picks,
-            session_date,
-            committed_at=committed_at,
-            snap_src=snap_src,
+        matrix_state = _ensure_today_matrix_snapshot()
+        matrix_ready, matrix_reason = (
+            matrix_state if isinstance(matrix_state, tuple) else (True, "READY")
         )
+        if matrix_ready:
+            raw_picks, snap_src = _picks_from_asset_matrix(exclude_symbols=exclude)
+            long_rows, skipped = _normalize_candidate_rows(
+                raw_picks,
+                session_date,
+                committed_at=committed_at,
+                snap_src=snap_src,
+            )
+        else:
+            skipped.append(matrix_reason)
 
     diagnostics = _swing_universe_diagnostics(exclude_symbols=exclude)
     hunt_started = committed_at
@@ -1712,7 +1733,11 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
             "counts": {"long": 0, "short": 0, "total": 0},
             "deskGates": {"minPrice": SWING_MIN_PRICE, "rejectDvr": True},
             "crossBookExcluded": sorted(exclude),
-            "cashReason": "WAITING_FOR_QUALIFIED_BUY_ENTRY",
+            "cashReason": (
+                "WAITING_FOR_QUALIFIED_BUY_ENTRY"
+                if not skipped or not skipped[0].startswith("MATRIX_")
+                else skipped[0]
+            ),
             "huntWindow": swing_entry_hunt_config(),
             "entryHuntDiagnostics": diagnostics,
         }
@@ -2183,6 +2208,18 @@ def _compute_swing_session(*, live: bool = False) -> dict[str, Any]:
         "totalPnl": round(realized + unrealized, 2),
         "lockedCount": len(all_rows),
     }
+    # Closed trades remain available for EOD/audit and realized P&L, but must
+    # not be presented or counted as active portfolio positions.
+    closed_rows = [r for r in all_rows if r.get("closed")]
+    out["closedPositions"] = closed_rows
+    out["long"] = [r for r in out["long"] if not r.get("closed")]
+    out["short"] = [r for r in out["short"] if not r.get("closed")]
+    out["counts"] = {
+        "long": len(out["long"]),
+        "short": len(out["short"]),
+        "total": len(out["long"]) + len(out["short"]),
+    }
+    out["portfolio"]["lockedCount"] = out["counts"]["total"]
     out["priceOnly"] = True
     out["liveMarks"] = len(live_marks)
     out["updatedAt"] = _utc_now_iso()
