@@ -240,7 +240,7 @@ export default function EodDeskPanel({
       } catch {
         /* keep local date */
       }
-      // Align Book dates to locked session days when today has no parity yet
+      // One EOD date for Intraday + Swing. Retarget only when both locks share a stale day.
       try {
         const [intra, swing] = await Promise.all([
           fetchLiveDesk<Record<string, any>>('intraday-session'),
@@ -248,17 +248,13 @@ export default function EodDeskPanel({
         ]);
         if (cancelled) return;
         const today = getIstMarketState().today;
-        if (intra) {
-          const iDate = String(intra?.sessionDate || '').slice(0, 10);
-          if (intra?.locked && iDate && iDate !== today) {
-            setDateStr((prev) => (prev === today ? iDate : prev));
-          }
-        }
-        if (swing) {
-          const sDate = String(swing?.sessionDate || '').slice(0, 10);
-          if (swing?.locked && sDate && sDate !== today) {
-            setSwingDateStr((prev) => (prev === today ? sDate : prev));
-          }
+        const iDate = String(intra?.sessionDate || '').slice(0, 10);
+        const sDate = String(swing?.sessionDate || '').slice(0, 10);
+        const iStale = Boolean(intra?.locked && iDate && iDate !== today);
+        const sStale = Boolean(swing?.locked && sDate && sDate !== today);
+        if (iStale && sStale && iDate === sDate) {
+          setDateStr(iDate);
+          setSwingDateStr(iDate);
         }
       } catch {
         /* keep IST today */
@@ -490,7 +486,11 @@ export default function EodDeskPanel({
                 <input
                   type="date"
                   value={swingDateStr}
-                  onChange={(e) => setSwingDateStr(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setDateStr(next);
+                    setSwingDateStr(next);
+                  }}
                   className="min-h-11 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-300"
                 />
               </label>

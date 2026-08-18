@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import datetime, timezone
+from time import monotonic
 
 from app.services import swing_session
 from app.services.exit_plan import attach_exit_plan
@@ -180,6 +182,57 @@ def test_closed_today_book_is_not_force_relocked(monkeypatch):
     assert out["long"][0]["closed"] is True
 
 
+def test_live_response_archives_closed_row_instead_of_rendering_active(monkeypatch):
+    closed = _qualified_locked_row("BLS")
+    closed.update({
+        "closed": True,
+        "status": "INITIAL STOP HIT",
+        "realizedPnl": -4286.0,
+        "unrealizedPnl": 0.0,
+    })
+    monkeypatch.setattr(
+        swing_session,
+        "load_swing_session",
+        lambda: {
+            "locked": True,
+            "sessionDate": "2026-08-17",
+            "long": [closed],
+            "short": [],
+            "capital": {"swingCapital": 1_000_000},
+        },
+    )
+    monkeypatch.setattr(swing_session, "_read_json", lambda _path: {})
+    monkeypatch.setattr(swing_session, "_is_market_open", lambda: True)
+    monkeypatch.setattr(
+        "app.services.trade_outcome.fetch_live_marks_for_symbols",
+        lambda _symbols: {},
+    )
+
+    out = swing_session._compute_swing_session(live=True)
+
+    assert out["long"] == []
+    assert out["counts"]["total"] == 0
+    assert out["portfolio"]["lockedCount"] == 0
+    assert out["portfolio"]["realizedPnl"] == -4286.0
+    assert out["closedPositions"][0]["symbol"] == "BLS"
+
+
+def test_stale_friday_matrix_cannot_lock_monday_pick(monkeypatch, tmp_path: Path):
+    _patch_hunt(monkeypatch, tmp_path, hunt_ok=True, picks=[_raw_buy_pick("BLS")])
+    monkeypatch.setattr(
+        swing_session,
+        "_ensure_today_matrix_snapshot",
+        lambda: (False, "MATRIX_DATA_DATE_STALE:2026-08-14"),
+    )
+
+    out = swing_session.lock_swing_session()
+
+    assert out["session"]["locked"] is False
+    assert out["session"]["long"] == []
+    assert out["session"]["cashReason"] == "MATRIX_DATA_DATE_STALE:2026-08-14"
+    assert "MATRIX_DATA_DATE_STALE:2026-08-14" in out["session"]["skippedIncomplete"]
+
+
 def _raw_buy_pick(symbol: str = "NEWBUY") -> dict:
     return {
         "ticker": symbol,
@@ -240,7 +293,7 @@ def _patch_hunt(monkeypatch, tmp_path, *, hunt_ok=True, hunt_code="entry_hunt", 
         "_picks_from_asset_matrix",
         lambda exclude_symbols=None: (list(picks or []), "test"),
     )
-    monkeypatch.setattr(swing_session, "_ensure_today_matrix_snapshot", lambda: None)
+    monkeypatch.setattr(swing_session, "_ensure_today_matrix_snapshot", lambda: (True, "READY"))
     return path
 
 
@@ -343,6 +396,34 @@ def test_fill_up_does_not_readd_closed_symbol(monkeypatch, tmp_path: Path):
     assert minda[0]["status"] == "INITIAL STOP HIT"
 
 
+def test_fill_up_refreshes_matrix_before_picks(monkeypatch, tmp_path: Path):
+    calls: list[str] = []
+    path = _patch_hunt(monkeypatch, tmp_path, hunt_ok=True, picks=[_raw_buy_pick("SECOND")])
+
+    def _ensure():
+        calls.append("ensure")
+        return True, "READY"
+
+    monkeypatch.setattr(swing_session, "_ensure_today_matrix_snapshot", _ensure)
+    first = _qualified_locked_row("FIRST")
+    swing_session._atomic_write(
+        str(path),
+        {
+            "locked": True,
+            "sessionDate": "2026-08-13",
+            "cashHeld": False,
+            "hunting": True,
+            "long": [first],
+            "short": [],
+            "counts": {"long": 1, "short": 0, "total": 1},
+        },
+    )
+    out = swing_session._append_new_swing_entries(swing_session.load_swing_session())
+    assert calls == ["ensure"]
+    assert out is not None
+    assert "SECOND" in (out.get("filled") or [])
+
+
 def test_refresh_does_not_copy_closed_label_onto_open_row(monkeypatch, tmp_path: Path):
     path = tmp_path / "swing_session.json"
     open_row = _qualified_locked_row("BLS")
@@ -384,3 +465,61 @@ def test_refresh_does_not_copy_closed_label_onto_open_row(monkeypatch, tmp_path:
     bls = [r for r in refreshed["long"] if str(r.get("symbol")) == "BLS"]
     assert len(bls) == 1
     assert bls[0].get("closed") is not True
+
+
+def test_ensure_refreshes_when_today_quotes_stale(monkeypatch):
+    swing_session._SWING_MATRIX_REFRESH_AT = 0.0
+    monkeypatch.setattr(swing_session, "_is_market_open", lambda: True)
+    monkeypatch.setattr(swing_session, "_ist_today", lambda: "2026-08-17")
+    stale = {
+        "updatedAt": "2026-08-17T04:48:00+00:00",
+        "selectionMeta": {"dataDate": "2026-08-17"},
+        "universeSize": 500,
+        "stocks": [{"deterministicSide": "BUY"} for _ in range(8)],
+        "stockQuotes": {f"T{i}": {"ltp": 100} for i in range(500)},
+    }
+    fresh = {**stale, "updatedAt": datetime.now(timezone.utc).isoformat()}
+    reads: list[str] = []
+
+    def _read(*_a, **_k):
+        if not reads:
+            reads.append("stale")
+            return stale
+        reads.append("fresh")
+        return fresh
+
+    monkeypatch.setattr(swing_session, "_read_json", _read)
+    calls: list[str] = []
+    monkeypatch.setattr(
+        swing_session,
+        "_run_swing_matrix_refresh",
+        lambda: calls.append("refresh") or {"success": True},
+    )
+    ready, reason = swing_session._ensure_today_matrix_snapshot()
+    assert ready is True
+    assert reason == "READY"
+    assert calls == ["refresh"]
+
+
+def test_ensure_cooldown_does_not_fill_on_stale_quotes(monkeypatch):
+    swing_session._SWING_MATRIX_REFRESH_AT = monotonic()
+    monkeypatch.setattr(swing_session, "_is_market_open", lambda: True)
+    monkeypatch.setattr(swing_session, "_ist_today", lambda: "2026-08-17")
+    snap = {
+        "updatedAt": "2026-08-17T04:48:00+00:00",
+        "selectionMeta": {"dataDate": "2026-08-17"},
+        "universeSize": 500,
+        "stocks": [{"deterministicSide": "BUY"} for _ in range(8)],
+        "stockQuotes": {f"T{i}": {"ltp": 100} for i in range(500)},
+    }
+    monkeypatch.setattr(swing_session, "_read_json", lambda *_a, **_k: snap)
+    calls: list[str] = []
+    monkeypatch.setattr(
+        swing_session,
+        "_run_swing_matrix_refresh",
+        lambda: calls.append("refresh") or {"success": True},
+    )
+    ready, reason = swing_session._ensure_today_matrix_snapshot()
+    assert ready is False
+    assert reason == "MATRIX_QUOTES_STALE"
+    assert calls == []

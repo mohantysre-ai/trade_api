@@ -2,7 +2,9 @@
 
 The official NSE Nifty 500 index payload is the primary quote source. Angel is
 used only for symbols NSE does not return. Dhan is limited to instrument-id and
-historical-candle recovery. The module is deliberately fail-closed.
+historical-candle recovery. NSE charting supplies public daily (and T-1
+intraday) OHLCV without broker credentials. The module is deliberately
+fail-closed.
 """
 
 from __future__ import annotations
@@ -14,8 +16,9 @@ import os
 import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Iterable
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -37,13 +40,41 @@ NSE_EQUITY_STOCK_INDICES_URL = os.getenv(
 DHAN_DAILY_URL = os.getenv("DHAN_DAILY_URL", "https://api.dhan.co/v2/charts/historical")
 DHAN_INTRADAY_URL = os.getenv("DHAN_INTRADAY_URL", "https://api.dhan.co/v2/charts/intraday")
 DHAN_MASTER_TTL_SECONDS = int(os.getenv("DHAN_MASTER_TTL_SECONDS", "86400"))
+NSE_CHARTING_BASE_URL = os.getenv("NSE_CHARTING_BASE_URL", "https://charting.nseindia.com")
+NSE_CHARTING_HISTORY_URL = os.getenv(
+    "NSE_CHARTING_HISTORY_URL",
+    f"{NSE_CHARTING_BASE_URL.rstrip('/')}/v1/charts/symbolHistoricalData",
+)
+NSE_CANDLE_MIN_INTERVAL_SECONDS = float(os.getenv("NSE_CANDLE_MIN_INTERVAL_SECONDS", "0.15"))
+NSE_CANDLE_CIRCUIT_SECONDS = float(os.getenv("NSE_CANDLE_CIRCUIT_SECONDS", "60"))
 MARKET_DATA_MIN_COVERAGE_PCT = float(os.getenv("MARKET_DATA_MIN_COVERAGE_PCT", "99"))
+_IST_ZONE = ZoneInfo("Asia/Kolkata")
 
 _MASTER_LOCK = threading.Lock()
 _DHAN_IDS: dict[str, str] = {}
 _DHAN_MASTER_LOADED_AT = 0.0
 _DHAN_HISTORY_LOCK = threading.Lock()
 _DHAN_HISTORY_LAST_CALL = 0.0
+_NSE_CHART_LOCK = threading.Lock()
+_NSE_CHART_SESSION: requests.Session | None = None
+_NSE_CHART_LAST_CALL = 0.0
+_NSE_CANDLE_CIRCUIT_UNTIL = 0.0
+_NSE_CHART_HEADERS = {
+    "Accept": "application/json, text/plain, */*",
+    "Referer": f"{NSE_CHARTING_BASE_URL.rstrip('/')}/",
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    ),
+}
+_NSE_INTERVAL = {
+    "ONE_DAY": ("D", "1"),
+    "ONE_MINUTE": ("I", "1"),
+    "FIVE_MINUTE": ("I", "5"),
+    "FIFTEEN_MINUTE": ("I", "15"),
+    "THIRTY_MINUTE": ("I", "30"),
+    "ONE_HOUR": ("I", "60"),
+}
 
 
 def _norm(value: Any) -> str:
@@ -171,6 +202,128 @@ def fetch_dhan_candles(
     if not all(isinstance(values, list) for values in arrays):
         return []
     return [list(row) for row in zip(*arrays)]
+
+
+def _as_ist(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=_IST_ZONE)
+    return value.astimezone(_IST_ZONE)
+
+
+def _nse_candle_calls_allowed() -> bool:
+    return time.monotonic() >= _NSE_CANDLE_CIRCUIT_UNTIL
+
+
+def _trip_nse_candle_circuit(seconds: float | None = None) -> None:
+    global _NSE_CANDLE_CIRCUIT_UNTIL, _NSE_CHART_SESSION
+    hold = NSE_CANDLE_CIRCUIT_SECONDS if seconds is None else float(seconds)
+    _NSE_CANDLE_CIRCUIT_UNTIL = max(_NSE_CANDLE_CIRCUIT_UNTIL, time.monotonic() + max(1.0, hold))
+    _NSE_CHART_SESSION = None
+    log.warning("NSE charting circuit open for %.0fs", hold)
+
+
+def _nse_history_slot() -> None:
+    global _NSE_CHART_LAST_CALL
+    with _NSE_CHART_LOCK:
+        wait = NSE_CANDLE_MIN_INTERVAL_SECONDS - (time.monotonic() - _NSE_CHART_LAST_CALL)
+        if wait > 0:
+            time.sleep(wait)
+        _NSE_CHART_LAST_CALL = time.monotonic()
+
+
+def _nse_chart_session() -> requests.Session:
+    global _NSE_CHART_SESSION
+    with _NSE_CHART_LOCK:
+        if _NSE_CHART_SESSION is None:
+            session = requests.Session()
+            session.headers.update(_NSE_CHART_HEADERS)
+            session.get(f"{NSE_CHARTING_BASE_URL.rstrip('/')}/", timeout=(5, 15))
+            _NSE_CHART_SESSION = session
+        return _NSE_CHART_SESSION
+
+
+def _nse_bar_dt(ms: Any) -> datetime:
+    """Charting `time` is IST wall-clock stored as UTC epoch milliseconds."""
+    raw = datetime.fromtimestamp(float(ms) / 1000.0, timezone.utc)
+    return raw.replace(tzinfo=_IST_ZONE)
+
+
+def _nse_chart_get(params: dict[str, Any]) -> dict[str, Any] | None:
+    if not _nse_candle_calls_allowed():
+        return None
+    _nse_history_slot()
+    try:
+        response = _nse_chart_session().get(
+            NSE_CHARTING_HISTORY_URL, params=params, timeout=(8, 20)
+        )
+    except Exception as exc:
+        log.warning("NSE charting request failed: %s", exc)
+        return None
+    if response.status_code in {401, 403, 429, 503}:
+        _trip_nse_candle_circuit()
+        log.warning("NSE charting HTTP %s", response.status_code)
+        return None
+    if response.status_code != 200:
+        return None
+    try:
+        payload = response.json()
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def fetch_nse_candles(
+    symbol: str,
+    token: str,
+    interval: str,
+    fromdate: datetime,
+    todate: datetime,
+) -> list[list[Any]]:
+    """Return NSE charting OHLCV in the candle row shape used by the screener.
+
+    Daily bars work during the session. Intraday 1m/5m is typically T-1 while
+    the market is open — empty today is expected, not an error.
+    """
+    mapped = _NSE_INTERVAL.get(interval)
+    if not mapped or not token:
+        return []
+    chart_type, time_interval = mapped
+    start = _as_ist(fromdate)
+    end = _as_ist(todate)
+    payload = _nse_chart_get(
+        {
+            "fromDate": int(start.timestamp()),
+            "toDate": int(end.timestamp()),
+            "symbol": f"{_norm(symbol)}-EQ",
+            "token": str(token),
+            "symbolType": "Equity",
+            "chartType": chart_type,
+            "timeInterval": time_interval,
+        }
+    )
+    rows = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        return []
+    out: list[list[Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        try:
+            bar_dt = _nse_bar_dt(row.get("time"))
+            open_ = float(row["open"])
+            high = float(row["high"])
+            low = float(row["low"])
+            close = float(row["close"])
+            volume = float(row.get("volume") or 0)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if interval != "ONE_DAY" and (bar_dt < start or bar_dt > end):
+            continue
+        out.append(
+            [bar_dt.strftime("%Y-%m-%d %H:%M:%S"), open_, high, low, close, volume]
+        )
+    out.sort(key=lambda item: item[0])
+    return out
 
 
 def _nse_quote_to_canonical(raw: dict[str, Any]) -> dict[str, Any] | None:

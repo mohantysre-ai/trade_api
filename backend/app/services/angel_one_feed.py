@@ -64,6 +64,7 @@ from .market_feeds import (
 from .market_data_provider import (
     dhan_configured,
     fetch_dhan_candles,
+    fetch_nse_candles,
     fetch_quotes_with_failover,
     load_dhan_security_ids,
 )
@@ -135,7 +136,9 @@ QUOTE_CHUNK_SIZE = int(os.getenv("QUOTE_CHUNK_SIZE", "10"))
 INTRADAY_CHUNK_SIZE = int(os.getenv("INTRADAY_CHUNK_SIZE", "5"))
 # Global candle throttle across all threads (Angel AB1021 / ~3–5 req/s soft limit).
 CANDLE_MIN_INTERVAL_SECONDS = float(os.getenv("CANDLE_MIN_INTERVAL_SECONDS", "1.1"))
-CANDLE_RATE_LIMIT_RETRIES = int(os.getenv("CANDLE_RATE_LIMIT_RETRIES", "5"))
+# Extra POSTs after AB1021 make the flood worse; default is trip the circuit.
+CANDLE_RATE_LIMIT_RETRIES = int(os.getenv("CANDLE_RATE_LIMIT_RETRIES", "0"))
+ANGEL_CANDLE_CIRCUIT_SECONDS = float(os.getenv("ANGEL_CANDLE_CIRCUIT_SECONDS", "120"))
 NIFTY_CACHE_EXPECTED_MIN = int(os.getenv("NIFTY_CACHE_EXPECTED_MIN", "475"))
 NIFTY_CACHE_MIN_COVERAGE_PCT = float(os.getenv("NIFTY_CACHE_MIN_COVERAGE_PCT", "99"))
 NIFTY_CACHE_MAX_AGE_SECONDS = int(os.getenv("NIFTY_CACHE_MAX_AGE_SECONDS", "86400"))
@@ -145,6 +148,7 @@ MARKET_DATA_MIN_CANDLE_COVERAGE_PCT = float(
 _CANDLE_THROTTLE_LOCK = threading.Lock()
 _CANDLE_LAST_CALL_MONO = 0.0
 _CANDLE_COOLDOWN_UNTIL_MONO = 0.0
+_ANGEL_CANDLE_CIRCUIT_UNTIL = 0.0
 
 AI_NEWS_API_URL = os.getenv("AI_NEWS_API_URL", "http://127.0.0.1:8001")
 
@@ -714,6 +718,24 @@ def _throttle_candle_api() -> None:
 def _trip_candle_rate_limit_cooldown(seconds: float = 8.0) -> None:
     global _CANDLE_COOLDOWN_UNTIL_MONO
     _CANDLE_COOLDOWN_UNTIL_MONO = max(_CANDLE_COOLDOWN_UNTIL_MONO, time.monotonic() + seconds)
+
+
+def _angel_candle_calls_allowed() -> bool:
+    return time.monotonic() >= _ANGEL_CANDLE_CIRCUIT_UNTIL
+
+
+def _trip_angel_candle_circuit(seconds: float | None = None) -> None:
+    """Stop further Angel getCandleData calls after AB1021 (whole 500-name scan)."""
+    global _ANGEL_CANDLE_CIRCUIT_UNTIL
+    hold = ANGEL_CANDLE_CIRCUIT_SECONDS if seconds is None else float(seconds)
+    until = time.monotonic() + max(1.0, hold)
+    if until > _ANGEL_CANDLE_CIRCUIT_UNTIL:
+        logging.getLogger(__name__).warning(
+            "Angel candle circuit open for %.0fs after AB1021; remaining names use Dhan or stay empty",
+            hold,
+        )
+    _ANGEL_CANDLE_CIRCUIT_UNTIL = max(_ANGEL_CANDLE_CIRCUIT_UNTIL, until)
+    _trip_candle_rate_limit_cooldown(hold)
 
 
 def _is_candle_rate_limited(response_or_exc: Any) -> bool:
@@ -2070,6 +2092,8 @@ class AngelOneClient:
             except Exception as exc:
                 log.warning("Dhan candle request failed for %s: %s", symboltoken, exc)
                 return []
+        if not _angel_candle_calls_allowed():
+            return []
         params = {
             "exchange": exchange,
             "symboltoken": symboltoken,
@@ -2090,13 +2114,16 @@ class AngelOneClient:
                     continue
                 if _is_candle_rate_limited(exc) and attempt < CANDLE_RATE_LIMIT_RETRIES:
                     delay = min(8.0, (2 ** attempt) + (0.1 * attempt))
-                    _trip_candle_rate_limit_cooldown(delay)
+                    _trip_angel_candle_circuit(max(delay, ANGEL_CANDLE_CIRCUIT_SECONDS))
                     log.warning(
                         "Angel candle rate-limited (token=%s interval=%s); retry in %.1fs (%d/%d)",
                         symboltoken, interval, delay, attempt + 1, CANDLE_RATE_LIMIT_RETRIES,
                     )
                     time.sleep(delay)
                     continue
+                if _is_candle_rate_limited(exc):
+                    _trip_angel_candle_circuit()
+                    return []
                 return []
 
             if not isinstance(response, dict):
@@ -2106,13 +2133,16 @@ class AngelOneClient:
                 return data if isinstance(data, list) else []
             if _is_candle_rate_limited(response) and attempt < CANDLE_RATE_LIMIT_RETRIES:
                 delay = min(8.0, (2 ** attempt) + (0.1 * attempt))
-                _trip_candle_rate_limit_cooldown(delay)
+                _trip_angel_candle_circuit(max(delay, ANGEL_CANDLE_CIRCUIT_SECONDS))
                 log.warning(
                     "Angel candle AB1021 (token=%s interval=%s); backoff %.1fs (%d/%d)",
                     symboltoken, interval, delay, attempt + 1, CANDLE_RATE_LIMIT_RETRIES,
                 )
                 time.sleep(delay)
                 continue
+            if _is_candle_rate_limited(response):
+                _trip_angel_candle_circuit()
+                return []
             return []
         return []
 
@@ -2603,17 +2633,28 @@ def _intraday_metrics(
         daily_to = now
 
         dhan_id = load_dhan_security_ids().get(inst.key) if dhan_configured() else None
+        tried_dhan = bool(dhan_id)
         if dhan_id:
             # Dhan is the primary chart provider: it avoids Angel's AB1021 burst
-            # limits while still letting Angel fill any Dhan master/data gap.
+            # limits while still letting Angel fill names with no Dhan security id.
             daily_raw = fetch_dhan_candles(dhan_id, "ONE_DAY", daily_from, daily_to)
             intraday_raw = fetch_dhan_candles(dhan_id, "FIVE_MINUTE", market_open, now)
         else:
             daily_raw = []
             intraday_raw = []
+        # Public NSE charting fills daily (and T-1 5m) without Angel. Today's
+        # 5m is usually empty while the session is open.
         if not daily_raw:
-            daily_raw = client.fetch_candles(inst.exchange, inst.token, "ONE_DAY", daily_from, daily_to)
+            daily_raw = fetch_nse_candles(inst.key, inst.token, "ONE_DAY", daily_from, daily_to)
         if not intraday_raw:
+            intraday_raw = fetch_nse_candles(
+                inst.key, inst.token, "FIVE_MINUTE", market_open, now
+            )
+        # Do not Angel-fallback a Dhan-mapped name — empty Dhan + 500 Angel
+        # getCandleData calls is what trips AB1021.
+        if not daily_raw and not tried_dhan and _angel_candle_calls_allowed():
+            daily_raw = client.fetch_candles(inst.exchange, inst.token, "ONE_DAY", daily_from, daily_to)
+        if not intraday_raw and not tried_dhan and _angel_candle_calls_allowed():
             intraday_raw = client.fetch_candles(inst.exchange, inst.token, "FIVE_MINUTE", market_open, now)
 
         daily_candles = _parse_candle_rows(daily_raw)

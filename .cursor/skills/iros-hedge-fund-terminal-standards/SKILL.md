@@ -58,15 +58,37 @@ Never invent prices, scores, win rates, Kelly, verdicts, news, or risk flags. If
 ### Snapshots and caches (JSON only)
 
 | File | Path | Role |
-|------|------|------|
-| Live market | `backend/app/services/last_market_snapshot.json` | Primary market payload; `GET /api/market-data` with `prefer_cache` |
+|---|---|---|
+| Live Intraday | `intraday_session.json` (repo root) | Today’s Intraday book — **includes closed names + realized P&L** |
+| Live Swing | `swing_session.json` (repo root) | Today’s Swing book — closed rows stay on `long`/`short` |
+| Live market | `last_market_snapshot.json` (repo root / `backend/app/services/`) | Quotes + Matrix; `GET /api/market-data` with `prefer_cache` |
+| EOD Book | `backend/app/data/eod/{IST date}/book_intraday.json` · `book_swing.json` | **Dated archive of that same IST day’s books** |
 | Bulk deals | `backend/app/data/bulk_deals_cache.json` | NSE bulk/block deal cache |
 | Promoter holdings | `backend/app/data/promoter_holdings.json` | Promoter % cache |
-| App state | `trade_api_snapshot.json` (repo root) | `scannerPicks`, `tickerNewsByTicker`, EOD/trade-outcome state |
+| App state | `trade_api_snapshot.json` (repo root) | `scannerPicks`, `tickerNewsByTicker`, EOD engine extras |
 
 TTL-gated reuse and on-demand refresh: `angel_one_feed.py`, `config/startup/refresh-data-on-demand.bat` → `.kilo/scripts/refresh-data-on-demand.ps1`.
 
 **Do not introduce SQLite, Postgres, Redis, or ORMs unless explicitly requested.**
+
+## Desk book alignment — Intraday · Swing · EOD
+
+EOD Intraday and Swing sections must stay aligned with each other and with the live books **for the same IST date**. They are not three independent baskets.
+
+| IST date D | Intraday tab | Swing / Asset Matrix tab | EOD Book Intraday | EOD Book Swing |
+|---|---|---|---|---|
+| D = today | `intraday_session.json` | `swing_session.json` | Generate from that live session (closed names + realized stay) | Generate from that live swing session |
+| D = prior session | Do not display as today’s working book | Do not overlay as today’s lock | `data/eod/D/book_intraday.json` only | `data/eod/D/book_swing.json` only |
+
+Rules:
+
+1. **One EOD date** — Date, Swing date, and Forensic Review use the same IST `YYYY-MM-DD`. Never mix Friday Intraday with Monday Swing on one EOD screen.
+2. **Same names and P&L** — For date D, live Intraday/Swing (when `sessionDate === D`) and EOD Book for D must list the same symbols. Closed / SL / replacement rows stay; realized P&L is not dropped when slots go flat.
+3. **EOD is the archive, not a second book** — After close, `book_intraday.json` / `book_swing.json` persist that day’s live books. During RTH, EOD for **today** reads the live sessions; it must not serve another day’s cache.
+4. **Do not resurrect a prior day** — A Friday `book_*.json` is Friday. Monday live (or empty weekend `2026-08-16`) is not backfilled from Friday names or P&L.
+5. **Session P&L** — Unrealized can be ₹0 when every name is closed; that is not “profit gone.” Headline session P&L is **realized + unrealized** from the session payload. EOD totals must match those date-matched rows.
+
+When investigating “symbols disappeared”: read live `sessionDate` + closed flags first, then EOD folder for **that same date**. If EOD has names and live does not, the dates differ or a rotate wiped a prior day (that prior day must still exist under `data/eod/{prior}/`).
 
 ## Asset Matrix — env defaults and funnel
 
@@ -79,6 +101,8 @@ Display funnel (rule baseline): **500 → 200 → 50 → ≥10 BUY**. LLM (verdi
 | `LLM_DISPLAY_COUNT` | `10` | `intelligence_engine.py` | BUY display set receiving LLM verdict + news |
 
 Do not expand LLM scope or change funnel semantics without explicit user approval. UI must show screened counts from live payload — never fabricate BUY badges or conviction.
+
+Swing hunt may evaluate **DHAN recommended tickers as extra names** after ledger membership. A DHAN / ScanX pick enters the swing book **only** when that ticker already passes the full deterministic Matrix BUY contract from `stocks[]` / `stockQuotes` (hard+quality, VWAP/EMA9, OI, RSI, breakout, risk, cross-book, day-move). Scanner `direction: LONG`, `buyAbove`, or ScanX levels must not confer side, eligibility, or prices.
 
 ## Parallelism
 

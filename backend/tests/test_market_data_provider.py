@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.services import market_data_provider as provider
 
@@ -136,3 +136,73 @@ def test_dhan_chart_arrays_are_normalized(monkeypatch):
         datetime(2026, 8, 14, 9, 45),
     )
     assert rows == [[1, 10, 12, 9, 11, 100], [2, 11, 13, 10, 12, 200]]
+
+
+def test_nse_daily_bars_map_to_screener_shape(monkeypatch):
+    provider._NSE_CANDLE_CIRCUIT_UNTIL = 0.0
+    monkeypatch.setattr(
+        provider,
+        "_nse_chart_get",
+        lambda _params: {
+            "status": True,
+            "data": [
+                {
+                    "time": 1786924800000,
+                    "open": 1314,
+                    "high": 1314.1,
+                    "low": 1298.1,
+                    "close": 1300,
+                    "volume": 2997335,
+                }
+            ],
+        },
+    )
+    rows = provider.fetch_nse_candles(
+        "RELIANCE",
+        "2885",
+        "ONE_DAY",
+        datetime(2026, 7, 3, 9, 15),
+        datetime(2026, 8, 17, 11, 9),
+    )
+    assert len(rows) == 1
+    assert rows[0][0].startswith("2026-08-17")
+    assert rows[0][1:] == [1314.0, 1314.1, 1298.1, 1300.0, 2997335.0]
+
+
+def test_nse_intraday_drops_bars_outside_requested_window(monkeypatch):
+    provider._NSE_CANDLE_CIRCUIT_UNTIL = 0.0
+    monkeypatch.setattr(
+        provider,
+        "_nse_chart_get",
+        lambda _params: {
+            "status": True,
+            "data": [
+                {
+                    "time": int(datetime(2026, 8, 14, 15, 28, tzinfo=timezone.utc).timestamp() * 1000),
+                    "open": 1,
+                    "high": 1,
+                    "low": 1,
+                    "close": 1,
+                    "volume": 10,
+                },
+                {
+                    "time": int(datetime(2026, 8, 17, 9, 20, tzinfo=timezone.utc).timestamp() * 1000),
+                    "open": 10,
+                    "high": 11,
+                    "low": 9,
+                    "close": 10.5,
+                    "volume": 100,
+                },
+            ],
+        },
+    )
+    rows = provider.fetch_nse_candles(
+        "RELIANCE",
+        "2885",
+        "FIVE_MINUTE",
+        datetime(2026, 8, 17, 9, 15, tzinfo=provider._IST_ZONE),
+        datetime(2026, 8, 17, 11, 9, tzinfo=provider._IST_ZONE),
+    )
+    assert len(rows) == 1
+    assert rows[0][0] == "2026-08-17 09:20:00"
+    assert rows[0][1:] == [10.0, 11.0, 9.0, 10.5, 100.0]

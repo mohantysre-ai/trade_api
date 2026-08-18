@@ -4,6 +4,8 @@ backend/app/services/last_market_snapshot.json
 logs/
 *.log.*
 config/cloudflare/credentials.json
+config/docker/desk-state/seed/*.json
+desk_state_hub_manifest.json
 # Local build, test, QA, and runtime artifacts
 .tmp/
 .pytest_cache/

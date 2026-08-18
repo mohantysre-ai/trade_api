@@ -208,7 +208,8 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
             day_key,
         )
 
-    # No dhanSwingPicks fallback — swing lock source is Asset Matrix only.
+    # No EOD lock from dhanSwingPicks. Live swing hunt may consider DHAN tickers
+    # only after the Matrix BUY contract; archive still comes from swing_session.
 
     session_long = list(session.get("long") or []) if session_ok else []
     session_short = list(session.get("short") or []) if session_ok else []
