@@ -65,9 +65,8 @@ services:
     volumes:
       - iros-backend-data:/app/backend/app/data
       - iros-eod-archive:/app/backend/app/services/eod_archive
-      # Host desk lock — same files native start-app uses (overrides empty volume stubs)
-      # Directory bind keeps atomic state-file replacements visible in Docker Desktop.
-      - ./:/app/state
+      # Docker volume keeps desk state durable across machines and container rebuilds.
+      - iros-desk-state:/app/state
     healthcheck:
       test:
         [
@@ -117,7 +116,7 @@ services:
     volumes:
       - iros-backend-data:/app/backend/app/data
       - iros-eod-archive:/app/backend/app/services/eod_archive
-      - ./:/app/state
+      - iros-desk-state:/app/state
     healthcheck:
       test:
         [

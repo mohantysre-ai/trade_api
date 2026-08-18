@@ -293,6 +293,36 @@ def save_session(payload: dict[str, Any]) -> None:
     _SESSION_RESPONSE_CACHE_AT = 0.0
 
 
+def _persist_if_close_transition(session: dict[str, Any], long_rows: list[dict[str, Any]], short_rows: list[dict[str, Any]]) -> None:
+    """Persist any live close / exit-state transition immediately to disk.
+
+    The scheduler is the durable writer, but some close transitions can be
+    computed in a refresh-only path without a later explicit save. This guard
+    ensures the session JSON is updated once a row moves to closed / stop-hit.
+    """
+    if not session.get("locked"):
+        return
+    for side_key, rows in (("long", long_rows), ("short", short_rows)):
+        orig_rows = session.get(side_key) or []
+        for idx, row in enumerate(rows):
+            if idx >= len(orig_rows):
+                if row.get("closed") or str(row.get("status") or "").upper() not in ("", "RUNNING"):
+                    session["updatedAt"] = _utc_now_iso()
+                    save_session(session)
+                    return
+            else:
+                prev = orig_rows[idx]
+                if (
+                    bool(prev.get("closed")) != bool(row.get("closed"))
+                    or str(prev.get("status") or "") != str(row.get("status") or "")
+                    or prev.get("slotFreed") != row.get("slotFreed")
+                    or prev.get("slotStatus") != row.get("slotStatus")
+                ):
+                    session["updatedAt"] = _utc_now_iso()
+                    save_session(session)
+                    return
+
+
 def _sector_of(symbol: str, row: dict[str, Any] | None = None) -> str:
     sym = (symbol or "").upper()
     if row:
@@ -4019,6 +4049,9 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
                 log.warning("close-mark freeze failed: %s", exc)
             finally:
                 _CLOSE_FREEZE_LOCK.release()
+
+    if persist:
+        _persist_if_close_transition(session, long_rows, short_rows)
 
     return {
         "success": True,
