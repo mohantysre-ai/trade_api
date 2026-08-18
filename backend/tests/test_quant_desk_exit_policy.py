@@ -443,3 +443,77 @@ def test_half_pct_stop_gap_print_is_a_real_hit():
         force=True,
     )
     assert replayed.get("closed") is True
+
+
+def test_corrupt_current_policy_state_is_replayed_not_trusted():
+    from app.services.exit_plan import (
+        EXIT_POLICY_VERSION,
+        _exit_state_is_sane,
+        attach_exit_plan,
+        overwrite_row_with_current_policy,
+    )
+
+    pick = attach_exit_plan({
+        "symbol": "PPLPHARMA",
+        "direction": "LONG",
+        "entryPrice": 212.84,
+        "stopLoss": 211.78,
+        "riskPerShare": 1.06,
+        "approxQty": 939,
+        "ltp": 210.0,
+        "sessionHigh": 214.0,
+        "sessionLow": 209.5,
+        "closed": True,
+        "status": "CLOSED",
+    })
+    pick["exitState"] = {
+        "policyVersion": EXIT_POLICY_VERSION,
+        "mfeR": 14_102_287_123.0,
+        "effectiveStop": 14_949_334_8377.70,
+        "realizedPnl": 56_060_005_562_719.27,
+        "legsFilled": [{
+            "r": "TRAIL_SL",
+            "qty": 939,
+            "price": 14_949_334_8377.70,
+            "pnl": 56_060_005_562_719.27,
+        }],
+    }
+
+    assert _exit_state_is_sane(pick, pick["exitState"]) is False
+    replayed = overwrite_row_with_current_policy(
+        pick,
+        quotes={"PPLPHARMA": {"high": 214.0, "low": 209.5}},
+        after_close=False,
+    )
+
+    assert replayed["effectiveStop"] < pick["entryPrice"] * 1.5
+    assert abs(replayed["realizedPnl"]) <= pick["entryPrice"] * pick["approxQty"] * 0.5
+    assert replayed["exitState"]["mfeR"] <= 100.0
+
+
+def test_evaluator_discards_corrupt_prior_mfe_and_stop():
+    from app.services.exit_plan import EXIT_POLICY_VERSION, attach_exit_plan, evaluate_scale_trail_path
+
+    pick = attach_exit_plan({
+        "symbol": "UNOMINDA",
+        "direction": "LONG",
+        "entryPrice": 1247.0,
+        "stopLoss": 1240.77,
+        "riskPerShare": 6.23,
+        "approxQty": 160,
+    })
+    pick["exitState"] = {
+        "policyVersion": EXIT_POLICY_VERSION,
+        "mfeR": 999_999.0,
+        "effectiveStop": 4668.87,
+        "realizedPnl": 219_896.96,
+        "legsFilled": [],
+    }
+
+    result = evaluate_scale_trail_path(
+        pick, 1247.0, day_high=1255.0, day_low=1239.0, after_close=False,
+    )
+
+    assert result["effectiveStop"] < 1300.0
+    assert abs(result["realizedPnl"]) < 10_000.0
+    assert result["exitState"]["mfeR"] < 10.0
