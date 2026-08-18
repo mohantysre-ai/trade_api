@@ -5,6 +5,7 @@ Forensic diagnostics must never redefine realized P&L or R.
 """
 from __future__ import annotations
 
+import math
 from typing import Any
 
 # Confirmed move -> fraction booked. 40% is deliberately retained as a runner.
@@ -38,6 +39,9 @@ MAX_STOP_PCT = 0.005
 REF_T1_R = 1.5
 REF_T2_R = 3.0
 EXIT_POLICY_VERSION = "0p5r_max_0p5pct"
+MAX_STATE_MFE_R = 100.0
+MAX_INTRADAY_PRICE_RATIO = 1.50
+MIN_INTRADAY_PRICE_RATIO = 0.50
 
 
 def allocate_leg_qty(total_qty: int, fracs: list[float] | None = None) -> list[int]:
@@ -325,7 +329,10 @@ def _row_initial_stop(row: dict[str, Any]) -> float | None:
 
 def _needs_path_overwrite(row: dict[str, Any]) -> bool:
     state = row.get("exitState") if isinstance(row.get("exitState"), dict) else {}
-    if str(state.get("policyVersion") or "") == EXIT_POLICY_VERSION:
+    if (
+        str(state.get("policyVersion") or "") == EXIT_POLICY_VERSION
+        and _exit_state_is_sane(row, state)
+    ):
         return False
     status = str(row.get("executionStatus") or "").upper()
     if status == "NOT_TRIGGERED":
@@ -341,6 +348,64 @@ def _needs_path_overwrite(row: dict[str, Any]) -> bool:
     if not row.get("entryPrice"):
         return False
     return int(row.get("approxQty") or row.get("qty") or 0) > 0
+
+
+def _plausible_trade_price(entry: float, value: Any) -> float | None:
+    price = _fnum(value)
+    if entry <= 0 or price is None or price <= 0:
+        return None
+    if price < entry * MIN_INTRADAY_PRICE_RATIO or price > entry * MAX_INTRADAY_PRICE_RATIO:
+        return None
+    return price
+
+
+def _exit_state_is_sane(row: dict[str, Any], state: dict[str, Any] | None = None) -> bool:
+    """Reject persisted state that can create impossible stop prices or P&L."""
+    state = state if isinstance(state, dict) else {}
+    entry = _fnum(row.get("entryPrice") or (row.get("exitPlan") or {}).get("entry"))
+    qty = int(row.get("approxQty") or row.get("qty") or 0)
+    if entry is None or entry <= 0 or qty <= 0:
+        return False
+
+    mfe = _fnum(state.get("mfeR"))
+    if mfe is not None and (mfe < 0 or mfe > MAX_STATE_MFE_R):
+        return False
+    for key in ("effectiveStop", "initialStop"):
+        if state.get(key) is not None and _plausible_trade_price(entry, state.get(key)) is None:
+            return False
+
+    booked_qty = 0
+    recomputed_realized = 0.0
+    for leg in state.get("legsFilled") or []:
+        if not isinstance(leg, dict):
+            return False
+        try:
+            leg_qty = int(leg.get("qty") or 0)
+        except (TypeError, ValueError):
+            return False
+        price = _plausible_trade_price(entry, leg.get("price"))
+        pnl = _fnum(leg.get("pnl"))
+        if leg_qty < 0 or price is None or pnl is None:
+            return False
+        booked_qty += leg_qty
+        if booked_qty > qty:
+            return False
+        expected = _mtm_pnl(str(row.get("direction") or "LONG"), entry, price, leg_qty)
+        if abs(pnl - expected) > max(1.0, abs(expected) * 0.01):
+            return False
+        recomputed_realized += expected
+
+    realized = _fnum(state.get("realizedPnl"))
+    if realized is not None:
+        if abs(realized) > entry * qty * (MAX_INTRADAY_PRICE_RATIO - 1.0) + 1.0:
+            return False
+        if state.get("legsFilled") and abs(realized - recomputed_realized) > max(1.0, abs(recomputed_realized) * 0.01):
+            return False
+    for key in ("economicPnl", "unrealizedPnl"):
+        value = _fnum(state.get(key))
+        if value is not None and abs(value) > entry * qty * (MAX_INTRADAY_PRICE_RATIO - 1.0) + 1.0:
+            return False
+    return True
 
 
 def overwrite_row_with_current_policy(
@@ -517,6 +582,10 @@ def evaluate_scale_trail(
         return {}
 
     prior = pick.get("exitState") if isinstance(pick.get("exitState"), dict) else {}
+    if prior and not _exit_state_is_sane(pick, prior):
+        # Fail closed on corrupted durable state. The path evaluator will
+        # reconstruct economics from today's bounded high/low/mark instead.
+        prior = {}
     legs_filled = [
         dict(x)
         for x in prior.get("legsFilled", [])
@@ -753,7 +822,7 @@ def _fnum(value: Any) -> float | None:
         num = float(value)
     except (TypeError, ValueError):
         return None
-    if num != num:
+    if not math.isfinite(num):
         return None
     return num
 
@@ -771,15 +840,24 @@ def _row_path_marks(row: dict[str, Any], quotes: dict[str, Any] | None) -> tuple
     symbol = str(row.get("symbol") or "").upper()
     evidence = row.get("entryEvidence") if isinstance(row.get("entryEvidence"), dict) else {}
     quote_high, quote_low = _quote_high_low(quotes, symbol)
-    mark = _fnum(
-        row.get("ltp")
-        or row.get("currentPrice")
-        or row.get("closeMark")
-        or row.get("exitPrice")
-        or evidence.get("ltp")
+    entry = _fnum(row.get("entryPrice")) or 0.0
+    def _first_plausible(*values: Any) -> float | None:
+        for value in values:
+            price = _plausible_trade_price(entry, value)
+            if price is not None:
+                return price
+        return None
+
+    mark = _first_plausible(
+        row.get("ltp"), row.get("currentPrice"), row.get("closeMark"),
+        row.get("exitPrice"), evidence.get("ltp"), entry,
     )
-    high = _fnum(row.get("sessionHigh") or row.get("dayHigh") or evidence.get("postEntryHigh") or quote_high)
-    low = _fnum(row.get("sessionLow") or row.get("dayLow") or evidence.get("postEntryLow") or quote_low)
+    high = _first_plausible(
+        row.get("sessionHigh"), row.get("dayHigh"), evidence.get("postEntryHigh"), quote_high, mark,
+    )
+    low = _first_plausible(
+        row.get("sessionLow"), row.get("dayLow"), evidence.get("postEntryLow"), quote_low, mark,
+    )
     if mark is None:
         return None, None, None
     if high is None:
@@ -790,16 +868,17 @@ def _row_path_marks(row: dict[str, Any], quotes: dict[str, Any] | None) -> tuple
     plan = row.get("exitPlan") if isinstance(row.get("exitPlan"), dict) else {}
     risk = _fnum(row.get("riskPerShare") or plan.get("riskPerShare"))
     state = row.get("exitState") if isinstance(row.get("exitState"), dict) else {}
-    mfe = _fnum(state.get("mfeR") or row.get("mfeR"))
+    state_sane = not state or _exit_state_is_sane(row, state)
+    mfe = _fnum(state.get("mfeR") or row.get("mfeR")) if state_sane else None
     direction = str(row.get("direction") or "LONG").upper()
-    if entry and risk and mfe and mfe > 0:
+    if entry and risk and mfe and 0 < mfe <= MAX_STATE_MFE_R:
         fav = entry + (1 if direction != "SHORT" else -1) * risk * mfe
-        if direction == "SHORT":
+        if _plausible_trade_price(entry, fav) is None:
+            fav = None
+        if fav is not None and direction == "SHORT":
             low = min(low, fav, mark)
-        else:
+        elif fav is not None:
             high = max(high, fav, mark)
     if high < low:
         high, low = low, high
     return mark, high, low
-
-
