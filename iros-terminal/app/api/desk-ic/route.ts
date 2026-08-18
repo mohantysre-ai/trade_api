@@ -20,8 +20,9 @@ export async function GET(request: Request) {
 
     const params = new URLSearchParams();
     params.set("ticker", ticker);
-    if (requestUrl.searchParams.get("force")) {
-      params.set("force", requestUrl.searchParams.get("force")!);
+    for (const key of ["force", "fast"] as const) {
+      const value = requestUrl.searchParams.get(key);
+      if (value) params.set(key, value);
     }
 
     const backendUrl = new URL("/api/desk-ic", MAIN_API_URL);
@@ -45,10 +46,17 @@ export async function GET(request: Request) {
 
     return NextResponse.json(data ?? { success: false, error: "Empty Desk IC response" });
   } catch (err) {
+    const aborted =
+      (err instanceof Error && (err.name === "AbortError" || err.name === "TimeoutError")) ||
+      (err instanceof DOMException && err.name === "AbortError");
     return NextResponse.json(
       {
         success: false,
-        error: err instanceof Error ? err.message : "Desk IC proxy failed",
+        error: aborted
+          ? "Desk IC upstream timed out"
+          : err instanceof Error
+            ? err.message
+            : "Desk IC proxy failed",
       },
       { status: 502 }
     );

@@ -1,7 +1,8 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { LiveTickNumber } from "@/lib/desk-motion";
 import { deskTransition } from "@/lib/motion-tokens";
+import type { DeskIcSummary } from "@/lib/market-api";
 
 type CriterionStatus = "PASS" | "FAIL" | "INSUFFICIENT";
 
@@ -31,8 +32,6 @@ type DeskIcPayload = {
   generatedAt?: string;
 };
 
-import type { DeskIcSummary } from "@/lib/market-api";
-
 type ConfidenceCheckerPanelProps = {
   ticker?: string;
   companyName?: string;
@@ -44,7 +43,24 @@ type ConfidenceCheckerPanelProps = {
   }) | null;
 };
 
-const DESK_IC_FETCH_MS = 25_000;
+const DESK_IC_FAST_MS = 15_000;
+const DESK_IC_LLM_MS = 45_000;
+
+function isAbortError(err: unknown): boolean {
+  if (err instanceof DOMException && err.name === "AbortError") return true;
+  return err instanceof Error && (err.name === "AbortError" || /aborted/i.test(err.message));
+}
+
+function deskAbortMessage(signal: AbortSignal, fallback: string): string {
+  const reason = signal.reason;
+  if (typeof reason === "string" && reason.trim() && !/without reason/i.test(reason)) {
+    return reason;
+  }
+  if (reason instanceof Error && reason.message && !/without reason/i.test(reason.message)) {
+    return reason.message;
+  }
+  return fallback;
+}
 
 function ConfidenceGauge({ score }: { score: number }) {
   const reduce = useReducedMotion();
@@ -179,26 +195,41 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
   const [enrichingLlm, setEnrichingLlm] = useState(false);
   const [deskIc, setDeskIc] = useState<DeskIcPayload | null>(initialDeskIc ?? null);
   const [deskError, setDeskError] = useState<string | null>(null);
+  const initialDeskIcRef = useRef(initialDeskIc);
+  initialDeskIcRef.current = initialDeskIc;
 
   useEffect(() => {
-    setDeskIc(initialDeskIc ?? null);
-  }, [initialDeskIc, normalizedTicker]);
+    setDeskIc(initialDeskIcRef.current ?? null);
+    setDeskError(null);
+  }, [normalizedTicker]);
+
+  useEffect(() => {
+    if (initialDeskIc) setDeskIc(initialDeskIc);
+  }, [normalizedTicker, initialDeskIc?.generatedAt, initialDeskIc?.deskDecision]);
 
   useEffect(() => {
     if (activeView !== "dashboard" || !normalizedTicker) return;
     let cancelled = false;
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), DESK_IC_FETCH_MS);
+    const fastController = new AbortController();
+    const llmController = new AbortController();
+    const fastTimer = window.setTimeout(
+      () => fastController.abort("Desk IC snapshot timed out"),
+      DESK_IC_FAST_MS,
+    );
+    const llmTimer = window.setTimeout(
+      () => llmController.abort("Desk IC LLM timed out"),
+      DESK_IC_LLM_MS,
+    );
 
     const loadDeskIc = async () => {
-      const hasCached = Boolean(initialDeskIc);
+      const hasCached = Boolean(initialDeskIcRef.current);
       setDeskError(null);
       if (!hasCached) setLoadingDashboard(true);
 
       try {
         const fastRes = await fetch(`/api/desk-ic?ticker=${encodeURIComponent(normalizedTicker)}&fast=1`, {
           cache: "no-store",
-          signal: controller.signal,
+          signal: fastController.signal,
         });
         const fastData = await fastRes.json();
         if (cancelled) return;
@@ -210,28 +241,33 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
           setDeskError(String(fastData?.error || fastData?.detail || `Desk IC unavailable (${fastRes.status})`));
         }
       } catch (err) {
-        if (!cancelled && !hasCached) {
+        if (cancelled) return;
+        if (isAbortError(err)) {
+          if (!hasCached && fastController.signal.reason !== "unmount") {
+            setDeskError(deskAbortMessage(fastController.signal, "Desk IC snapshot timed out"));
+          }
+        } else if (!hasCached) {
           setDeskError(err instanceof Error ? err.message : "Desk IC fetch failed");
         }
       } finally {
         if (!cancelled) setLoadingDashboard(false);
       }
 
-      if (cancelled || controller.signal.aborted) return;
+      if (cancelled) return;
 
       setEnrichingLlm(true);
       try {
         const llmRes = await fetch(`/api/desk-ic?ticker=${encodeURIComponent(normalizedTicker)}`, {
           cache: "no-store",
-          signal: controller.signal,
+          signal: llmController.signal,
         });
         const llmData = await llmRes.json();
         if (cancelled) return;
         if (llmRes.ok && llmData?.deskIc) {
           setDeskIc(llmData.deskIc as DeskIcPayload);
         }
-      } catch {
-        // Keep deterministic partial result
+      } catch (err) {
+        if (cancelled || isAbortError(err)) return;
       } finally {
         if (!cancelled) setEnrichingLlm(false);
       }
@@ -240,10 +276,12 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
     void loadDeskIc();
     return () => {
       cancelled = true;
-      controller.abort();
-      window.clearTimeout(timeoutId);
+      fastController.abort("unmount");
+      llmController.abort("unmount");
+      window.clearTimeout(fastTimer);
+      window.clearTimeout(llmTimer);
     };
-  }, [activeView, normalizedTicker, initialDeskIc]);
+  }, [activeView, normalizedTicker]);
 
   const widgetUrl = useMemo(() => {
     if (!normalizedTicker) return "";
@@ -338,7 +376,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
       {activeView === "dashboard" && (
         <div className="space-y-3">
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold leading-relaxed text-slate-700">
-            DESK IC · {deskIc?.llmUsed ? "LLM" : deskIc ? "DETERMINISTIC" : "…"} — fact-grounded criteria only. Soft gate:
+            DESK IC · {deskIc?.llmUsed ? "LLM" : deskIc ? "DETERMINISTIC" : loadingDashboard ? "LOADING" : deskError ? "FAILED" : "—"} — fact-grounded criteria only. Soft gate:
             REJECT flags the name; quant floors still control lock eligibility. Missing fields show INSUFFICIENT — never invented PASS.
             {enrichingLlm && (
               <span className="ml-1 text-amber-700">· LLM enrichment running (partial shown)</span>
