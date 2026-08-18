@@ -305,9 +305,8 @@ def save_session(payload: dict[str, Any]) -> None:
 def _persist_if_close_transition(session: dict[str, Any], long_rows: list[dict[str, Any]], short_rows: list[dict[str, Any]]) -> None:
     """Persist any live close / exit-state transition immediately to disk.
 
-    The scheduler is the durable writer, but some close transitions can be
-    computed in a refresh-only path without a later explicit save. This guard
-    ensures the session JSON is updated once a row moves to closed / stop-hit.
+    Callers must only invoke this on durable scheduler paths (`persist=True`).
+    Read-only API GET paths must not write session JSON.
     """
     if not session.get("locked"):
         return
@@ -3742,8 +3741,8 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
 def get_session(include_live: bool = True) -> dict[str, Any]:
     """Return one coalesced session snapshot to all concurrent UI callers.
 
-    The live read path can persist a newly closed position or replacement. It
-    must therefore execute once per refresh window, rather than once per user.
+    Read-only GET path (`persist=False`) — never writes session JSON.
+    Coalesced so concurrent UI polls share one compute window.
     """
     global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT
     if not include_live:
@@ -4205,7 +4204,8 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
             finally:
                 _CLOSE_FREEZE_LOCK.release()
 
-    _persist_if_close_transition(session, long_rows, short_rows)
+    if persist:
+        _persist_if_close_transition(session, long_rows, short_rows)
 
     return {
         "success": True,

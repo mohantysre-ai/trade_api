@@ -4,6 +4,7 @@ import React, { lazy, Suspense, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "motion/react";
 import type { AITickerNewsReport, DeskIcSummary, TerminalIntelligence } from "@/lib/market-api";
+import type { IntradayMetrics } from "@/lib/drawer-research";
 const AITickerNewsPanel = lazy(() => import("./AITickerNewsPanel"));
 const ConfidenceCheckerPanel = lazy(() => import("./ConfidenceCheckerPanel"));
 const TechnicalAnalysisPanel = lazy(() => import("./TechnicalAnalysisPanel"));
@@ -329,9 +330,18 @@ type DrawerContent = {
     ticker?: string;
     name?: string;
     deskIcSummary?: DeskIcSummary;
+    promoter_holding_pct?: number;
+    passes_quality_filters?: boolean;
+    bulk_deal_signal?: boolean;
   } | null;
   analysis?: DrawerAnalysis | null;
   tickerNews?: AITickerNewsReport | null;
+  intraday?: IntradayMetrics | null;
+  deskIc?: (DeskIcSummary & {
+    criteria?: unknown[];
+    categoryScores?: Record<string, number>;
+    llmUsed?: boolean;
+  }) | null;
 };
 
 type DrawerTab = "aiNews" | "analysis" | "confidenceChecker" | "technicalAnalysis" | "swotAnalysis";
@@ -343,6 +353,15 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
   const stock = content?.stock;
   const ticker = stock?.ticker ?? "";
   const tickerNews = content?.tickerNews;
+  const intraday = content?.intraday ?? null;
+  const deskIc = content?.deskIc ?? null;
+  const stockFacts = stock
+    ? {
+        promoter_holding_pct: stock.promoter_holding_pct,
+        passes_quality_filters: stock.passes_quality_filters,
+        bulk_deal_signal: stock.bulk_deal_signal,
+      }
+    : null;
 
   React.useEffect(() => {
     if (!ticker) return;
@@ -570,17 +589,30 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
 
         {/* Confidence Checker Tab */}
         {activeTab === "confidenceChecker" && (
-          <ConfidenceCheckerPanel key={ticker} ticker={ticker} companyName={stock?.name} />
+          <ConfidenceCheckerPanel
+            key={ticker}
+            ticker={ticker}
+            companyName={stock?.name}
+            initialDeskIc={deskIc ?? undefined}
+          />
         )}
 
         {/* Technical Analysis Tab */}
         {activeTab === "technicalAnalysis" && (
-          <TechnicalAnalysisPanel key={ticker} ticker={ticker} companyName={stock?.name} />
+          <TechnicalAnalysisPanel key={ticker} ticker={ticker} companyName={stock?.name} intraday={intraday} />
         )}
 
         {/* SWOT Analysis Tab */}
         {activeTab === "swotAnalysis" && (
-          <SwotAnalysisPanel key={ticker} ticker={ticker} companyName={stock?.name} />
+          <SwotAnalysisPanel
+            key={ticker}
+            ticker={ticker}
+            companyName={stock?.name}
+            intraday={intraday}
+            tickerNews={tickerNews}
+            terminalAnalysis={analysis ?? undefined}
+            stockFacts={stockFacts}
+          />
         )}
 
         {/* Analysis Tab */}

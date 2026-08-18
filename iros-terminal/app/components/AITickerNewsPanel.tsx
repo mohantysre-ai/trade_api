@@ -180,13 +180,24 @@ export default function AITickerNewsPanel({
 }) {
   const [report, setReport] = useState<AITickerNewsReport | null>(initialReport ?? null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [showRawArticles, setShowRawArticles] = useState(false);
 
   useEffect(() => {
+    setReport(initialReport ?? null);
+  }, [initialReport, ticker]);
+
+  useEffect(() => {
     if (!ticker) return;
     let cancelled = false;
+    if (initialReport) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
     fetchTickerNewsReport(ticker, {
       company: companyName,
       maxArticles: 50,
@@ -196,14 +207,23 @@ export default function AITickerNewsPanel({
         if (!cancelled) setReport(result);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to fetch news report");
+        if (!cancelled && !initialReport) {
+          setError(err instanceof Error ? err.message : "Failed to fetch news report");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       });
     return () => { cancelled = true; };
-  }, [ticker, companyName]);
+  }, [ticker, companyName, initialReport]);
 
   const fetchNews = useCallback(async (forceRefresh = false) => {
     if (!ticker) return;
-    setLoading(true);
+    if (report) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
       const result = await fetchTickerNewsReport(ticker, {
@@ -217,8 +237,9 @@ export default function AITickerNewsPanel({
       setError(err instanceof Error ? err.message : "Failed to fetch news report");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [ticker, companyName]);
+  }, [ticker, companyName, report]);
 
   const sentimentCfg = SENTIMENT_CONFIG[report?.sentiment_overall?.toLowerCase() ?? ""] ?? SENTIMENT_CONFIG.neutral;
   const hasNews = report && !report.error;
@@ -245,6 +266,7 @@ export default function AITickerNewsPanel({
               <p className="text-[10px] text-slate-500 truncate">
                 {report?.company_name ?? ticker}
                 {report && <span className="ml-1.5">· {report.articles_scraped} articles analyzed</span>}
+                {refreshing && <span className="ml-1.5 text-amber-600">· refreshing</span>}
               </p>
             </div>
           </div>

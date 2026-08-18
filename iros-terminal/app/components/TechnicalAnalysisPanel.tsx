@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import { buildTechnicalSignals, type IntradayMetrics } from "@/lib/drawer-research";
 
 type TechnicalAnalysisPanelProps = {
   ticker?: string;
   companyName?: string;
+  intraday?: IntradayMetrics | null;
 };
 
 /* ── Animated price ticker bar ── */
@@ -133,20 +135,30 @@ function MACrossoverDots() {
 }
 
 /* ── Oscillator gauge (light theme) ── */
-function OscillatorGauge({ rsi, macd }: { rsi: number; macd: number }) {
-  const rsiColor = rsi > 70 ? '#ef4444' : rsi < 30 ? '#22c55e' : '#f59e0b';
-  const macdColor = macd > 0 ? '#22c55e' : '#ef4444';
+function OscillatorGauge({ rsi, macd }: { rsi: number | null; macd: number | null }) {
+  if (rsi == null && macd == null) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center text-[11px] text-slate-500">
+        Intraday RSI / trend metrics not available in snapshot.
+      </div>
+    );
+  }
+
+  const rsiVal = rsi ?? 50;
+  const macdVal = macd ?? 0;
+  const rsiColor = rsiVal > 70 ? '#ef4444' : rsiVal < 30 ? '#22c55e' : '#f59e0b';
+  const macdColor = macdVal > 0 ? '#22c55e' : '#ef4444';
 
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="rounded-xl bg-white border border-slate-200 p-4 text-center shadow-sm">
         <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1 font-bold">RSI</div>
-        <div className="text-2xl font-black tabular-nums" style={{ color: rsiColor }}>{rsi.toFixed(0)}</div>
+        <div className="text-2xl font-black tabular-nums" style={{ color: rsiColor }}>{rsi != null ? rsiVal.toFixed(0) : "—"}</div>
         <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-1000"
             style={{
-              width: `${(rsi / 100) * 100}%`,
+              width: `${rsi != null ? (rsiVal / 100) * 100 : 0}%`,
               background: `linear-gradient(90deg, #22c55e, #f59e0b, #ef4444)`,
             }}
           />
@@ -158,11 +170,11 @@ function OscillatorGauge({ rsi, macd }: { rsi: number; macd: number }) {
       </div>
       <div className="rounded-xl bg-white border border-slate-200 p-4 text-center shadow-sm">
         <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1 font-bold">MACD</div>
-        <div className="text-2xl font-black tabular-nums" style={{ color: macdColor }}>{macd > 0 ? '+' : ''}{macd.toFixed(2)}</div>
+        <div className="text-2xl font-black tabular-nums" style={{ color: macdColor }}>{macd != null ? `${macdVal > 0 ? '+' : ''}${macdVal.toFixed(2)}` : "—"}</div>
         <div className="mt-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1" style={{ backgroundColor: `${macdColor}15` }}>
           <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: macdColor }} />
           <span className="text-[10px] font-semibold" style={{ color: macdColor }}>
-            {macd > 0 ? 'Bullish Crossover' : 'Bearish Crossover'}
+            {macd != null ? (macdVal > 0 ? 'Bullish Crossover' : 'Bearish Crossover') : '—'}
           </span>
         </div>
       </div>
@@ -230,26 +242,13 @@ function LoadingSkeleton() {
   );
 }
 
-export default function TechnicalAnalysisPanel({ ticker, companyName }: TechnicalAnalysisPanelProps) {
+export default function TechnicalAnalysisPanel({ ticker, companyName, intraday }: TechnicalAnalysisPanelProps) {
   const normalizedTicker = ticker?.trim().toUpperCase();
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
-  const [activeView, setActiveView] = useState<'widget' | 'dashboard'>('widget');
+  const [activeView, setActiveView] = useState<'widget' | 'dashboard'>('dashboard');
 
-  const oscillators = useMemo(() => ({
-    rsi: 45 + Math.random() * 30,
-    macd: (Math.random() - 0.5) * 4,
-    stochastic: 30 + Math.random() * 50,
-    williamsR: -(20 + Math.random() * 60),
-    cci: (Math.random() - 0.5) * 300,
-  }), [normalizedTicker]);
-
-  const signals = useMemo(() => ({
-    maSignal: Math.random() > 0.5 ? 'BUY' : 'SELL',
-    strength: 30 + Math.random() * 60,
-    volume: 40 + Math.random() * 55,
-    volatility: 20 + Math.random() * 50,
-  }), [normalizedTicker]);
+  const signals = useMemo(() => buildTechnicalSignals(intraday), [intraday]);
 
   const widgetUrl = useMemo(() => {
     if (!normalizedTicker) return "";
@@ -350,6 +349,11 @@ export default function TechnicalAnalysisPanel({ ticker, companyName }: Technica
       {/* Live Dashboard ── light theme */}
       {activeView === 'dashboard' && (
         <div className="space-y-3">
+          {!signals.hasData && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-semibold text-amber-900">
+              Partial desk view — live intraday metrics missing for {normalizedTicker}. Showing snapshot anchors only.
+            </div>
+          )}
           {/* Header card */}
           <div className="rounded-2xl bg-gradient-to-br from-white to-slate-50 border border-slate-200 shadow-sm overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-blue-400 to-violet-500" />
@@ -376,17 +380,20 @@ export default function TechnicalAnalysisPanel({ ticker, companyName }: Technica
           </div>
 
           {/* Oscillator gauges */}
-          <OscillatorGauge rsi={oscillators.rsi} macd={oscillators.macd} />
+          <OscillatorGauge rsi={signals.rsi} macd={signals.macd} />
 
           {/* Moving average crossover */}
           <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Moving Average Crossover</span>
               <span className={`text-[10px] font-black px-2 py-0.5 rounded ${
-                signals.maSignal === 'BUY' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                signals.maSignal === 'BUY' ? 'bg-emerald-100 text-emerald-700' : signals.maSignal === 'SELL' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'
               }`}>
                 {signals.maSignal} Signal
               </span>
+            </div>
+            <div className="text-[10px] text-slate-500 mb-2">
+              VWAP: {signals.aboveVwap == null ? "—" : signals.aboveVwap ? "above" : "below"} · EMA9: {signals.aboveEma9 == null ? "—" : signals.aboveEma9 ? "above" : "below"}
             </div>
             <MACrossoverDots />
           </div>
@@ -394,10 +401,10 @@ export default function TechnicalAnalysisPanel({ ticker, companyName }: Technica
           {/* Signal meters */}
           <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-3">
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-2">Signal Strength Metrics</div>
-            <SignalMeter label="Trend Strength" value={signals.strength} color="#22c55e" />
-            <SignalMeter label="Volume Momentum" value={signals.volume} color="#3b82f6" />
-            <SignalMeter label="Volatility Index" value={signals.volatility} color="#f59e0b" />
-            <SignalMeter label="Stochastic Oscillator" value={oscillators.stochastic} color="#a855f7" />
+            <SignalMeter label="Trend Strength (RSI)" value={signals.strength ?? 0} color="#22c55e" />
+            <SignalMeter label="Volume Momentum" value={signals.volume ?? 0} color="#3b82f6" />
+            <SignalMeter label="Volatility Index (ATR)" value={signals.volatility ?? 0} color="#f59e0b" />
+            <SignalMeter label="Stochastic (RSI proxy)" value={signals.stochastic ?? 0} color="#a855f7" />
           </div>
 
         </div>

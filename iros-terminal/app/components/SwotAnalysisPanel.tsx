@@ -1,10 +1,16 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from "react";
+import type { AITickerNewsReport, TerminalIntelligence } from "@/lib/market-api";
+import { buildFactSwot, type DrawerStockFacts, type IntradayMetrics } from "@/lib/drawer-research";
 
 type SwotAnalysisPanelProps = {
   ticker?: string;
   companyName?: string;
+  intraday?: IntradayMetrics | null;
+  tickerNews?: AITickerNewsReport | null;
+  terminalAnalysis?: TerminalIntelligence | null;
+  stockFacts?: DrawerStockFacts | null;
 };
 
 /* ── Color-coded quadrant card (light theme: tinted panel + dark text) ── */
@@ -175,76 +181,29 @@ function LoadingQuadrant() {
   );
 }
 
-/* ── Mock SWOT data generator ── */
-function generateSwotData(ticker: string) {
-  const strengths = [
-    `${ticker} commands strong brand equity with consistent market share expansion across core segments.`,
-    `Robust balance sheet with debt-to-equity ratio well below industry average of 0.8x.`,
-    `Superior operating margins of 22.4% compared to peer average of 14.7%.`,
-    `Highly diversified revenue base with no single customer exceeding 5% of total revenue.`,
-    `Industry-leading R&D spend at 8.3% of revenue driving continuous innovation.`,
-    `Experienced management team with average tenure of 14 years in the sector.`,
-  ];
-
-  const weaknesses = [
-    `Geographic concentration risk with 68% of revenue derived from domestic markets.`,
-    `Working capital cycle of 72 days remains elevated versus industry benchmark of 45 days.`,
-    `Legacy IT infrastructure leading to 15% higher operational costs vs digitally-native competitors.`,
-    `Limited pricing power in commoditized product segments facing margin compression.`,
-    `Succession planning uncertainty with key leadership roles concentrated in founding family.`,
-  ];
-
-  const opportunities = [
-    `Addressable market in Tier-2/3 cities projected to grow at 18% CAGR over next 3 years.`,
-    `Adjacent industry expansion potential in renewable energy & electric mobility verticals.`,
-    `Strategic M&A pipeline with 3-4 mid-sized acquisition targets at attractive valuations.`,
-    `Digital transformation initiative expected to reduce opex by 25% by FY2027.`,
-    `Export incentives and PLI scheme benefits could boost margins by 200-300 bps.`,
-  ];
-
-  const threats = [
-    `Regulatory headwinds in key operating regions with potential compliance cost increases.`,
-    `Intense price competition from unorganized sector players eroding market share by 3-4% annually.`,
-    `Currency volatility exposed through unhedged forex book of $120 million.`,
-    `Supply chain disruptions from geopolitical tensions in sourcing regions.`,
-    `Technological disruption risk from agile fintech startups with zero-cost acquisition models.`,
-  ];
-
-  const scores = {
-    overall: 65 + Math.random() * 25,
-    strength: 60 + Math.random() * 30,
-    opportunity: 55 + Math.random() * 30,
-    weakness: 20 + Math.random() * 30,
-    threat: 25 + Math.random() * 28,
-  };
-
-  return {
-    strengths: strengths.sort(() => 0.5 - Math.random()).slice(0, 3 + Math.floor(Math.random() * 2)),
-    weaknesses: weaknesses.sort(() => 0.5 - Math.random()).slice(0, 3 + Math.floor(Math.random() * 2)),
-    opportunities: opportunities.sort(() => 0.5 - Math.random()).slice(0, 3 + Math.floor(Math.random() * 2)),
-    threats: threats.sort(() => 0.5 - Math.random()).slice(0, 3 + Math.floor(Math.random() * 2)),
-    scores,
-  };
-}
-
-export default function SwotAnalysisPanel({ ticker, companyName }: SwotAnalysisPanelProps) {
+export default function SwotAnalysisPanel({
+  ticker,
+  companyName,
+  intraday,
+  tickerNews,
+  terminalAnalysis,
+  stockFacts,
+}: SwotAnalysisPanelProps) {
   const normalizedTicker = ticker?.trim().toUpperCase();
-  const [activeView, setActiveView] = useState<'widget' | 'analysis'>('widget');
+  const [activeView, setActiveView] = useState<'widget' | 'analysis'>('analysis');
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
-  const [loadingAnalysis, setLoadingAnalysis] = useState(true);
-
-  useEffect(() => {
-    if (activeView !== 'analysis' || !normalizedTicker) return;
-    setLoadingAnalysis(true);
-    const id = setTimeout(() => setLoadingAnalysis(false), 1800);
-    return () => clearTimeout(id);
-  }, [activeView, normalizedTicker]);
 
   const swotData = useMemo(() => {
     if (!normalizedTicker) return null;
-    return generateSwotData(normalizedTicker);
-  }, [normalizedTicker]);
+    return buildFactSwot({
+      ticker: normalizedTicker,
+      intraday,
+      tickerNews,
+      terminalAnalysis,
+      stock: stockFacts,
+    });
+  }, [normalizedTicker, intraday, tickerNews, terminalAnalysis, stockFacts]);
 
   const widgetUrl = useMemo(() => {
     if (!normalizedTicker) return "";
@@ -357,6 +316,16 @@ export default function SwotAnalysisPanel({ ticker, companyName }: SwotAnalysisP
       {/* AI Analysis view ── light theme quadrant visualizer */}
       {activeView === 'analysis' && swotData && (
         <div className="space-y-3">
+          {swotData.partial && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-semibold text-amber-900">
+              Partial SWOT — built from snapshot intraday metrics, news categories, and IC gates only.
+            </div>
+          )}
+          {!swotData.hasData && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] text-slate-600">
+              No fact-grounded SWOT fields available yet for {normalizedTicker}.
+            </div>
+          )}
           {/* Header card */}
           <div className="rounded-2xl bg-gradient-to-br from-amber-50 via-white to-red-50 border border-amber-200/50 shadow-sm p-4">
             <div className="flex items-center justify-between mb-3">
@@ -373,7 +342,7 @@ export default function SwotAnalysisPanel({ ticker, companyName }: SwotAnalysisP
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                <span className="text-[9px] text-amber-600 uppercase tracking-wider font-bold">AI Generated</span>
+                <span className="text-[9px] text-amber-600 uppercase tracking-wider font-bold">Fact-grounded</span>
               </div>
             </div>
 
@@ -395,10 +364,7 @@ export default function SwotAnalysisPanel({ ticker, companyName }: SwotAnalysisP
           </div>
 
           {/* Quadrant grid */}
-          {loadingAnalysis ? (
-            <LoadingQuadrant />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <QuadrantCard
                 title="Strengths"
                 accentColor="#059669"
@@ -436,7 +402,6 @@ export default function SwotAnalysisPanel({ ticker, companyName }: SwotAnalysisP
                 items={swotData.threats}
               />
             </div>
-          )}
 
           {/* Strength meters */}
           <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-3">

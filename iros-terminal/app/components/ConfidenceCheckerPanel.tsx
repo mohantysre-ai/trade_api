@@ -16,9 +16,9 @@ type DeskIcCriterion = {
 type DeskIcPayload = {
   ticker?: string;
   deskDecision?: "APPROVE" | "REJECT" | "HOLD_FOR_DATA" | string;
-  conviction?: number;
-  oneLiner?: string;
-  criteria?: DeskIcCriterion[];
+  conviction?: number | null;
+  oneLiner?: string | null;
+  criteria?: DeskIcCriterion[] | unknown[];
   categoryScores?: {
     liquidity?: number;
     technical?: number;
@@ -31,10 +31,20 @@ type DeskIcPayload = {
   generatedAt?: string;
 };
 
+import type { DeskIcSummary } from "@/lib/market-api";
+
 type ConfidenceCheckerPanelProps = {
   ticker?: string;
   companyName?: string;
+  initialDeskIc?: (DeskIcSummary & {
+    criteria?: unknown[];
+    categoryScores?: Record<string, number>;
+    llmUsed?: boolean;
+    generatedAt?: string;
+  }) | null;
 };
+
+const DESK_IC_FETCH_MS = 25_000;
 
 function ConfidenceGauge({ score }: { score: number }) {
   const reduce = useReducedMotion();
@@ -160,44 +170,77 @@ const CATEGORY_META: { key: keyof NonNullable<DeskIcPayload["categoryScores"]>; 
   { key: "portfolioFit", label: "Portfolio fit", color: "#22c55e" },
 ];
 
-export default function ConfidenceCheckerPanel({ ticker, companyName }: ConfidenceCheckerPanelProps) {
+export default function ConfidenceCheckerPanel({ ticker, companyName, initialDeskIc }: ConfidenceCheckerPanelProps) {
   const normalizedTicker = ticker?.trim().toUpperCase();
   const [activeView, setActiveView] = useState<"widget" | "dashboard">("dashboard");
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
-  const [deskIc, setDeskIc] = useState<DeskIcPayload | null>(null);
+  const [enrichingLlm, setEnrichingLlm] = useState(false);
+  const [deskIc, setDeskIc] = useState<DeskIcPayload | null>(initialDeskIc ?? null);
   const [deskError, setDeskError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDeskIc(initialDeskIc ?? null);
+  }, [initialDeskIc, normalizedTicker]);
 
   useEffect(() => {
     if (activeView !== "dashboard" || !normalizedTicker) return;
     let cancelled = false;
-    setLoadingDashboard(true);
-    setDeskError(null);
-    (async () => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), DESK_IC_FETCH_MS);
+
+    const loadDeskIc = async () => {
+      setDeskError(null);
+      if (!deskIc) setLoadingDashboard(true);
+
       try {
-        const res = await fetch(`/api/desk-ic?ticker=${encodeURIComponent(normalizedTicker)}`, {
+        const fastRes = await fetch(`/api/desk-ic?ticker=${encodeURIComponent(normalizedTicker)}&fast=1`, {
           cache: "no-store",
+          signal: controller.signal,
         });
-        const data = await res.json();
+        const fastData = await fastRes.json();
         if (cancelled) return;
-        if (!res.ok || !data?.success || !data?.deskIc) {
-          setDeskIc(null);
-          setDeskError(String(data?.error || data?.detail || `Desk IC unavailable (${res.status})`));
-          return;
+        if (fastRes.ok && fastData?.deskIc) {
+          const next = fastData.deskIc as DeskIcPayload;
+          setDeskIc(next);
+          if (next.llmUsed || fastData.cached) return;
+        } else if (!deskIc) {
+          setDeskError(String(fastData?.error || fastData?.detail || `Desk IC unavailable (${fastRes.status})`));
         }
-        setDeskIc(data.deskIc as DeskIcPayload);
       } catch (err) {
-        if (!cancelled) {
-          setDeskIc(null);
+        if (!cancelled && !deskIc) {
           setDeskError(err instanceof Error ? err.message : "Desk IC fetch failed");
         }
       } finally {
         if (!cancelled) setLoadingDashboard(false);
       }
-    })();
+
+      if (cancelled || controller.signal.aborted) return;
+
+      setEnrichingLlm(true);
+      try {
+        const llmRes = await fetch(`/api/desk-ic?ticker=${encodeURIComponent(normalizedTicker)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const llmData = await llmRes.json();
+        if (cancelled) return;
+        if (llmRes.ok && llmData?.deskIc) {
+          setDeskIc(llmData.deskIc as DeskIcPayload);
+        }
+      } catch {
+        // Keep deterministic partial result
+      } finally {
+        if (!cancelled) setEnrichingLlm(false);
+      }
+    };
+
+    void loadDeskIc();
     return () => {
       cancelled = true;
+      controller.abort();
+      window.clearTimeout(timeoutId);
     };
   }, [activeView, normalizedTicker]);
 
@@ -208,9 +251,10 @@ export default function ConfidenceCheckerPanel({ ticker, companyName }: Confiden
 
   if (!normalizedTicker) return <EmptyState />;
 
+  const criteria = (deskIc?.criteria ?? []) as DeskIcCriterion[];
   const decision = String(deskIc?.deskDecision || "").toUpperCase();
-  const passCount = (deskIc?.criteria || []).filter((c) => c.status === "PASS").length;
-  const totalCriteria = (deskIc?.criteria || []).length;
+  const passCount = criteria.filter((c) => c.status === "PASS").length;
+  const totalCriteria = criteria.length;
 
   return (
     <div className="space-y-4">
@@ -295,15 +339,18 @@ export default function ConfidenceCheckerPanel({ ticker, companyName }: Confiden
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold leading-relaxed text-slate-700">
             DESK IC · {deskIc?.llmUsed ? "LLM" : deskIc ? "DETERMINISTIC" : "…"} — fact-grounded criteria only. Soft gate:
             REJECT flags the name; quant floors still control lock eligibility. Missing fields show INSUFFICIENT — never invented PASS.
+            {enrichingLlm && (
+              <span className="ml-1 text-amber-700">· LLM enrichment running (partial shown)</span>
+            )}
           </div>
 
-          {loadingDashboard && (
+          {loadingDashboard && !deskIc && (
             <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-500">
               Running Desk IC for {normalizedTicker}…
             </div>
           )}
 
-          {!loadingDashboard && deskError && (
+          {!loadingDashboard && deskError && !deskIc && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-[11px] text-amber-900">
               {deskError}
             </div>
@@ -371,7 +418,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName }: Confiden
                 {(deskIc.criteria || []).length === 0 ? (
                   <p className="text-[11px] text-slate-500">— No criteria returned</p>
                 ) : (
-                  (deskIc.criteria || []).map((criterion) => (
+                  criteria.map((criterion) => (
                     <CriterionRow
                       key={criterion.id}
                       label={criterion.label}

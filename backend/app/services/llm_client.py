@@ -100,15 +100,24 @@ def _call_openai(prompt: str, api_key: str, api_url: str, model: str, timeout: i
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.1,
-        "max_tokens": 2000,
+        "max_tokens": 8000,
     }
     response = requests.post(api_url, json=payload, headers=headers, timeout=timeout)
     if response.status_code >= 300:
         raise RuntimeError(f"OpenAI request failed ({response.status_code}): {response.text}")
     data = response.json()
-    if not data.get("choices") or not data["choices"][0].get("message"):
+    choices = data.get("choices") or []
+    if not choices or not choices[0].get("message"):
         raise RuntimeError("OpenAI response missing expected content")
-    return data["choices"][0]["message"]["content"].strip()
+    finish = choices[0].get("finish_reason", "")
+    content = choices[0]["message"].get("content") or ""
+    if finish == "length" and content:
+        # Truncated JSON — attempt to close open braces so callers can still parse
+        open_braces = content.count("{") - content.count("}")
+        open_brackets = content.count("[") - content.count("]")
+        content = content.rstrip().rstrip(",")
+        content += "]" * max(0, open_brackets) + "}" * max(0, open_braces)
+    return content.strip()
 
 
 def _call_gemini(

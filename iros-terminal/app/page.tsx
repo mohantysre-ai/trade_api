@@ -9,6 +9,7 @@ import {
   type LedgerStock,
   type TerminalIntelligence,
   type AITickerNewsReport,
+  type DeskIcSummary,
 } from '@/lib/market-api';
 import ForensicPanel from './components/ForensicPanel';
 import DhanRecommendedPanel from './components/DhanRecommendedPanel';
@@ -21,6 +22,7 @@ import DeskActivityAlerts from './components/DeskActivityAlerts';
 import { DeskLiveTile, motion } from '@/lib/desk-motion';
 import { formatDeskDelta, formatPtsPctLabel } from '@/lib/format-delta';
 import { subscribeLiveDesk } from '@/lib/live-desk';
+import type { IntradayMetrics } from '@/lib/drawer-research';
 import { LayoutGroup } from 'motion/react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 
@@ -31,6 +33,12 @@ type DrawerContent = {
     error?: string;
   }) | null;
   tickerNews?: AITickerNewsReport | null;
+  intraday?: IntradayMetrics | null;
+  deskIc?: (DeskIcSummary & {
+    criteria?: unknown[];
+    categoryScores?: Record<string, number>;
+    llmUsed?: boolean;
+  }) | null;
 };
 
 const drawerIntelligenceCache = new Map<string, TerminalIntelligence>();
@@ -2320,7 +2328,6 @@ export default function IrosMasterAdvancedTerminal() {
         const q = quote as LiveStock;
         return { ...q, ticker: q.ticker || ticker };
       }
-      // Ledger / Matrix ticker may not be in the live stocks[] pool — keep drawer identity
       return {
         ticker,
         name: ticker,
@@ -2334,22 +2341,40 @@ export default function IrosMasterAdvancedTerminal() {
     [stocks, liveMarket?.stockQuotes],
   );
 
+  const resolveDrawerExtras = useCallback(
+    (ticker: string) => {
+      const key = ticker.toUpperCase();
+      const fromStocks = liveMarket?.stocks?.find((s) => String(s.ticker || '').toUpperCase() === key) as
+        | (LiveStock & { intraday?: IntradayMetrics })
+        | undefined;
+      const quote = (liveMarket?.stockQuotes?.[key] ?? fromStocks) as (LiveStock & { intraday?: IntradayMetrics }) | undefined;
+      return {
+        intraday: quote?.intraday ?? null,
+        deskIc: liveMarket?.deskIcByTicker?.[key] ?? null,
+      };
+    },
+    [liveMarket?.stockQuotes, liveMarket?.stocks, liveMarket?.deskIcByTicker],
+  );
+
   const handleSelect = async (t: string) => {
     const requestId = ++drawerRequestRef.current;
     t = t.toUpperCase().trim();
     setSelectedTicker(t);
     setDrawerOpen(true);
     const stock = resolveStockForDrawer(t);
+    const { intraday, deskIc } = resolveDrawerExtras(t);
     // Show drawer immediately with ticker shell while intelligence loads
     setDrawerContent((prev) =>
-      prev?.stock?.ticker === t ? prev : { stock, analysis: null, tickerNews: null },
+      prev?.stock?.ticker === t ? prev : { stock, analysis: null, tickerNews: null, intraday, deskIc },
     );
 
     const snapshotIntelligence = liveMarket?.tickerIntelligenceByTicker?.[t];
     const snapshotNews = liveMarket?.tickerNewsByTicker?.[t] as AITickerNewsReport | undefined;
     const cachedIntelligence = snapshotIntelligence ?? drawerIntelligenceCache.get(t);
     const cachedNews = snapshotNews ?? drawerNewsCache.get(t);
-    if (cachedIntelligence || cachedNews) setDrawerContent({ stock, analysis: cachedIntelligence ?? null, tickerNews: cachedNews ?? null });
+    if (cachedIntelligence || cachedNews) {
+      setDrawerContent({ stock, analysis: cachedIntelligence ?? null, tickerNews: cachedNews ?? null, intraday, deskIc });
+    }
 
     const params = new URLSearchParams({ ticker: t });
     if (selectedPool) params.set('pool', selectedPool);
@@ -2372,6 +2397,8 @@ export default function IrosMasterAdvancedTerminal() {
       stock,
       analysis: intelligence ? { ...intelligence, isSnapshotFallback: Boolean(snapshotIntelligence && liveMarket?.isSnapshotFallback) } : { error: intelResult.status === 'rejected' ? String(intelResult.reason) : 'Analysis unavailable' },
       tickerNews: news,
+      intraday,
+      deskIc,
     });
   };
 

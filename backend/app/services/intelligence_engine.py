@@ -970,6 +970,47 @@ def _ticker_risk_calc(stock: dict[str, Any], ledger_row: dict[str, Any], market_
     }
 
 
+_NEWS_CATEGORY_KEYS = (
+    "earnings_results",
+    "new_orders_contracts",
+    "future_expansion_capex",
+    "institutional_activity",
+    "insider_activity",
+    "regulatory_filings",
+    "management_changes",
+    "dividend_news",
+)
+
+
+def _ticker_news_catalyst_blurb(payload: dict[str, Any], ticker: str) -> str | None:
+    news = (payload.get("tickerNewsByTicker") or {}).get(str(ticker).upper())
+    if not isinstance(news, dict):
+        return None
+    parts: list[str] = []
+    headline = _clean_value(news.get("summary_headline"))
+    if headline:
+        parts.append(headline)
+    for key in _NEWS_CATEGORY_KEYS:
+        val = _clean_value(news.get(key))
+        if val and val.lower() not in {"no recent news found.", "n/a", "none", "-"}:
+            label = key.replace("_", " ").title()
+            parts.append(f"{label}: {val}")
+    risk = _clean_value(news.get("risk_flags"))
+    if risk and "no significant" not in risk.lower():
+        parts.append(f"Risk flags: {risk}")
+    sentiment = _clean_value(news.get("sentiment_overall"))
+    if sentiment:
+        parts.append(f"Sentiment: {sentiment}")
+    return " | ".join(parts[:8]) if parts else None
+
+
+def _needs_news_enrichment(text: str | None) -> bool:
+    raw = str(text or "").strip().lower()
+    if not raw:
+        return True
+    return "not available" in raw or raw.startswith("top market catalysts were not")
+
+
 def build_ticker_intelligence_report(payload: dict[str, Any], ticker: str) -> dict[str, Any]:
     terminal = payload.get("terminalIntelligence") or {}
     stock = _ticker_stock_row(payload, ticker)
@@ -986,6 +1027,9 @@ def build_ticker_intelligence_report(payload: dict[str, Any], ticker: str) -> di
     market_factor_hub = terminal.get("active_factor_hub") or {}
     market_gates = terminal.get("active_seven_ic_gates") or {}
     market_news = terminal.get("news_catalysts_card") or "Top market catalysts were not available from the current news feed."
+    enriched_news = _ticker_news_catalyst_blurb(payload, ticker)
+    if enriched_news and _needs_news_enrichment(market_news):
+        market_news = enriched_news
     market_macro = terminal.get("macro_anchors_card") or "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks."
     market_insti = terminal.get("insider_insti_activity_card") or "Institutional activity is inferred from live volume and price participation."
 

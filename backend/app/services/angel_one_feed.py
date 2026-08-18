@@ -4128,28 +4128,30 @@ def create_app() -> FastAPI:
         }
 
     @app.get("/api/desk-ic")
-    def desk_ic(ticker: str = "", force: bool = False) -> dict[str, Any]:
+    def desk_ic(ticker: str = "", force: bool = False, fast: bool = False) -> dict[str, Any]:
         """Fact-grounded Desk IC criteria (senior IB checklist) for one ticker."""
         sym = (ticker or "").strip().upper()
         if not sym:
             raise HTTPException(status_code=400, detail="Missing required parameter: ticker")
         snapshot = _load_last_snapshot() or {}
         try:
-            from .desk_ic_criteria import evaluate_and_cache_ticker
+            from .desk_ic_criteria import evaluate_and_cache_ticker, get_cached_desk_ic
 
+            cached = None if force else get_cached_desk_ic(snapshot, sym)
+            if cached:
+                return {"success": True, "ticker": sym, "deskIc": cached, "cached": True}
             result = evaluate_and_cache_ticker(
                 snapshot,
                 sym,
-                use_llm=True,
+                use_llm=not fast,
                 force=force,
             )
-            # Persist cache when we evaluated fresh
-            if snapshot:
+            if snapshot and not fast:
                 try:
                     _save_last_snapshot(snapshot)
                 except Exception:
                     pass
-            return {"success": True, "ticker": sym, "deskIc": result}
+            return {"success": True, "ticker": sym, "deskIc": result, "cached": False, "fast": fast}
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -4508,26 +4510,31 @@ def create_app() -> FastAPI:
 
     @app.get("/api/terminal-intelligence")
     def terminal_intelligence(ticker: str | None = None, pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
+        """Read-only ticker intelligence from the persisted snapshot (no live Angel refresh)."""
         try:
-            client = AngelOneClient()
-            payload = build_market_payload(client, pool_name=pool, custom_prompt=prompt)
-            if ticker:
-                report = (payload.get("tickerIntelligenceByTicker") or {}).get(ticker)
-                if report:
-                    report = dict(report)
-                else:
-                    report = build_ticker_intelligence_report(payload, ticker)
+            snapshot = _load_last_snapshot()
+            if not snapshot:
+                raise HTTPException(status_code=503, detail="Market snapshot unavailable.")
+            payload = _hydrate_ticker_intelligence_map(dict(snapshot))
+            if pool:
+                payload["activePool"] = pool
+            sym = str(ticker or "").strip().upper()
+            if sym:
+                report = (payload.get("tickerIntelligenceByTicker") or {}).get(sym)
+                report = dict(report) if isinstance(report, dict) else build_ticker_intelligence_report(payload, sym)
             else:
                 report = dict(payload.get("terminalIntelligence") or {})
             return {
                 "success": True,
                 "terminalIntelligence": report,
-                "focusTicker": ticker,
+                "focusTicker": sym or ticker,
                 "tickerIntelligenceByTicker": payload.get("tickerIntelligenceByTicker", {}),
                 "newsSummary": payload.get("newsSummary"),
                 "selectionMeta": payload.get("selectionMeta"),
-                "isSnapshotFallback": payload.get("isSnapshotFallback", False),
+                "isSnapshotFallback": bool(payload.get("isSnapshotFallback", True)),
             }
+        except HTTPException:
+            raise
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
