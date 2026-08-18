@@ -199,7 +199,9 @@ def _yahoo_last_print(symbol: str, *, timeout: float = 2.5) -> float | None:
 
 
 def _snapshot_ltp(symbol: str) -> float | None:
-    snap_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "last_market_snapshot.json")
+    from .market_snapshot_store import readable_market_snapshot_path
+
+    snap_path = str(readable_market_snapshot_path())
     try:
         with open(snap_path, "r", encoding="utf-8-sig") as fh:
             snap = json.load(fh)

@@ -1,0 +1,3291 @@
+[
+  {
+    "trade_id": "GLAND:LONG",
+    "ticker": "GLAND",
+    "direction": "LONG",
+    "confidence_score": 0.3693,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": null,
+    "exit_price": null,
+    "stop_loss": 2762.7,
+    "target_price": 3263.45,
+    "signal_entry_price": 2963.0,
+    "outcome": "NO_ENTRY",
+    "realized_pnl_pct": 0.0,
+    "realized_pnl_abs": null,
+    "holding_duration_mins": null,
+    "sector": null,
+    "score": 36.93,
+    "qty": 33,
+    "deployed_capital": 97779.0,
+    "risk_per_share": 200.3,
+    "tca": {
+      "implementation_shortfall_bps": null,
+      "delay_cost_bps": null,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": null,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": null,
+      "mfe_pct": null,
+      "realized_return_ratio": null,
+      "stop_efficiency_index": null
+    },
+    "attribution": {
+      "alpha_score": 36.93,
+      "volume_expansion_contrib": null,
+      "vwap_alignment_contrib": null,
+      "momentum_velocity_contrib": null,
+      "sector_relative_strength_contrib": null,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "ENTRY_NEVER_TRIGGERED"
+    ],
+    "root_cause": "NO_TRIGGER",
+    "false_positive": false,
+    "timeline_events": [],
+    "factor_breakdown": null
+  },
+  {
+    "trade_id": "OIL:LONG",
+    "ticker": "OIL",
+    "direction": "LONG",
+    "confidence_score": 0.2486,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 479.4,
+    "exit_price": 470.0,
+    "stop_loss": 454.47,
+    "target_price": 516.79,
+    "signal_entry_price": 479.4,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": -1.9608,
+    "realized_pnl_abs": -1955.2,
+    "holding_duration_mins": 348,
+    "sector": null,
+    "score": 24.86,
+    "qty": 208,
+    "deployed_capital": 99715.2,
+    "risk_per_share": 24.93,
+    "tca": {
+      "implementation_shortfall_bps": 95.95,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 95.95,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -2.232,
+      "mfe_pct": 0.9595,
+      "realized_return_ratio": -2.0435,
+      "stop_efficiency_index": 0.4292
+    },
+    "attribution": {
+      "alpha_score": 24.86,
+      "volume_expansion_contrib": null,
+      "vwap_alignment_contrib": null,
+      "momentum_velocity_contrib": null,
+      "sector_relative_strength_contrib": null,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -2.0405,
+        "pnl_delta_vs_actual_pct": -0.0797,
+        "max_drawdown_during_trade_pct": -2.9804
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.3979,
+        "pnl_delta_vs_actual_pct": 1.5629,
+        "max_drawdown_during_trade_pct": -2.9804
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.2399,
+        "pnl_delta_vs_actual_pct": 1.7209,
+        "max_drawdown_during_trade_pct": -2.9804
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.1102,
+        "pnl_delta_vs_actual_pct": 2.071,
+        "max_drawdown_during_trade_pct": -2.9804
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -1.9608,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -2.9804
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "NEGATIVE_OR_FLAT_EOD"
+    ],
+    "root_cause": "STALLED_TRADE",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 464.3
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:26:00+05:30",
+        "price": 479.4,
+        "bar_open": 478.5
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:14:00+05:30",
+        "price": 470.0
+      }
+    ],
+    "factor_breakdown": null
+  },
+  {
+    "trade_id": "SAPPHIRE:LONG",
+    "ticker": "SAPPHIRE",
+    "direction": "LONG",
+    "confidence_score": 0.241,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 233.14,
+    "exit_price": 236.0,
+    "stop_loss": 220.67,
+    "target_price": 251.84,
+    "signal_entry_price": 233.14,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": 1.2267,
+    "realized_pnl_abs": 1224.08,
+    "holding_duration_mins": 349,
+    "sector": null,
+    "score": 24.1,
+    "qty": 428,
+    "deployed_capital": 99783.92,
+    "risk_per_share": 12.47,
+    "tca": {
+      "implementation_shortfall_bps": 76.77,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 76.77,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -0.8107,
+      "mfe_pct": 1.9945,
+      "realized_return_ratio": 0.6151,
+      "stop_efficiency_index": 0.1516
+    },
+    "attribution": {
+      "alpha_score": 24.1,
+      "volume_expansion_contrib": null,
+      "vwap_alignment_contrib": null,
+      "momentum_velocity_contrib": null,
+      "sector_relative_strength_contrib": null,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 1.2267,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.9179
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.4361,
+        "pnl_delta_vs_actual_pct": -1.6628,
+        "max_drawdown_during_trade_pct": -1.9179
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 1.2267,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.9179
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.5369,
+        "pnl_delta_vs_actual_pct": -0.6898,
+        "max_drawdown_during_trade_pct": -1.9179
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 1.2267,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.9179
+      }
+    ],
+    "success_factors": [
+      "POSITIVE_EOD_SQUAREOFF"
+    ],
+    "failure_factors": [],
+    "root_cause": "PARTIAL_FOLLOWTHROUGH",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 220.5
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:40:00+05:30",
+        "price": 233.14,
+        "bar_open": 231.28
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:29:00+05:30",
+        "price": 236.0
+      }
+    ],
+    "factor_breakdown": null
+  },
+  {
+    "trade_id": "DEVYANI:LONG",
+    "ticker": "DEVYANI",
+    "direction": "LONG",
+    "confidence_score": 0.1981,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 138.33,
+    "exit_price": 141.95,
+    "stop_loss": 131.87,
+    "target_price": 148.02,
+    "signal_entry_price": 138.33,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": 2.6169,
+    "realized_pnl_abs": 2613.64,
+    "holding_duration_mins": 356,
+    "sector": null,
+    "score": 19.81,
+    "qty": 722,
+    "deployed_capital": 99874.26,
+    "risk_per_share": 6.46,
+    "tca": {
+      "implementation_shortfall_bps": 198.79,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 198.79,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -1.4892,
+      "mfe_pct": 4.6049,
+      "realized_return_ratio": 0.5683,
+      "stop_efficiency_index": 0.3189
+    },
+    "attribution": {
+      "alpha_score": 19.81,
+      "volume_expansion_contrib": null,
+      "vwap_alignment_contrib": null,
+      "momentum_velocity_contrib": null,
+      "sector_relative_strength_contrib": null,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 2.6169,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.8326
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 2.6169,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.8326
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 2.6169,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.8326
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.3699,
+        "pnl_delta_vs_actual_pct": -2.2471,
+        "max_drawdown_during_trade_pct": -1.8326
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 2.6169,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.8326
+      }
+    ],
+    "success_factors": [
+      "POSITIVE_EOD_SQUAREOFF"
+    ],
+    "failure_factors": [],
+    "root_cause": "PARTIAL_FOLLOWTHROUGH",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 133.56
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:33:00+05:30",
+        "price": 138.33,
+        "bar_open": 136.45
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:29:00+05:30",
+        "price": 141.95
+      }
+    ],
+    "factor_breakdown": null
+  },
+  {
+    "trade_id": "LICI:LONG",
+    "ticker": "LICI",
+    "direction": "LONG",
+    "confidence_score": 0.1881,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 405.0,
+    "exit_price": 405.0,
+    "stop_loss": 390.01,
+    "target_price": 427.49,
+    "signal_entry_price": 405.0,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": 0.0,
+    "realized_pnl_abs": 0.0,
+    "holding_duration_mins": 346,
+    "sector": null,
+    "score": 18.81,
+    "qty": 246,
+    "deployed_capital": 99630.0,
+    "risk_per_share": 14.99,
+    "tca": {
+      "implementation_shortfall_bps": 134.57,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 134.57,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -0.7284,
+      "mfe_pct": 1.3457,
+      "realized_return_ratio": 0.0,
+      "stop_efficiency_index": 0.1968
+    },
+    "attribution": {
+      "alpha_score": 18.81,
+      "volume_expansion_contrib": null,
+      "vwap_alignment_contrib": null,
+      "momentum_velocity_contrib": null,
+      "sector_relative_strength_contrib": null,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.0,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.3415
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.0121,
+        "pnl_delta_vs_actual_pct": 0.0121,
+        "max_drawdown_during_trade_pct": -1.3415
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.0,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.3415
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.4317,
+        "pnl_delta_vs_actual_pct": -0.4317,
+        "max_drawdown_during_trade_pct": -1.3415
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.0,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.3415
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "NEGATIVE_OR_FLAT_EOD"
+    ],
+    "root_cause": "STALLED_TRADE",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 394.4
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:28:00+05:30",
+        "price": 405.0,
+        "bar_open": 402.4
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:14:00+05:30",
+        "price": 405.0
+      }
+    ],
+    "factor_breakdown": null
+  },
+  {
+    "trade_id": "MRPL:LONG",
+    "ticker": "MRPL",
+    "direction": "LONG",
+    "confidence_score": 0.1835,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 169.25,
+    "exit_price": 179.88,
+    "stop_loss": 162.16,
+    "target_price": 179.88,
+    "signal_entry_price": 169.25,
+    "outcome": "TARGET_HIT",
+    "realized_pnl_pct": 6.2806,
+    "realized_pnl_abs": 6271.7,
+    "holding_duration_mins": 273,
+    "sector": null,
+    "score": 18.35,
+    "qty": 590,
+    "deployed_capital": 99857.5,
+    "risk_per_share": 7.09,
+    "tca": {
+      "implementation_shortfall_bps": 36.06,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 36.06,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -0.5613,
+      "mfe_pct": 6.6411,
+      "realized_return_ratio": 0.9457,
+      "stop_efficiency_index": 0.134
+    },
+    "attribution": {
+      "alpha_score": 18.35,
+      "volume_expansion_contrib": null,
+      "vwap_alignment_contrib": null,
+      "momentum_velocity_contrib": null,
+      "sector_relative_strength_contrib": null,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 6.7061,
+        "pnl_delta_vs_actual_pct": 0.4254,
+        "max_drawdown_during_trade_pct": -1.5451
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 6.7061,
+        "pnl_delta_vs_actual_pct": 0.4254,
+        "max_drawdown_during_trade_pct": -1.5451
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 6.7061,
+        "pnl_delta_vs_actual_pct": 0.4254,
+        "max_drawdown_during_trade_pct": -1.5451
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.341,
+        "pnl_delta_vs_actual_pct": -6.6217,
+        "max_drawdown_during_trade_pct": -1.5451
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 6.7061,
+        "pnl_delta_vs_actual_pct": 0.4254,
+        "max_drawdown_during_trade_pct": -1.5451
+      }
+    ],
+    "success_factors": [
+      "TARGET_REACHED",
+      "STRONG_MFE",
+      "SHALLOW_DRAWDOWN"
+    ],
+    "failure_factors": [],
+    "root_cause": "TREND_FOLLOWTHROUGH",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 163.0
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:29:00+05:30",
+        "price": 169.25,
+        "bar_open": 169.12
+      },
+      {
+        "event": "TARGET_HIT",
+        "ts": "2026-08-11T14:02:00+05:30",
+        "price": 179.88
+      }
+    ],
+    "factor_breakdown": null
+  },
+  {
+    "trade_id": "ABFRL:LONG",
+    "ticker": "ABFRL",
+    "direction": "LONG",
+    "confidence_score": 0.1748,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 59.29,
+    "exit_price": 58.6,
+    "stop_loss": 57.07,
+    "target_price": 62.62,
+    "signal_entry_price": 59.29,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": -1.1638,
+    "realized_pnl_abs": -1163.34,
+    "holding_duration_mins": 374,
+    "sector": null,
+    "score": 17.48,
+    "qty": 1686,
+    "deployed_capital": 99962.94,
+    "risk_per_share": 2.22,
+    "tca": {
+      "implementation_shortfall_bps": 339.01,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 339.01,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -2.0071,
+      "mfe_pct": 3.3901,
+      "realized_return_ratio": -0.3433,
+      "stop_efficiency_index": 0.536
+    },
+    "attribution": {
+      "alpha_score": 17.48,
+      "volume_expansion_contrib": null,
+      "vwap_alignment_contrib": null,
+      "momentum_velocity_contrib": null,
+      "sector_relative_strength_contrib": null,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.3901,
+        "pnl_delta_vs_actual_pct": 1.5539,
+        "max_drawdown_during_trade_pct": -4.8741
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 2.9159,
+        "pnl_delta_vs_actual_pct": 4.0797,
+        "max_drawdown_during_trade_pct": -4.8741
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 1.7878,
+        "pnl_delta_vs_actual_pct": 2.9516,
+        "max_drawdown_during_trade_pct": -4.8741
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 1.9418,
+        "pnl_delta_vs_actual_pct": 3.1055,
+        "max_drawdown_during_trade_pct": -4.8741
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -1.1638,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -4.8741
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "NEGATIVE_OR_FLAT_EOD"
+    ],
+    "root_cause": "STALLED_TRADE",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 61.0
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 59.29,
+        "bar_open": 61.0
+      },
+      {
+        "event": "VWAP_RETEST",
+        "ts": "2026-08-11T09:17:00+05:30",
+        "price": 60.8833
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:29:00+05:30",
+        "price": 58.6
+      }
+    ],
+    "factor_breakdown": null
+  },
+  {
+    "trade_id": "REDINGTON:LONG",
+    "ticker": "REDINGTON",
+    "direction": "LONG",
+    "confidence_score": 0.1712,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 363.65,
+    "exit_price": 353.0,
+    "stop_loss": 352.01,
+    "target_price": 381.11,
+    "signal_entry_price": 363.65,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": -2.9286,
+    "realized_pnl_abs": -2918.1,
+    "holding_duration_mins": 367,
+    "sector": null,
+    "score": 17.12,
+    "qty": 274,
+    "deployed_capital": 99640.1,
+    "risk_per_share": 11.64,
+    "tca": {
+      "implementation_shortfall_bps": 23.37,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 23.37,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -3.0111,
+      "mfe_pct": 0.2337,
+      "realized_return_ratio": -12.5294,
+      "stop_efficiency_index": 0.9407
+    },
+    "attribution": {
+      "alpha_score": 17.12,
+      "volume_expansion_contrib": null,
+      "vwap_alignment_contrib": null,
+      "momentum_velocity_contrib": null,
+      "sector_relative_strength_contrib": null,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -2.7663,
+        "pnl_delta_vs_actual_pct": 0.1624,
+        "max_drawdown_during_trade_pct": -2.982
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.6961,
+        "pnl_delta_vs_actual_pct": 2.2326,
+        "max_drawdown_during_trade_pct": -2.982
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.9625,
+        "pnl_delta_vs_actual_pct": 1.9662,
+        "max_drawdown_during_trade_pct": -2.982
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.2783,
+        "pnl_delta_vs_actual_pct": 2.6504,
+        "max_drawdown_during_trade_pct": -2.982
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -2.9286,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -2.982
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "NEGATIVE_OR_FLAT_EOD"
+    ],
+    "root_cause": "STALLED_TRADE",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 354.25
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:22:00+05:30",
+        "price": 363.65,
+        "bar_open": 362.65
+      },
+      {
+        "event": "VWAP_RETEST",
+        "ts": "2026-08-11T09:25:00+05:30",
+        "price": 360.9114
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:29:00+05:30",
+        "price": 353.0
+      }
+    ],
+    "factor_breakdown": null
+  },
+  {
+    "trade_id": "CIEINDIA:LONG",
+    "ticker": "CIEINDIA",
+    "direction": "LONG",
+    "confidence_score": 0.1697,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 413.5,
+    "exit_price": 413.9,
+    "stop_loss": 399.61,
+    "target_price": 434.33,
+    "signal_entry_price": 413.5,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": 0.0967,
+    "realized_pnl_abs": 96.4,
+    "holding_duration_mins": 345,
+    "sector": null,
+    "score": 16.97,
+    "qty": 241,
+    "deployed_capital": 99653.5,
+    "risk_per_share": 13.89,
+    "tca": {
+      "implementation_shortfall_bps": 140.27,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 140.27,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -1.1004,
+      "mfe_pct": 1.4994,
+      "realized_return_ratio": 0.0645,
+      "stop_efficiency_index": 0.3276
+    },
+    "attribution": {
+      "alpha_score": 16.97,
+      "volume_expansion_contrib": null,
+      "vwap_alignment_contrib": null,
+      "momentum_velocity_contrib": null,
+      "sector_relative_strength_contrib": null,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.0967,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -2.4094
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.2353,
+        "pnl_delta_vs_actual_pct": -0.3321,
+        "max_drawdown_during_trade_pct": -2.4094
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -1.0883,
+        "pnl_delta_vs_actual_pct": -1.185,
+        "max_drawdown_during_trade_pct": -2.4094
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.784,
+        "pnl_delta_vs_actual_pct": 0.6873,
+        "max_drawdown_during_trade_pct": -2.4094
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.0967,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -2.4094
+      }
+    ],
+    "success_factors": [
+      "POSITIVE_EOD_SQUAREOFF"
+    ],
+    "failure_factors": [],
+    "root_cause": "PARTIAL_FOLLOWTHROUGH",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 411.45
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:44:00+05:30",
+        "price": 413.5,
+        "bar_open": 412.3
+      },
+      {
+        "event": "VWAP_RETEST",
+        "ts": "2026-08-11T10:32:00+05:30",
+        "price": 411.6136
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:29:00+05:30",
+        "price": 413.9
+      }
+    ],
+    "factor_breakdown": null
+  },
+  {
+    "trade_id": "ZEEL:LONG",
+    "ticker": "ZEEL",
+    "direction": "LONG",
+    "confidence_score": 0.1671,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 92.75,
+    "exit_price": 91.95,
+    "stop_loss": 88.88,
+    "target_price": 98.56,
+    "signal_entry_price": 92.75,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": -0.8625,
+    "realized_pnl_abs": -862.4,
+    "holding_duration_mins": 364,
+    "sector": null,
+    "score": 16.71,
+    "qty": 1078,
+    "deployed_capital": 99984.5,
+    "risk_per_share": 3.87,
+    "tca": {
+      "implementation_shortfall_bps": 128.3,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 128.3,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -2.7062,
+      "mfe_pct": 1.283,
+      "realized_return_ratio": -0.6723,
+      "stop_efficiency_index": 0.6486
+    },
+    "attribution": {
+      "alpha_score": 16.71,
+      "volume_expansion_contrib": null,
+      "vwap_alignment_contrib": null,
+      "momentum_velocity_contrib": null,
+      "sector_relative_strength_contrib": null,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -1.717,
+        "pnl_delta_vs_actual_pct": -0.8544,
+        "max_drawdown_during_trade_pct": -2.923
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.2644,
+        "pnl_delta_vs_actual_pct": 0.5981,
+        "max_drawdown_during_trade_pct": -2.923
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.248,
+        "pnl_delta_vs_actual_pct": 0.6146,
+        "max_drawdown_during_trade_pct": -2.923
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.3061,
+        "pnl_delta_vs_actual_pct": 1.1686,
+        "max_drawdown_during_trade_pct": -2.923
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.8625,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -2.923
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "NEGATIVE_OR_FLAT_EOD"
+    ],
+    "root_cause": "STALLED_TRADE",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 90.0
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:25:00+05:30",
+        "price": 92.75,
+        "bar_open": 92.56
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:29:00+05:30",
+        "price": 91.95
+      }
+    ],
+    "factor_breakdown": null
+  },
+  {
+    "trade_id": "TECHM:LONG",
+    "ticker": "TECHM",
+    "direction": "LONG",
+    "confidence_score": 0.584,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 1650.9,
+    "exit_price": 1642.0,
+    "stop_loss": 1630.69,
+    "target_price": 1681.22,
+    "signal_entry_price": 1650.9,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": -0.5391,
+    "realized_pnl_abs": -534.0,
+    "holding_duration_mins": 358,
+    "sector": "IT",
+    "score": 58.4,
+    "qty": 60,
+    "deployed_capital": 99054.0,
+    "risk_per_share": 20.21,
+    "tca": {
+      "implementation_shortfall_bps": 56.94,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 56.94,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -0.6602,
+      "mfe_pct": 0.5694,
+      "realized_return_ratio": -0.9468,
+      "stop_efficiency_index": 0.5393
+    },
+    "attribution": {
+      "alpha_score": 58.4,
+      "volume_expansion_contrib": 10.0,
+      "vwap_alignment_contrib": 4.96,
+      "momentum_velocity_contrib": 5.18,
+      "sector_relative_strength_contrib": 2.185,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.5391,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.1088
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.2125,
+        "pnl_delta_vs_actual_pct": 0.7516,
+        "max_drawdown_during_trade_pct": -1.1088
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.2968,
+        "pnl_delta_vs_actual_pct": 0.2423,
+        "max_drawdown_during_trade_pct": -1.1088
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.0547,
+        "pnl_delta_vs_actual_pct": 0.5938,
+        "max_drawdown_during_trade_pct": -1.1088
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.5391,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.1088
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "NEGATIVE_OR_FLAT_EOD"
+    ],
+    "root_cause": "STALLED_TRADE",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 1645.9
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:16:00+05:30",
+        "price": 1650.9,
+        "bar_open": 1647.9
+      },
+      {
+        "event": "VWAP_RETEST",
+        "ts": "2026-08-11T09:28:00+05:30",
+        "price": 1649.9232
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:14:00+05:30",
+        "price": 1642.0
+      }
+    ],
+    "factor_breakdown": {
+      "regime": {
+        "score": 55.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "relativeStrength": {
+        "score": 57.2,
+        "weight": 15.0,
+        "rated": true,
+        "rsVsIndexPct": 0.724,
+        "niftyChangePct": -0.42,
+        "gapPct": 0.36,
+        "intradayRet": 0.304
+      },
+      "trend": {
+        "score": 50.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "momentum": {
+        "score": 51.8,
+        "weight": 10.0,
+        "rated": true,
+        "overextended": false
+      },
+      "vwap": {
+        "score": 49.6,
+        "weight": 10.0,
+        "rated": true,
+        "vwapMode": "TREND",
+        "vwapZ": null,
+        "vwapSource": "snapshot",
+        "vwap": 1651.6
+      },
+      "volume": {
+        "score": 100.0,
+        "weight": 10.0,
+        "rated": true,
+        "rvolTime": 5.172,
+        "rvolRaw": 1.0,
+        "cumVolFracHeuristic": 0.193
+      },
+      "breakout": {
+        "score": 32.2,
+        "weight": 10.0,
+        "rated": true,
+        "orbHigh": 1650.9,
+        "orbLow": 1645.9,
+        "orbVelocityPct": 0.0,
+        "orbPosPct": 100.0,
+        "inPlay": true,
+        "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+        "orbDecay": 1.0
+      },
+      "volatility": {
+        "score": 70.3,
+        "weight": 5.0,
+        "rated": true
+      },
+      "sector": {
+        "score": 43.7,
+        "weight": 5.0,
+        "rated": true
+      },
+      "liquidity": {
+        "score": 100.0,
+        "weight": 5.0,
+        "rated": true
+      }
+    }
+  },
+  {
+    "trade_id": "COFORGE:LONG",
+    "ticker": "COFORGE",
+    "direction": "LONG",
+    "confidence_score": 0.582,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 1826.5,
+    "exit_price": 1816.0,
+    "stop_loss": 1807.21,
+    "target_price": 1855.43,
+    "signal_entry_price": 1826.5,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": -0.5749,
+    "realized_pnl_abs": -567.0,
+    "holding_duration_mins": 359,
+    "sector": "IT",
+    "score": 58.2,
+    "qty": 54,
+    "deployed_capital": 98631.0,
+    "risk_per_share": 19.29,
+    "tca": {
+      "implementation_shortfall_bps": 52.01,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 52.01,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -0.9143,
+      "mfe_pct": 0.5201,
+      "realized_return_ratio": -1.1053,
+      "stop_efficiency_index": 0.8657
+    },
+    "attribution": {
+      "alpha_score": 58.2,
+      "volume_expansion_contrib": 10.0,
+      "vwap_alignment_contrib": 4.95,
+      "momentum_velocity_contrib": 5.21,
+      "sector_relative_strength_contrib": 2.03,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.5749,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.2374
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.2194,
+        "pnl_delta_vs_actual_pct": 0.7943,
+        "max_drawdown_during_trade_pct": -1.2374
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.3559,
+        "pnl_delta_vs_actual_pct": 0.219,
+        "max_drawdown_during_trade_pct": -1.2374
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.0968,
+        "pnl_delta_vs_actual_pct": 0.6716,
+        "max_drawdown_during_trade_pct": -1.2374
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.5749,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.2374
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "NEGATIVE_OR_FLAT_EOD"
+    ],
+    "root_cause": "STALLED_TRADE",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 1820.0
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 1826.5,
+        "bar_open": 1820.0
+      },
+      {
+        "event": "VWAP_RETEST",
+        "ts": "2026-08-11T09:37:00+05:30",
+        "price": 1825.5333
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:14:00+05:30",
+        "price": 1816.0
+      }
+    ],
+    "factor_breakdown": {
+      "regime": {
+        "score": 55.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "relativeStrength": {
+        "score": 57.8,
+        "weight": 15.0,
+        "rated": true,
+        "rsVsIndexPct": 0.777,
+        "niftyChangePct": -0.42,
+        "gapPct": 0.552,
+        "intradayRet": 0.357
+      },
+      "trend": {
+        "score": 50.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "momentum": {
+        "score": 52.1,
+        "weight": 10.0,
+        "rated": true,
+        "overextended": false
+      },
+      "vwap": {
+        "score": 49.5,
+        "weight": 10.0,
+        "rated": true,
+        "vwapMode": "TREND",
+        "vwapZ": null,
+        "vwapSource": "snapshot",
+        "vwap": 1827.5
+      },
+      "volume": {
+        "score": 100.0,
+        "weight": 10.0,
+        "rated": true,
+        "rvolTime": 5.172,
+        "rvolRaw": 1.0,
+        "cumVolFracHeuristic": 0.193
+      },
+      "breakout": {
+        "score": 32.2,
+        "weight": 10.0,
+        "rated": true,
+        "orbHigh": 1826.5,
+        "orbLow": 1820.0,
+        "orbVelocityPct": 0.0,
+        "orbPosPct": 100.0,
+        "inPlay": true,
+        "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+        "orbDecay": 1.0
+      },
+      "volatility": {
+        "score": 68.2,
+        "weight": 5.0,
+        "rated": true
+      },
+      "sector": {
+        "score": 40.6,
+        "weight": 5.0,
+        "rated": true
+      },
+      "liquidity": {
+        "score": 100.0,
+        "weight": 5.0,
+        "rated": true
+      }
+    }
+  },
+  {
+    "trade_id": "PAYTM:LONG",
+    "ticker": "PAYTM",
+    "direction": "LONG",
+    "confidence_score": 0.623,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 1592.9,
+    "exit_price": 1601.0,
+    "stop_loss": 1556.77,
+    "target_price": 1647.1,
+    "signal_entry_price": 1592.9,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": 0.5085,
+    "realized_pnl_abs": 502.2,
+    "holding_duration_mins": 359,
+    "sector": "OTHER",
+    "score": 62.3,
+    "qty": 62,
+    "deployed_capital": 98759.8,
+    "risk_per_share": 36.13,
+    "tca": {
+      "implementation_shortfall_bps": 244.22,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 244.22,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -1.0547,
+      "mfe_pct": 2.9506,
+      "realized_return_ratio": 0.1723,
+      "stop_efficiency_index": 0.465
+    },
+    "attribution": {
+      "alpha_score": 62.3,
+      "volume_expansion_contrib": 10.0,
+      "vwap_alignment_contrib": 5.08,
+      "momentum_velocity_contrib": 4.98,
+      "sector_relative_strength_contrib": 2.81,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.5085,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -2.302
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.1862,
+        "pnl_delta_vs_actual_pct": -0.6947,
+        "max_drawdown_during_trade_pct": -2.302
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.5085,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -2.302
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.6017,
+        "pnl_delta_vs_actual_pct": -1.1102,
+        "max_drawdown_during_trade_pct": -2.302
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.5085,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -2.302
+      }
+    ],
+    "success_factors": [
+      "POSITIVE_EOD_SQUAREOFF"
+    ],
+    "failure_factors": [],
+    "root_cause": "PARTIAL_FOLLOWTHROUGH",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 1593.5
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 1592.9,
+        "bar_open": 1593.5
+      },
+      {
+        "event": "VWAP_RETEST",
+        "ts": "2026-08-11T09:20:00+05:30",
+        "price": 1589.9333
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:14:00+05:30",
+        "price": 1601.0
+      }
+    ],
+    "factor_breakdown": {
+      "regime": {
+        "score": 55.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "relativeStrength": {
+        "score": 53.8,
+        "weight": 15.0,
+        "rated": true,
+        "rsVsIndexPct": 0.382,
+        "niftyChangePct": -0.42,
+        "gapPct": 0.593,
+        "intradayRet": -0.038
+      },
+      "trend": {
+        "score": 85.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "momentum": {
+        "score": 49.8,
+        "weight": 10.0,
+        "rated": true,
+        "overextended": false
+      },
+      "vwap": {
+        "score": 50.8,
+        "weight": 10.0,
+        "rated": true,
+        "vwapMode": "TREND",
+        "vwapZ": null,
+        "vwapSource": "snapshot",
+        "vwap": 1591.67
+      },
+      "volume": {
+        "score": 100.0,
+        "weight": 10.0,
+        "rated": true,
+        "rvolTime": 5.172,
+        "rvolRaw": 1.0,
+        "cumVolFracHeuristic": 0.193
+      },
+      "breakout": {
+        "score": 11.9,
+        "weight": 10.0,
+        "rated": true,
+        "orbHigh": 1593.5,
+        "orbLow": 1592.9,
+        "orbVelocityPct": 0.0,
+        "orbPosPct": 0.0,
+        "inPlay": true,
+        "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+        "orbDecay": 1.0
+      },
+      "volatility": {
+        "score": 83.3,
+        "weight": 5.0,
+        "rated": true
+      },
+      "sector": {
+        "score": 56.2,
+        "weight": 5.0,
+        "rated": true
+      },
+      "liquidity": {
+        "score": 100.0,
+        "weight": 5.0,
+        "rated": true
+      }
+    }
+  },
+  {
+    "trade_id": "ONGC:LONG",
+    "ticker": "ONGC",
+    "direction": "LONG",
+    "confidence_score": 0.675,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 242.29,
+    "exit_price": 239.88,
+    "stop_loss": 238.13,
+    "target_price": 248.53,
+    "signal_entry_price": 242.29,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": -0.9947,
+    "realized_pnl_abs": -992.92,
+    "holding_duration_mins": 358,
+    "sector": "ENERGY",
+    "score": 67.5,
+    "qty": 412,
+    "deployed_capital": 99823.48,
+    "risk_per_share": 4.16,
+    "tca": {
+      "implementation_shortfall_bps": 56.13,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 56.13,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -1.0071,
+      "mfe_pct": 0.5613,
+      "realized_return_ratio": -1.7721,
+      "stop_efficiency_index": 0.5865
+    },
+    "attribution": {
+      "alpha_score": 67.5,
+      "volume_expansion_contrib": 10.0,
+      "vwap_alignment_contrib": 5.1,
+      "momentum_velocity_contrib": 5.32,
+      "sector_relative_strength_contrib": 3.01,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.9947,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.43
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.0283,
+        "pnl_delta_vs_actual_pct": 1.023,
+        "max_drawdown_during_trade_pct": -1.43
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.4623,
+        "pnl_delta_vs_actual_pct": 0.5324,
+        "max_drawdown_during_trade_pct": -1.43
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.0547,
+        "pnl_delta_vs_actual_pct": 1.0494,
+        "max_drawdown_during_trade_pct": -1.43
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.9947,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.43
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "NEGATIVE_OR_FLAT_EOD"
+    ],
+    "root_cause": "STALLED_TRADE",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 241.0
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:16:00+05:30",
+        "price": 242.29,
+        "bar_open": 241.22
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:14:00+05:30",
+        "price": 239.88
+      }
+    ],
+    "factor_breakdown": {
+      "regime": {
+        "score": 55.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "relativeStrength": {
+        "score": 59.6,
+        "weight": 15.0,
+        "rated": true,
+        "rsVsIndexPct": 0.955,
+        "niftyChangePct": -0.42,
+        "gapPct": 0.484,
+        "intradayRet": 0.535
+      },
+      "trend": {
+        "score": 85.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "momentum": {
+        "score": 53.2,
+        "weight": 10.0,
+        "rated": true,
+        "overextended": false
+      },
+      "vwap": {
+        "score": 51.0,
+        "weight": 10.0,
+        "rated": true,
+        "vwapMode": "TREND",
+        "vwapZ": null,
+        "vwapSource": "snapshot",
+        "vwap": 242.06
+      },
+      "volume": {
+        "score": 100.0,
+        "weight": 10.0,
+        "rated": true,
+        "rvolTime": 5.172,
+        "rvolRaw": 1.0,
+        "cumVolFracHeuristic": 0.193
+      },
+      "breakout": {
+        "score": 52.6,
+        "weight": 10.0,
+        "rated": true,
+        "orbHigh": 242.29,
+        "orbLow": 241.0,
+        "orbVelocityPct": 0.0,
+        "orbPosPct": 100.0,
+        "inPlay": true,
+        "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+        "orbDecay": 1.0
+      },
+      "volatility": {
+        "score": 76.5,
+        "weight": 5.0,
+        "rated": true
+      },
+      "sector": {
+        "score": 60.2,
+        "weight": 5.0,
+        "rated": true
+      },
+      "liquidity": {
+        "score": 100.0,
+        "weight": 5.0,
+        "rated": true
+      }
+    }
+  },
+  {
+    "trade_id": "HINDCOPPER:LONG",
+    "ticker": "HINDCOPPER",
+    "direction": "LONG",
+    "confidence_score": 0.606,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 534.25,
+    "exit_price": 532.65,
+    "stop_loss": 513.35,
+    "target_price": 565.6,
+    "signal_entry_price": 534.25,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": -0.2995,
+    "realized_pnl_abs": -267.2,
+    "holding_duration_mins": 371,
+    "sector": "OTHER",
+    "score": 60.6,
+    "qty": 167,
+    "deployed_capital": 89219.75,
+    "risk_per_share": 20.9,
+    "tca": {
+      "implementation_shortfall_bps": 85.17,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 85.17,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -1.1511,
+      "mfe_pct": 0.8517,
+      "realized_return_ratio": -0.3516,
+      "stop_efficiency_index": 0.2943
+    },
+    "attribution": {
+      "alpha_score": 60.6,
+      "volume_expansion_contrib": 2.65,
+      "vwap_alignment_contrib": 5.16,
+      "momentum_velocity_contrib": 5.92,
+      "sector_relative_strength_contrib": 3.44,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.2995,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.6258
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.136,
+        "pnl_delta_vs_actual_pct": 0.1635,
+        "max_drawdown_during_trade_pct": -1.6258
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.4118,
+        "pnl_delta_vs_actual_pct": -0.1123,
+        "max_drawdown_during_trade_pct": -1.6258
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.3461,
+        "pnl_delta_vs_actual_pct": -0.0466,
+        "max_drawdown_during_trade_pct": -1.6258
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.2995,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.6258
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "NEGATIVE_OR_FLAT_EOD"
+    ],
+    "root_cause": "STALLED_TRADE",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 531.0
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:18:00+05:30",
+        "price": 534.25,
+        "bar_open": 533.25
+      },
+      {
+        "event": "VWAP_RETEST",
+        "ts": "2026-08-11T09:20:00+05:30",
+        "price": 532.1257
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:29:00+05:30",
+        "price": 532.65
+      }
+    ],
+    "factor_breakdown": {
+      "regime": {
+        "score": 55.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "relativeStrength": {
+        "score": 60.3,
+        "weight": 15.0,
+        "rated": true,
+        "rsVsIndexPct": 1.032,
+        "niftyChangePct": -0.42,
+        "gapPct": 0.903,
+        "intradayRet": 0.612
+      },
+      "trend": {
+        "score": 85.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "momentum": {
+        "score": 59.2,
+        "weight": 10.0,
+        "rated": true,
+        "overextended": false
+      },
+      "vwap": {
+        "score": 51.6,
+        "weight": 10.0,
+        "rated": true,
+        "vwapMode": "TREND",
+        "vwapZ": null,
+        "vwapSource": "snapshot",
+        "vwap": 533.41
+      },
+      "volume": {
+        "score": 26.5,
+        "weight": 10.0,
+        "rated": true,
+        "rvolTime": 1.324,
+        "rvolRaw": 0.26,
+        "cumVolFracHeuristic": 0.193
+      },
+      "breakout": {
+        "score": 35.8,
+        "weight": 10.0,
+        "rated": true,
+        "orbHigh": 537.0,
+        "orbLow": 527.7,
+        "orbVelocityPct": 0.0,
+        "orbPosPct": 70.4,
+        "inPlay": false,
+        "inPlayReason": "not in play",
+        "orbDecay": 1.0
+      },
+      "volatility": {
+        "score": 96.1,
+        "weight": 5.0,
+        "rated": true
+      },
+      "sector": {
+        "score": 68.8,
+        "weight": 5.0,
+        "rated": true
+      },
+      "liquidity": {
+        "score": 100.0,
+        "weight": 5.0,
+        "rated": true
+      }
+    }
+  },
+  {
+    "trade_id": "HINDZINC:LONG",
+    "ticker": "HINDZINC",
+    "direction": "LONG",
+    "confidence_score": 0.692,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 604.4,
+    "exit_price": 595.12,
+    "stop_loss": 595.12,
+    "target_price": 618.32,
+    "signal_entry_price": 604.4,
+    "outcome": "STOP_HIT",
+    "realized_pnl_pct": -1.5354,
+    "realized_pnl_abs": -1531.2,
+    "holding_duration_mins": 134,
+    "sector": "OTHER",
+    "score": 69.2,
+    "qty": 165,
+    "deployed_capital": 99726.0,
+    "risk_per_share": 9.28,
+    "tca": {
+      "implementation_shortfall_bps": 43.02,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 43.02,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -1.5387,
+      "mfe_pct": 0.4302,
+      "realized_return_ratio": -3.5692,
+      "stop_efficiency_index": 1.0022
+    },
+    "attribution": {
+      "alpha_score": 69.2,
+      "volume_expansion_contrib": 10.0,
+      "vwap_alignment_contrib": 5.18,
+      "momentum_velocity_contrib": 5.54,
+      "sector_relative_strength_contrib": 3.555,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -2.1298,
+        "pnl_delta_vs_actual_pct": -0.5944,
+        "max_drawdown_during_trade_pct": -3.5688
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.0037,
+        "pnl_delta_vs_actual_pct": 1.5317,
+        "max_drawdown_during_trade_pct": -3.5688
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.8934,
+        "pnl_delta_vs_actual_pct": 0.642,
+        "max_drawdown_during_trade_pct": -3.5688
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.3101,
+        "pnl_delta_vs_actual_pct": 1.2253,
+        "max_drawdown_during_trade_pct": -3.5688
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -3.2098,
+        "pnl_delta_vs_actual_pct": -1.6744,
+        "max_drawdown_during_trade_pct": -3.5688
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "STOP_HIT",
+      "FULL_STOP_TRAVERSAL"
+    ],
+    "root_cause": "ADVERSE_TRAJECTORY",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 599.0
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 604.4,
+        "bar_open": 599.0
+      },
+      {
+        "event": "VWAP_RETEST",
+        "ts": "2026-08-11T09:25:00+05:30",
+        "price": 602.5
+      },
+      {
+        "event": "STOP_HIT",
+        "ts": "2026-08-11T11:29:00+05:30",
+        "price": 595.12
+      }
+    ],
+    "factor_breakdown": {
+      "regime": {
+        "score": 55.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "relativeStrength": {
+        "score": 63.2,
+        "weight": 15.0,
+        "rated": true,
+        "rsVsIndexPct": 1.322,
+        "niftyChangePct": -0.42,
+        "gapPct": 0.647,
+        "intradayRet": 0.902
+      },
+      "trend": {
+        "score": 85.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "momentum": {
+        "score": 55.4,
+        "weight": 10.0,
+        "rated": true,
+        "overextended": false
+      },
+      "vwap": {
+        "score": 51.8,
+        "weight": 10.0,
+        "rated": true,
+        "vwapMode": "TREND",
+        "vwapZ": null,
+        "vwapSource": "snapshot",
+        "vwap": 603.33
+      },
+      "volume": {
+        "score": 100.0,
+        "weight": 10.0,
+        "rated": true,
+        "rvolTime": 5.172,
+        "rvolRaw": 1.0,
+        "cumVolFracHeuristic": 0.193
+      },
+      "breakout": {
+        "score": 57.7,
+        "weight": 10.0,
+        "rated": true,
+        "orbHigh": 604.4,
+        "orbLow": 599.0,
+        "orbVelocityPct": 0.0,
+        "orbPosPct": 100.0,
+        "inPlay": true,
+        "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+        "orbDecay": 1.0
+      },
+      "volatility": {
+        "score": 74.2,
+        "weight": 5.0,
+        "rated": true
+      },
+      "sector": {
+        "score": 71.1,
+        "weight": 5.0,
+        "rated": true
+      },
+      "liquidity": {
+        "score": 100.0,
+        "weight": 5.0,
+        "rated": true
+      }
+    }
+  },
+  {
+    "trade_id": "MCX:LONG",
+    "ticker": "MCX",
+    "direction": "LONG",
+    "confidence_score": 0.581,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 2770.3,
+    "exit_price": 2881.9,
+    "stop_loss": 2681.21,
+    "target_price": 2903.94,
+    "signal_entry_price": 2770.3,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": 4.0284,
+    "realized_pnl_abs": 4017.6,
+    "holding_duration_mins": 359,
+    "sector": "OTHER",
+    "score": 58.1,
+    "qty": 36,
+    "deployed_capital": 99730.8,
+    "risk_per_share": 89.09,
+    "tca": {
+      "implementation_shortfall_bps": 11.18,
+      "delay_cost_bps": 0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 11.18,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -0.9999,
+      "mfe_pct": 4.1403,
+      "realized_return_ratio": 0.973,
+      "stop_efficiency_index": 0.3109
+    },
+    "attribution": {
+      "alpha_score": 58.1,
+      "volume_expansion_contrib": 3.49,
+      "vwap_alignment_contrib": 5.2,
+      "momentum_velocity_contrib": 4.82,
+      "sector_relative_strength_contrib": 4.58,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 4.0284,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.4135
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.2864,
+        "pnl_delta_vs_actual_pct": -3.7421,
+        "max_drawdown_during_trade_pct": -1.4135
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.1913,
+        "pnl_delta_vs_actual_pct": -4.2198,
+        "max_drawdown_during_trade_pct": -1.4135
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.0134,
+        "pnl_delta_vs_actual_pct": -4.015,
+        "max_drawdown_during_trade_pct": -1.4135
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 4.0284,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.4135
+      }
+    ],
+    "success_factors": [
+      "POSITIVE_EOD_SQUAREOFF"
+    ],
+    "failure_factors": [],
+    "root_cause": "PARTIAL_FOLLOWTHROUGH",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 2779.5
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 2770.3,
+        "bar_open": 2779.5
+      },
+      {
+        "event": "VWAP_RETEST",
+        "ts": "2026-08-11T09:17:00+05:30",
+        "price": 2778.2333
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:14:00+05:30",
+        "price": 2881.9
+      }
+    ],
+    "factor_breakdown": {
+      "regime": {
+        "score": 55.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "relativeStrength": {
+        "score": 35.9,
+        "weight": 15.0,
+        "rated": true,
+        "rsVsIndexPct": 0.089,
+        "niftyChangePct": -0.42,
+        "gapPct": 0.732,
+        "intradayRet": -0.331
+      },
+      "trend": {
+        "score": 85.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "momentum": {
+        "score": 48.2,
+        "weight": 10.0,
+        "rated": true,
+        "overextended": false
+      },
+      "vwap": {
+        "score": 52.0,
+        "weight": 10.0,
+        "rated": true,
+        "vwapMode": "TREND",
+        "vwapZ": null,
+        "vwapSource": "snapshot",
+        "vwap": 2764.81
+      },
+      "volume": {
+        "score": 34.9,
+        "weight": 10.0,
+        "rated": true,
+        "rvolTime": 1.747,
+        "rvolRaw": 0.34,
+        "cumVolFracHeuristic": 0.193
+      },
+      "breakout": {
+        "score": 38.3,
+        "weight": 10.0,
+        "rated": true,
+        "orbHigh": 2788.9,
+        "orbLow": 2750.0,
+        "orbVelocityPct": 0.0,
+        "orbPosPct": 52.2,
+        "inPlay": false,
+        "inPlayReason": "not in play",
+        "orbDecay": 1.0
+      },
+      "volatility": {
+        "score": 95.2,
+        "weight": 5.0,
+        "rated": true
+      },
+      "sector": {
+        "score": 91.6,
+        "weight": 5.0,
+        "rated": true
+      },
+      "liquidity": {
+        "score": 100.0,
+        "weight": 5.0,
+        "rated": true
+      }
+    }
+  },
+  {
+    "trade_id": "LAURUSLABS:SHORT",
+    "ticker": "LAURUSLABS",
+    "direction": "SHORT",
+    "confidence_score": 0.651,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 1841.1,
+    "exit_price": 1859.0,
+    "stop_loss": 1893.02,
+    "target_price": 1763.22,
+    "signal_entry_price": 1841.1,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": -0.9722,
+    "realized_pnl_abs": -966.6,
+    "holding_duration_mins": 347,
+    "sector": "OTHER",
+    "score": 65.1,
+    "qty": 54,
+    "deployed_capital": 99419.4,
+    "risk_per_share": 51.92,
+    "tca": {
+      "implementation_shortfall_bps": 43.45,
+      "delay_cost_bps": -0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 43.45,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -0.9722,
+      "mfe_pct": 0.4345,
+      "realized_return_ratio": -2.2375,
+      "stop_efficiency_index": 0.3448
+    },
+    "attribution": {
+      "alpha_score": 65.1,
+      "volume_expansion_contrib": 1.21,
+      "vwap_alignment_contrib": 5.0,
+      "momentum_velocity_contrib": 4.34,
+      "sector_relative_strength_contrib": 3.64,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.9722,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.4007
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.0138,
+        "pnl_delta_vs_actual_pct": 0.9584,
+        "max_drawdown_during_trade_pct": -1.4007
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.1304,
+        "pnl_delta_vs_actual_pct": 0.8419,
+        "max_drawdown_during_trade_pct": -1.4007
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.0008,
+        "pnl_delta_vs_actual_pct": 0.9714,
+        "max_drawdown_during_trade_pct": -1.4007
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.9722,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.4007
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "NEGATIVE_OR_FLAT_EOD"
+    ],
+    "root_cause": "STALLED_TRADE",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 1851.0
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:27:00+05:30",
+        "price": 1841.1,
+        "bar_open": 1843.0
+      },
+      {
+        "event": "VWAP_RETEST",
+        "ts": "2026-08-11T09:54:00+05:30",
+        "price": 1845.6021
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:14:00+05:30",
+        "price": 1859.0
+      }
+    ],
+    "factor_breakdown": {
+      "regime": {
+        "score": 100.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "relativeStrength": {
+        "score": 51.1,
+        "weight": 15.0,
+        "rated": true,
+        "rsVsIndexPct": -0.115,
+        "niftyChangePct": -0.42,
+        "gapPct": -0.162,
+        "intradayRet": -0.535
+      },
+      "trend": {
+        "score": 85.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "momentum": {
+        "score": 43.4,
+        "weight": 10.0,
+        "rated": true,
+        "overextended": false
+      },
+      "vwap": {
+        "score": 50.0,
+        "weight": 10.0,
+        "rated": true,
+        "vwapMode": "TREND",
+        "vwapZ": null,
+        "vwapSource": "snapshot",
+        "vwap": 1841.13
+      },
+      "volume": {
+        "score": 12.1,
+        "weight": 10.0,
+        "rated": true,
+        "rvolTime": 0.606,
+        "rvolRaw": 0.12,
+        "cumVolFracHeuristic": 0.193
+      },
+      "breakout": {
+        "score": 64.5,
+        "weight": 10.0,
+        "rated": true,
+        "orbHigh": 1851.1,
+        "orbLow": 1834.1,
+        "orbVelocityPct": 0.0,
+        "orbPosPct": 41.2,
+        "inPlay": false,
+        "inPlayReason": "not in play",
+        "orbDecay": 1.0
+      },
+      "volatility": {
+        "score": 90.2,
+        "weight": 5.0,
+        "rated": true
+      },
+      "sector": {
+        "score": 72.8,
+        "weight": 5.0,
+        "rated": true
+      },
+      "liquidity": {
+        "score": 91.5,
+        "weight": 5.0,
+        "rated": true
+      }
+    }
+  },
+  {
+    "trade_id": "ITC:SHORT",
+    "ticker": "ITC",
+    "direction": "SHORT",
+    "confidence_score": 0.67,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 281.1,
+    "exit_price": 278.7,
+    "stop_loss": 286.83,
+    "target_price": 272.5,
+    "signal_entry_price": 281.1,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": 0.8538,
+    "realized_pnl_abs": 852.0,
+    "holding_duration_mins": 355,
+    "sector": "FMCG",
+    "score": 67.0,
+    "qty": 355,
+    "deployed_capital": 99790.5,
+    "risk_per_share": 5.73,
+    "tca": {
+      "implementation_shortfall_bps": 24.9,
+      "delay_cost_bps": -0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 24.9,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -0.2312,
+      "mfe_pct": 1.1028,
+      "realized_return_ratio": 0.7742,
+      "stop_efficiency_index": 0.1134
+    },
+    "attribution": {
+      "alpha_score": 67.0,
+      "volume_expansion_contrib": 1.15,
+      "vwap_alignment_contrib": 5.05,
+      "momentum_velocity_contrib": 5.58,
+      "sector_relative_strength_contrib": 4.685,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.8538,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -0.426
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.0528,
+        "pnl_delta_vs_actual_pct": -0.9066,
+        "max_drawdown_during_trade_pct": -0.426
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.1779,
+        "pnl_delta_vs_actual_pct": -1.0317,
+        "max_drawdown_during_trade_pct": -0.426
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.0661,
+        "pnl_delta_vs_actual_pct": -0.9199,
+        "max_drawdown_during_trade_pct": -0.426
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.8538,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -0.426
+      }
+    ],
+    "success_factors": [
+      "POSITIVE_EOD_SQUAREOFF"
+    ],
+    "failure_factors": [],
+    "root_cause": "PARTIAL_FOLLOWTHROUGH",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 282.0
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:19:00+05:30",
+        "price": 281.1,
+        "bar_open": 281.55
+      },
+      {
+        "event": "VWAP_RETEST",
+        "ts": "2026-08-11T09:33:00+05:30",
+        "price": 281.6007
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:14:00+05:30",
+        "price": 278.7
+      }
+    ],
+    "factor_breakdown": {
+      "regime": {
+        "score": 100.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "relativeStrength": {
+        "score": 49.0,
+        "weight": 15.0,
+        "rated": true,
+        "rsVsIndexPct": 0.101,
+        "niftyChangePct": -0.42,
+        "gapPct": -0.23,
+        "intradayRet": -0.319
+      },
+      "trend": {
+        "score": 85.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "momentum": {
+        "score": 55.8,
+        "weight": 10.0,
+        "rated": true,
+        "overextended": false
+      },
+      "vwap": {
+        "score": 50.5,
+        "weight": 10.0,
+        "rated": true,
+        "vwapMode": "TREND",
+        "vwapZ": null,
+        "vwapSource": "snapshot",
+        "vwap": 281.24
+      },
+      "volume": {
+        "score": 11.5,
+        "weight": 10.0,
+        "rated": true,
+        "rvolTime": 0.573,
+        "rvolRaw": 0.11,
+        "cumVolFracHeuristic": 0.193
+      },
+      "breakout": {
+        "score": 66.8,
+        "weight": 10.0,
+        "rated": true,
+        "orbHigh": 282.6,
+        "orbLow": 280.9,
+        "orbVelocityPct": 0.0,
+        "orbPosPct": 11.8,
+        "inPlay": false,
+        "inPlayReason": "not in play",
+        "orbDecay": 1.0
+      },
+      "volatility": {
+        "score": 80.5,
+        "weight": 5.0,
+        "rated": true
+      },
+      "sector": {
+        "score": 93.7,
+        "weight": 5.0,
+        "rated": true
+      },
+      "liquidity": {
+        "score": 93.8,
+        "weight": 5.0,
+        "rated": true
+      }
+    }
+  },
+  {
+    "trade_id": "RELIANCE:SHORT",
+    "ticker": "RELIANCE",
+    "direction": "SHORT",
+    "confidence_score": 0.59,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 1317.9,
+    "exit_price": 1320.6,
+    "stop_loss": 1343.52,
+    "target_price": 1279.47,
+    "signal_entry_price": 1317.9,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": -0.2049,
+    "realized_pnl_abs": -202.5,
+    "holding_duration_mins": 357,
+    "sector": "ENERGY",
+    "score": 59.0,
+    "qty": 75,
+    "deployed_capital": 98842.5,
+    "risk_per_share": 25.62,
+    "tca": {
+      "implementation_shortfall_bps": 28.83,
+      "delay_cost_bps": -0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 28.83,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -0.8195,
+      "mfe_pct": 0.2883,
+      "realized_return_ratio": -0.7105,
+      "stop_efficiency_index": 0.4215
+    },
+    "attribution": {
+      "alpha_score": 59.0,
+      "volume_expansion_contrib": 0.62,
+      "vwap_alignment_contrib": 5.06,
+      "momentum_velocity_contrib": 5.23,
+      "sector_relative_strength_contrib": 1.43,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.2049,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -0.9771
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.0597,
+        "pnl_delta_vs_actual_pct": 0.1451,
+        "max_drawdown_during_trade_pct": -0.9771
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.1518,
+        "pnl_delta_vs_actual_pct": 0.0531,
+        "max_drawdown_during_trade_pct": -0.9771
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.0304,
+        "pnl_delta_vs_actual_pct": 0.1744,
+        "max_drawdown_during_trade_pct": -0.9771
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.2049,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -0.9771
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "NEGATIVE_OR_FLAT_EOD"
+    ],
+    "root_cause": "STALLED_TRADE",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 1326.6
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:17:00+05:30",
+        "price": 1317.9,
+        "bar_open": 1319.4
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:14:00+05:30",
+        "price": 1320.6
+      }
+    ],
+    "factor_breakdown": {
+      "regime": {
+        "score": 100.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "relativeStrength": {
+        "score": 52.4,
+        "weight": 15.0,
+        "rated": true,
+        "rsVsIndexPct": -0.236,
+        "niftyChangePct": -0.42,
+        "gapPct": -0.053,
+        "intradayRet": -0.656
+      },
+      "trend": {
+        "score": 55.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "momentum": {
+        "score": 52.3,
+        "weight": 10.0,
+        "rated": true,
+        "overextended": false
+      },
+      "vwap": {
+        "score": 50.6,
+        "weight": 10.0,
+        "rated": true,
+        "vwapMode": "TREND",
+        "vwapZ": null,
+        "vwapSource": "snapshot",
+        "vwap": 1318.73
+      },
+      "volume": {
+        "score": 6.2,
+        "weight": 10.0,
+        "rated": true,
+        "rvolTime": 0.312,
+        "rvolRaw": 0.06,
+        "cumVolFracHeuristic": 0.193
+      },
+      "breakout": {
+        "score": 65.4,
+        "weight": 10.0,
+        "rated": true,
+        "orbHigh": 1327.0,
+        "orbLow": 1314.1,
+        "orbVelocityPct": 0.0,
+        "orbPosPct": 29.5,
+        "inPlay": false,
+        "inPlayReason": "not in play",
+        "orbDecay": 1.0
+      },
+      "volatility": {
+        "score": 79.3,
+        "weight": 5.0,
+        "rated": true
+      },
+      "sector": {
+        "score": 28.6,
+        "weight": 5.0,
+        "rated": true
+      },
+      "liquidity": {
+        "score": 100.0,
+        "weight": 5.0,
+        "rated": true
+      }
+    }
+  },
+  {
+    "trade_id": "IOC:SHORT",
+    "ticker": "IOC",
+    "direction": "SHORT",
+    "confidence_score": 0.626,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 140.0,
+    "exit_price": 140.7,
+    "stop_loss": 143.11,
+    "target_price": 135.34,
+    "signal_entry_price": 140.0,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": -0.5,
+    "realized_pnl_abs": -499.8,
+    "holding_duration_mins": 356,
+    "sector": "ENERGY",
+    "score": 62.6,
+    "qty": 714,
+    "deployed_capital": 99960.0,
+    "risk_per_share": 3.11,
+    "tca": {
+      "implementation_shortfall_bps": 42.86,
+      "delay_cost_bps": -0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 42.86,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -0.9857,
+      "mfe_pct": 0.4286,
+      "realized_return_ratio": -1.1667,
+      "stop_efficiency_index": 0.4437
+    },
+    "attribution": {
+      "alpha_score": 62.6,
+      "volume_expansion_contrib": 1.94,
+      "vwap_alignment_contrib": 5.08,
+      "momentum_velocity_contrib": 5.75,
+      "sector_relative_strength_contrib": 4.655,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.5,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.1027
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.0716,
+        "pnl_delta_vs_actual_pct": 0.4284,
+        "max_drawdown_during_trade_pct": -1.1027
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.1429,
+        "pnl_delta_vs_actual_pct": 0.3571,
+        "max_drawdown_during_trade_pct": -1.1027
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.04,
+        "pnl_delta_vs_actual_pct": 0.46,
+        "max_drawdown_during_trade_pct": -1.1027
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.5,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.1027
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "NEGATIVE_OR_FLAT_EOD"
+    ],
+    "root_cause": "STALLED_TRADE",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 141.5
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:18:00+05:30",
+        "price": 140.0,
+        "bar_open": 140.11
+      },
+      {
+        "event": "VWAP_RETEST",
+        "ts": "2026-08-11T09:58:00+05:30",
+        "price": 140.3194
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:14:00+05:30",
+        "price": 140.7
+      }
+    ],
+    "factor_breakdown": {
+      "regime": {
+        "score": 100.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "relativeStrength": {
+        "score": 56.4,
+        "weight": 15.0,
+        "rated": true,
+        "rsVsIndexPct": -0.64,
+        "niftyChangePct": -0.42,
+        "gapPct": -0.352,
+        "intradayRet": -1.06
+      },
+      "trend": {
+        "score": 55.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "momentum": {
+        "score": 57.5,
+        "weight": 10.0,
+        "rated": true,
+        "overextended": false
+      },
+      "vwap": {
+        "score": 50.8,
+        "weight": 10.0,
+        "rated": true,
+        "vwapMode": "TREND",
+        "vwapZ": null,
+        "vwapSource": "snapshot",
+        "vwap": 140.11
+      },
+      "volume": {
+        "score": 19.4,
+        "weight": 10.0,
+        "rated": true,
+        "rvolTime": 0.968,
+        "rvolRaw": 0.19,
+        "cumVolFracHeuristic": 0.193
+      },
+      "breakout": {
+        "score": 66.3,
+        "weight": 10.0,
+        "rated": true,
+        "orbHigh": 141.6,
+        "orbLow": 139.65,
+        "orbVelocityPct": 0.0,
+        "orbPosPct": 17.9,
+        "inPlay": false,
+        "inPlayReason": "not in play",
+        "orbDecay": 1.0
+      },
+      "volatility": {
+        "score": 82.8,
+        "weight": 5.0,
+        "rated": true
+      },
+      "sector": {
+        "score": 93.1,
+        "weight": 5.0,
+        "rated": true
+      },
+      "liquidity": {
+        "score": 53.4,
+        "weight": 5.0,
+        "rated": true
+      }
+    }
+  },
+  {
+    "trade_id": "BAJFINANCE:SHORT",
+    "ticker": "BAJFINANCE",
+    "direction": "SHORT",
+    "confidence_score": 0.673,
+    "confidence_basis": "FACTOR_SCORE",
+    "entry_price": 1094.0,
+    "exit_price": 1094.0,
+    "stop_loss": 1107.92,
+    "target_price": 1073.12,
+    "signal_entry_price": 1094.0,
+    "outcome": "EOD_SQUAREOFF",
+    "realized_pnl_pct": 0.0,
+    "realized_pnl_abs": -0.0,
+    "holding_duration_mins": 359,
+    "sector": "FINANCE",
+    "score": 67.3,
+    "qty": 91,
+    "deployed_capital": 99554.0,
+    "risk_per_share": 13.92,
+    "tca": {
+      "implementation_shortfall_bps": 70.38,
+      "delay_cost_bps": -0.0,
+      "spread_cost_bps": null,
+      "market_impact_bps": null,
+      "opportunity_cost_bps": 70.38,
+      "basis": "MODELED"
+    },
+    "efficiency": {
+      "mae_pct": -0.6856,
+      "mfe_pct": 0.7038,
+      "realized_return_ratio": -0.0,
+      "stop_efficiency_index": 0.5388
+    },
+    "attribution": {
+      "alpha_score": 67.3,
+      "volume_expansion_contrib": 10.0,
+      "vwap_alignment_contrib": 4.89,
+      "momentum_velocity_contrib": 5.22,
+      "sector_relative_strength_contrib": 1.71,
+      "open_interest_buildup_contrib": null,
+      "news_sentiment_contrib": null,
+      "allocation_effect": null,
+      "selection_effect": null,
+      "interaction_effect": null
+    },
+    "counterfactuals": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.0,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.2718
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.3749,
+        "pnl_delta_vs_actual_pct": 0.3749,
+        "max_drawdown_during_trade_pct": -1.2718
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.3656,
+        "pnl_delta_vs_actual_pct": -0.3656,
+        "max_drawdown_during_trade_pct": -1.2718
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.3258,
+        "pnl_delta_vs_actual_pct": 0.3258,
+        "max_drawdown_during_trade_pct": -1.2718
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.0,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.2718
+      }
+    ],
+    "success_factors": [],
+    "failure_factors": [
+      "NEGATIVE_OR_FLAT_EOD"
+    ],
+    "root_cause": "STALLED_TRADE",
+    "false_positive": false,
+    "timeline_events": [
+      {
+        "event": "SESSION_OPEN",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 1098.0
+      },
+      {
+        "event": "ENTRY_TRIGGER",
+        "ts": "2026-08-11T09:15:00+05:30",
+        "price": 1094.0,
+        "bar_open": 1098.0
+      },
+      {
+        "event": "VWAP_RETEST",
+        "ts": "2026-08-11T09:16:00+05:30",
+        "price": 1092.2
+      },
+      {
+        "event": "EOD_SQUAREOFF",
+        "ts": "2026-08-11T15:14:00+05:30",
+        "price": 1094.0
+      }
+    ],
+    "factor_breakdown": {
+      "regime": {
+        "score": 100.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "relativeStrength": {
+        "score": 49.4,
+        "weight": 15.0,
+        "rated": true,
+        "rsVsIndexPct": 0.056,
+        "niftyChangePct": -0.42,
+        "gapPct": -0.381,
+        "intradayRet": -0.364
+      },
+      "trend": {
+        "score": 45.0,
+        "weight": 15.0,
+        "rated": true
+      },
+      "momentum": {
+        "score": 52.2,
+        "weight": 10.0,
+        "rated": true,
+        "overextended": false
+      },
+      "vwap": {
+        "score": 48.9,
+        "weight": 10.0,
+        "rated": true,
+        "vwapMode": "TREND",
+        "vwapZ": null,
+        "vwapSource": "snapshot",
+        "vwap": 1092.77
+      },
+      "volume": {
+        "score": 100.0,
+        "weight": 10.0,
+        "rated": true,
+        "rvolTime": 5.172,
+        "rvolRaw": 1.0,
+        "cumVolFracHeuristic": 0.193
+      },
+      "breakout": {
+        "score": 77.7,
+        "weight": 10.0,
+        "rated": true,
+        "orbHigh": 1098.0,
+        "orbLow": 1094.0,
+        "orbVelocityPct": 0.0,
+        "orbPosPct": 0.0,
+        "inPlay": true,
+        "inPlayReason": "rvolTime 5.17\u00d7 \u2265 2.0",
+        "orbDecay": 1.0
+      },
+      "volatility": {
+        "score": 70.9,
+        "weight": 5.0,
+        "rated": true
+      },
+      "sector": {
+        "score": 34.2,
+        "weight": 5.0,
+        "rated": true
+      },
+      "liquidity": {
+        "score": 100.0,
+        "weight": 5.0,
+        "rated": true
+      }
+    }
+  }
+]

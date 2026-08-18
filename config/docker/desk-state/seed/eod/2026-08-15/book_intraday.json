@@ -1,0 +1,592 @@
+{
+  "date": "2026-08-15",
+  "capital": 1000000.0,
+  "totalDeployed": 0.0,
+  "totalPnl": 0.0,
+  "remainingCapital": 1000000.0,
+  "hitBreakdown": {
+    "T1_HIT": 0,
+    "T2_HIT": 0,
+    "SL_HIT": 0,
+    "EOD_SQUAREOFF": 0,
+    "TRAIL_SL_HIT": 0,
+    "PARTIAL_SCALE": 0
+  },
+  "hitRatePct": 0.0,
+  "missCount": 0,
+  "hitCount": 0,
+  "missScorecardCoverage": 0,
+  "isMock": false,
+  "symbolSource": "empty",
+  "executionPolicy": "MANUAL_ONLY",
+  "executionBasis": "MODELED_PAPER",
+  "marketPhase": "CLOSED",
+  "deskCounts": {
+    "swing": 0,
+    "intradayLong": 0,
+    "intradayShort": 0,
+    "total": 0
+  },
+  "attribution": {
+    "locked": 0,
+    "triggered": 0,
+    "skipped": 0,
+    "wins": 0,
+    "losses": 0,
+    "deployed": 0.0
+  },
+  "rotationAttribution": {
+    "slotFreedEvents": 200,
+    "freed": [
+      {
+        "at": "2026-08-14T15:00:40.121542+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:00:40.121621+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:01:42.742050+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:01:42.742125+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:02:45.381764+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:02:45.381835+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:03:47.792299+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:03:47.792370+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:04:50.305516+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:04:50.305588+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:05:58.404169+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:05:58.404244+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:07:06.018085+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:07:06.018332+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:08:08.108144+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:08:08.108312+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:09:10.557386+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:09:10.557495+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:10:12.887395+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:10:12.887470+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:11:15.225802+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:11:15.225877+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:12:17.816878+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:12:17.816964+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:13:20.222965+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:13:20.223075+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:14:38.622040+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:14:38.622268+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:15:51.718670+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:15:51.718762+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:17:04.782675+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:17:04.782761+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:18:18.928677+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:18:18.928749+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T15:19:34.302416+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T15:19:34.302583+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T17:47:04.066227+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T17:47:04.066227+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T17:48:21.205215+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T17:48:21.205215+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T17:49:37.286036+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T17:49:37.286036+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T17:50:38.484125+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T17:50:38.484125+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T17:51:40.529216+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T17:51:40.529216+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T17:52:42.205287+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T17:52:42.205287+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-14T17:53:44.520575+00:00",
+        "symbol": "ANANDRATHI",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-14T17:53:44.520575+00:00",
+        "freeSlots": {
+          "long": 3,
+          "short": 3,
+          "total": 5,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      }
+    ],
+    "replacementProposals": [
+      {
+        "at": "2026-08-14T17:53:44.520575+00:00",
+        "candidates": [
+          {
+            "symbol": "BLUESTARCO",
+            "direction": "LONG",
+            "score": 57.2,
+            "sector": "OTHER",
+            "sleeve": "MOMENTUM",
+            "entryState": "QUALIFIED",
+            "excludeReason": null,
+            "flags": [
+              "FNO_OI",
+              "OI_LONG_BUILDUP",
+              "OI_PREFERRED",
+              "OI_ALIGN_BONUS"
+            ],
+            "ltpSource": null,
+            "dayMovePct": -0.832,
+            "qualityAdjustedExpectedR": 1.549,
+            "ltp": 1501.4,
+            "rewardRisk": 1.5,
+            "inPlay": false,
+            "oiSetup": "LONG_BUILDUP",
+            "oiAligned": true,
+            "replaceReason": "FREE_SLOT",
+            "proposalOnly": true
+          },
+          {
+            "symbol": "DIVISLAB",
+            "direction": "SHORT",
+            "score": 66.5,
+            "sector": "PHARMA",
+            "sleeve": "MEAN_REVERSION",
+            "entryState": "QUALIFIED",
+            "excludeReason": null,
+            "flags": [
+              "FNO_OI",
+              "OI_SHORT_BUILDUP",
+              "OI_PREFERRED",
+              "OI_ALIGN_BONUS",
+              "IN_PLAY"
+            ],
+            "ltpSource": null,
+            "dayMovePct": 0.688,
+            "qualityAdjustedExpectedR": 1.462,
+            "ltp": 8558.0,
+            "rewardRisk": 1.5,
+            "inPlay": true,
+            "oiSetup": "SHORT_BUILDUP",
+            "oiAligned": true,
+            "replaceReason": "FREE_SLOT",
+            "proposalOnly": true
+          },
+          {
+            "symbol": "BPCL",
+            "direction": "SHORT",
+            "score": 65.4,
+            "sector": "ENERGY",
+            "sleeve": "MEAN_REVERSION",
+            "entryState": "QUALIFIED",
+            "excludeReason": null,
+            "flags": [
+              "FNO_OI",
+              "OI_SHORT_BUILDUP",
+              "OI_PREFERRED",
+              "OI_ALIGN_BONUS"
+            ],
+            "ltpSource": null,
+            "dayMovePct": 0.81,
+            "qualityAdjustedExpectedR": 1.386,
+            "ltp": 317.4,
+            "rewardRisk": 1.5,
+            "inPlay": false,
+            "oiSetup": "SHORT_BUILDUP",
+            "oiAligned": true,
+            "replaceReason": "FREE_SLOT",
+            "proposalOnly": true
+          }
+        ],
+        "source": "lastReplacementProposals"
+      }
+    ],
+    "proposedSymbolCount": 3,
+    "proposedSymbols": [
+      "BLUESTARCO",
+      "BPCL",
+      "DIVISLAB"
+    ],
+    "cashHeldEvents": [],
+    "cashHeld": false,
+    "closedTrades": [],
+    "closedPnlSum": null,
+    "note": "Proposals are advisory (proposalOnly); P&L is from closed book rows only. No invented replacement fills."
+  },
+  "dayLessons": [],
+  "trades": [],
+  "bookCacheSchemaVersion": 8,
+  "cachedAt": "2026-08-15T18:07:23.669283+00:00"
+}

@@ -1,0 +1,1520 @@
+{
+  "date": "2026-08-10",
+  "capital": 1000000.0,
+  "totalDeployed": 992228.32,
+  "totalPnl": -1847.99,
+  "remainingCapital": 998152.01,
+  "hitBreakdown": {
+    "T1_HIT": 0,
+    "T2_HIT": 0,
+    "SL_HIT": 0,
+    "EOD_SQUAREOFF": 0,
+    "TRAIL_SL_HIT": 0,
+    "PARTIAL_SCALE": 10
+  },
+  "hitRatePct": 0.0,
+  "missCount": 5,
+  "hitCount": 5,
+  "missScorecardCoverage": 0,
+  "isMock": false,
+  "symbolSource": "intraday_session",
+  "deskCounts": {
+    "swing": 12,
+    "intradayLong": 5,
+    "intradayShort": 5,
+    "total": 22
+  },
+  "attribution": {
+    "locked": 10,
+    "triggered": 10,
+    "skipped": 0,
+    "wins": 5,
+    "losses": 5,
+    "deployed": 992228.32
+  },
+  "rotationAttribution": {
+    "slotFreedEvents": 12,
+    "freed": [
+      {
+        "at": "2026-08-10T08:30:47.495784+00:00",
+        "symbol": "ADANIPORTS",
+        "direction": "LONG",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-10T08:30:47.495799+00:00",
+        "symbol": "ANGELONE",
+        "direction": "LONG",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-10T08:30:47.495809+00:00",
+        "symbol": "AUBANK",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-10T08:30:47.495831+00:00",
+        "freeSlots": {
+          "long": 2,
+          "short": 1,
+          "total": 3,
+          "openLong": 3,
+          "openShort": 4,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-10T10:14:21.646074+00:00",
+        "symbol": "HEROMOTOCO",
+        "direction": "LONG",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-10T10:14:21.646086+00:00",
+        "symbol": "ESCORTS",
+        "direction": "LONG",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-10T10:14:21.646095+00:00",
+        "symbol": "CHOLAFIN",
+        "direction": "LONG",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-10T10:14:21.646101+00:00",
+        "symbol": "CGPOWER",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-10T10:14:21.646108+00:00",
+        "symbol": "ASTRAL",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-10T10:14:21.646114+00:00",
+        "symbol": "HDFCAMC",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-10T10:14:21.646120+00:00",
+        "symbol": "GROWW",
+        "direction": "SHORT",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-10T10:14:21.646224+00:00",
+        "freeSlots": {
+          "long": 5,
+          "short": 5,
+          "total": 10,
+          "openLong": 0,
+          "openShort": 0,
+          "lockSize": 5
+        }
+      }
+    ],
+    "replacementProposals": [
+      {
+        "at": "2026-08-10T08:30:48.021631+00:00",
+        "freeSlots": {
+          "long": 2,
+          "short": 1,
+          "total": 3,
+          "openLong": 3,
+          "openShort": 4,
+          "lockSize": 5
+        },
+        "candidates": [
+          {
+            "symbol": "BIOCON",
+            "direction": "LONG",
+            "entryState": "QUALIFIED",
+            "score": 57.4,
+            "oiSetup": "SHORT_BUILDUP",
+            "qualityAdjustedExpectedR": 1.094,
+            "proposalOnly": true
+          },
+          {
+            "symbol": "AMBUJACEM",
+            "direction": "LONG",
+            "entryState": "QUALIFIED",
+            "score": 66.3,
+            "oiSetup": "SHORT_BUILDUP",
+            "qualityAdjustedExpectedR": 1.043,
+            "proposalOnly": true
+          }
+        ]
+      }
+    ],
+    "proposedSymbolCount": 2,
+    "proposedSymbols": [
+      "AMBUJACEM",
+      "BIOCON"
+    ],
+    "cashHeldEvents": [],
+    "cashHeld": false,
+    "closedTrades": [
+      {
+        "symbol": "ADANIPORTS",
+        "direction": "LONG",
+        "exitReason": "PARTIAL_SCALE",
+        "pnl": -999.34,
+        "slotFreed": false
+      },
+      {
+        "symbol": "HEROMOTOCO",
+        "direction": "LONG",
+        "exitReason": "PARTIAL_SCALE",
+        "pnl": 2525.66,
+        "slotFreed": false
+      },
+      {
+        "symbol": "ESCORTS",
+        "direction": "LONG",
+        "exitReason": "PARTIAL_SCALE",
+        "pnl": -1308.8,
+        "slotFreed": false
+      },
+      {
+        "symbol": "ANGELONE",
+        "direction": "LONG",
+        "exitReason": "PARTIAL_SCALE",
+        "pnl": -1589.84,
+        "slotFreed": false
+      },
+      {
+        "symbol": "CHOLAFIN",
+        "direction": "LONG",
+        "exitReason": "PARTIAL_SCALE",
+        "pnl": 1499.64,
+        "slotFreed": false
+      },
+      {
+        "symbol": "CGPOWER",
+        "direction": "SHORT",
+        "exitReason": "PARTIAL_SCALE",
+        "pnl": -2006.8,
+        "slotFreed": false
+      },
+      {
+        "symbol": "ASTRAL",
+        "direction": "SHORT",
+        "exitReason": "PARTIAL_SCALE",
+        "pnl": 179.4,
+        "slotFreed": false
+      },
+      {
+        "symbol": "HDFCAMC",
+        "direction": "SHORT",
+        "exitReason": "PARTIAL_SCALE",
+        "pnl": 1510.26,
+        "slotFreed": false
+      },
+      {
+        "symbol": "AUBANK",
+        "direction": "SHORT",
+        "exitReason": "PARTIAL_SCALE",
+        "pnl": -1880.05,
+        "slotFreed": false
+      },
+      {
+        "symbol": "GROWW",
+        "direction": "SHORT",
+        "exitReason": "PARTIAL_SCALE",
+        "pnl": 221.88,
+        "slotFreed": false
+      }
+    ],
+    "closedPnlSum": -1847.99,
+    "note": "Proposals are advisory (proposalOnly); P&L is from closed book rows only. No invented replacement fills."
+  },
+  "dayLessons": [],
+  "trades": [
+    {
+      "symbol": "ADANIPORTS",
+      "direction": "LONG",
+      "entryPrice": 1709.0,
+      "exitPrice": 1691.77,
+      "stopLoss": 1691.77,
+      "target1": 1734.85,
+      "target2": 1760.69,
+      "exitReason": "PARTIAL_SCALE",
+      "deskExitLabel": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "LOSS",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -1.63R R -1.62 SL -1.00R",
+      "mfeR": -1.625,
+      "effectiveStopR": -1.0,
+      "qty": 58,
+      "deployedCapital": 99122.0,
+      "pnl": -999.34,
+      "pnlPct": -1.01,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": true,
+        "isHit": false,
+        "exitReason": "PARTIAL_SCALE",
+        "rootCause": "STALLED_TRADE",
+        "factors": [
+          "SCALE_LEGS_FILLED",
+          "NEGATIVE_OR_FLAT_SCALE"
+        ],
+        "rMultiple": -1.625,
+        "movePct": -1.01,
+        "gapToT1Pct": 2.52,
+        "gapToT2Pct": 4.03,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 17.23,
+        "maePct": null,
+        "mfePct": null,
+        "stopEff": null,
+        "falsePositive": false,
+        "holdingMins": null,
+        "source": "LEVELS",
+        "exitSource": "SCALE_TRAIL",
+        "mfeR": -1.625
+      },
+      "pickSource": "intraday_session",
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "r_ladder",
+        "mfe_mae",
+        "desk_exit_label",
+        "outcome_bucket"
+      ],
+      "rMultiple": -1.625,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 1709.0,
+        "riskPerShare": 17.23,
+        "initialStop": 1691.77,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.35,
+            "qty": 20,
+            "price": 1717.62,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 17,
+            "price": 1726.23,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 12,
+            "price": 1734.85,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 9,
+        "runnerFrac": 0.15,
+        "trailRatchet": {
+          "0.25": -0.5,
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 1734.85,
+        "target2": 1760.69,
+        "notes": []
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 58,
+            "price": 1691.77,
+            "pnl": -999.34
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1691.77,
+        "realizedPnl": -999.34,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -1.625,
+        "mfeR": -1.6250725478816017,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "remainingQty": 0,
+      "effectiveStop": 1691.77,
+      "realizedPnl": -999.34,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -1.63R R -1.62 rem 0 trail SL 1691.77"
+    },
+    {
+      "symbol": "HEROMOTOCO",
+      "direction": "LONG",
+      "entryPrice": 5428.5,
+      "exitPrice": 5568.81,
+      "stopLoss": 5340.56,
+      "target1": 5560.41,
+      "target2": 5692.32,
+      "exitReason": "PARTIAL_SCALE",
+      "deskExitLabel": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "WIN",
+      "deskProgress": "0.25R+ 0.5R+ 0.75R+ 1R+ 1.25R+ 1.5R+ 2R+ 3R+ 4R+ 5R. MFE +4.91R R +4.91 SL +3.00R",
+      "mfeR": 4.907,
+      "effectiveStopR": 3.0,
+      "qty": 18,
+      "deployedCapital": 97713.0,
+      "pnl": 2525.66,
+      "pnlPct": 2.58,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": false,
+        "isHit": true,
+        "exitReason": "PARTIAL_SCALE",
+        "rootCause": "PARTIAL_FOLLOWTHROUGH",
+        "factors": [
+          "SCALE_LEGS_FILLED",
+          "POSITIVE_SCALE_BOOK"
+        ],
+        "rMultiple": 4.907,
+        "movePct": 2.58,
+        "gapToT1Pct": -0.15,
+        "gapToT2Pct": 2.28,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 87.94,
+        "maePct": null,
+        "mfePct": null,
+        "stopEff": null,
+        "falsePositive": false,
+        "holdingMins": null,
+        "source": "LEVELS",
+        "exitSource": "SCALE_TRAIL",
+        "mfeR": 4.907
+      },
+      "pickSource": "intraday_session",
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "r_ladder",
+        "mfe_mae",
+        "desk_exit_label",
+        "outcome_bucket"
+      ],
+      "rMultiple": 4.907,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 5428.5,
+        "riskPerShare": 87.94,
+        "initialStop": 5340.56,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.35,
+            "qty": 6,
+            "price": 5472.47,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 5,
+            "price": 5516.44,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 4,
+            "price": 5560.41,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 3,
+        "runnerFrac": 0.15,
+        "trailRatchet": {
+          "0.25": -0.5,
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 5560.41,
+        "target2": 5692.32,
+        "notes": []
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 0.5,
+            "qty": 6,
+            "price": 5472.47,
+            "pnl": 263.82
+          },
+          {
+            "r": 1.0,
+            "qty": 5,
+            "price": 5516.44,
+            "pnl": 439.7
+          },
+          {
+            "r": 1.5,
+            "qty": 4,
+            "price": 5560.41,
+            "pnl": 527.64
+          },
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 3,
+            "price": 5860.0,
+            "pnl": 1294.5
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 5692.32,
+        "realizedPnl": 2525.66,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 4.907,
+        "mfeR": 4.9067546054127815,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "remainingQty": 0,
+      "effectiveStop": 5692.32,
+      "realizedPnl": 2525.66,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R+ 0.5R+ 0.75R+ 1R+ 1.25R+ 1.5R+ 2R+ 3R+ 4R+ 5R. MFE +4.91R R +4.91 rem 0 trail SL 5692.32"
+    },
+    {
+      "symbol": "ESCORTS",
+      "direction": "LONG",
+      "entryPrice": 3123.0,
+      "exitPrice": 3082.1,
+      "stopLoss": 3073.16,
+      "target1": 3197.76,
+      "target2": 3272.52,
+      "exitReason": "PARTIAL_SCALE",
+      "deskExitLabel": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "LOSS",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.82R R -0.82 SL -1.00R",
+      "mfeR": -0.821,
+      "effectiveStopR": -1.0,
+      "qty": 32,
+      "deployedCapital": 99936.0,
+      "pnl": -1308.8,
+      "pnlPct": -1.31,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": true,
+        "isHit": false,
+        "exitReason": "PARTIAL_SCALE",
+        "rootCause": "STALLED_TRADE",
+        "factors": [
+          "SCALE_LEGS_FILLED",
+          "NEGATIVE_OR_FLAT_SCALE"
+        ],
+        "rMultiple": -0.821,
+        "movePct": -1.31,
+        "gapToT1Pct": 3.7,
+        "gapToT2Pct": 6.1,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 49.84,
+        "maePct": null,
+        "mfePct": null,
+        "stopEff": null,
+        "falsePositive": false,
+        "holdingMins": null,
+        "source": "LEVELS",
+        "exitSource": "SCALE_TRAIL",
+        "mfeR": -0.821
+      },
+      "pickSource": "intraday_session",
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "r_ladder",
+        "mfe_mae",
+        "desk_exit_label",
+        "outcome_bucket"
+      ],
+      "rMultiple": -0.821,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 3123.0,
+        "riskPerShare": 49.84,
+        "initialStop": 3073.16,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.35,
+            "qty": 11,
+            "price": 3147.92,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 10,
+            "price": 3172.84,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 6,
+            "price": 3197.76,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 5,
+        "runnerFrac": 0.15,
+        "trailRatchet": {
+          "0.25": -0.5,
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 3197.76,
+        "target2": 3272.52,
+        "notes": []
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 32,
+            "price": 3082.1,
+            "pnl": -1308.8
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 3073.16,
+        "realizedPnl": -1308.8,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -0.821,
+        "mfeR": -0.8206260032102747,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "remainingQty": 0,
+      "effectiveStop": 3073.16,
+      "realizedPnl": -1308.8,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.82R R -0.82 rem 0 trail SL 3073.16"
+    },
+    {
+      "symbol": "ANGELONE",
+      "direction": "LONG",
+      "entryPrice": 298.55,
+      "exitPrice": 293.79,
+      "stopLoss": 293.79,
+      "target1": 305.69,
+      "target2": 312.83,
+      "exitReason": "PARTIAL_SCALE",
+      "deskExitLabel": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "LOSS",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.79R R -0.79 SL -1.00R",
+      "mfeR": -0.788,
+      "effectiveStopR": -1.0,
+      "qty": 334,
+      "deployedCapital": 99715.7,
+      "pnl": -1589.84,
+      "pnlPct": -1.59,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": true,
+        "isHit": false,
+        "exitReason": "PARTIAL_SCALE",
+        "rootCause": "STALLED_TRADE",
+        "factors": [
+          "SCALE_LEGS_FILLED",
+          "NEGATIVE_OR_FLAT_SCALE"
+        ],
+        "rMultiple": -0.788,
+        "movePct": -1.59,
+        "gapToT1Pct": 3.99,
+        "gapToT2Pct": 6.38,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 4.76,
+        "maePct": null,
+        "mfePct": null,
+        "stopEff": null,
+        "falsePositive": false,
+        "holdingMins": null,
+        "source": "LEVELS",
+        "exitSource": "SCALE_TRAIL",
+        "mfeR": -0.788
+      },
+      "pickSource": "intraday_session",
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "r_ladder",
+        "mfe_mae",
+        "desk_exit_label",
+        "outcome_bucket"
+      ],
+      "rMultiple": -0.788,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 298.55,
+        "riskPerShare": 4.76,
+        "initialStop": 293.79,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.35,
+            "qty": 117,
+            "price": 300.93,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 100,
+            "price": 303.31,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 67,
+            "price": 305.69,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 50,
+        "runnerFrac": 0.15,
+        "trailRatchet": {
+          "0.25": -0.5,
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 305.69,
+        "target2": 312.83,
+        "notes": []
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 334,
+            "price": 293.79,
+            "pnl": -1589.84
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 293.79,
+        "realizedPnl": -1589.84,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -0.788,
+        "mfeR": -0.7878151260504203,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "remainingQty": 0,
+      "effectiveStop": 293.79,
+      "realizedPnl": -1589.84,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.79R R -0.79 rem 0 trail SL 293.79"
+    },
+    {
+      "symbol": "CHOLAFIN",
+      "direction": "LONG",
+      "entryPrice": 1889.7,
+      "exitPrice": 1918.54,
+      "stopLoss": 1837.54,
+      "target1": 1967.94,
+      "target2": 2046.18,
+      "exitReason": "PARTIAL_SCALE",
+      "deskExitLabel": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "WIN",
+      "deskProgress": "0.25R+ 0.5R+ 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +0.58R R +0.58 SL +0.00R",
+      "mfeR": 0.581,
+      "effectiveStopR": 0.0,
+      "qty": 52,
+      "deployedCapital": 98264.4,
+      "pnl": 1499.64,
+      "pnlPct": 1.53,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": false,
+        "isHit": true,
+        "exitReason": "PARTIAL_SCALE",
+        "rootCause": "PARTIAL_FOLLOWTHROUGH",
+        "factors": [
+          "SCALE_LEGS_FILLED",
+          "POSITIVE_SCALE_BOOK"
+        ],
+        "rMultiple": 0.581,
+        "movePct": 1.53,
+        "gapToT1Pct": 2.61,
+        "gapToT2Pct": 6.75,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 52.16,
+        "maePct": null,
+        "mfePct": null,
+        "stopEff": null,
+        "falsePositive": false,
+        "holdingMins": null,
+        "source": "LEVELS",
+        "exitSource": "SCALE_TRAIL",
+        "mfeR": 0.581
+      },
+      "pickSource": "intraday_session",
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "r_ladder",
+        "mfe_mae",
+        "desk_exit_label",
+        "outcome_bucket"
+      ],
+      "rMultiple": 0.581,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 1889.7,
+        "riskPerShare": 52.16,
+        "initialStop": 1837.54,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.35,
+            "qty": 18,
+            "price": 1915.78,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 16,
+            "price": 1941.86,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 10,
+            "price": 1967.94,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 8,
+        "runnerFrac": 0.15,
+        "trailRatchet": {
+          "0.25": -0.5,
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 1967.94,
+        "target2": 2046.18,
+        "notes": []
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 0.5,
+            "qty": 18,
+            "price": 1915.78,
+            "pnl": 469.44
+          },
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 34,
+            "price": 1920.0,
+            "pnl": 1030.2
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1889.7,
+        "realizedPnl": 1499.64,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.581,
+        "mfeR": 0.5809049079754592,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "remainingQty": 0,
+      "effectiveStop": 1889.7,
+      "realizedPnl": 1499.64,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R+ 0.5R+ 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +0.58R R +0.58 rem 0 trail SL 1889.70"
+    },
+    {
+      "symbol": "CGPOWER",
+      "direction": "SHORT",
+      "entryPrice": 861.7,
+      "exitPrice": 879.0,
+      "stopLoss": 896.13,
+      "target1": 810.06,
+      "target2": 758.41,
+      "exitReason": "PARTIAL_SCALE",
+      "deskExitLabel": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "LOSS",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.50R R -0.50 SL -1.00R",
+      "mfeR": -0.502,
+      "effectiveStopR": -1.0,
+      "qty": 116,
+      "deployedCapital": 99957.2,
+      "pnl": -2006.8,
+      "pnlPct": -2.01,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": true,
+        "isHit": false,
+        "exitReason": "PARTIAL_SCALE",
+        "rootCause": "STALLED_TRADE",
+        "factors": [
+          "SCALE_LEGS_FILLED",
+          "NEGATIVE_OR_FLAT_SCALE"
+        ],
+        "rMultiple": -0.502,
+        "movePct": -2.01,
+        "gapToT1Pct": 8.0,
+        "gapToT2Pct": 13.99,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 34.43,
+        "maePct": null,
+        "mfePct": null,
+        "stopEff": null,
+        "falsePositive": false,
+        "holdingMins": null,
+        "source": "LEVELS",
+        "exitSource": "SCALE_TRAIL",
+        "mfeR": -0.502
+      },
+      "pickSource": "intraday_session",
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "r_ladder",
+        "mfe_mae",
+        "desk_exit_label",
+        "outcome_bucket"
+      ],
+      "rMultiple": -0.502,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 861.7,
+        "riskPerShare": 34.43,
+        "initialStop": 896.13,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.35,
+            "qty": 41,
+            "price": 844.49,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 35,
+            "price": 827.27,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 23,
+            "price": 810.06,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 17,
+        "runnerFrac": 0.15,
+        "trailRatchet": {
+          "0.25": -0.5,
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 810.06,
+        "target2": 758.41,
+        "notes": []
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 116,
+            "price": 879.0,
+            "pnl": -2006.8
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 896.13,
+        "realizedPnl": -2006.8,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -0.502,
+        "mfeR": -0.5024687772291593,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "remainingQty": 0,
+      "effectiveStop": 896.13,
+      "realizedPnl": -2006.8,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.50R R -0.50 rem 0 trail SL 896.13"
+    },
+    {
+      "symbol": "ASTRAL",
+      "direction": "SHORT",
+      "entryPrice": 1439.6,
+      "exitPrice": 1437.0,
+      "stopLoss": 1487.97,
+      "target1": 1367.04,
+      "target2": 1294.49,
+      "exitReason": "PARTIAL_SCALE",
+      "deskExitLabel": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "WIN",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +0.05R R +0.05 SL -1.00R",
+      "mfeR": 0.054,
+      "effectiveStopR": -1.0,
+      "qty": 69,
+      "deployedCapital": 99332.4,
+      "pnl": 179.4,
+      "pnlPct": 0.18,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": false,
+        "isHit": true,
+        "exitReason": "PARTIAL_SCALE",
+        "rootCause": "PARTIAL_FOLLOWTHROUGH",
+        "factors": [
+          "SCALE_LEGS_FILLED",
+          "POSITIVE_SCALE_BOOK"
+        ],
+        "rMultiple": 0.054,
+        "movePct": 0.18,
+        "gapToT1Pct": 4.86,
+        "gapToT2Pct": 9.9,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 48.37,
+        "maePct": null,
+        "mfePct": null,
+        "stopEff": null,
+        "falsePositive": false,
+        "holdingMins": null,
+        "source": "LEVELS",
+        "exitSource": "SCALE_TRAIL",
+        "mfeR": 0.054
+      },
+      "pickSource": "intraday_session",
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "r_ladder",
+        "mfe_mae",
+        "desk_exit_label",
+        "outcome_bucket"
+      ],
+      "rMultiple": 0.054,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 1439.6,
+        "riskPerShare": 48.37,
+        "initialStop": 1487.97,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.35,
+            "qty": 24,
+            "price": 1415.41,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 21,
+            "price": 1391.23,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 14,
+            "price": 1367.04,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 10,
+        "runnerFrac": 0.15,
+        "trailRatchet": {
+          "0.25": -0.5,
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 1367.04,
+        "target2": 1294.49,
+        "notes": []
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 69,
+            "price": 1437.0,
+            "pnl": 179.4
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1487.97,
+        "realizedPnl": 179.4,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.054,
+        "mfeR": 0.05375232582178849,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "remainingQty": 0,
+      "effectiveStop": 1487.97,
+      "realizedPnl": 179.4,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +0.05R R +0.05 rem 0 trail SL 1487.97"
+    },
+    {
+      "symbol": "HDFCAMC",
+      "direction": "SHORT",
+      "entryPrice": 2606.1,
+      "exitPrice": 2566.36,
+      "stopLoss": 2661.14,
+      "target1": 2523.54,
+      "target2": 2440.98,
+      "exitReason": "PARTIAL_SCALE",
+      "deskExitLabel": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "WIN",
+      "deskProgress": "0.25R+ 0.5R+ 0.75R+ 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +0.84R R +0.84 SL +0.25R",
+      "mfeR": 0.838,
+      "effectiveStopR": 0.25,
+      "qty": 38,
+      "deployedCapital": 99031.8,
+      "pnl": 1510.26,
+      "pnlPct": 1.53,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": false,
+        "isHit": true,
+        "exitReason": "PARTIAL_SCALE",
+        "rootCause": "PARTIAL_FOLLOWTHROUGH",
+        "factors": [
+          "SCALE_LEGS_FILLED",
+          "POSITIVE_SCALE_BOOK"
+        ],
+        "rMultiple": 0.838,
+        "movePct": 1.52,
+        "gapToT1Pct": 1.64,
+        "gapToT2Pct": 4.81,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 55.04,
+        "maePct": null,
+        "mfePct": null,
+        "stopEff": null,
+        "falsePositive": false,
+        "holdingMins": null,
+        "source": "LEVELS",
+        "exitSource": "SCALE_TRAIL",
+        "mfeR": 0.838
+      },
+      "pickSource": "intraday_session",
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "r_ladder",
+        "mfe_mae",
+        "desk_exit_label",
+        "outcome_bucket"
+      ],
+      "rMultiple": 0.838,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 2606.1,
+        "riskPerShare": 55.04,
+        "initialStop": 2661.14,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.35,
+            "qty": 13,
+            "price": 2578.58,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 11,
+            "price": 2551.06,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 8,
+            "price": 2523.54,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 6,
+        "runnerFrac": 0.15,
+        "trailRatchet": {
+          "0.25": -0.5,
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 2523.54,
+        "target2": 2440.98,
+        "notes": []
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 0.5,
+            "qty": 13,
+            "price": 2578.58,
+            "pnl": 357.76
+          },
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 25,
+            "price": 2560.0,
+            "pnl": 1152.5
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 2592.34,
+        "realizedPnl": 1510.26,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.838,
+        "mfeR": 0.8375726744186031,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "remainingQty": 0,
+      "effectiveStop": 2592.34,
+      "realizedPnl": 1510.26,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R+ 0.5R+ 0.75R+ 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +0.84R R +0.84 rem 0 trail SL 2592.34"
+    },
+    {
+      "symbol": "AUBANK",
+      "direction": "SHORT",
+      "entryPrice": 1043.9,
+      "exitPrice": 1063.69,
+      "stopLoss": 1063.69,
+      "target1": 1014.22,
+      "target2": 984.53,
+      "exitReason": "PARTIAL_SCALE",
+      "deskExitLabel": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "LOSS",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -1.22R R -1.22 SL -1.00R",
+      "mfeR": -1.218,
+      "effectiveStopR": -1.0,
+      "qty": 95,
+      "deployedCapital": 99170.5,
+      "pnl": -1880.05,
+      "pnlPct": -1.9,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": true,
+        "isHit": false,
+        "exitReason": "PARTIAL_SCALE",
+        "rootCause": "STALLED_TRADE",
+        "factors": [
+          "SCALE_LEGS_FILLED",
+          "NEGATIVE_OR_FLAT_SCALE"
+        ],
+        "rMultiple": -1.218,
+        "movePct": -1.9,
+        "gapToT1Pct": 4.74,
+        "gapToT2Pct": 7.58,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 19.79,
+        "maePct": null,
+        "mfePct": null,
+        "stopEff": null,
+        "falsePositive": false,
+        "holdingMins": null,
+        "source": "LEVELS",
+        "exitSource": "SCALE_TRAIL",
+        "mfeR": -1.218
+      },
+      "pickSource": "intraday_session",
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "r_ladder",
+        "mfe_mae",
+        "desk_exit_label",
+        "outcome_bucket"
+      ],
+      "rMultiple": -1.218,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 1043.9,
+        "riskPerShare": 19.79,
+        "initialStop": 1063.69,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.35,
+            "qty": 33,
+            "price": 1034.01,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 29,
+            "price": 1024.11,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 19,
+            "price": 1014.22,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 14,
+        "runnerFrac": 0.15,
+        "trailRatchet": {
+          "0.25": -0.5,
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 1014.22,
+        "target2": 984.53,
+        "notes": []
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 95,
+            "price": 1063.69,
+            "pnl": -1880.05
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1063.69,
+        "realizedPnl": -1880.05,
+        "unrealizedPnl": 0.0,
+        "rMultiple": -1.218,
+        "mfeR": -1.2177867609903947,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "remainingQty": 0,
+      "effectiveStop": 1063.69,
+      "realizedPnl": -1880.05,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -1.22R R -1.22 rem 0 trail SL 1063.69"
+    },
+    {
+      "symbol": "GROWW",
+      "direction": "SHORT",
+      "entryPrice": 193.77,
+      "exitPrice": 193.34,
+      "stopLoss": 197.19,
+      "target1": 188.64,
+      "target2": 183.51,
+      "exitReason": "PARTIAL_SCALE",
+      "deskExitLabel": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "WIN",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +0.13R R +0.13 SL -1.00R",
+      "mfeR": 0.126,
+      "effectiveStopR": -1.0,
+      "qty": 516,
+      "deployedCapital": 99985.32,
+      "pnl": 221.88,
+      "pnlPct": 0.22,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": false,
+        "isHit": true,
+        "exitReason": "PARTIAL_SCALE",
+        "rootCause": "PARTIAL_FOLLOWTHROUGH",
+        "factors": [
+          "SCALE_LEGS_FILLED",
+          "POSITIVE_SCALE_BOOK"
+        ],
+        "rMultiple": 0.126,
+        "movePct": 0.22,
+        "gapToT1Pct": 2.43,
+        "gapToT2Pct": 5.07,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 3.42,
+        "maePct": null,
+        "mfePct": null,
+        "stopEff": null,
+        "falsePositive": false,
+        "holdingMins": null,
+        "source": "LEVELS",
+        "exitSource": "SCALE_TRAIL",
+        "mfeR": 0.126
+      },
+      "pickSource": "intraday_session",
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "r_ladder",
+        "mfe_mae",
+        "desk_exit_label",
+        "outcome_bucket"
+      ],
+      "rMultiple": 0.126,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 193.77,
+        "riskPerShare": 3.42,
+        "initialStop": 197.19,
+        "legs": [
+          {
+            "r": 0.5,
+            "qtyPct": 0.35,
+            "qty": 181,
+            "price": 192.06,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 155,
+            "price": 190.35,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 103,
+            "price": 188.64,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 77,
+        "runnerFrac": 0.15,
+        "trailRatchet": {
+          "0.25": -0.5,
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.5,
+          "2.0": 1.0,
+          "3.0": 1.5,
+          "4.0": 2.5
+        },
+        "target1": 188.64,
+        "target2": 183.51,
+        "notes": []
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 516,
+            "price": 193.34,
+            "pnl": 221.88
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 197.19,
+        "realizedPnl": 221.88,
+        "unrealizedPnl": 0.0,
+        "rMultiple": 0.126,
+        "mfeR": 0.12573099415204878,
+        "closed": true,
+        "mode": "SCALE_TRAIL"
+      },
+      "remainingQty": 0,
+      "effectiveStop": 197.19,
+      "realizedPnl": 221.88,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +0.13R R +0.13 rem 0 trail SL 197.19"
+    }
+  ],
+  "cachedAt": "2026-08-10T18:13:29.726661+00:00"
+}

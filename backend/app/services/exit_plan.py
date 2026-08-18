@@ -79,6 +79,41 @@ def cap_stop_risk(entry: float, risk: float) -> float:
     return min(float(risk), round(float(entry) * MAX_STOP_PCT, 6))
 
 
+def apply_max_stop_cap(row: dict[str, Any]) -> dict[str, Any]:
+    """Put the 0.5% initial-stop cap on the row. Never widens a valid tighter stop."""
+    out = dict(row)
+    entry = _fnum(out.get("entryPrice"))
+    if entry is None or entry <= 0:
+        return out
+    direction = str(out.get("direction") or "LONG").upper()
+    raw_stop = _fnum(out.get("stopLoss"))
+    plan = out.get("exitPlan") if isinstance(out.get("exitPlan"), dict) else {}
+    state = out.get("exitState") if isinstance(out.get("exitState"), dict) else {}
+    if raw_stop is None:
+        raw_stop = _fnum(plan.get("initialStop") or state.get("initialStop"))
+    raw_risk = _fnum(out.get("riskPerShare") or plan.get("riskPerShare"))
+    if raw_risk is None and raw_stop is not None:
+        raw_risk = abs(entry - raw_stop)
+    wrong_side = raw_stop is not None and not _valid_stop(entry, raw_stop, direction)
+    if raw_risk is None or raw_risk <= 0 or wrong_side:
+        raw_risk = entry * MAX_STOP_PCT
+    risk = cap_stop_risk(entry, raw_risk)
+    stop = _initial_stop(entry, risk, direction)
+    out["riskPerShare"] = risk
+    out["stopLoss"] = stop
+    if plan:
+        next_plan = dict(plan)
+        next_plan["initialStop"] = stop
+        next_plan["riskPerShare"] = risk
+        notes = [str(n) for n in (next_plan.get("notes") or [])]
+        if "max_stop_0p5pct" not in notes:
+            notes.append("max_stop_0p5pct")
+        next_plan["notes"] = notes
+        next_plan["policyVersion"] = EXIT_POLICY_VERSION
+        out["exitPlan"] = next_plan
+    return out
+
+
 def _tighter_stop(direction: str, current: float, candidate: float) -> float:
     return min(current, candidate) if str(direction).upper() == "SHORT" else max(current, candidate)
 
@@ -315,20 +350,23 @@ def overwrite_row_with_current_policy(
     after_close: bool = False,
     force: bool = False,
 ) -> dict[str, Any]:
-    """Replace booked 0.25R path prices with current 0.5R / 0.5% trail math."""
-    if not force and not _needs_path_overwrite(row):
-        return row
+    """Replay SCALE_TRAIL with the 0.5% initial-stop cap and current trail math."""
     qty = int(row.get("approxQty") or row.get("qty") or 0)
     if not row.get("entryPrice") or qty <= 0:
         return row
-    mark, high, low = _row_path_marks(row, quotes)
+    capped = apply_max_stop_cap(row)
+    stop_changed = _fnum(capped.get("stopLoss")) != _fnum(row.get("stopLoss"))
+    open_row = not bool(row.get("closed"))
+    if not force and not stop_changed and not open_row and not _needs_path_overwrite(row):
+        return row
+    mark, high, low = _row_path_marks(capped, quotes)
     if mark is None:
         return row
-    work = {k: v for k, v in row.items() if k != "exitState"}
+    work = {k: v for k, v in capped.items() if k != "exitState"}
+    if force or stop_changed:
+        work.pop("exitPlan", None)
+        work.pop("bookedExitPlan", None)
     work["approxQty"] = qty
-    initial_stop = _row_initial_stop(row)
-    if initial_stop is not None:
-        work["stopLoss"] = initial_stop
     work = refresh_exit_policy(work, keep_exit_state=False)
     ev = evaluate_scale_trail_path(work, mark, high, low, after_close=after_close)
     if not ev:
@@ -363,6 +401,15 @@ def overwrite_row_with_current_policy(
     }
     if state.get("policyVersion") is None and isinstance(out.get("exitState"), dict):
         out["exitState"] = {**state, "policyVersion": EXIT_POLICY_VERSION}
+    if (
+        not force
+        and bool(out.get("closed")) == bool(row.get("closed"))
+        and out.get("remainingQty") == row.get("remainingQty")
+        and _fnum(out.get("realizedPnl")) == _fnum(row.get("realizedPnl"))
+        and _fnum(out.get("stopLoss")) == _fnum(row.get("stopLoss"))
+        and str(out.get("status") or "") == str(row.get("status") or "")
+    ):
+        return row
     return out
 
 

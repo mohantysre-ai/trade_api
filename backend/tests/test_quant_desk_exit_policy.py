@@ -406,3 +406,40 @@ def test_live_scale_rejects_one_poll_crash_tick():
     live = _evaluate_live_scale_trail(pick, 487.9, after_close=False)
     assert live.get("closed") is not True
     assert live.get("exitState", {}).get("legsFilled") == []
+
+
+def test_half_pct_stop_gap_print_is_a_real_hit():
+    from app.services.exit_plan import apply_max_stop_cap, overwrite_row_with_current_policy
+    from app.services.trade_outcome import _evaluate_live_scale_trail, _plausible_live_mark
+
+    assert _plausible_live_mark(
+        entry=1253.8, risk=6.27, last_mark=1253.8, new_mark=1202.0, direction="LONG"
+    ) is True
+    pick = attach_exit_plan({
+        "symbol": "GODREJIND",
+        "direction": "LONG",
+        "entryPrice": 1253.8,
+        "stopLoss": 1247.53,
+        "riskPerShare": 6.27,
+        "approxQty": 159,
+        "ltp": 1253.8,
+    })
+    live = _evaluate_live_scale_trail(pick, 1202.0, after_close=False)
+    assert live.get("closed") is True
+    assert live.get("hitLevel") == "sl"
+
+    wide = apply_max_stop_cap({
+        "symbol": "GODREJIND",
+        "direction": "LONG",
+        "entryPrice": 1253.8,
+        "stopLoss": 1276.68,
+        "approxQty": 159,
+        "ltp": 1253.8,
+    })
+    assert wide["stopLoss"] == 1247.53
+    replayed = overwrite_row_with_current_policy(
+        wide,
+        quotes={"GODREJIND": {"high": 1263.4, "low": 1199.0}},
+        force=True,
+    )
+    assert replayed.get("closed") is True

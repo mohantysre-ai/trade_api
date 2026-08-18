@@ -5,7 +5,7 @@
 # This PC (after code changes):  rebuild-docker.bat   then  push-docker-hub.bat
 # Other PCs (pull only):         start-from-hub.bat
 #   requires backend/.env and config/cloudflare/credentials.json (never in the image)
-#   desk JSON is seeded from iros-desk-state (last push) into ./ before up
+#   desk JSON is seeded from iros-desk-state (last push) into the named volume iros-desk-state
 #
 # Usage:
 #   1. Ensure backend/.env exists (Angel + LLM secrets)

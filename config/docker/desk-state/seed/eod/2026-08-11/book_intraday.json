@@ -1,0 +1,2320 @@
+{
+  "date": "2026-08-11",
+  "capital": 1000000.0,
+  "totalDeployed": 1182511.23,
+  "totalPnl": 1020.27,
+  "remainingCapital": 1001020.27,
+  "hitBreakdown": {
+    "T1_HIT": 0,
+    "T2_HIT": 0,
+    "SL_HIT": 0,
+    "EOD_SQUAREOFF": 9,
+    "TRAIL_SL_HIT": 0,
+    "PARTIAL_SCALE": 3
+  },
+  "hitRatePct": 33.3,
+  "missCount": 7,
+  "hitCount": 4,
+  "missScorecardCoverage": 12,
+  "isMock": false,
+  "symbolSource": "intraday_session",
+  "deskCounts": {
+    "swing": 10,
+    "intradayLong": 7,
+    "intradayShort": 5,
+    "total": 22
+  },
+  "attribution": {
+    "locked": 12,
+    "triggered": 12,
+    "skipped": 0,
+    "wins": 4,
+    "losses": 7,
+    "deployed": 1182511.23
+  },
+  "rotationAttribution": {
+    "slotFreedEvents": 6,
+    "freed": [
+      {
+        "at": "2026-08-11T06:21:14.499116+00:00",
+        "symbol": "PAYTM",
+        "direction": "LONG",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-11T06:21:14.499173+00:00",
+        "freeSlots": {
+          "long": 1,
+          "short": 0,
+          "total": 1,
+          "openLong": 4,
+          "openShort": 5,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-11T06:39:50.004935+00:00",
+        "symbol": "HINDZINC",
+        "direction": "LONG",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-11T06:39:50.004980+00:00",
+        "freeSlots": {
+          "long": 1,
+          "short": 0,
+          "total": 1,
+          "openLong": 4,
+          "openShort": 5,
+          "lockSize": 5
+        }
+      },
+      {
+        "at": "2026-08-11T06:49:26.806197+00:00",
+        "symbol": "COFORGE",
+        "direction": "LONG",
+        "status": "POSITION_CLOSED",
+        "realizedPnl": null
+      },
+      {
+        "at": "2026-08-11T06:49:26.806278+00:00",
+        "freeSlots": {
+          "long": 1,
+          "short": 0,
+          "total": 1,
+          "openLong": 4,
+          "openShort": 5,
+          "lockSize": 5
+        }
+      }
+    ],
+    "replacementProposals": [
+      {
+        "at": "2026-08-11T06:21:15.534364+00:00",
+        "freeSlots": {
+          "long": 0,
+          "short": 0,
+          "total": 0,
+          "openLong": 5,
+          "openShort": 5,
+          "lockSize": 5
+        },
+        "candidates": [
+          {
+            "symbol": "HINDZINC",
+            "direction": "LONG",
+            "entryState": "QUALIFIED",
+            "score": 69.2,
+            "oiSetup": "LONG_BUILDUP",
+            "qualityAdjustedExpectedR": 1.556,
+            "proposalOnly": true
+          }
+        ]
+      },
+      {
+        "at": "2026-08-11T06:39:54.261346+00:00",
+        "freeSlots": {
+          "long": 0,
+          "short": 0,
+          "total": 0,
+          "openLong": 5,
+          "openShort": 5,
+          "lockSize": 5
+        },
+        "candidates": [
+          {
+            "symbol": "MCX",
+            "direction": "LONG",
+            "entryState": "QUALIFIED",
+            "score": 58.1,
+            "oiSetup": null,
+            "qualityAdjustedExpectedR": 1.48,
+            "proposalOnly": true
+          }
+        ]
+      }
+    ],
+    "proposedSymbolCount": 2,
+    "proposedSymbols": [
+      "HINDZINC",
+      "MCX"
+    ],
+    "cashHeldEvents": [
+      {
+        "at": "2026-08-11T06:49:28.769060+00:00",
+        "reason": "prefer_cash_no_qualified",
+        "freeSlots": {
+          "long": 1,
+          "short": 0,
+          "total": 1,
+          "openLong": 4,
+          "openShort": 5,
+          "lockSize": 5
+        }
+      }
+    ],
+    "cashHeld": true,
+    "closedTrades": [
+      {
+        "symbol": "TECHM",
+        "direction": "LONG",
+        "exitReason": "EOD_SQUAREOFF",
+        "pnl": -474.0,
+        "slotFreed": false
+      },
+      {
+        "symbol": "COFORGE",
+        "direction": "LONG",
+        "exitReason": "PARTIAL_SCALE",
+        "pnl": -1041.66,
+        "slotFreed": false
+      },
+      {
+        "symbol": "PAYTM",
+        "direction": "LONG",
+        "exitReason": "PARTIAL_SCALE",
+        "pnl": 1851.77,
+        "slotFreed": false
+      },
+      {
+        "symbol": "ONGC",
+        "direction": "LONG",
+        "exitReason": "EOD_SQUAREOFF",
+        "pnl": -1170.08,
+        "slotFreed": false
+      },
+      {
+        "symbol": "HINDCOPPER",
+        "direction": "LONG",
+        "exitReason": "EOD_SQUAREOFF",
+        "pnl": -158.65,
+        "slotFreed": false
+      },
+      {
+        "symbol": "HINDZINC",
+        "direction": "LONG",
+        "exitReason": "PARTIAL_SCALE",
+        "pnl": -1531.2,
+        "slotFreed": false
+      },
+      {
+        "symbol": "MCX",
+        "direction": "LONG",
+        "exitReason": "EOD_SQUAREOFF",
+        "pnl": 4097.49,
+        "slotFreed": false
+      },
+      {
+        "symbol": "LAURUSLABS",
+        "direction": "SHORT",
+        "exitReason": "EOD_SQUAREOFF",
+        "pnl": -912.6,
+        "slotFreed": false
+      },
+      {
+        "symbol": "ITC",
+        "direction": "SHORT",
+        "exitReason": "EOD_SQUAREOFF",
+        "pnl": 745.5,
+        "slotFreed": false
+      },
+      {
+        "symbol": "RELIANCE",
+        "direction": "SHORT",
+        "exitReason": "EOD_SQUAREOFF",
+        "pnl": -450.0,
+        "slotFreed": false
+      },
+      {
+        "symbol": "IOC",
+        "direction": "SHORT",
+        "exitReason": "EOD_SQUAREOFF",
+        "pnl": 0.0,
+        "slotFreed": false
+      },
+      {
+        "symbol": "BAJFINANCE",
+        "direction": "SHORT",
+        "exitReason": "EOD_SQUAREOFF",
+        "pnl": 63.7,
+        "slotFreed": false
+      }
+    ],
+    "closedPnlSum": 1020.27,
+    "note": "Proposals are advisory (proposalOnly); P&L is from closed book rows only. No invented replacement fills."
+  },
+  "dayLessons": [],
+  "trades": [
+    {
+      "symbol": "TECHM",
+      "direction": "LONG",
+      "entryPrice": 1650.9,
+      "exitPrice": 1643.0,
+      "stopLoss": 1630.69,
+      "target1": 1681.22,
+      "target2": 1711.53,
+      "exitReason": "EOD_SQUAREOFF",
+      "deskExitLabel": "EOD_SQUAREOFF",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "LOSS",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.39R R -0.39 SL -1.00R",
+      "mfeR": -0.391,
+      "maeR": -0.539,
+      "economicR": -0.391,
+      "pathR": -0.391,
+      "effectiveStopR": -1.0,
+      "qty": 60,
+      "deployedCapital": 99054.0,
+      "pnl": -474.0,
+      "pnlPct": -0.48,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": true,
+        "isHit": false,
+        "exitReason": "EOD_SQUAREOFF",
+        "rootCause": "ENTRY_FAILURE",
+        "factors": [
+          "NO_FAVOURABLE_EXCURSION",
+          "ADVERSE_FROM_ENTRY"
+        ],
+        "pathR": -0.391,
+        "rMultiple": -0.391,
+        "movePct": -0.48,
+        "gapToT1Pct": 2.32,
+        "gapToT2Pct": 4.15,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 20.21,
+        "maePct": -0.66,
+        "mfePct": 0.57,
+        "mfeR": -0.391,
+        "stopEff": 0.539,
+        "falsePositive": false,
+        "holdingMins": 358,
+        "source": "SCORECARD",
+        "exitSource": "SCALE_TRAIL",
+        "economicR": -0.391,
+        "maeR": -0.539
+      },
+      "pickSource": "intraday_session",
+      "lineage": {
+        "source": "intraday_session",
+        "filterStage": null,
+        "score": 58.4,
+        "scoreComponents": null,
+        "lockRank": null,
+        "selectionReason": null,
+        "verdict": null,
+        "sector": "IT",
+        "levelsSource": null,
+        "triggeredAt": null,
+        "executedFills": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 60,
+            "price": 1643.0,
+            "pnl": -474.0
+          }
+        ],
+        "exitPathTag": null
+      },
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "economic_r",
+        "path_r",
+        "mfe_mae",
+        "taxonomy",
+        "desk_label",
+        "outcome_bucket"
+      ],
+      "outcomeSchemaVersion": 1,
+      "rMultiple": -0.391,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 1650.9,
+        "riskPerShare": 20.21,
+        "initialStop": 1630.69,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 18,
+            "price": 1671.11,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 15,
+            "price": 1681.22,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 9,
+            "price": 1691.32,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 18,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 1681.22,
+        "target2": 1711.53,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 60,
+            "price": 1643.0,
+            "pnl": -474.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1630.69,
+        "realizedPnl": -474.0,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -474.0,
+        "rMultiple": -0.391,
+        "economicR": -0.391,
+        "pathR": -0.391,
+        "mfeR": -0.391,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1630.69,
+        "totalQty": 60,
+        "riskPerShare": 20.21
+      },
+      "remainingQty": 0,
+      "effectiveStop": 1630.69,
+      "realizedPnl": -474.0,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.39R R -0.39 rem 0 trail SL 1630.69",
+      "narrativeFingerprint": "25f356f92238250d"
+    },
+    {
+      "symbol": "COFORGE",
+      "direction": "LONG",
+      "entryPrice": 1826.5,
+      "exitPrice": 1807.21,
+      "stopLoss": 1807.21,
+      "target1": 1855.43,
+      "target2": 1884.37,
+      "exitReason": "PARTIAL_SCALE",
+      "deskExitLabel": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "LOSS",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.39R R -1.00 SL -1.00R",
+      "mfeR": -0.389,
+      "maeR": -1.0,
+      "economicR": -1.0,
+      "pathR": -1.0,
+      "effectiveStopR": -1.0,
+      "qty": 54,
+      "deployedCapital": 98631.0,
+      "pnl": -1041.66,
+      "pnlPct": -1.06,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": false,
+        "isHit": false,
+        "exitReason": "PARTIAL_SCALE",
+        "rootCause": "ENTRY_FAILURE",
+        "factors": [
+          "NO_FAVOURABLE_EXCURSION",
+          "ADVERSE_FROM_ENTRY"
+        ],
+        "pathR": -1.0,
+        "rMultiple": -1.0,
+        "movePct": -1.06,
+        "gapToT1Pct": 2.64,
+        "gapToT2Pct": 4.22,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 19.29,
+        "maePct": -0.91,
+        "mfePct": 0.52,
+        "mfeR": -0.389,
+        "stopEff": 0.866,
+        "falsePositive": false,
+        "holdingMins": 359,
+        "source": "SCORECARD",
+        "exitSource": "SCALE_TRAIL",
+        "economicR": -1.0,
+        "maeR": -1.0
+      },
+      "pickSource": "intraday_session",
+      "lineage": {
+        "source": "intraday_session",
+        "filterStage": null,
+        "score": 58.2,
+        "scoreComponents": null,
+        "lockRank": null,
+        "selectionReason": null,
+        "verdict": null,
+        "sector": "IT",
+        "levelsSource": null,
+        "triggeredAt": null,
+        "executedFills": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 54,
+            "price": 1807.21,
+            "pnl": -1041.66
+          }
+        ],
+        "exitPathTag": null
+      },
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "economic_r",
+        "path_r",
+        "mfe_mae",
+        "taxonomy",
+        "desk_label",
+        "outcome_bucket"
+      ],
+      "outcomeSchemaVersion": 1,
+      "rMultiple": -1.0,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 1826.5,
+        "riskPerShare": 19.29,
+        "initialStop": 1807.21,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 16,
+            "price": 1845.79,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 14,
+            "price": 1855.43,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 8,
+            "price": 1865.08,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 16,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 1855.43,
+        "target2": 1884.37,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 54,
+            "price": 1807.21,
+            "pnl": -1041.66
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1807.21,
+        "realizedPnl": -1041.66,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -1041.66,
+        "rMultiple": -1.0,
+        "economicR": -1.0,
+        "pathR": -0.389,
+        "mfeR": -0.389,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1807.21,
+        "totalQty": 54,
+        "riskPerShare": 19.29
+      },
+      "remainingQty": 0,
+      "effectiveStop": 1807.21,
+      "realizedPnl": -1041.66,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.39R R -1.00 rem 0 trail SL 1807.21",
+      "narrativeFingerprint": "ba312cd2f16cf8a3"
+    },
+    {
+      "symbol": "PAYTM",
+      "direction": "LONG",
+      "entryPrice": 1592.9,
+      "exitPrice": 1622.77,
+      "stopLoss": 1556.77,
+      "target1": 1647.1,
+      "target2": 1701.29,
+      "exitReason": "PARTIAL_SCALE",
+      "deskExitLabel": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "WIN",
+      "deskProgress": "0.25R+ 0.5R+ 0.75R+ 1R+ 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +1.13R R +0.83 SL +0.75R",
+      "mfeR": 1.129,
+      "maeR": -0.465,
+      "economicR": 0.827,
+      "pathR": 0.827,
+      "effectiveStopR": 0.75,
+      "qty": 62,
+      "deployedCapital": 98759.8,
+      "pnl": 1851.77,
+      "pnlPct": 1.88,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": false,
+        "isHit": false,
+        "exitReason": "PARTIAL_SCALE",
+        "rootCause": "PARTIAL_FOLLOWTHROUGH",
+        "factors": [
+          "SCALE_LEGS_FILLED",
+          "POSITIVE_SCALE_BOOK"
+        ],
+        "pathR": 0.827,
+        "rMultiple": 0.827,
+        "movePct": 1.88,
+        "gapToT1Pct": 1.53,
+        "gapToT2Pct": 4.93,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 36.13,
+        "maePct": -1.05,
+        "mfePct": 2.95,
+        "mfeR": 1.129,
+        "stopEff": 0.465,
+        "falsePositive": false,
+        "holdingMins": 359,
+        "source": "SCORECARD",
+        "exitSource": "SCALE_TRAIL",
+        "economicR": 0.827,
+        "maeR": -0.465
+      },
+      "pickSource": "intraday_session",
+      "lineage": {
+        "source": "intraday_session",
+        "filterStage": null,
+        "score": 62.3,
+        "scoreComponents": null,
+        "lockRank": null,
+        "selectionReason": null,
+        "verdict": null,
+        "sector": "OTHER",
+        "levelsSource": null,
+        "triggeredAt": null,
+        "executedFills": [
+          {
+            "r": 1.0,
+            "qty": 19,
+            "price": 1629.03,
+            "pnl": 686.47
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 43,
+            "price": 1620.0,
+            "pnl": 1165.3
+          }
+        ],
+        "exitPathTag": null
+      },
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "economic_r",
+        "path_r",
+        "mfe_mae",
+        "taxonomy",
+        "desk_label",
+        "outcome_bucket"
+      ],
+      "outcomeSchemaVersion": 1,
+      "rMultiple": 0.827,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 1592.9,
+        "riskPerShare": 36.13,
+        "initialStop": 1556.77,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 19,
+            "price": 1629.03,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 15,
+            "price": 1647.1,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 9,
+            "price": 1665.16,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 19,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 1647.1,
+        "target2": 1701.29,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 19,
+            "price": 1629.03,
+            "pnl": 686.47
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 43,
+            "price": 1620.0,
+            "pnl": 1165.3
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1620.0,
+        "realizedPnl": 1851.77,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 1851.77,
+        "rMultiple": 0.827,
+        "economicR": 0.827,
+        "pathR": 0.022,
+        "mfeR": 1.129,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1556.77,
+        "totalQty": 62,
+        "riskPerShare": 36.13
+      },
+      "remainingQty": 0,
+      "effectiveStop": 1620.0,
+      "realizedPnl": 1851.77,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R+ 0.5R+ 0.75R+ 1R+ 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +1.13R R +0.83 rem 0 trail SL 1620.00",
+      "narrativeFingerprint": "075a30fab47b40a7"
+    },
+    {
+      "symbol": "ONGC",
+      "direction": "LONG",
+      "entryPrice": 242.29,
+      "exitPrice": 239.45,
+      "stopLoss": 238.13,
+      "target1": 248.53,
+      "target2": 254.77,
+      "exitReason": "EOD_SQUAREOFF",
+      "deskExitLabel": "EOD_SQUAREOFF",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "LOSS",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.68R R -0.68 SL -1.00R",
+      "mfeR": -0.683,
+      "maeR": -0.683,
+      "economicR": -0.683,
+      "pathR": -0.683,
+      "effectiveStopR": -1.0,
+      "qty": 412,
+      "deployedCapital": 99823.48,
+      "pnl": -1170.08,
+      "pnlPct": -1.17,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": true,
+        "isHit": false,
+        "exitReason": "EOD_SQUAREOFF",
+        "rootCause": "ENTRY_FAILURE",
+        "factors": [
+          "NO_FAVOURABLE_EXCURSION",
+          "ADVERSE_FROM_ENTRY"
+        ],
+        "pathR": -0.683,
+        "rMultiple": -0.683,
+        "movePct": -1.17,
+        "gapToT1Pct": 3.75,
+        "gapToT2Pct": 6.32,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 4.16,
+        "maePct": -1.01,
+        "mfePct": 0.56,
+        "mfeR": -0.683,
+        "stopEff": 0.587,
+        "falsePositive": false,
+        "holdingMins": 358,
+        "source": "SCORECARD",
+        "exitSource": "SCALE_TRAIL",
+        "economicR": -0.683,
+        "maeR": -0.683
+      },
+      "pickSource": "intraday_session",
+      "lineage": {
+        "source": "intraday_session",
+        "filterStage": null,
+        "score": 67.5,
+        "scoreComponents": null,
+        "lockRank": null,
+        "selectionReason": null,
+        "verdict": null,
+        "sector": "ENERGY",
+        "levelsSource": null,
+        "triggeredAt": null,
+        "executedFills": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 412,
+            "price": 239.45,
+            "pnl": -1170.08
+          }
+        ],
+        "exitPathTag": null
+      },
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "economic_r",
+        "path_r",
+        "mfe_mae",
+        "taxonomy",
+        "desk_label",
+        "outcome_bucket"
+      ],
+      "outcomeSchemaVersion": 1,
+      "rMultiple": -0.683,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 242.29,
+        "riskPerShare": 4.16,
+        "initialStop": 238.13,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 124,
+            "price": 246.45,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 103,
+            "price": 248.53,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 62,
+            "price": 250.61,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 123,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 248.53,
+        "target2": 254.77,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 412,
+            "price": 239.45,
+            "pnl": -1170.08
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 238.13,
+        "realizedPnl": -1170.08,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -1170.08,
+        "rMultiple": -0.683,
+        "economicR": -0.683,
+        "pathR": -0.683,
+        "mfeR": -0.683,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 238.13,
+        "totalQty": 412,
+        "riskPerShare": 4.16
+      },
+      "remainingQty": 0,
+      "effectiveStop": 238.13,
+      "realizedPnl": -1170.08,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.68R R -0.68 rem 0 trail SL 238.13",
+      "narrativeFingerprint": "878a0248c9ce8222"
+    },
+    {
+      "symbol": "HINDCOPPER",
+      "direction": "LONG",
+      "entryPrice": 534.25,
+      "exitPrice": 533.3,
+      "stopLoss": 513.35,
+      "target1": 565.6,
+      "target2": 596.95,
+      "exitReason": "EOD_SQUAREOFF",
+      "deskExitLabel": "EOD_SQUAREOFF",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "LOSS",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.04R R -0.04 SL -1.00R",
+      "mfeR": -0.045,
+      "maeR": -0.313,
+      "economicR": -0.045,
+      "pathR": -0.045,
+      "effectiveStopR": -1.0,
+      "qty": 167,
+      "deployedCapital": 89219.75,
+      "pnl": -158.65,
+      "pnlPct": -0.18,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": true,
+        "isHit": false,
+        "exitReason": "EOD_SQUAREOFF",
+        "rootCause": "ENTRY_FAILURE",
+        "factors": [
+          "NO_FAVOURABLE_EXCURSION",
+          "ADVERSE_FROM_ENTRY"
+        ],
+        "pathR": -0.045,
+        "rMultiple": -0.045,
+        "movePct": -0.18,
+        "gapToT1Pct": 6.05,
+        "gapToT2Pct": 11.91,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 20.9,
+        "maePct": -1.15,
+        "mfePct": 0.85,
+        "mfeR": -0.045,
+        "stopEff": 0.294,
+        "falsePositive": false,
+        "holdingMins": 371,
+        "source": "SCORECARD",
+        "exitSource": "SCALE_TRAIL",
+        "economicR": -0.045,
+        "maeR": -0.313
+      },
+      "pickSource": "intraday_session",
+      "lineage": {
+        "source": "intraday_session",
+        "filterStage": null,
+        "score": 60.6,
+        "scoreComponents": null,
+        "lockRank": null,
+        "selectionReason": null,
+        "verdict": null,
+        "sector": "OTHER",
+        "levelsSource": null,
+        "triggeredAt": null,
+        "executedFills": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 167,
+            "price": 533.3,
+            "pnl": -158.65
+          }
+        ],
+        "exitPathTag": null
+      },
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "economic_r",
+        "path_r",
+        "mfe_mae",
+        "taxonomy",
+        "desk_label",
+        "outcome_bucket"
+      ],
+      "outcomeSchemaVersion": 1,
+      "rMultiple": -0.045,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 534.25,
+        "riskPerShare": 20.9,
+        "initialStop": 513.35,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 50,
+            "price": 555.15,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 42,
+            "price": 565.6,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 25,
+            "price": 576.05,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 50,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 565.6,
+        "target2": 596.95,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 167,
+            "price": 533.3,
+            "pnl": -158.65
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 513.35,
+        "realizedPnl": -158.65,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -158.65,
+        "rMultiple": -0.045,
+        "economicR": -0.045,
+        "pathR": -0.045,
+        "mfeR": -0.045,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 513.35,
+        "totalQty": 167,
+        "riskPerShare": 20.9
+      },
+      "remainingQty": 0,
+      "effectiveStop": 513.35,
+      "realizedPnl": -158.65,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.04R R -0.04 rem 0 trail SL 513.35",
+      "narrativeFingerprint": "e40622d6f8b1ed1d"
+    },
+    {
+      "symbol": "HINDZINC",
+      "direction": "LONG",
+      "entryPrice": 604.4,
+      "exitPrice": 595.12,
+      "stopLoss": 595.12,
+      "target1": 618.32,
+      "target2": 632.24,
+      "exitReason": "PARTIAL_SCALE",
+      "deskExitLabel": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "LOSS",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -1.03R R -1.00 SL -1.00R",
+      "mfeR": -1.034,
+      "maeR": -2.198,
+      "economicR": -1.0,
+      "pathR": -1.0,
+      "effectiveStopR": -1.0,
+      "qty": 165,
+      "deployedCapital": 99726.0,
+      "pnl": -1531.2,
+      "pnlPct": -1.54,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": false,
+        "isHit": false,
+        "exitReason": "PARTIAL_SCALE",
+        "rootCause": "ENTRY_FAILURE",
+        "factors": [
+          "NO_FAVOURABLE_EXCURSION",
+          "ADVERSE_FROM_ENTRY"
+        ],
+        "pathR": -1.0,
+        "rMultiple": -1.0,
+        "movePct": -1.54,
+        "gapToT1Pct": 3.84,
+        "gapToT2Pct": 6.14,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 9.28,
+        "maePct": -1.54,
+        "mfePct": 0.43,
+        "mfeR": -1.034,
+        "stopEff": 1.002,
+        "falsePositive": false,
+        "holdingMins": 134,
+        "source": "SCORECARD",
+        "exitSource": "SCALE_TRAIL",
+        "economicR": -1.0,
+        "maeR": -2.198
+      },
+      "pickSource": "intraday_session",
+      "lineage": {
+        "source": "intraday_session",
+        "filterStage": null,
+        "score": 69.2,
+        "scoreComponents": null,
+        "lockRank": null,
+        "selectionReason": null,
+        "verdict": null,
+        "sector": "OTHER",
+        "levelsSource": null,
+        "triggeredAt": null,
+        "executedFills": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 165,
+            "price": 595.12,
+            "pnl": -1531.2
+          }
+        ],
+        "exitPathTag": null
+      },
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "economic_r",
+        "path_r",
+        "mfe_mae",
+        "taxonomy",
+        "desk_label",
+        "outcome_bucket"
+      ],
+      "outcomeSchemaVersion": 1,
+      "rMultiple": -1.0,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 604.4,
+        "riskPerShare": 9.28,
+        "initialStop": 595.12,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 50,
+            "price": 613.68,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 41,
+            "price": 618.32,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 25,
+            "price": 622.96,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 49,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 618.32,
+        "target2": 632.24,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 165,
+            "price": 595.12,
+            "pnl": -1531.2
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 595.12,
+        "realizedPnl": -1531.2,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -1531.2,
+        "rMultiple": -1.0,
+        "economicR": -1.0,
+        "pathR": -1.913,
+        "mfeR": -1.034,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 595.12,
+        "totalQty": 165,
+        "riskPerShare": 9.28
+      },
+      "remainingQty": 0,
+      "effectiveStop": 595.12,
+      "realizedPnl": -1531.2,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -1.03R R -1.00 rem 0 trail SL 595.12",
+      "narrativeFingerprint": "3c60e2943c72b8cf"
+    },
+    {
+      "symbol": "MCX",
+      "direction": "LONG",
+      "entryPrice": 2770.3,
+      "exitPrice": 2884.12,
+      "stopLoss": 2681.21,
+      "target1": 2903.94,
+      "target2": 3037.57,
+      "exitReason": "EOD_SQUAREOFF",
+      "deskExitLabel": "EOD_SQUAREOFF",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "WIN",
+      "deskProgress": "0.25R+ 0.5R+ 0.75R+ 1R+ 1.25R+ 1.5R. 2R. 3R. 4R. 5R. MFE +1.40R R +1.28 SL +1.00R",
+      "mfeR": 1.4,
+      "maeR": -0.311,
+      "economicR": 1.278,
+      "pathR": 1.278,
+      "effectiveStopR": 1.0,
+      "qty": 36,
+      "deployedCapital": 99730.8,
+      "pnl": 4097.49,
+      "pnlPct": 4.11,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": false,
+        "isHit": false,
+        "exitReason": "EOD_SQUAREOFF",
+        "rootCause": "PARTIAL_FOLLOWTHROUGH",
+        "factors": [
+          "TARGET_NOT_REACHED",
+          "EOD_FORCED_EXIT",
+          "POSITIVE_EOD_SQUAREOFF"
+        ],
+        "pathR": 1.278,
+        "rMultiple": 1.278,
+        "movePct": 4.11,
+        "gapToT1Pct": 0.72,
+        "gapToT2Pct": 5.54,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 89.09,
+        "maePct": -1.0,
+        "mfePct": 4.14,
+        "mfeR": 1.4,
+        "stopEff": 0.311,
+        "falsePositive": false,
+        "holdingMins": 359,
+        "source": "SCORECARD",
+        "exitSource": "SCALE_TRAIL",
+        "economicR": 1.278,
+        "maeR": -0.311
+      },
+      "pickSource": "intraday_session",
+      "lineage": {
+        "source": "intraday_session",
+        "filterStage": null,
+        "score": 58.1,
+        "scoreComponents": null,
+        "lockRank": null,
+        "selectionReason": null,
+        "verdict": null,
+        "sector": "OTHER",
+        "levelsSource": null,
+        "triggeredAt": null,
+        "executedFills": [
+          {
+            "r": 1.0,
+            "qty": 11,
+            "price": 2859.39,
+            "pnl": 979.99
+          },
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 25,
+            "price": 2895.0,
+            "pnl": 3117.5
+          }
+        ],
+        "exitPathTag": null
+      },
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "economic_r",
+        "path_r",
+        "mfe_mae",
+        "taxonomy",
+        "desk_label",
+        "outcome_bucket"
+      ],
+      "outcomeSchemaVersion": 1,
+      "rMultiple": 1.278,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 2770.3,
+        "riskPerShare": 89.09,
+        "initialStop": 2681.21,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 11,
+            "price": 2859.39,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 9,
+            "price": 2903.94,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 5,
+            "price": 2948.48,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 11,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 2903.94,
+        "target2": 3037.57,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 11,
+            "price": 2859.39,
+            "pnl": 979.99
+          },
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 25,
+            "price": 2895.0,
+            "pnl": 3117.5
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 2859.39,
+        "realizedPnl": 4097.49,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 4097.49,
+        "rMultiple": 1.278,
+        "economicR": 1.278,
+        "pathR": 1.4,
+        "mfeR": 1.4,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 2681.21,
+        "totalQty": 36,
+        "riskPerShare": 89.09
+      },
+      "remainingQty": 0,
+      "effectiveStop": 2859.39,
+      "realizedPnl": 4097.49,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R+ 0.5R+ 0.75R+ 1R+ 1.25R+ 1.5R. 2R. 3R. 4R. 5R. MFE +1.40R R +1.28 rem 0 trail SL 2859.39",
+      "narrativeFingerprint": "896bc96dc818e551"
+    },
+    {
+      "symbol": "LAURUSLABS",
+      "direction": "SHORT",
+      "entryPrice": 1841.1,
+      "exitPrice": 1858.0,
+      "stopLoss": 1893.02,
+      "target1": 1763.22,
+      "target2": 1685.34,
+      "exitReason": "EOD_SQUAREOFF",
+      "deskExitLabel": "EOD_SQUAREOFF",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "LOSS",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.33R R -0.33 SL -1.00R",
+      "mfeR": -0.326,
+      "maeR": -0.345,
+      "economicR": -0.326,
+      "pathR": -0.326,
+      "effectiveStopR": -1.0,
+      "qty": 54,
+      "deployedCapital": 99419.4,
+      "pnl": -912.6,
+      "pnlPct": -0.92,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": true,
+        "isHit": false,
+        "exitReason": "EOD_SQUAREOFF",
+        "rootCause": "ENTRY_FAILURE",
+        "factors": [
+          "NO_FAVOURABLE_EXCURSION",
+          "ADVERSE_FROM_ENTRY"
+        ],
+        "pathR": -0.326,
+        "rMultiple": -0.326,
+        "movePct": -0.92,
+        "gapToT1Pct": 5.15,
+        "gapToT2Pct": 9.38,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 51.92,
+        "maePct": -0.97,
+        "mfePct": 0.43,
+        "mfeR": -0.326,
+        "stopEff": 0.345,
+        "falsePositive": false,
+        "holdingMins": 347,
+        "source": "SCORECARD",
+        "exitSource": "SCALE_TRAIL",
+        "economicR": -0.326,
+        "maeR": -0.345
+      },
+      "pickSource": "intraday_session",
+      "lineage": {
+        "source": "intraday_session",
+        "filterStage": null,
+        "score": 65.1,
+        "scoreComponents": null,
+        "lockRank": null,
+        "selectionReason": null,
+        "verdict": null,
+        "sector": "OTHER",
+        "levelsSource": null,
+        "triggeredAt": null,
+        "executedFills": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 54,
+            "price": 1858.0,
+            "pnl": -912.6
+          }
+        ],
+        "exitPathTag": null
+      },
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "economic_r",
+        "path_r",
+        "mfe_mae",
+        "taxonomy",
+        "desk_label",
+        "outcome_bucket"
+      ],
+      "outcomeSchemaVersion": 1,
+      "rMultiple": -0.326,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 1841.1,
+        "riskPerShare": 51.92,
+        "initialStop": 1893.02,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 16,
+            "price": 1789.18,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 14,
+            "price": 1763.22,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 8,
+            "price": 1737.26,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 16,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 1763.22,
+        "target2": 1685.34,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 54,
+            "price": 1858.0,
+            "pnl": -912.6
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1893.02,
+        "realizedPnl": -912.6,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -912.6,
+        "rMultiple": -0.326,
+        "economicR": -0.326,
+        "pathR": -0.326,
+        "mfeR": -0.326,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1893.02,
+        "totalQty": 54,
+        "riskPerShare": 51.92
+      },
+      "remainingQty": 0,
+      "effectiveStop": 1893.02,
+      "realizedPnl": -912.6,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.33R R -0.33 rem 0 trail SL 1893.02",
+      "narrativeFingerprint": "c16159e634be9737"
+    },
+    {
+      "symbol": "ITC",
+      "direction": "SHORT",
+      "entryPrice": 281.1,
+      "exitPrice": 279.0,
+      "stopLoss": 286.83,
+      "target1": 272.5,
+      "target2": 263.91,
+      "exitReason": "EOD_SQUAREOFF",
+      "deskExitLabel": "EOD_SQUAREOFF",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "WIN",
+      "deskProgress": "0.25R+ 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +0.37R R +0.37 SL -0.00R",
+      "mfeR": 0.366,
+      "maeR": -0.262,
+      "economicR": 0.366,
+      "pathR": 0.366,
+      "effectiveStopR": -0.0,
+      "qty": 355,
+      "deployedCapital": 99790.5,
+      "pnl": 745.5,
+      "pnlPct": 0.75,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": false,
+        "isHit": false,
+        "exitReason": "EOD_SQUAREOFF",
+        "rootCause": "PARTIAL_FOLLOWTHROUGH",
+        "factors": [
+          "TARGET_NOT_REACHED",
+          "EOD_FORCED_EXIT",
+          "POSITIVE_EOD_SQUAREOFF"
+        ],
+        "pathR": 0.366,
+        "rMultiple": 0.366,
+        "movePct": 0.75,
+        "gapToT1Pct": 2.31,
+        "gapToT2Pct": 5.37,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 5.73,
+        "maePct": -0.23,
+        "mfePct": 1.1,
+        "mfeR": 0.366,
+        "stopEff": 0.113,
+        "falsePositive": false,
+        "holdingMins": 355,
+        "source": "SCORECARD",
+        "exitSource": "SCALE_TRAIL",
+        "economicR": 0.366,
+        "maeR": -0.262
+      },
+      "pickSource": "intraday_session",
+      "lineage": {
+        "source": "intraday_session",
+        "filterStage": null,
+        "score": 67.0,
+        "scoreComponents": null,
+        "lockRank": null,
+        "selectionReason": null,
+        "verdict": null,
+        "sector": "FMCG",
+        "levelsSource": null,
+        "triggeredAt": null,
+        "executedFills": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 355,
+            "price": 279.0,
+            "pnl": 745.5
+          }
+        ],
+        "exitPathTag": null
+      },
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "economic_r",
+        "path_r",
+        "mfe_mae",
+        "taxonomy",
+        "desk_label",
+        "outcome_bucket"
+      ],
+      "outcomeSchemaVersion": 1,
+      "rMultiple": 0.366,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 281.1,
+        "riskPerShare": 5.73,
+        "initialStop": 286.83,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 107,
+            "price": 275.37,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 89,
+            "price": 272.5,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 53,
+            "price": 269.64,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 106,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 272.5,
+        "target2": 263.91,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 355,
+            "price": 279.0,
+            "pnl": 745.5
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 281.1,
+        "realizedPnl": 745.5,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 745.5,
+        "rMultiple": 0.366,
+        "economicR": 0.366,
+        "pathR": 0.366,
+        "mfeR": 0.366,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 286.83,
+        "totalQty": 355,
+        "riskPerShare": 5.73
+      },
+      "remainingQty": 0,
+      "effectiveStop": 281.1,
+      "realizedPnl": 745.5,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R+ 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +0.37R R +0.37 rem 0 trail SL 281.10",
+      "narrativeFingerprint": "1f5621916aa2ab67"
+    },
+    {
+      "symbol": "RELIANCE",
+      "direction": "SHORT",
+      "entryPrice": 1317.9,
+      "exitPrice": 1323.9,
+      "stopLoss": 1343.52,
+      "target1": 1279.47,
+      "target2": 1241.04,
+      "exitReason": "EOD_SQUAREOFF",
+      "deskExitLabel": "EOD_SQUAREOFF",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "LOSS",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.23R R -0.23 SL -1.00R",
+      "mfeR": -0.234,
+      "maeR": -0.422,
+      "economicR": -0.234,
+      "pathR": -0.234,
+      "effectiveStopR": -1.0,
+      "qty": 75,
+      "deployedCapital": 98842.5,
+      "pnl": -450.0,
+      "pnlPct": -0.46,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": true,
+        "isHit": false,
+        "exitReason": "EOD_SQUAREOFF",
+        "rootCause": "ENTRY_FAILURE",
+        "factors": [
+          "NO_FAVOURABLE_EXCURSION",
+          "ADVERSE_FROM_ENTRY"
+        ],
+        "pathR": -0.234,
+        "rMultiple": -0.234,
+        "movePct": -0.46,
+        "gapToT1Pct": 3.37,
+        "gapToT2Pct": 6.29,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 25.62,
+        "maePct": -0.82,
+        "mfePct": 0.29,
+        "mfeR": -0.234,
+        "stopEff": 0.421,
+        "falsePositive": false,
+        "holdingMins": 357,
+        "source": "SCORECARD",
+        "exitSource": "SCALE_TRAIL",
+        "economicR": -0.234,
+        "maeR": -0.422
+      },
+      "pickSource": "intraday_session",
+      "lineage": {
+        "source": "intraday_session",
+        "filterStage": null,
+        "score": 59.0,
+        "scoreComponents": null,
+        "lockRank": null,
+        "selectionReason": null,
+        "verdict": null,
+        "sector": "ENERGY",
+        "levelsSource": null,
+        "triggeredAt": null,
+        "executedFills": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 75,
+            "price": 1323.9,
+            "pnl": -450.0
+          }
+        ],
+        "exitPathTag": null
+      },
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "economic_r",
+        "path_r",
+        "mfe_mae",
+        "taxonomy",
+        "desk_label",
+        "outcome_bucket"
+      ],
+      "outcomeSchemaVersion": 1,
+      "rMultiple": -0.234,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 1317.9,
+        "riskPerShare": 25.62,
+        "initialStop": 1343.52,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 23,
+            "price": 1292.28,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 19,
+            "price": 1279.47,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 11,
+            "price": 1266.66,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 22,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 1279.47,
+        "target2": 1241.04,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 75,
+            "price": 1323.9,
+            "pnl": -450.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1343.52,
+        "realizedPnl": -450.0,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -450.0,
+        "rMultiple": -0.234,
+        "economicR": -0.234,
+        "pathR": -0.234,
+        "mfeR": -0.234,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1343.52,
+        "totalQty": 75,
+        "riskPerShare": 25.62
+      },
+      "remainingQty": 0,
+      "effectiveStop": 1343.52,
+      "realizedPnl": -450.0,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.23R R -0.23 rem 0 trail SL 1343.52",
+      "narrativeFingerprint": "96c878bcd96abfd7"
+    },
+    {
+      "symbol": "IOC",
+      "direction": "SHORT",
+      "entryPrice": 140.0,
+      "exitPrice": 140.0,
+      "stopLoss": 143.11,
+      "target1": 135.34,
+      "target2": 130.67,
+      "exitReason": "EOD_SQUAREOFF",
+      "deskExitLabel": "EOD_SQUAREOFF",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "FLAT",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE -0.00R R +0.00 SL -1.00R",
+      "mfeR": -0.0,
+      "maeR": -0.514,
+      "economicR": 0.0,
+      "pathR": -0.0,
+      "effectiveStopR": -1.0,
+      "qty": 714,
+      "deployedCapital": 99960.0,
+      "pnl": 0.0,
+      "pnlPct": 0.0,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": true,
+        "isHit": false,
+        "exitReason": "EOD_SQUAREOFF",
+        "rootCause": "ENTRY_FAILURE",
+        "factors": [
+          "NO_FAVOURABLE_EXCURSION",
+          "ADVERSE_FROM_ENTRY"
+        ],
+        "pathR": -0.0,
+        "rMultiple": 0.0,
+        "movePct": -0.0,
+        "gapToT1Pct": 3.33,
+        "gapToT2Pct": 6.66,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 3.11,
+        "maePct": -0.99,
+        "mfePct": 0.43,
+        "mfeR": -0.0,
+        "stopEff": 0.444,
+        "falsePositive": false,
+        "holdingMins": 356,
+        "source": "SCORECARD",
+        "exitSource": "SCALE_TRAIL",
+        "economicR": 0.0,
+        "maeR": -0.514
+      },
+      "pickSource": "intraday_session",
+      "lineage": {
+        "source": "intraday_session",
+        "filterStage": null,
+        "score": 62.6,
+        "scoreComponents": null,
+        "lockRank": null,
+        "selectionReason": null,
+        "verdict": null,
+        "sector": "ENERGY",
+        "levelsSource": null,
+        "triggeredAt": null,
+        "executedFills": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 714,
+            "price": 140.0,
+            "pnl": -0.0
+          }
+        ],
+        "exitPathTag": null
+      },
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "economic_r",
+        "path_r",
+        "mfe_mae",
+        "taxonomy",
+        "desk_label",
+        "outcome_bucket"
+      ],
+      "outcomeSchemaVersion": 1,
+      "rMultiple": 0.0,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 140.0,
+        "riskPerShare": 3.11,
+        "initialStop": 143.11,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 214,
+            "price": 136.89,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 179,
+            "price": 135.34,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 107,
+            "price": 133.78,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 214,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 135.34,
+        "target2": 130.67,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 714,
+            "price": 140.0,
+            "pnl": -0.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 143.11,
+        "realizedPnl": 0.0,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 0.0,
+        "rMultiple": 0.0,
+        "economicR": 0.0,
+        "pathR": -0.0,
+        "mfeR": -0.0,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 143.11,
+        "totalQty": 714,
+        "riskPerShare": 3.11
+      },
+      "remainingQty": 0,
+      "effectiveStop": 143.11,
+      "realizedPnl": 0.0,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +0.00R R +0.00 rem 0 trail SL 143.11",
+      "narrativeFingerprint": "4e9813616887efe2"
+    },
+    {
+      "symbol": "BAJFINANCE",
+      "direction": "SHORT",
+      "entryPrice": 1094.0,
+      "exitPrice": 1093.3,
+      "stopLoss": 1107.92,
+      "target1": 1073.12,
+      "target2": 1052.24,
+      "exitReason": "EOD_SQUAREOFF",
+      "deskExitLabel": "EOD_SQUAREOFF",
+      "executionStatus": "TRIGGERED",
+      "outcomeBucket": "WIN",
+      "deskProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +0.05R R +0.05 SL -1.00R",
+      "mfeR": 0.05,
+      "maeR": -0.539,
+      "economicR": 0.05,
+      "pathR": 0.05,
+      "effectiveStopR": -1.0,
+      "qty": 91,
+      "deployedCapital": 99554.0,
+      "pnl": 63.7,
+      "pnlPct": 0.06,
+      "missAnalysis": null,
+      "missDiagnostic": {
+        "isMiss": false,
+        "isHit": false,
+        "exitReason": "EOD_SQUAREOFF",
+        "rootCause": "PARTIAL_FOLLOWTHROUGH",
+        "factors": [
+          "TARGET_NOT_REACHED",
+          "EOD_FORCED_EXIT",
+          "POSITIVE_EOD_SQUAREOFF"
+        ],
+        "pathR": 0.05,
+        "rMultiple": 0.05,
+        "movePct": 0.06,
+        "gapToT1Pct": 1.84,
+        "gapToT2Pct": 3.75,
+        "stopUtilization": null,
+        "plannedRr": null,
+        "riskPerShare": 13.92,
+        "maePct": -0.69,
+        "mfePct": 0.7,
+        "mfeR": 0.05,
+        "stopEff": 0.539,
+        "falsePositive": false,
+        "holdingMins": 359,
+        "source": "SCORECARD",
+        "exitSource": "SCALE_TRAIL",
+        "economicR": 0.05,
+        "maeR": -0.539
+      },
+      "pickSource": "intraday_session",
+      "lineage": {
+        "source": "intraday_session",
+        "filterStage": null,
+        "score": 67.3,
+        "scoreComponents": null,
+        "lockRank": null,
+        "selectionReason": null,
+        "verdict": null,
+        "sector": "FINANCE",
+        "levelsSource": null,
+        "triggeredAt": null,
+        "executedFills": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 91,
+            "price": 1093.3,
+            "pnl": 63.7
+          }
+        ],
+        "exitPathTag": null
+      },
+      "policyChain": [
+        "execution_truth",
+        "canonical_pnl",
+        "economic_r",
+        "path_r",
+        "mfe_mae",
+        "taxonomy",
+        "desk_label",
+        "outcome_bucket"
+      ],
+      "outcomeSchemaVersion": 1,
+      "rMultiple": 0.05,
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 1094.0,
+        "riskPerShare": 13.92,
+        "initialStop": 1107.92,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.3,
+            "qty": 27,
+            "price": 1080.08,
+            "trailStopAfter": 0.75
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.25,
+            "qty": 23,
+            "price": 1073.12,
+            "trailStopAfter": 1.25
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.15,
+            "qty": 14,
+            "price": 1066.16,
+            "trailStopAfter": 1.5
+          }
+        ],
+        "runnerQty": 27,
+        "runnerFrac": 0.3,
+        "trailRatchet": {
+          "0.25": 0.0,
+          "0.5": 0.25,
+          "0.75": 0.5,
+          "1.0": 0.75,
+          "1.25": 1.0,
+          "1.5": 1.25,
+          "2.0": 1.5,
+          "3.0": 2.25,
+          "4.0": 3.25,
+          "5.0": 4.25
+        },
+        "target1": 1073.12,
+        "target2": 1052.24,
+        "notes": [
+          "30pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p25r",
+          "no_stop_loosen"
+        ]
+      },
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "EOD_SQUAREOFF",
+            "qty": 91,
+            "price": 1093.3,
+            "pnl": 63.7
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1107.92,
+        "realizedPnl": 63.7,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 63.7,
+        "rMultiple": 0.05,
+        "economicR": 0.05,
+        "pathR": 0.05,
+        "mfeR": 0.05,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1107.92,
+        "totalQty": 91,
+        "riskPerShare": 13.92
+      },
+      "remainingQty": 0,
+      "effectiveStop": 1107.92,
+      "realizedPnl": 63.7,
+      "unrealizedPnl": 0.0,
+      "scaleTrail": true,
+      "scaleProgress": "0.25R. 0.5R. 0.75R. 1R. 1.25R. 1.5R. 2R. 3R. 4R. 5R. MFE +0.05R R +0.05 rem 0 trail SL 1107.92",
+      "narrativeFingerprint": "00ba1e3a2fce6118"
+    }
+  ],
+  "bookCacheSchemaVersion": 4,
+  "cachedAt": "2026-08-11T10:06:04.165545+00:00"
+}

@@ -1,0 +1,375 @@
+{
+  "date": "2026-08-03",
+  "trades": {
+    "CONCORDBIO:LONG": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.5014,
+        "pnl_delta_vs_actual_pct": -0.9378,
+        "max_drawdown_during_trade_pct": -2.9107
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.9079,
+        "pnl_delta_vs_actual_pct": 0.4716,
+        "max_drawdown_during_trade_pct": -2.9107
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.0633,
+        "pnl_delta_vs_actual_pct": -0.4997,
+        "max_drawdown_during_trade_pct": -2.9107
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.53,
+        "pnl_delta_vs_actual_pct": 0.0937,
+        "max_drawdown_during_trade_pct": -2.9107
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.4364,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -2.9107
+      }
+    ],
+    "BALKRISIND:LONG": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.3073,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.9177
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.2589,
+        "pnl_delta_vs_actual_pct": -0.0484,
+        "max_drawdown_during_trade_pct": -1.9177
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.3073,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.9177
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.695,
+        "pnl_delta_vs_actual_pct": -1.0022,
+        "max_drawdown_during_trade_pct": -1.9177
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.3073,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.9177
+      }
+    ],
+    "DIVISLAB:LONG": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      }
+    ],
+    "ADANIGREEN:LONG": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 2.068,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.3319
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 2.0992,
+        "pnl_delta_vs_actual_pct": 0.0312,
+        "max_drawdown_during_trade_pct": -1.3319
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 2.068,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.3319
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 2.2199,
+        "pnl_delta_vs_actual_pct": 0.1519,
+        "max_drawdown_during_trade_pct": -1.3319
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 2.068,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.3319
+      }
+    ],
+    "BPCL:LONG": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      }
+    ],
+    "ACC:SHORT": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      }
+    ],
+    "APTUS:SHORT": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.0574,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.1206
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.1043,
+        "pnl_delta_vs_actual_pct": 0.0469,
+        "max_drawdown_during_trade_pct": -1.1206
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.0574,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.1206
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": 0.4221,
+        "pnl_delta_vs_actual_pct": 0.3647,
+        "max_drawdown_during_trade_pct": -1.1206
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": 0.0574,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.1206
+      }
+    ],
+    "CUB:SHORT": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.2954,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.0169
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -0.8667,
+        "pnl_delta_vs_actual_pct": -0.5713,
+        "max_drawdown_during_trade_pct": -1.0169
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.2954,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.0169
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "TRAILED_EXIT",
+        "simulated_pnl_pct": -1.0171,
+        "pnl_delta_vs_actual_pct": -0.7217,
+        "max_drawdown_during_trade_pct": -1.0169
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "EOD_SQUAREOFF",
+        "simulated_pnl_pct": -0.2954,
+        "pnl_delta_vs_actual_pct": 0.0,
+        "max_drawdown_during_trade_pct": -1.0169
+      }
+    ],
+    "AMBUJACEM:SHORT": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      }
+    ],
+    "DLF:SHORT": [
+      {
+        "scenario_name": "ATR_2X_TRAIL",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "ANCHORED_VWAP_FLOOR",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "VCP_PIVOT",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "PARABOLIC_SAR",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      },
+      {
+        "scenario_name": "FIXED_EOD_SQUAREOFF",
+        "simulated_outcome": "NO_ENTRY",
+        "simulated_pnl_pct": null,
+        "pnl_delta_vs_actual_pct": null,
+        "max_drawdown_during_trade_pct": null
+      }
+    ]
+  }
+}

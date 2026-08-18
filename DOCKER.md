@@ -30,7 +30,7 @@ Flags: `start-docker.bat --no-build` / `--pull` / `--no-open`. `rebuild-docker.b
 
 Hub images (no secrets inside): `smohanty010620/iros-market-api`, `smohanty010620/iros-frontend`, `smohanty010620/cloudflared`, `smohanty010620/iros-desk-state`. The cloudflared image already runs `tunnel … run iros-desk`. Copy `backend/.env` and `config/cloudflare/credentials.json` onto each machine.
 
-**Desk JSON across PCs:** Docker Hub cannot store volumes. `push-docker-hub.bat` packs `intraday_session.json`, `swing_session.json`, `last_market_snapshot.json`, plan, alerts, and `trade_api_snapshot.json` into `iros-desk-state`. `start-from-hub.bat` pulls that image and writes the files into the repo (bind-mounted as `/app/state`) **before** compose up. Last push wins. Do not run two desks live at once.
+**Desk JSON across PCs:** Docker Hub cannot store volumes. `push-docker-hub.bat` packs `/app/state` (and EOD under `/app/backend/app/data/eod`) from the running desk into `iros-desk-state`. `start-from-hub.bat` pulls that image and writes the files into the named volumes `iros-desk-state` and `iros-backend-data` **before** compose up. Last push wins. Do not run two desks live at once. Git working-tree JSON is not the live store.
 
 ### After every code change (Docker)
 
@@ -92,10 +92,11 @@ That is: seed desk JSON from `iros-desk-state`, then `docker compose --profile t
 
 Named volumes keep JSON state **on that PC** across restarts (source code is not mounted):
 
-- `iros-backend-data` → `/app/backend/app/data`
+- `iros-desk-state` → `/app/state` (sessions, snapshot, plan, alerts)
+- `iros-backend-data` → `/app/backend/app/data` (EOD Book)
 - `iros-eod-archive` → `/app/backend/app/services/eod_archive`
 
-Desk lock / price JSON lives on the **host repo** bind `./:/app/state`. Cross-machine copy is the `iros-desk-state` Hub image (see above), not a Hub volume.
+Live lock / price JSON is the named volume, not the git working tree. Cross-machine copy is the `iros-desk-state` Hub image.
 
 ## Image size notes
 

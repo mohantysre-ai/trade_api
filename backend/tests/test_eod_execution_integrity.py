@@ -12,16 +12,16 @@ def test_current_session_applies_scale_trail_without_eod_squareoff():
         "symbol": "TEST",
         "direction": "LONG",
         "entryPrice": 100.0,
-        "currentPrice": 110.0,
-        "stopLoss": 95.0,
-        "target1": 115.0,
-        "target2": 120.0,
+        "currentPrice": 101.0,
+        "stopLoss": 99.5,
+        "target1": 100.75,
+        "target2": 101.5,
         "approxQty": 10,
     }
     reason, _, pnl, _ = _leg_pnl(pick, after_close=False)
     assert reason == "OPEN"
-    # At +2R, configured scale legs are booked and the remainder stays MTM.
-    assert pnl == 85.0
+    # 0.5% 1R; at +2R scale legs are booked and the 40% runner stays MTM.
+    assert pnl == 8.5
 
 
 def test_cash_session_phase_is_open_before_cash_close():

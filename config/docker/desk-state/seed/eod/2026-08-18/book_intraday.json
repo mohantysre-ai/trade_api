@@ -1,0 +1,2439 @@
+{
+  "date": "2026-08-18",
+  "totalPnl": 19614.09,
+  "trades": [
+    {
+      "symbol": "M&M",
+      "direction": "LONG",
+      "entryPrice": 3416.3,
+      "stopLoss": 3416.3,
+      "pnl": 783.0,
+      "realizedPnl": 0.0,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 3416.3,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 58,
+            "price": 3416.3,
+            "pnl": 0.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 3416.3,
+        "realizedPnl": 0.0,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 0.0,
+        "rMultiple": 0.0,
+        "economicR": 0.0,
+        "pathR": 0.0,
+        "mfeR": 0.837,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 3399.22,
+        "totalQty": 58,
+        "riskPerShare": 17.08
+      },
+      "outcome": {
+        "label": "PENDING",
+        "detail": "R +0.79 \u00b7 trail SL 3416.30 \u00b7 rem 58",
+        "hitLevel": null,
+        "ltp": 3429.8,
+        "pctChange": 0.4,
+        "scaleTrail": true,
+        "closed": false
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 3416.3,
+        "riskPerShare": 17.08,
+        "initialStop": 3399.22,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 12,
+            "price": 3433.38,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 12,
+            "price": 3441.92,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 11,
+            "price": 3450.46,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 23,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 3441.92,
+        "target2": 3467.54,
+        "validRiskModel": true,
+        "stopRepaired": true,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 58,
+      "deployedCapital": 198145.4
+    },
+    {
+      "symbol": "SBIN",
+      "direction": "LONG",
+      "entryPrice": 1082.8,
+      "stopLoss": 1077.39,
+      "pnl": -995.44,
+      "realizedPnl": -995.44,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 1077.39,
+      "exitReason": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "INITIAL_SL",
+            "qty": 184,
+            "price": 1077.39,
+            "pnl": -995.44
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1077.39,
+        "realizedPnl": -995.44,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -995.44,
+        "rMultiple": -1.0,
+        "economicR": -1.0,
+        "pathR": -1.0,
+        "mfeR": 0.0,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1077.39,
+        "totalQty": 184,
+        "riskPerShare": 5.41,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "SCALE COMPLETE",
+        "detail": "R -1.00 \u00b7 trail SL 1077.39 \u00b7 rem 0",
+        "hitLevel": "partial",
+        "ltp": 1077.39,
+        "pctChange": -0.5,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 1082.8,
+        "riskPerShare": 5.41,
+        "initialStop": 1077.39,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 37,
+            "price": 1088.21,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 37,
+            "price": 1090.91,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 37,
+            "price": 1093.62,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 73,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 1090.91,
+        "target2": 1099.03,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 184,
+      "deployedCapital": 199235.2
+    },
+    {
+      "symbol": "BANDHANBNK",
+      "direction": "LONG",
+      "entryPrice": 176.01,
+      "stopLoss": 176.01,
+      "pnl": 0.0,
+      "realizedPnl": 0.0,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 176.01,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 1136,
+            "price": 176.01,
+            "pnl": 0.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 176.01,
+        "realizedPnl": 0.0,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 0.0,
+        "rMultiple": 0.0,
+        "economicR": 0.0,
+        "pathR": 0.0,
+        "mfeR": 0.727,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 175.13,
+        "totalQty": 1136,
+        "riskPerShare": 0.88,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +0.00 \u00b7 trail SL 176.01 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 176.01,
+        "pctChange": 0.0,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 176.01,
+        "riskPerShare": 0.88,
+        "initialStop": 175.13,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 227,
+            "price": 176.89,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 227,
+            "price": 177.33,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 227,
+            "price": 177.77,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 455,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 177.33,
+        "target2": 178.65,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 1136,
+      "deployedCapital": 199947.36
+    },
+    {
+      "symbol": "AUROPHARMA",
+      "direction": "LONG",
+      "entryPrice": 1674.4,
+      "stopLoss": 1674.4,
+      "pnl": 0.0,
+      "realizedPnl": 0.0,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 1674.4,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 119,
+            "price": 1674.4,
+            "pnl": 0.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1674.4,
+        "realizedPnl": 0.0,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 0.0,
+        "rMultiple": 0.0,
+        "economicR": 0.0,
+        "pathR": 0.0,
+        "mfeR": 0.956,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1666.03,
+        "totalQty": 119,
+        "riskPerShare": 8.37,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +0.00 \u00b7 trail SL 1674.40 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 1674.4,
+        "pctChange": 0.0,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 1674.4,
+        "riskPerShare": 8.37,
+        "initialStop": 1666.03,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 24,
+            "price": 1682.77,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 24,
+            "price": 1686.96,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 24,
+            "price": 1691.14,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 47,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 1686.96,
+        "target2": 1699.51,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 119,
+      "deployedCapital": 199253.6
+    },
+    {
+      "symbol": "TITAGARH",
+      "direction": "LONG",
+      "entryPrice": 855.3,
+      "stopLoss": 865.55,
+      "pnl": 1849.91,
+      "realizedPnl": 1849.91,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 865.55,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 47,
+            "price": 859.58,
+            "pnl": 201.16
+          },
+          {
+            "r": 1.5,
+            "qty": 47,
+            "price": 861.72,
+            "pnl": 301.74
+          },
+          {
+            "r": 2.0,
+            "qty": 46,
+            "price": 863.86,
+            "pnl": 393.76
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 93,
+            "price": 865.55,
+            "pnl": 953.25
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 865.55,
+        "realizedPnl": 1849.91,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 1849.91,
+        "rMultiple": 1.855,
+        "economicR": 1.855,
+        "pathR": 2.395,
+        "mfeR": 3.411,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 851.02,
+        "totalQty": 233,
+        "riskPerShare": 4.28,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +1.85 \u00b7 trail SL 865.55 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 865.55,
+        "pctChange": 1.2,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 855.3,
+        "riskPerShare": 4.28,
+        "initialStop": 851.02,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 47,
+            "price": 859.58,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 47,
+            "price": 861.72,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 46,
+            "price": 863.86,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 93,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 861.72,
+        "target2": 868.14,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 233,
+      "deployedCapital": 199284.9
+    },
+    {
+      "symbol": "PPLPHARMA",
+      "direction": "LONG",
+      "entryPrice": 212.84,
+      "stopLoss": 230.27,
+      "pnl": 7433.01,
+      "realizedPnl": 7433.01,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 230.27,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 188,
+            "price": 213.9,
+            "pnl": 199.28
+          },
+          {
+            "r": 1.5,
+            "qty": 188,
+            "price": 214.43,
+            "pnl": 298.92
+          },
+          {
+            "r": 2.0,
+            "qty": 188,
+            "price": 214.96,
+            "pnl": 398.56
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 375,
+            "price": 230.27,
+            "pnl": 6536.25
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 230.27,
+        "realizedPnl": 7433.01,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 7433.01,
+        "rMultiple": 7.468,
+        "economicR": 7.468,
+        "pathR": 16.443,
+        "mfeR": 17.538,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 211.78,
+        "totalQty": 939,
+        "riskPerShare": 1.06,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +7.47 \u00b7 trail SL 230.27 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 230.27,
+        "pctChange": 8.19,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 212.84,
+        "riskPerShare": 1.06,
+        "initialStop": 211.78,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 188,
+            "price": 213.9,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 188,
+            "price": 214.43,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 188,
+            "price": 214.96,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 375,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 214.43,
+        "target2": 216.02,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 939,
+      "deployedCapital": 199856.76
+    },
+    {
+      "symbol": "HDFCLIFE",
+      "direction": "LONG",
+      "entryPrice": 538.3,
+      "stopLoss": 538.4,
+      "pnl": 228.76,
+      "realizedPnl": 228.76,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 538.4,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 74,
+            "price": 540.99,
+            "pnl": 199.06
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 297,
+            "price": 538.4,
+            "pnl": 29.7
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 538.4,
+        "realizedPnl": 228.76,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 228.76,
+        "rMultiple": 0.229,
+        "economicR": 0.229,
+        "pathR": 0.037,
+        "mfeR": 1.042,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 535.61,
+        "totalQty": 371,
+        "riskPerShare": 2.69,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +0.23 \u00b7 trail SL 538.40 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 538.4,
+        "pctChange": 0.02,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 538.3,
+        "riskPerShare": 2.69,
+        "initialStop": 535.61,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 74,
+            "price": 540.99,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 74,
+            "price": 542.33,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 74,
+            "price": 543.68,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 149,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 542.33,
+        "target2": 546.37,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 371,
+      "deployedCapital": 199709.3
+    },
+    {
+      "symbol": "GRSE",
+      "direction": "LONG",
+      "entryPrice": 2644.8,
+      "stopLoss": 2661.58,
+      "pnl": 1395.75,
+      "realizedPnl": 1395.75,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 2661.58,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 15,
+            "price": 2658.02,
+            "pnl": 198.3
+          },
+          {
+            "r": 1.5,
+            "qty": 15,
+            "price": 2664.63,
+            "pnl": 297.45
+          },
+          {
+            "r": 2.0,
+            "qty": 15,
+            "price": 2671.24,
+            "pnl": 396.6
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 30,
+            "price": 2661.58,
+            "pnl": 503.4
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 2661.58,
+        "realizedPnl": 1395.75,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 1395.75,
+        "rMultiple": 1.408,
+        "economicR": 1.408,
+        "pathR": 1.269,
+        "mfeR": 2.281,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 2631.58,
+        "totalQty": 75,
+        "riskPerShare": 13.22,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +1.41 \u00b7 trail SL 2661.58 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 2661.58,
+        "pctChange": 0.63,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 2644.8,
+        "riskPerShare": 13.22,
+        "initialStop": 2631.58,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 15,
+            "price": 2658.02,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 15,
+            "price": 2664.63,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 15,
+            "price": 2671.24,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 30,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 2664.63,
+        "target2": 2684.46,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 75,
+      "deployedCapital": 198360.0
+    },
+    {
+      "symbol": "ITC",
+      "direction": "LONG",
+      "entryPrice": 277.85,
+      "stopLoss": 276.46,
+      "pnl": -999.41,
+      "realizedPnl": -999.41,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 276.46,
+      "exitReason": "PARTIAL_SCALE",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "INITIAL_SL",
+            "qty": 719,
+            "price": 276.46,
+            "pnl": -999.41
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 276.46,
+        "realizedPnl": -999.41,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -999.41,
+        "rMultiple": -1.0,
+        "economicR": -1.0,
+        "pathR": -1.0,
+        "mfeR": 0.36,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 276.46,
+        "totalQty": 719,
+        "riskPerShare": 1.39
+      },
+      "outcome": {
+        "label": "PENDING",
+        "detail": "R +0.00 \u00b7 trail SL 276.46 \u00b7 rem 719",
+        "hitLevel": null,
+        "ltp": 277.85,
+        "pctChange": 0.0,
+        "scaleTrail": true,
+        "closed": false
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 277.85,
+        "riskPerShare": 1.39,
+        "initialStop": 276.46,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 144,
+            "price": 279.24,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 144,
+            "price": 279.94,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 144,
+            "price": 280.63,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 287,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 279.94,
+        "target2": 282.02,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 719,
+      "deployedCapital": 199774.15
+    },
+    {
+      "symbol": "UNOMINDA",
+      "direction": "LONG",
+      "entryPrice": 1247.0,
+      "stopLoss": 1264.63,
+      "pnl": 2025.6,
+      "realizedPnl": 2025.6,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 1264.63,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 32,
+            "price": 1253.23,
+            "pnl": 199.36
+          },
+          {
+            "r": 1.5,
+            "qty": 32,
+            "price": 1256.35,
+            "pnl": 299.2
+          },
+          {
+            "r": 2.0,
+            "qty": 32,
+            "price": 1259.46,
+            "pnl": 398.72
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 64,
+            "price": 1264.63,
+            "pnl": 1128.32
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1264.63,
+        "realizedPnl": 2025.6,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 2025.6,
+        "rMultiple": 2.032,
+        "economicR": 2.032,
+        "pathR": 2.83,
+        "mfeR": 3.85,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1240.77,
+        "totalQty": 160,
+        "riskPerShare": 6.23,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +2.03 \u00b7 trail SL 1264.63 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 1264.63,
+        "pctChange": 1.41,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 1247.0,
+        "riskPerShare": 6.23,
+        "initialStop": 1240.77,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 32,
+            "price": 1253.23,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 32,
+            "price": 1256.35,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 32,
+            "price": 1259.46,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 64,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 1256.35,
+        "target2": 1265.69,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 160,
+      "deployedCapital": 199520.0
+    },
+    {
+      "symbol": "IRFC",
+      "direction": "LONG",
+      "entryPrice": 88.43,
+      "stopLoss": 87.99,
+      "pnl": -994.84,
+      "realizedPnl": -994.84,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 87.99,
+      "exitReason": "SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "INITIAL_SL",
+            "qty": 2261,
+            "price": 87.99,
+            "pnl": -994.84
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 87.99,
+        "realizedPnl": -994.84,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -994.84,
+        "rMultiple": -1.0,
+        "economicR": -1.0,
+        "pathR": -1.0,
+        "mfeR": 0.386,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 87.99,
+        "totalQty": 2261,
+        "riskPerShare": 0.44,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "INITIAL STOP HIT",
+        "detail": "R -1.00 \u00b7 trail SL 87.99 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 87.99,
+        "pctChange": -0.5,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 88.43,
+        "riskPerShare": 0.44,
+        "initialStop": 87.99,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 452,
+            "price": 88.87,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 452,
+            "price": 89.09,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 452,
+            "price": 89.31,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 905,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 89.09,
+        "target2": 89.75,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 2261,
+      "deployedCapital": 199940.23
+    },
+    {
+      "symbol": "ETERNAL",
+      "direction": "LONG",
+      "entryPrice": 318.65,
+      "stopLoss": 317.06,
+      "pnl": -996.93,
+      "realizedPnl": -996.93,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 317.06,
+      "exitReason": "SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "INITIAL_SL",
+            "qty": 627,
+            "price": 317.06,
+            "pnl": -996.93
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 317.06,
+        "realizedPnl": -996.93,
+        "unrealizedPnl": 0.0,
+        "economicPnl": -996.93,
+        "rMultiple": -1.0,
+        "economicR": -1.0,
+        "pathR": -1.0,
+        "mfeR": 0.377,
+        "profitGuardActive": false,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 317.06,
+        "totalQty": 627,
+        "riskPerShare": 1.59,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "INITIAL STOP HIT",
+        "detail": "R -1.00 \u00b7 trail SL 317.06 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 317.06,
+        "pctChange": -0.5,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 318.65,
+        "riskPerShare": 1.59,
+        "initialStop": 317.06,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 126,
+            "price": 320.24,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 125,
+            "price": 321.03,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 125,
+            "price": 321.83,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 251,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 321.03,
+        "target2": 323.42,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 627,
+      "deployedCapital": 199793.55
+    },
+    {
+      "symbol": "BHARTIARTL",
+      "direction": "LONG",
+      "entryPrice": 1962.3,
+      "stopLoss": 1962.3,
+      "pnl": 0.0,
+      "realizedPnl": 0.0,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 1962.3,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 101,
+            "price": 1962.3,
+            "pnl": 0.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1962.3,
+        "realizedPnl": 0.0,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 0.0,
+        "rMultiple": 0.0,
+        "economicR": 0.0,
+        "pathR": 0.0,
+        "mfeR": 0.785,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1952.49,
+        "totalQty": 101,
+        "riskPerShare": 9.81,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +0.00 \u00b7 trail SL 1962.30 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 1962.3,
+        "pctChange": 0.0,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "LONG",
+        "entry": 1962.3,
+        "riskPerShare": 9.81,
+        "initialStop": 1952.49,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 20,
+            "price": 1972.11,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 20,
+            "price": 1977.01,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 20,
+            "price": 1981.92,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 41,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 1977.01,
+        "target2": 1991.73,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 101,
+      "deployedCapital": 198192.3
+    },
+    {
+      "symbol": "PFC",
+      "direction": "SHORT",
+      "entryPrice": 375.0,
+      "stopLoss": 375.0,
+      "pnl": 213.2,
+      "realizedPnl": 0.0,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 375.0,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 533,
+            "price": 375.0,
+            "pnl": -0.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 375.0,
+        "realizedPnl": 0.0,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 0.0,
+        "rMultiple": 0.0,
+        "economicR": 0.0,
+        "pathR": -0.0,
+        "mfeR": 0.532,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 376.88,
+        "totalQty": 533,
+        "riskPerShare": 1.88
+      },
+      "outcome": {
+        "label": "PENDING",
+        "detail": "R +0.21 \u00b7 trail SL 375.00 \u00b7 rem 533",
+        "hitLevel": null,
+        "ltp": 374.6,
+        "pctChange": 0.11,
+        "scaleTrail": true,
+        "closed": false
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 375.0,
+        "riskPerShare": 1.875,
+        "initialStop": 376.88,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 107,
+            "price": 373.12,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 107,
+            "price": 372.19,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 106,
+            "price": 371.25,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 213,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 372.19,
+        "target2": 369.38,
+        "validRiskModel": true,
+        "stopRepaired": true,
+        "stopCapped": true,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 533,
+      "deployedCapital": 199875.0
+    },
+    {
+      "symbol": "RECLTD",
+      "direction": "SHORT",
+      "entryPrice": 343.0,
+      "stopLoss": 332.44,
+      "pnl": 3356.79,
+      "realizedPnl": 3356.79,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 332.44,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 117,
+            "price": 341.29,
+            "pnl": 200.07
+          },
+          {
+            "r": 1.5,
+            "qty": 117,
+            "price": 340.44,
+            "pnl": 299.52
+          },
+          {
+            "r": 2.0,
+            "qty": 116,
+            "price": 339.58,
+            "pnl": 396.72
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 233,
+            "price": 332.44,
+            "pnl": 2460.48
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 332.44,
+        "realizedPnl": 3356.79,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 3356.79,
+        "rMultiple": 3.367,
+        "economicR": 3.367,
+        "pathR": 6.175,
+        "mfeR": 7.145,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 344.71,
+        "totalQty": 583,
+        "riskPerShare": 1.71,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +3.37 \u00b7 trail SL 332.44 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 332.44,
+        "pctChange": 3.08,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 343.0,
+        "riskPerShare": 1.71,
+        "initialStop": 344.71,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 117,
+            "price": 341.29,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 117,
+            "price": 340.44,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 116,
+            "price": 339.58,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 233,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 340.44,
+        "target2": 337.87,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 583,
+      "deployedCapital": 199969.0
+    },
+    {
+      "symbol": "GVT&D",
+      "direction": "SHORT",
+      "entryPrice": 4324.7,
+      "stopLoss": 4235.4,
+      "pnl": 2572.31,
+      "realizedPnl": 2572.31,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 4235.4,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 9,
+            "price": 4303.08,
+            "pnl": 194.58
+          },
+          {
+            "r": 1.5,
+            "qty": 9,
+            "price": 4292.27,
+            "pnl": 291.87
+          },
+          {
+            "r": 2.0,
+            "qty": 9,
+            "price": 4281.46,
+            "pnl": 389.16
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 19,
+            "price": 4235.4,
+            "pnl": 1696.7
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 4235.4,
+        "realizedPnl": 2572.31,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 2572.31,
+        "rMultiple": 2.586,
+        "economicR": 2.586,
+        "pathR": 4.13,
+        "mfeR": 5.105,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 4346.32,
+        "totalQty": 46,
+        "riskPerShare": 21.62,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +2.59 \u00b7 trail SL 4235.40 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 4235.41,
+        "pctChange": 2.06,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 4324.7,
+        "riskPerShare": 21.62,
+        "initialStop": 4346.32,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 9,
+            "price": 4303.08,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 9,
+            "price": 4292.27,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 9,
+            "price": 4281.46,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 19,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 4292.27,
+        "target2": 4259.84,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 46,
+      "deployedCapital": 198936.2
+    },
+    {
+      "symbol": "HINDALCO",
+      "direction": "SHORT",
+      "entryPrice": 1054.6,
+      "stopLoss": 1049.1,
+      "pnl": 1313.86,
+      "realizedPnl": 1313.86,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 1049.1,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 38,
+            "price": 1049.33,
+            "pnl": 200.26
+          },
+          {
+            "r": 1.5,
+            "qty": 38,
+            "price": 1046.69,
+            "pnl": 300.58
+          },
+          {
+            "r": 2.0,
+            "qty": 38,
+            "price": 1044.06,
+            "pnl": 400.52
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 75,
+            "price": 1049.1,
+            "pnl": 412.5
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 1049.1,
+        "realizedPnl": 1313.86,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 1313.86,
+        "rMultiple": 1.319,
+        "economicR": 1.319,
+        "pathR": 1.044,
+        "mfeR": 2.033,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 1059.87,
+        "totalQty": 189,
+        "riskPerShare": 5.27,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +1.32 \u00b7 trail SL 1049.10 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 1049.1,
+        "pctChange": 0.52,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 1054.6,
+        "riskPerShare": 5.27,
+        "initialStop": 1059.87,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 38,
+            "price": 1049.33,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 38,
+            "price": 1046.69,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 38,
+            "price": 1044.06,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 75,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 1046.69,
+        "target2": 1038.79,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 189,
+      "deployedCapital": 199319.4
+    },
+    {
+      "symbol": "PNB",
+      "direction": "SHORT",
+      "entryPrice": 118.34,
+      "stopLoss": 117.78,
+      "pnl": 1068.08,
+      "realizedPnl": 1068.08,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 117.78,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 338,
+            "price": 117.75,
+            "pnl": 199.42
+          },
+          {
+            "r": 1.5,
+            "qty": 338,
+            "price": 117.45,
+            "pnl": 300.82
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 1014,
+            "price": 117.78,
+            "pnl": 567.84
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 117.78,
+        "realizedPnl": 1068.08,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 1068.08,
+        "rMultiple": 1.071,
+        "economicR": 1.071,
+        "pathR": 0.949,
+        "mfeR": 1.938,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 118.93,
+        "totalQty": 1690,
+        "riskPerShare": 0.59,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +1.07 \u00b7 trail SL 117.78 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 117.78,
+        "pctChange": 0.47,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 118.34,
+        "riskPerShare": 0.59,
+        "initialStop": 118.93,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 338,
+            "price": 117.75,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 338,
+            "price": 117.45,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 338,
+            "price": 117.16,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 676,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 117.45,
+        "target2": 116.57,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 1690,
+      "deployedCapital": 199994.6
+    },
+    {
+      "symbol": "TATASTEEL",
+      "direction": "SHORT",
+      "entryPrice": 184.94,
+      "stopLoss": 184.35,
+      "pnl": 879.71,
+      "realizedPnl": 879.71,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 184.35,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 216,
+            "price": 184.02,
+            "pnl": 198.72
+          },
+          {
+            "r": 1.5,
+            "qty": 216,
+            "price": 183.56,
+            "pnl": 298.08
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 649,
+            "price": 184.35,
+            "pnl": 382.91
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 184.35,
+        "realizedPnl": 879.71,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 879.71,
+        "rMultiple": 0.885,
+        "economicR": 0.885,
+        "pathR": 0.641,
+        "mfeR": 1.633,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 185.86,
+        "totalQty": 1081,
+        "riskPerShare": 0.92,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +0.89 \u00b7 trail SL 184.35 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 184.35,
+        "pctChange": 0.32,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 184.94,
+        "riskPerShare": 0.92,
+        "initialStop": 185.86,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 216,
+            "price": 184.02,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 216,
+            "price": 183.56,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 216,
+            "price": 183.1,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 433,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 183.56,
+        "target2": 182.18,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 1081,
+      "deployedCapital": 199920.14
+    },
+    {
+      "symbol": "BPCL",
+      "direction": "SHORT",
+      "entryPrice": 312.75,
+      "stopLoss": 312.2,
+      "pnl": 480.73,
+      "realizedPnl": 480.73,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 312.2,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": 1.0,
+            "qty": 128,
+            "price": 311.19,
+            "pnl": 199.68
+          },
+          {
+            "r": "TRAIL_SL",
+            "qty": 511,
+            "price": 312.2,
+            "pnl": 281.05
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 312.2,
+        "realizedPnl": 480.73,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 480.73,
+        "rMultiple": 0.482,
+        "economicR": 0.482,
+        "pathR": 0.353,
+        "mfeR": 1.346,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 314.31,
+        "totalQty": 639,
+        "riskPerShare": 1.56,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +0.48 \u00b7 trail SL 312.20 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 312.2,
+        "pctChange": 0.18,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 312.75,
+        "riskPerShare": 1.56,
+        "initialStop": 314.31,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 128,
+            "price": 311.19,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 128,
+            "price": 310.41,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 128,
+            "price": 309.63,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 255,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 310.41,
+        "target2": 308.07,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 639,
+      "deployedCapital": 199847.25
+    },
+    {
+      "symbol": "AMBUJACEM",
+      "direction": "SHORT",
+      "entryPrice": 420.1,
+      "stopLoss": 420.1,
+      "pnl": 0.0,
+      "realizedPnl": 0.0,
+      "unrealizedPnl": 0,
+      "closed": true,
+      "status": "CLOSED",
+      "remainingQty": 0,
+      "effectiveStop": 420.1,
+      "exitReason": "TRAIL_SL_HIT",
+      "executionStatus": "TRIGGERED",
+      "exitState": {
+        "legsFilled": [
+          {
+            "r": "TRAIL_SL",
+            "qty": 476,
+            "price": 420.1,
+            "pnl": -0.0
+          }
+        ],
+        "remainingQty": 0,
+        "effectiveStop": 420.1,
+        "realizedPnl": 0.0,
+        "unrealizedPnl": 0.0,
+        "economicPnl": 0.0,
+        "rMultiple": 0.0,
+        "economicR": 0.0,
+        "pathR": -0.0,
+        "mfeR": 0.952,
+        "profitGuardActive": true,
+        "closed": true,
+        "mode": "SCALE_TRAIL",
+        "initialStop": 422.2,
+        "totalQty": 476,
+        "riskPerShare": 2.1,
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "outcome": {
+        "label": "TRAIL STOP HIT",
+        "detail": "R +0.00 \u00b7 trail SL 420.10 \u00b7 rem 0",
+        "hitLevel": "sl",
+        "ltp": 420.1,
+        "pctChange": -0.0,
+        "scaleTrail": true,
+        "closed": true
+      },
+      "exitPlan": {
+        "mode": "SCALE_TRAIL",
+        "direction": "SHORT",
+        "entry": 420.1,
+        "riskPerShare": 2.1,
+        "initialStop": 422.2,
+        "legs": [
+          {
+            "r": 1.0,
+            "qtyPct": 0.2,
+            "qty": 95,
+            "price": 418.0,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 1.5,
+            "qtyPct": 0.2,
+            "qty": 95,
+            "price": 416.95,
+            "trailStopAfter": 0.0
+          },
+          {
+            "r": 2.0,
+            "qtyPct": 0.2,
+            "qty": 95,
+            "price": 415.9,
+            "trailStopAfter": 0.5
+          }
+        ],
+        "runnerQty": 191,
+        "runnerFrac": 0.4,
+        "trailRatchet": {
+          "0.5": 0.0,
+          "1.0": 0.0,
+          "1.5": 0.0,
+          "2.0": 0.5,
+          "3.0": 1.5,
+          "4.0": 2.5,
+          "5.0": 3.5
+        },
+        "target1": 416.95,
+        "target2": 413.8,
+        "validRiskModel": true,
+        "stopRepaired": false,
+        "stopCapped": false,
+        "notes": [
+          "40pct_runner",
+          "monotonic_r_ratchet",
+          "be_at_0p5r",
+          "max_stop_0p5pct",
+          "nse_hybrid_trail",
+          "no_stop_loosen",
+          "book_pnl_authoritative"
+        ],
+        "policyVersion": "0p5r_max_0p5pct"
+      },
+      "qty": 476,
+      "deployedCapital": 199967.6
+    }
+  ],
+  "symbolSource": "intraday_session",
+  "marketPhase": "OPEN",
+  "executionPolicy": "MANUAL_ONLY",
+  "updatedAt": "2026-08-18T06:50:26.009355+00:00",
+  "bookCacheSchemaVersion": 8,
+  "cachedAt": "2026-08-18T06:50:26.009613+00:00"
+}

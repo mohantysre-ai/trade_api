@@ -274,7 +274,11 @@ def _ensure_current_exit_policy(session: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(rows, list) or not rows:
             continue
         updated, row_changed = apply_exit_policy_to_rows(rows)
-        updated, path_changed = overwrite_rows_with_current_policy(updated, after_close=False)
+        snap = load_market_snapshot()
+        quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
+        updated, path_changed = overwrite_rows_with_current_policy(
+            updated, quotes=quotes, after_close=False, force=False
+        )
         if row_changed or path_changed:
             work[key] = updated
             changed = True
@@ -4201,8 +4205,7 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
             finally:
                 _CLOSE_FREEZE_LOCK.release()
 
-    if persist:
-        _persist_if_close_transition(session, long_rows, short_rows)
+    _persist_if_close_transition(session, long_rows, short_rows)
 
     return {
         "success": True,

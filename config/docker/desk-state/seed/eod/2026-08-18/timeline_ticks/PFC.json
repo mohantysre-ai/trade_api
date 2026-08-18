@@ -1,0 +1,10 @@
+{
+  "ticker": "PFC",
+  "date": "2026-08-18",
+  "interval": "ONE_MINUTE",
+  "from": "2026-08-18T09:15:00+05:30",
+  "to": "2026-08-18T15:30:00+05:30",
+  "candle_count": 0,
+  "candles": [],
+  "error": "empty_candles"
+}

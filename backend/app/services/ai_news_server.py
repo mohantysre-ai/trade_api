@@ -384,7 +384,9 @@ def _load_snapshot_deltas() -> dict[str, float]:
     angel_one_feed.py, so ticker chips can show a real intraday delta%
     instead of a placeholder. Returns {} if the snapshot is missing or
     stale-format -- callers must handle empty deltas gracefully."""
-    snapshot_path = Path(__file__).resolve().parent / "last_market_snapshot.json"
+    from .market_snapshot_store import readable_market_snapshot_path
+
+    snapshot_path = readable_market_snapshot_path()
     deltas: dict[str, float] = {}
     try:
         with open(snapshot_path, "r") as f:

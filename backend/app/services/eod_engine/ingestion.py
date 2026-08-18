@@ -9,6 +9,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from ..eod_archive import load_archive
+from ..market_snapshot_store import readable_market_snapshot_path
 
 log = logging.getLogger(__name__)
 
@@ -28,7 +29,6 @@ _INTRADAY_SESSION_PATH = os.environ.get(
     "INTRADAY_SESSION_FILE",
     os.path.join(_REPO_ROOT, "intraday_session.json"),
 )
-_LAST_SNAPSHOT_PATH = os.path.join(_SERVICES_DIR, "last_market_snapshot.json")
 
 
 def eod_day_dir(for_date: date) -> str:
@@ -63,7 +63,7 @@ def _read_json(path: str) -> dict[str, Any]:
 
 
 def load_market_snapshot() -> dict[str, Any]:
-    return _read_json(_LAST_SNAPSHOT_PATH)
+    return _read_json(str(readable_market_snapshot_path()))
 
 
 def load_fixed_trade_plan(for_date: date | None = None) -> dict[str, Any]:

@@ -1,0 +1,10 @@
+{
+  "ticker": "STLTECH",
+  "date": "2026-08-13",
+  "interval": "ONE_MINUTE",
+  "from": "2026-08-13T09:15:00+05:30",
+  "to": "2026-08-13T15:30:00+05:30",
+  "candle_count": 0,
+  "candles": [],
+  "error": "token_unresolved"
+}

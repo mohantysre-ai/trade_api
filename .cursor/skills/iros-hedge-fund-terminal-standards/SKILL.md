@@ -59,10 +59,10 @@ Never invent prices, scores, win rates, Kelly, verdicts, news, or risk flags. If
 
 | File | Path | Role |
 |---|---|---|
-| Live Intraday | `intraday_session.json` (repo root) | Today’s Intraday book — **includes closed names + realized P&L** |
-| Live Swing | `swing_session.json` (repo root) | Today’s Swing book — closed rows stay on `long`/`short` |
-| Live market | `last_market_snapshot.json` (repo root / `backend/app/services/`) | Quotes + Matrix; `GET /api/market-data` with `prefer_cache` |
-| EOD Book | `backend/app/data/eod/{IST date}/book_intraday.json` · `book_swing.json` | **Dated archive of that same IST day’s books** |
+| Live Intraday | Docker volume `/app/state/intraday_session.json` (native: repo root) | Today’s Intraday book — **includes closed names + realized P&L** |
+| Live Swing | Docker volume `/app/state/swing_session.json` (native: repo root) | Today’s Swing book — closed rows stay on `long`/`short` |
+| Live market | Docker volume `/app/state/last_market_snapshot.json` | Quotes + Matrix; `GET /api/market-data` with `prefer_cache` |
+| EOD Book | Docker volume `/app/backend/app/data/eod/{IST date}/` (native: `backend/app/data/eod/`) | **Dated archive of that same IST day’s books** |
 | Bulk deals | `backend/app/data/bulk_deals_cache.json` | NSE bulk/block deal cache |
 | Promoter holdings | `backend/app/data/promoter_holdings.json` | Promoter % cache |
 | App state | `trade_api_snapshot.json` (repo root) | `scannerPicks`, `tickerNewsByTicker`, EOD engine extras |

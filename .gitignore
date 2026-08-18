@@ -1,5 +1,10 @@
 trade_api_snapshot.json
 backend/app/services/last_market_snapshot.json
+/intraday_session.json
+/swing_session.json
+/fixed_trade_plan.json
+/alert_history.json
+/last_market_snapshot.json
 *.log
 logs/
 *.log.*

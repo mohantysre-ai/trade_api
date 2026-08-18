@@ -412,6 +412,13 @@ def _plausible_live_mark(
         return False
     if entry > 0 and risk > 0:
         sign = -1 if str(direction).upper() == "SHORT" else 1
+        stop = entry - sign * risk
+        through_stop = (
+            (str(direction).upper() != "SHORT" and new_mark <= stop)
+            or (str(direction).upper() == "SHORT" and new_mark >= stop)
+        )
+        if through_stop:
+            return True
         adverse_r = sign * (ref - new_mark) / risk
         if adverse_r > 1.5:
             return False
@@ -437,8 +444,7 @@ def _evaluate_live_scale_trail(pick: dict[str, Any], ltp: float, *, after_close:
         entry=entry, risk=risk, last_mark=last_mark, new_mark=mark, direction=direction
     ):
         mark = float(last_mark or entry or mark)
-        quote_lo = None if direction == "LONG" else quote_lo
-        quote_hi = None if direction == "SHORT" else quote_hi
+        # Keep quote day range — those prints are not a one-poll spike.
     highs = [v for v in (pick.get("sessionHigh"), quote_hi, mark, last_mark) if isinstance(v, (int, float)) and v > 0]
     lows = [v for v in (pick.get("sessionLow"), quote_lo, mark, last_mark) if isinstance(v, (int, float)) and v > 0]
     session_high = max(highs) if highs else None
@@ -1219,13 +1225,21 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
                     p["exitState"] = outcome["exitState"]
                 plan_changed.append(True)
                 if outcome.get("closed") or hit_level == "sl":
+                    p["closed"] = True
+                    p["status"] = (
+                        "TRAIL STOP HIT"
+                        if hit_level == "sl" and outcome.get("scaleTrail")
+                        else "STOP LOSS HIT"
+                        if hit_level == "sl"
+                        else "CLOSED"
+                    )
+                    p["remainingQty"] = outcome.get("remainingQty", 0)
+                    if outcome.get("realizedPnl") is not None:
+                        p["realizedPnl"] = outcome.get("realizedPnl")
+                    if outcome.get("unrealizedPnl") is not None:
+                        p["unrealizedPnl"] = outcome.get("unrealizedPnl")
                     entry["closed"] = True
-                    if hit_level == "sl" and outcome.get("scaleTrail"):
-                        entry["status"] = "TRAIL STOP HIT"
-                    elif hit_level == "sl":
-                        entry["status"] = "STOP LOSS HIT"
-                    else:
-                        entry["status"] = "CLOSED"
+                    entry["status"] = p["status"]
                 elif hit_level == "partial":
                     entry["status"] = str(outcome.get("label") or "PARTIAL")
                     entry["closed"] = False
@@ -1283,6 +1297,18 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
             "sessionDate": fixed.get("sessionDate") or _today_ist(),
         }
         save_fixed_trade_plan(merged_plan)
+    elif plan_changed and book_source == "intraday_session":
+        try:
+            from .intraday_session_engine import save_session, sync_fixed_plan_from_session
+
+            sess = dict(fixed)
+            sess["long"] = long_plan
+            sess["short"] = short_plan
+            sess["updatedAt"] = _utc_now()
+            save_session(sess)
+            sync_fixed_plan_from_session(sess)
+        except Exception:
+            log.exception("intraday session persist after live SL evaluation failed")
 
     if new_alerts:
         _record_alert(new_alerts[0])
