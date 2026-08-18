@@ -108,18 +108,26 @@ if %DO_PULL% equ 1 (
         if not "%IROS_NO_PAUSE%"=="1" pause
         exit /b 1
     )
-    echo [*] docker compose %COMPOSE_PROFILES% up -d ...
-    docker compose %COMPOSE_PROFILES% up -d
+    echo [*] Creating containers without start so live JSON can seed first ...
+    docker compose %COMPOSE_PROFILES% up --no-start
     if errorlevel 1 (
-        echo [FAIL] docker compose up failed.
+        echo [FAIL] docker compose up --no-start failed.
         popd
         if not "%IROS_NO_PAUSE%"=="1" pause
         exit /b 1
     )
-    echo [*] Seeding desk JSON from Hub image iros-desk-state into volumes ...
+    echo [*] Seeding desk JSON ^(sessions + market snapshot + eod^) from Hub into volumes ...
     powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%seed-desk-state-from-hub.ps1"
     if errorlevel 1 (
         echo [FAIL] desk-state seed failed — docker login, or run push-docker-hub.bat on the live desk.
+        popd
+        if not "%IROS_NO_PAUSE%"=="1" pause
+        exit /b 1
+    )
+    echo [*] docker compose %COMPOSE_PROFILES% up -d ...
+    docker compose %COMPOSE_PROFILES% up -d
+    if errorlevel 1 (
+        echo [FAIL] docker compose up failed.
         popd
         if not "%IROS_NO_PAUSE%"=="1" pause
         exit /b 1

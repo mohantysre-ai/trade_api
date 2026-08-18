@@ -10,6 +10,9 @@ logs/
 *.log.*
 config/cloudflare/credentials.json
 config/docker/desk-state/seed/*.json
+config/docker/desk-state/seed/state/
+config/docker/desk-state/seed/data/
+config/docker/desk-state/seed/archive/
 desk_state_hub_manifest.json
 # Local build, test, QA, and runtime artifacts
 .tmp/
