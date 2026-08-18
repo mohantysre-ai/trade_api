@@ -2639,5 +2639,20 @@
       "volume": 147.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 357.5
+    },
+    {
+      "event": "NO_ENTRY",
+      "ts": "2026-08-18T14:43:00+05:30",
+      "price": 362.75,
+      "detail": "price never crossed signal entry"
+    }
+  ],
+  "trade_id": "TATACAP:LONG",
+  "outcome": "NO_ENTRY"
 }

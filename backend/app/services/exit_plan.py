@@ -39,7 +39,8 @@ MAX_STOP_PCT = 0.005
 REF_T1_R = 1.5
 REF_T2_R = 3.0
 EXIT_POLICY_VERSION = "0p5r_max_0p5pct"
-MAX_STATE_MFE_R = 100.0
+# 40R at 0.5% risk = 20% (upper circuit class). 80–100R trails are not market.
+MAX_STATE_MFE_R = 40.0
 MAX_INTRADAY_PRICE_RATIO = 1.50
 MIN_INTRADAY_PRICE_RATIO = 0.50
 
@@ -414,6 +415,7 @@ def overwrite_row_with_current_policy(
     *,
     after_close: bool = False,
     force: bool = False,
+    ohlc_bars: list[tuple[float, float, float]] | None = None,
 ) -> dict[str, Any]:
     """Replay SCALE_TRAIL with the 0.5% initial-stop cap and current trail math."""
     qty = int(row.get("approxQty") or row.get("qty") or 0)
@@ -425,6 +427,17 @@ def overwrite_row_with_current_policy(
     if not force and not stop_changed and not open_row and not _needs_path_overwrite(row):
         return row
     mark, high, low = _row_path_marks(capped, quotes)
+    if ohlc_bars:
+        last_close = float(ohlc_bars[-1][2])
+        highs = [float(b[0]) for b in ohlc_bars]
+        lows = [float(b[1]) for b in ohlc_bars]
+        mark = last_close if mark is None else mark
+        high = max(highs)
+        low = min(lows)
+        capped = dict(capped)
+        capped["ltp"] = capped["currentPrice"] = last_close
+        capped["sessionHigh"] = capped["dayHigh"] = high
+        capped["sessionLow"] = capped["dayLow"] = low
     if mark is None:
         return row
     work = {k: v for k, v in capped.items() if k != "exitState"}
@@ -433,7 +446,10 @@ def overwrite_row_with_current_policy(
         work.pop("bookedExitPlan", None)
     work["approxQty"] = qty
     work = refresh_exit_policy(work, keep_exit_state=False)
-    ev = evaluate_scale_trail_path(work, mark, high, low, after_close=after_close)
+    if ohlc_bars:
+        ev = evaluate_scale_trail_candles(work, ohlc_bars, after_close=after_close)
+    else:
+        ev = evaluate_scale_trail_path(work, mark, high, low, after_close=after_close)
     if not ev:
         return work
     state = ev.get("exitState") if isinstance(ev.get("exitState"), dict) else {}
@@ -450,7 +466,15 @@ def overwrite_row_with_current_policy(
     if ev.get("effectiveStop") is not None:
         out["stopLoss"] = ev.get("effectiveStop")
     out["closed"] = closed
-    out["status"] = "CLOSED" if closed else "RUNNING"
+    label = str(ev.get("label") or "").upper()
+    if not closed:
+        out["status"] = "RUNNING"
+    elif "TRAIL STOP" in label:
+        out["status"] = "TRAIL STOP HIT"
+    elif "INITIAL STOP" in label:
+        out["status"] = "STOP LOSS HIT"
+    else:
+        out["status"] = "CLOSED"
     out["mfeR"] = state.get("mfeR") if state.get("mfeR") is not None else out.get("mfeR")
     out["rMultiple"] = ev.get("rMultiple")
     out["economicR"] = ev.get("economicR")
@@ -733,10 +757,13 @@ def evaluate_scale_trail_path(
     """Evaluate favourable excursion first, then adverse path against the ratcheted stop."""
     work = dict(pick)
     direction = str(work.get("direction") or "LONG").upper()
+    entry = float(work.get("entryPrice") or 0)
     hi = float(day_high) if day_high is not None else float(mark)
     lo = float(day_low) if day_low is not None else float(mark)
     fav = hi if direction == "LONG" else lo
     adv = lo if direction == "LONG" else hi
+    fav = _plausible_trade_price(entry, fav) or float(mark)
+    adv = _plausible_trade_price(entry, adv) or float(mark)
     first = evaluate_scale_trail(
         work,
         fav,
@@ -754,6 +781,68 @@ def evaluate_scale_trail_path(
     return evaluate_scale_trail(
         work,
         eval_px,
+        after_close=after_close,
+        trail_ratchet=trail_ratchet,
+        profit_guard_trigger=profit_guard_trigger,
+        use_pct_trail=use_pct_trail,
+    )
+
+
+def evaluate_scale_trail_candles(
+    pick: dict[str, Any],
+    ohlc_bars: list[tuple[float, float, float]],
+    *,
+    after_close: bool = True,
+    trail_ratchet: dict[float, float] | None = None,
+    profit_guard_trigger: float | None = None,
+    use_pct_trail: bool = True,
+) -> dict[str, Any]:
+    """Walk 1-minute bars in order. Intra-bar: adverse extreme before MFE.
+
+    Bars are (high, low, close) already sliced to post-entry. A later spike
+    cannot book profit after an earlier 0.5% stop.
+    """
+    work = dict(pick)
+    direction = str(work.get("direction") or "LONG").upper()
+    entry = float(work.get("entryPrice") or 0)
+    last_ev: dict[str, Any] = {}
+    last_close: float | None = None
+    kwargs = {
+        "after_close": False,
+        "trail_ratchet": trail_ratchet,
+        "profit_guard_trigger": profit_guard_trigger,
+        "use_pct_trail": use_pct_trail,
+    }
+    for high, low, close in ohlc_bars or []:
+        hi = _plausible_trade_price(entry, high)
+        lo = _plausible_trade_price(entry, low)
+        cl = _plausible_trade_price(entry, close)
+        if cl is None:
+            continue
+        last_close = cl
+        adv = (lo if lo is not None else cl) if direction != "SHORT" else (hi if hi is not None else cl)
+        fav = (hi if hi is not None else cl) if direction != "SHORT" else (lo if lo is not None else cl)
+        adv_ev = evaluate_scale_trail(work, adv, **kwargs)
+        if adv_ev.get("closed"):
+            return adv_ev
+        if adv_ev.get("exitState"):
+            work["exitState"] = adv_ev["exitState"]
+        fav_ev = evaluate_scale_trail(work, fav, **kwargs)
+        if fav_ev.get("exitState"):
+            work["exitState"] = fav_ev["exitState"]
+        last_ev = fav_ev
+        if fav_ev.get("closed"):
+            return fav_ev
+        stop = float((work.get("exitState") or {}).get("effectiveStop") or work.get("stopLoss") or 0)
+        if stop > 0 and _stop_hit(stop, adv, direction):
+            hit = evaluate_scale_trail(work, stop, **kwargs)
+            if hit:
+                return hit
+    if last_close is None:
+        return last_ev
+    return evaluate_scale_trail(
+        work,
+        last_close,
         after_close=after_close,
         trail_ratchet=trail_ratchet,
         profit_guard_trigger=profit_guard_trigger,
@@ -864,21 +953,8 @@ def _row_path_marks(row: dict[str, Any], quotes: dict[str, Any] | None) -> tuple
         high = mark
     if low is None:
         low = mark
-    entry = _fnum(row.get("entryPrice"))
-    plan = row.get("exitPlan") if isinstance(row.get("exitPlan"), dict) else {}
-    risk = _fnum(row.get("riskPerShare") or plan.get("riskPerShare"))
-    state = row.get("exitState") if isinstance(row.get("exitState"), dict) else {}
-    state_sane = not state or _exit_state_is_sane(row, state)
-    mfe = _fnum(state.get("mfeR") or row.get("mfeR")) if state_sane else None
-    direction = str(row.get("direction") or "LONG").upper()
-    if entry and risk and mfe and 0 < mfe <= MAX_STATE_MFE_R:
-        fav = entry + (1 if direction != "SHORT" else -1) * risk * mfe
-        if _plausible_trade_price(entry, fav) is None:
-            fav = None
-        if fav is not None and direction == "SHORT":
-            low = min(low, fav, mark)
-        elif fav is not None:
-            high = max(high, fav, mark)
+    # Do not invent a favourable extreme from stored mfeR — that is how
+    # 80R ghost trails (GRSE 3735, ZEEL 143) appear against a sane session high.
     if high < low:
         high, low = low, high
     return mark, high, low

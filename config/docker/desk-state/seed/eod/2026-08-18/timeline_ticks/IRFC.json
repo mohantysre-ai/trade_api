@@ -2631,5 +2631,20 @@
       "volume": 10616.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 86.76
+    },
+    {
+      "event": "NO_ENTRY",
+      "ts": "2026-08-18T14:42:00+05:30",
+      "price": 86.33,
+      "detail": "price never crossed signal entry"
+    }
+  ],
+  "trade_id": "IRFC:LONG",
+  "outcome": "NO_ENTRY"
 }

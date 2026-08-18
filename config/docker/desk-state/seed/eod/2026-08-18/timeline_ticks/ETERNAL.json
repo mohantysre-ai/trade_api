@@ -2583,5 +2583,30 @@
       "volume": 24060.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 318.0
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 318.65,
+      "bar_open": 318.0
+    },
+    {
+      "event": "VWAP_RETEST",
+      "ts": "2026-08-18T09:16:00+05:30",
+      "price": 317.9167
+    },
+    {
+      "event": "TARGET_HIT",
+      "ts": "2026-08-18T09:27:00+05:30",
+      "price": 321.03
+    }
+  ],
+  "trade_id": "ETERNAL:LONG",
+  "outcome": "TARGET_HIT"
 }

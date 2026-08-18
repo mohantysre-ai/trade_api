@@ -1004,6 +1004,14 @@ def collect_hit_alerts_from_rows(
     return new_alerts
 
 
+def invalidate_live_book_cache() -> None:
+    """Drop the coalesced live-book snapshot so disk P&L is not overlaid from stale rows."""
+    global _LIVE_BOOK_CACHE, _LIVE_BOOK_CACHE_AT
+    with _LIVE_BOOK_CACHE_LOCK:
+        _LIVE_BOOK_CACHE = None
+        _LIVE_BOOK_CACHE_AT = 0.0
+
+
 def get_live_prices_for_plan() -> dict[str, Any]:
     """Return a process-wide coalesced live-book snapshot.
 

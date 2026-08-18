@@ -2639,5 +2639,30 @@
       "volume": 132.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 1789.0
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 1824.0,
+      "bar_open": 1789.0
+    },
+    {
+      "event": "VWAP_RETEST",
+      "ts": "2026-08-18T09:16:00+05:30",
+      "price": 1792.2
+    },
+    {
+      "event": "STOP_HIT",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 1771.31
+    }
+  ],
+  "trade_id": "SBILIFE:SHORT",
+  "outcome": "STOP_HIT"
 }

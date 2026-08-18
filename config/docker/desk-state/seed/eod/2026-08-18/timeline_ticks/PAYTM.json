@@ -2615,5 +2615,20 @@
       "volume": 1287.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 1580.2
+    },
+    {
+      "event": "NO_ENTRY",
+      "ts": "2026-08-18T14:40:00+05:30",
+      "price": 1550.5,
+      "detail": "price never crossed signal entry"
+    }
+  ],
+  "trade_id": "PAYTM:LONG",
+  "outcome": "NO_ENTRY"
 }

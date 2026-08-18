@@ -2647,5 +2647,30 @@
       "volume": 7422.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 1131.9
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 1170.5,
+      "bar_open": 1131.9
+    },
+    {
+      "event": "VWAP_RETEST",
+      "ts": "2026-08-18T09:19:00+05:30",
+      "price": 1132.6
+    },
+    {
+      "event": "TARGET_HIT",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 1161.73
+    }
+  ],
+  "trade_id": "ZYDUSLIFE:SHORT",
+  "outcome": "TARGET_HIT"
 }

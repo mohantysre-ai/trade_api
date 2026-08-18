@@ -2887,5 +2887,30 @@
       "volume": 10115.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 4068.0
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 4054.0,
+      "bar_open": 4068.0
+    },
+    {
+      "event": "VWAP_RETEST",
+      "ts": "2026-08-18T09:16:00+05:30",
+      "price": 4061.4667
+    },
+    {
+      "event": "STOP_HIT",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 4064.57
+    }
+  ],
+  "trade_id": "LT:LONG",
+  "outcome": "STOP_HIT"
 }

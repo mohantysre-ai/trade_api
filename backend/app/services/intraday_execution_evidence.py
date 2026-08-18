@@ -96,6 +96,52 @@ def candle_entry_evidence(
     }
 
 
+def _bar_ohlc(candle: Any) -> tuple[Any, float, float, float] | None:
+    if isinstance(candle, dict):
+        ts = candle.get("ts") or candle.get("timestamp") or candle.get("time")
+        try:
+            high = float(candle.get("high"))
+            low = float(candle.get("low"))
+            close = float(candle.get("close") if candle.get("close") is not None else candle.get("high"))
+        except (TypeError, ValueError):
+            return None
+    elif isinstance(candle, (list, tuple)) and len(candle) >= 5:
+        ts, _open, high, low, close = candle[0], candle[1], candle[2], candle[3], candle[4]
+        try:
+            high, low, close = float(high), float(low), float(close)
+        except (TypeError, ValueError):
+            return None
+    else:
+        return None
+    if high <= 0 or low <= 0 or close <= 0:
+        return None
+    return ts, high, low, close
+
+
+def post_entry_ohlc_bars(
+    candles: list[Any],
+    *,
+    entry_at: str | datetime | None,
+    session_date: date | None = None,
+) -> list[tuple[float, float, float]]:
+    """1-minute (high, low, close) from the fill bar through cash close."""
+    start = _dt(entry_at)
+    close_dt = datetime.combine(session_date, CASH_CLOSE, tzinfo=IST) if session_date else None
+    bars: list[tuple[float, float, float]] = []
+    for candle in candles or []:
+        parsed = _bar_ohlc(candle)
+        if parsed is None:
+            continue
+        ts, high, low, close = parsed
+        ts_dt = _dt(ts)
+        if start is not None and ts_dt is not None and ts_dt < start:
+            continue
+        if close_dt is not None and ts_dt is not None and ts_dt > close_dt:
+            continue
+        bars.append((high, low, close))
+    return bars
+
+
 _SESSION_FILL_STATUSES = frozenset({"TRIGGERED", "EXECUTED", "FILLED"})
 
 

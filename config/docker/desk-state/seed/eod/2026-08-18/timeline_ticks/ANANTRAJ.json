@@ -2623,5 +2623,30 @@
       "volume": 1076.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 623.0
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 615.65,
+      "bar_open": 623.0
+    },
+    {
+      "event": "VWAP_RETEST",
+      "ts": "2026-08-18T09:16:00+05:30",
+      "price": 626.1167
+    },
+    {
+      "event": "TARGET_HIT",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 620.27
+    }
+  ],
+  "trade_id": "ANANTRAJ:LONG",
+  "outcome": "TARGET_HIT"
 }

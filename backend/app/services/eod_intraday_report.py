@@ -17,7 +17,7 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 from .eod_archive import load_archive
-from .exit_plan import attach_exit_plan, blended_pnl_from_state, format_scale_progress, overwrite_row_with_current_policy, refresh_exit_policy, apply_max_stop_cap
+from .exit_plan import EXIT_POLICY_VERSION, attach_exit_plan, blended_pnl_from_state, format_scale_progress, overwrite_row_with_current_policy, refresh_exit_policy, apply_max_stop_cap
 from .quant_desk_exit_policy import build_trade_outcome, classify_taxonomy
 import time
 import urllib.request
@@ -320,7 +320,12 @@ def _enrich_pick_day_range(
     return out
 
 
-def _leg_pnl(pick: dict[str, Any], *, after_close: bool) -> tuple[str, float, float, dict[str, Any]]:
+def _leg_pnl(
+    pick: dict[str, Any],
+    *,
+    after_close: bool,
+    ohlc_bars: list[tuple[float, float, float]] | None = None,
+) -> tuple[str, float, float, dict[str, Any]]:
     """Return (exit_reason, exit_price, pnl, scale_meta) for one intraday pick."""
     direction = pick.get("direction", "LONG")
     entry = float(pick.get("entryPrice") or 0)
@@ -344,7 +349,9 @@ def _leg_pnl(pick: dict[str, Any], *, after_close: bool) -> tuple[str, float, fl
             work["dayLow"] = pick.get("dayLow")
             work.setdefault("sessionLow", pick.get("dayLow"))
         # Overwrite booked 0.25R path with current 0.5R / 0.5% trail using session H/L.
-        overwritten = overwrite_row_with_current_policy(work, after_close=False, force=True)
+        overwritten = overwrite_row_with_current_policy(
+            work, after_close=after_close, force=True, ohlc_bars=ohlc_bars,
+        )
         eval_state = overwritten.get("exitState") if isinstance(overwritten.get("exitState"), dict) else {}
         if eval_state:
             plan = overwritten.get("exitPlan") if isinstance(overwritten.get("exitPlan"), dict) else None
@@ -1057,17 +1064,26 @@ def generate_intraday_eod_report(
         pick["dayHigh"] = entry_evidence.get("postEntryHigh")
         pick["dayLow"] = entry_evidence.get("postEntryLow")
         pick["entryEvidence"] = entry_evidence
+        ohlc_bars = _post_entry_bars_for(
+            for_date,
+            ticker,
+            entry_evidence.get("triggeredAt") or pick.get("triggeredAt") or pick.get("replacedAt") or committed_at,
+        )
 
         # Prefer SCALE_TRAIL blended PnL + ladder fields when attachable.
         # Scorecard only for legacy unresolved binary legs (no inventing ladder).
         if _scale_trail_work_pick(pick) is not None:
-            reason, exit_price, pnl, scale_meta = _leg_pnl(pick, after_close=after_close)
+            reason, exit_price, pnl, scale_meta = _leg_pnl(
+                pick, after_close=after_close, ohlc_bars=ohlc_bars,
+            )
             exit_source = "SCALE_TRAIL"
         elif card and _outcome_unresolved(pick):
             reason, exit_price, pnl, scale_meta = _apply_scorecard_to_leg(pick, card)
             exit_source = "SCORECARD"
         else:
-            reason, exit_price, pnl, scale_meta = _leg_pnl(pick, after_close=after_close)
+            reason, exit_price, pnl, scale_meta = _leg_pnl(
+                pick, after_close=after_close, ohlc_bars=ohlc_bars,
+            )
             exit_source = "ARCHIVE"
 
         deployed = float(pick.get("deployedCapital") or 0)
@@ -1312,35 +1328,107 @@ def generate_intraday_eod_report(
     return save_book_cache(for_date, "intraday", report)
 
 
-def _timeline_path_range(for_date: date, symbol: str) -> tuple[float | None, float | None, float | None]:
+def _post_entry_bars_for(
+    for_date: date,
+    symbol: str,
+    entry_at: Any,
+) -> list[tuple[float, float, float]]:
     from .eod_engine.ingestion import load_persisted_candles
+    from .intraday_execution_evidence import post_entry_ohlc_bars
 
     payload = load_persisted_candles(for_date, symbol)
     candles = payload.get("candles") if isinstance(payload, dict) else []
-    hi: float | None = None
-    lo: float | None = None
-    last: float | None = None
-    for candle in candles or []:
-        if isinstance(candle, dict):
-            h, l, c = candle.get("high"), candle.get("low"), candle.get("close")
-        elif isinstance(candle, (list, tuple)) and len(candle) >= 5:
-            h, l, c = candle[2], candle[3], candle[4]
-        else:
-            continue
-        try:
-            h_f, l_f = float(h), float(l)
-        except (TypeError, ValueError):
-            continue
-        if h_f > 0:
-            hi = h_f if hi is None else max(hi, h_f)
-        if l_f > 0:
-            lo = l_f if lo is None else min(lo, l_f)
-        try:
-            if c is not None and float(c) > 0:
-                last = float(c)
-        except (TypeError, ValueError):
-            pass
+    return post_entry_ohlc_bars(
+        candles if isinstance(candles, list) else [],
+        entry_at=entry_at,
+        session_date=for_date,
+    )
+
+
+def _timeline_path_range(
+    for_date: date,
+    symbol: str,
+    entry_at: Any = None,
+) -> tuple[float | None, float | None, float | None]:
+    bars = _post_entry_bars_for(for_date, symbol, entry_at)
+    if not bars:
+        return None, None, None
+    hi = max(b[0] for b in bars)
+    lo = min(b[1] for b in bars)
+    last = bars[-1][2]
     return hi, lo, last
+
+
+def _replay_triggered_row(
+    raw: dict[str, Any],
+    *,
+    for_date: date,
+    after_close: bool,
+    committed_at: Any = None,
+) -> dict[str, Any]:
+    """Replay 0.5% SL + trail on one triggered row from post-entry minute bars."""
+    work = apply_max_stop_cap(dict(raw))
+    for drop in (
+        "exitPrice",
+        "exitState",
+        "exitPlan",
+        "bookedExitPlan",
+        "outcome",
+    ):
+        work.pop(drop, None)
+    evidence = work.get("entryEvidence") if isinstance(work.get("entryEvidence"), dict) else {}
+    entry_at = (
+        work.get("triggeredAt")
+        or work.get("replacedAt")
+        or evidence.get("triggeredAt")
+        or committed_at
+    )
+    bars = _post_entry_bars_for(for_date, str(work.get("symbol") or ""), entry_at)
+    if bars:
+        work["ltp"] = work["currentPrice"] = bars[-1][2]
+        work["dayHigh"] = work["sessionHigh"] = max(b[0] for b in bars)
+        work["dayLow"] = work["sessionLow"] = min(b[1] for b in bars)
+    else:
+        for k in ("sessionHigh", "dayHigh", "sessionLow", "dayLow"):
+            work.pop(k, None)
+    overwritten = overwrite_row_with_current_policy(
+        work, after_close=after_close, force=True, ohlc_bars=bars or None,
+    )
+    out = dict(raw)
+    out.update({
+        "stopLoss": overwritten.get("stopLoss") or work.get("stopLoss"),
+        "riskPerShare": overwritten.get("riskPerShare") or work.get("riskPerShare"),
+        "closed": overwritten.get("closed"),
+        "status": overwritten.get("status"),
+        "remainingQty": overwritten.get("remainingQty"),
+        "effectiveStop": overwritten.get("effectiveStop"),
+        "realizedPnl": overwritten.get("realizedPnl"),
+        "unrealizedPnl": overwritten.get("unrealizedPnl"),
+        "pnl": overwritten.get("pnl") or overwritten.get("totalPnl"),
+        "totalPnl": overwritten.get("totalPnl"),
+        "exitState": overwritten.get("exitState"),
+        "outcome": overwritten.get("outcome"),
+        "exitPlan": overwritten.get("exitPlan"),
+        "mfeR": overwritten.get("mfeR"),
+        "ltp": overwritten.get("ltp") or work.get("ltp"),
+        "currentPrice": overwritten.get("currentPrice") or work.get("currentPrice"),
+        "sessionHigh": overwritten.get("sessionHigh") or work.get("sessionHigh"),
+        "sessionLow": overwritten.get("sessionLow") or work.get("sessionLow"),
+        "dayHigh": overwritten.get("dayHigh") or work.get("dayHigh"),
+        "dayLow": overwritten.get("dayLow") or work.get("dayLow"),
+    })
+    outcome = overwritten.get("outcome") if isinstance(overwritten.get("outcome"), dict) else {}
+    reason = _exit_reason_from_scale_eval({
+        "hitLevel": outcome.get("hitLevel"),
+        "label": outcome.get("label"),
+        "closed": overwritten.get("closed"),
+        "exitState": overwritten.get("exitState"),
+    })
+    if overwritten.get("closed"):
+        out["exitReason"] = reason
+        out["executionStatus"] = "TRIGGERED"
+        out["deskExitLabel"] = reason
+    return out
 
 
 def recalculate_cached_intraday_book(for_date: date, *, after_close: bool | None = None) -> dict[str, Any]:
@@ -1353,6 +1441,12 @@ def recalculate_cached_intraday_book(for_date: date, *, after_close: bool | None
     if after_close is None:
         from .desk_clock import cash_session_phase
         after_close = cash_session_phase(for_date) == "CLOSED"
+    committed_at = None
+    try:
+        from .eod_engine.ingestion import load_intraday_session
+        committed_at = load_intraday_session(for_date).get("committedAt")
+    except Exception:
+        committed_at = None
     rows: list[dict[str, Any]] = []
     total_pnl = 0.0
     hits = {"T1_HIT": 0, "T2_HIT": 0, "SL_HIT": 0, "EOD_SQUAREOFF": 0, "TRAIL_SL_HIT": 0, "PARTIAL_SCALE": 0}
@@ -1362,67 +1456,93 @@ def recalculate_cached_intraday_book(for_date: date, *, after_close: bool | None
         if raw.get("skipped") or str(raw.get("executionStatus") or "") == "NOT_TRIGGERED":
             rows.append(raw)
             continue
-        work = apply_max_stop_cap(dict(raw))
-        for drop in (
-            "exitPrice",
-            "ltp",
-            "currentPrice",
-            "effectiveStop",
-            "exitState",
-            "exitPlan",
-            "bookedExitPlan",
-            "outcome",
-        ):
-            work.pop(drop, None)
-        hi, lo, last = _timeline_path_range(for_date, str(work.get("symbol") or ""))
-        if hi is not None:
-            work["dayHigh"] = work["sessionHigh"] = hi
-        if lo is not None:
-            work["dayLow"] = work["sessionLow"] = lo
-        if last is not None:
-            work["ltp"] = work["currentPrice"] = last
-        quotes = {
-            str(work.get("symbol") or "").upper(): {
-                "high": work.get("dayHigh"),
-                "low": work.get("dayLow"),
-            }
-        }
-        overwritten = overwrite_row_with_current_policy(
-            work, quotes=quotes, after_close=after_close, force=True
+        out = _replay_triggered_row(
+            raw, for_date=for_date, after_close=after_close, committed_at=committed_at,
         )
-        out = dict(raw)
-        out.update({
-            "stopLoss": work.get("stopLoss"),
-            "riskPerShare": overwritten.get("riskPerShare") or work.get("riskPerShare"),
-            "closed": overwritten.get("closed"),
-            "status": overwritten.get("status"),
-            "remainingQty": overwritten.get("remainingQty"),
-            "effectiveStop": overwritten.get("effectiveStop"),
-            "realizedPnl": overwritten.get("realizedPnl"),
-            "unrealizedPnl": overwritten.get("unrealizedPnl"),
-            "pnl": overwritten.get("pnl") or overwritten.get("totalPnl"),
-            "exitState": overwritten.get("exitState"),
-            "outcome": overwritten.get("outcome"),
-            "exitPlan": overwritten.get("exitPlan"),
-        })
-        outcome = overwritten.get("outcome") if isinstance(overwritten.get("outcome"), dict) else {}
-        reason = _exit_reason_from_scale_eval({
-            "hitLevel": outcome.get("hitLevel"),
-            "label": outcome.get("label"),
-            "closed": overwritten.get("closed"),
-            "exitState": overwritten.get("exitState"),
-        })
-        if overwritten.get("closed"):
-            out["exitReason"] = reason
-            out["executionStatus"] = "TRIGGERED"
-            out["deskExitLabel"] = reason
         pnl = float(out.get("pnl") or out.get("realizedPnl") or 0)
         total_pnl += pnl
+        reason = str(out.get("exitReason") or "")
         if reason in hits:
             hits[reason] += 1
         rows.append(out)
     cached["trades"] = rows
     cached["totalPnl"] = round(total_pnl, 2)
     cached["hitBreakdown"] = hits
+    capital = float(cached.get("capital") or DEFAULT_INTRADAY_CAPITAL)
+    deployed_sum = round(
+        sum(
+            float(r.get("deployedCapital") or 0)
+            for r in rows
+            if isinstance(r, dict) and not r.get("skipped")
+        ),
+        2,
+    )
+    cached["bookTurnover"] = deployed_sum
+    cached["totalDeployed"] = round(min(deployed_sum, capital), 2)
     cached["updatedAt"] = datetime.now(tz=timezone.utc).isoformat()
     return save_book_cache(for_date, "intraday", cached)
+
+
+def recalculate_live_intraday_from_candles(
+    for_date: date,
+    *,
+    after_close: bool | None = None,
+) -> dict[str, Any]:
+    """Rebuild today's locked session P&L from post-entry 1-minute candles. Does not unlock."""
+    from .intraday_session_engine import load_session, save_session, sync_fixed_plan_from_session
+
+    session = load_session()
+    session_date = str(session.get("sessionDate") or "")[:10]
+    if session_date != for_date.isoformat():
+        return {
+            "ok": False,
+            "error": "session_date_mismatch",
+            "sessionDate": session_date,
+            "requested": for_date.isoformat(),
+        }
+    if after_close is None:
+        from .desk_clock import cash_session_phase
+        after_close = cash_session_phase(for_date) == "CLOSED"
+    committed_at = session.get("committedAt")
+    out = dict(session)
+    names = 0
+    realized = 0.0
+    for key in ("long", "short"):
+        replayed: list[dict[str, Any]] = []
+        for raw in session.get(key) or []:
+            if not isinstance(raw, dict):
+                replayed.append(raw)
+                continue
+            if raw.get("skipped") or str(raw.get("executionStatus") or "") == "NOT_TRIGGERED":
+                replayed.append(raw)
+                continue
+            row = _replay_triggered_row(
+                raw, for_date=for_date, after_close=after_close, committed_at=committed_at,
+            )
+            replayed.append(row)
+            names += 1
+            realized += float(row.get("realizedPnl") or row.get("pnl") or 0)
+        out[key] = replayed
+    out["updatedAt"] = datetime.now(tz=timezone.utc).isoformat()
+    out["pnlRecalc"] = {
+        "source": "post_entry_one_minute_candles",
+        "policyVersion": EXIT_POLICY_VERSION,
+        "at": out["updatedAt"],
+        "afterClose": after_close,
+    }
+    save_session(out)
+    try:
+        sync_fixed_plan_from_session(out)
+    except Exception:
+        log.exception("sync_fixed_plan_from_session after candle recalc failed")
+    book = generate_intraday_eod_report(for_date, force=True)
+    return {
+        "ok": True,
+        "sessionDate": session_date,
+        "names": names,
+        "realizedPnl": round(realized, 2),
+        "bookPnl": book.get("totalPnl"),
+        "bookDeployed": book.get("totalDeployed"),
+        "afterClose": after_close,
+        "locked": bool(out.get("locked")),
+    }

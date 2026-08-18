@@ -2647,5 +2647,25 @@
       "volume": 1026.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 187.99
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T10:59:00+05:30",
+      "price": 186.77,
+      "bar_open": 186.89
+    },
+    {
+      "event": "STOP_HIT",
+      "ts": "2026-08-18T10:59:00+05:30",
+      "price": 186.24
+    }
+  ],
+  "trade_id": "UNIONBANK:SHORT",
+  "outcome": "STOP_HIT"
 }

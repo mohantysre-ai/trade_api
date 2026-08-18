@@ -1479,5 +1479,30 @@
       "volume": 349.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 1048.95
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 1054.6,
+      "bar_open": 1048.95
+    },
+    {
+      "event": "VWAP_RETEST",
+      "ts": "2026-08-18T09:29:00+05:30",
+      "price": 1047.0333
+    },
+    {
+      "event": "STOP_HIT",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 863.45
+    }
+  ],
+  "trade_id": "HINDALCO:SHORT",
+  "outcome": "STOP_HIT"
 }

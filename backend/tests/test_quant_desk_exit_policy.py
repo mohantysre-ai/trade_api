@@ -488,7 +488,7 @@ def test_corrupt_current_policy_state_is_replayed_not_trusted():
 
     assert replayed["effectiveStop"] < pick["entryPrice"] * 1.5
     assert abs(replayed["realizedPnl"]) <= pick["entryPrice"] * pick["approxQty"] * 0.5
-    assert replayed["exitState"]["mfeR"] <= 100.0
+    assert replayed["exitState"]["mfeR"] <= 40.0
 
 
 def test_evaluator_discards_corrupt_prior_mfe_and_stop():
@@ -517,3 +517,91 @@ def test_evaluator_discards_corrupt_prior_mfe_and_stop():
     assert result["effectiveStop"] < 1300.0
     assert abs(result["realizedPnl"]) < 10_000.0
     assert result["exitState"]["mfeR"] < 10.0
+
+
+def test_candle_walk_stops_before_later_high():
+    from app.services.exit_plan import attach_exit_plan, evaluate_scale_trail_candles
+
+    pick = attach_exit_plan({
+        "symbol": "STOPFIRST",
+        "direction": "LONG",
+        "entryPrice": 100.0,
+        "stopLoss": 99.5,
+        "riskPerShare": 0.5,
+        "approxQty": 200,
+    })
+    result = evaluate_scale_trail_candles(
+        pick,
+        [
+            (102.0, 99.4, 99.6),
+            (110.0, 100.0, 109.0),
+        ],
+        after_close=True,
+    )
+    assert result["closed"] is True
+    assert result["exitState"]["mfeR"] < 2.0
+    assert abs(float(result["realizedPnl"])) <= 200 * 0.5 + 1.0
+    fill = result["exitState"]["legsFilled"][-1]
+    assert fill["r"] in ("INITIAL_SL", "TRAIL_SL")
+    assert fill["price"] < 101.0
+
+
+def test_ghost_mfe_does_not_invent_session_high():
+    from app.services.exit_plan import EXIT_POLICY_VERSION, attach_exit_plan, overwrite_row_with_current_policy
+
+    pick = attach_exit_plan({
+        "symbol": "GRSE",
+        "direction": "LONG",
+        "entryPrice": 2644.8,
+        "stopLoss": 2631.58,
+        "riskPerShare": 13.224,
+        "approxQty": 75,
+        "ltp": 2677.0,
+        "sessionHigh": 2677.0,
+        "sessionLow": 2630.0,
+        "closed": True,
+    })
+    pick["exitState"] = {
+        "policyVersion": EXIT_POLICY_VERSION,
+        "mfeR": 84.0,
+        "effectiveStop": 3735.64,
+        "realizedPnl": 80_000.0,
+        "legsFilled": [{"r": "TRAIL_SL", "qty": 75, "price": 3735.64, "pnl": 80_000.0}],
+    }
+    replayed = overwrite_row_with_current_policy(
+        pick,
+        quotes={"GRSE": {"high": 2677.0, "low": 2630.0}},
+        after_close=True,
+        force=True,
+    )
+    assert replayed["effectiveStop"] < 2700.0
+    assert float(replayed["realizedPnl"] or 0) < 20_000.0
+    ohlc = overwrite_row_with_current_policy(
+        pick,
+        after_close=True,
+        force=True,
+        ohlc_bars=[(3735.64, 2600.0, 2640.0), (2677.0, 2630.0, 2677.0)],
+    )
+    # First bar adverse 2600 hits 0.5% SL; 3735 is implausible vs 1.50 ratio anyway.
+    assert ohlc["effectiveStop"] < 2700.0
+    assert float(ohlc["realizedPnl"] or 0) < 5_000.0
+    legs = (ohlc.get("exitState") or {}).get("legsFilled") or []
+    assert all(float(leg.get("price") or 0) < 2700.0 for leg in legs if isinstance(leg, dict))
+
+
+def test_post_entry_bars_drop_pre_fill_spike():
+    from datetime import date
+
+    from app.services.intraday_execution_evidence import post_entry_ohlc_bars
+
+    candles = [
+        {"ts": "2026-08-18T09:30:00+05:30", "high": 3735.64, "low": 2600.0, "close": 2640.0},
+        {"ts": "2026-08-18T12:09:00+05:30", "high": 2677.0, "low": 2630.0, "close": 2677.0},
+        {"ts": "2026-08-18T15:31:00+05:30", "high": 4000.0, "low": 2000.0, "close": 3000.0},
+    ]
+    bars = post_entry_ohlc_bars(
+        candles,
+        entry_at="2026-08-18T12:09:00+05:30",
+        session_date=date(2026, 8, 18),
+    )
+    assert bars == [(2677.0, 2630.0, 2677.0)]

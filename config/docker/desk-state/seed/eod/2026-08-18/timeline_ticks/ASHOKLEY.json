@@ -2583,5 +2583,20 @@
       "volume": 9995.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 177.0
+    },
+    {
+      "event": "NO_ENTRY",
+      "ts": "2026-08-18T14:36:00+05:30",
+      "price": 176.77,
+      "detail": "price never crossed signal entry"
+    }
+  ],
+  "trade_id": "ASHOKLEY:LONG",
+  "outcome": "NO_ENTRY"
 }

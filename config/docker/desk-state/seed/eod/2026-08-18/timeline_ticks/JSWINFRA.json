@@ -2599,5 +2599,30 @@
       "volume": 1066.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 334.45
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 342.35,
+      "bar_open": 334.45
+    },
+    {
+      "event": "VWAP_RETEST",
+      "ts": "2026-08-18T09:16:00+05:30",
+      "price": 335.4833
+    },
+    {
+      "event": "STOP_HIT",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 240.26
+    }
+  ],
+  "trade_id": "JSWINFRA:SHORT",
+  "outcome": "STOP_HIT"
 }

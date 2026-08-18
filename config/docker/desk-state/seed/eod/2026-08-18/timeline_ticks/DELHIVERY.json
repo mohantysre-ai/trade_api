@@ -2623,5 +2623,30 @@
       "volume": 8389.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 451.65
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 468.65,
+      "bar_open": 451.65
+    },
+    {
+      "event": "VWAP_RETEST",
+      "ts": "2026-08-18T09:17:00+05:30",
+      "price": 454.3167
+    },
+    {
+      "event": "STOP_HIT",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 304.03
+    }
+  ],
+  "trade_id": "DELHIVERY:SHORT",
+  "outcome": "STOP_HIT"
 }

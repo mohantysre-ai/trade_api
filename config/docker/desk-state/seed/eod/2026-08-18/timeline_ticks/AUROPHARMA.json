@@ -2583,5 +2583,20 @@
       "volume": 219.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 1631.0
+    },
+    {
+      "event": "NO_ENTRY",
+      "ts": "2026-08-18T14:36:00+05:30",
+      "price": 1637.9,
+      "detail": "price never crossed signal entry"
+    }
+  ],
+  "trade_id": "AUROPHARMA:LONG",
+  "outcome": "NO_ENTRY"
 }

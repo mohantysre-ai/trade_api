@@ -359,3 +359,73 @@ def test_persist_refreshes_snapshot_and_stamps_live_regime(monkeypatch):
     assert refreshes == ["intraday_replacement_hunt"]
     assert out["regime"]["label"] == "LIVE"
     assert session["regime"]["label"] == "LIVE"
+
+
+def test_closed_row_keeps_session_pnl_not_live_ghost():
+    pos = {
+        "symbol": "GRSE",
+        "direction": "LONG",
+        "closed": True,
+        "status": "TRAIL STOP HIT",
+        "entryPrice": 2644.8,
+        "approxQty": 75,
+        "realizedPnl": 990.3,
+        "effectiveStop": 2645.31,
+        "exitState": {"mfeR": 1.2, "realizedPnl": 990.3, "effectiveStop": 2645.31},
+    }
+    live = {
+        "symbol": "GRSE",
+        "realizedPnl": 33617.55,
+        "effectiveStop": 3735.64,
+        "exitState": {"mfeR": 83.9, "realizedPnl": 33617.55, "effectiveStop": 3735.64},
+        "ltp": 2677.0,
+    }
+    out = eng._enrich_position(pos, {}, live)
+    assert out["realizedPnl"] == 990.3
+    assert out["effectiveStop"] == 2645.31
+    assert out["exitState"]["mfeR"] == 1.2
+    assert out["closed"] is True
+
+
+def test_get_applies_current_exit_policy_without_writing(monkeypatch):
+    session = {
+        "locked": False,
+        "long": [{
+            "symbol": "NTPC",
+            "direction": "LONG",
+            "entryPrice": 100.0,
+            "stopLoss": 99.5,
+            "riskPerShare": 0.5,
+            "approxQty": 50,
+            "closed": False,
+            "status": "RUNNING",
+            "exitPlan": {
+                "mode": "SCALE_TRAIL",
+                "notes": ["40pct_runner", "be_at_0p25r"],
+                "trailRatchet": {"0.25": 0.0},
+                "entry": 100.0,
+                "direction": "LONG",
+                "riskPerShare": 0.5,
+                "initialStop": 99.5,
+            },
+        }],
+        "short": [],
+    }
+    saves: list = []
+    path_calls: list = []
+    monkeypatch.setattr(eng, "load_session", lambda: session)
+    monkeypatch.setattr(eng, "save_session", lambda payload: saves.append(payload))
+    monkeypatch.setattr(eng, "load_market_snapshot", _stale_snap)
+    monkeypatch.setattr(eng, "detect_regime", lambda _snap: {"label": "LOCK"})
+    monkeypatch.setattr(
+        eng,
+        "overwrite_rows_with_current_policy",
+        lambda *a, **k: path_calls.append(True) or (a[0], False),
+    )
+    monkeypatch.setattr("app.services.trade_outcome._is_market_open", lambda: False)
+    out = eng._compute_session(include_live=False, persist=False)
+    assert saves == []
+    assert path_calls == []
+    notes = ((out.get("long") or [{}])[0].get("exitPlan") or {}).get("notes") or []
+    assert "be_at_0p5r" in notes
+    assert "max_stop_0p5pct" in notes

@@ -2647,5 +2647,30 @@
       "volume": 7865.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 467.0
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T09:48:00+05:30",
+      "price": 473.6,
+      "bar_open": 472.85
+    },
+    {
+      "event": "VWAP_RETEST",
+      "ts": "2026-08-18T10:47:00+05:30",
+      "price": 470.0747
+    },
+    {
+      "event": "STOP_HIT",
+      "ts": "2026-08-18T09:48:00+05:30",
+      "price": 482.57
+    }
+  ],
+  "trade_id": "TMCV:LONG",
+  "outcome": "STOP_HIT"
 }

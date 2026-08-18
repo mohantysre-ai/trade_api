@@ -1479,5 +1479,20 @@
       "volume": 2036.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 1956.7
+    },
+    {
+      "event": "NO_ENTRY",
+      "ts": "2026-08-18T12:18:00+05:30",
+      "price": 1945.2,
+      "detail": "price never crossed signal entry"
+    }
+  ],
+  "trade_id": "BHARTIARTL:LONG",
+  "outcome": "NO_ENTRY"
 }

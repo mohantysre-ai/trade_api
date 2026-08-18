@@ -1,0 +1,40 @@
+{
+  "date": "2026-08-18",
+  "proposals": [
+    {
+      "proposal_id": "2026-08-18-stop-distance",
+      "parameter_name": "stop_atr_multiple",
+      "current_value": "plan_levels",
+      "proposed_value": "widen_1.2x",
+      "expected_pnl_uplift_pct": 2.0,
+      "confidence_interval": "95% CI provisional",
+      "supporting_evidence": {
+        "sample_count": 137,
+        "stop_hit_samples": 66,
+        "mean_stop_efficiency_index": 0.9255,
+        "rule": "If mean stop_efficiency_index > 0.85 on stop-hits, stops may be tight vs realized MAE",
+        "min_required_samples": 30
+      },
+      "status": "PENDING_REVIEW",
+      "sample_count": 137,
+      "audit_trail": []
+    },
+    {
+      "proposal_id": "2026-08-18-volume-multiplier",
+      "parameter_name": "min_volume_multiplier",
+      "current_value": "session_filter",
+      "proposed_value": "raise_threshold",
+      "expected_pnl_uplift_pct": null,
+      "confidence_interval": "95% CI provisional",
+      "supporting_evidence": {
+        "sample_count": 137,
+        "high_score_stop_hits": 8,
+        "rule": "High factor-score stop-hits suggest tightening volume/liquidity gates",
+        "min_required_samples": 30
+      },
+      "status": "PENDING_REVIEW",
+      "sample_count": 137,
+      "audit_trail": []
+    }
+  ]
+}

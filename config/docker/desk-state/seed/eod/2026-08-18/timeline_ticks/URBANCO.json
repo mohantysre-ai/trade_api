@@ -2647,5 +2647,30 @@
       "volume": 20958.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 144.56
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T11:53:00+05:30",
+      "price": 143.39,
+      "bar_open": 143.6
+    },
+    {
+      "event": "VWAP_RETEST",
+      "ts": "2026-08-18T12:23:00+05:30",
+      "price": 144.519
+    },
+    {
+      "event": "STOP_HIT",
+      "ts": "2026-08-18T11:53:00+05:30",
+      "price": 141.93
+    }
+  ],
+  "trade_id": "URBANCO:SHORT",
+  "outcome": "STOP_HIT"
 }

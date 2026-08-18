@@ -1,0 +1,10 @@
+{
+  "executive_summary": "Book-reconciled EOD: +132484.16 net P&L across 65 locked names (65 triggered, 0 not triggered), with 48 wins and 10 losses. Win rate is 73.85% and net return is 1.278% on \u20b910,366,335 deployed.",
+  "attribution_narrative": "Intraday P&L +132484.16; Swing P&L +0.00. Trade-level attribution is sourced from Book rows; forensic scorecards remain diagnostic.",
+  "execution_and_slippage_review": "Book reconciliation uses realized P&L, close marks, scale/trail state, and deployed-capital rows shown in the EOD Book.",
+  "actionable_directives": [
+    "Use BOOK as the headline P&L / win-rate source for EOD reporting.",
+    "Keep ECE/Brier and forensic scorecards separate from realized Book accounting."
+  ],
+  "source": "DETERMINISTIC_FALLBACK"
+}

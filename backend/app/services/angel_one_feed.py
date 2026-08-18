@@ -4531,7 +4531,7 @@ def create_app() -> FastAPI:
                 "tickerIntelligenceByTicker": payload.get("tickerIntelligenceByTicker", {}),
                 "newsSummary": payload.get("newsSummary"),
                 "selectionMeta": payload.get("selectionMeta"),
-                "isSnapshotFallback": bool(payload.get("isSnapshotFallback", True)),
+                "isSnapshotFallback": bool(payload.get("isSnapshotFallback", False)),
             }
         except HTTPException:
             raise

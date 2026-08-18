@@ -2591,5 +2591,20 @@
       "volume": 438.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 5067.4
+    },
+    {
+      "event": "NO_ENTRY",
+      "ts": "2026-08-18T14:37:00+05:30",
+      "price": 5098.6,
+      "detail": "price never crossed signal entry"
+    }
+  ],
+  "trade_id": "HAL:SHORT",
+  "outcome": "NO_ENTRY"
 }

@@ -2631,5 +2631,20 @@
       "volume": 11896.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 78.0
+    },
+    {
+      "event": "NO_ENTRY",
+      "ts": "2026-08-18T14:42:00+05:30",
+      "price": 74.82,
+      "detail": "price never crossed signal entry"
+    }
+  ],
+  "trade_id": "INOXWIND:SHORT",
+  "outcome": "NO_ENTRY"
 }

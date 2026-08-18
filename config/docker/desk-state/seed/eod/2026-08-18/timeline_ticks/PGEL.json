@@ -2615,5 +2615,30 @@
       "volume": 653.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 609.0
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T09:17:00+05:30",
+      "price": 607.25,
+      "bar_open": 608.55
+    },
+    {
+      "event": "VWAP_RETEST",
+      "ts": "2026-08-18T09:18:00+05:30",
+      "price": 608.8764
+    },
+    {
+      "event": "STOP_HIT",
+      "ts": "2026-08-18T09:17:00+05:30",
+      "price": 597.47
+    }
+  ],
+  "trade_id": "PGEL:SHORT",
+  "outcome": "STOP_HIT"
 }

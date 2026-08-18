@@ -267,11 +267,13 @@ def load_session() -> dict[str, Any]:
 
 
 def _ensure_current_exit_policy(session: dict[str, Any], *, persist: bool = False) -> dict[str, Any]:
-    """Apply 0.5R / 0.5% trail onto open rows. Persist only on scheduler writes."""
+    """Apply current SCALE_TRAIL notes/ratchet in memory. Path replay + disk write only on persist."""
     work = dict(session)
     changed = False
-    snap = load_market_snapshot()
-    quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
+    quotes: dict[str, Any] = {}
+    if persist:
+        snap = load_market_snapshot()
+        quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
     for key in ("long", "short", "candidatePoolLong", "candidatePoolShort"):
         rows = work.get(key)
         if not isinstance(rows, list) or not rows:
@@ -311,6 +313,12 @@ def save_session(payload: dict[str, Any]) -> None:
     # will republish a fresh value after its state transition finishes.
     _SESSION_RESPONSE_CACHE = None
     _SESSION_RESPONSE_CACHE_AT = 0.0
+    try:
+        from .trade_outcome import invalidate_live_book_cache
+
+        invalidate_live_book_cache()
+    except Exception:
+        pass
 
 
 def _persist_if_close_transition(session: dict[str, Any], long_rows: list[dict[str, Any]], short_rows: list[dict[str, Any]]) -> None:
@@ -3654,7 +3662,16 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
         realized = float(out["outcome"]["pnl"])
 
     if was_closed:
-        out["status"] = "CLOSED"
+        # Closed economics are the session archive. The coalesced live-book
+        # cache must not overlay a prior ghost trail / mfeR onto disk P&L.
+        realized = None
+        if out.get("realizedPnl") is not None:
+            realized = float(out["realizedPnl"])
+        elif isinstance(out.get("exitState"), dict) and out["exitState"].get("realizedPnl") is not None:
+            realized = float(out["exitState"]["realizedPnl"])
+        elif isinstance(out.get("outcome"), dict) and out["outcome"].get("pnl") is not None:
+            realized = float(out["outcome"]["pnl"])
+        out["status"] = out.get("status") if str(out.get("status") or "").upper() not in ("", "RUNNING") else "CLOSED"
         out["closed"] = True
         out["realizedPnl"] = round(realized, 2) if realized is not None else None
         out["unrealizedPnl"] = 0.0 if realized is not None else None
@@ -3663,10 +3680,6 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
             out["pnlPct"] = round((realized / (entry * qty)) * 100, 2)
         if realized is not None:
             out["totalPnl"] = round(realized, 2)
-        if live_row and isinstance(live_row.get("exitState"), dict):
-            out["exitState"] = live_row.get("exitState")
-        if live_row and isinstance(live_row.get("outcome"), dict):
-            out["outcome"] = live_row.get("outcome")
         try:
             refreshed = refresh_exit_policy(out, keep_exit_state=True)
             if refreshed.get("exitPlan"):
@@ -3787,6 +3800,8 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
     """Return one coalesced session snapshot to all concurrent UI callers.
 
     Read-only GET path (`persist=False`) — never writes session JSON.
+    Current SCALE_TRAIL notes still attach in memory so the UI is not stuck
+    on a prior 0.25R plan. Path replay stays on the scheduler persist path.
     Coalesced so concurrent UI polls share one compute window.
     """
     global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT
@@ -3822,8 +3837,7 @@ def refresh_session_state() -> dict[str, Any]:
 
 def _compute_session(include_live: bool = True, *, persist: bool = False) -> dict[str, Any]:
     session = load_session()
-    if persist:
-        session = _ensure_current_exit_policy(session, persist=True)
+    session = _ensure_current_exit_policy(session, persist=persist)
     snap = load_market_snapshot()
     try:
         from .trade_outcome import _is_market_open as _rth_open

@@ -3007,5 +3007,20 @@
       "volume": 5207.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 840.0
+    },
+    {
+      "event": "NO_ENTRY",
+      "ts": "2026-08-18T15:29:00+05:30",
+      "price": 832.0,
+      "detail": "price never crossed signal entry"
+    }
+  ],
+  "trade_id": "TATATECH:LONG",
+  "outcome": "NO_ENTRY"
 }

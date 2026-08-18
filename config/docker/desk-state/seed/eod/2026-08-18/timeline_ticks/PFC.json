@@ -2615,5 +2615,30 @@
       "volume": 4388.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 375.0
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 375.0,
+      "bar_open": 375.0
+    },
+    {
+      "event": "VWAP_RETEST",
+      "ts": "2026-08-18T09:17:00+05:30",
+      "price": 375.3833
+    },
+    {
+      "event": "STOP_HIT",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 375.0
+    }
+  ],
+  "trade_id": "PFC:SHORT",
+  "outcome": "STOP_HIT"
 }

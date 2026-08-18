@@ -2999,5 +2999,25 @@
       "volume": 17178.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 697.5
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 688.15,
+      "bar_open": 697.5
+    },
+    {
+      "event": "STOP_HIT",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 1022.03
+    }
+  ],
+  "trade_id": "HEG:LONG",
+  "outcome": "STOP_HIT"
 }

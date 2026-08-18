@@ -1479,5 +1479,30 @@
       "volume": 316.0
     }
   ],
-  "error": null
+  "error": null,
+  "events": [
+    {
+      "event": "SESSION_OPEN",
+      "ts": "2026-08-18T09:15:00+05:30",
+      "price": 3390.4
+    },
+    {
+      "event": "ENTRY_TRIGGER",
+      "ts": "2026-08-18T09:25:00+05:30",
+      "price": 3416.3,
+      "bar_open": 3411.6
+    },
+    {
+      "event": "VWAP_RETEST",
+      "ts": "2026-08-18T09:38:00+05:30",
+      "price": 3409.4526
+    },
+    {
+      "event": "STOP_HIT",
+      "ts": "2026-08-18T09:25:00+05:30",
+      "price": 3417.83
+    }
+  ],
+  "trade_id": "M&M:LONG",
+  "outcome": "STOP_HIT"
 }
