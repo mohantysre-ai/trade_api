@@ -109,6 +109,8 @@ def _close_truncated_json(content: str) -> str:
         elif ch in "}]" and stack:
             stack.pop()
     if in_string:
+        if escape:
+            text += "\\"
         text += '"'
     return text + "".join(reversed(stack))
 

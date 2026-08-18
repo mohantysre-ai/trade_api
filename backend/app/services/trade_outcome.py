@@ -157,8 +157,20 @@ def fetch_live_marks_for_symbols(symbols: list[str]) -> dict[str, float]:
     return out
 
 
+def _plan_row_is_open(pos: dict[str, Any]) -> bool:
+    """True when the desk still needs a live mark (not closed / not triggered)."""
+    if str(pos.get("executionStatus") or "").upper() == "NOT_TRIGGERED":
+        return False
+    if pos.get("closed"):
+        return False
+    st = str(pos.get("status") or "").upper()
+    if st in ("CLOSED", "STOP LOSS HIT", "TRAIL STOP HIT", "SCALE COMPLETE"):
+        return False
+    return True
+
+
 def _should_refresh_plan_ltps(market_open: bool, after_close: bool) -> bool:
-    """Refresh every plan ticker on trading days — session open and post-close."""
+    """Refresh open plan tickers on trading days — session open and post-close."""
     if not _is_trading_day():
         return False
     return bool(market_open or after_close)
@@ -1064,8 +1076,13 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
             "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0},
         }
 
-    all_plan_symbols = [p.get("symbol", "").upper() for p in long_plan + short_plan if p.get("symbol")]
-    unique_symbols = list(dict.fromkeys(all_plan_symbols))
+    open_symbols = list(
+        dict.fromkeys(
+            str(p.get("symbol") or "").upper()
+            for p in (long_plan + short_plan)
+            if p.get("symbol") and _plan_row_is_open(p)
+        )
+    )
 
     snapshot = snapshot_prefetch
     quotes = snapshot.get("stockQuotes") or {}
@@ -1090,18 +1107,17 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
     new_alerts: list[dict[str, Any]] = []
     source_mix = {"live": 0, "snapshot": 0, "cached": 0, "none": 0}
 
-    # Trading-day refresh for every plan ticker (session + post-close close marks).
-    # Session: Angel first, Yahoo fills gaps. Post-close: Yahoo only (fast close marks;
-    # Angel searchScrip can hang DNS and block the desk).
+    # Live marks only for OPEN rows. Closed archive already has exit LTP — Yahoo/Angel
+    # on 50+ closed names blocks GET /api/intraday-session past the UI timeout.
     live_quotes: dict[str, float] = {}
     live_attempted = False
-    if _should_refresh_plan_ltps(market_open, after_close) and unique_symbols:
+    if _should_refresh_plan_ltps(market_open, after_close) and open_symbols:
         live_attempted = True
         if market_open:
-            angel_quotes = _fetch_angel_plan_prices(unique_symbols)
+            angel_quotes = _fetch_angel_plan_prices(open_symbols)
             live_quotes.update(angel_quotes)
         now = time.time()
-        for sym in unique_symbols:
+        for sym in open_symbols:
             if sym in live_quotes:
                 continue
             cached = _YAHOO_FINANCE_CACHE.get(sym)
@@ -1331,12 +1347,12 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
             plan_note
             or (
                 (
-                    "Angel One ltpData + Yahoo last print for every plan ticker"
+                    "Angel One ltpData + Yahoo last print for open tickers"
                     if market_open
-                    else "Yahoo close marks for every plan ticker (post-close)"
+                    else "Yahoo close marks for open tickers (post-close)"
                 )
                 if live_attempted
-                else "Angel One snapshot / plan cache only (weekend or no plan symbols)"
+                else "Angel One snapshot / plan cache only (weekend, no open names, or closed archive)"
             )
         ),
         "newAlerts": new_alerts,

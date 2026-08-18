@@ -254,42 +254,53 @@ def load_market_snapshot() -> dict[str, Any]:
 
 
 def load_session() -> dict[str, Any]:
+    """Read session JSON. GET-safe: no migrate, no disk write."""
     try:
         from .json_atomic import load_json_with_fallback
 
         data = load_json_with_fallback(_SESSION_FILE)
         if not isinstance(data, dict):
             return {}
-        return _ensure_current_exit_policy(data)
+        return data
     except Exception:
         return {}
 
 
-def _ensure_current_exit_policy(session: dict[str, Any]) -> dict[str, Any]:
-    """Persist 0.5R / 0.5% trail onto disk books and overwrite booked 0.25R path prices."""
+def _ensure_current_exit_policy(session: dict[str, Any], *, persist: bool = False) -> dict[str, Any]:
+    """Apply 0.5R / 0.5% trail onto open rows. Persist only on scheduler writes."""
     work = dict(session)
     changed = False
+    snap = load_market_snapshot()
+    quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
     for key in ("long", "short", "candidatePoolLong", "candidatePoolShort"):
         rows = work.get(key)
         if not isinstance(rows, list) or not rows:
             continue
         updated, row_changed = apply_exit_policy_to_rows(rows)
-        snap = load_market_snapshot()
-        quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
-        updated, path_changed = overwrite_rows_with_current_policy(
-            updated, quotes=quotes, after_close=False, force=False
-        )
+        path_changed = False
+        if persist:
+            open_idx = [
+                i for i, r in enumerate(updated)
+                if isinstance(r, dict) and _position_is_open(r)
+            ]
+            if open_idx:
+                subset = [updated[i] for i in open_idx]
+                subset, path_changed = overwrite_rows_with_current_policy(
+                    subset, quotes=quotes, after_close=False, force=False
+                )
+                for i, row in zip(open_idx, subset):
+                    updated[i] = row
         if row_changed or path_changed:
             work[key] = updated
             changed = True
     if not changed:
         return session
-    try:
-        save_session(work)
-        sync_fixed_plan_from_session(work)
-    except Exception:
-        log.exception("intraday exit-policy migrate persist failed")
-        return work
+    if persist:
+        try:
+            save_session(work)
+            sync_fixed_plan_from_session(work)
+        except Exception:
+            log.exception("intraday exit-policy migrate persist failed")
     return work
 
 
@@ -3209,6 +3220,20 @@ def propose_replacements(
     return proposals
 
 
+def _closed_notional_for(rows: list[dict[str, Any]], symbol: str | None) -> float:
+    """Deployed notional of the closed row that freed this slot (0 if unknown)."""
+    want = str(symbol or "").upper()
+    if not want:
+        return 0.0
+    for row in reversed(rows):
+        if str(row.get("symbol") or "").upper() != want:
+            continue
+        if _position_is_open(row):
+            continue
+        return float(row.get("deployedCapital") or row.get("positionValue") or row.get("plannedCapital") or 0)
+    return 0.0
+
+
 def apply_replacements(
     session: dict[str, Any],
     proposals: list[dict[str, Any]],
@@ -3384,20 +3409,6 @@ def apply_replacements(
             risk_scale_cache[direction] = _regime_risk_scale(regime, direction)
         expected_r = float(gate.get("qualityAdjustedExpectedR") or 0)
         band = 0.30 if expected_r >= HIGH_CONVICTION_R else (0.20 if expected_r >= PRIORITY_EXPECTED_R else 0.10)
-        qty = min(
-            int((INTRADAY_CAPITAL * band) // entry),
-            int(min(INTRADAY_CAPITAL * MAX_SINGLE_TRADE_RISK, remaining_risk) // risk),
-            int(remaining_capital // entry),
-        )
-        sizing = {
-            "approxQty": max(0, qty),
-            "deployedCapital": round(max(0, qty) * entry, 2),
-            "maxLoss": round(max(0, qty) * risk, 2),
-            "riskScale": risk_scale_cache[direction],
-        }
-        if int(sizing.get("approxQty") or 0) <= 0:
-            continue
-
         freed_q = freed_long if direction == "LONG" else freed_short
         replaced_from = None
         for src in freed_q:
@@ -3405,6 +3416,40 @@ def apply_replacements(
                 replaced_from = src
                 used_freed.add(src)
                 break
+        src_rows = long_rows if direction == "LONG" else short_rows
+        freed_notional = _closed_notional_for(src_rows, replaced_from) if replaced_from else 0.0
+        slot_budget = remaining_capital / max(1, total_slots_left)
+        sleeve = min(remaining_capital, slot_budget, INTRADAY_CAPITAL * band)
+        if freed_notional > 0:
+            sleeve = min(sleeve, freed_notional)
+        if sleeve <= 0:
+            if replaced_from:
+                used_freed.discard(replaced_from)
+            continue
+        sizing = _size_position(
+            entry,
+            risk,
+            sleeve,
+            risk_scale=risk_scale_cache[direction],
+            basket_slots=1,
+        )
+        qty_by_risk_cap = int(min(INTRADAY_CAPITAL * MAX_SINGLE_TRADE_RISK, remaining_risk) // risk)
+        if qty_by_risk_cap >= 0:
+            qty = min(int(sizing.get("approxQty") or 0), qty_by_risk_cap, int(remaining_capital // entry))
+            sizing = {
+                **sizing,
+                "approxQty": max(0, qty),
+                "deployedCapital": round(max(0, qty) * entry, 2),
+                "maxLoss": round(max(0, qty) * risk, 2),
+            }
+        if int(sizing.get("approxQty") or 0) <= 0:
+            if replaced_from:
+                used_freed.discard(replaced_from)
+            continue
+        if float(sizing.get("deployedCapital") or 0) > remaining_capital + 0.01:
+            if replaced_from:
+                used_freed.discard(replaced_from)
+            continue
 
         at = _utc_now_iso()
         row = attach_exit_plan(
@@ -3777,6 +3822,8 @@ def refresh_session_state() -> dict[str, Any]:
 
 def _compute_session(include_live: bool = True, *, persist: bool = False) -> dict[str, Any]:
     session = load_session()
+    if persist:
+        session = _ensure_current_exit_policy(session, persist=True)
     snap = load_market_snapshot()
     try:
         from .trade_outcome import _is_market_open as _rth_open
@@ -3784,7 +3831,7 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
         market_open_now = bool(_rth_open())
     except Exception:
         market_open_now = False
-    if market_open_now:
+    if persist and market_open_now:
         snap = _maybe_refresh_live_snapshot(reason="intraday_replacement_hunt")
     quotes = snap.get("stockQuotes") or {}
     if market_open_now:
@@ -3986,7 +4033,7 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
             replacement_blocked_reason = win_reason or rot_code
         elif free_slots["total"] <= 0:
             replacement_blocked_reason = "no_free_slots"
-        else:
+        elif persist:
             if market_open_now:
                 try:
                     long_p, short_p, replacement_hunt_source = _replacement_source_pools(

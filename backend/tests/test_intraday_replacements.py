@@ -228,6 +228,60 @@ def test_apply_uses_hunt_pools_not_lock_pool():
     assert "FRESH" not in lock_syms
 
 
+def test_no_apply_when_open_book_at_capital_cap():
+    session = {
+        "locked": True,
+        "sessionDate": "2026-08-18",
+        "long": [
+            {**_closed_long("LOSER"), "deployedCapital": 50_000.0},
+            {**_open_long("KEEP1"), "deployedCapital": eng.INTRADAY_CAPITAL},
+        ],
+        "short": [],
+        "candidatePoolLong": [_pool_cand("NEWONE")],
+        "candidatePoolShort": [],
+        "events": [],
+    }
+    proposals = [{"symbol": "NEWONE", "direction": "LONG", "score": 70, "ltp": 200.0}]
+    with patch.object(eng, "entry_quality_gate", side_effect=_qualified_gate):
+        with patch("app.services.trade_outcome.emit_replacement_alerts", return_value=[]):
+            applied = eng.apply_replacements(session, proposals, {}, {}, bypass_window=True)
+    assert applied == []
+    assert [r["symbol"] for r in session["long"] if not r.get("closed")] == ["KEEP1"]
+
+
+def test_replacement_sized_to_freed_slot_not_full_book():
+    session = {
+        "locked": True,
+        "sessionDate": "2026-08-18",
+        "long": [
+            {
+                **_closed_long("LOSER"),
+                "deployedCapital": 40_000.0,
+                "entryPrice": 100.0,
+                "approxQty": 400,
+            },
+            {**_open_long("KEEP1"), "deployedCapital": 200_000.0},
+        ],
+        "short": [],
+        "candidatePoolLong": [_pool_cand("NEWONE")],
+        "candidatePoolShort": [],
+        "events": [],
+    }
+    proposals = [{"symbol": "NEWONE", "direction": "LONG", "score": 70, "ltp": 200.0}]
+    with patch.object(eng, "entry_quality_gate", side_effect=_qualified_gate):
+        with patch.object(eng, "sync_fixed_plan_from_session"):
+            with patch("app.services.trade_outcome.emit_replacement_alerts", return_value=[]):
+                applied = eng.apply_replacements(session, proposals, {}, {}, bypass_window=True)
+    assert len(applied) == 1
+    assert float(applied[0]["deployedCapital"]) <= 40_000.01
+    open_notional = sum(
+        float(r.get("deployedCapital") or 0)
+        for r in session["long"]
+        if not r.get("closed")
+    )
+    assert open_notional <= eng.INTRADAY_CAPITAL + 0.01
+
+
 def _stale_snap() -> dict:
     return {"updatedAt": "2020-01-01T00:00:00+00:00", "stockQuotes": {}}
 
@@ -269,7 +323,7 @@ def test_maybe_refresh_stamps_gap_only_after_success(monkeypatch):
     assert eng._SNAP_REFRESH_LAST > 0.0
 
 
-def test_get_poll_refreshes_snapshot_and_stamps_live_regime(monkeypatch):
+def test_get_poll_skips_snapshot_refresh(monkeypatch):
     refreshes: list[str] = []
     session = {"locked": False, "regime": {"label": "LOCK"}}
     monkeypatch.setattr("app.services.trade_outcome._is_market_open", lambda: True)
@@ -283,6 +337,25 @@ def test_get_poll_refreshes_snapshot_and_stamps_live_regime(monkeypatch):
     monkeypatch.setattr(eng, "_maybe_refresh_live_snapshot", _refresh)
     monkeypatch.setattr(eng, "detect_regime", lambda _snap: {"label": "LIVE"})
     out = eng._compute_session(include_live=False, persist=False)
+    assert refreshes == []
+    assert out["regime"]["label"] == "LIVE"
+    assert session["regime"]["label"] == "LIVE"
+
+
+def test_persist_refreshes_snapshot_and_stamps_live_regime(monkeypatch):
+    refreshes: list[str] = []
+    session = {"locked": False, "regime": {"label": "LOCK"}}
+    monkeypatch.setattr("app.services.trade_outcome._is_market_open", lambda: True)
+    monkeypatch.setattr(eng, "load_session", lambda: session)
+    monkeypatch.setattr(eng, "load_market_snapshot", _stale_snap)
+
+    def _refresh(*, reason: str):
+        refreshes.append(reason)
+        return {"updatedAt": "2026-08-17T09:07:00+00:00", "stockQuotes": {}}
+
+    monkeypatch.setattr(eng, "_maybe_refresh_live_snapshot", _refresh)
+    monkeypatch.setattr(eng, "detect_regime", lambda _snap: {"label": "LIVE"})
+    out = eng._compute_session(include_live=False, persist=True)
     assert refreshes == ["intraday_replacement_hunt"]
     assert out["regime"]["label"] == "LIVE"
     assert session["regime"]["label"] == "LIVE"

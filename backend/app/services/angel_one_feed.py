@@ -4356,11 +4356,11 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.get("/api/intraday-session")
-    def intraday_session() -> dict[str, Any]:
+    def intraday_session(live: bool = True) -> dict[str, Any]:
         """Return locked session state + mark-to-market (JSON snapshots only)."""
         try:
             from .intraday_session_engine import get_session
-            return get_session(include_live=True)
+            return get_session(include_live=live)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -4531,7 +4531,7 @@ def create_app() -> FastAPI:
                 "tickerIntelligenceByTicker": payload.get("tickerIntelligenceByTicker", {}),
                 "newsSummary": payload.get("newsSummary"),
                 "selectionMeta": payload.get("selectionMeta"),
-                "isSnapshotFallback": bool(payload.get("isSnapshotFallback", False)),
+                "isSnapshotFallback": bool(payload.get("isSnapshotFallback", True)),
             }
         except HTTPException:
             raise

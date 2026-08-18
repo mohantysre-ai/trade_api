@@ -1258,6 +1258,8 @@ def generate_intraday_eod_report(
                 r["outcomeNarrative"] = prior_narr[sym]
 
     rows = attach_outcome_narratives(rows, force=force, refresh_existing=force)
+    book_turnover = round(total_deployed, 2)
+    working_deployed = round(min(total_deployed, capital), 2)
     remaining_capital = capital + total_pnl
     scored = sum(1 for r in rows if r.get("missDiagnostic") and r["missDiagnostic"].get("source") == "SCORECARD")
     wins = sum(1 for r in rows if r.get("outcomeBucket") == "WIN")
@@ -1279,7 +1281,8 @@ def generate_intraday_eod_report(
     report = {
         "date": for_date.isoformat(),
         "capital": capital,
-        "totalDeployed": round(total_deployed, 2),
+        "totalDeployed": working_deployed,
+        "bookTurnover": book_turnover,
         "totalPnl": round(total_pnl, 2),
         "remainingCapital": round(remaining_capital, 2),
         "hitBreakdown": hits,
@@ -1299,7 +1302,8 @@ def generate_intraday_eod_report(
             "skipped": skipped,
             "wins": wins,
             "losses": losses,
-            "deployed": round(total_deployed, 2),
+            "deployed": working_deployed,
+            "turnover": book_turnover,
         },
         "rotationAttribution": rotation,
         "dayLessons": lessons,

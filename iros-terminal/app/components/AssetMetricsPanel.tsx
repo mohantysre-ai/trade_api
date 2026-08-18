@@ -158,6 +158,7 @@ type SessionEvent = {
 
 type SessionResponse = {
   success?: boolean;
+  sessionUnavailable?: boolean;
   locked?: boolean;
   sessionDate?: string;
   committedAt?: string;
@@ -534,7 +535,7 @@ async function readJsonSafe<T extends object>(res: Response, fallback: T): Promi
 }
 
 async function fetchSession(): Promise<SessionResponse> {
-  const empty: SessionResponse = { success: false, locked: false, long: [], short: [] };
+  const empty: SessionResponse = { success: false, sessionUnavailable: true, long: [], short: [] };
   try {
     return await fetchLiveDesk<SessionResponse>('intraday-session');
   } catch (err) {
@@ -997,6 +998,11 @@ export default function AssetMetricsPanel({
     [clock],
   );
   const sessionDate = String(session?.sessionDate || '').slice(0, 10);
+  const sessionUnavailable = Boolean(
+    session?.sessionUnavailable ||
+      (session != null && session.success === false && session.locked == null) ||
+      (session != null && session.locked == null && session.success == null && !session.sessionDate),
+  );
   const lockedToday = Boolean(session?.locked && sessionDate === istToday);
   const staleLocked = Boolean(session?.locked && sessionDate && sessionDate !== istToday);
   // After close / overnight: keep showing the locked basket (SESSION CLOSED + last LTP).
@@ -1073,7 +1079,9 @@ export default function AssetMetricsPanel({
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="desk-panel-title text-slate-900">INTRADAY</h2>
               <StatusPill tone="desk-pill--strong">MANUAL EXECUTION</StatusPill>
-              {lockedToday ? (
+              {sessionUnavailable ? (
+                <StatusPill tone="desk-pill--warn">SESSION UNAVAILABLE</StatusPill>
+              ) : lockedToday ? (
                 <StatusPill tone="desk-pill--info">SESSION BASKET LOCKED · {sessionDate}</StatusPill>
               ) : staleLocked ? (
                 <StatusPill tone="desk-pill--warn">
