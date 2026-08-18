@@ -191,8 +191,9 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
     const timeoutId = window.setTimeout(() => controller.abort(), DESK_IC_FETCH_MS);
 
     const loadDeskIc = async () => {
+      const hasCached = Boolean(initialDeskIc);
       setDeskError(null);
-      if (!deskIc) setLoadingDashboard(true);
+      if (!hasCached) setLoadingDashboard(true);
 
       try {
         const fastRes = await fetch(`/api/desk-ic?ticker=${encodeURIComponent(normalizedTicker)}&fast=1`, {
@@ -205,11 +206,11 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
           const next = fastData.deskIc as DeskIcPayload;
           setDeskIc(next);
           if (next.llmUsed || fastData.cached) return;
-        } else if (!deskIc) {
+        } else if (!hasCached) {
           setDeskError(String(fastData?.error || fastData?.detail || `Desk IC unavailable (${fastRes.status})`));
         }
       } catch (err) {
-        if (!cancelled && !deskIc) {
+        if (!cancelled && !hasCached) {
           setDeskError(err instanceof Error ? err.message : "Desk IC fetch failed");
         }
       } finally {
@@ -242,7 +243,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [activeView, normalizedTicker]);
+  }, [activeView, normalizedTicker, initialDeskIc]);
 
   const widgetUrl = useMemo(() => {
     if (!normalizedTicker) return "";

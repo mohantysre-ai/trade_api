@@ -85,6 +85,34 @@ def _llm_quota_available() -> bool:
     return _time.time() >= _llm_not_before
 
 
+def _close_truncated_json(content: str) -> str:
+    """Best-effort close of truncated JSON, respecting brace/bracket nesting order."""
+    text = content.rstrip().rstrip(",")
+    stack: list[str] = []
+    in_string = False
+    escape = False
+    for ch in text:
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            stack.append("}")
+        elif ch == "[":
+            stack.append("]")
+        elif ch in "}]" and stack:
+            stack.pop()
+    if in_string:
+        text += '"'
+    return text + "".join(reversed(stack))
+
+
 def _call_openai(prompt: str, api_key: str, api_url: str, model: str, timeout: int = LLM_CALL_TIMEOUT_SECONDS) -> str:
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -112,11 +140,7 @@ def _call_openai(prompt: str, api_key: str, api_url: str, model: str, timeout: i
     finish = choices[0].get("finish_reason", "")
     content = choices[0]["message"].get("content") or ""
     if finish == "length" and content:
-        # Truncated JSON — attempt to close open braces so callers can still parse
-        open_braces = content.count("{") - content.count("}")
-        open_brackets = content.count("[") - content.count("]")
-        content = content.rstrip().rstrip(",")
-        content += "]" * max(0, open_brackets) + "}" * max(0, open_braces)
+        content = _close_truncated_json(content)
     return content.strip()
 
 
