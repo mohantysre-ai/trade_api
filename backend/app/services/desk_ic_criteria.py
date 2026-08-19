@@ -41,7 +41,9 @@ CRITERION_DEFS: list[dict[str, str]] = [
     {"id": "portfolio_fit", "label": "Portfolio fit"},
 ]
 
-HARD_CRITERION_IDS = frozenset({"price_floor", "instrument_quality", "news_event_risk"})
+BLOCKING_CRITERION_IDS = frozenset(
+    {"price_floor", "instrument_quality", "liquidity_turnover", "governance_promoter", "news_event_risk"}
+)
 
 DESK_IC_SYSTEM_PROMPT = """
 You are a senior investment banking / sell-side analyst and large-portfolio PM
@@ -55,11 +57,11 @@ Rules:
 3. INSUFFICIENT when the FactPack lacks the needed field — never guess PASS.
 4. If FactPack.penny_or_dvr is true OR ltp < min_price → price_floor and/or
    instrument_quality MUST be FAIL (already pre-scored; reinforce in narrative).
-5. REJECT if any hard criterion FAIL: price_floor, instrument_quality, news_event_risk
-   (binary earnings <48h, regulatory, exchange restriction, court, gap CA).
+5. REJECT if any blocking criterion FAIL: price_floor, instrument_quality,
+   liquidity_turnover, governance_promoter, or news_event_risk.
 6. HOLD_FOR_DATA if ≥2 core criteria are INSUFFICIENT and no hard FAIL.
 7. Otherwise APPROVE. conviction = round(100 * PASS_count / 7), integer 0-100.
-8. categoryScores 0-100 must reflect only FactPack evidence (not invented).
+8. categoryScores are calculated by Python from criteria; do not invent them.
 9. oneLiner: one terse desk sentence. Cite sourceFields on every criterion.
 10. Return JSON only matching the schema. No markdown.
 """.strip()
@@ -69,7 +71,7 @@ def _f(v: Any) -> float | None:
     if v is None or v == "":
         return None
     if isinstance(v, str):
-        s = (
+        v = (
             v.replace("₹", "")
             .replace(",", "")
             .replace("%", "")
@@ -77,9 +79,8 @@ def _f(v: Any) -> float | None:
             .replace("cr", "")
             .strip()
         )
-        if not s or s in {"—", "-", "N/A", "n/a", "NA", "None"}:
+        if not v or v in {"—", "-", "N/A", "n/a", "NA", "None"}:
             return None
-        v = s
     try:
         return float(v)
     except (TypeError, ValueError):
@@ -138,7 +139,7 @@ def build_fact_pack(
     promoter = _f(
         row.get("promoter_holding_pct")
         or row.get("promoterHoldingPct")
-        or (intraday.get("promoter_holding_pct") if isinstance(intraday, dict) else None)
+        or intraday.get("promoter_holding_pct")
     )
     passes_hard = row.get("passes_hard_filters")
     if passes_hard is None:
@@ -282,12 +283,12 @@ def _deterministic_soft_hints(fact_pack: dict[str, Any]) -> dict[str, dict[str, 
     ph = fact_pack.get("passes_hard_filters")
     pq = fact_pack.get("passes_quality_filters")
     rsi = _f(fact_pack.get("rsi"))
-    if ph is None and pq is None and rsi is None:
+    if ph is None and pq is None:
         hints["technical_alignment"] = _criterion(
             "technical_alignment",
             "INSUFFICIENT",
-            "No hard-filter / quality / RSI fields in FactPack.",
-            ["passes_hard_filters", "rsi"],
+            f"Quant hard/quality status unavailable{f'; RSI={rsi:.1f} alone cannot establish alignment' if rsi is not None else ''}.",
+            ["passes_hard_filters", "passes_quality_filters", "rsi"],
         )
     elif ph is False or pq is False:
         hints["technical_alignment"] = _criterion(
@@ -370,7 +371,15 @@ def _deterministic_soft_hints(fact_pack: dict[str, Any]) -> dict[str, dict[str, 
         )
 
     atr = _f(fact_pack.get("atr_pct"))
-    if atr is None and _f(fact_pack.get("alpha_score")) is None:
+    sector = str(fact_pack.get("sector") or "").strip()
+    if not sector:
+        hints["portfolio_fit"] = _criterion(
+            "portfolio_fit",
+            "INSUFFICIENT",
+            "Sector classification missing — cannot assess sleeve concentration or thematic fit.",
+            ["sector"],
+        )
+    elif atr is None and _f(fact_pack.get("alpha_score")) is None:
         hints["portfolio_fit"] = _criterion(
             "portfolio_fit",
             "INSUFFICIENT",
@@ -407,7 +416,7 @@ def _deterministic_soft_hints(fact_pack: dict[str, Any]) -> dict[str, dict[str, 
 def _decide_from_criteria(criteria: list[dict[str, Any]]) -> tuple[str, int]:
     by_id = {c["id"]: c for c in criteria}
     hard_fail = any(
-        by_id.get(cid, {}).get("status") == "FAIL" for cid in HARD_CRITERION_IDS
+        by_id.get(cid, {}).get("status") == "FAIL" for cid in BLOCKING_CRITERION_IDS
     )
     if hard_fail:
         return "REJECT", max(
@@ -423,7 +432,7 @@ def _decide_from_criteria(criteria: list[dict[str, Any]]) -> tuple[str, int]:
     return "APPROVE", int(100 * passes / max(len(CRITERION_DEFS), 1))
 
 
-def _category_scores_from_criteria(criteria: list[dict[str, Any]]) -> dict[str, int]:
+def _category_scores_from_criteria(criteria: list[dict[str, Any]]) -> dict[str, int | None]:
     mapping = {
         "liquidity": ["price_floor", "liquidity_turnover"],
         "technical": ["technical_alignment"],
@@ -432,18 +441,18 @@ def _category_scores_from_criteria(criteria: list[dict[str, Any]]) -> dict[str, 
         "portfolioFit": ["portfolio_fit"],
     }
 
-    def score_ids(ids: list[str]) -> int:
+    def score_ids(ids: list[str]) -> int | None:
         rows = [c for c in criteria if c.get("id") in ids]
         if not rows:
-            return 0
+            return None
+        if any(r.get("status") == "INSUFFICIENT" for r in rows):
+            return None
         pts = 0
         for r in rows:
             st = r.get("status")
             if st == "PASS":
                 pts += 100
-            elif st == "INSUFFICIENT":
-                pts += 40
-            else:
+            elif st == "FAIL":
                 pts += 0
         return int(pts / len(rows))
 
@@ -486,51 +495,34 @@ def _merge_llm_over_hard(
     soft_fallback = _deterministic_soft_hints(fact_pack)
     llm_criteria = llm_payload.get("criteria") if isinstance(llm_payload.get("criteria"), list) else []
     by_id: dict[str, dict[str, Any]] = {c["id"]: c for c in soft_fallback.values()}
+    by_id.update(hard)
     for raw in llm_criteria:
         if not isinstance(raw, dict):
             continue
         cid = str(raw.get("id") or "").strip()
         if cid not in {d["id"] for d in CRITERION_DEFS}:
             continue
-        status = str(raw.get("status") or "INSUFFICIENT").upper()
-        if status not in ("PASS", "FAIL", "INSUFFICIENT"):
-            status = "INSUFFICIENT"
-        by_id[cid] = _criterion(
-            cid,
-            status,
-            str(raw.get("detail") or "")[:400],
-            [str(x) for x in (raw.get("sourceFields") or [])][:8] or ["fact_pack"],
-        )
-    # Hard rows always win
-    by_id.update(hard)
+        # The LLM may explain a criterion, but it cannot change its deterministic
+        # evidence status or source fields. Missing facts remain INSUFFICIENT.
+        baseline = by_id.get(cid)
+        if baseline is None:
+            continue
+        detail = str(raw.get("detail") or "").strip()[:400]
+        if detail and baseline.get("status") != "INSUFFICIENT":
+            baseline = dict(baseline)
+            baseline["llmDetail"] = detail
+            by_id[cid] = baseline
     criteria = [by_id[d["id"]] for d in CRITERION_DEFS if d["id"] in by_id]
     decision, conviction = _decide_from_criteria(criteria)
-    # Soft: honor LLM REJECT when news_event_risk is FAIL; hard FAIL always REJECT
-    llm_decision = str(llm_payload.get("deskDecision") or "").upper()
-    news_c = next((c for c in criteria if c.get("id") == "news_event_risk"), None)
-    if decision == "REJECT":
-        final_decision = "REJECT"
-    elif news_c and news_c.get("status") == "FAIL":
-        final_decision = "REJECT"
-    elif decision == "HOLD_FOR_DATA":
-        final_decision = "HOLD_FOR_DATA"
-    elif llm_decision == "HOLD_FOR_DATA":
-        final_decision = "HOLD_FOR_DATA"
-    else:
-        final_decision = "APPROVE"
-
-    cat = llm_payload.get("categoryScores") if isinstance(llm_payload.get("categoryScores"), dict) else {}
+    final_decision = decision
     cat_scores = _category_scores_from_criteria(criteria)
-    for k in cat_scores:
-        try:
-            v = int(float(cat.get(k))) if cat.get(k) is not None else cat_scores[k]
-            cat_scores[k] = max(0, min(100, v))
-        except (TypeError, ValueError):
-            pass
-
-    one = str(llm_payload.get("oneLiner") or "").strip()[:280]
-    if not one:
-        one = f"Desk IC: {final_decision}."
+    failed = [c["label"] for c in criteria if c.get("status") == "FAIL"]
+    missing = [c["label"] for c in criteria if c.get("status") == "INSUFFICIENT"]
+    one = f"Evidence-gated Desk IC: {final_decision}."
+    if failed:
+        one += f" Failed: {', '.join(failed)}."
+    if missing:
+        one += f" Insufficient: {', '.join(missing)}."
 
     return {
         "ticker": fact_pack.get("ticker"),
@@ -539,7 +531,7 @@ def _merge_llm_over_hard(
         "oneLiner": one,
         "criteria": criteria,
         "categoryScores": cat_scores,
-        "source": "llm+deterministic",
+        "source": "deterministic-gates+llm-notes",
         "llmUsed": True,
         "generatedAt": _utc_now_iso(),
         "factPack": {
@@ -689,11 +681,6 @@ def get_cached_desk_ic(
     *,
     require_llm: bool = False,
 ) -> dict[str, Any] | None:
-    """Return a fresh Desk IC cache entry.
-
-    Snapshot refresh stores a deterministic FactPack (llmUsed=False). The drawer
-    LLM path must not treat that as a completed IC — pass require_llm=True.
-    """
     if not snapshot:
         return None
     block = snapshot.get("deskIcByTicker")
@@ -761,13 +748,12 @@ def evaluate_and_cache_ticker(
     if not isinstance(block, dict):
         block = {}
     existing = block.get(sym)
-    keep_llm = (
+    if (
         not use_llm
         and isinstance(existing, dict)
         and existing.get("llmUsed") is True
         and _cache_fresh(existing)
-    )
-    if keep_llm:
+    ):
         snapshot["deskIcByTicker"] = block
         return existing
     block[sym] = result

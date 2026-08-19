@@ -36,7 +36,7 @@ type DrawerContent = {
   intraday?: IntradayMetrics | null;
   deskIc?: (DeskIcSummary & {
     criteria?: unknown[];
-    categoryScores?: Record<string, number>;
+    categoryScores?: Record<string, number | null>;
     llmUsed?: boolean;
   }) | null;
 };

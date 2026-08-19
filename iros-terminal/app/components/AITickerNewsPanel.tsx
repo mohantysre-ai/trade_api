@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import MarketSymbolBadge from "./MarketSymbolBadge";
 import type { AITickerNewsReport } from "@/lib/market-api";
 import { fetchTickerNewsReport } from "@/lib/market-api";
 
@@ -257,9 +258,7 @@ export default function AITickerNewsPanel({
 
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className="w-9 h-9 rounded-lg ai-news-icon flex items-center justify-center text-white text-[10px] font-black tracking-wider flex-shrink-0">
-              AI
-            </div>
+            <MarketSymbolBadge symbol={ticker} size="md" />
             <div className="min-w-0">
               <h3 className="desk-panel-title text-slate-800 truncate">
                 AI News Summary

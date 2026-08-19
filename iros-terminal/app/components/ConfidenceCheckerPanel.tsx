@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { LiveTickNumber } from "@/lib/desk-motion";
 import { deskTransition } from "@/lib/motion-tokens";
 import type { DeskIcSummary } from "@/lib/market-api";
+import MarketSymbolBadge from "./MarketSymbolBadge";
 
 type CriterionStatus = "PASS" | "FAIL" | "INSUFFICIENT";
 
@@ -21,11 +22,11 @@ type DeskIcPayload = {
   oneLiner?: string | null;
   criteria?: DeskIcCriterion[] | unknown[];
   categoryScores?: {
-    liquidity?: number;
-    technical?: number;
-    governance?: number;
-    eventRisk?: number;
-    portfolioFit?: number;
+    liquidity?: number | null;
+    technical?: number | null;
+    governance?: number | null;
+    eventRisk?: number | null;
+    portfolioFit?: number | null;
   };
   source?: string;
   llmUsed?: boolean;
@@ -37,7 +38,7 @@ type ConfidenceCheckerPanelProps = {
   companyName?: string;
   initialDeskIc?: (DeskIcSummary & {
     criteria?: unknown[];
-    categoryScores?: Record<string, number>;
+    categoryScores?: Record<string, number | null>;
     llmUsed?: boolean;
     generatedAt?: string;
   }) | null;
@@ -133,20 +134,20 @@ function CriterionRow({ label, status, detail }: { label: string; status: Criter
   );
 }
 
-function CategoryBar({ label, score, color }: { label: string; score: number; color: string }) {
+function CategoryBar({ label, score, color }: { label: string; score: number | null; color: string }) {
   const [animVal, setAnimVal] = useState(0);
   useEffect(() => {
-    const id = setTimeout(() => setAnimVal(Math.min(score, 100)), 150);
+    const id = setTimeout(() => setAnimVal(score == null ? 0 : Math.min(score, 100)), 150);
     return () => clearTimeout(id);
   }, [score]);
 
-  const pct = Math.min(score, 100);
+  const pct = score == null ? null : Math.min(score, 100);
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
         <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">{label}</span>
         <span className="text-[10px] font-black" style={{ color }}>
-          {pct.toFixed(0)}%
+          {pct == null ? "—" : `${pct.toFixed(0)}%`}
         </span>
       </div>
       <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
@@ -376,7 +377,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
       {activeView === "dashboard" && (
         <div className="space-y-3">
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold leading-relaxed text-slate-700">
-            DESK IC · {deskIc?.llmUsed ? "LLM" : deskIc ? "DETERMINISTIC" : loadingDashboard ? "LOADING" : deskError ? "FAILED" : "—"} — fact-grounded criteria only. Soft gate:
+            DESK IC · {deskIc?.llmUsed ? "DETERMINISTIC GATES + LLM NOTES" : deskIc ? "DETERMINISTIC" : loadingDashboard ? "LOADING" : deskError ? "FAILED" : "—"} — evidence-gated criteria only. Soft gate:
             REJECT flags the name; quant floors still control lock eligibility. Missing fields show INSUFFICIENT — never invented PASS.
             {enrichingLlm && (
               <span className="ml-1 text-amber-700">· LLM enrichment running (partial shown)</span>
@@ -400,11 +401,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
               <div className="rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-teal-50 border border-emerald-200/50 shadow-sm p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2.5">
-                    <div className="h-8 w-8 rounded-lg confidence-icon flex items-center justify-center shadow-sm">
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
-                        <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </div>
+                    <MarketSymbolBadge symbol={normalizedTicker} size="md" />
                     <div>
                       <div className="text-sm font-black text-slate-900">{companyName ?? normalizedTicker}</div>
                       <div className="text-[9px] text-slate-500 uppercase tracking-wider">
@@ -440,7 +437,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
                   <CategoryBar
                     key={cat.key}
                     label={cat.label}
-                    score={Number(deskIc.categoryScores?.[cat.key] ?? 0)}
+                    score={deskIc.categoryScores?.[cat.key] ?? null}
                     color={cat.color}
                   />
                 ))}

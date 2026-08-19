@@ -11,6 +11,7 @@ const TechnicalAnalysisPanel = lazy(() => import("./TechnicalAnalysisPanel"));
 const SwotAnalysisPanel = lazy(() => import("./SwotAnalysisPanel"));
 import { parseNewsCatalystsCard, type TrendlyneCardSummary } from "@/lib/intelligence-summary";
 import { deskDrawerVariants } from "@/lib/motion-tokens";
+import MarketSymbolBadge from "./MarketSymbolBadge";
 
 type DrawerAnalysis = TerminalIntelligence & {
   error?: string;
@@ -57,6 +58,11 @@ function formatGateKey(key: string) {
   };
 
   return labels[key] ?? formatSnakeKey(key);
+}
+
+function displayDrawerValue(value: unknown): string {
+  if (value == null || value === "") return "—";
+  return String(value);
 }
 
 // Unique color palette for key-value pairs to make each key distinct
@@ -220,26 +226,27 @@ function DrawerStructuredReasoningOutput({ analysis }: { analysis?: DrawerAnalys
                     <div className="space-y-1">
                       {Object.entries(riskCalc).map(([label, value], idx) => {
                         const isRiskFlag = label.toLowerCase() === 'risk_flag' || label.toLowerCase() === 'risk_flag_value';
+                        const isInsufficient = isRiskFlag && String(value).toUpperCase() === 'INSUFFICIENT';
                         const color = getKeyColor(idx);
                         return (
                           <div
                             key={label}
                             className={`flex items-center justify-between gap-2 py-1.5 px-2 rounded-md transition-colors ${
-                              isRiskFlag ? 'bg-red-50 border border-red-100' : 'hover:bg-slate-50'
+                              isRiskFlag && !isInsufficient ? 'bg-red-50 border border-red-100' : 'hover:bg-slate-50'
                             }`}
                           >
                             <span className="flex items-center gap-1.5">
                               <span className={`w-1 h-1 rounded-full ${color.dot} flex-shrink-0`} />
-                              <span className={`text-[9px] uppercase tracking-wider ${isRiskFlag ? 'text-red-600 font-bold' : color.label}`}>
+                              <span className={`text-[9px] uppercase tracking-wider ${isRiskFlag && !isInsufficient ? 'text-red-600 font-bold' : color.label}`}>
                                 {formatSnakeKey(label)}
                               </span>
                             </span>
                             <span className={`text-xs font-semibold truncate ml-2 ${
-                              isRiskFlag
+                              isRiskFlag && !isInsufficient
                                 ? 'text-red-600 uppercase tracking-wider animate-pulse'
                                 : 'text-slate-700'
                             }`}>
-                              {String(value)}
+                              {displayDrawerValue(value)}
                             </span>
                           </div>
                         );
@@ -268,7 +275,7 @@ function DrawerStructuredReasoningOutput({ analysis }: { analysis?: DrawerAnalys
                                 {formatSnakeKey(label)}
                               </span>
                             </div>
-                            <div className="text-xs text-slate-600 leading-relaxed pl-3.5">{String(value)}</div>
+                            <div className="text-xs text-slate-600 leading-relaxed pl-3.5">{displayDrawerValue(value)}</div>
                           </div>
                         );
                       })}
@@ -307,7 +314,7 @@ function DrawerStructuredReasoningOutput({ analysis }: { analysis?: DrawerAnalys
                       {formatGateKey(gate)}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{String(value)}</p>
+                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{displayDrawerValue(value)}</p>
                 </div>
               ))}
             </div>
@@ -339,7 +346,7 @@ type DrawerContent = {
   intraday?: IntradayMetrics | null;
   deskIc?: (DeskIcSummary & {
     criteria?: unknown[];
-    categoryScores?: Record<string, number>;
+    categoryScores?: Record<string, number | null>;
     llmUsed?: boolean;
   }) | null;
 };
@@ -495,10 +502,12 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
       {/* Header */}
       <div className="z-20 shrink-0 border-b border-slate-200 bg-[var(--terminal-panel)]">
         <div className="right-drawer-head px-3 sm:px-5 py-2 sm:py-3 flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="desk-panel-title mb-0 hidden sm:block">Deep Asset Analysis</p>
-            <h4 className="desk-metric-value truncate leading-tight">{stock?.ticker ?? "—"}</h4>
-            <p className="text-[11px] text-slate-500 truncate">{stock?.name ?? "Analysis Payload"}</p>
+          <div className="flex min-w-0 flex-1 items-start gap-2.5">
+            {stock?.ticker ? <MarketSymbolBadge symbol={stock.ticker} size="md" /> : null}
+            <div className="min-w-0">
+              <p className="desk-panel-title mb-0 hidden sm:block">Deep Asset Analysis</p>
+              <h4 className="desk-metric-value truncate leading-tight">{stock?.ticker ?? "—"}</h4>
+              <p className="text-[11px] text-slate-500 truncate">{stock?.name ?? "Analysis Payload"}</p>
             {stock?.deskIcSummary?.deskDecision && (
               <span
                 className={`mt-1 inline-flex text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
@@ -511,7 +520,8 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
               >
                 Desk IC {String(stock.deskIcSummary.deskDecision).toUpperCase()}
               </span>
-            )}
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}

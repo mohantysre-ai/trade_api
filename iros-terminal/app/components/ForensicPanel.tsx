@@ -33,6 +33,7 @@ import {
 } from '@/lib/intelligence-summary';
 import type { DhanSwingPicksPayload } from '@/lib/market-api';
 import { DeskCardTilt, DeskGaugeFill, IcStatusChip, LiveTickNumber, motion, useReducedMotion } from '@/lib/desk-motion';
+import MarketSymbolBadge from './MarketSymbolBadge';
 import { duration } from '@/lib/motion-tokens';
 import { formatPtsPctLabel, formatSeriesDelta } from '@/lib/format-delta';
 
@@ -1462,7 +1463,10 @@ export default function ForensicPanel({
 
               {/* Header: ticker + conviction tier + win edge */}
               <div className="flex items-center justify-between gap-2 mb-1 relative z-10">
-                <span className="desk-metric-value font-mono truncate">{row.ticker}</span>
+                <div className="flex min-w-0 items-center gap-2">
+                  <MarketSymbolBadge symbol={row.ticker} size="sm" />
+                  <span className="desk-metric-value font-mono truncate">{row.ticker}</span>
+                </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {winEdge && (
                     <span
