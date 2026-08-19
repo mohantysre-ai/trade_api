@@ -671,9 +671,10 @@ def _ticker_stock_row(payload: dict[str, Any], ticker: str) -> dict[str, Any]:
         intra = merged.get("intraday") if isinstance(merged.get("intraday"), dict) else {}
         q_intra = quote.get("intraday") if isinstance(quote.get("intraday"), dict) else {}
         merged = {**merged, **quote}
-        preferred = prefer_intraday_blocks(q_intra, intra)
-        if preferred:
-            merged["intraday"] = preferred
+        if isinstance(q_intra, dict) and q_intra.get("data_source") in ("candles", "daily_candles"):
+            merged["intraday"] = q_intra
+        elif intra:
+            merged["intraday"] = intra
     return merged
 
 
@@ -708,18 +709,16 @@ def _ticker_intraday_text(stock: dict[str, Any]) -> str:
     src = _intraday_bar_source(intraday)
     if not src:
         return "no usable candle metrics"
-    trigger = str(intraday.get("trigger_point") or "").strip()
-    if src == "daily_candles" or not trigger or (
-        float(intraday.get("vwap") or 0) <= 0 and trigger == "VWAP Bounce"
-    ):
-        trigger = "no 5m trigger"
-    vwap = "VWAP unavailable" if src == "daily_candles" else (intraday.get("vwap") or "VWAP unavailable")
-    ema9 = "EMA9 unavailable" if src == "daily_candles" else (intraday.get("ema9") or "EMA9 unavailable")
-    atr = intraday.get("atr_pct")
-    volume_multiplier = intraday.get("volume_multiplier")
-    atr_text = f"{atr}%" if atr is not None else "unavailable"
-    volume_text = f"{volume_multiplier}x" if volume_multiplier is not None else "unavailable"
-    return f"{trigger}, VWAP {vwap}, EMA9 {ema9}, ATR {atr_text}, volume multiplier {volume_text}"
+    trigger = intraday.get("trigger_point") or "no trigger"
+    if src == "daily_candles":
+        vwap = "VWAP unavailable"
+        ema9 = "EMA9 unavailable"
+    else:
+        vwap = intraday.get("vwap") or "VWAP unavailable"
+        ema9 = intraday.get("ema9") or "EMA9 unavailable"
+    atr = intraday.get("atr_pct") or 0
+    volume_multiplier = intraday.get("volume_multiplier") or 0
+    return f"{trigger}, VWAP {vwap}, EMA9 {ema9}, ATR {atr}%, volume multiplier {volume_multiplier}x"
 
 
 def _build_dynamic_selection_reason(stock: dict[str, Any], score: float | None) -> str:
@@ -748,12 +747,7 @@ def _build_dynamic_selection_reason(stock: dict[str, Any], score: float | None) 
             if (price_above_vwap and price_above_ema9)
             else "mixed trend around intraday anchors"
         )
-        trigger_text = f"trigger {trigger}" if trigger else "5m trigger unavailable"
-    momentum_text = (
-        f"delta {delta:.2f}% with score {score:.1f}"
-        if score is not None
-        else f"delta {delta:.2f}%; score unavailable"
-    )
+    momentum_text = f"delta {delta:.2f}% with score {score:.1f}"
     liquidity_text = (
         f"volume {volume_multiplier:.2f}x and turnover {turnover_cr:.2f} Cr"
         if turnover_cr > 0

@@ -99,10 +99,8 @@ def atomic_update_json(
             current = load_json_with_fallback(path)
         except FileNotFoundError:
             current = {}
-        except Exception:
-            current = {}
         if not isinstance(current, dict):
-            current = {}
+            raise TypeError(f"{path} did not contain a JSON object; refusing to patch")
         updated = mutator(dict(current))
         if not isinstance(updated, dict):
             updated = current
@@ -113,22 +111,36 @@ def atomic_update_json(
 
 
 def load_json_with_fallback(path: str | Path) -> Any:
-    """Load JSON, preferring a valid live file then ``*.new`` then ``*.bak``."""
+    """Load JSON from live / ``*.new`` / ``*.bak``.
+
+    Prefer the newest valid among live and ``*.new`` (writers publish to
+    ``*.new`` when ``os.replace`` fails). ``*.bak`` is last-known-good only
+    after live and ``*.new`` fail to parse — it must not beat a valid live file
+    just because it was stamped later during the write.
+    """
     path = Path(path)
-    candidates = [
-        path,
-        path.with_suffix(path.suffix + ".new"),
-        path.with_suffix(path.suffix + ".bak"),
-    ]
+    live = path
+    new_path = path.with_suffix(path.suffix + ".new")
+    bak = path.with_suffix(path.suffix + ".bak")
+    primary = [p for p in (live, new_path) if p.is_file()]
+    if not primary and not bak.is_file():
+        raise FileNotFoundError(str(path))
+
+    def _rank(candidate: Path) -> tuple[float, int]:
+        return (candidate.stat().st_mtime, 1 if candidate == new_path else 0)
+
+    primary.sort(key=_rank, reverse=True)
     errors: list[str] = []
-    for candidate in candidates:
-        if not candidate.is_file():
-            continue
+    for candidate in primary:
         try:
             return json.loads(candidate.read_text(encoding="utf-8-sig"))
         except Exception as exc:
             errors.append(f"{candidate.name}: {exc}")
-            continue
+    if bak.is_file():
+        try:
+            return json.loads(bak.read_text(encoding="utf-8-sig"))
+        except Exception as exc:
+            errors.append(f"{bak.name}: {exc}")
     if errors:
         raise RuntimeError("; ".join(errors))
     raise FileNotFoundError(str(path))

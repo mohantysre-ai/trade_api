@@ -90,6 +90,27 @@ def test_daily_candles_do_not_claim_vwap_bounce():
     assert "5m trigger unavailable" in reason
 
 
+def test_five_minute_vwap_bounce_is_kept():
+    stock = {
+        "delta": "1.20%",
+        "intraday": {
+            "data_source": "candles",
+            "atr_pct": 2.1,
+            "turnover_cr": 88.2,
+            "volume_multiplier": 1.4,
+            "vwap": 103.38,
+            "ema9": 102.58,
+            "price_above_vwap": True,
+            "trigger_point": "VWAP Bounce",
+        },
+    }
+    reason = _build_dynamic_selection_reason(stock, 62.0)
+    assert "trigger VWAP Bounce" in reason
+    assert "5m trigger unavailable" not in reason
+    text = _ticker_intraday_text(stock)
+    assert "VWAP Bounce" in text
+
+
 def test_wl_policy_does_not_invent_kelly(monkeypatch):
     monkeypatch.setattr(
         "app.services.intelligence_engine._analyze_forensic_wl_policy",
