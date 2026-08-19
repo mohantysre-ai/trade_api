@@ -951,6 +951,8 @@ def get_cached_summary(
     entry = _llm_cache.get(key)
     if not entry:
         return None
+    if entry.get("llmUsed") is not True:
+        return None
     generated_at = entry.get("generated_at")
     if generated_at:
         try:
@@ -980,38 +982,23 @@ def set_cached_summary(
 _load_llm_cache()
 
 
-async def summarize_with_gemini(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:
-    """Use Google Gemini to produce a structured news summary with model fallback on 429."""
-    gemini_api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not gemini_api_key:
-        logger.warning("No GEMINI_API_KEY or GOOGLE_API_KEY set — falling back to rule-based summary")
-        return _rule_based_summary(ticker, company, articles)
+async def summarize_with_llm(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:
+    """OpenRouter / OpenAI-compatible summary. Does not invent Neutral/heuristic copy."""
+    from .llm_client import _call_openai, _llm_config, _llm_quota_available, _record_quota_error
 
-    try:
-        from google import genai
-    except ImportError:
-        logger.warning("google-genai not installed — falling back to rule-based summary")
-        return _rule_based_summary(ticker, company, articles)
-
+    missing = _llm_unavailable_summary(ticker, company, articles, "LLM not configured")
+    provider, api_key, api_url, model, _oauth = _llm_config()
+    if not provider or not api_key:
+        logger.warning("LLM not configured for ticker news (%s) — no heuristic summary", ticker)
+        return missing
     if not _llm_quota_available():
-        logger.warning("LLM quota exhausted, using rule-based summary for %s", ticker)
-        return _rule_based_summary(ticker, company, articles)
-
-    primary_model = os.environ.get("LLM_MODEL", "gemini-3.7-flash")
-    fallback_models = [
-        "gemini-3.7-flash",
-        "gemini-3.1-flash-lite",
-    ]
-    model_list = [primary_model]
-    for m in fallback_models:
-        if m not in model_list:
-            model_list.append(m)
+        logger.warning("LLM quota cooling down — no heuristic summary for %s", ticker)
+        return _llm_unavailable_summary(ticker, company, articles, "LLM quota cooling down")
 
     article_text = "\n\n".join(
         f"Title: {a.title}\nSource: {a.source}\nSummary: {a.summary}\nPublished: {a.published_at}\nURL: {a.url}"
         for a in articles[:30]
     )
-
     prompt = f"""You are a financial news analyst. Analyze the following news articles for the company "{company}" (ticker: {ticker}) on the Indian stock market.
 
 For each of the categories below, provide a concise 1-3 sentence summary based ONLY on information present in the articles. If no information is found for a category, write "No recent news found."
@@ -1038,112 +1025,69 @@ Here are the articles:
 
 Respond ONLY in valid JSON format with these exact keys: insider_activity, institutional_activity, order_book_block_deals, future_expansion_capex, auditor_changes, dividend_news, new_orders_contracts, earnings_results, management_changes, regulatory_filings, sentiment_overall, risk_flags, summary_headline
 """
-
     expected_keys = [
         "insider_activity", "institutional_activity", "order_book_block_deals",
         "future_expansion_capex", "auditor_changes", "dividend_news",
         "new_orders_contracts", "earnings_results", "management_changes",
-        "regulatory_filings", "sentiment_overall", "risk_flags", "summary_headline"
+        "regulatory_filings", "sentiment_overall", "risk_flags", "summary_headline",
     ]
+    try:
+        import asyncio
 
-    for model in model_list:
-        try:
-            client = genai.Client(api_key=gemini_api_key)
+        if provider == "gemini":
+            from .llm_client import _call_gemini
 
-            response = client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config={
-                    "temperature": 0.1,
-                    "max_output_tokens": 2048,
-                },
+            text = await asyncio.to_thread(
+                _call_gemini,
+                prompt,
+                api_key,
+                model,
+                "You are an elite institutional financial terminal. Return valid JSON only.",
             )
-
-            text = response.text.strip()
-            if "```json" in text:
-                text = text.split("```json")[1].split("```")[0].strip()
-            elif "```" in text:
-                text = text.split("```")[1].split("```")[0].strip()
-
-            result = _parse_json_response(text, expected_keys)
-            for key in expected_keys:
-                result.setdefault(key, "No recent news found.")
-
-            logger.info("Gemini analysis complete for %s using model %s", ticker, model)
-            return result
-
-        except Exception as e:
-            err_str = str(e).lower()
-            is_rate_limit = (
-                "429" in str(e)
-                or "rate limit" in err_str
-                or "quota" in err_str
-                or "resource exhausted" in err_str
-            )
-            is_model_unavailable = (
-                "404" in str(e)
-                or "not_found" in err_str
-                or "no longer available" in err_str
-                or "model not found" in err_str
-            )
-            if is_rate_limit or is_model_unavailable:
-                logger.warning(
-                    "Gemini model %s unavailable for %s; trying next model: %s",
-                    model,
-                    ticker,
-                    e,
-                )
-                continue
-            logger.error("Gemini summarization with model %s failed for %s: %s — falling back to rule-based summary", model, ticker, e)
-            return _rule_based_summary(ticker, company, articles)
-
-    _record_quota_error("All models exhausted for " + ticker)
-    logger.warning("All Gemini models exhausted for %s, using rule-based summary", ticker)
-    return _rule_based_summary(ticker, company, articles)
+        else:
+            text = await asyncio.to_thread(_call_openai, prompt, api_key, api_url, model)
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0].strip()
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0].strip()
+        result = _parse_json_response(text, expected_keys)
+        for key in expected_keys:
+            result.setdefault(key, "No recent news found.")
+        result["llmUsed"] = True
+        logger.info("LLM ticker-news summary complete for %s via %s/%s", ticker, provider, model)
+        return result
+    except Exception as exc:
+        err = str(exc)
+        if "429" in err:
+            _record_quota_error(err)
+        logger.error("LLM ticker-news failed for %s: %s", ticker, exc)
+        return _llm_unavailable_summary(ticker, company, articles, err)
 
 
-def _rule_based_summary(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:
-    """Fallback rule-based categorization when LLM is unavailable."""
-    result = {
-        "insider_activity": "No recent news found.",
-        "institutional_activity": "No recent news found.",
-        "order_book_block_deals": "No recent news found.",
-        "future_expansion_capex": "No recent news found.",
-        "auditor_changes": "No recent news found.",
-        "dividend_news": "No recent news found.",
-        "new_orders_contracts": "No recent news found.",
-        "earnings_results": "No recent news found.",
-        "management_changes": "No recent news found.",
-        "regulatory_filings": "No recent news found.",
-        "sentiment_overall": "Neutral",
-        "risk_flags": "None",
-        "summary_headline": f"{len(articles)} articles found for {company}.",
+async def summarize_with_gemini(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:
+    """Compat alias — OpenRouter/OpenAI path, not Gemini-only."""
+    return await summarize_with_llm(ticker, company, articles)
+
+
+def _llm_unavailable_summary(ticker: str, company: str, articles: list[TickerNewsArticle], error: str) -> dict:
+    """Honest empty summary. Never invent Neutral/keyword buckets."""
+    return {
+        "insider_activity": "—",
+        "institutional_activity": "—",
+        "order_book_block_deals": "—",
+        "future_expansion_capex": "—",
+        "auditor_changes": "—",
+        "dividend_news": "—",
+        "new_orders_contracts": "—",
+        "earnings_results": "—",
+        "management_changes": "—",
+        "regulatory_filings": "—",
+        "sentiment_overall": "—",
+        "risk_flags": "—",
+        "summary_headline": f"LLM summary unavailable for {company} ({len(articles)} articles scraped).",
+        "llmUsed": False,
+        "llmError": str(error)[:400],
     }
-
-    keywords_map = {
-        "insider_activity": ["insider", "promoter", "pledge", "shareholding pattern", "buyback"],
-        "institutional_activity": ["fii", "dii", "mutual fund", "qip", "fpo", "institutional", "bulk deal"],
-        "order_book_block_deals": ["order book", "block deal", "bulk deal", "order inflow"],
-        "future_expansion_capex": ["expansion", "capex", "new project", "acquisition", "subsidiary"],
-        "auditor_changes": ["auditor", "audit", "delloite", "pwc", "kpmg", "ernst", "resignation"],
-        "dividend_news": ["dividend", "bonus", "stock split", "buyback"],
-        "new_orders_contracts": ["order", "contract", "approval", "government", "deal worth"],
-        "earnings_results": ["result", "quarter", "revenue", "profit", "margin", "EBITDA", "PAT"],
-        "management_changes": ["CEO", "CFO", "appointed", "resigned", "board", "director"],
-        "regulatory_filings": ["SEBI", "regulatory", "compliance", "filing", "ROC", "RBI"],
-    }
-
-    for article in articles:
-        text = f"{article.title} {article.summary}".lower()
-        for category, keywords in keywords_map.items():
-            for kw in keywords:
-                if kw.lower() in text:
-                    if result[category] == "No recent news found.":
-                        result[category] = f"Related: {article.title[:200]}"
-                    break
-
-    return result
-
 
 # ---------------------------------------------------------------------------
 # Main entry point
@@ -1171,8 +1115,9 @@ async def generate_ticker_news_report(
         logger.info("Using cached LLM summary for %s (max_articles=%d)", ticker, max_articles)
         llm_result = cached
     else:
-        llm_result = await summarize_with_gemini(ticker, company, articles)
-        set_cached_summary(ticker, articles, max_articles, llm_result)
+        llm_result = await summarize_with_llm(ticker, company, articles)
+        if llm_result.get("llmUsed") is True:
+            set_cached_summary(ticker, articles, max_articles, llm_result)
 
     # Step 3: Build report
     llm_fields = {k: v for k, v in llm_result.items() if k in AITickerNewsReport.__dataclass_fields__ and k not in ("generated_at", "ticker")}

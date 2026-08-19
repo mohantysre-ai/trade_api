@@ -236,7 +236,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
         if (fastRes.ok && fastData?.deskIc) {
           const next = fastData.deskIc as DeskIcPayload;
           setDeskIc(next);
-          if (next.llmUsed || fastData.cached) return;
+          if (next.llmUsed) return;
         } else if (!hasCached) {
           setDeskError(String(fastData?.error || fastData?.detail || `Desk IC unavailable (${fastRes.status})`));
         }

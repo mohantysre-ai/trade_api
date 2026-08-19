@@ -45,6 +45,18 @@ const drawerIntelligenceCache = new Map<string, TerminalIntelligence>();
 const drawerNewsCache = new Map<string, AITickerNewsReport>();
 const drawerPending = new Map<string, Promise<unknown>>();
 
+function intelligenceNeedsLiveRefresh(intel?: TerminalIntelligence | null): boolean {
+  if (!intel) return true;
+  const risk = intel.active_risk_calc;
+  if (!risk || typeof risk !== 'object') return true;
+  const row = risk as Record<string, unknown>;
+  const quality = String(row.signal_quality ?? '');
+  if (quality === 'snapshot-quote' || quality === '') return true;
+  if (row.atr_pct === '—' || row.atr_pct == null || row.atr_pct === '') return true;
+  if (row.turnover_cr === '—' || row.turnover_cr == null || row.turnover_cr === '') return true;
+  return false;
+}
+
 function dedupedDrawerFetch<T>(key: string, url: string): Promise<T> {
   const pending = drawerPending.get(key);
   if (pending) return pending as Promise<T>;
@@ -2370,21 +2382,25 @@ export default function IrosMasterAdvancedTerminal() {
 
     const snapshotIntelligence = liveMarket?.tickerIntelligenceByTicker?.[t];
     const snapshotNews = liveMarket?.tickerNewsByTicker?.[t] as AITickerNewsReport | undefined;
-    const cachedIntelligence = snapshotIntelligence ?? drawerIntelligenceCache.get(t);
-    const cachedNews = snapshotNews ?? drawerNewsCache.get(t);
+    const liveIntelCache = drawerIntelligenceCache.get(t);
+    const liveNewsCache = drawerNewsCache.get(t);
+    const cachedIntelligence = liveIntelCache ?? snapshotIntelligence;
+    const cachedNews = liveNewsCache ?? snapshotNews;
     if (cachedIntelligence || cachedNews) {
       setDrawerContent({ stock, analysis: cachedIntelligence ?? null, tickerNews: cachedNews ?? null, intraday, deskIc });
     }
 
     const params = new URLSearchParams({ ticker: t });
     if (selectedPool) params.set('pool', selectedPool);
-    const intelligencePromise = cachedIntelligence ? Promise.resolve(cachedIntelligence) :
-      dedupedDrawerFetch<Record<string, unknown>>(`intelligence:${t}:${selectedPool || ''}`, `/api/terminal-intelligence?${params}`).then((body) => {
+    const intelligencePromise = liveIntelCache && !intelligenceNeedsLiveRefresh(liveIntelCache)
+      ? Promise.resolve(liveIntelCache)
+      : dedupedDrawerFetch<Record<string, unknown>>(`intelligence:${t}:${selectedPool || ''}`, `/api/terminal-intelligence?${params}`).then((body) => {
         const value = (body.terminalIntelligence ?? body) as TerminalIntelligence;
         drawerIntelligenceCache.set(t, value); return value;
       });
-    const newsPromise = cachedNews ? Promise.resolve(cachedNews) :
-      dedupedDrawerFetch<{ success?: boolean; payload?: AITickerNewsReport } & Partial<AITickerNewsReport>>(`news:${t}`, `/api/ticker-news?ticker=${encodeURIComponent(t)}`).then((body) => {
+    const newsPromise = liveNewsCache
+      ? Promise.resolve(liveNewsCache)
+      : dedupedDrawerFetch<{ success?: boolean; payload?: AITickerNewsReport } & Partial<AITickerNewsReport>>(`news:${t}`, `/api/ticker-news?ticker=${encodeURIComponent(t)}`).then((body) => {
         const value = (body.payload ?? body) as AITickerNewsReport;
         drawerNewsCache.set(t, value); return value;
       });

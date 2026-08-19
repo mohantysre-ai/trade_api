@@ -35,9 +35,9 @@ ANGEL_MPIN = os.getenv("ANGEL_MPIN") or os.getenv("ANGEL_PASSWORD") or ""
 ANGEL_TOTP_SECRET = os.getenv("ANGEL_TOTP_SECRET", "")
 
 # LLM Configuration
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "") or os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")
-LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.5-flash")
+LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
 LLM_API_URL = os.getenv("LLM_API_URL", "")
 
 # Server

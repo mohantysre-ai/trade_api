@@ -68,6 +68,18 @@ Rules:
 def _f(v: Any) -> float | None:
     if v is None or v == "":
         return None
+    if isinstance(v, str):
+        s = (
+            v.replace("₹", "")
+            .replace(",", "")
+            .replace("%", "")
+            .replace("Cr", "")
+            .replace("cr", "")
+            .strip()
+        )
+        if not s or s in {"—", "-", "N/A", "n/a", "NA", "None"}:
+            return None
+        v = s
     try:
         return float(v)
     except (TypeError, ValueError):
@@ -104,7 +116,15 @@ def build_fact_pack(
     row = stock if isinstance(stock, dict) else {}
     sym = str(ticker or row.get("ticker") or "").upper().strip()
     intraday = row.get("intraday") if isinstance(row.get("intraday"), dict) else {}
-    ltp = _f(row.get("ltp") or row.get("Ltp") or row.get("entryPrice") or row.get("scanLtp"))
+    ltp = _f(
+        row.get("ltpRaw")
+        or row.get("lastPrice")
+        or row.get("ltp")
+        or row.get("Ltp")
+        or row.get("entryPrice")
+        or row.get("scanLtp")
+        or row.get("close")
+    )
     turnover = _f(
         row.get("turnoverCr")
         or row.get("turnover_cr")
@@ -115,7 +135,11 @@ def build_fact_pack(
     vol_mult = _f(row.get("volume_multiplier") or intraday.get("volume_multiplier"))
     rsi = _f(row.get("rsi") or row.get("RSI") or intraday.get("rsi"))
     atr_pct = _f(row.get("atr_pct") or intraday.get("atr_pct") or row.get("atrPct"))
-    promoter = _f(row.get("promoter_holding_pct") or row.get("promoterHoldingPct"))
+    promoter = _f(
+        row.get("promoter_holding_pct")
+        or row.get("promoterHoldingPct")
+        or (intraday.get("promoter_holding_pct") if isinstance(intraday, dict) else None)
+    )
     passes_hard = row.get("passes_hard_filters")
     if passes_hard is None:
         passes_hard = intraday.get("passes_hard_filters")
@@ -659,41 +683,62 @@ def _cache_fresh(entry: dict[str, Any] | None) -> bool:
     return (time.time() - ts) <= AI_CACHE_TTL_SECONDS
 
 
-def get_cached_desk_ic(snapshot: dict[str, Any] | None, ticker: str) -> dict[str, Any] | None:
+def get_cached_desk_ic(
+    snapshot: dict[str, Any] | None,
+    ticker: str,
+    *,
+    require_llm: bool = False,
+) -> dict[str, Any] | None:
+    """Return a fresh Desk IC cache entry.
+
+    Snapshot refresh stores a deterministic FactPack (llmUsed=False). The drawer
+    LLM path must not treat that as a completed IC — pass require_llm=True.
+    """
     if not snapshot:
         return None
     block = snapshot.get("deskIcByTicker")
     if not isinstance(block, dict):
         return None
     entry = block.get(str(ticker).upper())
-    if _cache_fresh(entry if isinstance(entry, dict) else None):
-        return entry  # type: ignore[return-value]
-    return None
+    if not _cache_fresh(entry if isinstance(entry, dict) else None):
+        return None
+    if require_llm and entry.get("llmUsed") is not True:
+        return None
+    return entry  # type: ignore[return-value]
 
 
 def resolve_stock_from_snapshot(snapshot: dict[str, Any], ticker: str) -> dict[str, Any] | None:
     sym = ticker.upper().strip()
+    merged: dict[str, Any] = {"ticker": sym}
+    found = False
     for row in snapshot.get("stocks") or []:
         if isinstance(row, dict) and str(row.get("ticker") or "").upper() == sym:
-            return row
+            merged.update(row)
+            found = True
+            break
     quotes = snapshot.get("stockQuotes")
     if isinstance(quotes, dict):
         q = quotes.get(sym) or quotes.get(ticker)
         if isinstance(q, dict):
-            return {**q, "ticker": sym}
-    # swing picks
+            intra = merged.get("intraday") if isinstance(merged.get("intraday"), dict) else {}
+            q_intra = q.get("intraday") if isinstance(q.get("intraday"), dict) else {}
+            merged = {**merged, **q}
+            if q_intra.get("data_source") == "candles":
+                merged["intraday"] = q_intra
+            elif intra:
+                merged["intraday"] = intra
+            found = True
     dhan = snapshot.get("dhanSwingPicks")
     if isinstance(dhan, dict):
         for p in dhan.get("picks") or []:
             if isinstance(p, dict) and str(p.get("symbol") or p.get("ticker") or "").upper() == sym:
-                return {
-                    "ticker": sym,
-                    "name": p.get("name") or sym,
-                    "ltp": p.get("ltp") or p.get("entry") or p.get("entryPrice") or p.get("scanLtp"),
-                    "score": p.get("score"),
-                    "sector": p.get("sector"),
-                }
-    return None
+                merged.setdefault("name", p.get("name") or sym)
+                merged.setdefault("ltp", p.get("ltp") or p.get("entry") or p.get("entryPrice") or p.get("scanLtp"))
+                merged.setdefault("score", p.get("score"))
+                merged.setdefault("sector", p.get("sector"))
+                found = True
+                break
+    return merged if found else None
 
 
 def evaluate_and_cache_ticker(
@@ -705,7 +750,7 @@ def evaluate_and_cache_ticker(
 ) -> dict[str, Any]:
     sym = ticker.upper().strip()
     if not force:
-        cached = get_cached_desk_ic(snapshot, sym)
+        cached = get_cached_desk_ic(snapshot, sym, require_llm=use_llm)
         if cached:
             return cached
     stock = resolve_stock_from_snapshot(snapshot, sym)
@@ -715,6 +760,16 @@ def evaluate_and_cache_ticker(
     block = snapshot.get("deskIcByTicker")
     if not isinstance(block, dict):
         block = {}
+    existing = block.get(sym)
+    keep_llm = (
+        not use_llm
+        and isinstance(existing, dict)
+        and existing.get("llmUsed") is True
+        and _cache_fresh(existing)
+    )
+    if keep_llm:
+        snapshot["deskIcByTicker"] = block
+        return existing
     block[sym] = result
     snapshot["deskIcByTicker"] = block
     # Soft summary on stock row when present in ranked list

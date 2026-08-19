@@ -35,6 +35,131 @@ DASH_ROOT = {
 }
 
 
+def _iso_epoch(value: Any) -> float:
+    if not value:
+        return 0.0
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return 0.0
+
+
+def _session_leg_index(session: dict[str, Any] | None) -> dict[tuple[str, str], dict[str, Any]]:
+    idx: dict[tuple[str, str], dict[str, Any]] = {}
+    if not isinstance(session, dict):
+        return idx
+    for key in ("long", "short"):
+        default_dir = "SHORT" if key == "short" else "LONG"
+        for row in session.get(key) or []:
+            if not isinstance(row, dict):
+                continue
+            sym = str(row.get("symbol") or "").upper()
+            if not sym:
+                continue
+            direction = str(row.get("direction") or default_dir).upper()
+            idx[(sym, direction)] = row
+    return idx
+
+
+def _session_leg_is_triggered(row: dict[str, Any] | None) -> bool:
+    if not isinstance(row, dict):
+        return False
+    if row.get("skipped"):
+        return False
+    if str(row.get("executionStatus") or "").upper() == "NOT_TRIGGERED":
+        return False
+    if str(row.get("outcomeBucket") or "").upper() == "SKIPPED":
+        return False
+    return True
+
+
+def session_realized_pnl(session: dict[str, Any] | None) -> float:
+    """Sum realized P&L on triggered session legs (skipped excluded)."""
+    total = 0.0
+    for row in _session_leg_index(session).values():
+        if not _session_leg_is_triggered(row):
+            continue
+        total += float(row.get("realizedPnl") or row.get("pnl") or 0)
+    return round(total, 2)
+
+
+def apply_session_leg_economics(
+    sess_row: dict[str, Any] | None,
+    *,
+    reason: str,
+    exit_price: float,
+    pnl: float,
+    scale_meta: dict[str, Any] | None,
+) -> tuple[str, float, float, dict[str, Any] | None]:
+    """Live locked session is Book source of truth for the matching IST date."""
+    if not _session_leg_is_triggered(sess_row) or sess_row is None:
+        return reason, exit_price, pnl, scale_meta
+    sp = sess_row.get("realizedPnl")
+    if sp is None:
+        sp = sess_row.get("pnl")
+    if sp is not None:
+        pnl = float(sp)
+    er = sess_row.get("exitReason") or sess_row.get("status")
+    if er:
+        reason = str(er)
+    ep = sess_row.get("exitPrice")
+    if ep is not None:
+        try:
+            exit_price = float(ep)
+        except (TypeError, ValueError):
+            pass
+    st = sess_row.get("exitState")
+    if isinstance(st, dict):
+        merged = dict(scale_meta or {})
+        merged["exitState"] = st
+        scale_meta = merged
+    return reason, float(exit_price or 0), pnl, scale_meta
+
+
+def intraday_book_cache_stale(
+    *,
+    for_date: date,
+    cached: dict[str, Any],
+    picks: list[dict[str, Any]],
+    is_mock: bool,
+    symbol_source: str,
+    session: dict[str, Any] | None,
+    scorecards_mtime: float | None = None,
+) -> str | None:
+    """Why the CLOSED book cache must rebuild. None = cache is usable."""
+    cached_syms = {
+        str(t.get("symbol") or "").upper()
+        for t in (cached.get("trades") or [])
+        if t.get("symbol")
+    }
+    live_syms = {
+        str(p.get("symbol") or "").upper()
+        for p in picks
+        if p.get("symbol")
+    }
+    if cached.get("isMock") and picks and not is_mock:
+        return "mock"
+    if live_syms and cached_syms != live_syms:
+        return "symbol_set"
+    if str(cached.get("symbolSource") or "") != symbol_source:
+        return "source"
+    if cached_syms and not live_syms and symbol_source in (
+        "empty",
+        "intraday_session_stale",
+    ):
+        return "ghost"
+    sess_date = str((session or {}).get("sessionDate") or "")[:10]
+    if session and sess_date == for_date.isoformat() and bool(session.get("locked")):
+        sess_pnl = session_realized_pnl(session)
+        cache_pnl = round(float(cached.get("totalPnl") or 0), 2)
+        if abs(sess_pnl - cache_pnl) > 0.05:
+            return "pnl_mismatch"
+    cache_ts = _iso_epoch(cached.get("cachedAt"))
+    if scorecards_mtime and cache_ts and scorecards_mtime > cache_ts + 1:
+        return "eod_scorecards_newer"
+    return None
+
+
 def _build_rotation_attribution(
     session: dict[str, Any],
     trade_rows: list[dict[str, Any]],
@@ -900,40 +1025,31 @@ def generate_intraday_eod_report(
 
     picks, is_mock, symbol_source, desk_counts = _load_canonical_intraday_picks(for_date)
     from .desk_clock import cash_session_phase
+    from .eod_engine.ingestion import eod_day_dir, load_intraday_session
+
     market_phase = cash_session_phase(for_date)
     after_close = market_phase == "CLOSED"
+    session_live = load_intraday_session(for_date)
+    sess_idx: dict[tuple[str, str], dict[str, Any]] = {}
+    if str(session_live.get("sessionDate") or "")[:10] == for_date.isoformat():
+        sess_idx = _session_leg_index(session_live)
 
     if not force:
         cached = load_book_cache(for_date, "intraday")
         if cached is not None:
-            cached_syms = {
-                str(t.get("symbol") or "").upper()
-                for t in (cached.get("trades") or [])
-                if t.get("symbol")
-            }
-            live_syms = {
-                str(p.get("symbol") or "").upper()
-                for p in picks
-                if p.get("symbol")
-            }
-            stale_mock = bool(cached.get("isMock") and picks and not is_mock)
-            stale_set = bool(live_syms) and cached_syms != live_syms
-            stale_source = str(cached.get("symbolSource") or "") != symbol_source
-            ghost_cache = bool(cached_syms) and not live_syms and symbol_source in (
-                "empty",
-                "intraday_session_stale",
+            score_path = os.path.join(eod_day_dir(for_date), "scorecards.json")
+            score_mtime = os.path.getmtime(score_path) if os.path.isfile(score_path) else None
+            stale_reason = intraday_book_cache_stale(
+                for_date=for_date,
+                cached=cached,
+                picks=picks,
+                is_mock=is_mock,
+                symbol_source=symbol_source,
+                session=session_live,
+                scorecards_mtime=score_mtime,
             )
-            if stale_mock or stale_set or stale_source or ghost_cache:
-                log.info(
-                    "Rebuilding intraday book for %s (mock=%s set_mismatch=%s source_mismatch=%s ghost=%s live=%s cached=%s)",
-                    for_date.isoformat(),
-                    stale_mock,
-                    stale_set,
-                    stale_source,
-                    ghost_cache,
-                    sorted(live_syms),
-                    sorted(cached_syms),
-                )
+            if stale_reason:
+                log.info("Rebuilding intraday book for %s (%s)", for_date.isoformat(), stale_reason)
             elif market_phase == "CLOSED" and str(cached.get("marketPhase") or "") == market_phase:
                 return cached
 
@@ -955,12 +1071,7 @@ def generate_intraday_eod_report(
     # inventing fills from a close or daily range.
     from .eod_engine.ingestion import fetch_and_persist_candles
     fetch_and_persist_candles(for_date, [str(p.get("symbol") or "") for p in picks])
-    committed_at = None
-    try:
-        from .eod_engine.ingestion import load_intraday_session
-        committed_at = load_intraday_session(for_date).get("committedAt")
-    except Exception:
-        committed_at = None
+    committed_at = session_live.get("committedAt") if isinstance(session_live, dict) else None
 
     scorecards = _load_scorecard_by_ticker(for_date)
 
@@ -996,6 +1107,12 @@ def generate_intraday_eod_report(
                 pick["deployedCapital"] = float(pick.get("plannedCapital") or 0)
         else:
             entry_evidence = candle_evidence
+        sess_row = sess_idx.get((ticker, str(pick.get("direction") or "LONG").upper()))
+        if not entry_evidence.get("triggered") and _session_leg_is_triggered(sess_row):
+            entry_evidence = dict(entry_evidence)
+            entry_evidence["triggered"] = True
+            entry_evidence["reason"] = "SESSION_FILL"
+
         if not entry_evidence.get("triggered"):
             planned = float(pick.get("deployedCapital") or 0)
             skip_reason = entry_evidence.get("reason") or "ENTRY_NOT_CROSSED_POST_LOCK"
@@ -1085,6 +1202,14 @@ def generate_intraday_eod_report(
                 pick, after_close=after_close, ohlc_bars=ohlc_bars,
             )
             exit_source = "ARCHIVE"
+
+        reason, exit_price, pnl, scale_meta = apply_session_leg_economics(
+            sess_row,
+            reason=reason,
+            exit_price=float(exit_price or 0),
+            pnl=float(pnl or 0),
+            scale_meta=scale_meta if isinstance(scale_meta, dict) else scale_meta,
+        )
 
         deployed = float(pick.get("deployedCapital") or 0)
         if deployed <= 0:
@@ -1286,9 +1411,6 @@ def generate_intraday_eod_report(
     miss_rows = losses
     lessons = build_day_lessons(rows, force=force, refresh_existing=False, existing=prior_lessons)
 
-    from .eod_engine.ingestion import load_intraday_session
-
-    session_live = load_intraday_session(for_date)
     rotation = _build_rotation_attribution(
         session_live if isinstance(session_live, dict) else {},
         rows,

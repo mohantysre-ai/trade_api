@@ -61,7 +61,12 @@ def _llm_config() -> tuple[str, str, str, str, str | None]:
     model = os.getenv("LLM_MODEL", "gpt-4o-mini").strip()
     oauth_token_path = os.getenv("GEMINI_OAUTH_TOKEN_PATH", "").strip()
 
-    if provider == "gemini":
+    openrouter = "openrouter.ai" in api_url.lower() or api_key.startswith("sk-or-")
+    if openrouter and provider in ("", "openrouter", "openai"):
+        provider = "openai"
+        if not api_url:
+            api_url = "https://openrouter.ai/api/v1/chat/completions"
+    elif provider == "gemini":
         if not api_key and gemini_key:
             api_key = gemini_key
         if not api_key and oauth_token_path:
@@ -120,6 +125,9 @@ def _call_openai(prompt: str, api_key: str, api_url: str, model: str, timeout: i
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
+    if "openrouter.ai" in (api_url or "").lower():
+        headers["HTTP-Referer"] = os.getenv("OPENROUTER_HTTP_REFERER", "https://sigq.in")
+        headers["X-Title"] = os.getenv("OPENROUTER_APP_TITLE", "IROS Desk")
     payload = {
         "model": model,
         "messages": [

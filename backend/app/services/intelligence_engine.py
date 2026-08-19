@@ -15,7 +15,7 @@ import re
 import time as _time
 import logging as _logging
 import requests
-from .llm_client import LLM_CALL_TIMEOUT_SECONDS, _call_gemini, _call_openai
+from .llm_client import LLM_CALL_TIMEOUT_SECONDS, _call_gemini, _call_openai, _llm_config
 
 
 class CompleteSecurityAnalysisPayload(BaseModel):
@@ -383,30 +383,6 @@ def _fallback_bullets(title: str, items: list[str]) -> str:
     return title + "\n" + "\n".join([f"• {item}" for item in clean])
 
 
-def _llm_config() -> tuple[str, str, str, str, str | None]:
-    provider = os.getenv("LLM_PROVIDER", "").strip().lower()
-    api_key = os.getenv("LLM_API_KEY", "").strip()
-    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
-    api_url = os.getenv("LLM_API_URL", "").strip()
-    model = os.getenv("LLM_MODEL", "gpt-4o-mini").strip()
-    oauth_token_path = os.getenv("GEMINI_OAUTH_TOKEN_PATH", "").strip()
-
-    if provider == "gemini":
-        if not api_key and gemini_key:
-            api_key = gemini_key
-        if not api_key and oauth_token_path:
-            from app.services.llm_client import _get_gemini_oauth_token
-            api_key = _get_gemini_oauth_token(oauth_token_path) or api_key
-    elif not provider and gemini_key:
-        provider = "gemini"
-        api_key = gemini_key
-    if not provider or not api_key:
-        return None, None, None, None, None
-    if not api_url and provider == "openai":
-        api_url = "https://api.openai.com/v1/chat/completions"
-    return provider, api_key, api_url, model, oauth_token_path
-
-
 def _parse_retry_delay(error_str: str, cap: float = 90.0) -> float:
     match = re.search(r"'retryDelay':\s*'([\d.]+)s'", error_str)
     if match:
@@ -425,7 +401,7 @@ def _record_quota_error(error_str: str) -> None:
     global _llm_not_before
     delay = _parse_retry_delay(error_str)
     _llm_not_before = _time.monotonic() + delay
-    _logging.getLogger(__name__).warning("Gemini 429 quota cooling down for %.0fs.", delay)
+    _logging.getLogger(__name__).warning("LLM 429 quota cooling down for %.0fs.", delay)
 
 
 
@@ -671,8 +647,6 @@ def _ticker_fundamentals(payload: dict[str, Any], ticker: str) -> dict[str, str]
     fundamentals_map = _estimate_fundamentals_from_snapshot(payload)
     if ticker in fundamentals_map:
         return fundamentals_map[ticker]
-    if ticker in KNOWN_FUNDAMENTALS:
-        return dict(KNOWN_FUNDAMENTALS[ticker])
 
     return {
         "beneish_m_score": "N/A",
@@ -690,14 +664,34 @@ def _ticker_ledger_row(payload: dict[str, Any], ticker: str) -> dict[str, Any]:
 
 
 def _ticker_stock_row(payload: dict[str, Any], ticker: str) -> dict[str, Any]:
-    stock_quotes = payload.get("stockQuotes") or {}
-    quote = stock_quotes.get(ticker)
-    if isinstance(quote, dict) and quote:
-        return quote
+    merged: dict[str, Any] = {}
     for stock in payload.get("stocks") or []:
-        if stock.get("ticker") == ticker:
-            return stock
-    return {}
+        if str(stock.get("ticker") or "").upper() == str(ticker).upper():
+            merged.update(stock)
+            break
+    quote = (payload.get("stockQuotes") or {}).get(ticker) or (payload.get("stockQuotes") or {}).get(str(ticker).upper())
+    if isinstance(quote, dict) and quote:
+        intra = merged.get("intraday") if isinstance(merged.get("intraday"), dict) else {}
+        q_intra = quote.get("intraday") if isinstance(quote.get("intraday"), dict) else {}
+        merged = {**merged, **quote}
+        if isinstance(q_intra, dict) and q_intra.get("data_source") in ("candles", "daily_candles"):
+            merged["intraday"] = q_intra
+        elif intra:
+            merged["intraday"] = intra
+    return merged
+
+
+def _intraday_bar_source(intraday: Any) -> str:
+    """Return candles | daily_candles | empty. Dummy hunt stubs are empty."""
+    if not isinstance(intraday, dict):
+        return ""
+    src = str(intraday.get("data_source") or "")
+    if src not in ("candles", "daily_candles"):
+        return ""
+    reasons = [str(r) for r in (intraday.get("hard_filter_reasons") or [])]
+    if any(r == "not in intraday candidate set" for r in reasons):
+        return ""
+    return src
 
 
 def _ticker_score(stock: dict[str, Any], ledger_row: dict[str, Any]) -> float:
@@ -710,11 +704,16 @@ def _ticker_score(stock: dict[str, Any], ledger_row: dict[str, Any]) -> float:
 
 def _ticker_intraday_text(stock: dict[str, Any]) -> str:
     intraday = stock.get("intraday") or {}
-    if not intraday:
-        return "no intraday metrics"
+    src = _intraday_bar_source(intraday)
+    if not src:
+        return "no usable candle metrics"
     trigger = intraday.get("trigger_point") or "no trigger"
-    vwap = intraday.get("vwap") or "VWAP unavailable"
-    ema9 = intraday.get("ema9") or "EMA9 unavailable"
+    if src == "daily_candles":
+        vwap = "VWAP unavailable"
+        ema9 = "EMA9 unavailable"
+    else:
+        vwap = intraday.get("vwap") or "VWAP unavailable"
+        ema9 = intraday.get("ema9") or "EMA9 unavailable"
     atr = intraday.get("atr_pct") or 0
     volume_multiplier = intraday.get("volume_multiplier") or 0
     return f"{trigger}, VWAP {vwap}, EMA9 {ema9}, ATR {atr}%, volume multiplier {volume_multiplier}x"
@@ -722,6 +721,12 @@ def _ticker_intraday_text(stock: dict[str, Any]) -> str:
 
 def _build_dynamic_selection_reason(stock: dict[str, Any], score: float) -> str:
     intraday = stock.get("intraday") or {}
+    src = _intraday_bar_source(intraday)
+    if not src:
+        delta = _parse_percent(stock.get("delta"))
+        delta_txt = f"delta {delta:.2f}%" if stock.get("delta") not in (None, "") else "delta unavailable"
+        score_txt = f"score {score:.1f}" if score else "score unavailable"
+        return f"Candle metrics unavailable; {delta_txt}; {score_txt}."
     price_above_vwap = bool(intraday.get("price_above_vwap"))
     price_above_ema9 = bool(intraday.get("price_above_ema9"))
     volume_multiplier = float(intraday.get("volume_multiplier") or 0)
@@ -730,7 +735,14 @@ def _build_dynamic_selection_reason(stock: dict[str, Any], score: float) -> str:
     delta = _parse_percent(stock.get("delta"))
     trigger = intraday.get("trigger_point") or "intraday trigger"
 
-    trend_text = "trend follow-through above VWAP and EMA9" if (price_above_vwap and price_above_ema9) else "mixed trend around intraday anchors"
+    if src == "daily_candles":
+        trend_text = "daily ATR/RSI (5m bars unavailable)"
+    else:
+        trend_text = (
+            "trend follow-through above VWAP and EMA9"
+            if (price_above_vwap and price_above_ema9)
+            else "mixed trend around intraday anchors"
+        )
     momentum_text = f"delta {delta:.2f}% with score {score:.1f}"
     liquidity_text = (
         f"volume {volume_multiplier:.2f}x and turnover {turnover_cr:.2f} Cr"
@@ -806,6 +818,17 @@ def _on_demand_ticker_selection_reason(ticker: str, stock: dict[str, Any], score
 
 def _ticker_factor_hub(stock: dict[str, Any], score: float) -> dict[str, Any]:
     intraday = stock.get("intraday") or {}
+    src = _intraday_bar_source(intraday)
+    if not src:
+        return {
+            "selection_reason": _build_dynamic_selection_reason(stock, score),
+            "dominant_factors": "—",
+            "momentum_factor": "—",
+            "liquidity_factor": "—",
+            "quality_factor": "—",
+            "value_factor": "—",
+            "low_vol_factor": "—",
+        }
     price_above_vwap = bool(intraday.get("price_above_vwap"))
     price_above_ema9 = bool(intraday.get("price_above_ema9"))
     volume_multiplier = float(intraday.get("volume_multiplier") or 0)
@@ -813,19 +836,41 @@ def _ticker_factor_hub(stock: dict[str, Any], score: float) -> dict[str, Any]:
     atr = float(intraday.get("atr_pct") or 0)
     delta = _parse_percent(stock.get("delta"))
 
-    if price_above_vwap and price_above_ema9 and delta >= 0:
+    if src == "daily_candles":
+        dominant = (
+            "range expansion with volatility-led execution risk"
+            if atr >= 3.5 or abs(delta) >= 5
+            else "daily candle ATR and quote-volume liquidity (5m bars unavailable)"
+        )
+        momentum_factor = (
+            f"VWAP/EMA9 unavailable without 5m bars; score {score:.1f}."
+            if score
+            else "VWAP/EMA9 unavailable without 5m bars."
+        )
+    elif price_above_vwap and price_above_ema9 and delta >= 0:
         dominant = "momentum, liquidity, and structural trend alignment"
+        momentum_factor = f"Above VWAP/EMA9; score {score:.1f}."
     elif atr >= 3.5 or abs(delta) >= 5:
         dominant = "range expansion with volatility-led execution risk"
+        momentum_factor = f"Near VWAP/EMA9; score {score:.1f}."
     else:
         dominant = "liquidity and mean-reversion around intraday anchors"
+        momentum_factor = f"Near VWAP/EMA9; score {score:.1f}."
 
     return {
         "selection_reason": _build_dynamic_selection_reason(stock, score),
         "dominant_factors": dominant,
-        "momentum_factor": f"{'Above' if price_above_vwap and price_above_ema9 else 'Near'} VWAP/EMA9; score {score:.1f}.",
-        "liquidity_factor": f"Volume multiplier {volume_multiplier:.2f}x; turnover {turnover_cr:.2f} Cr." if turnover_cr else "Turnover data unavailable.",
-        "quality_factor": f"ATR {atr:.2f}% and hard-filter status {'pass' if intraday.get('passes_hard_filters') else 'watch'}.",
+        "momentum_factor": momentum_factor,
+        "liquidity_factor": (
+            f"Volume multiplier {volume_multiplier:.2f}x; turnover {turnover_cr:.2f} Cr."
+            if turnover_cr
+            else "Turnover data unavailable."
+        ),
+        "quality_factor": (
+            f"ATR {atr:.2f}% from daily candles; 5m hard filters not applied."
+            if src == "daily_candles"
+            else f"ATR {atr:.2f}% and hard-filter status {'pass' if intraday.get('passes_hard_filters') else 'watch'}."
+        ),
         "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
         "low_vol_factor": "Low-vol regime" if atr <= 2 else "Volatility premium regime",
     }
@@ -941,32 +986,41 @@ def _risk_flag_from_metrics(
 
 def _ticker_risk_calc(stock: dict[str, Any], ledger_row: dict[str, Any], market_risk: dict[str, Any], score: float) -> dict[str, Any]:
     intraday = stock.get("intraday") or {}
+    src = _intraday_bar_source(intraday)
+    live = bool(src)
     delta = _parse_percent(stock.get("delta"))
-    atr = float(intraday.get("atr_pct") or 0)
-    turnover_cr = float(intraday.get("turnover_cr") or 0)
-    volume_multiplier = float(intraday.get("volume_multiplier") or 0)
-    win_loss_ratio = market_risk.get("win_loss_ratio", "—")
-    kelly_policy_max = ledger_row.get("policy_allocation_pct") or market_risk.get("kelly_policy_max", "—")
+    atr = float(intraday.get("atr_pct") or 0) if live else None
+    turnover_cr = float(intraday.get("turnover_cr") or 0) if live else None
+    volume_multiplier = float(intraday.get("volume_multiplier") or 0) if live else None
+    win_loss_ratio = market_risk.get("win_loss_ratio") or "—"
+    kelly_policy_max = ledger_row.get("policy_allocation_pct") or market_risk.get("kelly_policy_max") or "—"
     risk_flag_score, risk_flag = _risk_flag_from_metrics(
         score=score,
         delta=delta,
-        atr=atr,
-        volume_multiplier=volume_multiplier,
+        atr=float(atr or 0),
+        volume_multiplier=float(volume_multiplier or 0),
         win_loss_ratio_text=win_loss_ratio,
         kelly_policy_text=kelly_policy_max,
     )
+    has_score = bool(ledger_row.get("score") not in (None, "") or stock.get("score") not in (None, "") or (intraday.get("score") not in (None, "") if isinstance(intraday, dict) else False))
+    if src == "candles":
+        signal_quality = "live-derived"
+    elif src == "daily_candles":
+        signal_quality = "daily-candles"
+    else:
+        signal_quality = "snapshot-quote"
     return {
-        "ticker_score": round(score, 2),
-        "delta_pct": round(delta, 2),
-        "atr_pct": round(atr, 2),
-        "turnover_cr": round(turnover_cr, 2),
-        "volume_multiplier": round(volume_multiplier, 2),
-        "selection_risk": "lower" if score >= 70 and delta >= 0 else "moderate" if score >= 50 else "higher",
-        "signal_quality": "live-derived" if stock else "snapshot-ledger",
-        "win_loss_ratio": win_loss_ratio,
-        "kelly_policy_max": kelly_policy_max,
-        "risk_flag_score": risk_flag_score,
-        "risk_flag": risk_flag,
+        "ticker_score": round(score, 2) if has_score else "—",
+        "delta_pct": round(delta, 2) if stock.get("delta") not in (None, "") else "—",
+        "atr_pct": round(atr, 2) if atr is not None else "—",
+        "turnover_cr": round(turnover_cr, 2) if turnover_cr is not None else "—",
+        "volume_multiplier": round(volume_multiplier, 2) if volume_multiplier is not None else "—",
+        "selection_risk": "—" if not has_score else ("lower" if score >= 70 and delta >= 0 else "moderate" if score >= 50 else "higher"),
+        "signal_quality": signal_quality,
+        "win_loss_ratio": win_loss_ratio if win_loss_ratio not in ("1.0:1", "1.00:1") else "—",
+        "kelly_policy_max": kelly_policy_max if kelly_policy_max not in ("0.0%", "0%") else "—",
+        "risk_flag_score": risk_flag_score if live or has_score else "—",
+        "risk_flag": risk_flag if live or has_score else "—",
     }
 
 
@@ -1270,60 +1324,11 @@ def _apply_wl_policy_from_llm(
     focus_ticker: str | None,
 ) -> dict[str, Any]:
     risk = analysis.get("active_risk_calc") or {}
-    needs_wl = not risk.get("win_loss_ratio") or risk.get("win_loss_ratio") == "—"
-    needs_policy = not risk.get("kelly_policy_max") or risk.get("kelly_policy_max") == "—"
+    needs_wl = not risk.get("win_loss_ratio") or str(risk.get("win_loss_ratio")) in {"—", "1.0:1", "1.00:1"}
+    needs_policy = not risk.get("kelly_policy_max") or str(risk.get("kelly_policy_max")) in {"—", "0.0%", "0%"}
 
     if not needs_wl and not needs_policy:
         return analysis
-
-    ledger = analysis.get("ledger_stocks") or []
-    scores = [float((row.get("score") or 0)) for row in ledger]
-
-    if not scores:
-        if needs_wl:
-            risk["win_loss_ratio"] = "1.0:1"
-        if needs_policy:
-            risk["kelly_policy_max"] = "0.0%"
-        analysis["active_risk_calc"] = risk
-        return analysis
-
-    best_score = max(scores)
-    avg_score = sum(scores) / len(scores)
-
-    best_idx = scores.index(best_score)
-    worst_idx = scores.index(min(scores))
-    best_momentum = abs(float(ledger[best_idx].get("score") or 0))
-    worst_momentum = abs(float(ledger[worst_idx].get("score") or 0))
-    reward_to_risk = best_momentum / worst_momentum if worst_momentum > 0 else 1.5
-    win_rate = min(avg_score / 20.0, 0.85)
-    loss_rate = 1.0 - win_rate
-    kelly_raw = (win_rate * reward_to_risk - loss_rate) / reward_to_risk if reward_to_risk else 0
-    kelly_fraction = max(0.0, min(kelly_raw * 0.5, 0.2))
-    wl_ratio = f"{win_rate / loss_rate:.2f}:1" if loss_rate > 0 else "1.00:1"
-    kelly_policy = f"{kelly_fraction * 100:.1f}%"
-
-    if needs_wl:
-        risk["win_loss_ratio"] = wl_ratio
-    if needs_policy:
-        risk["kelly_policy_max"] = kelly_policy
-
-    analysis["active_risk_calc"] = risk
-
-    if needs_policy:
-        per_ticker: dict[str, dict[str, str]] = {}
-        for idx, row in enumerate(ledger):
-            ticker = row.get("ticker")
-            if not ticker:
-                continue
-            ticker_score = float(row.get("score") or 0)
-            relative_strength = ticker_score / (avg_score or 1)
-            alloc = max(0.0, min(kelly_fraction * relative_strength * 0.5, kelly_fraction))
-            per_ticker[ticker] = {
-                "policy_allocation_pct": f"{alloc * 100:.1f}%",
-            }
-            row["policy_allocation_pct"] = per_ticker[ticker]["policy_allocation_pct"]
-
-    return analysis
 
     ledger = analysis.get("ledger_stocks") or []
     forensic_snapshot = {
@@ -1334,31 +1339,27 @@ def _apply_wl_policy_from_llm(
             "ledger_stocks": ledger,
         }
     }
-
     llm_outcome = _analyze_forensic_wl_policy(forensic_snapshot, ledger, focus_ticker)
-    if not llm_outcome:
+    if llm_outcome:
+        per_ticker = llm_outcome.get("per_ticker") or {}
         if needs_wl:
-            analysis.setdefault("active_risk_calc", {})["win_loss_ratio"] = "—"
+            risk["win_loss_ratio"] = llm_outcome.get("win_loss_ratio") or "—"
         if needs_policy:
-            analysis.setdefault("active_risk_calc", {})["kelly_policy_max"] = "—"
+            risk["kelly_policy_max"] = llm_outcome.get("kelly_policy_max") or "—"
+        analysis["active_risk_calc"] = risk
+        for row in ledger:
+            ticker = row.get("ticker")
+            if not ticker or not needs_policy:
+                continue
+            row_policy = per_ticker.get(ticker, {}).get("policy_allocation_pct")
+            row["policy_allocation_pct"] = row_policy or risk.get("kelly_policy_max") or "—"
         return analysis
 
-    per_ticker = llm_outcome.get("per_ticker") or {}
-
     if needs_wl:
-        analysis.setdefault("active_risk_calc", {})["win_loss_ratio"] = llm_outcome.get("win_loss_ratio", "—")
-
+        risk["win_loss_ratio"] = "—"
     if needs_policy:
-        analysis.setdefault("active_risk_calc", {})["kelly_policy_max"] = llm_outcome.get("kelly_policy_max", "—")
-
-    for row in (analysis.get("ledger_stocks") or []):
-        ticker = row.get("ticker")
-        if not ticker:
-            continue
-        if needs_policy:
-            row_policy = per_ticker.get(ticker, {}).get("policy_allocation_pct")
-            row["policy_allocation_pct"] = row_policy or analysis.get("active_risk_calc", {}).get("kelly_policy_max", "—")
-
+        risk["kelly_policy_max"] = "—"
+    analysis["active_risk_calc"] = risk
     return analysis
 
 
@@ -1444,8 +1445,13 @@ def execute_terminal_intelligence_pipeline(live_unstructured_stream: str) -> Com
             err_str = str(exc)
             if "429" in err_str:
                 _record_quota_error(err_str)
-            _logging.getLogger(__name__).warning("LLM call failed, falling back to heuristic: %s", err_str)
+            _logging.getLogger(__name__).warning("OpenRouter/LLM call failed; using snapshot facts only: %s", err_str)
 
+    snapshot = _compile_market_context_snapshot()
+    if focus_ticker:
+        data = build_ticker_intelligence_report(snapshot, focus_ticker)
+        data = _apply_wl_policy_from_llm(data, snapshot, focus_ticker)
+        return CompleteSecurityAnalysisPayload.model_validate(_sanitize_llm_analysis_data(data))
     return _heuristic_analysis(live_unstructured_stream, focus_ticker)
 
 

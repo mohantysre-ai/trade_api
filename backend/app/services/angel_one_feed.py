@@ -405,23 +405,28 @@ def _snapshot_age_seconds(snapshot: dict[str, Any] | None) -> float | None:
 
 
 def _intraday_metrics_usable(intraday: Any) -> bool:
-    """True when cached candle metrics are real, not a dummy quote-only stub."""
+    """True when cached metrics come from 5m or daily candles, not a dummy stub."""
     if not isinstance(intraday, dict):
         return False
-    if intraday.get("data_source") != "candles":
+    source = str(intraday.get("data_source") or "")
+    if source not in ("candles", "daily_candles"):
         return False
     reasons = [str(r) for r in (intraday.get("hard_filter_reasons") or [])]
     if any(r == "not in intraday candidate set" for r in reasons):
         return False
-    try:
-        vwap = float(intraday.get("vwap")) if intraday.get("vwap") is not None else 0.0
-    except (TypeError, ValueError):
-        vwap = 0.0
-    try:
-        rsi = float(intraday.get("rsi")) if intraday.get("rsi") is not None else 0.0
-    except (TypeError, ValueError):
-        rsi = 0.0
-    return vwap > 0 or rsi > 0
+
+    def _num(key: str) -> float:
+        try:
+            return float(intraday.get(key) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    return (
+        _num("vwap") > 0
+        or _num("rsi") > 0
+        or _num("atr_pct") > 0
+        or _num("turnover_cr") > 0
+    )
 
 
 def _snapshot_intraday_cache(snapshot: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
@@ -437,6 +442,108 @@ def _snapshot_intraday_cache(snapshot: dict[str, Any] | None) -> dict[str, dict[
         if _intraday_metrics_usable(intraday):
             cache[str(ticker)] = intraday
     return cache
+
+
+def ensure_snapshot_ticker_facts(snapshot: dict[str, Any], ticker: str) -> dict[str, Any]:
+    """Fetch live quote + candle metrics for one ticker and persist into the snapshot."""
+    if not isinstance(snapshot, dict):
+        snapshot = {}
+    sym = str(ticker or "").upper().strip()
+    if not sym:
+        return snapshot
+    quotes = dict(snapshot.get("stockQuotes") or {})
+    merged: dict[str, Any] = {}
+    for row in snapshot.get("stocks") or []:
+        if isinstance(row, dict) and str(row.get("ticker") or "").upper() == sym:
+            merged.update(row)
+            break
+    existing = quotes.get(sym)
+    if isinstance(existing, dict):
+        intra = merged.get("intraday") if isinstance(merged.get("intraday"), dict) else {}
+        q_intra = existing.get("intraday") if isinstance(existing.get("intraday"), dict) else {}
+        merged = {**merged, **existing}
+        if q_intra.get("data_source") == "candles":
+            merged["intraday"] = q_intra
+        elif intra:
+            merged["intraday"] = intra
+    merged["ticker"] = sym
+
+    need_quote = float(merged.get("ltpRaw") or 0) <= 0
+    need_intra = not _intraday_metrics_usable(merged.get("intraday"))
+    if need_quote or need_intra:
+        try:
+            client = _get_fixed_plan_client()
+            if client is None:
+                client = AngelOneClient()
+            if need_quote:
+                quote = client.fetch_symbol_quote(sym)
+                if quote:
+                    inst = Instrument(
+                        sym,
+                        "NSE",
+                        str(quote.get("tradingsymbol") or f"{sym}-EQ"),
+                        str(quote.get("token") or "0"),
+                    )
+                    built = _build_stock_row(inst, quote, str(snapshot.get("activePool") or "LIVE"))
+                    merged = {**merged, **built}
+            if need_intra and float(merged.get("ltpRaw") or 0) > 0:
+                universe: dict[str, Instrument] = {}
+                try:
+                    for inst in _ensure_nifty500_cache(client):
+                        universe[inst.key] = inst
+                except Exception:
+                    universe = {}
+                inst = universe.get(sym)
+                if inst is None:
+                    token = "0"
+                    try:
+                        q2 = client.fetch_symbol_quote(sym) or {}
+                        token = str(q2.get("token") or "0")
+                        inst = Instrument(sym, "NSE", str(q2.get("tradingsymbol") or f"{sym}-EQ"), token)
+                    except Exception:
+                        inst = Instrument(sym, "NSE", f"{sym}-EQ", "0")
+                resolved = _resolve_nse_equity(sym, client=client)
+                if resolved:
+                    token, tradingsymbol = resolved
+                    inst = Instrument(sym, "NSE", tradingsymbol, str(token))
+                metrics_map = _fetch_intraday_chunk(
+                    client,
+                    [merged],
+                    {sym: inst},
+                    _ist_now(),
+                    force_angel_fallback=True,
+                )
+                metrics = metrics_map.get(sym)
+                if _intraday_metrics_usable(metrics):
+                    merged["intraday"] = metrics
+        except Exception as exc:
+            logging.getLogger(__name__).warning("ensure_snapshot_ticker_facts failed for %s: %s", sym, exc)
+
+    try:
+        pct_map = ensure_promoter_holdings([sym])
+        pct = pct_map.get(sym)
+        if pct is not None:
+            merged["promoter_holding_pct"] = pct
+            intra = merged.get("intraday") if isinstance(merged.get("intraday"), dict) else {}
+            intra = dict(intra)
+            intra["promoter_holding_pct"] = pct
+            merged["intraday"] = intra
+    except Exception:
+        pass
+
+    quotes[sym] = merged
+    snapshot["stockQuotes"] = quotes
+    stocks = list(snapshot.get("stocks") or [])
+    for i, row in enumerate(stocks):
+        if isinstance(row, dict) and str(row.get("ticker") or "").upper() == sym:
+            stocks[i] = {**row, **merged}
+            snapshot["stocks"] = stocks
+            break
+    try:
+        _save_last_snapshot(snapshot)
+    except Exception:
+        pass
+    return snapshot
 
 
 def _top_ledger_tickers(snapshot: dict[str, Any] | None, limit: int = LLM_DISPLAY_COUNT) -> list[str]:
@@ -1597,11 +1704,17 @@ def _save_last_snapshot(payload: dict[str, Any]) -> None:
     except Exception as exc:
         log.warning("dhanSwingPicks snapshot hydration failed: %s", exc)
     try:
+        from .json_atomic import atomic_write_json
+
         path = _snapshot_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(_normalize_snapshot(payload), indent=2), encoding="utf-8")
+        atomic_write_json(path, _normalize_snapshot(payload))
     except Exception:
-        pass
+        try:
+            path = _snapshot_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(_normalize_snapshot(payload), indent=2), encoding="utf-8")
+        except Exception:
+            pass
 
 
 def refresh_fixed_plan_close_marks(*, force: bool = True) -> dict[str, Any]:
@@ -2620,12 +2733,59 @@ def _empty_intraday_metrics(reason: str) -> dict[str, Any]:
     }
 
 
+def _intraday_metrics_from_daily(
+    daily_candles: list[dict[str, Any]],
+    ltp: float,
+    now: datetime,
+    quote_fallback: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """ATR / RSI / turnover from daily candles + quote volume when 5m bars are missing."""
+    atr_pct = _atr_percent(daily_candles)
+    daily_volumes = [row["volume"] for row in daily_candles[-20:]]
+    avg_daily_volume_20 = (sum(daily_volumes) / len(daily_volumes)) if daily_volumes else 0.0
+    today_volume = float((quote_fallback or {}).get("tradeVolume") or 0)
+    if today_volume <= 0:
+        today_volume = float(daily_candles[-1].get("volume") or 0)
+    volume_multiplier = pace_volume_multiplier(today_volume, avg_daily_volume_20, now)
+    turnover_cr = (ltp * today_volume) / 10_000_000 if ltp and today_volume else 0.0
+    rsi_val = _rsi([row["close"] for row in daily_candles], period=14)
+    prev_close = float((quote_fallback or {}).get("close") or 0)
+    if prev_close <= 0 and len(daily_candles) >= 2:
+        prev_close = float(daily_candles[-2].get("close") or 0)
+    day_move_pct = day_change_pct_from_prices(ltp, prev_close)
+    return {
+        "data_source": "daily_candles",
+        "atr_pct": round(atr_pct, 2),
+        "volume_multiplier": round(volume_multiplier, 2),
+        "today_volume": round(today_volume, 0),
+        "avg_daily_volume_20": round(avg_daily_volume_20, 0),
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "ema_angle_deg": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "orb_velocity_pct": 0.0,
+        "wick_noise_ratio": 1.0,
+        "turnover_cr": round(turnover_cr, 2),
+        "price_above_vwap": False,
+        "price_above_ema9": False,
+        "trigger_point": "VWAP Bounce",
+        "rsi": rsi_val,
+        "passes_hard_filters": False,
+        "hard_filter_reasons": ["5m bars unavailable; ATR/RSI/turnover from daily candles + quote volume"],
+        "day_change_pct": None if day_move_pct is None else round(day_move_pct, 2),
+        "volume_pace_adjusted": False,
+    }
+
+
 def _intraday_metrics(
     client: AngelOneClient,
     inst: Instrument,
     ltp: float,
     now: datetime,
     quote_fallback: dict[str, Any] | None = None,
+    *,
+    force_angel_fallback: bool = False,
 ) -> dict[str, Any]:
     try:
         market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
@@ -2650,11 +2810,12 @@ def _intraday_metrics(
             intraday_raw = fetch_nse_candles(
                 inst.key, inst.token, "FIVE_MINUTE", market_open, now
             )
-        # Do not Angel-fallback a Dhan-mapped name — empty Dhan + 500 Angel
-        # getCandleData calls is what trips AB1021.
-        if not daily_raw and not tried_dhan and _angel_candle_calls_allowed():
+        # Batch hunt skips Angel when a Dhan id exists (AB1021). Drawer single-name
+        # fetches may force Angel so ATR/turnover are not left blank.
+        allow_angel = force_angel_fallback or not tried_dhan
+        if not daily_raw and allow_angel and _angel_candle_calls_allowed():
             daily_raw = client.fetch_candles(inst.exchange, inst.token, "ONE_DAY", daily_from, daily_to)
-        if not intraday_raw and not tried_dhan and _angel_candle_calls_allowed():
+        if not intraday_raw and allow_angel and _angel_candle_calls_allowed():
             intraday_raw = client.fetch_candles(inst.exchange, inst.token, "FIVE_MINUTE", market_open, now)
 
         daily_candles = _parse_candle_rows(daily_raw)
@@ -2663,9 +2824,13 @@ def _intraday_metrics(
         daily_candles = []
         intraday_candles = []
 
-    if not daily_candles or not intraday_candles:
-        # Quote-derived indicators are opt-in only and never count as valid
-        # candle coverage. Production selection defaults to fail-closed.
+    if not daily_candles and not intraday_candles:
+        if quote_fallback is not None and os.getenv("ALLOW_QUOTE_METRICS_FALLBACK", "0") == "1":
+            return _intraday_metrics_from_quote(ltp, now, quote_fallback)
+        return _empty_intraday_metrics("insufficient candle data")
+    if not intraday_candles and daily_candles:
+        return _intraday_metrics_from_daily(daily_candles, ltp, now, quote_fallback)
+    if not daily_candles:
         if quote_fallback is not None and os.getenv("ALLOW_QUOTE_METRICS_FALLBACK", "0") == "1":
             return _intraday_metrics_from_quote(ltp, now, quote_fallback)
         return _empty_intraday_metrics("insufficient candle data")
@@ -2790,6 +2955,8 @@ def _fetch_intraday_chunk(
     rows: list[dict[str, Any]],
     stock_universe_by_key: dict[str, Instrument],
     now: datetime,
+    *,
+    force_angel_fallback: bool = False,
 ) -> dict[str, dict[str, Any]]:
     results: dict[str, dict[str, Any]] = {}
     for row in rows:
@@ -2811,7 +2978,9 @@ def _fetch_intraday_chunk(
             "previousOI": row.get("prev_oi"),
         }
         try:
-            metrics = _intraday_metrics(client, inst, ltp, now, quote_fallback=quote_fallback)
+            metrics = _intraday_metrics(
+                client, inst, ltp, now, quote_fallback=quote_fallback, force_angel_fallback=force_angel_fallback,
+            )
         except Exception:
             import traceback as _traceback
             logging.getLogger(__name__).error(
@@ -4135,9 +4304,24 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail="Missing required parameter: ticker")
         snapshot = _load_last_snapshot() or {}
         try:
+            snapshot = ensure_snapshot_ticker_facts(snapshot, sym)
             from .desk_ic_criteria import evaluate_and_cache_ticker, get_cached_desk_ic
 
-            cached = None if force else get_cached_desk_ic(snapshot, sym)
+            cached = None if force else get_cached_desk_ic(
+                snapshot, sym, require_llm=not fast
+            )
+            fact = None
+            try:
+                from .desk_ic_criteria import build_fact_pack, resolve_stock_from_snapshot
+
+                fact = build_fact_pack(sym, resolve_stock_from_snapshot(snapshot, sym))
+            except Exception:
+                fact = None
+            if cached and isinstance(cached.get("factPack"), dict) and isinstance(fact, dict):
+                if cached["factPack"].get("ltp") is None and fact.get("ltp") is not None:
+                    cached = None
+                elif cached["factPack"].get("turnover_cr") is None and fact.get("turnover_cr") is not None:
+                    cached = None
             if cached:
                 return {"success": True, "ticker": sym, "deskIc": cached, "cached": True}
             result = evaluate_and_cache_ticker(
@@ -4515,7 +4699,10 @@ def create_app() -> FastAPI:
             snapshot = _load_last_snapshot()
             if not snapshot:
                 raise HTTPException(status_code=503, detail="Market snapshot unavailable.")
-            payload = _hydrate_ticker_intelligence_map(dict(snapshot))
+            snapshot = dict(snapshot)
+            if ticker:
+                snapshot = ensure_snapshot_ticker_facts(snapshot, str(ticker).strip().upper())
+            payload = _hydrate_ticker_intelligence_map(snapshot)
             if pool:
                 payload["activePool"] = pool
             sym = str(ticker or "").strip().upper()
@@ -4878,6 +5065,22 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     wire_eod_into_app(app)
+
+    def _persist_books_on_boot() -> None:
+        try:
+            from .intraday_session_engine import refresh_session_state
+
+            refresh_session_state()
+        except Exception:
+            logging.getLogger(__name__).exception("boot persist session JSON failed")
+        try:
+            from .swing_session import refresh_swing_session_state
+
+            refresh_swing_session_state()
+        except Exception:
+            logging.getLogger(__name__).exception("boot persist swing session failed")
+
+    threading.Thread(target=_persist_books_on_boot, name="desk-boot-persist", daemon=True).start()
 
     return app
 
