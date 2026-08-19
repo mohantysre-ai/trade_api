@@ -4,6 +4,7 @@ import React, { lazy, Suspense, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "motion/react";
 import type { AITickerNewsReport, DeskIcSummary, TerminalIntelligence } from "@/lib/market-api";
+import { isNseCashSessionNow } from "@/lib/market-api";
 import type { IntradayMetrics } from "@/lib/drawer-research";
 const AITickerNewsPanel = lazy(() => import("./AITickerNewsPanel"));
 const ConfidenceCheckerPanel = lazy(() => import("./ConfidenceCheckerPanel"));
@@ -12,6 +13,7 @@ const SwotAnalysisPanel = lazy(() => import("./SwotAnalysisPanel"));
 import { parseNewsCatalystsCard, type TrendlyneCardSummary } from "@/lib/intelligence-summary";
 import { deskDrawerVariants } from "@/lib/motion-tokens";
 import MarketSymbolBadge from "./MarketSymbolBadge";
+import CashSessionClosedBanner from "./CashSessionClosedBanner";
 
 type DrawerAnalysis = TerminalIntelligence & {
   error?: string;
@@ -535,6 +537,11 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
             </svg>
           </button>
         </div>
+        {!isNseCashSessionNow() && (
+          <div className="px-3 sm:px-5 pb-2">
+            <CashSessionClosedBanner />
+          </div>
+        )}
 
         {/* Tab navigation */}
         <div className="right-drawer-tabs flex px-2 sm:px-5 overflow-x-auto desk-scroll-x flex-nowrap">

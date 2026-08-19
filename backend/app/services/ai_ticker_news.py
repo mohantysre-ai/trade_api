@@ -32,9 +32,6 @@ import httpx
 import requests
 from bs4 import BeautifulSoup
 
-_llm_not_before: float = 0.0
-_LLM_COOLDOWN_SECONDS = 60
-
 # Cap concurrent outbound scrapes (batch × 7 sources was melting DNS).
 _SCRAPE_CONCURRENCY = int(os.getenv("NEWS_SCRAPE_CONCURRENCY", "3"))
 _SCRAPE_SEMAPHORE: asyncio.Semaphore | None = None
@@ -134,15 +131,6 @@ async def _guarded_scrape(name: str, coro):
             return []
 
 
-def _llm_quota_available() -> bool:
-    return _time.monotonic() >= _llm_not_before
-
-
-def _record_quota_error(message: str) -> None:
-    global _llm_not_before
-    _llm_not_before = _time.monotonic() + _LLM_COOLDOWN_SECONDS
-    logger.warning("LLM quota cooldown activated for %.0fs due to: %s", _LLM_COOLDOWN_SECONDS, message[:120])
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -184,6 +172,8 @@ class AITickerNewsReport:
     sentiment_overall: str = ""
     risk_flags: str = ""
     summary_headline: str = ""
+    llmUsed: bool = False
+    llmError: str = ""
 
     raw_articles: list[dict] | None = None
 
@@ -938,6 +928,20 @@ def _cache_key(ticker: str, articles: list[TickerNewsArticle], max_articles: int
     return ticker.upper()
 
 
+def ticker_news_report_is_llm_complete(report: dict | None) -> bool:
+    """True only for a successful LLM summary. Failed 429 shells must not be cached as news."""
+    if not isinstance(report, dict) or report.get("error"):
+        return False
+    if report.get("llmUsed") is True:
+        return True
+    if report.get("llmUsed") is False:
+        return False
+    headline = str(report.get("summary_headline") or "")
+    if "LLM summary unavailable" in headline:
+        return False
+    return bool(headline.strip())
+
+
 def get_cached_summary(
     ticker: str,
     articles: list[TickerNewsArticle],
@@ -993,7 +997,7 @@ async def summarize_with_llm(ticker: str, company: str, articles: list[TickerNew
         return missing
     if not _llm_quota_available():
         logger.warning("LLM quota cooling down — no heuristic summary for %s", ticker)
-        return _llm_unavailable_summary(ticker, company, articles, "LLM quota cooling down")
+        return _llm_unavailable_summary(ticker, company, articles, _quota_cooldown_message())
 
     article_text = "\n\n".join(
         f"Title: {a.title}\nSource: {a.source}\nSummary: {a.summary}\nPublished: {a.published_at}\nURL: {a.url}"
@@ -1060,6 +1064,36 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
         err = str(exc)
         if "429" in err:
             _record_quota_error(err)
+            gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+            gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
+            if gemini_key:
+                try:
+                    from .llm_client import _call_gemini
+
+                    text = await asyncio.to_thread(
+                        _call_gemini,
+                        prompt,
+                        gemini_key,
+                        gemini_model,
+                        "You are an elite institutional financial terminal. Return valid JSON only.",
+                    )
+                    if "```json" in text:
+                        text = text.split("```json")[1].split("```")[0].strip()
+                    elif "```" in text:
+                        text = text.split("```")[1].split("```")[0].strip()
+                    result = _parse_json_response(text, expected_keys)
+                    for key in expected_keys:
+                        result.setdefault(key, "No recent news found.")
+                    result["llmUsed"] = True
+                    logger.info(
+                        "LLM ticker-news summary complete for %s via gemini/%s (OpenRouter 429 fallback)",
+                        ticker,
+                        gemini_model,
+                    )
+                    return result
+                except Exception as gemini_exc:
+                    logger.error("Gemini fallback failed for %s: %s", ticker, gemini_exc)
+                    err = f"{err}; gemini fallback: {gemini_exc}"
         logger.error("LLM ticker-news failed for %s: %s", ticker, exc)
         return _llm_unavailable_summary(ticker, company, articles, err)
 
@@ -1067,6 +1101,29 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
 async def summarize_with_gemini(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:
     """Compat alias — OpenRouter/OpenAI path, not Gemini-only."""
     return await summarize_with_llm(ticker, company, articles)
+
+
+def _quota_cooldown_message() -> str:
+    from .llm_client import llm_quota_resume_unix
+
+    until = llm_quota_resume_unix()
+    try:
+        from zoneinfo import ZoneInfo
+
+        stamp = datetime.fromtimestamp(until, tz=ZoneInfo("Asia/Kolkata")).strftime("%H:%M IST")
+    except Exception:
+        stamp = datetime.fromtimestamp(until, tz=timezone.utc).strftime("%H:%M UTC")
+    return f"OpenRouter free-model daily quota exhausted until {stamp}."
+
+
+def _short_llm_error(error: str) -> str:
+    text = str(error or "")
+    lowered = text.lower()
+    if "quota cooling down" in lowered or "quota exhausted" in lowered:
+        return text[:280]
+    if "free-models-per-day" in text or "Rate limit exceeded" in text or "429" in text:
+        return _quota_cooldown_message()
+    return text[:280]
 
 
 def _llm_unavailable_summary(ticker: str, company: str, articles: list[TickerNewsArticle], error: str) -> dict:
@@ -1086,7 +1143,7 @@ def _llm_unavailable_summary(ticker: str, company: str, articles: list[TickerNew
         "risk_flags": "—",
         "summary_headline": f"LLM summary unavailable for {company} ({len(articles)} articles scraped).",
         "llmUsed": False,
-        "llmError": str(error)[:400],
+        "llmError": _short_llm_error(error),
     }
 
 # ---------------------------------------------------------------------------

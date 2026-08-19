@@ -12,11 +12,10 @@ from pydantic import BaseModel, Field
 import json
 import os
 import re
-import time as _time
 import logging as _logging
 import requests
 from .desk_ic_criteria import prefer_intraday_blocks
-from .llm_client import LLM_CALL_TIMEOUT_SECONDS, _call_gemini, _call_openai, _llm_config
+from .llm_client import LLM_CALL_TIMEOUT_SECONDS, _call_gemini, _call_openai, _llm_config, _llm_quota_available, _record_quota_error
 
 
 class CompleteSecurityAnalysisPayload(BaseModel):
@@ -34,7 +33,6 @@ class CompleteSecurityAnalysisPayload(BaseModel):
     active_factor_hub: dict[str, Any] = Field(default_factory=dict, description="Factor attribution")
 
 
-_llm_not_before: float = 0.0
 # Asset Matrix funnel: 500 quotes → volume screen → ranked UI list (env: TOP_SELECTION_COUNT).
 TOP_SELECTION_COUNT = int(os.getenv("TOP_SELECTION_COUNT", "50"))
 # LLM scope: verdict + terminal intelligence + news summary only for top BUY display set.
@@ -382,29 +380,6 @@ def _fallback_bullets(title: str, items: list[str]) -> str:
     if not clean:
         return ""
     return title + "\n" + "\n".join([f"• {item}" for item in clean])
-
-
-def _parse_retry_delay(error_str: str, cap: float = 90.0) -> float:
-    match = re.search(r"'retryDelay':\s*'([\d.]+)s'", error_str)
-    if match:
-        return min(float(match.group(1)), cap)
-    match = re.search(r"retry.*?in\s+([\d.]+)s", error_str, re.IGNORECASE)
-    if match:
-        return min(float(match.group(1)), cap)
-    return 30.0
-
-
-def _llm_quota_available() -> bool:
-    return _time.monotonic() >= _llm_not_before
-
-
-def _record_quota_error(error_str: str) -> None:
-    global _llm_not_before
-    delay = _parse_retry_delay(error_str)
-    _llm_not_before = _time.monotonic() + delay
-    _logging.getLogger(__name__).warning("LLM 429 quota cooling down for %.0fs.", delay)
-
-
 
 
 def _json_block(text: str) -> str:

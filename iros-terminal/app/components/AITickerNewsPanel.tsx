@@ -119,7 +119,32 @@ const SENTIMENT_CONFIG: Record<string, { label: string; gradient: string; text: 
     border: "border-red-300",
     icon: "📉",
   },
+  unavailable: {
+    label: "Unavailable",
+    gradient: "bg-gradient-to-br from-slate-50 to-white",
+    text: "text-slate-500",
+    border: "border-slate-200",
+    icon: "—",
+  },
 };
+
+const EMPTY_INTEL = new Set([
+  "none",
+  "n/a",
+  "na",
+  "nil",
+  "not available",
+  "no data",
+  "no recent news found",
+  "—",
+  "-",
+  "–",
+]);
+
+function isBlankIntel(value?: string): boolean {
+  const normalized = value?.trim().toLowerCase().replace(/[.!]+$/g, "") ?? "";
+  return !normalized || EMPTY_INTEL.has(normalized);
+}
 
 // ---------------------------------------------------------------------------
 // Loading skeleton — shimmer effect
@@ -242,12 +267,15 @@ export default function AITickerNewsPanel({
     }
   }, [ticker, companyName, report]);
 
-  const sentimentCfg = SENTIMENT_CONFIG[report?.sentiment_overall?.toLowerCase() ?? ""] ?? SENTIMENT_CONFIG.neutral;
+  const sentKey = report?.sentiment_overall?.trim().toLowerCase() ?? "";
+  const sentimentCfg =
+    SENTIMENT_CONFIG[sentKey]
+    ?? (isBlankIntel(report?.sentiment_overall) ? SENTIMENT_CONFIG.unavailable : SENTIMENT_CONFIG.neutral);
   const hasNews = report && !report.error;
+  const llmFailed = Boolean(report && report.llmUsed === false);
   const activeCategories = CATEGORIES.filter((cat) => {
     const value = report?.[cat.key] as string | undefined;
-    const normalized = value?.trim().toLowerCase().replace(/[.!]+$/g, "");
-    return Boolean(value) && !new Set(["none", "n/a", "na", "nil", "not available", "no data", "no recent news found"]).has(normalized ?? "");
+    return !isBlankIntel(value);
   });
 
   return (
@@ -307,13 +335,18 @@ export default function AITickerNewsPanel({
         {hasNews && report.summary_headline && (
           <div className="mt-3 flex items-start gap-3 bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-xl p-3.5 hover:shadow-sm transition-shadow">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 mb-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
+                <div className="flex items-center gap-1.5 mb-1">
+                <div className={`w-1.5 h-1.5 rounded-full ${llmFailed ? "bg-amber-400" : "bg-teal-400 animate-pulse"}`} />
                 <span className="desk-panel-title text-teal-600">Headline</span>
               </div>
               <p className="text-[11px] text-slate-700 leading-relaxed">
                 {report.summary_headline}
               </p>
+              {report.llmError && (
+                <p className="mt-1.5 text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+                  {report.llmError}
+                </p>
+              )}
             </div>
             <MiniSparkline className="flex-shrink-0" />
           </div>
@@ -370,17 +403,29 @@ export default function AITickerNewsPanel({
                   <span className="desk-panel-title">Risk Flags</span>
                 </div>
                 <div className="text-[11px] text-slate-700 leading-relaxed">
-                  {report.risk_flags && report.risk_flags !== "None"
-                    ? report.risk_flags
-                    : <span className="text-emerald-600 font-medium flex items-center gap-1">
+                  {isBlankIntel(report.risk_flags) || report.risk_flags === "None" ? (
+                    llmFailed ? (
+                      <span className="text-slate-400">—</span>
+                    ) : (
+                    <span className="text-emerald-600 font-medium flex items-center gap-1">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         No significant risks flagged
-                      </span>}
+                      </span>
+                    )
+                  ) : (
+                    report.risk_flags
+                  )}
                 </div>
               </div>
             </div>
+
+            {llmFailed && activeCategories.length === 0 && (
+              <p className="text-[10px] text-slate-500">
+                Intelligence categories empty — LLM did not summarize the scraped articles.
+              </p>
+            )}
 
             {/* ── Category grid ── */}
             {activeCategories.length > 0 && (

@@ -5,6 +5,7 @@ import { buildTechnicalSignals, type IntradayMetrics } from "@/lib/drawer-resear
 import type { TrendlyneCardSummary } from "@/lib/intelligence-summary";
 import { isNseCashSessionNow } from "@/lib/market-api";
 import MarketSymbolBadge from "./MarketSymbolBadge";
+import CashSessionClosedBanner from "./CashSessionClosedBanner";
 
 type TechnicalAnalysisPanelProps = {
   ticker?: string;
@@ -251,11 +252,9 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
 
       {/* Live Dashboard ── light theme */}
       {activeView === 'dashboard' && (
-        <div className={`space-y-3 ${sessionOpen ? "" : "opacity-70"}`}>
+        <div className={`space-y-3 ${sessionOpen ? "" : "grayscale-[0.45]"}`}>
           {!sessionOpen && (
-            <div className="rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
-              NSE cash session closed{trendlyne?.lastModified ? ` · last print ${trendlyne.lastModified}` : " · last Trendlyne / snapshot print"}
-            </div>
+            <CashSessionClosedBanner lastPrint={trendlyne?.lastModified} />
           )}
           {!signals.hasData && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-semibold text-amber-900">

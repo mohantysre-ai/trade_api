@@ -3,9 +3,10 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import type { SparkFlag } from '@/lib/market-api';
-import { fetchNseSparkline } from '@/lib/market-api';
+import { fetchNseSparkline, isNseCashSessionNow } from '@/lib/market-api';
 import { LiveTickNumber } from '@/lib/desk-motion';
 import { fetchLiveDesk, subscribeLiveDesk } from '@/lib/live-desk';
+import CashSessionClosedBanner from './CashSessionClosedBanner';
 
 /* ── Smooth sparkline SVG with Catmull-Rom spline ─────────────────────── */
 let intraSparkIdCounter = 0;
@@ -889,8 +890,8 @@ export default function IntradayMatrixPanel() {
   const [monitorMode, setMonitorMode] = useState(false);
   const [alerts, setAlerts] = useState<AlertRecord[]>([]);
   const [alertBanner, setAlertBanner] = useState<AlertRecord | null>(null);
-  const [marketOpen, setMarketOpen] = useState(true);
-  const [sessionClosed, setSessionClosed] = useState(false);
+  const [marketOpen, setMarketOpen] = useState(() => isNseCashSessionNow());
+  const [sessionClosed, setSessionClosed] = useState(() => !isNseCashSessionNow());
   const prevOutcomeRef = useRef<Record<string, string | null>>({});
   const [longBookRef] = useAutoAnimate({ duration: 200, easing: 'ease-in-out' });
   const [shortBookRef] = useAutoAnimate({ duration: 200, easing: 'ease-in-out' });
@@ -941,6 +942,8 @@ export default function IntradayMatrixPanel() {
   const loadLivePrices = useCallback(async (snapshotData?: LivePricesResponse) => {
     try {
       const data = snapshotData ?? await fetchLivePrices();
+      if (data.sessionClosed != null) setSessionClosed(Boolean(data.sessionClosed));
+      if (data.marketOpen != null) setMarketOpen(data.marketOpen !== false);
       if (data.source === 'none' || ((data.long?.length ?? 0) === 0 && (data.short?.length ?? 0) === 0)) {
         // No fixed plan — fall back to normal mode
         setMonitorMode(false);
@@ -1060,10 +1063,22 @@ export default function IntradayMatrixPanel() {
     return merged;
   }, [allTickers, stockSparklines1D, stockSparklines1M, stockSparklines1Y]);
 
+  const cashClosed = Boolean(sessionClosed) || !isNseCashSessionNow();
+
   /* ── RENDER ───────────────────────────────────────────────────────────── */
 
   return (
     <div className="space-y-4">
+      {cashClosed && (
+        <CashSessionClosedBanner
+          lastPrint={
+            livePricesData?.updatedAt
+              ? new Date(livePricesData.updatedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false })
+              : null
+          }
+        />
+      )}
+      <div className={`space-y-4${cashClosed ? " opacity-[0.72] grayscale-[0.4]" : ""}`}>
       {/* ── ALERT BANNER ─────────────────────────────────────────────────── */}
       {alertBanner && (
         <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl shadow-2xl border-2 animate-pulse ${
@@ -1388,17 +1403,6 @@ export default function IntradayMatrixPanel() {
 
               return (
                 <>
-                  {sessionClosed && (
-                    <div className="mb-3 flex items-center gap-2 rounded-md glass-flat desk-banner-warn px-3 py-2">
-                      <span className="desk-breathe-dot shrink-0 opacity-70" style={{ animation: 'none', background: 'var(--terminal-line)' }} />
-                      <span className="glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 desk-panel-title text-slate-900">
-                        SESSION CLOSED
-                      </span>
-                      <span className="text-[9px] text-slate-500 ml-1">
-                        Unfilled picks marked NOT TRIGGERED. Monitoring halted.
-                      </span>
-                    </div>
-                  )}
                   <div className="mb-3">
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <span className={`glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
@@ -1680,6 +1684,7 @@ export default function IntradayMatrixPanel() {
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
+      </div>
     </div>
   );
 }

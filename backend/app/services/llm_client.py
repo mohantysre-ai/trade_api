@@ -1,10 +1,14 @@
 import json
+import logging
 import os
+import re
 import time as _time
 from typing import Any
 from pydantic import BaseModel, Field
 
 import requests
+
+_log = logging.getLogger(__name__)
 
 
 _llm_not_before: float = 0.0
@@ -81,13 +85,158 @@ def _llm_config() -> tuple[str, str, str, str, str | None]:
     return provider, api_key, api_url, model, oauth_token_path
 
 
+def parse_openrouter_reset_unix(message: str) -> float | None:
+    """Parse OpenRouter X-RateLimit-Reset (unix seconds or milliseconds)."""
+    match = re.search(r"X-RateLimit-Reset['\"]?\s*[:=]\s*['\"]?(\d+)", message or "")
+    raw: float | None = None
+    if match:
+        raw = float(match.group(1))
+    else:
+        start = (message or "").find("{")
+        if start >= 0:
+            try:
+                data = json.loads(message[start:])
+                headers = ((data.get("error") or {}).get("metadata") or {}).get("headers") or {}
+                token = headers.get("X-RateLimit-Reset") or headers.get("x-ratelimit-reset")
+                if token is not None:
+                    raw = float(token)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                raw = None
+    if raw is None:
+        return None
+    if raw > 1e12:
+        raw /= 1000.0
+    return raw
+
+
+def _retry_delay_seconds(error_str: str, cap: float = 90.0) -> float:
+    match = re.search(r"'retryDelay':\s*'([\d.]+)s'", error_str or "")
+    if match:
+        return min(float(match.group(1)), cap)
+    match = re.search(r"retry.*?in\s+([\d.]+)s", error_str or "", re.IGNORECASE)
+    if match:
+        return min(float(match.group(1)), cap)
+    return 60.0
+
+
+def quota_not_before_unix(message: str, now: float | None = None) -> float:
+    now = _time.time() if now is None else now
+    reset = parse_openrouter_reset_unix(message)
+    if reset is not None:
+        return min(max(reset, now + 5.0), now + 36 * 3600)
+    return now + _retry_delay_seconds(message)
+
+
 def _record_quota_error(message: str) -> None:
     global _llm_not_before
-    _llm_not_before = _time.time() + 60
+    until = quota_not_before_unix(message)
+    _llm_not_before = until
+    remaining = max(0.0, until - _time.time())
+    _log.warning("LLM quota cooling down for %.0fs due to: %s", remaining, (message or "")[:160])
 
 
 def _llm_quota_available() -> bool:
     return _time.time() >= _llm_not_before
+
+
+def llm_quota_resume_unix() -> float:
+    return _llm_not_before
+
+
+OPENROUTER_FREE_ROUTER = "openrouter/free"
+_DEFAULT_OPENROUTER_FREE = [
+    OPENROUTER_FREE_ROUTER,
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "inclusionai/ling-3.0-flash:free",
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "openai/gpt-oss-20b:free",
+    "poolside/laguna-s-2.1:free",
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+]
+_SKIP_FREE_SUBSTR = ("content-safety", "lyria")
+_MAX_FREE_FAILOVER = 6
+_live_free_models: list[str] = []
+_live_free_models_at: float = 0.0
+
+
+def _is_openrouter_url(api_url: str) -> bool:
+    return "openrouter.ai" in (api_url or "").lower()
+
+
+def _is_openrouter_free_model(model: str) -> bool:
+    name = (model or "").strip()
+    return name == OPENROUTER_FREE_ROUTER or name.endswith(":free")
+
+
+def _skip_free_model(model: str) -> bool:
+    lowered = (model or "").lower()
+    return any(token in lowered for token in _SKIP_FREE_SUBSTR)
+
+
+def _env_free_fallback_models() -> list[str]:
+    raw = os.getenv("LLM_FREE_FALLBACK_MODELS", "").strip()
+    if not raw:
+        return []
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
+def _list_openrouter_free_models() -> list[str]:
+    """Live :free catalog; falls back to a short static list if the models API is down."""
+    global _live_free_models, _live_free_models_at
+    now = _time.time()
+    if _live_free_models and now - _live_free_models_at < 1800:
+        return list(_live_free_models)
+    ids: list[str] = []
+    try:
+        response = requests.get("https://openrouter.ai/api/v1/models", timeout=8)
+        if response.status_code < 300:
+            rows = (response.json() or {}).get("data") or []
+            for row in rows:
+                model_id = str((row or {}).get("id") or "").strip()
+                if not _is_openrouter_free_model(model_id) or _skip_free_model(model_id):
+                    continue
+                ids.append(model_id)
+    except Exception as exc:
+        _log.warning("OpenRouter free-model catalog fetch failed: %s", exc)
+    if not ids:
+        ids = list(_DEFAULT_OPENROUTER_FREE)
+    if OPENROUTER_FREE_ROUTER not in ids:
+        ids.insert(0, OPENROUTER_FREE_ROUTER)
+    _live_free_models = ids
+    _live_free_models_at = now
+    return list(ids)
+
+
+def openrouter_free_failover_models(primary: str) -> list[str]:
+    """Primary first, then OpenRouter free router + other :free models."""
+    seen: set[str] = set()
+    ordered: list[str] = []
+    extras = _env_free_fallback_models() or _list_openrouter_free_models()
+    for model in [primary, OPENROUTER_FREE_ROUTER, *extras]:
+        name = (model or "").strip()
+        if not name or name in seen or _skip_free_model(name):
+            continue
+        seen.add(name)
+        ordered.append(name)
+    return ordered[:_MAX_FREE_FAILOVER]
+
+
+def _openrouter_error_retryable(message: str) -> bool:
+    text = (message or "").lower()
+    return any(
+        token in text
+        for token in (
+            "429",
+            "rate limit",
+            "no endpoints",
+            "not found",
+            "unavailable",
+            "404",
+            "provider returned error",
+            "model is not available",
+        )
+    )
 
 
 def _close_truncated_json(content: str) -> str:
@@ -120,7 +269,13 @@ def _close_truncated_json(content: str) -> str:
     return text + "".join(reversed(stack))
 
 
-def _call_openai(prompt: str, api_key: str, api_url: str, model: str, timeout: int = LLM_CALL_TIMEOUT_SECONDS) -> str:
+def _openai_chat_once(
+    prompt: str,
+    api_key: str,
+    api_url: str,
+    model: str,
+    timeout: int,
+) -> str:
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -152,6 +307,27 @@ def _call_openai(prompt: str, api_key: str, api_url: str, model: str, timeout: i
     if finish == "length" and content:
         content = _close_truncated_json(content)
     return content.strip()
+
+
+def _call_openai(prompt: str, api_key: str, api_url: str, model: str, timeout: int = LLM_CALL_TIMEOUT_SECONDS) -> str:
+    models = [model]
+    if _is_openrouter_url(api_url) and _is_openrouter_free_model(model):
+        models = openrouter_free_failover_models(model)
+    last_error = ""
+    for index, candidate in enumerate(models):
+        try:
+            text = _openai_chat_once(prompt, api_key, api_url, candidate, timeout)
+            if index > 0:
+                _log.info("OpenRouter free failover succeeded via %s (after %s)", candidate, model)
+            return text
+        except Exception as exc:
+            last_error = str(exc)
+            more = index < len(models) - 1
+            if more and _is_openrouter_url(api_url) and _openrouter_error_retryable(last_error):
+                _log.warning("OpenRouter model %s failed; trying next free model: %s", candidate, last_error[:160])
+                continue
+            raise
+    raise RuntimeError(last_error or "OpenRouter free-model failover exhausted")
 
 
 def _call_gemini(

@@ -155,9 +155,11 @@ export type AITickerNewsReport = {
   regulatory_filings: string;
 
   // Meta
-  sentiment_overall: "Bullish" | "Neutral" | "Bearish";
+  sentiment_overall: "Bullish" | "Neutral" | "Bearish" | "—" | string;
   risk_flags: string;
   summary_headline: string;
+  llmUsed?: boolean;
+  llmError?: string;
 
   // Optional raw articles
   raw_articles?: Array<{

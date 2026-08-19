@@ -5059,8 +5059,16 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     @app.get("/api/ticker-news")
-    async def get_ticker_news(ticker: str, company: str | None = None) -> dict[str, Any]:
+    async def get_ticker_news(
+        ticker: str,
+        company: str | None = None,
+        max_articles: int = 20,
+        include_raw: bool = False,
+        force_refresh: bool = False,
+    ) -> dict[str, Any]:
         try:
+            from .ai_ticker_news import ticker_news_report_is_llm_complete
+
             resolved_ticker = ticker.strip().upper()
             if not resolved_ticker:
                 raise HTTPException(status_code=400, detail="Missing required parameter: ticker")
@@ -5069,7 +5077,10 @@ def create_app() -> FastAPI:
             ticker_news_map = (snapshot.get("tickerNewsByTicker") or {}) if snapshot else {}
             cached_report = ticker_news_map.get(resolved_ticker)
 
-            if cached_report and not cached_report.get("error"):
+            if (
+                not force_refresh
+                and ticker_news_report_is_llm_complete(cached_report)
+            ):
                 cached_report = dict(cached_report)
                 cached_report["cached"] = True
                 return cached_report
@@ -5077,7 +5088,13 @@ def create_app() -> FastAPI:
             async with httpx.AsyncClient() as http_client:
                 response = await http_client.get(
                     f"{AI_NEWS_API_URL}/api/ticker-news",
-                    params={"ticker": resolved_ticker, "company": company or "", "max_articles": 20, "include_raw": False},
+                    params={
+                        "ticker": resolved_ticker,
+                        "company": company or "",
+                        "max_articles": max_articles,
+                        "include_raw": include_raw,
+                        "force_refresh": force_refresh,
+                    },
                     timeout=90,
                 )
                 response.raise_for_status()
@@ -5085,7 +5102,7 @@ def create_app() -> FastAPI:
 
             report_data["cached"] = False
 
-            if snapshot:
+            if snapshot and ticker_news_report_is_llm_complete(report_data):
                 updated_map = dict(snapshot.get("tickerNewsByTicker") or {})
                 updated_map[resolved_ticker] = report_data
                 snapshot = dict(snapshot)
@@ -5148,9 +5165,11 @@ async def _refresh_ticker_news_for_payload(payload: dict[str, Any]) -> None:
                         return t, {"error": True, "ticker": t, "message": str(exc)}
 
             results = dict(await asyncio.gather(*[_fetch_one(t) for t in tickers]))
+            from .ai_ticker_news import ticker_news_report_is_llm_complete
+
             ticker_news_map = {
                 t: data for t, data in results.items()
-                if not data.get("error") and data.get("ticker")
+                if ticker_news_report_is_llm_complete(data) and data.get("ticker")
             }
             payload["tickerNewsByTicker"] = ticker_news_map
             print(
