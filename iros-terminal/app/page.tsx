@@ -19,6 +19,7 @@ import AssetMetricsPanel from './components/AssetMetricsPanel';
 import EodDeskPanel from './components/EodDeskPanel';
 import DeskControls from './components/DeskControls';
 import DeskActivityAlerts from './components/DeskActivityAlerts';
+import MarketSymbolBadge from './components/MarketSymbolBadge';
 import { DeskLiveTile, motion } from '@/lib/desk-motion';
 import { formatDeskDelta, formatPtsPctLabel } from '@/lib/format-delta';
 import { subscribeLiveDesk } from '@/lib/live-desk';
@@ -454,6 +455,7 @@ function AdaptiveTooltipPortal({
       onMouseLeave={onMouseLeave}
     >
       <div className="flex items-center gap-2 mb-2 flex-shrink-0">
+        <MarketSymbolBadge symbol={ticker} size="sm" />
         <span className={`w-1.5 h-1.5 rounded-full ${positive !== null ? (positive ? 'bg-emerald-500' : 'bg-red-500') : 'bg-slate-400'} animate-pulse`} />
         <span className={`text-[9px] uppercase tracking-widest font-bold ${positive !== null ? (positive ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500'}`}>
           {ticker} · NSE
@@ -916,9 +918,12 @@ function NseHeatMapTooltip({ stock, ticker, colors }: { stock: NseEquityStock; t
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter') handleClick(); }}
       >
-        <span className="text-[9px] font-bold leading-tight relative z-10" style={{ color: colors.text }}>
-          {ticker}
-        </span>
+        <div className="relative z-10 flex min-w-0 items-center justify-center gap-1">
+          <MarketSymbolBadge symbol={symbol} size="sm" className="!h-5 !w-5 !rounded-md" />
+          <span className="truncate text-[9px] font-bold leading-tight" style={{ color: colors.text }}>
+            {ticker}
+          </span>
+        </div>
         <span className="text-[7px] font-semibold mt-0.5 relative z-10 text-center leading-tight" style={{ color: colors.text }}>
           {changeLabel}
         </span>
@@ -1134,9 +1139,12 @@ function SectorRotationHeatMap() {
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-6">
           {sorted.map((row) => {
             const tone = row.changePct >= 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800';
-            return <div key={row.name} className={`min-w-0 border px-2 py-2 ${tone}`} title={`${row.name}: ${row.changePct.toFixed(2)}%`}>
-              <div className="truncate text-[9px] font-extrabold uppercase">{row.name.replace(/^NIFTY\s+/i, '')}</div>
-              <div className="mt-0.5 text-sm font-black tabular-nums">{row.changePct >= 0 ? '+' : ''}{row.changePct.toFixed(2)}%</div>
+            return <div key={row.name} className={`flex min-w-0 items-center gap-2 border px-2 py-2 ${tone}`} title={`${row.name}: ${row.changePct.toFixed(2)}%`}>
+              <MarketSymbolBadge symbol={row.name} kind="index" size="sm" />
+              <div className="min-w-0">
+                <div className="truncate text-[9px] font-extrabold uppercase">{row.name.replace(/^NIFTY\s+/i, '')}</div>
+                <div className="mt-0.5 text-sm font-black tabular-nums">{row.changePct >= 0 ? '+' : ''}{row.changePct.toFixed(2)}%</div>
+              </div>
             </div>;
           })}
         </div>
