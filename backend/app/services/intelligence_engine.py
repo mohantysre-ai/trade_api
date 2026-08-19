@@ -15,6 +15,7 @@ import re
 import time as _time
 import logging as _logging
 import requests
+from .desk_ic_criteria import prefer_intraday_blocks
 from .llm_client import LLM_CALL_TIMEOUT_SECONDS, _call_gemini, _call_openai, _llm_config
 
 
@@ -674,10 +675,9 @@ def _ticker_stock_row(payload: dict[str, Any], ticker: str) -> dict[str, Any]:
         intra = merged.get("intraday") if isinstance(merged.get("intraday"), dict) else {}
         q_intra = quote.get("intraday") if isinstance(quote.get("intraday"), dict) else {}
         merged = {**merged, **quote}
-        if isinstance(q_intra, dict) and q_intra.get("data_source") in ("candles", "daily_candles"):
-            merged["intraday"] = q_intra
-        elif intra:
-            merged["intraday"] = intra
+        preferred = prefer_intraday_blocks(q_intra, intra)
+        if preferred:
+            merged["intraday"] = preferred
     return merged
 
 
@@ -707,7 +707,11 @@ def _ticker_intraday_text(stock: dict[str, Any]) -> str:
     src = _intraday_bar_source(intraday)
     if not src:
         return "no usable candle metrics"
-    trigger = intraday.get("trigger_point") or "no trigger"
+    trigger = str(intraday.get("trigger_point") or "").strip()
+    if src == "daily_candles" or not trigger or (
+        float(intraday.get("vwap") or 0) <= 0 and trigger == "VWAP Bounce"
+    ):
+        trigger = "no 5m trigger"
     if src == "daily_candles":
         vwap = "VWAP unavailable"
         ema9 = "EMA9 unavailable"
@@ -733,15 +737,20 @@ def _build_dynamic_selection_reason(stock: dict[str, Any], score: float) -> str:
     turnover_cr = float(intraday.get("turnover_cr") or 0)
     atr = float(intraday.get("atr_pct") or 0)
     delta = _parse_percent(stock.get("delta"))
-    trigger = intraday.get("trigger_point") or "intraday trigger"
-
+    trigger = str(intraday.get("trigger_point") or "").strip()
     if src == "daily_candles":
         trend_text = "daily ATR/RSI (5m bars unavailable)"
+        trigger_text = "5m trigger unavailable"
     else:
         trend_text = (
             "trend follow-through above VWAP and EMA9"
             if (price_above_vwap and price_above_ema9)
             else "mixed trend around intraday anchors"
+        )
+        trigger_text = (
+            f"trigger {trigger}"
+            if trigger and trigger != "VWAP Bounce"
+            else "5m trigger unavailable"
         )
     momentum_text = f"delta {delta:.2f}% with score {score:.1f}"
     liquidity_text = (
@@ -754,7 +763,7 @@ def _build_dynamic_selection_reason(stock: dict[str, Any], score: float) -> str:
 
     return (
         f"{trend_text}; {momentum_text}; {liquidity_text}; "
-        f"{risk_text}; trigger {trigger}; {filter_text}."
+        f"{risk_text}; {trigger_text}; {filter_text}."
     )
 
 

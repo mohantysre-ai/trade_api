@@ -18,6 +18,7 @@ from typing import Any
 
 from .eod_archive import load_archive
 from .exit_plan import EXIT_POLICY_VERSION, attach_exit_plan, blended_pnl_from_state, format_scale_progress, overwrite_row_with_current_policy, refresh_exit_policy, apply_max_stop_cap
+from .intraday_execution_evidence import session_lock_fill_evidence
 from .quant_desk_exit_policy import build_trade_outcome, classify_taxonomy
 import time
 import urllib.request
@@ -66,11 +67,9 @@ def _session_leg_is_triggered(row: dict[str, Any] | None) -> bool:
         return False
     if row.get("skipped"):
         return False
-    if str(row.get("executionStatus") or "").upper() == "NOT_TRIGGERED":
-        return False
     if str(row.get("outcomeBucket") or "").upper() == "SKIPPED":
         return False
-    return True
+    return session_lock_fill_evidence(row) is not None
 
 
 def session_realized_pnl(session: dict[str, Any] | None) -> float:

@@ -1,5 +1,11 @@
 from app.services.desk_ic_criteria import _f, build_fact_pack
-from app.services.intelligence_engine import _apply_wl_policy_from_llm, _ticker_factor_hub, _ticker_risk_calc
+from app.services.intelligence_engine import (
+    _apply_wl_policy_from_llm,
+    _build_dynamic_selection_reason,
+    _ticker_factor_hub,
+    _ticker_intraday_text,
+    _ticker_risk_calc,
+)
 from app.services.llm_client import _llm_config
 
 
@@ -61,6 +67,27 @@ def test_factor_hub_dashes_when_dummy_intraday():
     assert out["liquidity_factor"] == "—"
     assert out["quality_factor"] == "—"
     assert "0.00 Cr" not in out["liquidity_factor"]
+
+
+def test_daily_candles_do_not_claim_vwap_bounce():
+    stock = {
+        "delta": "-2.16%",
+        "intraday": {
+            "data_source": "daily_candles",
+            "atr_pct": 2.4,
+            "turnover_cr": 41.2,
+            "volume_multiplier": 0.8,
+            "vwap": 0.0,
+            "ema9": 0.0,
+            "trigger_point": "VWAP Bounce",
+        },
+    }
+    text = _ticker_intraday_text(stock)
+    assert "VWAP Bounce" not in text
+    assert "no 5m trigger" in text
+    reason = _build_dynamic_selection_reason(stock, 0.0)
+    assert "VWAP Bounce" not in reason
+    assert "5m trigger unavailable" in reason
 
 
 def test_wl_policy_does_not_invent_kelly(monkeypatch):

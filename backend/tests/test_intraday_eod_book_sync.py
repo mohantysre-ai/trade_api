@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 
 from app.services.eod_intraday_report import (
+    _session_leg_is_triggered,
     apply_session_leg_economics,
     intraday_book_cache_stale,
     session_realized_pnl,
@@ -47,6 +48,28 @@ def test_session_realized_excludes_skips():
         }
     )
     assert session_realized_pnl(session) == 37503.08
+
+
+def test_session_realized_excludes_pending_entry():
+    session = _session(pnl=37503.08)
+    session["long"].append(
+        {
+            "symbol": "CCC",
+            "direction": "LONG",
+            "triggered": False,
+            "executionStatus": "PENDING_ENTRY",
+            "realizedPnl": 8888.0,
+            "pnl": 8888.0,
+        }
+    )
+    assert session_realized_pnl(session) == 37503.08
+    pending = session["long"][-1]
+    assert _session_leg_is_triggered(pending) is False
+    reason, _ep, pnl, _meta = apply_session_leg_economics(
+        pending, reason="ARCHIVE", exit_price=1.0, pnl=10.0, scale_meta=None
+    )
+    assert pnl == 10.0
+    assert reason == "ARCHIVE"
 
 
 def test_cache_stale_on_pnl_mismatch():

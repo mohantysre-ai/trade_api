@@ -429,6 +429,46 @@ def _intraday_metrics_usable(intraday: Any) -> bool:
     )
 
 
+def _prefer_intraday_metrics(quote_intra: Any, stock_intra: Any) -> dict[str, Any]:
+    """Prefer usable candle/daily metrics over a hunt stub on the stocks row."""
+    from .desk_ic_criteria import prefer_intraday_blocks
+
+    if _intraday_metrics_usable(quote_intra):
+        return quote_intra if isinstance(quote_intra, dict) else {}
+    if _intraday_metrics_usable(stock_intra):
+        return stock_intra if isinstance(stock_intra, dict) else {}
+    return prefer_intraday_blocks(quote_intra, stock_intra) or {}
+
+
+def _apply_ticker_row_to_snapshot(snapshot: dict[str, Any], sym: str, merged: dict[str, Any]) -> dict[str, Any]:
+    quotes = dict(snapshot.get("stockQuotes") or {})
+    existing = quotes.get(sym) if isinstance(quotes.get(sym), dict) else {}
+    row = dict(merged)
+    if not _intraday_metrics_usable(row.get("intraday")) and _intraday_metrics_usable(
+        (existing or {}).get("intraday")
+    ):
+        row["intraday"] = existing["intraday"]
+    quotes[sym] = {**(existing or {}), **row}
+    snapshot["stockQuotes"] = quotes
+    stocks = list(snapshot.get("stocks") or [])
+    for i, srow in enumerate(stocks):
+        if isinstance(srow, dict) and str(srow.get("ticker") or "").upper() == sym:
+            stocks[i] = {**srow, **row}
+            snapshot["stocks"] = stocks
+            break
+    return snapshot
+
+
+def _persist_snapshot_ticker_facts(sym: str, merged: dict[str, Any]) -> None:
+    """Patch one ticker onto the on-disk snapshot without rewriting an older universe."""
+    from .json_atomic import atomic_update_json
+
+    def _mutator(disk: dict[str, Any]) -> dict[str, Any]:
+        return _apply_ticker_row_to_snapshot(disk, sym, merged)
+
+    atomic_update_json(_snapshot_path(), _mutator)
+
+
 def _snapshot_intraday_cache(snapshot: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
     """Reuse intraday candle metrics from last_market_snapshot when still within TTL."""
     age = _snapshot_age_seconds(snapshot)
@@ -462,10 +502,9 @@ def ensure_snapshot_ticker_facts(snapshot: dict[str, Any], ticker: str) -> dict[
         intra = merged.get("intraday") if isinstance(merged.get("intraday"), dict) else {}
         q_intra = existing.get("intraday") if isinstance(existing.get("intraday"), dict) else {}
         merged = {**merged, **existing}
-        if q_intra.get("data_source") == "candles":
-            merged["intraday"] = q_intra
-        elif intra:
-            merged["intraday"] = intra
+        preferred = _prefer_intraday_metrics(q_intra, intra)
+        if preferred:
+            merged["intraday"] = preferred
     merged["ticker"] = sym
 
     need_quote = float(merged.get("ltpRaw") or 0) <= 0
@@ -540,7 +579,7 @@ def ensure_snapshot_ticker_facts(snapshot: dict[str, Any], ticker: str) -> dict[
             snapshot["stocks"] = stocks
             break
     try:
-        _save_last_snapshot(snapshot)
+        _persist_snapshot_ticker_facts(sym, merged)
     except Exception:
         pass
     return snapshot
@@ -2769,7 +2808,7 @@ def _intraday_metrics_from_daily(
         "turnover_cr": round(turnover_cr, 2),
         "price_above_vwap": False,
         "price_above_ema9": False,
-        "trigger_point": "VWAP Bounce",
+        "trigger_point": None,
         "rsi": rsi_val,
         "passes_hard_filters": False,
         "hard_filter_reasons": ["5m bars unavailable; ATR/RSI/turnover from daily candles + quote volume"],

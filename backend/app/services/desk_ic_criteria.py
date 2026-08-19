@@ -28,6 +28,9 @@ from .stock_quality import MIN_PROMOTER_HOLDING_PCT, MIN_TURNOVER_CR, is_risky_s
 
 log = logging.getLogger(__name__)
 
+_CANDLE_SOURCES = frozenset({"candles", "daily_candles"})
+_INTRADAY_STUB_REASON = 'not in intraday candidate set'
+
 AI_CACHE_TTL_SECONDS = int(os.getenv("AI_CACHE_TTL_SECONDS", "900"))
 DESK_IC_LLM_TIMEOUT_SECONDS = int(os.getenv("DESK_IC_LLM_TIMEOUT_SECONDS", "20"))
 
@@ -707,6 +710,35 @@ def get_cached_desk_ic(
     return entry  # type: ignore[return-value]
 
 
+def _intraday_source_rank(block: Any) -> int:
+    if not isinstance(block, dict) or not block:
+        return 0
+    reasons = [str(r) for r in (block.get("hard_filter_reasons") or [])]
+    if _INTRADAY_STUB_REASON in reasons:
+        return 0
+    src = str(block.get("data_source") or "")
+    if src not in _CANDLE_SOURCES:
+        return 0
+    if src == "candles":
+        return 2
+    return 1
+
+
+def prefer_intraday_blocks(quote_intra: Any, stock_intra: Any) -> dict[str, Any] | None:
+    """Keep usable 5m/daily candle metrics; do not let a hunt stub replace them."""
+    q = quote_intra if isinstance(quote_intra, dict) else {}
+    s = stock_intra if isinstance(stock_intra, dict) else {}
+    qn = _intraday_source_rank(q)
+    sn = _intraday_source_rank(s)
+    if qn >= sn and qn > 0:
+        return q
+    if sn > 0:
+        return s
+    if q:
+        return q
+    return s or None
+
+
 def resolve_stock_from_snapshot(snapshot: dict[str, Any], ticker: str) -> dict[str, Any] | None:
     sym = ticker.upper().strip()
     merged: dict[str, Any] = {"ticker": sym}
@@ -723,10 +755,9 @@ def resolve_stock_from_snapshot(snapshot: dict[str, Any], ticker: str) -> dict[s
             intra = merged.get("intraday") if isinstance(merged.get("intraday"), dict) else {}
             q_intra = q.get("intraday") if isinstance(q.get("intraday"), dict) else {}
             merged = {**merged, **q}
-            if q_intra.get("data_source") == "candles":
-                merged["intraday"] = q_intra
-            elif intra:
-                merged["intraday"] = intra
+            preferred = prefer_intraday_blocks(q_intra, intra)
+            if preferred:
+                merged["intraday"] = preferred
             found = True
     dhan = snapshot.get("dhanSwingPicks")
     if isinstance(dhan, dict):
