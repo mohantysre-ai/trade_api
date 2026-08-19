@@ -716,9 +716,11 @@ def _ticker_intraday_text(stock: dict[str, Any]) -> str:
         trigger = intraday.get("trigger_point") or "no trigger"
         vwap = intraday.get("vwap") or "VWAP unavailable"
         ema9 = intraday.get("ema9") or "EMA9 unavailable"
-    atr = intraday.get("atr_pct") or 0
-    volume_multiplier = intraday.get("volume_multiplier") or 0
-    return f"{trigger}, VWAP {vwap}, EMA9 {ema9}, ATR {atr}%, volume multiplier {volume_multiplier}x"
+    atr = intraday.get("atr_pct")
+    volume_multiplier = intraday.get("volume_multiplier")
+    atr_text = f"{atr}%" if atr is not None else "unavailable"
+    volume_text = f"{volume_multiplier}x" if volume_multiplier is not None else "unavailable"
+    return f"{trigger}, VWAP {vwap}, EMA9 {ema9}, ATR {atr_text}, volume multiplier {volume_text}"
 
 
 def _build_dynamic_selection_reason(stock: dict[str, Any], score: float | None) -> str:

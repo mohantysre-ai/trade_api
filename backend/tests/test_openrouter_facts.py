@@ -148,6 +148,22 @@ def test_five_minute_vwap_bounce_is_kept():
     assert "VWAP Bounce" in text
 
 
+def test_intraday_text_does_not_fabricate_zero_atr_or_volume():
+    stock = {
+        "intraday": {
+            "data_source": "candles",
+            "vwap": 103.38,
+            "ema9": 102.58,
+            "trigger_point": "VWAP Bounce",
+        },
+    }
+    text = _ticker_intraday_text(stock)
+    assert "ATR 0%" not in text
+    assert "volume multiplier 0x" not in text
+    assert "ATR unavailable" in text
+    assert "volume multiplier unavailable" in text
+
+
 def test_wl_policy_does_not_invent_kelly(monkeypatch):
     monkeypatch.setattr(
         "app.services.intelligence_engine._analyze_forensic_wl_policy",

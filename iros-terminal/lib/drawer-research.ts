@@ -87,7 +87,7 @@ export function buildTechnicalSignals(
           ? 0.2
           : null;
   const macd = snapshotMacd ?? parseNumeric(trendlyne?.macd);
-  const stochastic = parseNumeric(trendlyne?.stochastic) ?? rsi;
+  const stochastic = parseNumeric(trendlyne?.stochastic);
 
   const strength = rsi != null ? Math.min(100, Math.max(0, rsi)) : null;
   const volume = volMult != null ? Math.min(100, Math.max(0, volMult * 25)) : null;

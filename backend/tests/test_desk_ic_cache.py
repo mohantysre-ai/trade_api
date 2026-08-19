@@ -54,3 +54,23 @@ def test_resolve_stock_keeps_daily_candles_over_hunt_stub():
     assert row["intraday"]["atr_pct"] == 2.4
     chosen = prefer_intraday_blocks(daily, stub)
     assert chosen is daily
+
+
+def test_prefer_intraday_keeps_five_minute_over_daily_quote():
+    five = {
+        "data_source": "candles",
+        "vwap": 103.38,
+        "ema9": 102.58,
+        "trigger_point": "VWAP Bounce",
+        "atr_pct": 2.1,
+    }
+    daily = {
+        "data_source": "daily_candles",
+        "atr_pct": 2.4,
+        "turnover_cr": 41.2,
+        "vwap": 0.0,
+        "trigger_point": None,
+    }
+    chosen = prefer_intraday_blocks(daily, five)
+    assert chosen is five
+    assert chosen["trigger_point"] == "VWAP Bounce"

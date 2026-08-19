@@ -430,24 +430,21 @@ def _intraday_metrics_usable(intraday: Any) -> bool:
 
 
 def _prefer_intraday_metrics(quote_intra: Any, stock_intra: Any) -> dict[str, Any]:
-    """Prefer usable candle/daily metrics over a hunt stub on the stocks row."""
+    """Rank 5m candles over daily_candles; never let a hunt stub replace either."""
     from .desk_ic_criteria import prefer_intraday_blocks
 
-    if _intraday_metrics_usable(quote_intra):
-        return quote_intra if isinstance(quote_intra, dict) else {}
-    if _intraday_metrics_usable(stock_intra):
-        return stock_intra if isinstance(stock_intra, dict) else {}
     return prefer_intraday_blocks(quote_intra, stock_intra) or {}
 
 
 def _apply_ticker_row_to_snapshot(snapshot: dict[str, Any], sym: str, merged: dict[str, Any]) -> dict[str, Any]:
+    from .desk_ic_criteria import prefer_intraday_blocks
+
     quotes = dict(snapshot.get("stockQuotes") or {})
     existing = quotes.get(sym) if isinstance(quotes.get(sym), dict) else {}
     row = dict(merged)
-    if not _intraday_metrics_usable(row.get("intraday")) and _intraday_metrics_usable(
-        (existing or {}).get("intraday")
-    ):
-        row["intraday"] = existing["intraday"]
+    preferred = prefer_intraday_blocks(row.get("intraday"), (existing or {}).get("intraday"))
+    if preferred:
+        row["intraday"] = preferred
     quotes[sym] = {**(existing or {}), **row}
     snapshot["stockQuotes"] = quotes
     stocks = list(snapshot.get("stocks") or [])
