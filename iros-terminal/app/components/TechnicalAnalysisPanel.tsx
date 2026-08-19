@@ -1,67 +1,25 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { buildTechnicalSignals, type IntradayMetrics } from "@/lib/drawer-research";
+import type { TrendlyneCardSummary } from "@/lib/intelligence-summary";
 
 type TechnicalAnalysisPanelProps = {
   ticker?: string;
   companyName?: string;
   intraday?: IntradayMetrics | null;
+  trendlyne?: TrendlyneCardSummary | null;
+  researchLoading?: boolean;
 };
 
-/* ── Animated price ticker bar ── */
-function AnimatedPriceBar({ visible }: { visible: boolean }) {
-  const [bars, setBars] = useState<number[]>([]);
-
-  useEffect(() => {
-    if (!visible) return;
-    const gen = Array.from({ length: 40 }, () => Math.random() * 60 + 10);
-    setBars(gen);
-    const id = setInterval(() => {
-      setBars((prev) => {
-        const next = [...prev.slice(1)];
-        next.push(Math.random() * 60 + 10);
-        return next;
-      });
-    }, 600);
-    return () => clearInterval(id);
-  }, [visible]);
-
-  if (!visible || bars.length === 0) return null;
-
-  return (
-    <div className="flex items-end justify-center gap-[3px] h-16 px-2 py-2">
-      {bars.map((h, i) => {
-        const green = Math.random() > 0.48;
-        return (
-          <div
-            key={i}
-            className="w-[6px] rounded-t-sm transition-all duration-300"
-            style={{
-              height: `${h}%`,
-              background: green
-                ? 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)'
-                : 'linear-gradient(180deg, #ef4444 0%, #dc2626 100%)',
-              opacity: 0.7 + (h / 100) * 0.3,
-              boxShadow: green
-                ? '0 0 6px rgba(34,197,94,0.3)'
-                : '0 0 6px rgba(239,68,68,0.3)',
-            }}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
 /* ── Animated signal meter (light theme) ── */
-function SignalMeter({ label, value, max = 100, color }: { label: string; value: number; max?: number; color: string }) {
-  const pct = Math.min((value / max) * 100, 100);
+function SignalMeter({ label, value, max = 100, color }: { label: string; value: number | null; max?: number; color: string }) {
+  const pct = value == null ? 0 : Math.min((value / max) * 100, 100);
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">{label}</span>
-        <span className="text-[11px] font-black tabular-nums" style={{ color }}>{value.toFixed(1)}</span>
+        <span className="text-[11px] font-black tabular-nums" style={{ color }}>{value == null ? "—" : value.toFixed(1)}</span>
       </div>
       <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
         <div
@@ -71,64 +29,6 @@ function SignalMeter({ label, value, max = 100, color }: { label: string; value:
             background: `linear-gradient(90deg, ${color}40, ${color})`,
           }}
         />
-      </div>
-    </div>
-  );
-}
-
-/* ── Moving average crossover dots (light theme) ── */
-function MACrossoverDots() {
-  const dots = useMemo(() => {
-    return Array.from({ length: 30 }, (_, i) => ({
-      ma5: 40 + Math.sin(i * 0.4) * 20 + Math.random() * 6,
-      ma20: 42 + Math.sin(i * 0.35 + 0.8) * 18 + Math.random() * 5,
-    }));
-  }, []);
-
-  return (
-    <div className="relative h-20 w-full">
-      <svg viewBox="0 0 300 80" className="w-full h-full">
-        <defs>
-          <linearGradient id="ma5g-light" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#22c55e" stopOpacity="0.05" />
-            <stop offset="100%" stopColor="#22c55e" stopOpacity="0.25" />
-          </linearGradient>
-          <linearGradient id="ma20g-light" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.05" />
-            <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.25" />
-          </linearGradient>
-        </defs>
-        <path
-          d={dots.map((d, i) => `${i === 0 ? 'M' : 'L'} ${i * 10 + 5} ${80 - d.ma5}`).join(' ')}
-          stroke="#22c55e"
-          strokeWidth="2"
-          fill="none"
-          opacity={0.8}
-        />
-        <path
-          d={dots.map((d, i) => `${i === 0 ? 'M' : 'L'} ${i * 10 + 5} ${80 - d.ma20}`).join(' ')}
-          stroke="#f59e0b"
-          strokeWidth="2"
-          fill="none"
-          strokeDasharray="4 2"
-          opacity={0.8}
-        />
-        {dots.filter((_, i) => i > 0 && Math.abs(dots[i].ma5 - dots[i].ma20) < 3).map((d, i) => (
-          <circle
-            key={i}
-            cx={dots.indexOf(d) * 10 + 5}
-            cy={80 - d.ma5}
-            r="4"
-            fill="#a855f7"
-            className="animate-ping"
-            opacity={0.5}
-          />
-        ))}
-      </svg>
-      <div className="absolute inset-x-0 bottom-0 flex justify-between text-[8px] text-slate-400 px-1">
-        <span className="flex items-center gap-1"><span className="w-2 h-0.5 rounded bg-emerald-500" /> MA5</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-0.5 rounded bg-amber-500" /> MA20</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-500" /> Crossover</span>
       </div>
     </div>
   );
@@ -231,7 +131,7 @@ function LoadingSkeleton() {
             key={i}
             className="w-2 rounded-full bg-emerald-300/60"
             style={{
-              height: `${10 + Math.random() * 30}px`,
+              height: `${10 + i * 6}px`,
               animation: `pulse ${0.8 + i * 0.2}s ease-in-out infinite`,
               animationDelay: `${i * 0.15}s`,
             }}
@@ -242,7 +142,7 @@ function LoadingSkeleton() {
   );
 }
 
-export default function TechnicalAnalysisPanel({ ticker, companyName, intraday }: TechnicalAnalysisPanelProps) {
+export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, trendlyne, researchLoading = false }: TechnicalAnalysisPanelProps) {
   const normalizedTicker = ticker?.trim().toUpperCase();
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
@@ -351,7 +251,7 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday }
         <div className="space-y-3">
           {!signals.hasData && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-semibold text-amber-900">
-              Partial desk view — live intraday metrics missing for {normalizedTicker}. Showing snapshot anchors only.
+              {researchLoading ? `Loading verified technical data for ${normalizedTicker}…` : `Partial desk view — live intraday metrics are unavailable for ${normalizedTicker}. Missing values remain unscored.`}
             </div>
           )}
           {/* Header card */}
@@ -371,11 +271,13 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday }
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[9px] text-emerald-600 uppercase tracking-wider font-bold">Streaming</span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${signals.hasData ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                  <span className={`text-[9px] uppercase tracking-wider font-bold ${signals.hasData ? "text-emerald-600" : "text-amber-700"}`}>{signals.hasData ? "Streaming" : "Partial"}</span>
                 </div>
               </div>
-              <AnimatedPriceBar visible={true} />
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] text-slate-600">
+                Research bias: {trendlyne?.technicalBias ?? "—"} · MA buy/sell: {trendlyne?.maBullish ?? "—"}/{trendlyne?.maTotal != null && trendlyne.maBullish != null ? trendlyne.maTotal - trendlyne.maBullish : "—"} · Oscillator buy/sell: {trendlyne?.oscillatorBullish ?? "—"}/{trendlyne?.oscillatorTotal != null && trendlyne.oscillatorBullish != null ? trendlyne.oscillatorTotal - trendlyne.oscillatorBullish : "—"}
+              </div>
             </div>
           </div>
 
@@ -395,16 +297,16 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday }
             <div className="text-[10px] text-slate-500 mb-2">
               VWAP: {signals.aboveVwap == null ? "—" : signals.aboveVwap ? "above" : "below"} · EMA9: {signals.aboveEma9 == null ? "—" : signals.aboveEma9 ? "above" : "below"}
             </div>
-            <MACrossoverDots />
+            <div className="rounded-lg bg-slate-50 px-3 py-2 text-[10px] text-slate-500">Only sourced VWAP/EMA9 relationships are shown; no synthetic price path is generated.</div>
           </div>
 
           {/* Signal meters */}
           <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 space-y-3">
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-2">Signal Strength Metrics</div>
-            <SignalMeter label="Trend Strength (RSI)" value={signals.strength ?? 0} color="#22c55e" />
-            <SignalMeter label="Volume Momentum" value={signals.volume ?? 0} color="#3b82f6" />
-            <SignalMeter label="Volatility Index (ATR)" value={signals.volatility ?? 0} color="#f59e0b" />
-            <SignalMeter label="Stochastic (RSI proxy)" value={signals.stochastic ?? 0} color="#a855f7" />
+            <SignalMeter label="Trend Strength (RSI)" value={signals.strength} color="#22c55e" />
+            <SignalMeter label="Volume Momentum" value={signals.volume} color="#3b82f6" />
+            <SignalMeter label="Volatility Index (ATR)" value={signals.volatility} color="#f59e0b" />
+            <SignalMeter label="Stochastic (RSI proxy)" value={signals.stochastic} color="#a855f7" />
           </div>
 
         </div>

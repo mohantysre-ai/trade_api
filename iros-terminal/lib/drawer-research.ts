@@ -1,4 +1,5 @@
 import type { AITickerNewsReport, TerminalIntelligence } from "@/lib/market-api";
+import type { TrendlyneCardSummary } from "@/lib/intelligence-summary";
 
 export type IntradayMetrics = {
   rsi?: number | null;
@@ -89,8 +90,26 @@ const NEWS_OPPORTUNITY_KEYS: Array<keyof AITickerNewsReport> = [
 function newsLine(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
-  if (!trimmed || trimmed.toLowerCase() === "no recent news found.") return null;
+  const normalized = trimmed.toLowerCase().replace(/[.!]+$/g, "");
+  if (!trimmed || new Set([
+    "none", "n/a", "na", "nil", "not available", "no data",
+    "no recent news found", "no significant risk", "no significant risks",
+  ]).has(normalized)) return null;
   return trimmed;
+}
+
+function distinctMeaningful(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of values) {
+    const value = newsLine(raw);
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+  }
+  return out;
 }
 
 export function buildFactSwot(params: {
@@ -99,20 +118,23 @@ export function buildFactSwot(params: {
   tickerNews?: AITickerNewsReport | null;
   terminalAnalysis?: TerminalIntelligence | null;
   stock?: DrawerStockFacts | null;
+  trendlyne?: TrendlyneCardSummary | null;
 }): {
   strengths: string[];
   weaknesses: string[];
   opportunities: string[];
   threats: string[];
   scores: {
-    overall: number;
-    strength: number;
-    opportunity: number;
-    weakness: number;
-    threat: number;
+    overall: number | null;
+    strength: number | null;
+    opportunity: number | null;
+    weakness: number | null;
+    threat: number | null;
   };
   hasData: boolean;
   partial: boolean;
+  coverage: string[];
+  source: "trendlyne+snapshot" | "trendlyne" | "snapshot" | "none";
 } {
   const strengths: string[] = [];
   const weaknesses: string[] = [];
@@ -121,6 +143,12 @@ export function buildFactSwot(params: {
   const intra = params.intraday;
   const news = params.tickerNews;
   const stock = params.stock;
+  const trendlyne = params.trendlyne;
+
+  strengths.push(...distinctMeaningful(trendlyne?.swotStrengthItems ?? []));
+  weaknesses.push(...distinctMeaningful(trendlyne?.swotWeaknessItems ?? []));
+  opportunities.push(...distinctMeaningful(trendlyne?.swotOpportunityItems ?? []));
+  threats.push(...distinctMeaningful(trendlyne?.swotThreatItems ?? []));
 
   if (intra?.price_above_vwap && intra?.price_above_ema9) {
     strengths.push("Price above VWAP and EMA9 — intraday trend alignment.");
@@ -199,23 +227,45 @@ export function buildFactSwot(params: {
     }
   }
 
-  const hasData = strengths.length + weaknesses.length + opportunities.length + threats.length > 0;
-  const balance = strengths.length + opportunities.length - weaknesses.length - threats.length;
-  const overall = hasData ? Math.round(Math.min(92, Math.max(12, 50 + balance * 7))) : 0;
+  const cleanStrengths = distinctMeaningful(strengths);
+  const cleanWeaknesses = distinctMeaningful(weaknesses);
+  const cleanOpportunities = distinctMeaningful(opportunities);
+  const cleanThreats = distinctMeaningful(threats);
+  const hasData = cleanStrengths.length + cleanWeaknesses.length + cleanOpportunities.length + cleanThreats.length > 0;
+  const hasTrendlyne = trendlyne?.swotAvailable === true;
+  const hasSnapshot = Boolean(intra || news || stock || params.terminalAnalysis);
+  const balance = cleanStrengths.length + cleanOpportunities.length - cleanWeaknesses.length - cleanThreats.length;
+  const overall = hasData ? Math.round(Math.min(92, Math.max(12, 50 + balance * 7))) : null;
+  const score = (count: number, base: number) => count ? Math.min(88, base + count * 11) : null;
+  const coverage = [
+    hasTrendlyne ? "Trendlyne SWOT" : null,
+    intra ? "intraday metrics" : null,
+    news ? "ticker news" : null,
+    params.terminalAnalysis ? "IC gates" : null,
+    stock ? "snapshot facts" : null,
+  ].filter((value): value is string => Boolean(value));
 
   return {
-    strengths: strengths.slice(0, 5),
-    weaknesses: weaknesses.slice(0, 5),
-    opportunities: opportunities.slice(0, 5),
-    threats: threats.slice(0, 5),
+    strengths: cleanStrengths.slice(0, 5),
+    weaknesses: cleanWeaknesses.slice(0, 5),
+    opportunities: cleanOpportunities.slice(0, 5),
+    threats: cleanThreats.slice(0, 5),
     scores: {
       overall,
-      strength: strengths.length ? Math.min(88, 35 + strengths.length * 11) : 0,
-      opportunity: opportunities.length ? Math.min(88, 35 + opportunities.length * 11) : 0,
-      weakness: weaknesses.length ? Math.min(88, 30 + weaknesses.length * 11) : 0,
-      threat: threats.length ? Math.min(88, 30 + threats.length * 11) : 0,
+      strength: score(cleanStrengths.length, 35),
+      opportunity: score(cleanOpportunities.length, 35),
+      weakness: score(cleanWeaknesses.length, 30),
+      threat: score(cleanThreats.length, 30),
     },
     hasData,
-    partial: !news || rsi == null,
+    partial: !hasTrendlyne || !news || rsi == null,
+    coverage,
+    source: hasTrendlyne && hasSnapshot
+      ? "trendlyne+snapshot"
+      : hasTrendlyne
+        ? "trendlyne"
+        : hasSnapshot
+          ? "snapshot"
+          : "none",
   };
 }

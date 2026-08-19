@@ -245,7 +245,8 @@ export default function AITickerNewsPanel({
   const hasNews = report && !report.error;
   const activeCategories = CATEGORIES.filter((cat) => {
     const value = report?.[cat.key] as string | undefined;
-    return value && value !== "No recent news found.";
+    const normalized = value?.trim().toLowerCase().replace(/[.!]+$/g, "");
+    return Boolean(value) && !new Set(["none", "n/a", "na", "nil", "not available", "no data", "no recent news found"]).has(normalized ?? "");
   });
 
   return (

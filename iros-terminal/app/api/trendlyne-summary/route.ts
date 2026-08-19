@@ -23,6 +23,23 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&gt;/g, '>');
 }
 
+function cleanText(value: string): string {
+  return decodeHtmlEntities(value)
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isMeaningfulText(value: string): boolean {
+  const normalized = value.trim().toLowerCase().replace(/[.!]+$/g, '');
+  return Boolean(normalized) && !new Set([
+    'none', 'n/a', 'na', 'nil', 'not available', 'no data',
+    'no recent news found', 'no significant risk', 'no significant risks',
+  ]).has(normalized);
+}
+
 function parseAttributeJson(html: string, attribute: string): unknown {
   const pattern = new RegExp(`${attribute}\\s*=\\s*"([^"]+)"`, 'i');
   const match = html.match(pattern);
@@ -56,19 +73,41 @@ function parseChecklistSummary(html: string): Pick<
 
 function parseSwotCounts(html: string): Pick<
   TrendlyneCardSummary,
-  'swotStrengths' | 'swotWeaknesses' | 'swotOpportunities' | 'swotThreats' | 'swotNet'
+  | 'swotStrengths'
+  | 'swotWeaknesses'
+  | 'swotOpportunities'
+  | 'swotThreats'
+  | 'swotNet'
+  | 'swotStrengthItems'
+  | 'swotWeaknessItems'
+  | 'swotOpportunityItems'
+  | 'swotThreatItems'
+  | 'swotAvailable'
 > {
-  const quadrants: Array<{ key: keyof TrendlyneCardSummary; label: string }> = [
-    { key: 'swotStrengths', label: 'Strengths' },
-    { key: 'swotWeaknesses', label: 'Weakness' },
-    { key: 'swotOpportunities', label: 'Opportunity' },
-    { key: 'swotThreats', label: 'Threats' },
+  const quadrants: Array<{
+    key: keyof TrendlyneCardSummary;
+    itemsKey: keyof TrendlyneCardSummary;
+    labels: string[];
+  }> = [
+    { key: 'swotStrengths', itemsKey: 'swotStrengthItems', labels: ['Strengths', 'Strength'] },
+    { key: 'swotWeaknesses', itemsKey: 'swotWeaknessItems', labels: ['Weaknesses', 'Weakness'] },
+    { key: 'swotOpportunities', itemsKey: 'swotOpportunityItems', labels: ['Opportunities', 'Opportunity'] },
+    { key: 'swotThreats', itemsKey: 'swotThreatItems', labels: ['Threats', 'Threat'] },
   ];
 
   const counts: Partial<Record<keyof TrendlyneCardSummary, number>> = {};
-  for (const { key, label } of quadrants) {
-    const section = html.match(new RegExp(`<ul[^>]*data-value="${label}"[^>]*>([\\s\\S]*?)</ul>`, 'i'));
-    counts[key] = section ? (section[1].match(/<li>/gi) ?? []).length : 0;
+  const items: Partial<Record<keyof TrendlyneCardSummary, string[]>> = {};
+  let matchedSections = 0;
+  for (const { key, itemsKey, labels } of quadrants) {
+    const labelPattern = labels.join('|');
+    const section = html.match(new RegExp(`<ul[^>]*data-value="(?:${labelPattern})"[^>]*>([\\s\\S]*?)</ul>`, 'i'));
+    if (!section) continue;
+    matchedSections += 1;
+    const parsed = Array.from(section[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi))
+      .map((match) => cleanText(match[1] ?? ''))
+      .filter(isMeaningfulText);
+    counts[key] = parsed.length;
+    items[itemsKey] = parsed;
   }
 
   const s = counts.swotStrengths ?? 0;
@@ -76,7 +115,7 @@ function parseSwotCounts(html: string): Pick<
   const o = counts.swotOpportunities ?? 0;
   const t = counts.swotThreats ?? 0;
 
-  if (s + w + o + t === 0) {
+  if (matchedSections === 0) {
     return {};
   }
 
@@ -86,6 +125,11 @@ function parseSwotCounts(html: string): Pick<
     swotOpportunities: o,
     swotThreats: t,
     swotNet: s + o - w - t,
+    swotStrengthItems: (items.swotStrengthItems as string[] | undefined) ?? [],
+    swotWeaknessItems: (items.swotWeaknessItems as string[] | undefined) ?? [],
+    swotOpportunityItems: (items.swotOpportunityItems as string[] | undefined) ?? [],
+    swotThreatItems: (items.swotThreatItems as string[] | undefined) ?? [],
+    swotAvailable: true,
   };
 }
 
@@ -195,6 +239,7 @@ async function fetchTrendlyneSummary(ticker: string): Promise<TrendlyneCardSumma
     if (checklistRes.ok) {
       const checklistHtml = await checklistRes.text();
       Object.assign(result, parseChecklistSummary(checklistHtml));
+      result.checklistAvailable = result.checklistTotal != null;
     }
 
     if (swotRes.ok) {
@@ -203,6 +248,9 @@ async function fetchTrendlyneSummary(ticker: string): Promise<TrendlyneCardSumma
     }
 
     Object.assign(result, technical);
+    result.technicalAvailable = Boolean(
+      result.technicalBias || result.technicalMomentumScore != null || result.maTotal != null,
+    );
   } catch (err) {
     result.error = err instanceof Error ? err.message : 'Trendlyne fetch failed';
   }

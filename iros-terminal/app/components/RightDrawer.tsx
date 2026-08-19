@@ -9,7 +9,7 @@ const AITickerNewsPanel = lazy(() => import("./AITickerNewsPanel"));
 const ConfidenceCheckerPanel = lazy(() => import("./ConfidenceCheckerPanel"));
 const TechnicalAnalysisPanel = lazy(() => import("./TechnicalAnalysisPanel"));
 const SwotAnalysisPanel = lazy(() => import("./SwotAnalysisPanel"));
-import { parseNewsCatalystsCard } from "@/lib/intelligence-summary";
+import { parseNewsCatalystsCard, type TrendlyneCardSummary } from "@/lib/intelligence-summary";
 import { deskDrawerVariants } from "@/lib/motion-tokens";
 
 type DrawerAnalysis = TerminalIntelligence & {
@@ -112,8 +112,8 @@ function DrawerStructuredReasoningOutput({ analysis }: { analysis?: DrawerAnalys
     return (
       <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-xl p-6 shadow-sm">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-slate-300 animate-pulse" />
-          <div className="text-slate-400 text-sm">Loading structured analysis...</div>
+          <div className="w-2 h-2 rounded-full bg-slate-300" />
+          <div className="text-slate-400 text-sm">Structured analysis is not available for this ticker.</div>
         </div>
       </div>
     );
@@ -348,6 +348,9 @@ type DrawerTab = "aiNews" | "analysis" | "confidenceChecker" | "technicalAnalysi
 
 export default function RightDrawer({ open, onClose, content }: { open: boolean; onClose: () => void; content?: DrawerContent | null }) {
   const [activeTab, setActiveTab] = useState<DrawerTab>("aiNews");
+  const [trendlyneSummary, setTrendlyneSummary] = useState<TrendlyneCardSummary | null>(null);
+  const [trendlyneLoading, setTrendlyneLoading] = useState(false);
+  const [trendlyneError, setTrendlyneError] = useState<string | null>(null);
 
   const analysis = content?.analysis;
   const stock = content?.stock;
@@ -368,6 +371,33 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
     const id = window.requestAnimationFrame(() => setActiveTab("aiNews"));
     return () => window.cancelAnimationFrame(id);
   }, [ticker]);
+
+  React.useEffect(() => {
+    if (!open || !ticker) {
+      setTrendlyneSummary(null);
+      setTrendlyneError(null);
+      setTrendlyneLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    setTrendlyneSummary(null);
+    setTrendlyneError(null);
+    setTrendlyneLoading(true);
+    fetch(`/api/trendlyne-summary?ticker=${encodeURIComponent(ticker)}`, { signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(payload?.error || `Research request failed (${response.status})`);
+        return payload as TrendlyneCardSummary;
+      })
+      .then(setTrendlyneSummary)
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setTrendlyneError(error instanceof Error ? error.message : "Research source unavailable");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setTrendlyneLoading(false);
+      });
+    return () => controller.abort();
+  }, [open, ticker]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -599,7 +629,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
 
         {/* Technical Analysis Tab */}
         {activeTab === "technicalAnalysis" && (
-          <TechnicalAnalysisPanel key={ticker} ticker={ticker} companyName={stock?.name} intraday={intraday} />
+          <TechnicalAnalysisPanel key={ticker} ticker={ticker} companyName={stock?.name} intraday={intraday} trendlyne={trendlyneSummary} researchLoading={trendlyneLoading} />
         )}
 
         {/* SWOT Analysis Tab */}
@@ -612,6 +642,9 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
             tickerNews={tickerNews}
             terminalAnalysis={analysis ?? undefined}
             stockFacts={stockFacts}
+            trendlyne={trendlyneSummary}
+            researchLoading={trendlyneLoading}
+            researchError={trendlyneError}
           />
         )}
 

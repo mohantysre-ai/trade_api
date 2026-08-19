@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import type { AITickerNewsReport, TerminalIntelligence } from "@/lib/market-api";
 import { buildFactSwot, type DrawerStockFacts, type IntradayMetrics } from "@/lib/drawer-research";
+import type { TrendlyneCardSummary } from "@/lib/intelligence-summary";
 
 type SwotAnalysisPanelProps = {
   ticker?: string;
@@ -11,6 +12,9 @@ type SwotAnalysisPanelProps = {
   tickerNews?: AITickerNewsReport | null;
   terminalAnalysis?: TerminalIntelligence | null;
   stockFacts?: DrawerStockFacts | null;
+  trendlyne?: TrendlyneCardSummary | null;
+  researchLoading?: boolean;
+  researchError?: string | null;
 };
 
 /* ── Color-coded quadrant card (light theme: tinted panel + dark text) ── */
@@ -22,6 +26,7 @@ function QuadrantCard({
   accentColor,
   borderGlow,
   titleClass,
+  loading = false,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -30,6 +35,7 @@ function QuadrantCard({
   accentColor: string;
   borderGlow: string;
   titleClass: string;
+  loading?: boolean;
 }) {
   return (
     <div className={`relative overflow-hidden rounded-xl border ${borderGlow} shadow-md group hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5`}>
@@ -59,7 +65,7 @@ function QuadrantCard({
             </div>
           ))}
           {items.length === 0 && (
-            <span className="text-[10px] text-slate-400 italic">Loading data...</span>
+            <span className="text-[10px] text-slate-400 italic">{loading ? "Loading verified data…" : "No fact-grounded evidence available."}</span>
           )}
         </div>
 
@@ -73,9 +79,9 @@ function QuadrantCard({
 }
 
 /* ── Animated strength meter ── */
-function StrengthMeter({ label, score, color }: { label: string; score: number; color: string }) {
+function StrengthMeter({ label, score, color }: { label: string; score: number | null; color: string }) {
   const [animVal, setAnimVal] = useState(0);
-  const pct = Math.min((score / 100) * 100, 100);
+  const pct = score == null ? 0 : Math.min(score, 100);
 
   useEffect(() => {
     const id = setTimeout(() => setAnimVal(pct), 100);
@@ -86,7 +92,7 @@ function StrengthMeter({ label, score, color }: { label: string; score: number; 
     <div className="space-y-1">
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">{label}</span>
-        <span className="text-[10px] font-black tabular-nums" style={{ color }}>{score.toFixed(0)}%</span>
+        <span className="text-[10px] font-black tabular-nums" style={{ color }}>{score == null ? "—" : `${score.toFixed(0)}%`}</span>
       </div>
       <div className="relative h-4 rounded-full bg-slate-100 overflow-hidden">
         <div
@@ -104,10 +110,10 @@ function StrengthMeter({ label, score, color }: { label: string; score: number; 
 }
 
 /* ── Score ring (score centered in middle) ── */
-function ScoreRing({ value, label, color }: { value: number; label: string; color: string }) {
+function ScoreRing({ value, label, color }: { value: number | null; label: string; color: string }) {
   const radius = 36;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (value / 100) * circumference;
+  const offset = circumference - ((value ?? 0) / 100) * circumference;
 
   return (
     <div className="flex flex-col items-center">
@@ -127,7 +133,7 @@ function ScoreRing({ value, label, color }: { value: number; label: string; colo
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xl font-black tabular-nums leading-none" style={{ color }}>{value.toFixed(0)}</span>
+          <span className="text-xl font-black tabular-nums leading-none" style={{ color }}>{value == null ? "—" : value.toFixed(0)}</span>
           <span className="text-[8px] uppercase tracking-wider text-slate-400 mt-0.5">{label}</span>
         </div>
       </div>
@@ -158,29 +164,6 @@ function EmptyState() {
   );
 }
 
-/* ── Loading quadrant skeleton (light theme) ── */
-function LoadingQuadrant() {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {[
-        { label: 'Strengths', color: 'bg-emerald-200' },
-        { label: 'Weaknesses', color: 'bg-red-200' },
-        { label: 'Opportunities', color: 'bg-blue-200' },
-        { label: 'Threats', color: 'bg-amber-200' },
-      ].map((item, i) => (
-        <div key={item.label} className={`rounded-xl p-4 animate-pulse min-h-[140px] border border-slate-200 ${item.color}/30`}>
-          <div className="h-4 w-24 bg-slate-200 rounded mb-3" />
-          <div className="space-y-2">
-            <div className="h-3 w-full bg-slate-100 rounded" />
-            <div className="h-3 w-3/4 bg-slate-100 rounded" />
-            <div className="h-3 w-5/6 bg-slate-100 rounded" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function SwotAnalysisPanel({
   ticker,
   companyName,
@@ -188,6 +171,9 @@ export default function SwotAnalysisPanel({
   tickerNews,
   terminalAnalysis,
   stockFacts,
+  trendlyne,
+  researchLoading = false,
+  researchError,
 }: SwotAnalysisPanelProps) {
   const normalizedTicker = ticker?.trim().toUpperCase();
   const [activeView, setActiveView] = useState<'widget' | 'analysis'>('analysis');
@@ -202,8 +188,9 @@ export default function SwotAnalysisPanel({
       tickerNews,
       terminalAnalysis,
       stock: stockFacts,
+      trendlyne,
     });
-  }, [normalizedTicker, intraday, tickerNews, terminalAnalysis, stockFacts]);
+  }, [normalizedTicker, intraday, tickerNews, terminalAnalysis, stockFacts, trendlyne]);
 
   const widgetUrl = useMemo(() => {
     if (!normalizedTicker) return "";
@@ -230,7 +217,7 @@ export default function SwotAnalysisPanel({
             activeView === 'analysis' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          AI Analysis
+          Fact Analysis
         </button>
       </div>
 
@@ -318,7 +305,12 @@ export default function SwotAnalysisPanel({
         <div className="space-y-3">
           {swotData.partial && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-semibold text-amber-900">
-              Partial SWOT — built from snapshot intraday metrics, news categories, and IC gates only.
+              Partial SWOT — only verified source fields are scored; unavailable categories remain unscored.
+            </div>
+          )}
+          {researchError && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] text-amber-900">
+              External research unavailable: {researchError}. Snapshot evidence is still shown.
             </div>
           )}
           {!swotData.hasData && (
@@ -358,7 +350,7 @@ export default function SwotAnalysisPanel({
                 <ScoreRing value={swotData.scores.opportunity} label="Opportunity" color="#3b82f6" />
               </div>
               <div className="relative">
-                <ScoreRing value={100 - swotData.scores.weakness} label="Defense" color="#ef4444" />
+                <ScoreRing value={swotData.scores.weakness == null ? null : 100 - swotData.scores.weakness} label="Defense" color="#ef4444" />
               </div>
             </div>
           </div>
@@ -373,6 +365,7 @@ export default function SwotAnalysisPanel({
                 titleClass="text-emerald-800"
                 icon={<svg viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                 items={swotData.strengths}
+                loading={researchLoading}
               />
               <QuadrantCard
                 title="Weaknesses"
@@ -382,6 +375,7 @@ export default function SwotAnalysisPanel({
                 titleClass="text-red-800"
                 icon={<svg viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d="M6 18L18 6M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                 items={swotData.weaknesses}
+                loading={researchLoading}
               />
               <QuadrantCard
                 title="Opportunities"
@@ -391,6 +385,7 @@ export default function SwotAnalysisPanel({
                 titleClass="text-blue-800"
                 icon={<svg viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d="M13 7h8m0 0v8m0-8l-9 9-4-4-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                 items={swotData.opportunities}
+                loading={researchLoading}
               />
               <QuadrantCard
                 title="Threats"
@@ -400,6 +395,7 @@ export default function SwotAnalysisPanel({
                 titleClass="text-amber-800"
                 icon={<svg viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                 items={swotData.threats}
+                loading={researchLoading}
               />
             </div>
 

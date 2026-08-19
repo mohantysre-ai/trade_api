@@ -151,6 +151,13 @@ export type TrendlyneCardSummary = {
   swotOpportunities?: number;
   swotThreats?: number;
   swotNet?: number;
+  swotStrengthItems?: string[];
+  swotWeaknessItems?: string[];
+  swotOpportunityItems?: string[];
+  swotThreatItems?: string[];
+  swotAvailable?: boolean;
+  checklistAvailable?: boolean;
+  technicalAvailable?: boolean;
   fetchedAt?: string;
   error?: string;
 };
