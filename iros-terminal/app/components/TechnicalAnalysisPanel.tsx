@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { buildTechnicalSignals, type IntradayMetrics } from "@/lib/drawer-research";
 import type { TrendlyneCardSummary } from "@/lib/intelligence-summary";
+import MarketSymbolBadge from "./MarketSymbolBadge";
 
 type TechnicalAnalysisPanelProps = {
   ticker?: string;
@@ -260,11 +261,7 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-lg tech-analysis-icon flex items-center justify-center shadow-sm">
-                    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-                      <path d="M3 20h18M6 16l4-8 4 6 4-10" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
+                  <MarketSymbolBadge symbol={normalizedTicker} size="md" />
                   <div>
                     <div className="text-sm font-black text-slate-900">{companyName ?? normalizedTicker}</div>
                     <div className="text-[9px] text-slate-500 uppercase tracking-wider">{normalizedTicker} · LIVE SIGNALS</div>

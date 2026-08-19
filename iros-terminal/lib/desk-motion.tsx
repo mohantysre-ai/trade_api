@@ -21,6 +21,7 @@ import {
   useReducedMotion,
   useSpring,
 } from "motion/react";
+import MarketSymbolBadge from "@/app/components/MarketSymbolBadge";
 import {
   deskNumClass,
   deskTransition,
@@ -390,14 +391,17 @@ export function DeskLiveTile({
       role="link"
       aria-label={`View ${label} details`}
     >
-      <div className="flex-1 min-w-0 z-10">
-        <span className="desk-metric-label block">{label}</span>
-        <LiveTickNumber value={value} className="desk-metric-value block" />
-        {deltaLabel != null && (
-          <span className={`desk-metric-delta block ${positive ? "is-up" : "is-down"}`}>
-            {positive ? "↑" : "↓"} {deltaLabel}
-          </span>
-        )}
+      <div className="flex flex-1 min-w-0 items-center gap-2 z-10">
+        <MarketSymbolBadge symbol={label} kind="index" size="sm" />
+        <div className="min-w-0">
+          <span className="desk-metric-label block truncate">{label}</span>
+          <LiveTickNumber value={value} className="desk-metric-value block" />
+          {deltaLabel != null && (
+            <span className={`desk-metric-delta block ${positive ? "is-up" : "is-down"}`}>
+              {positive ? "↑" : "↓"} {deltaLabel}
+            </span>
+          )}
+        </div>
       </div>
       {sparkline}
     </DeskCardTilt>

@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DeskGaugeFill, motion } from '@/lib/desk-motion';
 import { fetchLiveDesk, subscribeLiveDesk } from '@/lib/live-desk';
+import MarketSymbolBadge from './MarketSymbolBadge';
 
 /* ── Types (API facts only) ─────────────────────────────────────────── */
 
@@ -625,18 +626,22 @@ function Kpi({
   title?: string;
   span2?: boolean;
 }) {
+  const showMarketBadge = /NIFTY|VIX|SENSEX|NASDAQ|DOW|S&P/i.test(label);
   return (
     <div
-      className={`min-w-0 rounded-lg border border-slate-100 bg-slate-50/70 px-2 py-1.5 ${
+      className={`flex min-w-0 items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/70 px-2 py-1.5 ${
         span2 ? 'col-span-2' : ''
       }`}
     >
-      <div className="text-[8px] uppercase tracking-wider text-slate-500 font-semibold">{label}</div>
-      <div
-        className={`text-[12px] font-bold tabular-nums truncate ${valueClass || 'text-slate-900'}`}
-        title={title ?? value}
-      >
-        {value}
+      {showMarketBadge ? <MarketSymbolBadge symbol={label} kind="index" size="sm" /> : null}
+      <div className="min-w-0">
+        <div className="text-[8px] uppercase tracking-wider text-slate-500 font-semibold">{label}</div>
+        <div
+          className={`text-[12px] font-bold tabular-nums truncate ${valueClass || 'text-slate-900'}`}
+          title={title ?? value}
+        >
+          {value}
+        </div>
       </div>
     </div>
   );

@@ -645,15 +645,11 @@ def _ticker_fundamentals(payload: dict[str, Any], ticker: str) -> dict[str, str]
     ):
         return {key: str(active_scoring_matrix[key]) for key in active_scoring_matrix}
 
-    fundamentals_map = _estimate_fundamentals_from_snapshot(payload)
-    if ticker in fundamentals_map:
-        return fundamentals_map[ticker]
-
     return {
-        "beneish_m_score": "N/A",
-        "altman_z_score": "N/A",
-        "ocf_ebitda_ratio": "N/A",
-        "mansfield_relative_strength": "N/A",
+        "beneish_m_score": "INSUFFICIENT — financial-statement inputs unavailable",
+        "altman_z_score": "INSUFFICIENT — balance-sheet inputs unavailable",
+        "ocf_ebitda_ratio": "INSUFFICIENT — cash-flow and EBITDA inputs unavailable",
+        "mansfield_relative_strength": "INSUFFICIENT — benchmark price history unavailable",
     }
 
 
@@ -682,24 +678,29 @@ def _ticker_stock_row(payload: dict[str, Any], ticker: str) -> dict[str, Any]:
 
 
 def _intraday_bar_source(intraday: Any) -> str:
-    """Return candles | daily_candles | empty. Dummy hunt stubs are empty."""
     if not isinstance(intraday, dict):
         return ""
     src = str(intraday.get("data_source") or "")
     if src not in ("candles", "daily_candles"):
         return ""
     reasons = [str(r) for r in (intraday.get("hard_filter_reasons") or [])]
-    if any(r == "not in intraday candidate set" for r in reasons):
+    if "not in intraday candidate set" in reasons:
         return ""
     return src
 
 
-def _ticker_score(stock: dict[str, Any], ledger_row: dict[str, Any]) -> float:
-    raw = ledger_row.get("score") or stock.get("score") or (stock.get("intraday") or {}).get("score") or 0
+def _ticker_score(stock: dict[str, Any], ledger_row: dict[str, Any]) -> float | None:
+    raw = ledger_row.get("score")
+    if raw is None:
+        raw = stock.get("score")
+    if raw is None:
+        raw = (stock.get("intraday") or {}).get("score")
+    if raw is None or raw == "":
+        return None
     try:
         return float(raw)
     except Exception:
-        return 0.0
+        return None
 
 
 def _ticker_intraday_text(stock: dict[str, Any]) -> str:
@@ -712,25 +713,25 @@ def _ticker_intraday_text(stock: dict[str, Any]) -> str:
         float(intraday.get("vwap") or 0) <= 0 and trigger == "VWAP Bounce"
     ):
         trigger = "no 5m trigger"
-    if src == "daily_candles":
-        vwap = "VWAP unavailable"
-        ema9 = "EMA9 unavailable"
-    else:
-        vwap = intraday.get("vwap") or "VWAP unavailable"
-        ema9 = intraday.get("ema9") or "EMA9 unavailable"
-    atr = intraday.get("atr_pct") or 0
-    volume_multiplier = intraday.get("volume_multiplier") or 0
-    return f"{trigger}, VWAP {vwap}, EMA9 {ema9}, ATR {atr}%, volume multiplier {volume_multiplier}x"
+    vwap = "VWAP unavailable" if src == "daily_candles" else (intraday.get("vwap") or "VWAP unavailable")
+    ema9 = "EMA9 unavailable" if src == "daily_candles" else (intraday.get("ema9") or "EMA9 unavailable")
+    atr = intraday.get("atr_pct")
+    volume_multiplier = intraday.get("volume_multiplier")
+    atr_text = f"{atr}%" if atr is not None else "unavailable"
+    volume_text = f"{volume_multiplier}x" if volume_multiplier is not None else "unavailable"
+    return f"{trigger}, VWAP {vwap}, EMA9 {ema9}, ATR {atr_text}, volume multiplier {volume_text}"
 
 
-def _build_dynamic_selection_reason(stock: dict[str, Any], score: float) -> str:
-    intraday = stock.get("intraday") or {}
+def _build_dynamic_selection_reason(stock: dict[str, Any], score: float | None) -> str:
+    raw_intraday = stock.get("intraday") or {}
+    intraday_source = _intraday_bar_source(raw_intraday)
+    intraday = raw_intraday if intraday_source else {}
     src = _intraday_bar_source(intraday)
     if not src:
         delta = _parse_percent(stock.get("delta"))
-        delta_txt = f"delta {delta:.2f}%" if stock.get("delta") not in (None, "") else "delta unavailable"
-        score_txt = f"score {score:.1f}" if score else "score unavailable"
-        return f"Candle metrics unavailable; {delta_txt}; {score_txt}."
+        delta_text = f"delta {delta:.2f}%" if stock.get("delta") not in (None, "") else "delta unavailable"
+        score_text = f"score {score:.1f}" if score is not None else "score unavailable"
+        return f"Candle metrics unavailable; {delta_text}; {score_text}."
     price_above_vwap = bool(intraday.get("price_above_vwap"))
     price_above_ema9 = bool(intraday.get("price_above_ema9"))
     volume_multiplier = float(intraday.get("volume_multiplier") or 0)
@@ -747,12 +748,12 @@ def _build_dynamic_selection_reason(stock: dict[str, Any], score: float) -> str:
             if (price_above_vwap and price_above_ema9)
             else "mixed trend around intraday anchors"
         )
-        trigger_text = (
-            f"trigger {trigger}"
-            if trigger and trigger != "VWAP Bounce"
-            else "5m trigger unavailable"
-        )
-    momentum_text = f"delta {delta:.2f}% with score {score:.1f}"
+        trigger_text = f"trigger {trigger}" if trigger else "5m trigger unavailable"
+    momentum_text = (
+        f"delta {delta:.2f}% with score {score:.1f}"
+        if score is not None
+        else f"delta {delta:.2f}%; score unavailable"
+    )
     liquidity_text = (
         f"volume {volume_multiplier:.2f}x and turnover {turnover_cr:.2f} Cr"
         if turnover_cr > 0
@@ -767,7 +768,7 @@ def _build_dynamic_selection_reason(stock: dict[str, Any], score: float) -> str:
     )
 
 
-def _build_ticker_reason_prompt(ticker: str, stock: dict[str, Any], score: float) -> str:
+def _build_ticker_reason_prompt(ticker: str, stock: dict[str, Any], score: float | None) -> str:
     intraday = stock.get("intraday") or {}
     payload = {
         "ticker": ticker,
@@ -794,7 +795,7 @@ def _build_ticker_reason_prompt(ticker: str, stock: dict[str, Any], score: float
     )
 
 
-def _on_demand_ticker_selection_reason(ticker: str, stock: dict[str, Any], score: float) -> str:
+def _on_demand_ticker_selection_reason(ticker: str, stock: dict[str, Any], score: float | None) -> str:
     fallback = _build_dynamic_selection_reason(stock, score)
     llm_config = _llm_config()
     if llm_config is None or not _llm_quota_available():
@@ -825,7 +826,7 @@ def _on_demand_ticker_selection_reason(ticker: str, stock: dict[str, Any], score
         return fallback
 
 
-def _ticker_factor_hub(stock: dict[str, Any], score: float) -> dict[str, Any]:
+def _ticker_factor_hub(stock: dict[str, Any], score: float | None) -> dict[str, Any]:
     intraday = stock.get("intraday") or {}
     src = _intraday_bar_source(intraday)
     if not src:
@@ -835,7 +836,7 @@ def _ticker_factor_hub(stock: dict[str, Any], score: float) -> dict[str, Any]:
             "momentum_factor": "—",
             "liquidity_factor": "—",
             "quality_factor": "—",
-            "value_factor": "—",
+            "value_factor": "INSUFFICIENT — valuation inputs unavailable.",
             "low_vol_factor": "—",
         }
     price_above_vwap = bool(intraday.get("price_above_vwap"))
@@ -845,42 +846,27 @@ def _ticker_factor_hub(stock: dict[str, Any], score: float) -> dict[str, Any]:
     atr = float(intraday.get("atr_pct") or 0)
     delta = _parse_percent(stock.get("delta"))
 
+    score_text = f"score {score:.1f}" if score is not None else "score unavailable"
     if src == "daily_candles":
-        dominant = (
-            "range expansion with volatility-led execution risk"
-            if atr >= 3.5 or abs(delta) >= 5
-            else "daily candle ATR and quote-volume liquidity (5m bars unavailable)"
-        )
-        momentum_factor = (
-            f"VWAP/EMA9 unavailable without 5m bars; score {score:.1f}."
-            if score
-            else "VWAP/EMA9 unavailable without 5m bars."
-        )
+        dominant = "range expansion with volatility-led execution risk" if atr >= 3.5 or abs(delta) >= 5 else "daily candle ATR and quote-volume liquidity (5m bars unavailable)"
+        momentum_factor = f"VWAP/EMA9 unavailable without 5m bars; {score_text}."
     elif price_above_vwap and price_above_ema9 and delta >= 0:
         dominant = "momentum, liquidity, and structural trend alignment"
-        momentum_factor = f"Above VWAP/EMA9; score {score:.1f}."
+        momentum_factor = f"Above VWAP/EMA9; {score_text}."
     elif atr >= 3.5 or abs(delta) >= 5:
         dominant = "range expansion with volatility-led execution risk"
-        momentum_factor = f"Near VWAP/EMA9; score {score:.1f}."
+        momentum_factor = f"Near VWAP/EMA9; {score_text}."
     else:
         dominant = "liquidity and mean-reversion around intraday anchors"
-        momentum_factor = f"Near VWAP/EMA9; score {score:.1f}."
+        momentum_factor = f"Near VWAP/EMA9; {score_text}."
 
     return {
         "selection_reason": _build_dynamic_selection_reason(stock, score),
         "dominant_factors": dominant,
         "momentum_factor": momentum_factor,
-        "liquidity_factor": (
-            f"Volume multiplier {volume_multiplier:.2f}x; turnover {turnover_cr:.2f} Cr."
-            if turnover_cr
-            else "Turnover data unavailable."
-        ),
-        "quality_factor": (
-            f"ATR {atr:.2f}% from daily candles; 5m hard filters not applied."
-            if src == "daily_candles"
-            else f"ATR {atr:.2f}% and hard-filter status {'pass' if intraday.get('passes_hard_filters') else 'watch'}."
-        ),
-        "value_factor": "Valuation proxy is derived from live momentum and liquidity rather than static multiples.",
+        "liquidity_factor": f"Volume multiplier {volume_multiplier:.2f}x; turnover {turnover_cr:.2f} Cr." if turnover_cr else "Turnover data unavailable.",
+        "quality_factor": f"ATR {atr:.2f}% from daily candles; 5m hard filters not applied." if src == "daily_candles" else f"ATR {atr:.2f}% and hard-filter status {'pass' if intraday.get('passes_hard_filters') else 'watch'}.",
+        "value_factor": "INSUFFICIENT — valuation cannot be inferred from momentum or liquidity.",
         "low_vol_factor": "Low-vol regime" if atr <= 2 else "Volatility premium regime",
     }
 
@@ -912,18 +898,20 @@ def _parse_percent_value(value: Any) -> float | None:
 
 
 def _risk_flag_from_metrics(
-    score: float,
+    score: float | None,
     delta: float,
     atr: float,
     volume_multiplier: float,
     win_loss_ratio_text: Any,
     kelly_policy_text: Any,
-) -> tuple[float, str]:
+) -> tuple[float | None, str]:
     # Start at neutral 50 and move based on risk signals
     risk_score = 50.0
 
     # Score: higher score lowers risk
-    if score >= 75:
+    if score is None:
+        pass
+    elif score >= 75:
         risk_score -= 18
     elif score >= 60:
         risk_score -= 10
@@ -993,43 +981,40 @@ def _risk_flag_from_metrics(
     return round(risk_score, 2), flag
 
 
-def _ticker_risk_calc(stock: dict[str, Any], ledger_row: dict[str, Any], market_risk: dict[str, Any], score: float) -> dict[str, Any]:
+def _ticker_risk_calc(stock: dict[str, Any], ledger_row: dict[str, Any], market_risk: dict[str, Any], score: float | None) -> dict[str, Any]:
     intraday = stock.get("intraday") or {}
     src = _intraday_bar_source(intraday)
-    live = bool(src)
     delta = _parse_percent(stock.get("delta"))
-    atr = float(intraday.get("atr_pct") or 0) if live else None
-    turnover_cr = float(intraday.get("turnover_cr") or 0) if live else None
-    volume_multiplier = float(intraday.get("volume_multiplier") or 0) if live else None
+    atr = float(intraday.get("atr_pct") or 0) if src else None
+    turnover_cr = float(intraday.get("turnover_cr") or 0) if src else None
+    volume_multiplier = float(intraday.get("volume_multiplier") or 0) if src else None
     win_loss_ratio = market_risk.get("win_loss_ratio") or "—"
     kelly_policy_max = ledger_row.get("policy_allocation_pct") or market_risk.get("kelly_policy_max") or "—"
-    risk_flag_score, risk_flag = _risk_flag_from_metrics(
-        score=score,
-        delta=delta,
-        atr=float(atr or 0),
-        volume_multiplier=float(volume_multiplier or 0),
-        win_loss_ratio_text=win_loss_ratio,
-        kelly_policy_text=kelly_policy_max,
-    )
-    has_score = bool(ledger_row.get("score") not in (None, "") or stock.get("score") not in (None, "") or (intraday.get("score") not in (None, "") if isinstance(intraday, dict) else False))
-    if src == "candles":
-        signal_quality = "live-derived"
-    elif src == "daily_candles":
-        signal_quality = "daily-candles"
-    else:
-        signal_quality = "snapshot-quote"
+    wl_ratio = _parse_win_loss_ratio(win_loss_ratio)
+    has_execution_risk = src == "candles" and score is not None and wl_ratio is not None and _parse_percent_value(kelly_policy_max) is not None
+    risk_flag_score, risk_flag = (None, "INSUFFICIENT")
+    if has_execution_risk:
+        risk_flag_score, risk_flag = _risk_flag_from_metrics(
+            score=score,
+            delta=delta,
+            atr=float(atr or 0),
+            volume_multiplier=float(volume_multiplier or 0),
+            win_loss_ratio_text=win_loss_ratio,
+            kelly_policy_text=kelly_policy_max,
+        )
     return {
-        "ticker_score": round(score, 2) if has_score else "—",
-        "delta_pct": round(delta, 2) if stock.get("delta") not in (None, "") else "—",
-        "atr_pct": round(atr, 2) if atr is not None else "—",
-        "turnover_cr": round(turnover_cr, 2) if turnover_cr is not None else "—",
-        "volume_multiplier": round(volume_multiplier, 2) if volume_multiplier is not None else "—",
-        "selection_risk": "—" if not has_score else ("lower" if score >= 70 and delta >= 0 else "moderate" if score >= 50 else "higher"),
-        "signal_quality": signal_quality,
-        "win_loss_ratio": win_loss_ratio if win_loss_ratio not in ("1.0:1", "1.00:1") else "—",
-        "kelly_policy_max": kelly_policy_max if kelly_policy_max not in ("0.0%", "0%") else "—",
-        "risk_flag_score": risk_flag_score if live or has_score else "—",
-        "risk_flag": risk_flag if live or has_score else "—",
+        "ticker_score": round(score, 2) if score is not None else None,
+        "delta_pct": round(delta, 2) if stock.get("delta") not in (None, "") else None,
+        "atr_pct": round(atr, 2) if atr is not None else None,
+        "turnover_cr": round(turnover_cr, 2) if turnover_cr is not None else None,
+        "volume_multiplier": round(volume_multiplier, 2) if volume_multiplier is not None else None,
+        "selection_risk": "INSUFFICIENT" if score is None else "lower" if score >= 70 and delta >= 0 else "moderate" if score >= 50 else "higher",
+        "signal_quality": "partial-live-metrics" if src == "candles" else "daily-candles" if src == "daily_candles" else "snapshot-quote",
+        "win_loss_ratio": win_loss_ratio,
+        "kelly_policy_max": kelly_policy_max,
+        "risk_flag_score": risk_flag_score,
+        "risk_flag": risk_flag,
+        "risk_method": "Requires score, win/loss ratio, and Kelly allocation; missing inputs are not imputed.",
     }
 
 
@@ -1067,19 +1052,14 @@ def _ticker_news_catalyst_blurb(payload: dict[str, Any], ticker: str) -> str | N
     return " | ".join(parts[:8]) if parts else None
 
 
-def _needs_news_enrichment(text: str | None) -> bool:
-    raw = str(text or "").strip().lower()
-    if not raw:
-        return True
-    return "not available" in raw or raw.startswith("top market catalysts were not")
-
-
 def build_ticker_intelligence_report(payload: dict[str, Any], ticker: str) -> dict[str, Any]:
     terminal = payload.get("terminalIntelligence") or {}
     stock = _ticker_stock_row(payload, ticker)
     ledger_row = _ticker_ledger_row(payload, ticker)
     score = _ticker_score(stock, ledger_row)
-    intraday = stock.get("intraday") or {}
+    raw_intraday = stock.get("intraday") or {}
+    intraday_source = _intraday_bar_source(raw_intraday)
+    intraday = raw_intraday if intraday_source else {}
     delta = _clean_value(stock.get("delta")) or "flat"
     ltp = _clean_value(stock.get("ltp")) or "N/A"
     volume = stock.get("volume") or "N/A"
@@ -1088,13 +1068,8 @@ def build_ticker_intelligence_report(payload: dict[str, Any], ticker: str) -> di
     fundamentals = _ticker_fundamentals(payload, ticker)
     market_risk = terminal.get("active_risk_calc") or {}
     market_factor_hub = terminal.get("active_factor_hub") or {}
-    market_gates = terminal.get("active_seven_ic_gates") or {}
-    market_news = terminal.get("news_catalysts_card") or "Top market catalysts were not available from the current news feed."
     enriched_news = _ticker_news_catalyst_blurb(payload, ticker)
-    if enriched_news and _needs_news_enrichment(market_news):
-        market_news = enriched_news
-    market_macro = terminal.get("macro_anchors_card") or "Macro anchors are drawn from live index action, global market breadth, and commodity/FX benchmarks."
-    market_insti = terminal.get("insider_insti_activity_card") or "Institutional activity is inferred from live volume and price participation."
+    market_news = enriched_news or "INSUFFICIENT — no ticker-specific, dated news catalyst was available from the current feed."
 
     why_parts = [f"{ticker} is in the active terminal universe with LTP {ltp}, {delta} move, and volume {volume}."]
     if selection_reason:
@@ -1102,33 +1077,46 @@ def build_ticker_intelligence_report(payload: dict[str, Any], ticker: str) -> di
     why_parts.append(f"Intraday setup: {_ticker_intraday_text(stock)}.")
     why = " ".join(why_parts)
 
-    forensic_bits = ", ".join(
+    forensic_bits = "; ".join(
         f"{key.replace('_', ' ').title()}: {value}" for key, value in fundamentals.items()
+    )
+    score_text = f"{score:.1f}" if score is not None else "INSUFFICIENT"
+    turnover = float(intraday.get("turnover_cr") or 0)
+    volume_multiplier = float(intraday.get("volume_multiplier") or 0)
+    above_vwap = intraday.get("price_above_vwap")
+    above_ema9 = intraday.get("price_above_ema9")
+    hard_filter = bool(intraday.get("passes_hard_filters"))
+    q2_status = "PASS" if turnover >= 50 else "FAIL" if turnover > 0 else "INSUFFICIENT"
+    anchor_evidence = (
+        f"price_above_vwap={above_vwap}, price_above_ema9={above_ema9}"
+        if above_vwap is not None or above_ema9 is not None
+        else "VWAP/EMA9 relationship unavailable"
     )
     return {
         "news_catalysts_card": f"Market context for {ticker}: {market_news}",
-        "insider_insti_activity_card": f"{market_insti} For {ticker}, participation is read through volume multiplier {intraday.get('volume_multiplier', 'N/A')}x and turnover {intraday.get('turnover_cr', 'N/A')} Cr.",
-        "macro_anchors_card": f"{market_macro} {ticker} is evaluated against this backdrop using live price, volume, and intraday structure.",
+        "insider_insti_activity_card": f"INSUFFICIENT — volume multiplier {volume_multiplier:.2f}x and turnover {turnover:.2f} Cr do not establish institutional buying. Exchange block/bulk deals, delivery volume, or shareholding evidence is required.",
+        "macro_anchors_card": "INSUFFICIENT — no source-stamped index breadth, VIX, FX, rates, commodity, or sector-index observations were supplied for this ticker report.",
         "forensic_screen_card": f"{ticker} forensic screen: {forensic_bits}.",
         "why_interested": why,
-        "future_revenue_model": f"Forward model for {ticker} is inferred from current sector momentum, order-flow quality, and live liquidity participation rather than static multiples.",
-        "current_model": f"Current model for {ticker}: LTP {ltp}, delta {delta}, volume {volume}, score {score:.1f}, action {action}.",
+        "future_revenue_model": f"INSUFFICIENT — {ticker} forward revenue requires reported order book, execution schedule, historical revenue, margins, and management guidance; market momentum is not a revenue proxy.",
+        "current_model": f"Current market snapshot for {ticker}: LTP {ltp}, delta {delta}, volume {volume}, score {score_text}, action {action}.",
         "ledger_stocks": _canonicalize_ledger_rows([ledger_row] if ledger_row else [], ticker) or _canonicalize_ledger_rows(terminal.get("ledger_stocks") or [], ticker),
         "active_scoring_matrix": fundamentals,
         "active_seven_ic_gates": {
-            "q1_fund_buying": f"{ticker} volume multiplier is {intraday.get('volume_multiplier', 'N/A')}x; institutional participation is inferred from turnover and price follow-through.",
-            "q2_liquidity_delivery": f"{ticker} turnover is {intraday.get('turnover_cr', 'N/A')} Cr; liquidity quality is {'institutional' if float(intraday.get('turnover_cr') or 0) >= 50 else 'watch-list'} level.",
-            "q3_catalyst_validation": f"{ticker} price action is {delta}; catalyst validation depends on follow-through above VWAP/EMA9.",
-            "q4_bear_thesis": market_gates.get("q4_bear_thesis", "Bear thesis is monitored through breakdown risk and failure to hold intraday anchors."),
-            "q5_risk_reward": f"{ticker} risk/reward is driven by score {score:.1f}, ATR {intraday.get('atr_pct', 'N/A')}%, and execution level {intraday.get('trigger_point', 'N/A')}.",
-            "q6_quantitative_milestone": f"{ticker} quantitative milestone: hard-filter {'pass' if intraday.get('passes_hard_filters') else 'watch'} with score {score:.1f}.",
-            "q7_governance_gate": market_gates.get("q7_governance_gate", "Governance gate remains a watch item; no live red flag was embedded in the market payload."),
+            "q1_fund_buying": f"INSUFFICIENT — {ticker} volume {volume_multiplier:.2f}x and turnover ₹{turnover:.2f} Cr are participation metrics, not proof of fund buying.",
+            "q2_liquidity_delivery": f"{q2_status} — turnover ₹{turnover:.2f} Cr against the deterministic ₹50 Cr liquidity threshold.",
+            "q3_catalyst_validation": "INSUFFICIENT — no ticker-specific, dated catalyst with a verifiable source was supplied.",
+            "q4_bear_thesis": f"WATCH — market-structure evidence only: {anchor_evidence}; delta {delta}. No fundamental bear thesis was supplied.",
+            "q5_risk_reward": "INSUFFICIENT — entry, stop-loss and target values are required to calculate reward/risk.",
+            "q6_quantitative_milestone": f"{'PASS' if hard_filter else 'FAIL'} — deterministic hard-filter status; score {score_text}.",
+            "q7_governance_gate": "INSUFFICIENT — auditor, promoter pledge, related-party, regulatory and exchange-disclosure evidence was not supplied.",
         },
         "active_risk_calc": _ticker_risk_calc(stock, ledger_row, market_risk, score),
         "active_factor_hub": _ticker_factor_hub(stock, score) if stock else market_factor_hub,
         "focusTicker": ticker,
         "ticker": ticker,
-        "dataQuality": "live-derived" if stock else "snapshot-ledger",
+        "dataQuality": "partial-live-metrics" if intraday_source == "candles" else "daily-candles" if intraday_source == "daily_candles" else "snapshot-quote",
+        "evidencePolicy": "Unsupported fields remain INSUFFICIENT; price/volume data is not used as a proxy for fundamentals, institutional ownership, governance, or revenue.",
     }
 
 
@@ -1348,6 +1336,7 @@ def _apply_wl_policy_from_llm(
             "ledger_stocks": ledger,
         }
     }
+
     llm_outcome = _analyze_forensic_wl_policy(forensic_snapshot, ledger, focus_ticker)
     if llm_outcome:
         per_ticker = llm_outcome.get("per_ticker") or {}
@@ -1363,7 +1352,6 @@ def _apply_wl_policy_from_llm(
             row_policy = per_ticker.get(ticker, {}).get("policy_allocation_pct")
             row["policy_allocation_pct"] = row_policy or risk.get("kelly_policy_max") or "—"
         return analysis
-
     if needs_wl:
         risk["win_loss_ratio"] = "—"
     if needs_policy:
