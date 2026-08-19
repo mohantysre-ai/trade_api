@@ -239,7 +239,7 @@ const MACRO_POLL_OPEN_MS = 60_000;
 /** After cash close, still refresh India/global/commodities strip (slower). */
 const MACRO_POLL_CLOSED_MS = 180_000;
 
-function isNseCashSessionNow(d = new Date()): boolean {
+export function isNseCashSessionNow(d = new Date()): boolean {
   try {
     const parts = new Intl.DateTimeFormat("en-GB", {
       timeZone: "Asia/Kolkata",

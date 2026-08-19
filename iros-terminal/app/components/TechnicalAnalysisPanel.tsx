@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { buildTechnicalSignals, type IntradayMetrics } from "@/lib/drawer-research";
 import type { TrendlyneCardSummary } from "@/lib/intelligence-summary";
+import { isNseCashSessionNow } from "@/lib/market-api";
 import MarketSymbolBadge from "./MarketSymbolBadge";
 
 type TechnicalAnalysisPanelProps = {
@@ -40,7 +41,7 @@ function OscillatorGauge({ rsi, macd }: { rsi: number | null; macd: number | nul
   if (rsi == null && macd == null) {
     return (
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center text-[11px] text-slate-500">
-        Intraday RSI / trend metrics not available in snapshot.
+        Intraday RSI / trend metrics not available in snapshot or Trendlyne.
       </div>
     );
   }
@@ -149,7 +150,8 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
   const [errored, setErrored] = useState(false);
   const [activeView, setActiveView] = useState<'widget' | 'dashboard'>('dashboard');
 
-  const signals = useMemo(() => buildTechnicalSignals(intraday), [intraday]);
+  const signals = useMemo(() => buildTechnicalSignals(intraday, trendlyne), [intraday, trendlyne]);
+  const sessionOpen = isNseCashSessionNow();
 
   const widgetUrl = useMemo(() => {
     if (!normalizedTicker) return "";
@@ -249,10 +251,15 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
 
       {/* Live Dashboard ── light theme */}
       {activeView === 'dashboard' && (
-        <div className="space-y-3">
+        <div className={`space-y-3 ${sessionOpen ? "" : "opacity-70"}`}>
+          {!sessionOpen && (
+            <div className="rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+              NSE cash session closed{trendlyne?.lastModified ? ` · last print ${trendlyne.lastModified}` : " · last Trendlyne / snapshot print"}
+            </div>
+          )}
           {!signals.hasData && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-semibold text-amber-900">
-              {researchLoading ? `Loading verified technical data for ${normalizedTicker}…` : `Partial desk view — live intraday metrics are unavailable for ${normalizedTicker}. Missing values remain unscored.`}
+              {researchLoading ? `Loading Trendlyne technicals for ${normalizedTicker}…` : `Partial desk view — live 5m metrics and Trendlyne technicals are unavailable for ${normalizedTicker}. Missing values remain unscored.`}
             </div>
           )}
           {/* Header card */}
@@ -264,12 +271,12 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
                   <MarketSymbolBadge symbol={normalizedTicker} size="md" />
                   <div>
                     <div className="text-sm font-black text-slate-900">{companyName ?? normalizedTicker}</div>
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">{normalizedTicker} · LIVE SIGNALS</div>
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">{normalizedTicker} · {sessionOpen ? "LIVE SIGNALS" : "SESSION CLOSED"}{signals.metricSource === "trendlyne" ? " · TRENDLYNE" : signals.metricSource === "mixed" ? " · 5M + TRENDLYNE" : ""}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${signals.hasData ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-                  <span className={`text-[9px] uppercase tracking-wider font-bold ${signals.hasData ? "text-emerald-600" : "text-amber-700"}`}>{signals.hasData ? "Streaming" : "Partial"}</span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${!sessionOpen ? "bg-slate-500" : signals.hasData ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                  <span className={`text-[9px] uppercase tracking-wider font-bold ${!sessionOpen ? "text-slate-600" : signals.hasData ? "text-emerald-600" : "text-amber-700"}`}>{!sessionOpen ? "Closed" : signals.hasData ? "Streaming" : "Partial"}</span>
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] text-slate-600">
@@ -292,9 +299,13 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
               </span>
             </div>
             <div className="text-[10px] text-slate-500 mb-2">
-              VWAP: {signals.aboveVwap == null ? "—" : signals.aboveVwap ? "above" : "below"} · EMA9: {signals.aboveEma9 == null ? "—" : signals.aboveEma9 ? "above" : "below"}
+              {signals.vwapLabel}: {signals.aboveVwap == null ? "—" : signals.aboveVwap ? "above" : "below"} · {signals.emaLabel}: {signals.aboveEma9 == null ? "—" : signals.aboveEma9 ? "above" : "below"}
             </div>
-            <div className="rounded-lg bg-slate-50 px-3 py-2 text-[10px] text-slate-500">Only sourced VWAP/EMA9 relationships are shown; no synthetic price path is generated.</div>
+            <div className="rounded-lg bg-slate-50 px-3 py-2 text-[10px] text-slate-500">
+              {signals.metricSource === "trendlyne" || signals.metricSource === "mixed"
+                ? "Trendlyne widget technicals fill RSI/MACD/MA when 5m candle anchors are missing. No synthetic price path is generated."
+                : "Only sourced VWAP/EMA9 relationships are shown; no synthetic price path is generated."}
+            </div>
           </div>
 
           {/* Signal meters */}
@@ -303,7 +314,7 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
             <SignalMeter label="Trend Strength (RSI)" value={signals.strength} color="#22c55e" />
             <SignalMeter label="Volume Momentum" value={signals.volume} color="#3b82f6" />
             <SignalMeter label="Volatility Index (ATR)" value={signals.volatility} color="#f59e0b" />
-            <SignalMeter label="Stochastic (RSI proxy)" value={signals.stochastic} color="#a855f7" />
+            <SignalMeter label="Stochastic" value={signals.stochastic} color="#a855f7" />
           </div>
 
         </div>

@@ -13,6 +13,7 @@ export type IntradayMetrics = {
   promoter_holding_pct?: number | null;
   vwap?: number | null;
   data_source?: string | null;
+  hard_filter_reasons?: string[] | null;
 };
 
 export type DrawerStockFacts = {
@@ -27,8 +28,18 @@ export function parseNumeric(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function snapshotBarSource(intraday?: IntradayMetrics | null): "candles" | "daily_candles" | "" {
+  if (!intraday) return "";
+  const reasons = (intraday.hard_filter_reasons || []).map(String);
+  if (reasons.some((reason) => reason.includes("not in intraday candidate set"))) return "";
+  const src = String(intraday.data_source || "");
+  if (src === "candles" || src === "daily_candles") return src;
+  return "";
+}
+
 export function buildTechnicalSignals(
   intraday?: IntradayMetrics | null,
+  trendlyne?: TrendlyneCardSummary | null,
 ): {
   rsi: number | null;
   macd: number | null;
@@ -40,35 +51,74 @@ export function buildTechnicalSignals(
   hasData: boolean;
   aboveVwap: boolean | null;
   aboveEma9: boolean | null;
+  vwapLabel: string;
+  emaLabel: string;
+  metricSource: "5m" | "daily" | "trendlyne" | "mixed" | "none";
 } {
-  const rsi = parseNumeric(intraday?.rsi);
-  const atr = parseNumeric(intraday?.atr_pct);
-  const volMult = parseNumeric(intraday?.volume_multiplier);
-  const aboveVwap = intraday?.price_above_vwap ?? null;
-  const aboveEma9 = intraday?.price_above_ema9 ?? null;
+  const src = snapshotBarSource(intraday);
+  const snapshotRsi = src ? parseNumeric(intraday?.rsi) : null;
+  const snapshotAtr = src ? parseNumeric(intraday?.atr_pct) : null;
+  const volMult = src ? parseNumeric(intraday?.volume_multiplier) : null;
+  const snapshotVwap = src === "candles" ? (intraday?.price_above_vwap ?? null) : null;
+  const snapshotEma9 = src === "candles" ? (intraday?.price_above_ema9 ?? null) : null;
+
+  const rsi = snapshotRsi ?? parseNumeric(trendlyne?.rsi);
+  const atr = snapshotAtr ?? parseNumeric(trendlyne?.atrPct);
+  const aboveVwap = snapshotVwap ?? trendlyne?.priceAboveSma5 ?? null;
+  const aboveEma9 = snapshotEma9 ?? trendlyne?.priceAboveEma9 ?? trendlyne?.priceAboveEma5 ?? null;
+  const vwapLabel = snapshotVwap != null ? "VWAP" : "SMA5 (Trendlyne)";
+  const emaLabel = snapshotEma9 != null ? "EMA9" : "EMA (Trendlyne)";
 
   let maSignal: "BUY" | "SELL" | "NEUTRAL" = "NEUTRAL";
   if (aboveVwap === true && aboveEma9 === true) maSignal = "BUY";
   else if (aboveVwap === false && aboveEma9 === false) maSignal = "SELL";
+  else if (snapshotVwap == null && snapshotEma9 == null && trendlyne?.maBullish != null && trendlyne.maTotal) {
+    const ratio = trendlyne.maBullish / trendlyne.maTotal;
+    if (ratio >= 0.65) maSignal = "BUY";
+    else if (ratio <= 0.35) maSignal = "SELL";
+  }
 
-  const macd =
-    aboveVwap === true && aboveEma9 === true
+  const snapshotMacd =
+    snapshotVwap === true && snapshotEma9 === true
       ? 1
-      : aboveVwap === false && aboveEma9 === false
+      : snapshotVwap === false && snapshotEma9 === false
         ? -1
-        : aboveVwap != null || aboveEma9 != null
+        : snapshotVwap != null || snapshotEma9 != null
           ? 0.2
           : null;
+  const macd = snapshotMacd ?? parseNumeric(trendlyne?.macd);
+  const stochastic = parseNumeric(trendlyne?.stochastic) ?? rsi;
 
   const strength = rsi != null ? Math.min(100, Math.max(0, rsi)) : null;
   const volume = volMult != null ? Math.min(100, Math.max(0, volMult * 25)) : null;
   const volatility = atr != null ? Math.min(100, Math.max(0, atr * 20)) : null;
-  const hasData = rsi != null || atr != null || volMult != null || aboveVwap != null || aboveEma9 != null;
+  const hasTrendlyne = Boolean(
+    trendlyne &&
+      (trendlyne.rsi != null ||
+        trendlyne.macd != null ||
+        trendlyne.atrPct != null ||
+        trendlyne.maTotal != null ||
+        trendlyne.priceAboveSma5 != null ||
+        trendlyne.priceAboveEma5 != null ||
+        trendlyne.priceAboveEma9 != null),
+  );
+  const hasSnapshot = snapshotRsi != null || snapshotAtr != null || volMult != null || snapshotVwap != null || snapshotEma9 != null;
+  const hasData = hasSnapshot || hasTrendlyne;
+  const metricSource: "5m" | "daily" | "trendlyne" | "mixed" | "none" =
+    hasSnapshot && hasTrendlyne && src
+      ? "mixed"
+      : src === "candles"
+        ? "5m"
+        : src === "daily_candles"
+          ? "daily"
+          : hasTrendlyne
+            ? "trendlyne"
+            : "none";
 
   return {
     rsi,
     macd,
-    stochastic: rsi,
+    stochastic,
     maSignal,
     strength,
     volume,
@@ -76,6 +126,9 @@ export function buildTechnicalSignals(
     hasData,
     aboveVwap,
     aboveEma9,
+    vwapLabel,
+    emaLabel,
+    metricSource,
   };
 }
 

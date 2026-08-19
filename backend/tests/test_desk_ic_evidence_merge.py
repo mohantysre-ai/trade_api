@@ -31,6 +31,18 @@ def test_missing_news_and_rsi_alone_never_become_pass() -> None:
     assert criteria["portfolio_fit"]["status"] == "INSUFFICIENT"
 
 
+def test_portfolio_fit_uses_ticker_sector_hint() -> None:
+    pack = build_fact_pack(
+        "RELIANCE",
+        {"ticker": "RELIANCE", "ltp": 1311.0, "atr_pct": 2.1, "sector": None},
+    )
+    assert pack["sector"] == "ENERGY"
+    result = build_deterministic_desk_ic(pack)
+    criteria = {row["id"]: row for row in result["criteria"]}
+    assert criteria["portfolio_fit"]["status"] == "PASS"
+    assert "ENERGY" in criteria["portfolio_fit"]["detail"]
+
+
 def test_llm_cannot_override_status_scores_or_decision() -> None:
     llm_payload = {
         "deskDecision": "APPROVE",

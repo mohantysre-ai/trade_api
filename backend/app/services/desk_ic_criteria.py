@@ -28,6 +28,26 @@ from .stock_quality import MIN_PROMOTER_HOLDING_PCT, MIN_TURNOVER_CR, is_risky_s
 
 log = logging.getLogger(__name__)
 
+_MISSING_SECTOR = frozenset({"", "NA", "N/A", "OTHER", "NONE"})
+
+
+def _resolve_sector(ticker: str, row: dict[str, Any]) -> str | None:
+    for key in ("sector", "industry"):
+        raw = row.get(key)
+        if isinstance(raw, str) and raw.strip():
+            val = raw.strip().upper()
+            if val not in _MISSING_SECTOR:
+                return val
+    if not ticker:
+        return None
+    from .intraday_session_engine import _sector_of
+
+    hinted = str(_sector_of(ticker, row) or "").strip().upper()
+    if hinted and hinted not in _MISSING_SECTOR:
+        return hinted
+    return None
+
+
 _CANDLE_SOURCES = frozenset({"candles", "daily_candles"})
 _INTRADAY_STUB_REASON = 'not in intraday candidate set'
 
@@ -191,7 +211,7 @@ def build_fact_pack(
         "news_sentiment": news_sentiment,
         "news_risk_flags": news_risk,
         "news_headline": news_headline,
-        "sector": row.get("sector"),
+        "sector": _resolve_sector(sym, row),
     }
 
 
@@ -406,11 +426,13 @@ def _deterministic_soft_hints(fact_pack: dict[str, Any]) -> dict[str, dict[str, 
         if score is not None:
             bits.append(f"alpha={score:.1f}")
             src.append("alpha_score")
+        bits.insert(0, f"{sector} sleeve")
+        src.insert(0, "sector")
         hints["portfolio_fit"] = _criterion(
             "portfolio_fit",
             "PASS",
             "; ".join(bits) or "Fit fields present.",
-            src or ["alpha_score"],
+            src or ["sector"],
         )
 
     return hints

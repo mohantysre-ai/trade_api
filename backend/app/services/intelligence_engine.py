@@ -671,10 +671,9 @@ def _ticker_stock_row(payload: dict[str, Any], ticker: str) -> dict[str, Any]:
         intra = merged.get("intraday") if isinstance(merged.get("intraday"), dict) else {}
         q_intra = quote.get("intraday") if isinstance(quote.get("intraday"), dict) else {}
         merged = {**merged, **quote}
-        if isinstance(q_intra, dict) and q_intra.get("data_source") in ("candles", "daily_candles"):
-            merged["intraday"] = q_intra
-        elif intra:
-            merged["intraday"] = intra
+        preferred = prefer_intraday_blocks(q_intra, intra)
+        if preferred:
+            merged["intraday"] = preferred
     return merged
 
 
@@ -709,11 +708,12 @@ def _ticker_intraday_text(stock: dict[str, Any]) -> str:
     src = _intraday_bar_source(intraday)
     if not src:
         return "no usable candle metrics"
-    trigger = intraday.get("trigger_point") or "no trigger"
     if src == "daily_candles":
+        trigger = "no 5m trigger"
         vwap = "VWAP unavailable"
         ema9 = "EMA9 unavailable"
     else:
+        trigger = intraday.get("trigger_point") or "no trigger"
         vwap = intraday.get("vwap") or "VWAP unavailable"
         ema9 = intraday.get("ema9") or "EMA9 unavailable"
     atr = intraday.get("atr_pct") or 0
@@ -747,7 +747,9 @@ def _build_dynamic_selection_reason(stock: dict[str, Any], score: float | None) 
             if (price_above_vwap and price_above_ema9)
             else "mixed trend around intraday anchors"
         )
-    momentum_text = f"delta {delta:.2f}% with score {score:.1f}"
+        trigger_text = f"trigger {trigger}" if trigger else "no 5m trigger"
+    score_text = f"score {score:.1f}" if score is not None else "score unavailable"
+    momentum_text = f"delta {delta:.2f}% with {score_text}"
     liquidity_text = (
         f"volume {volume_multiplier:.2f}x and turnover {turnover_cr:.2f} Cr"
         if turnover_cr > 0
@@ -763,7 +765,16 @@ def _build_dynamic_selection_reason(stock: dict[str, Any], score: float | None) 
 
 
 def _build_ticker_reason_prompt(ticker: str, stock: dict[str, Any], score: float | None) -> str:
-    intraday = stock.get("intraday") or {}
+    raw_intraday = stock.get("intraday") or {}
+    src = _intraday_bar_source(raw_intraday)
+    if src == "candles":
+        trigger_point = raw_intraday.get("trigger_point")
+        price_above_vwap = bool(raw_intraday.get("price_above_vwap"))
+        price_above_ema9 = bool(raw_intraday.get("price_above_ema9"))
+    else:
+        trigger_point = None
+        price_above_vwap = None
+        price_above_ema9 = None
     payload = {
         "ticker": ticker,
         "name": stock.get("name"),
@@ -771,14 +782,15 @@ def _build_ticker_reason_prompt(ticker: str, stock: dict[str, Any], score: float
         "delta_pct": _parse_percent(stock.get("delta")),
         "score": score,
         "intraday": {
-            "price_above_vwap": bool(intraday.get("price_above_vwap")),
-            "price_above_ema9": bool(intraday.get("price_above_ema9")),
-            "atr_pct": float(intraday.get("atr_pct") or 0),
-            "volume_multiplier": float(intraday.get("volume_multiplier") or 0),
-            "turnover_cr": float(intraday.get("turnover_cr") or 0),
-            "trigger_point": intraday.get("trigger_point"),
-            "passes_hard_filters": bool(intraday.get("passes_hard_filters")),
-            "hard_filter_reasons": intraday.get("hard_filter_reasons") or [],
+            "data_source": src or None,
+            "price_above_vwap": price_above_vwap,
+            "price_above_ema9": price_above_ema9,
+            "atr_pct": float(raw_intraday.get("atr_pct") or 0) if src else None,
+            "volume_multiplier": float(raw_intraday.get("volume_multiplier") or 0) if src else None,
+            "turnover_cr": float(raw_intraday.get("turnover_cr") or 0) if src else None,
+            "trigger_point": trigger_point,
+            "passes_hard_filters": bool(raw_intraday.get("passes_hard_filters")) if src == "candles" else False,
+            "hard_filter_reasons": raw_intraday.get("hard_filter_reasons") or [],
         },
     }
     return (

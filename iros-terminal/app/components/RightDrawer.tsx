@@ -228,12 +228,14 @@ function DrawerStructuredReasoningOutput({ analysis }: { analysis?: DrawerAnalys
                         const isRiskFlag = label.toLowerCase() === 'risk_flag' || label.toLowerCase() === 'risk_flag_value';
                         const isInsufficient = isRiskFlag && String(value).toUpperCase() === 'INSUFFICIENT';
                         const color = getKeyColor(idx);
+                        const text = displayDrawerValue(value);
+                        const stacked = text.length > 36;
                         return (
                           <div
                             key={label}
-                            className={`flex items-center justify-between gap-2 py-1.5 px-2 rounded-md transition-colors ${
+                            className={`gap-2 py-1.5 px-2 rounded-md transition-colors ${
                               isRiskFlag && !isInsufficient ? 'bg-red-50 border border-red-100' : 'hover:bg-slate-50'
-                            }`}
+                            } ${stacked ? "flex flex-col items-start" : "flex items-start justify-between"}`}
                           >
                             <span className="flex items-center gap-1.5">
                               <span className={`w-1 h-1 rounded-full ${color.dot} flex-shrink-0`} />
@@ -241,12 +243,12 @@ function DrawerStructuredReasoningOutput({ analysis }: { analysis?: DrawerAnalys
                                 {formatSnakeKey(label)}
                               </span>
                             </span>
-                            <span className={`text-xs font-semibold truncate ml-2 ${
+                            <span className={`text-xs font-semibold ${stacked ? "pl-3.5 leading-relaxed whitespace-normal" : "ml-2 text-right"} ${
                               isRiskFlag && !isInsufficient
                                 ? 'text-red-600 uppercase tracking-wider animate-pulse'
                                 : 'text-slate-700'
                             }`}>
-                              {displayDrawerValue(value)}
+                              {text}
                             </span>
                           </div>
                         );

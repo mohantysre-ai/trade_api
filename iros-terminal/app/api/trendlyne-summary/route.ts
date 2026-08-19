@@ -133,14 +133,29 @@ function parseSwotCounts(html: string): Pick<
   };
 }
 
-function deriveTechnicalBias(body: Record<string, unknown> | undefined): {
-  technicalBias?: TechnicalBias;
-  technicalMomentumScore?: number;
-  maBullish?: number;
-  maTotal?: number;
-  oscillatorBullish?: number;
-  oscillatorTotal?: number;
-} {
+function numericMetric(raw: unknown): number | undefined {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (raw && typeof raw === 'object' && typeof (raw as { value?: unknown }).value === 'number') {
+    const value = (raw as { value: number }).value;
+    return Number.isFinite(value) ? value : undefined;
+  }
+  return undefined;
+}
+
+function maColorAbove(rows: unknown, needle: string): boolean | undefined {
+  if (!Array.isArray(rows)) return undefined;
+  const match = rows.find((row) => {
+    if (!row || typeof row !== 'object') return false;
+    const name = String((row as { name?: string }).name || '').toLowerCase();
+    return name.includes(needle);
+  }) as { color?: string } | undefined;
+  const color = String(match?.color || '').toLowerCase();
+  if (color === 'positive') return true;
+  if (color === 'negative') return false;
+  return undefined;
+}
+
+function deriveTechnicalBias(body: Record<string, unknown> | undefined): Partial<TrendlyneCardSummary> {
   const parameters = (body?.parameters ?? {}) as Record<string, unknown>;
   const momentum = parameters.momentum as { value?: number; insight?: { shorttext?: string }; color?: string } | undefined;
   const maSignal = parameters.ma_signal as { bullish?: number; bearish?: number; sma_total?: number } | undefined;
@@ -184,6 +199,14 @@ function deriveTechnicalBias(body: Record<string, unknown> | undefined): {
   if (technicalBias === 'neutral' && momentumColor === 'positive') technicalBias = 'bullish';
   if (technicalBias === 'neutral' && momentumColor === 'negative') technicalBias = 'bearish';
 
+  const rsi = numericMetric(parameters.rsi);
+  const macd = numericMetric(parameters.macd);
+  const atr = numericMetric(parameters.atr);
+  const price = numericMetric(parameters.current_price);
+  const stochastic = numericMetric(parameters.STOCHk_14_3_3 ?? parameters.STOCHRSIk_14_14_3_3);
+  const atrPct = atr != null && price && price > 0 ? (atr / price) * 100 : undefined;
+  const lastModified = typeof parameters.last_modified === 'string' ? parameters.last_modified : undefined;
+
   return {
     technicalBias,
     technicalMomentumScore: momentumScore,
@@ -191,6 +214,14 @@ function deriveTechnicalBias(body: Record<string, unknown> | undefined): {
     maTotal,
     oscillatorBullish,
     oscillatorTotal,
+    rsi,
+    macd,
+    atrPct: atrPct != null && Number.isFinite(atrPct) ? atrPct : undefined,
+    stochastic,
+    priceAboveSma5: maColorAbove(parameters.sma_parameters, '5 day'),
+    priceAboveEma5: maColorAbove(parameters.ema_parameters, '5 day'),
+    priceAboveEma9: maColorAbove(parameters.ema_parameters, '9 day') ?? maColorAbove(parameters.ema_parameters, '10 day'),
+    lastModified,
   };
 }
 
@@ -249,7 +280,11 @@ async function fetchTrendlyneSummary(ticker: string): Promise<TrendlyneCardSumma
 
     Object.assign(result, technical);
     result.technicalAvailable = Boolean(
-      result.technicalBias || result.technicalMomentumScore != null || result.maTotal != null,
+      result.technicalBias ||
+        result.technicalMomentumScore != null ||
+        result.maTotal != null ||
+        result.rsi != null ||
+        result.macd != null,
     );
   } catch (err) {
     result.error = err instanceof Error ? err.message : 'Trendlyne fetch failed';

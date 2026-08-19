@@ -158,6 +158,15 @@ export type TrendlyneCardSummary = {
   swotAvailable?: boolean;
   checklistAvailable?: boolean;
   technicalAvailable?: boolean;
+  rsi?: number;
+  macd?: number;
+  atrPct?: number;
+  stochastic?: number;
+  volumeMomentum?: number;
+  priceAboveSma5?: boolean;
+  priceAboveEma5?: boolean;
+  priceAboveEma9?: boolean;
+  lastModified?: string;
   fetchedAt?: string;
   error?: string;
 };
