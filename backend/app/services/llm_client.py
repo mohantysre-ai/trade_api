@@ -12,6 +12,8 @@ _log = logging.getLogger(__name__)
 
 
 _llm_not_before: float = 0.0
+_model_not_before: dict[str, float] = {}
+_last_good_model: str | None = None
 LLM_API_TIMEOUT_SECONDS = int(os.getenv("LLM_API_TIMEOUT_SECONDS", "60"))
 _MIN_LLM_TIMEOUT = 1
 _MAX_LLM_TIMEOUT = 120
@@ -127,12 +129,39 @@ def quota_not_before_unix(message: str, now: float | None = None) -> float:
     return now + _retry_delay_seconds(message)
 
 
-def _record_quota_error(message: str) -> None:
+def _is_account_wide_quota(message: str) -> bool:
+    text = (message or "").lower()
+    return "free-models-per-day" in text or "free models per day" in text
+
+
+def _model_available(model: str, now: float | None = None) -> bool:
+    now = _time.time() if now is None else now
+    return now >= _model_not_before.get((model or "").strip(), 0.0)
+
+
+def _record_model_skip(model: str, message: str) -> None:
+    name = (model or "").strip()
+    if not name:
+        return
+    until = quota_not_before_unix(message)
+    _model_not_before[name] = until
+    remaining = max(0.0, until - _time.time())
+    _log.warning("OpenRouter model %s cooling down for %.0fs: %s", name, remaining, (message or "")[:160])
+
+
+def _record_quota_error(message: str, model: str | None = None) -> None:
+    """Lock all LLMs only on account-wide free-model daily quota. Per-model 429s skip that id."""
     global _llm_not_before
+    if model:
+        _record_model_skip(model, message)
+    if not _is_account_wide_quota(message):
+        if not model:
+            _log.warning("LLM 429 without account-wide quota — not locking all models: %s", (message or "")[:160])
+        return
     until = quota_not_before_unix(message)
     _llm_not_before = until
     remaining = max(0.0, until - _time.time())
-    _log.warning("LLM quota cooling down for %.0fs due to: %s", remaining, (message or "")[:160])
+    _log.warning("LLM account quota cooling down for %.0fs due to: %s", remaining, (message or "")[:160])
 
 
 def _llm_quota_available() -> bool:
@@ -155,7 +184,7 @@ _DEFAULT_OPENROUTER_FREE = [
     "nvidia/nemotron-3-nano-30b-a3b:free",
 ]
 _SKIP_FREE_SUBSTR = ("content-safety", "lyria")
-_MAX_FREE_FAILOVER = 6
+_MAX_FREE_FAILOVER = 12
 _live_free_models: list[str] = []
 _live_free_models_at: float = 0.0
 
@@ -208,18 +237,35 @@ def _list_openrouter_free_models() -> list[str]:
     return list(ids)
 
 
+def _failover_cap() -> int:
+    raw = os.getenv("LLM_FREE_FAILOVER_MAX", "").strip()
+    if raw.isdigit():
+        return max(3, min(int(raw), 24))
+    return _MAX_FREE_FAILOVER
+
+
 def openrouter_free_failover_models(primary: str) -> list[str]:
-    """Primary first, then OpenRouter free router + other :free models."""
+    """Last-good, then primary, then free router, env extras, and live :free catalog."""
     seen: set[str] = set()
     ordered: list[str] = []
-    extras = _env_free_fallback_models() or _list_openrouter_free_models()
-    for model in [primary, OPENROUTER_FREE_ROUTER, *extras]:
+    env_extras = _env_free_fallback_models()
+    catalog = _list_openrouter_free_models()
+    last_good = (_last_good_model or "").strip()
+    primary_name = (primary or "").strip()
+    for model in [last_good, primary_name, OPENROUTER_FREE_ROUTER, *env_extras, *catalog]:
         name = (model or "").strip()
         if not name or name in seen or _skip_free_model(name):
             continue
+        if name not in {last_good, primary_name} and not _is_openrouter_free_model(name):
+            continue
         seen.add(name)
         ordered.append(name)
-    return ordered[:_MAX_FREE_FAILOVER]
+    cap = _failover_cap()
+    available = [name for name in ordered if _model_available(name)]
+    if available:
+        return available[:cap]
+    preferred = [name for name in ordered if name in {last_good, primary_name}]
+    return (preferred or ordered)[: max(1, min(3, cap))]
 
 
 def _openrouter_error_retryable(message: str) -> bool:
@@ -229,10 +275,18 @@ def _openrouter_error_retryable(message: str) -> bool:
         for token in (
             "429",
             "rate limit",
+            "quota",
+            "free-models-per-day",
             "no endpoints",
             "not found",
             "unavailable",
             "404",
+            "502",
+            "503",
+            "524",
+            "529",
+            "timeout",
+            "timed out",
             "provider returned error",
             "model is not available",
         )
@@ -310,23 +364,33 @@ def _openai_chat_once(
 
 
 def _call_openai(prompt: str, api_key: str, api_url: str, model: str, timeout: int = LLM_CALL_TIMEOUT_SECONDS) -> str:
+    global _last_good_model
+    if _is_openrouter_url(api_url) and not _llm_quota_available():
+        raise RuntimeError("LLM quota cooling down")
     models = [model]
-    if _is_openrouter_url(api_url) and _is_openrouter_free_model(model):
+    if _is_openrouter_url(api_url):
         models = openrouter_free_failover_models(model)
+    available = [candidate for candidate in models if _model_available(candidate)]
+    if available:
+        models = available
     last_error = ""
     for index, candidate in enumerate(models):
         try:
             text = _openai_chat_once(prompt, api_key, api_url, candidate, timeout)
-            if index > 0:
-                _log.info("OpenRouter free failover succeeded via %s (after %s)", candidate, model)
+            _last_good_model = candidate
+            if candidate != model or index > 0:
+                _log.info("OpenRouter succeeded via %s (requested %s)", candidate, model)
             return text
         except Exception as exc:
             last_error = str(exc)
+            _record_model_skip(candidate, last_error)
             more = index < len(models) - 1
             if more and _is_openrouter_url(api_url) and _openrouter_error_retryable(last_error):
                 _log.warning("OpenRouter model %s failed; trying next free model: %s", candidate, last_error[:160])
                 continue
-            raise
+            break
+    if _is_account_wide_quota(last_error):
+        _record_quota_error(last_error)
     raise RuntimeError(last_error or "OpenRouter free-model failover exhausted")
 
 

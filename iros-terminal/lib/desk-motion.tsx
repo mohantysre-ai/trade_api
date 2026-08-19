@@ -391,13 +391,13 @@ export function DeskLiveTile({
       role="link"
       aria-label={`View ${label} details`}
     >
-      <div className="flex flex-1 min-w-0 items-center gap-2 z-10">
+      <div className="flex min-w-0 flex-1 items-center gap-2 z-10 overflow-hidden">
         <MarketSymbolBadge symbol={label} kind="index" size="sm" />
-        <div className="min-w-0">
-          <span className="desk-metric-label block truncate">{label}</span>
-          <LiveTickNumber value={value} className="desk-metric-value block" />
+        <div className="flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
+          <span className="desk-metric-label">{label}</span>
+          <LiveTickNumber value={value} className="desk-metric-value" />
           {deltaLabel != null && (
-            <span className={`desk-metric-delta block ${positive ? "is-up" : "is-down"}`}>
+            <span className={`desk-metric-delta ${positive ? "is-up" : "is-down"}`}>
               {positive ? "↑" : "↓"} {deltaLabel}
             </span>
           )}

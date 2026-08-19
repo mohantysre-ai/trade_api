@@ -123,10 +123,10 @@ function KpiTile({
   hint?: string;
 }) {
   return (
-    <div className="desk-metric-tile min-w-0">
-      <div className="desk-metric-label">{label}</div>
-      <div className={`desk-metric-value tabular-nums ${valueClass || ''}`}>{value}</div>
-      {hint ? <div className="desk-metric-delta text-[9px] text-slate-500">{hint}</div> : null}
+    <div className="desk-metric-tile min-w-0 overflow-hidden">
+      <div className="desk-metric-label w-full min-w-0">{label}</div>
+      <div className={`desk-metric-value tabular-nums w-full min-w-0 ${valueClass || ''}`}>{value}</div>
+      {hint ? <div className="desk-metric-delta text-[9px] text-slate-500 w-full min-w-0">{hint}</div> : null}
     </div>
   );
 }

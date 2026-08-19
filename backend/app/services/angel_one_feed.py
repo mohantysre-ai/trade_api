@@ -69,7 +69,13 @@ from .market_data_provider import (
     load_dhan_security_ids,
 )
 from ..utils.symbols import MACRO_INSTRUMENTS, MOCK_TICKERS, NIFTY_50_KEYS, WATCHLIST, Instrument
-from .llm_client import _llm_config as _llm_config_canonical, _get_gemini_oauth_token, _llm_quota_available, _record_quota_error
+from .llm_client import (
+    _call_openai as _llm_openai_chat,
+    _llm_config as _llm_config_canonical,
+    _get_gemini_oauth_token,
+    _llm_quota_available,
+    _record_quota_error,
+)
 from .intelligence_engine import (
     CompleteSecurityAnalysisPayload,
     TOP_SELECTION_COUNT,
@@ -3234,7 +3240,7 @@ def _execute_llm_risk_audit(
     config = _llm_config_canonical()
     provider, api_key, api_url, model, oauth_token_path = config or (None, None, None, None, None)
 
-    if not provider or not api_key:
+    if not provider or not api_key or not _llm_quota_available():
         for stock in audit_targets:
             stock["risk_flags"] = ["LLM unavailable -- news risk not audited"]
             stock["riskAuditVerdict"] = "HOLD_FOR_DATA"
@@ -3295,24 +3301,13 @@ def _execute_llm_risk_audit(
                     oauth_token_path=oauth_token_path,
                 )
             elif provider == "openai":
-                headers = {
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                }
-                body = {
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt},
-                    ],
-                    "temperature": 0.0,
-                    "max_tokens": 2000,
-                }
-                resp = requests.post(api_url, json=body, headers=headers, timeout=timeout)
-                if resp.status_code >= 300:
-                    raise RuntimeError(f"OpenAI audit failed ({resp.status_code}): {resp.text}")
-                data = resp.json()
-                res_text = data["choices"][0]["message"]["content"].strip()
+                res_text = _llm_openai_chat(
+                    f"{SYSTEM_PROMPT.strip()}\n\n{prompt}",
+                    api_key,
+                    api_url,
+                    model,
+                    timeout,
+                )
             else:
                 raise RuntimeError(f"Unsupported LLM provider for audit: {provider}")
 
@@ -3362,6 +3357,9 @@ def _execute_llm_risk_audit(
 
         except Exception as exc:
             last_exc = exc
+            err = str(exc)
+            if "429" in err:
+                _record_quota_error(err)
             logging.getLogger(__name__).warning(
                 "LLM audit attempt %d/%d failed (timeout=%ds): %s",
                 attempt + 1, len(audit_timeouts), timeout, exc,

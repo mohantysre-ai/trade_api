@@ -1121,7 +1121,7 @@ def _short_llm_error(error: str) -> str:
     lowered = text.lower()
     if "quota cooling down" in lowered or "quota exhausted" in lowered:
         return text[:280]
-    if "free-models-per-day" in text or "Rate limit exceeded" in text or "429" in text:
+    if "free-models-per-day" in text:
         return _quota_cooldown_message()
     return text[:280]
 

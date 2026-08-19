@@ -1398,6 +1398,11 @@ html[data-perf="1"] .desk-sources-track {
 .desk-metric-grid .desk-metric-tile:nth-child(10) { animation-delay: 360ms; }
 .desk-metric-grid .desk-metric-tile:nth-child(n+11) { animation-delay: 400ms; }
 
+.desk-metric-grid,
+.desk-metric-tile {
+  min-width: 0;
+}
+
 .desk-metric-tile {
   position: relative;
   overflow: hidden;
@@ -1513,12 +1518,33 @@ html[data-perf="1"] .desk-sources-track {
   outline: 2px solid var(--terminal-cyan);
   outline-offset: 2px;
 }
+.desk-metric-tile .desk-metric-label,
+.desk-metric-tile .desk-metric-value,
+.desk-metric-tile .desk-metric-delta {
+  min-width: 0;
+  max-width: 100%;
+}
 .desk-metric-tile .desk-metric-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
   font-size: var(--desk-label);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--fg-muted);
+  line-height: 1.15;
+  overflow-wrap: break-word;
+  padding-inline-end: 0.06em;
+}
+.desk-metric-tile .desk-metric-value,
+.desk-metric-tile .desk-metric-value .desk-live-tick {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .desk-metric-tile .desk-metric-value {
   font-size: var(--desk-kpi);
@@ -1530,6 +1556,10 @@ html[data-perf="1"] .desk-sources-track {
   margin-top: 2px;
 }
 .desk-metric-tile .desk-metric-delta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--desk-label);
   font-weight: 800;
   margin-top: 2px;
@@ -2022,6 +2052,11 @@ html[data-perf="1"] .desk-sources-track {
 .eod-dynamic-grid > .eod-panel-card:nth-child(1) { animation-delay: 0ms; }
 .eod-dynamic-grid > .eod-panel-card:nth-child(2) { animation-delay: 70ms; }
 
+.eod-kpi-strip .desk-metric-tile {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
 .eod-kpi-strip > * {
   animation: desk-fade-up 0.4s var(--ease-out-strong) both;
 }
