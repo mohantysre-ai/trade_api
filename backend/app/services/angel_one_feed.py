@@ -5060,7 +5060,7 @@ def create_app() -> FastAPI:
     async def get_ticker_news(
         ticker: str,
         company: str | None = None,
-        max_articles: int = 20,
+        max_articles: int = 8,
         include_raw: bool = False,
         force_refresh: bool = False,
     ) -> dict[str, Any]:
@@ -5070,6 +5070,7 @@ def create_app() -> FastAPI:
             resolved_ticker = ticker.strip().upper()
             if not resolved_ticker:
                 raise HTTPException(status_code=400, detail="Missing required parameter: ticker")
+            capped_articles = max(1, min(int(max_articles or 8), 15))
 
             snapshot = _load_last_snapshot()
             ticker_news_map = (snapshot.get("tickerNewsByTicker") or {}) if snapshot else {}
@@ -5089,7 +5090,7 @@ def create_app() -> FastAPI:
                     params={
                         "ticker": resolved_ticker,
                         "company": company or "",
-                        "max_articles": max_articles,
+                        "max_articles": capped_articles,
                         "include_raw": include_raw,
                         "force_refresh": force_refresh,
                     },

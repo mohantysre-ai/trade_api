@@ -2,36 +2,18 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+/** Prefer server-side MARKET_API_URL (Docker: http://market-api:8000). Empty NEXT_PUBLIC_ must not win. */
 const MAIN_API_URL =
-  process.env.MARKET_API_URL ||
-  process.env.NEXT_PUBLIC_MARKET_API_URL ||
+  process.env["MARKET_API_URL"] ||
+  process.env["NEXT_PUBLIC_MARKET_API_URL"] ||
   "http://127.0.0.1:8000";
 
-function generateMockReport(ticker: string, companyName: string) {
-  const company = companyName || ticker;
-  return {
-    ticker: ticker.toUpperCase(),
-    company_name: company,
-    articles_scraped: 0,
-    articles_after_dedup: 0,
-    generated_at: new Date().toISOString(),
-    cached: false,
-    insider_activity: "Backend not running — start the backend server to get AI news summaries.",
-    institutional_activity: "Backend not running.",
-    order_book_block_deals: "Backend not running.",
-    future_expansion_capex: "Backend not running.",
-    auditor_changes: "Backend not running.",
-    dividend_news: "Backend not running.",
-    new_orders_contracts: "Backend not running.",
-    earnings_results: "Backend not running.",
-    management_changes: "Backend not running.",
-    regulatory_filings: "Backend not running.",
-    sentiment_overall: "Neutral",
-    risk_flags: "Scraper backend offline.",
-    summary_headline: `${company}: AI news backend is not running.`,
-    generated: true,
-    raw_articles: [] as Array<{ title: string; source: string; url: string; summary: string; published_at: string; relevance: string }>,
-  };
+const TICKER_NEWS_MAX_ARTICLES = 15;
+
+function clampMaxArticles(raw: string | null): string {
+  const parsed = Number.parseInt(raw || "8", 10);
+  if (!Number.isFinite(parsed)) return "8";
+  return String(Math.max(1, Math.min(parsed, TICKER_NEWS_MAX_ARTICLES)));
 }
 
 export async function GET(request: Request) {
@@ -50,45 +32,50 @@ export async function GET(request: Request) {
     const params = new URLSearchParams();
     params.set("ticker", ticker);
     if (company) params.set("company", company);
-    if (requestUrl.searchParams.get("max_articles")) params.set("max_articles", requestUrl.searchParams.get("max_articles")!);
-    if (requestUrl.searchParams.get("include_raw")) params.set("include_raw", requestUrl.searchParams.get("include_raw")!);
-    if (requestUrl.searchParams.get("force_refresh")) params.set("force_refresh", requestUrl.searchParams.get("force_refresh")!);
-
-    try {
-      const backendUrl = new URL("/api/ticker-news", MAIN_API_URL);
-      backendUrl.search = params.toString();
-
-      const res = await fetch(backendUrl.toString(), {
-        cache: "no-store",
-        signal: AbortSignal.timeout(90_000),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const report = data.report || data;
-        return NextResponse.json({
-          success: true,
-          payload: {
-            ...report,
-            cached: report.cached ?? false,
-          },
-        });
-      }
-    } catch {
-      // Backend unavailable — fall through to mock
+    params.set("max_articles", clampMaxArticles(requestUrl.searchParams.get("max_articles")));
+    if (requestUrl.searchParams.get("include_raw")) {
+      params.set("include_raw", requestUrl.searchParams.get("include_raw")!);
+    }
+    if (requestUrl.searchParams.get("force_refresh")) {
+      params.set("force_refresh", requestUrl.searchParams.get("force_refresh")!);
     }
 
-    const mockReport = generateMockReport(ticker, company || "");
-    return NextResponse.json({ success: true, payload: mockReport });
+    const backendUrl = new URL("/api/ticker-news", MAIN_API_URL);
+    backendUrl.search = params.toString();
+
+    const res = await fetch(backendUrl.toString(), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(90_000),
+    });
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      return NextResponse.json(
+        { success: false, error: detail || `ticker-news HTTP ${res.status}` },
+        { status: 502 }
+      );
+    }
+
+    const data = await res.json();
+    const report = data.report || data;
+    return NextResponse.json({
+      success: true,
+      payload: {
+        ...report,
+        cached: report.cached ?? false,
+      },
+    });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Unknown error";
+    const message = err instanceof Error ? err.message : "Unknown error";
+    const timedOut = /timeout|aborted|AbortError/i.test(message);
     return NextResponse.json(
       {
         success: false,
-        error: `${message}`,
+        error: timedOut
+          ? "Ticker news timed out — retry shortly"
+          : `market-api unreachable at ${MAIN_API_URL}: ${message}`,
       },
-      { status: 500 }
+      { status: timedOut ? 504 : 503 }
     );
   }
 }

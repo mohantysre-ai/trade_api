@@ -209,11 +209,12 @@ async def ticker_news_batch_check(payload: dict[str, Any]):  # type: ignore[misc
 async def ticker_news(
     ticker: str = Query(..., description="Stock ticker symbol (e.g., RELIANCE, TCS, INFY)"),
     company: str | None = Query(None, description="Company name (optional)"),
-    max_articles: int = Query(8, ge=1, le=15, description="Max recent articles to analyze"),
+    max_articles: int = Query(8, ge=1, description="Max recent articles to analyze"),
     include_raw: bool = Query(False, description="Include raw article list"),
     force_refresh: bool = Query(False, description="Bypass cache"),
 ):
     """Scrape news for a ticker and return LLM-structured summary."""
+    max_articles = max(1, min(int(max_articles or 8), 15))
     # Check cache
     if not force_refresh:
         cached = _get_cached(ticker)

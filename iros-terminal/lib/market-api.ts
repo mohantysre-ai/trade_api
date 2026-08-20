@@ -527,7 +527,10 @@ export async function fetchTickerNewsReport(
    const params = new URLSearchParams();
    params.set("ticker", ticker);
    if (options?.company) params.set("company", options.company);
-   if (options?.maxArticles) params.set("max_articles", String(options.maxArticles));
+   if (options?.maxArticles) {
+     const capped = Math.max(1, Math.min(options.maxArticles, 15));
+     params.set("max_articles", String(capped));
+   }
    if (options?.includeRaw) params.set("include_raw", "true");
    if (options?.forceRefresh) params.set("force_refresh", "true");
 

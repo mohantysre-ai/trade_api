@@ -226,7 +226,7 @@ export default function AITickerNewsPanel({
     setError(null);
     fetchTickerNewsReport(ticker, {
       company: companyName,
-      maxArticles: 50,
+      maxArticles: 8,
       includeRaw: true,
     })
       .then((result) => {
@@ -254,7 +254,7 @@ export default function AITickerNewsPanel({
     try {
       const result = await fetchTickerNewsReport(ticker, {
         company: companyName,
-        maxArticles: 50,
+        maxArticles: 8,
         includeRaw: true,
         forceRefresh,
       });
