@@ -62,7 +62,10 @@ function intelligenceNeedsLiveRefresh(intel?: TerminalIntelligence | null): bool
 function tickerNewsIsLlmComplete(report?: AITickerNewsReport | null): boolean {
   if (!report || report.error) return false;
   if (report.llmUsed === true) return true;
-  return report.digestSource === 'tinyfish';
+  if (report.digestMode === 'quota') return false;
+  if (report.digestSource !== 'tinyfish') return false;
+  const headline = (report.summary_headline || '').trim();
+  return Boolean(headline) && !headline.startsWith('No verified');
 }
 
 function dedupedDrawerFetch<T>(key: string, url: string): Promise<T> {

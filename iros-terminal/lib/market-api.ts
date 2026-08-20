@@ -161,6 +161,7 @@ export type AITickerNewsReport = {
   llmUsed?: boolean;
   llmError?: string;
   digestSource?: string;
+  digestMode?: string;
 
   // Optional raw articles
   raw_articles?: Array<{

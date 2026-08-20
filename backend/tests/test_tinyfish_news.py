@@ -209,5 +209,46 @@ def test_summarize_uses_tinyfish_not_openrouter(monkeypatch):
     ]
     result = asyncio.run(summarize_with_llm("RELIANCE", "Reliance Industries", articles))
     assert result["digestSource"] == "tinyfish"
+    assert result["digestMode"] == "primary"
     assert result["llmUsed"] is False
     assert "Q1 results" in str(result["earnings_results"])
+
+
+def test_quota_path_tinyfish_digest_is_not_complete(monkeypatch):
+    import asyncio
+
+    from app.services.ai_ticker_news import TickerNewsArticle, summarize_with_llm, ticker_news_report_is_llm_complete
+
+    monkeypatch.setenv("TINYFISH_API_KEY", "sk-tinyfish-test")
+    monkeypatch.setenv("TICKER_NEWS_LLM", "openrouter")
+    monkeypatch.setattr("app.services.ai_ticker_news._llm_quota_available", lambda: False)
+    monkeypatch.setattr(
+        "app.services.ai_ticker_news._llm_config",
+        lambda: ("openai", "sk-or-test", "https://openrouter.ai/api/v1/chat/completions", "openrouter/free", None),
+    )
+    now = datetime.now(timezone.utc).isoformat()
+    monkeypatch.setattr(
+        "app.services.ai_ticker_news.search_tinyfish",
+        lambda *_a, **_k: [
+            {
+                "title": "Reliance Q1 results beat estimates",
+                "source": "Moneycontrol",
+                "url": "https://www.moneycontrol.com/news/r",
+                "summary": "Revenue rose 12 percent.",
+                "published_at": now,
+            }
+        ],
+    )
+    articles = [
+        TickerNewsArticle(
+            title="Reliance Q1 results beat estimates",
+            source="Moneycontrol",
+            url="https://www.moneycontrol.com/news/r",
+            summary="Revenue rose 12 percent.",
+            published_at=now,
+        )
+    ]
+    result = asyncio.run(summarize_with_llm("RELIANCE", "Reliance Industries", articles))
+    assert result["digestSource"] == "tinyfish"
+    assert result["digestMode"] == "quota"
+    assert ticker_news_report_is_llm_complete(result) is False

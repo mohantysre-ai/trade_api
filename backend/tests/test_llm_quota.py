@@ -1,5 +1,14 @@
+from datetime import datetime, timedelta, timezone
+
 import app.services.llm_client as llm_client
-from app.services.ai_ticker_news import ticker_news_report_is_llm_complete
+from app.services.ai_ticker_news import (
+    _EMPTY_CACHE_MINUTES,
+    _LLM_CACHE_HOURS,
+    _article_fingerprint,
+    _ticker_news_cache_ttl,
+    get_cached_summary,
+    ticker_news_report_is_llm_complete,
+)
 from app.services.llm_client import parse_openrouter_reset_unix, quota_not_before_unix
 
 
@@ -54,8 +63,91 @@ def test_ticker_news_incomplete_not_cacheable():
         "ticker": "RELIANCE",
         "llmUsed": False,
         "digestSource": "tinyfish",
+        "digestMode": "primary",
         "summary_headline": "Reliance wins new order",
     }) is True
+    assert ticker_news_report_is_llm_complete({
+        "ticker": "RELIANCE",
+        "llmUsed": False,
+        "digestSource": "tinyfish",
+        "digestMode": "primary",
+        "summary_headline": "No verified Reliance Industries (RELIANCE) news found.",
+    }) is False
+    assert ticker_news_report_is_llm_complete({
+        "ticker": "RELIANCE",
+        "llmUsed": False,
+        "digestSource": "tinyfish",
+        "digestMode": "quota",
+        "summary_headline": "Reliance wins new order",
+    }) is False
+
+
+def test_tinyfish_cache_ttl_empty_and_quota_are_short():
+    empty_ttl = _ticker_news_cache_ttl({
+        "digestSource": "tinyfish",
+        "digestMode": "primary",
+        "llmUsed": False,
+        "summary_headline": "No verified Reliance Industries (RELIANCE) news found.",
+    })
+    assert empty_ttl == timedelta(minutes=_EMPTY_CACHE_MINUTES)
+    quota_ttl = _ticker_news_cache_ttl({
+        "digestSource": "tinyfish",
+        "digestMode": "quota",
+        "llmUsed": False,
+        "summary_headline": "Reliance wins new order",
+    })
+    assert quota_ttl == timedelta(minutes=_EMPTY_CACHE_MINUTES)
+    durable = _ticker_news_cache_ttl({
+        "digestSource": "tinyfish",
+        "digestMode": "primary",
+        "llmUsed": False,
+        "summary_headline": "Reliance wins new order",
+    })
+    assert durable == timedelta(hours=_LLM_CACHE_HOURS)
+
+
+def test_quota_tinyfish_cache_released_when_quota_available(monkeypatch):
+    from app.services import ai_ticker_news as news
+
+    monkeypatch.setattr(news, "_llm_quota_available", lambda: True)
+    monkeypatch.setattr(
+        news,
+        "_llm_cache",
+        {
+            "RELIANCE": {
+                "digestSource": "tinyfish",
+                "digestMode": "quota",
+                "llmUsed": False,
+                "summary_headline": "Reliance wins new order",
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "articleFingerprint": _article_fingerprint([]),
+            }
+        },
+    )
+    assert get_cached_summary("RELIANCE", [], 8) is None
+
+
+def test_quota_tinyfish_cache_held_during_cooldown(monkeypatch):
+    from app.services import ai_ticker_news as news
+
+    monkeypatch.setattr(news, "_llm_quota_available", lambda: False)
+    monkeypatch.setattr(
+        news,
+        "_llm_cache",
+        {
+            "RELIANCE": {
+                "digestSource": "tinyfish",
+                "digestMode": "quota",
+                "llmUsed": False,
+                "summary_headline": "Reliance wins new order",
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "articleFingerprint": _article_fingerprint([]),
+            }
+        },
+    )
+    cached = get_cached_summary("RELIANCE", [], 8)
+    assert cached is not None
+    assert cached["digestMode"] == "quota"
 
 
 def test_openrouter_free_failover_puts_primary_then_router(monkeypatch):
