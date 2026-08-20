@@ -1,4 +1,6 @@
-from app.services.tinyfish_news import search_tinyfish
+from datetime import datetime, timezone
+
+from app.services.tinyfish_news import digest_ticker_news, search_tinyfish
 
 
 def test_search_tinyfish_parses_news_rows(monkeypatch):
@@ -89,3 +91,52 @@ def test_scrape_all_sources_uses_tinyfish_when_html_skipped(monkeypatch):
     assert len(articles) == 1
     assert articles[0].title == "Reliance Q1 results"
     assert articles[0].source == "Moneycontrol"
+
+
+def test_digest_routes_sourced_headlines_not_verdicts():
+    out = digest_ticker_news(
+        [
+            {
+                "title": "Reliance Q1 results beat estimates",
+                "source": "Moneycontrol",
+                "summary": "Revenue rose 12 percent.",
+                "url": "https://www.moneycontrol.com/news/r",
+                "published_at": "2026-08-20",
+            }
+        ],
+        ticker="RELIANCE",
+        company="Reliance Industries",
+    )
+    assert out["digestSource"] == "tinyfish"
+    assert out["llmUsed"] is False
+    assert "Q1 results" in str(out["earnings_results"])
+    assert out["sentiment_overall"] == "—"
+    assert out["insider_activity"] == "—"
+
+
+def test_summarize_uses_tinyfish_not_openrouter(monkeypatch):
+    import asyncio
+
+    from app.services.ai_ticker_news import TickerNewsArticle, summarize_with_llm
+
+    monkeypatch.setenv("TINYFISH_API_KEY", "sk-tinyfish-test")
+    monkeypatch.delenv("TICKER_NEWS_LLM", raising=False)
+    monkeypatch.setattr("app.services.ai_ticker_news.search_tinyfish", lambda *_a, **_k: [])
+    monkeypatch.setattr(
+        "app.services.llm_client._call_openai",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("must not call OpenRouter")),
+    )
+    now = datetime.now(timezone.utc).isoformat()
+    articles = [
+        TickerNewsArticle(
+            title="Reliance Q1 results beat estimates",
+            source="Moneycontrol",
+            url="https://www.moneycontrol.com/news/r",
+            summary="Revenue rose 12 percent.",
+            published_at=now,
+        )
+    ]
+    result = asyncio.run(summarize_with_llm("RELIANCE", "Reliance Industries", articles))
+    assert result["digestSource"] == "tinyfish"
+    assert result["llmUsed"] is False
+    assert "Q1 results" in str(result["earnings_results"])

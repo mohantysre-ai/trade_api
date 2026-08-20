@@ -37,7 +37,13 @@ import httpx
 import requests
 from bs4 import BeautifulSoup
 
-from .tinyfish_news import backup_min_articles, search_tinyfish, tinyfish_enabled
+from .tinyfish_news import (
+    backup_min_articles,
+    digest_ticker_news,
+    search_tinyfish,
+    tinyfish_enabled,
+    tinyfish_ticker_news_failover,
+)
 
 # Cap concurrent outbound scrapes (batch × 7 sources was melting DNS).
 _SCRAPE_CONCURRENCY = int(os.getenv("NEWS_SCRAPE_CONCURRENCY", "3"))
@@ -184,6 +190,7 @@ class AITickerNewsReport:
     summary_headline: str = ""
     llmUsed: bool = False
     llmError: str = ""
+    digestSource: str = ""
 
     raw_articles: list[dict] | None = None
 
@@ -1157,10 +1164,12 @@ def _cache_key(ticker: str, articles: list[TickerNewsArticle], max_articles: int
 
 
 def ticker_news_report_is_llm_complete(report: dict | None) -> bool:
-    """Accept completed LLM reports or explicit no-evidence reports, never quota/error shells."""
+    """Accept completed LLM reports, TinyFish digests, or explicit no-evidence reports."""
     if not isinstance(report, dict) or report.get("error"):
         return False
     if report.get("llmUsed") is True:
+        return True
+    if str(report.get("digestSource") or "").strip().lower() == "tinyfish":
         return True
     if report.get("llmUsed") is False:
         return report.get("evidence_status") == "NO_RECENT_EVIDENCE" and not report.get("articles_scraped")
@@ -1195,7 +1204,11 @@ def get_cached_summary(
         try:
             dt = datetime.fromisoformat(generated_at)
             dt = dt.replace(tzinfo=dt.tzinfo or timezone.utc).astimezone(timezone.utc)
-            ttl = timedelta(hours=_LLM_CACHE_HOURS) if entry.get("llmUsed") is True else timedelta(minutes=_EMPTY_CACHE_MINUTES)
+            ttl = (
+                timedelta(hours=_LLM_CACHE_HOURS)
+                if entry.get("llmUsed") is True or str(entry.get("digestSource") or "").lower() == "tinyfish"
+                else timedelta(minutes=_EMPTY_CACHE_MINUTES)
+            )
             if datetime.now(timezone.utc) - dt > ttl:
                 return None
         except Exception:
@@ -1223,11 +1236,58 @@ def set_cached_summary(
 _load_llm_cache()
 
 
+def _ticker_news_rows(articles: list[TickerNewsArticle]) -> list[dict[str, str]]:
+    return [
+        {
+            "title": a.title,
+            "source": a.source,
+            "url": a.url,
+            "summary": a.summary,
+            "published_at": a.published_at,
+        }
+        for a in articles
+    ]
+
+
+async def _tinyfish_ticker_digest(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:
+    query = f'("{company}" OR {ticker}) NSE stock'
+    extra = await asyncio.to_thread(
+        search_tinyfish,
+        query,
+        location="IN",
+        language="en",
+        domain_type="news",
+        recency_minutes=NEWS_LOOKBACK_DAYS * 24 * 60,
+    )
+    seen = {re.sub(r"\s+", " ", a.title.lower())[:60] for a in articles}
+    merged = list(articles)
+    for row in extra:
+        key = re.sub(r"\s+", " ", row["title"].lower())[:60]
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(
+            TickerNewsArticle(
+                title=row["title"],
+                source=row["source"],
+                url=row["url"],
+                summary=row["summary"],
+                published_at=row["published_at"],
+                relevance="general",
+            )
+        )
+    digest = digest_ticker_news(_ticker_news_rows(merged), ticker=ticker, company=company)
+    logger.info("TinyFish ticker-news digest for %s (%d evidence rows)", ticker, len(merged))
+    return digest
+
+
 async def summarize_with_llm(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:
-    """OpenRouter / OpenAI-compatible summary. Does not invent Neutral/heuristic copy."""
+    """TinyFish Search digest when enabled; otherwise OpenRouter/OpenAI summary."""
     from .llm_client import _call_openai, _llm_config, _llm_quota_available, _record_quota_error
 
     missing = _llm_unavailable_summary(ticker, company, articles, "LLM not configured")
+    if tinyfish_ticker_news_failover():
+        return await _tinyfish_ticker_digest(ticker, company, articles)
     if not articles:
         return _llm_unavailable_summary(ticker, company, articles, f"No verified articles in the last {NEWS_LOOKBACK_DAYS} days")
     provider, api_key, api_url, model, _oauth = _llm_config()
@@ -1235,6 +1295,9 @@ async def summarize_with_llm(ticker: str, company: str, articles: list[TickerNew
         logger.warning("LLM not configured for ticker news (%s) — no heuristic summary", ticker)
         return missing
     if not _llm_quota_available():
+        if tinyfish_enabled():
+            logger.warning("LLM quota cooling down — TinyFish digest for %s", ticker)
+            return await _tinyfish_ticker_digest(ticker, company, articles)
         logger.warning("LLM quota cooling down — no heuristic summary for %s", ticker)
         return _llm_unavailable_summary(ticker, company, articles, _quota_cooldown_message())
 
@@ -1315,6 +1378,9 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
         err = str(exc)
         if "429" in err:
             _record_quota_error(err)
+            if tinyfish_enabled():
+                logger.warning("OpenRouter 429 — TinyFish digest for %s", ticker)
+                return await _tinyfish_ticker_digest(ticker, company, articles)
             gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
             gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
             if gemini_key:
@@ -1431,7 +1497,7 @@ async def generate_ticker_news_report(
         llm_result = await summarize_with_llm(ticker, company, articles)
         # Cache successful summaries and honest no-evidence results. Quota/error
         # shells remain retryable and are governed by the shared model cooldowns.
-        if llm_result.get("llmUsed") is True or not articles:
+        if llm_result.get("llmUsed") is True or str(llm_result.get("digestSource") or "").lower() == "tinyfish" or not articles:
             set_cached_summary(
                 ticker,
                 articles,

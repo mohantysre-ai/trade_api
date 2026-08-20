@@ -50,6 +50,12 @@ def test_ticker_news_incomplete_not_cacheable():
         "llmUsed": True,
         "summary_headline": "Kotak reports Q1 update.",
     }) is True
+    assert ticker_news_report_is_llm_complete({
+        "ticker": "RELIANCE",
+        "llmUsed": False,
+        "digestSource": "tinyfish",
+        "summary_headline": "Reliance wins new order",
+    }) is True
 
 
 def test_openrouter_free_failover_puts_primary_then_router(monkeypatch):

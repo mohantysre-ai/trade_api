@@ -274,7 +274,8 @@ export default function AITickerNewsPanel({
     SENTIMENT_CONFIG[sentKey]
     ?? (isBlankIntel(report?.sentiment_overall) ? SENTIMENT_CONFIG.unavailable : SENTIMENT_CONFIG.neutral);
   const hasNews = report && !report.error;
-  const llmFailed = Boolean(report && report.llmUsed === false);
+  const tinyfishDigest = report?.digestSource === "tinyfish";
+  const llmFailed = Boolean(report && report.llmUsed === false && !tinyfishDigest);
   const activeCategories = CATEGORIES.filter((cat) => {
     const value = report?.[cat.key] as string | undefined;
     return !isBlankIntel(value);
@@ -296,6 +297,7 @@ export default function AITickerNewsPanel({
               <p className="text-[10px] text-slate-500 truncate">
                 {report?.company_name ?? ticker}
                 {report && <span className="ml-1.5">· {report.articles_scraped} articles analyzed</span>}
+                {tinyfishDigest && <span className="ml-1.5">· TinyFish search</span>}
                 {refreshing && <span className="ml-1.5 text-amber-600">· refreshing</span>}
               </p>
             </div>

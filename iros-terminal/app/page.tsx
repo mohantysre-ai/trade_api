@@ -60,7 +60,9 @@ function intelligenceNeedsLiveRefresh(intel?: TerminalIntelligence | null): bool
 }
 
 function tickerNewsIsLlmComplete(report?: AITickerNewsReport | null): boolean {
-  return Boolean(report && report.llmUsed === true && !report.error);
+  if (!report || report.error) return false;
+  if (report.llmUsed === true) return true;
+  return report.digestSource === 'tinyfish';
 }
 
 function dedupedDrawerFetch<T>(key: string, url: string): Promise<T> {

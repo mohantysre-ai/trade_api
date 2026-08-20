@@ -34,6 +34,7 @@ def test_article_fingerprint_changes_with_evidence():
 
 
 def test_empty_evidence_skips_llm(monkeypatch):
+    monkeypatch.setattr("app.services.ai_ticker_news.tinyfish_ticker_news_failover", lambda: False)
     monkeypatch.setattr("app.services.llm_client._llm_config", lambda: (_ for _ in ()).throw(AssertionError("must not call")))
     result = asyncio.run(summarize_with_llm("TEXRAIL", "Texmaco Rail", []))
     assert result["llmUsed"] is False
