@@ -95,7 +95,7 @@ def test_openrouter_retries_next_free_model_on_429(monkeypatch):
         model = (json or {}).get("model")
         seen.append(model)
         if model != "google/gemma-4-31b-it:free":
-            return _Resp(429, '{"error":{"message":"Rate limit exceeded: free-models-per-day"}}')
+            return _Resp(429, '{"error":{"message":"Rate limit exceeded"}}')
         return _Resp(200, "{}", _ok_payload())
 
     monkeypatch.setattr("app.services.llm_client.requests.post", _post)
@@ -184,7 +184,7 @@ def test_paid_openrouter_primary_still_failsover_to_free(monkeypatch):
     assert "openai/gpt-oss-20b:free" in seen
 
 
-def test_account_daily_quota_locks_after_chain_exhausts(monkeypatch):
+def test_account_daily_quota_stops_failover_immediately(monkeypatch):
     from app.services.llm_client import _call_openai, _llm_quota_available
 
     _reset_llm_state()
@@ -192,8 +192,10 @@ def test_account_daily_quota_locks_after_chain_exhausts(monkeypatch):
         "app.services.llm_client.openrouter_free_failover_models",
         lambda primary: [primary, "google/gemma-4-31b-it:free"],
     )
+    seen: list[str] = []
 
     def _post(url, json=None, headers=None, timeout=None):
+        seen.append((json or {}).get("model"))
         return _Resp(429, '{"error":{"message":"Rate limit exceeded: free-models-per-day"}}')
 
     monkeypatch.setattr("app.services.llm_client.requests.post", _post)
@@ -208,4 +210,5 @@ def test_account_daily_quota_locks_after_chain_exhausts(monkeypatch):
         assert "429" in str(exc)
     else:
         raise AssertionError("expected RuntimeError")
+    assert seen == ["nvidia/nemotron-3-nano-30b-a3b:free"]
     assert _llm_quota_available() is False

@@ -408,13 +408,14 @@ def _call_openai(
         except Exception as exc:
             last_error = str(exc)
             _record_model_skip(candidate, last_error)
+            if _is_account_wide_quota(last_error):
+                _record_quota_error(last_error)
+                break
             more = index < len(models) - 1
             if more and _is_openrouter_url(api_url) and _openrouter_error_retryable(last_error):
                 _log.warning("OpenRouter model %s failed; trying next free model: %s", candidate, last_error[:160])
                 continue
             break
-    if _is_account_wide_quota(last_error):
-        _record_quota_error(last_error)
     raise RuntimeError(last_error or "OpenRouter free-model failover exhausted")
 
 

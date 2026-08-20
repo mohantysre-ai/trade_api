@@ -140,7 +140,7 @@ async def ticker_news_batch_check(payload: dict[str, Any]):  # type: ignore[misc
     raw_tickers = payload.get("tickers", [])
     tickers = list(dict.fromkeys(
         str(ticker).upper().strip()
-        for ticker in raw_tickers[:50]
+        for ticker in raw_tickers[: int(os.getenv("LLM_DISPLAY_COUNT", "10"))]
         if ticker and re.fullmatch(r"[A-Za-z0-9&._-]{1,30}", str(ticker).strip())
     )) if isinstance(raw_tickers, list) else []
     max_articles = max(1, min(int(payload.get("max_articles", 8)), 15))

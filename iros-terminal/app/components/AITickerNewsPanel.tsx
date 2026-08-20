@@ -217,12 +217,14 @@ export default function AITickerNewsPanel({
 
   useEffect(() => {
     if (!ticker) return;
-    let cancelled = false;
     if (initialReport) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
+      setLoading(false);
+      setRefreshing(false);
+      setError(null);
+      return;
     }
+    let cancelled = false;
+    setLoading(true);
     setError(null);
     fetchTickerNewsReport(ticker, {
       company: companyName,
@@ -233,7 +235,7 @@ export default function AITickerNewsPanel({
         if (!cancelled) setReport(result);
       })
       .catch((err) => {
-        if (!cancelled && !initialReport) {
+        if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to fetch news report");
         }
       })

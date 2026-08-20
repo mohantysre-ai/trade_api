@@ -198,6 +198,11 @@ def test_openrouter_defaults_to_free_router(monkeypatch):
 
 
 def test_openrouter_uses_compact_budget_across_fallbacks(monkeypatch):
+    import app.services.llm_client as llm_client
+
+    llm_client._llm_not_before = 0.0
+    llm_client._model_not_before.clear()
+    llm_client._last_good_model = None
     sent = []
 
     class Response:

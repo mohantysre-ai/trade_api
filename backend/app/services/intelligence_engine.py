@@ -1310,31 +1310,6 @@ def _apply_wl_policy_from_llm(
     if not needs_wl and not needs_policy:
         return analysis
 
-    ledger = analysis.get("ledger_stocks") or []
-    forensic_snapshot = {
-        "terminalIntelligence": {
-            "active_scoring_matrix": analysis.get("active_scoring_matrix"),
-            "active_seven_ic_gates": analysis.get("active_seven_ic_gates"),
-            "active_risk_calc": analysis.get("active_risk_calc"),
-            "ledger_stocks": ledger,
-        }
-    }
-
-    llm_outcome = _analyze_forensic_wl_policy(forensic_snapshot, ledger, focus_ticker)
-    if llm_outcome:
-        per_ticker = llm_outcome.get("per_ticker") or {}
-        if needs_wl:
-            risk["win_loss_ratio"] = llm_outcome.get("win_loss_ratio") or "—"
-        if needs_policy:
-            risk["kelly_policy_max"] = llm_outcome.get("kelly_policy_max") or "—"
-        analysis["active_risk_calc"] = risk
-        for row in ledger:
-            ticker = row.get("ticker")
-            if not ticker or not needs_policy:
-                continue
-            row_policy = per_ticker.get(ticker, {}).get("policy_allocation_pct")
-            row["policy_allocation_pct"] = row_policy or risk.get("kelly_policy_max") or "—"
-        return analysis
     if needs_wl:
         risk["win_loss_ratio"] = "—"
     if needs_policy:

@@ -59,6 +59,10 @@ function intelligenceNeedsLiveRefresh(intel?: TerminalIntelligence | null): bool
   return false;
 }
 
+function tickerNewsIsLlmComplete(report?: AITickerNewsReport | null): boolean {
+  return Boolean(report && report.llmUsed === true && !report.error);
+}
+
 function dedupedDrawerFetch<T>(key: string, url: string): Promise<T> {
   const pending = drawerPending.get(key);
   if (pending) return pending as Promise<T>;
@@ -2407,8 +2411,8 @@ export default function IrosMasterAdvancedTerminal() {
         const value = (body.terminalIntelligence ?? body) as TerminalIntelligence;
         drawerIntelligenceCache.set(t, value); return value;
       });
-    const newsPromise = liveNewsCache
-      ? Promise.resolve(liveNewsCache)
+    const newsPromise = liveNewsCache || tickerNewsIsLlmComplete(snapshotNews)
+      ? Promise.resolve((liveNewsCache ?? snapshotNews) as AITickerNewsReport)
       : dedupedDrawerFetch<{ success?: boolean; payload?: AITickerNewsReport } & Partial<AITickerNewsReport>>(`news:${t}`, `/api/ticker-news?ticker=${encodeURIComponent(t)}`).then((body) => {
         const value = (body.payload ?? body) as AITickerNewsReport;
         drawerNewsCache.set(t, value); return value;
