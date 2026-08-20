@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import {
   useMarketData,
   type LiveStock,
@@ -2634,6 +2635,16 @@ export default function IrosMasterAdvancedTerminal() {
           </div>
         )}
         </main>
+
+        <footer className="mx-3 mb-4 mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--terminal-line)] px-1 pt-3 text-[10px] uppercase tracking-[0.16em] text-[var(--fg-subtle)] sm:mx-4">
+          <span>Alphix Terminal · Market intelligence · Manual execution</span>
+          <Link
+            href="/privacy"
+            className="rounded-full border border-[var(--terminal-line)] px-3 py-1.5 font-semibold text-[var(--fg-muted)] transition-colors hover:border-[var(--terminal-cyan)] hover:text-[var(--terminal-cyan)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--terminal-cyan)]"
+          >
+            Privacy &amp; data use
+          </Link>
+        </footer>
 
         <RightDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} content={drawerContent} />
       </div>

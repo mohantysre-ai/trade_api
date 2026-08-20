@@ -1,6 +1,6 @@
 /* Alphix Terminal — minimal installability SW (network-first shell) */
 const CACHE = "alphix-shell-v1";
-const PRECACHE = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
+const PRECACHE = ["/", "/privacy", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
