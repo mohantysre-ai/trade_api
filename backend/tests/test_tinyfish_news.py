@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.services.tinyfish_news import digest_ticker_news, search_tinyfish
 
@@ -91,6 +91,77 @@ def test_scrape_all_sources_uses_tinyfish_when_html_skipped(monkeypatch):
     assert len(articles) == 1
     assert articles[0].title == "Reliance Q1 results"
     assert articles[0].source == "Moneycontrol"
+
+
+def test_scrape_all_sources_drops_stale_and_undated_tinyfish(monkeypatch):
+    import asyncio
+
+    from app.services.ai_ticker_news import scrape_all_sources
+
+    monkeypatch.setattr("app.services.ai_ticker_news._dns_circuit_open", lambda: True)
+    monkeypatch.setattr("app.services.ai_ticker_news.tinyfish_enabled", lambda: True)
+    monkeypatch.setattr("app.services.ai_ticker_news.backup_min_articles", lambda: 3)
+    now = datetime.now(timezone.utc)
+
+    def _search(_query, **_kwargs):
+        return [
+            {
+                "title": "Stale Reliance filing",
+                "source": "Moneycontrol",
+                "url": "https://www.moneycontrol.com/news/old",
+                "summary": "Old contract.",
+                "published_at": (now - timedelta(days=9)).isoformat(),
+            },
+            {
+                "title": "Undated Reliance headline",
+                "source": "ET",
+                "url": "https://economictimes.indiatimes.com/news/x",
+                "summary": "No date.",
+                "published_at": "",
+            },
+            {
+                "title": "Reliance Q1 results",
+                "source": "Moneycontrol",
+                "url": "https://www.moneycontrol.com/news/r",
+                "summary": "Results beat estimates.",
+                "published_at": (now - timedelta(days=1)).isoformat(),
+            },
+        ]
+
+    monkeypatch.setattr("app.services.ai_ticker_news.search_tinyfish", _search)
+    articles = asyncio.run(scrape_all_sources("RELIANCE", "Reliance Industries"))
+    assert [item.title for item in articles] == ["Reliance Q1 results"]
+
+
+def test_tinyfish_digest_drops_stale_and_undated_rows(monkeypatch):
+    import asyncio
+
+    from app.services.ai_ticker_news import _tinyfish_ticker_digest
+
+    now = datetime.now(timezone.utc)
+
+    def _search(_query, **_kwargs):
+        return [
+            {
+                "title": "Stale Reliance filing",
+                "source": "Moneycontrol",
+                "url": "https://www.moneycontrol.com/news/old",
+                "summary": "Old contract.",
+                "published_at": (now - timedelta(days=9)).isoformat(),
+            },
+            {
+                "title": "Undated Reliance headline",
+                "source": "ET",
+                "url": "https://economictimes.indiatimes.com/news/x",
+                "summary": "No date.",
+                "published_at": "",
+            },
+        ]
+
+    monkeypatch.setattr("app.services.ai_ticker_news.search_tinyfish", _search)
+    digest = asyncio.run(_tinyfish_ticker_digest("RELIANCE", "Reliance Industries", []))
+    assert digest["summary_headline"] == "No verified Reliance Industries (RELIANCE) news found."
+    assert digest["earnings_results"] == "—"
 
 
 def test_digest_routes_sourced_headlines_not_verdicts():

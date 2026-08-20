@@ -476,6 +476,26 @@ def _recent_articles(articles: list[TickerNewsArticle]) -> list[TickerNewsArticl
     return [article for _, article in recent]
 
 
+def _tinyfish_recent_articles(rows: list[dict[str, str]]) -> list[TickerNewsArticle]:
+    """Map TinyFish search rows, then drop undated and older-than-lookback items."""
+    candidates: list[TickerNewsArticle] = []
+    for row in rows:
+        title = str(row.get("title") or "").strip()
+        if not title:
+            continue
+        candidates.append(
+            TickerNewsArticle(
+                title=title,
+                source=str(row.get("source") or "").strip(),
+                url=str(row.get("url") or "").strip(),
+                summary=str(row.get("summary") or "").strip(),
+                published_at=str(row.get("published_at") or "").strip(),
+                relevance="general",
+            )
+        )
+    return _recent_articles(candidates)
+
+
 async def scrape_google_news(
     ticker: str,
     session: httpx.AsyncClient,
@@ -1067,24 +1087,17 @@ async def scrape_all_sources(ticker: str, company_name: str | None = None) -> li
             recency_minutes=NEWS_LOOKBACK_DAYS * 24 * 60,
         )
         added = 0
-        for row in extra:
-            key = re.sub(r"\s+", " ", row["title"].lower())[:60]
+        for art in _tinyfish_recent_articles(extra):
+            key = re.sub(r"\s+", " ", art.title.lower())[:60]
             if key in seen_titles:
                 continue
             seen_titles.add(key)
             added += 1
-            deduped.append(
-                TickerNewsArticle(
-                    title=row["title"],
-                    source=row["source"],
-                    url=row["url"],
-                    summary=row["summary"],
-                    published_at=row["published_at"],
-                    relevance="general",
-                )
-            )
+            deduped.append(art)
         if added:
             logger.info("TinyFish backup added %d news items for %s (now %d articles)", added, ticker, len(deduped))
+        elif extra:
+            logger.info("TinyFish backup returned %d rows for %s but none passed the %d-day lookback", len(extra), ticker, NEWS_LOOKBACK_DAYS)
 
     logger.info(
         "Scraped %d articles from %d sources for %s (after dedup: %d)",
@@ -1261,21 +1274,12 @@ async def _tinyfish_ticker_digest(ticker: str, company: str, articles: list[Tick
     )
     seen = {re.sub(r"\s+", " ", a.title.lower())[:60] for a in articles}
     merged = list(articles)
-    for row in extra:
-        key = re.sub(r"\s+", " ", row["title"].lower())[:60]
+    for art in _tinyfish_recent_articles(extra):
+        key = re.sub(r"\s+", " ", art.title.lower())[:60]
         if key in seen:
             continue
         seen.add(key)
-        merged.append(
-            TickerNewsArticle(
-                title=row["title"],
-                source=row["source"],
-                url=row["url"],
-                summary=row["summary"],
-                published_at=row["published_at"],
-                relevance="general",
-            )
-        )
+        merged.append(art)
     digest = digest_ticker_news(_ticker_news_rows(merged), ticker=ticker, company=company)
     logger.info("TinyFish ticker-news digest for %s (%d evidence rows)", ticker, len(merged))
     return digest
