@@ -73,14 +73,14 @@ except ImportError:
 # Re-use the same snapshot-backed cache as ai_ticker_news.
 # Import here to avoid circular imports; the module-level _load_llm_cache()
 # in ai_ticker_news.py populates this at import time.
-from app.services.ai_ticker_news import get_cached_summary, set_cached_summary  # noqa: E402
+from app.services.ai_ticker_news import get_cached_summary  # noqa: E402
 
 _CACHE_TTL_SECONDS = 600  # 10 minutes (server-side memory TTL for fast path)
 
 
 def _get_cached(ticker: str, force_refresh: bool = False) -> dict | None:
     """
-    Try snapshot cache first (24h TTL enforced inside ai_ticker_news).
+    Try the snapshot cache first (evidence-aware TTL enforced in ai_ticker_news).
     If force_refresh=True, always return None to trigger a fresh LLM call.
     """
     if force_refresh:
@@ -137,9 +137,15 @@ def _check_ticker_news_fresh(ticker: str) -> dict:
 
 @app.post("/api/ticker-news/batch-check")
 async def ticker_news_batch_check(payload: dict[str, Any]):  # type: ignore[misc]
-    tickers = payload.get("tickers", [])
-    max_articles = payload.get("max_articles", 50)
+    raw_tickers = payload.get("tickers", [])
+    tickers = list(dict.fromkeys(
+        str(ticker).upper().strip()
+        for ticker in raw_tickers[:50]
+        if ticker and re.fullmatch(r"[A-Za-z0-9&._-]{1,30}", str(ticker).strip())
+    )) if isinstance(raw_tickers, list) else []
+    max_articles = max(1, min(int(payload.get("max_articles", 8)), 15))
     include_raw = payload.get("include_raw", False)
+    companies = payload.get("companies") if isinstance(payload.get("companies"), dict) else {}
 
     statuses = []
     for ticker in tickers:
@@ -165,12 +171,11 @@ async def ticker_news_batch_check(payload: dict[str, Any]):  # type: ignore[misc
                 try:
                     report = await generate_ticker_news_report(
                         ticker=t,
-                        company_name=None,
+                        company_name=companies.get(t) or companies.get(t.upper()),
                         max_articles=max_articles,
                         include_raw=include_raw,
                     )
                     report_dict = report.to_dict()
-                    set_cached_summary(t, [], max_articles, report_dict)
                     report_dict["cached"] = False
                     report_dict["needs_refresh"] = False
                     return t.upper(), report_dict
@@ -204,7 +209,7 @@ async def ticker_news_batch_check(payload: dict[str, Any]):  # type: ignore[misc
 async def ticker_news(
     ticker: str = Query(..., description="Stock ticker symbol (e.g., RELIANCE, TCS, INFY)"),
     company: str | None = Query(None, description="Company name (optional)"),
-    max_articles: int = Query(50, description="Max articles to analyze"),
+    max_articles: int = Query(8, ge=1, le=15, description="Max recent articles to analyze"),
     include_raw: bool = Query(False, description="Include raw article list"),
     force_refresh: bool = Query(False, description="Bypass cache"),
 ):

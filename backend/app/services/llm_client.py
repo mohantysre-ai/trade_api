@@ -64,26 +64,30 @@ def _llm_config() -> tuple[str, str, str, str, str | None]:
     api_key = os.getenv("LLM_API_KEY", "").strip()
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
     api_url = os.getenv("LLM_API_URL", "").strip()
-    model = os.getenv("LLM_MODEL", "gpt-4o-mini").strip()
+    model = os.getenv("LLM_MODEL", "").strip()
     oauth_token_path = os.getenv("GEMINI_OAUTH_TOKEN_PATH", "").strip()
 
     openrouter = "openrouter.ai" in api_url.lower() or api_key.startswith("sk-or-")
     if openrouter and provider in ("", "openrouter", "openai"):
         provider = "openai"
+        model = model or OPENROUTER_FREE_ROUTER
         if not api_url:
             api_url = "https://openrouter.ai/api/v1/chat/completions"
     elif provider == "gemini":
+        model = model or "gemini-2.0-flash"
         if not api_key and gemini_key:
             api_key = gemini_key
         if not api_key and oauth_token_path:
             api_key = _get_gemini_oauth_token(oauth_token_path) or api_key
     elif not provider and gemini_key:
         provider = "gemini"
+        model = model or "gemini-2.0-flash"
         api_key = gemini_key
     if not provider or not api_key:
         return None, None, None, None, None
     if not api_url and provider == "openai":
         api_url = "https://api.openai.com/v1/chat/completions"
+    model = model or "gpt-4o-mini"
     return provider, api_key, api_url, model, oauth_token_path
 
 
@@ -204,7 +208,11 @@ def _skip_free_model(model: str) -> bool:
 
 
 def _env_free_fallback_models() -> list[str]:
-    raw = os.getenv("LLM_FREE_FALLBACK_MODELS", "").strip()
+    raw = (
+        os.getenv("LLM_FREE_FALLBACK_MODELS", "").strip()
+        or os.getenv("OPENROUTER_MODELS", "").strip()
+        or os.getenv("LLM_FALLBACK_MODELS", "").strip()
+    )
     if not raw:
         return []
     return [part.strip() for part in raw.split(",") if part.strip()]
@@ -329,6 +337,7 @@ def _openai_chat_once(
     api_url: str,
     model: str,
     timeout: int,
+    max_tokens: int | None = None,
 ) -> str:
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -347,12 +356,20 @@ def _openai_chat_once(
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.1,
-        "max_tokens": 8000,
+        "max_tokens": max_tokens or int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "2000")),
     }
     response = requests.post(api_url, json=payload, headers=headers, timeout=timeout)
     if response.status_code >= 300:
         raise RuntimeError(f"OpenAI request failed ({response.status_code}): {response.text}")
     data = response.json()
+    if _is_openrouter_url(api_url):
+        usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+        _log.info(
+            "OpenRouter completion model=%s prompt_tokens=%s completion_tokens=%s",
+            data.get("model") or model,
+            usage.get("prompt_tokens", "unknown"),
+            usage.get("completion_tokens", "unknown"),
+        )
     choices = data.get("choices") or []
     if not choices or not choices[0].get("message"):
         raise RuntimeError("OpenAI response missing expected content")
@@ -363,7 +380,14 @@ def _openai_chat_once(
     return content.strip()
 
 
-def _call_openai(prompt: str, api_key: str, api_url: str, model: str, timeout: int = LLM_CALL_TIMEOUT_SECONDS) -> str:
+def _call_openai(
+    prompt: str,
+    api_key: str,
+    api_url: str,
+    model: str,
+    timeout: int = LLM_CALL_TIMEOUT_SECONDS,
+    max_tokens: int | None = None,
+) -> str:
     global _last_good_model
     if _is_openrouter_url(api_url) and not _llm_quota_available():
         raise RuntimeError("LLM quota cooling down")
@@ -376,7 +400,7 @@ def _call_openai(prompt: str, api_key: str, api_url: str, model: str, timeout: i
     last_error = ""
     for index, candidate in enumerate(models):
         try:
-            text = _openai_chat_once(prompt, api_key, api_url, candidate, timeout)
+            text = _openai_chat_once(prompt, api_key, api_url, candidate, timeout, max_tokens)
             _last_good_model = candidate
             if candidate != model or index > 0:
                 _log.info("OpenRouter succeeded via %s (requested %s)", candidate, model)

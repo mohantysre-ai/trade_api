@@ -721,6 +721,7 @@ function PositionTable({
           rows.map((r, i) => {
             const sym = r.symbol;
             const isSel = selected === sym;
+            const isClosed = r.closed === true || r.exitState?.closed === true || r.status?.toUpperCase().includes('CLOSED');
             const sl =
               r.exitState?.effectiveStop != null
                 ? dash(r.exitState.effectiveStop)
@@ -730,13 +731,17 @@ function PositionTable({
                 key={`card-${sym}-${i}`}
                 type="button"
                 onClick={() => onSelect(sym)}
-                className={`w-full text-left px-3 py-3 min-h-[44px] space-y-1.5 ${
-                  isSel ? 'bg-cyan-50/60' : 'hover:bg-cyan-50/40 active:bg-cyan-50/50'
+                aria-label={`${sym || 'Position'}${isClosed ? ', closed' : ''}`}
+                className={`w-full text-left px-3 py-3 min-h-[44px] space-y-1.5 transition-colors ${
+                  isClosed
+                    ? 'bg-slate-100/90 text-slate-500 opacity-[0.68] grayscale-[35%] hover:bg-slate-200/80'
+                    : isSel ? 'bg-cyan-50/60' : 'hover:bg-cyan-50/40 active:bg-cyan-50/50'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-bold text-[13px] text-slate-900 truncate">{sym || '—'}</span>
+                    {sym ? <MarketSymbolBadge symbol={sym} size="sm" className="!h-6 !w-6 !rounded-md" /> : null}
+                    <span className={`font-bold text-[13px] truncate ${isClosed ? 'text-slate-600 line-through decoration-slate-400/70' : 'text-slate-900'}`}>{sym || '—'}</span>
                     <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 shrink-0">
                       {r.direction || '—'}
                     </span>
@@ -798,14 +803,25 @@ function PositionTable({
                 const { gap, intra } = rowGapIntra(r);
                 const play = rowInPlay(r);
                 const sleeve = r.sleeve || 'MOMENTUM';
+                const isClosed = r.closed === true || r.exitState?.closed === true || r.status?.toUpperCase().includes('CLOSED');
                 return (
                   <tr
                     key={`${sym}-${i}`}
                     onClick={() => onSelect(sym)}
-                    className={`border-t border-slate-100 cursor-pointer hover:bg-cyan-50/40 ${isSel ? 'bg-cyan-50/60' : ''}`}
+                    aria-label={`${sym || 'Position'}${isClosed ? ', closed' : ''}`}
+                    className={`border-t cursor-pointer transition-colors ${
+                      isClosed
+                        ? 'border-slate-200 bg-slate-100/90 text-slate-500 opacity-[0.68] grayscale-[35%] hover:bg-slate-200/80'
+                        : `border-slate-100 hover:bg-cyan-50/40 ${isSel ? 'bg-cyan-50/60' : ''}`
+                    }`}
                   >
                     <td className="px-2 py-2.5 tabular-nums text-slate-500">{r.rank ?? i + 1}</td>
-                    <td className="px-2 py-2.5 font-bold text-slate-900">{sym || '—'}</td>
+                    <td className="px-2 py-2.5">
+                      <span className="flex items-center gap-1.5 min-w-[7.5rem]">
+                        {sym ? <MarketSymbolBadge symbol={sym} size="sm" className="!h-5 !w-5 !rounded-md" /> : null}
+                        <span className={`font-bold ${isClosed ? 'text-slate-600 line-through decoration-slate-400/70' : 'text-slate-900'}`}>{sym || '—'}</span>
+                      </span>
+                    </td>
                     <td className="px-2 py-2.5">
                       <StatusPill tone={sleeveTone(sleeve)}>
                         {sleeve.includes('MEAN') || sleeve.includes('REV') ? 'MR' : 'MOM'}
@@ -1319,7 +1335,12 @@ export default function AssetMetricsPanel({
               <tbody>
                 {replacementCandidates.map((c, i) => (
                   <tr key={`${c.symbol}-${c.direction}-${i}`} className="border-t border-slate-50">
-                    <td className="px-1.5 py-1.5 font-bold text-slate-900">{c.symbol || '—'}</td>
+                    <td className="px-1.5 py-1.5">
+                      <span className="flex items-center gap-1.5 font-bold text-slate-900">
+                        {c.symbol ? <MarketSymbolBadge symbol={c.symbol} size="sm" className="!h-5 !w-5 !rounded-md" /> : null}
+                        {c.symbol || '—'}
+                      </span>
+                    </td>
                     <td className="px-1.5 py-1.5 text-slate-600">{c.direction || '—'}</td>
                     <td className="px-1.5 py-1.5">
                       <StatusPill tone={entryStateTone(c.entryState)} title={c.entryState || undefined}>

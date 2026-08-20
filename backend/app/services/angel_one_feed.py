@@ -5144,29 +5144,38 @@ async def _refresh_ticker_news_for_payload(payload: dict[str, Any]) -> None:
         return
 
     tickers = [s["ticker"] for s in stocks_to_refresh_news]
+    companies = {
+        str(s["ticker"]).upper(): str(s.get("name") or s["ticker"])
+        for s in stocks_to_refresh_news
+    }
     logger = logging.getLogger("angel_one_feed")
     try:
-        semaphore = asyncio.Semaphore(2)
         async with httpx.AsyncClient() as http_client:
-            async def _fetch_one(t: str) -> tuple[str, dict[str, Any]]:
-                async with semaphore:
-                    try:
-                        resp = await http_client.get(
-                            f"{AI_NEWS_API_URL}/api/ticker-news",
-                            params={"ticker": t, "max_articles": 15, "include_raw": False},
-                            timeout=60,
-                        )
-                        resp.raise_for_status()
-                        return t, resp.json()
-                    except Exception as exc:
-                        logger.warning("Per-ticker news fetch failed for %s: %s", t, exc)
-                        return t, {"error": True, "ticker": t, "message": str(exc)}
-
-            results = dict(await asyncio.gather(*[_fetch_one(t) for t in tickers]))
+            resp = await http_client.post(
+                f"{AI_NEWS_API_URL}/api/ticker-news/batch-check",
+                json={
+                    "tickers": tickers,
+                    "companies": companies,
+                    "max_articles": 8,
+                    "include_raw": False,
+                },
+                timeout=max(60, min(300, len(tickers) * 8)),
+            )
+            resp.raise_for_status()
+            batch_results = resp.json().get("results") or []
+            results = {
+                str(item.get("ticker") or "").upper(): item
+                for item in batch_results
+                if isinstance(item, dict) and item.get("ticker")
+            }
+            ticker_news_map = {
+                t.upper(): results.get(t.upper(), {}) for t in tickers
+                if results.get(t.upper())
+            }
             from .ai_ticker_news import ticker_news_report_is_llm_complete
 
             ticker_news_map = {
-                t: data for t, data in results.items()
+                t: data for t, data in ticker_news_map.items()
                 if ticker_news_report_is_llm_complete(data) and data.get("ticker")
             }
             payload["tickerNewsByTicker"] = ticker_news_map

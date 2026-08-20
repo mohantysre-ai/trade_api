@@ -7,7 +7,7 @@ from app.services.intelligence_engine import (
     _ticker_intraday_text,
     _ticker_risk_calc,
 )
-from app.services.llm_client import _llm_config
+from app.services.llm_client import _call_openai, _llm_config
 
 
 def test_fact_pack_parses_formatted_inr_ltp(monkeypatch):
@@ -184,3 +184,53 @@ def test_openrouter_url_selects_openai_provider(monkeypatch):
     assert key.startswith("sk-or-")
     assert "openrouter.ai" in url
     assert "nemotron" in model
+
+
+def test_openrouter_defaults_to_free_router(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "")
+    monkeypatch.setenv("LLM_API_KEY", "sk-or-v1-test")
+    monkeypatch.delenv("LLM_API_URL", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    provider, _key, url, model, _ = _llm_config()
+    assert provider == "openai"
+    assert url == "https://openrouter.ai/api/v1/chat/completions"
+    assert model == "openrouter/free"
+
+
+def test_openrouter_uses_compact_budget_across_fallbacks(monkeypatch):
+    sent = []
+
+    class Response:
+        def __init__(self, status_code, text):
+            self.status_code = status_code
+            self.text = text
+
+        def json(self):
+            return {
+                "model": "meta-llama/llama:free",
+                "choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}],
+            }
+
+    def fake_post(_url, json, headers, timeout):
+        sent.append(dict(json))
+        if len(sent) == 1:
+            return Response(429, "provider rate limit")
+        return Response(200, "")
+
+    monkeypatch.setattr(
+        "app.services.llm_client.openrouter_free_failover_models",
+        lambda _primary: ["qwen/qwen3:free", "meta-llama/llama:free"],
+    )
+    monkeypatch.setattr("app.services.llm_client.requests.post", fake_post)
+    _call_openai(
+        "test",
+        "sk-or-test",
+        "https://openrouter.ai/api/v1/chat/completions",
+        "qwen/qwen3:free",
+        max_tokens=321,
+    )
+    assert [request["model"] for request in sent] == [
+        "qwen/qwen3:free",
+        "meta-llama/llama:free",
+    ]
+    assert all(request["max_tokens"] == 321 for request in sent)

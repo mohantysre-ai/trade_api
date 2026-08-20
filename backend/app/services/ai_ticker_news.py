@@ -17,16 +17,21 @@ then uses Google Gemini to produce structured summaries covering:
 
 import argparse
 import asyncio
+import hashlib
 import json
 import logging
 import os
 import re
 import sys
+import tempfile
+import threading
 import time as _time
 from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from typing import Optional
 from urllib.parse import quote_plus
+from xml.etree import ElementTree
 
 import httpx
 import requests
@@ -157,6 +162,9 @@ class AITickerNewsReport:
     articles_scraped: int
     articles_after_dedup: int
     generated_at: str
+    lookback_days: int = 7
+    evidence_status: str = "NO_RECENT_EVIDENCE"
+    sources_checked: list[str] | None = None
 
     # LLM-generated structured fields
     insider_activity: str = ""
@@ -378,7 +386,11 @@ TICKER_MAP = {
     "POWERGRID": "Power Grid Corporation",
     "AXISBANK": "Axis Bank",
     "SUNPHARMA": "Sun Pharmaceutical",
+    "TEXRAIL": "Texmaco Rail & Engineering",
 }
+
+NEWS_LOOKBACK_DAYS = max(1, min(int(os.getenv("NEWS_LOOKBACK_DAYS", "7")), 30))
+NEWS_LLM_ARTICLE_LIMIT = max(1, min(int(os.getenv("NEWS_LLM_ARTICLE_LIMIT", "8")), 15))
 
 
 TRENDLYNE_TICKER_ID_MAP = {
@@ -412,6 +424,160 @@ def _company_name(ticker: str) -> str:
 
 def _clean_html(html: str) -> str:
     return BeautifulSoup(html, "html.parser").get_text(separator=" ", strip=True)
+
+
+def _parse_published_at(value: str) -> datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    relative = re.search(r"\b(\d+)\s*(minute|hour|day)s?\s+ago\b", raw, re.IGNORECASE)
+    if relative:
+        amount = int(relative.group(1))
+        unit = relative.group(2).lower()
+        return datetime.now(timezone.utc) - timedelta(**{f"{unit}s": amount})
+    try:
+        parsed = parsedate_to_datetime(raw)
+        return parsed.replace(tzinfo=parsed.tzinfo or timezone.utc).astimezone(timezone.utc)
+    except (TypeError, ValueError, OverflowError):
+        pass
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        return parsed.replace(tzinfo=parsed.tzinfo or timezone.utc).astimezone(timezone.utc)
+    except ValueError:
+        pass
+    for fmt in ("%d-%b-%Y %H:%M:%S", "%d-%b-%Y", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
+def _recent_articles(articles: list[TickerNewsArticle]) -> list[TickerNewsArticle]:
+    cutoff = datetime.now(timezone.utc) - timedelta(days=NEWS_LOOKBACK_DAYS)
+    recent: list[tuple[datetime, TickerNewsArticle]] = []
+    for article in articles:
+        published = _parse_published_at(article.published_at)
+        if published is None or published < cutoff:
+            continue
+        article.published_at = published.isoformat()
+        recent.append((published, article))
+    relevance_order = {"high": 0, "medium": 1, "general": 2}
+    recent.sort(key=lambda pair: (relevance_order.get(pair[1].relevance, 3), -pair[0].timestamp()))
+    return [article for _, article in recent]
+
+
+async def scrape_google_news(
+    ticker: str,
+    session: httpx.AsyncClient,
+    company_name: str | None = None,
+) -> list[TickerNewsArticle]:
+    """Search seven-day publisher coverage and retain the originating publication."""
+    company = company_name or _company_name(ticker)
+    query = quote_plus(f'("{ticker}" OR "{company}") stock when:{NEWS_LOOKBACK_DAYS}d')
+    url = f"https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en"
+    try:
+        response = await session.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
+        if response.status_code != 200:
+            return []
+        root = ElementTree.fromstring(response.content)
+        articles: list[TickerNewsArticle] = []
+        for item in root.findall(".//item")[:20]:
+            title = (item.findtext("title") or "").strip()
+            if not title:
+                continue
+            source_node = item.find("source")
+            source = (source_node.text or "Google News").strip() if source_node is not None else "Google News"
+            articles.append(TickerNewsArticle(
+                title=title[:300],
+                source=source[:100],
+                url=(item.findtext("link") or url)[:500],
+                summary=_clean_html(item.findtext("description") or "")[:500],
+                published_at=(item.findtext("pubDate") or "").strip(),
+                relevance="medium",
+            ))
+        return articles
+    except Exception as exc:
+        _reraise_if_dns(exc)
+        _warn_scrape_failure("Google News", exc, ticker)
+        return []
+
+
+async def scrape_bse_announcements(
+    ticker: str,
+    session: httpx.AsyncClient,
+    company_name: str | None = None,
+) -> list[TickerNewsArticle]:
+    """Resolve the BSE scrip code, then fetch exact-company announcements."""
+    try:
+        headers = {**HEADERS, "Accept": "application/json", "Origin": "https://www.bseindia.com", "Referer": "https://www.bseindia.com/"}
+        suggest = await session.get(
+            "https://api.bseindia.com/BseIndiaAPI/api/Suggest/w",
+            params={"text": ticker},
+            headers=headers,
+            timeout=15.0,
+        )
+        if suggest.status_code != 200:
+            return []
+        suggestions = suggest.json()
+        rows = suggestions if isinstance(suggestions, list) else suggestions.get("Table") or suggestions.get("Data") or suggestions.get("data") or []
+        exact = next(
+            (
+                row for row in rows
+                if isinstance(row, dict)
+                and str(row.get("scrip_id") or row.get("symbol") or row.get("ScripID") or "").upper() == ticker.upper()
+            ),
+            None,
+        )
+        if exact is None:
+            company_prefix = (company_name or _company_name(ticker)).split(" ")[0].upper()
+            exact = next((row for row in rows if company_prefix in str(row).upper()), None)
+        if isinstance(exact, dict):
+            scrip = exact.get("scrip_cd") or exact.get("ScripCode") or exact.get("code") or exact.get("id")
+        else:
+            code_match = re.search(r"\b\d{6}\b", str(exact or ""))
+            scrip = code_match.group(0) if code_match else None
+        if not scrip:
+            return []
+        now = datetime.now(timezone.utc)
+        response = await session.get(
+            "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w",
+            params={
+                "pageno": 1,
+                "strCat": -1,
+                "strPrevDate": (now - timedelta(days=NEWS_LOOKBACK_DAYS)).strftime("%Y%m%d"),
+                "strScrip": str(scrip),
+                "strSearch": "P",
+                "strToDate": now.strftime("%Y%m%d"),
+                "strType": "C",
+                "subcategory": -1,
+            },
+            headers=headers,
+            timeout=15.0,
+        )
+        if response.status_code != 200:
+            return []
+        payload = response.json()
+        announcements = payload.get("Table") or payload.get("data") or []
+        result: list[TickerNewsArticle] = []
+        for item in announcements[:20]:
+            title = item.get("HEADLINE") or item.get("NEWSSUB") or item.get("CATEGORYNAME") or "BSE corporate filing"
+            attachment = item.get("ATTACHMENTNAME") or item.get("NSURL") or ""
+            if attachment and not str(attachment).startswith("http"):
+                attachment = f"https://www.bseindia.com/xml-data/corpfiling/AttachLive/{attachment}"
+            result.append(TickerNewsArticle(
+                title=str(title)[:300],
+                source="BSE Announcements",
+                url=str(attachment or "https://www.bseindia.com/corporates/ann.html")[:500],
+                summary=str(item.get("MORE") or item.get("NEWS_DT") or "")[:500],
+                published_at=str(item.get("NEWS_DT") or item.get("DT_TM") or ""),
+                relevance="high",
+            ))
+        return result
+    except Exception as exc:
+        _reraise_if_dns(exc)
+        _warn_scrape_failure("BSE announcements", exc, ticker)
+        return []
 
 
 async def scrape_moneycontrol(ticker: str, session: httpx.AsyncClient) -> list[TickerNewsArticle]:
@@ -461,7 +627,7 @@ async def scrape_moneycontrol(ticker: str, session: httpx.AsyncClient) -> list[T
                     source="Moneycontrol",
                     url=href[:500],
                     summary=summary[:500],
-                    published_at=published or datetime.now(timezone.utc).isoformat(),
+                    published_at=published,
                 ))
                 count += 1
         except Exception as e:
@@ -501,6 +667,10 @@ async def scrape_economic_times(ticker: str, session: httpx.AsyncClient) -> list
                 p_text = p_tag.find("p")
                 if p_text:
                     summary = p_text.get_text(strip=True)
+            time_tag = p_tag.find("time") if p_tag else None
+            if time_tag is None and p_tag:
+                time_tag = p_tag.find("span", class_=re.compile(r"date|time", re.IGNORECASE))
+            published = (time_tag.get("datetime") or time_tag.get_text(" ", strip=True)) if time_tag else ""
 
             if not any(kw.lower() in title.lower() for kw in [ticker.lower(), company[:10].lower()]):
                 if summary and not any(kw.lower() in summary.lower() for kw in [ticker.lower(), company[:10].lower()]):
@@ -511,7 +681,7 @@ async def scrape_economic_times(ticker: str, session: httpx.AsyncClient) -> list
                 source="Economic Times",
                 url=href[:500],
                 summary=summary[:500],
-                published_at=datetime.now(timezone.utc).isoformat(),
+                published_at=published,
             ))
             if len(articles) >= 15:
                 break
@@ -556,7 +726,7 @@ async def scrape_yahoo_finance(ticker: str, session: httpx.AsyncClient) -> list[
                 source="Yahoo Finance",
                 url=href[:500],
                 summary=summary[:500],
-                published_at=published or datetime.now(timezone.utc).isoformat(),
+                published_at=published,
             ))
             if len(articles) >= 10:
                 break
@@ -668,7 +838,7 @@ class PulseNewsCollector:
                     source="Zerodha Pulse",
                     url=href[:500] if href else self.base_url,
                     summary=title[:500],
-                    published_at=timestamp or datetime.now(timezone.utc).isoformat(),
+                    published_at=timestamp,
                     relevance="medium" if symbols else "general",
                 ))
 
@@ -776,7 +946,6 @@ async def _scrape_finshots(ticker: str, session: httpx.AsyncClient) -> list[Tick
 async def scrape_nse_announcements(ticker: str, session: httpx.AsyncClient) -> list[TickerNewsArticle]:
     """Scrape NSE corporate announcements via announcements API."""
     articles: list[TickerNewsArticle] = []
-    company = _company_name(ticker)
     url = "https://www.nseindia.com/api/corporate-announcements?index=equities"
     
     try:
@@ -785,7 +954,18 @@ async def scrape_nse_announcements(ticker: str, session: httpx.AsyncClient) -> l
             "Accept": "application/json",
             "Referer": "https://www.nseindia.com/",
         }
-        resp = await session.get(url, headers=headers, timeout=15.0)
+        now = datetime.now(timezone.utc)
+        resp = await session.get(
+            url,
+            params={
+                "index": "equities",
+                "symbol": ticker.upper(),
+                "from_date": (now - timedelta(days=NEWS_LOOKBACK_DAYS)).strftime("%d-%m-%Y"),
+                "to_date": now.strftime("%d-%m-%Y"),
+            },
+            headers=headers,
+            timeout=15.0,
+        )
         if resp.status_code == 200:
             data = resp.json()
             items = data if isinstance(data, list) else data.get("data", [])
@@ -801,13 +981,15 @@ async def scrape_nse_announcements(ticker: str, session: httpx.AsyncClient) -> l
                 desc = item.get("attchmntText") or item.get("details") or item.get("description", "")
                 dt = item.get("an_dt") or item.get("dt") or item.get("date", "")
                 attachment_url = item.get("attchmntFile", "")
+                if attachment_url and not str(attachment_url).startswith("http"):
+                    attachment_url = f"https://nsearchives.nseindia.com/corporate/{attachment_url}"
 
                 articles.append(TickerNewsArticle(
                     title=str(title)[:300],
                     source="NSE Announcements",
                     url=str(attachment_url) if attachment_url else "https://www.nseindia.com/",
                     summary=str(desc)[:500],
-                    published_at=str(dt) if dt else datetime.now(timezone.utc).isoformat(),
+                    published_at=str(dt) if dt else "",
                     relevance="high",
                 ))
                 if len(articles) >= 15:
@@ -819,7 +1001,7 @@ async def scrape_nse_announcements(ticker: str, session: httpx.AsyncClient) -> l
     return articles
 
 
-async def scrape_all_sources(ticker: str) -> list[TickerNewsArticle]:
+async def scrape_all_sources(ticker: str, company_name: str | None = None) -> list[TickerNewsArticle]:
     """Run scrapers with shared concurrency limit; skip when DNS circuit is open."""
     if _dns_circuit_open():
         logger.warning("Skipping news scrapers for %s — DNS/connect circuit open", ticker)
@@ -839,11 +1021,11 @@ async def scrape_all_sources(ticker: str) -> list[TickerNewsArticle]:
         tasks = [
             _guarded_scrape("Moneycontrol", scrape_moneycontrol(ticker, session)),
             _guarded_scrape("ET", scrape_economic_times(ticker, session)),
+            _guarded_scrape("Google News", scrape_google_news(ticker, session, company_name)),
             _guarded_scrape("NSE announcements", scrape_nse_announcements(ticker, session)),
-            _guarded_scrape("NSE NIFTY 100", scrape_nse_nifty100(ticker, session)),
+            _guarded_scrape("BSE announcements", scrape_bse_announcements(ticker, session, company_name)),
+            _guarded_scrape("Yahoo Finance", scrape_yahoo_finance(ticker, session)),
             _guarded_scrape("Zerodha Pulse", _scrape_zerodha_pulse(ticker, session)),
-            _guarded_scrape("Trendlyne", _scrape_trendlyne(ticker, session)),
-            _guarded_scrape("Finshots", _scrape_finshots(ticker, session)),
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -858,7 +1040,7 @@ async def scrape_all_sources(ticker: str) -> list[TickerNewsArticle]:
     # Deduplicate by title similarity
     seen_titles: set[str] = set()
     deduped: list[TickerNewsArticle] = []
-    for art in all_articles:
+    for art in _recent_articles(all_articles):
         # Simple dedup: normalize and compare first 60 chars
         key = re.sub(r"\s+", " ", art.title.lower())[:60]
         if key not in seen_titles:
@@ -890,6 +1072,9 @@ _SNAPSHOT_FILE = os.environ.get(
     ),
 )
 _llm_cache: dict[str, dict] = {}
+_CACHE_WRITE_LOCK = threading.RLock()
+_LLM_CACHE_HOURS = max(1, int(os.getenv("NEWS_LLM_CACHE_HOURS", "6")))
+_EMPTY_CACHE_MINUTES = max(5, int(os.getenv("NEWS_EMPTY_CACHE_MINUTES", "30")))
 
 
 def _load_llm_cache() -> None:
@@ -911,13 +1096,24 @@ def _save_llm_cache() -> None:
     """Persist LLM summary into trade_api_snapshot.json -> tickerNewsByTicker.
     Uses utf-8-sig for reading (handles BOM) and utf-8 for writing (no BOM)."""
     try:
-        snapshot = {}
-        if os.path.exists(_SNAPSHOT_FILE):
-            with open(_SNAPSHOT_FILE, "r", encoding="utf-8-sig") as f:
-                snapshot = json.load(f)
-        snapshot["tickerNewsByTicker"] = _llm_cache
-        with open(_SNAPSHOT_FILE, "w", encoding="utf-8") as f:
-            json.dump(snapshot, f, indent=2)
+        with _CACHE_WRITE_LOCK:
+            snapshot = {}
+            if os.path.exists(_SNAPSHOT_FILE):
+                with open(_SNAPSHOT_FILE, "r", encoding="utf-8-sig") as f:
+                    snapshot = json.load(f)
+            snapshot["tickerNewsByTicker"] = _llm_cache
+            parent = os.path.dirname(_SNAPSHOT_FILE) or "."
+            os.makedirs(parent, exist_ok=True)
+            fd, temporary = tempfile.mkstemp(prefix="ticker-news-", suffix=".json", dir=parent)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(snapshot, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(temporary, _SNAPSHOT_FILE)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
         logger.debug("Saved LLM cache to snapshot (%d tickers)", len(_llm_cache))
     except Exception as e:
         logger.warning("Failed to save LLM cache to snapshot: %s", e)
@@ -929,17 +1125,22 @@ def _cache_key(ticker: str, articles: list[TickerNewsArticle], max_articles: int
 
 
 def ticker_news_report_is_llm_complete(report: dict | None) -> bool:
-    """True only for a successful LLM summary. Failed 429 shells must not be cached as news."""
+    """Accept completed LLM reports or explicit no-evidence reports, never quota/error shells."""
     if not isinstance(report, dict) or report.get("error"):
         return False
     if report.get("llmUsed") is True:
         return True
     if report.get("llmUsed") is False:
-        return False
+        return report.get("evidence_status") == "NO_RECENT_EVIDENCE" and not report.get("articles_scraped")
     headline = str(report.get("summary_headline") or "")
     if "LLM summary unavailable" in headline:
         return False
     return bool(headline.strip())
+
+
+def _article_fingerprint(articles: list[TickerNewsArticle]) -> str:
+    evidence = [f"{a.source}|{a.published_at}|{a.title}|{a.url}" for a in articles]
+    return hashlib.sha256("\n".join(sorted(evidence)).encode("utf-8")).hexdigest()[:20]
 
 
 def get_cached_summary(
@@ -948,20 +1149,22 @@ def get_cached_summary(
     max_articles: int,
     force_refresh: bool = False,
 ) -> dict | None:
-    """Return cached summary if available and fresh (24h TTL), unless force_refresh=True."""
+    """Return cached summary while its evidence fingerprint and TTL remain valid."""
     if force_refresh:
         return None
     key = _cache_key(ticker, articles, max_articles)
     entry = _llm_cache.get(key)
     if not entry:
         return None
-    if entry.get("llmUsed") is not True:
+    if articles and entry.get("articleFingerprint") != _article_fingerprint(articles):
         return None
     generated_at = entry.get("generated_at")
     if generated_at:
         try:
             dt = datetime.fromisoformat(generated_at)
-            if datetime.now(timezone.utc) - dt > __import__("datetime").timedelta(hours=1):
+            dt = dt.replace(tzinfo=dt.tzinfo or timezone.utc).astimezone(timezone.utc)
+            ttl = timedelta(hours=_LLM_CACHE_HOURS) if entry.get("llmUsed") is True else timedelta(minutes=_EMPTY_CACHE_MINUTES)
+            if datetime.now(timezone.utc) - dt > ttl:
                 return None
         except Exception:
             pass
@@ -978,6 +1181,8 @@ def set_cached_summary(
     entry = dict(llm_result)
     entry["generated_at"] = datetime.now(timezone.utc).isoformat()
     entry["ticker"] = ticker.upper()
+    entry["articleFingerprint"] = _article_fingerprint(articles)
+    entry["lookbackDays"] = NEWS_LOOKBACK_DAYS
     _llm_cache[key] = entry
     _save_llm_cache()
 
@@ -991,6 +1196,8 @@ async def summarize_with_llm(ticker: str, company: str, articles: list[TickerNew
     from .llm_client import _call_openai, _llm_config, _llm_quota_available, _record_quota_error
 
     missing = _llm_unavailable_summary(ticker, company, articles, "LLM not configured")
+    if not articles:
+        return _llm_unavailable_summary(ticker, company, articles, f"No verified articles in the last {NEWS_LOOKBACK_DAYS} days")
     provider, api_key, api_url, model, _oauth = _llm_config()
     if not provider or not api_key:
         logger.warning("LLM not configured for ticker news (%s) — no heuristic summary", ticker)
@@ -999,13 +1206,19 @@ async def summarize_with_llm(ticker: str, company: str, articles: list[TickerNew
         logger.warning("LLM quota cooling down — no heuristic summary for %s", ticker)
         return _llm_unavailable_summary(ticker, company, articles, _quota_cooldown_message())
 
-    article_text = "\n\n".join(
-        f"Title: {a.title}\nSource: {a.source}\nSummary: {a.summary}\nPublished: {a.published_at}\nURL: {a.url}"
-        for a in articles[:30]
-    )
+    compact_articles = [
+        {
+            "title": a.title[:220],
+            "source": a.source[:80],
+            "published": a.published_at[:32],
+            "snippet": a.summary[:240],
+        }
+        for a in articles[:NEWS_LLM_ARTICLE_LIMIT]
+    ]
+    article_text = json.dumps(compact_articles, ensure_ascii=False, separators=(",", ":"))
     prompt = f"""You are a financial news analyst. Analyze the following news articles for the company "{company}" (ticker: {ticker}) on the Indian stock market.
 
-For each of the categories below, provide a concise 1-3 sentence summary based ONLY on information present in the articles. If no information is found for a category, write "No recent news found."
+For each category, provide at most one short sentence based ONLY on the supplied evidence. If absent, write "No recent news found."
 
 Categories to analyze:
 1. insider_activity - Insider trading, promoter buying/selling, pledged shares
@@ -1036,20 +1249,26 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
         "regulatory_filings", "sentiment_overall", "risk_flags", "summary_headline",
     ]
     try:
-        import asyncio
+        async with _LLM_SEMAPHORE:
+            if provider == "gemini":
+                from .llm_client import _call_gemini
 
-        if provider == "gemini":
-            from .llm_client import _call_gemini
-
-            text = await asyncio.to_thread(
-                _call_gemini,
-                prompt,
-                api_key,
-                model,
-                "You are an elite institutional financial terminal. Return valid JSON only.",
-            )
-        else:
-            text = await asyncio.to_thread(_call_openai, prompt, api_key, api_url, model)
+                text = await asyncio.to_thread(
+                    _call_gemini,
+                    prompt,
+                    api_key,
+                    model,
+                    "You are an elite institutional financial terminal. Return valid JSON only.",
+                )
+            else:
+                text = await asyncio.to_thread(
+                    _call_openai,
+                    prompt,
+                    api_key,
+                    api_url,
+                    model,
+                    max_tokens=1400,
+                )
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
@@ -1128,6 +1347,11 @@ def _short_llm_error(error: str) -> str:
 
 def _llm_unavailable_summary(ticker: str, company: str, articles: list[TickerNewsArticle], error: str) -> dict:
     """Honest empty summary. Never invent Neutral/keyword buckets."""
+    headline = (
+        f"No verified {ticker} news found in the last {NEWS_LOOKBACK_DAYS} days."
+        if not articles and "No verified articles" in error
+        else f"LLM summary unavailable for {company} ({len(articles)} articles scraped)."
+    )
     return {
         "insider_activity": "—",
         "institutional_activity": "—",
@@ -1141,7 +1365,7 @@ def _llm_unavailable_summary(ticker: str, company: str, articles: list[TickerNew
         "regulatory_filings": "—",
         "sentiment_overall": "—",
         "risk_flags": "—",
-        "summary_headline": f"LLM summary unavailable for {company} ({len(articles)} articles scraped).",
+        "summary_headline": headline,
         "llmUsed": False,
         "llmError": _short_llm_error(error),
     }
@@ -1162,7 +1386,7 @@ async def generate_ticker_news_report(
     company = company_name or _company_name(ticker)
 
     # Step 1: Scrape
-    articles = await scrape_all_sources(ticker)
+    articles = await scrape_all_sources(ticker, company)
     if len(articles) > max_articles:
         articles = articles[:max_articles]
 
@@ -1173,8 +1397,26 @@ async def generate_ticker_news_report(
         llm_result = cached
     else:
         llm_result = await summarize_with_llm(ticker, company, articles)
-        if llm_result.get("llmUsed") is True:
-            set_cached_summary(ticker, articles, max_articles, llm_result)
+        # Cache successful summaries and honest no-evidence results. Quota/error
+        # shells remain retryable and are governed by the shared model cooldowns.
+        if llm_result.get("llmUsed") is True or not articles:
+            set_cached_summary(
+                ticker,
+                articles,
+                max_articles,
+                {
+                    **llm_result,
+                    "company_name": company,
+                    "articles_scraped": len(articles),
+                    "articles_after_dedup": len(articles),
+                    "lookback_days": NEWS_LOOKBACK_DAYS,
+                    "evidence_status": "VERIFIED_RECENT" if articles else "NO_RECENT_EVIDENCE",
+                    "sources_checked": [
+                        "NSE Announcements", "BSE Announcements", "Moneycontrol",
+                        "Economic Times", "Google News publishers", "Yahoo Finance", "Zerodha Pulse",
+                    ],
+                },
+            )
 
     # Step 3: Build report
     llm_fields = {k: v for k, v in llm_result.items() if k in AITickerNewsReport.__dataclass_fields__ and k not in ("generated_at", "ticker")}
@@ -1184,6 +1426,12 @@ async def generate_ticker_news_report(
         articles_scraped=len(articles),
         articles_after_dedup=len(articles),
         generated_at=str(llm_result.get("generated_at") or datetime.now(timezone.utc).isoformat()),
+        lookback_days=NEWS_LOOKBACK_DAYS,
+        evidence_status="VERIFIED_RECENT" if articles else "NO_RECENT_EVIDENCE",
+        sources_checked=[
+            "NSE Announcements", "BSE Announcements", "Moneycontrol",
+            "Economic Times", "Google News publishers", "Yahoo Finance", "Zerodha Pulse",
+        ],
         **llm_fields,
     )
 
