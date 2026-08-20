@@ -17,12 +17,8 @@ from typing import Any
 
 from .feed_scanner import SWING_MIN_PRICE, is_swing_desk_eligible
 from .llm_client import (
-    LLM_CALL_TIMEOUT_SECONDS,
-    _call_gemini,
-    _call_openai,
-    _llm_config,
-    _llm_quota_available,
-    _record_quota_error,
+    call_llm_with_fallback,
+    configured_llm_providers,
 )
 from .stock_quality import MIN_PROMOTER_HOLDING_PCT, MIN_TURNOVER_CR, is_risky_symbol
 
@@ -567,18 +563,8 @@ def _merge_llm_over_hard(
     }
 
 
-def _desk_ic_llm_model(default_model: str) -> str:
-    return (os.getenv("LLM_DESK_IC_MODEL") or default_model or "").strip() or default_model
-
-
 def _call_desk_ic_llm_inner(
     fact_pack: dict[str, Any],
-    *,
-    provider: str,
-    api_key: str,
-    api_url: str,
-    model: str,
-    oauth_token_path: str | None,
 ) -> dict[str, Any] | None:
 
     schema_hint = {
@@ -611,55 +597,27 @@ def _call_desk_ic_llm_inner(
         f"{json.dumps(schema_hint, indent=2)}\n"
     )
     try:
-        if provider == "gemini":
-            text = _call_gemini(
-                prompt=prompt,
-                api_key=api_key,
-                model=model,
-                system_instruction=DESK_IC_SYSTEM_PROMPT,
-                timeout=LLM_CALL_TIMEOUT_SECONDS,
-                oauth_token_path=oauth_token_path,
-            )
-        elif provider == "openai" and api_url:
-            text = _call_openai(
-                f"{DESK_IC_SYSTEM_PROMPT}\n\n{prompt}",
-                api_key,
-                api_url,
-                model,
-                DESK_IC_LLM_TIMEOUT_SECONDS,
-            )
-        else:
-            return None
+        text, _provider, _model = call_llm_with_fallback(
+            prompt,
+            DESK_IC_SYSTEM_PROMPT,
+            purpose="reasoning",
+            max_tokens=1200,
+            timeout=DESK_IC_LLM_TIMEOUT_SECONDS,
+        )
         from .ai_ticker_news import _parse_json_response
 
         parsed = _parse_json_response(text.strip(), ["deskDecision", "criteria"])
         return parsed if isinstance(parsed, dict) else None
     except Exception as exc:
-        msg = str(exc).lower()
-        if "429" in msg or "quota" in msg or "resource exhausted" in msg:
-            _record_quota_error(str(exc))
         log.warning("Desk IC LLM failed for %s: %s", fact_pack.get("ticker"), exc)
         return None
 
 
 def _call_desk_ic_llm(fact_pack: dict[str, Any]) -> dict[str, Any] | None:
-    if not _llm_quota_available():
+    if not configured_llm_providers("reasoning"):
         return None
-    config = _llm_config()
-    provider, api_key, api_url, model, oauth_token_path = config or (None, None, None, None, None)
-    if not provider or not api_key:
-        return None
-    model = _desk_ic_llm_model(model)
     with ThreadPoolExecutor(max_workers=1) as pool:
-        fut = pool.submit(
-            _call_desk_ic_llm_inner,
-            fact_pack,
-            provider=provider,
-            api_key=api_key,
-            api_url=api_url,
-            model=model,
-            oauth_token_path=oauth_token_path,
-        )
+        fut = pool.submit(_call_desk_ic_llm_inner, fact_pack)
         try:
             return fut.result(timeout=DESK_IC_LLM_TIMEOUT_SECONDS + 2)
         except FuturesTimeoutError:

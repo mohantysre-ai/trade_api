@@ -16,6 +16,8 @@ def _reset_llm_state():
     llm_client._llm_not_before = 0.0
     llm_client._model_not_before.clear()
     llm_client._last_good_model = None
+    llm_client._provider_not_before.clear()
+    llm_client._last_good_provider = None
 
 
 class _Resp:
@@ -310,3 +312,77 @@ def test_account_daily_quota_stops_failover_immediately(monkeypatch):
         raise AssertionError("expected RuntimeError")
     assert seen == ["nvidia/nemotron-3-nano-30b-a3b:free"]
     assert _llm_quota_available() is False
+
+
+def _clear_provider_env(monkeypatch):
+    for name in (
+        "LLM_PROVIDER", "LLM_API_KEY", "LLM_API_URL", "LLM_MODEL",
+        "NVIDIA_API_KEY", "GROQ_API_KEY", "CEREBRAS_API_KEY",
+        "SAMBANOVA_API_KEY", "HUGGINGFACE_API_KEY", "GEMINI_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_provider_router_discovers_configured_open_model_endpoints(monkeypatch):
+    _reset_llm_state()
+    _clear_provider_env(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER_ORDER", "groq,nvidia,cerebras")
+    monkeypatch.setenv("GROQ_API_KEY", "gsk-test")
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-test")
+    monkeypatch.setenv("CEREBRAS_API_KEY", "csk-test")
+    monkeypatch.setenv("NVIDIA_NEWS_MODEL", "nvidia/news-small")
+    providers = llm_client.configured_llm_providers("news")
+    assert [item.name for item in providers] == ["groq", "nvidia", "cerebras"]
+    assert providers[1].model == "nvidia/news-small"
+    assert providers[1].api_url == "https://integrate.api.nvidia.com/v1/chat/completions"
+
+
+def test_openrouter_daily_quota_does_not_block_other_provider(monkeypatch):
+    _reset_llm_state()
+    _clear_provider_env(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER_ORDER", "openrouter,nvidia")
+    monkeypatch.setenv("LLM_PROVIDER_ATTEMPTS", "2")
+    monkeypatch.setenv("LLM_PROVIDER", "openrouter")
+    monkeypatch.setenv("LLM_API_KEY", "sk-or-test")
+    monkeypatch.setenv("LLM_API_URL", "https://openrouter.ai/api/v1/chat/completions")
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-test")
+    llm_client._llm_not_before = 9999999999.0
+    seen: list[str] = []
+
+    def fake_call(prompt, api_key, api_url, model, timeout, max_tokens=None):
+        seen.append(api_url)
+        return '{"summary":"ok"}'
+
+    monkeypatch.setattr(llm_client, "_call_openai", fake_call)
+    text, provider, _model = llm_client.call_llm_with_fallback(
+        "facts", "json only", purpose="news", max_tokens=300
+    )
+    assert text == '{"summary":"ok"}'
+    assert provider == "nvidia"
+    assert seen == ["https://integrate.api.nvidia.com/v1/chat/completions"]
+
+
+def test_provider_router_is_sequential_and_stops_after_success(monkeypatch):
+    _reset_llm_state()
+    _clear_provider_env(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER_ORDER", "nvidia,groq,cerebras")
+    monkeypatch.setenv("LLM_PROVIDER_ATTEMPTS", "3")
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-test")
+    monkeypatch.setenv("GROQ_API_KEY", "gsk-test")
+    monkeypatch.setenv("CEREBRAS_API_KEY", "csk-test")
+    seen: list[str] = []
+
+    def fake_call(prompt, api_key, api_url, model, timeout, max_tokens=None):
+        seen.append(api_url)
+        if "nvidia" in api_url:
+            raise RuntimeError("429 rate limit")
+        return "{}"
+
+    monkeypatch.setattr(llm_client, "_call_openai", fake_call)
+    text, provider, _model = llm_client.call_llm_with_fallback("facts", "json only")
+    assert text == "{}"
+    assert provider == "groq"
+    assert seen == [
+        "https://integrate.api.nvidia.com/v1/chat/completions",
+        "https://api.groq.com/openai/v1/chat/completions",
+    ]

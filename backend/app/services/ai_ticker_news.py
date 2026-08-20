@@ -45,11 +45,9 @@ from .tinyfish_news import (
     tinyfish_ticker_news_failover,
 )
 from .llm_client import (
-    _call_gemini,
-    _call_openai,
-    _llm_config,
+    call_llm_with_fallback,
+    configured_llm_providers,
     _llm_quota_available,
-    _record_quota_error,
     llm_quota_resume_unix,
 )
 
@@ -1325,25 +1323,15 @@ async def _tinyfish_ticker_digest(
 
 
 async def summarize_with_llm(ticker: str, company: str, articles: list[TickerNewsArticle]) -> dict:
-    """TinyFish Search digest when enabled; otherwise OpenRouter/OpenAI summary."""
+    """Summarize verified evidence through the shared sequential provider router."""
     missing = _llm_unavailable_summary(ticker, company, articles, "LLM not configured")
     if tinyfish_ticker_news_failover():
         return await _tinyfish_ticker_digest(ticker, company, articles, mode="primary")
     if not articles:
         return _llm_unavailable_summary(ticker, company, articles, f"No verified articles in the last {NEWS_LOOKBACK_DAYS} days")
-    provider, api_key, api_url, model, _oauth = _llm_config()
-    if not provider or not api_key:
+    if not configured_llm_providers("news"):
         logger.warning("LLM not configured for ticker news (%s) — no heuristic summary", ticker)
         return missing
-    if not _llm_quota_available():
-        if tinyfish_enabled():
-            logger.warning("LLM quota cooling down — TinyFish digest for %s", ticker)
-            digest = await _tinyfish_ticker_digest(ticker, company, articles, mode="quota")
-            digest["llmError"] = _quota_cooldown_message()
-            return digest
-        logger.warning("LLM quota cooling down — no heuristic summary for %s", ticker)
-        return _llm_unavailable_summary(ticker, company, articles, _quota_cooldown_message())
-
     compact_articles = [
         {
             "title": a.title[:220],
@@ -1388,23 +1376,13 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
     ]
     try:
         async with _LLM_SEMAPHORE:
-            if provider == "gemini":
-                text = await asyncio.to_thread(
-                    _call_gemini,
-                    prompt,
-                    api_key,
-                    model,
-                    "You are an elite institutional financial terminal. Return valid JSON only.",
-                )
-            else:
-                text = await asyncio.to_thread(
-                    _call_openai,
-                    prompt,
-                    api_key,
-                    api_url,
-                    model,
-                    max_tokens=1400,
-                )
+            text, provider, model = await asyncio.to_thread(
+                call_llm_with_fallback,
+                prompt,
+                "You are an elite institutional financial terminal. Return valid JSON only.",
+                purpose="news",
+                max_tokens=1400,
+            )
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
@@ -1417,41 +1395,11 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
         return result
     except Exception as exc:
         err = str(exc)
-        if "429" in err:
-            _record_quota_error(err)
-            if tinyfish_enabled():
-                logger.warning("OpenRouter 429 — TinyFish digest for %s", ticker)
-                digest = await _tinyfish_ticker_digest(ticker, company, articles, mode="quota")
-                digest["llmError"] = _quota_cooldown_message()
-                return digest
-            gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
-            gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
-            if gemini_key:
-                try:
-                    text = await asyncio.to_thread(
-                        _call_gemini,
-                        prompt,
-                        gemini_key,
-                        gemini_model,
-                        "You are an elite institutional financial terminal. Return valid JSON only.",
-                    )
-                    if "```json" in text:
-                        text = text.split("```json")[1].split("```")[0].strip()
-                    elif "```" in text:
-                        text = text.split("```")[1].split("```")[0].strip()
-                    result = _parse_json_response(text, expected_keys)
-                    for key in expected_keys:
-                        result.setdefault(key, "No recent news found.")
-                    result["llmUsed"] = True
-                    logger.info(
-                        "LLM ticker-news summary complete for %s via gemini/%s (OpenRouter 429 fallback)",
-                        ticker,
-                        gemini_model,
-                    )
-                    return result
-                except Exception as gemini_exc:
-                    logger.error("Gemini fallback failed for %s: %s", ticker, gemini_exc)
-                    err = f"{err}; gemini fallback: {gemini_exc}"
+        if tinyfish_enabled():
+            logger.warning("All configured LLM providers unavailable — TinyFish digest for %s", ticker)
+            digest = await _tinyfish_ticker_digest(ticker, company, articles, mode="quota")
+            digest["llmError"] = err[:280]
+            return digest
         logger.error("LLM ticker-news failed for %s: %s", ticker, exc)
         return _llm_unavailable_summary(ticker, company, articles, err)
 

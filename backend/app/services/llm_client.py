@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import time as _time
+from dataclasses import dataclass
 from typing import Any
 from pydantic import BaseModel, Field
 
@@ -14,6 +15,8 @@ _log = logging.getLogger(__name__)
 _llm_not_before: float = 0.0
 _model_not_before: dict[str, float] = {}
 _last_good_model: str | None = None
+_provider_not_before: dict[str, float] = {}
+_last_good_provider: str | None = None
 LLM_API_TIMEOUT_SECONDS = int(os.getenv("LLM_API_TIMEOUT_SECONDS", "60"))
 _MIN_LLM_TIMEOUT = 1
 _MAX_LLM_TIMEOUT = 120
@@ -169,11 +172,192 @@ def _record_quota_error(message: str, model: str | None = None) -> None:
 
 
 def _llm_quota_available() -> bool:
+    """Compatibility: reports OpenRouter availability, not every configured provider."""
     return _time.time() >= _llm_not_before
 
 
 def llm_quota_resume_unix() -> float:
     return _llm_not_before
+
+
+@dataclass(frozen=True)
+class LLMProviderConfig:
+    name: str
+    api_key: str
+    api_url: str
+    model: str
+    kind: str = "openai"
+    oauth_token_path: str | None = None
+
+
+_OPENAI_COMPATIBLE_PROVIDERS = {
+    "nvidia": (
+        "NVIDIA_API_KEY",
+        "NVIDIA_API_URL",
+        "https://integrate.api.nvidia.com/v1/chat/completions",
+        "NVIDIA_MODEL",
+        "nvidia/llama-3.3-nemotron-super-49b-v1",
+    ),
+    "groq": (
+        "GROQ_API_KEY",
+        "GROQ_API_URL",
+        "https://api.groq.com/openai/v1/chat/completions",
+        "GROQ_MODEL",
+        "llama-3.3-70b-versatile",
+    ),
+    "cerebras": (
+        "CEREBRAS_API_KEY",
+        "CEREBRAS_API_URL",
+        "https://api.cerebras.ai/v1/chat/completions",
+        "CEREBRAS_MODEL",
+        "llama-3.3-70b",
+    ),
+    "sambanova": (
+        "SAMBANOVA_API_KEY",
+        "SAMBANOVA_API_URL",
+        "https://api.sambanova.ai/v1/chat/completions",
+        "SAMBANOVA_MODEL",
+        "Meta-Llama-3.3-70B-Instruct",
+    ),
+    "huggingface": (
+        "HUGGINGFACE_API_KEY",
+        "HUGGINGFACE_API_URL",
+        "https://router.huggingface.co/v1/chat/completions",
+        "HUGGINGFACE_MODEL",
+        "meta-llama/Llama-3.1-8B-Instruct:fastest",
+    ),
+}
+
+
+def _provider_order() -> list[str]:
+    raw = os.getenv(
+        "LLM_PROVIDER_ORDER",
+        "nvidia,groq,cerebras,sambanova,huggingface,openrouter,gemini",
+    )
+    seen: set[str] = set()
+    result: list[str] = []
+    for token in raw.split(","):
+        name = token.strip().lower()
+        if name and name not in seen:
+            seen.add(name)
+            result.append(name)
+    return result
+
+
+def _purpose_model(provider: str, default: str, purpose: str) -> str:
+    suffix = "NEWS_MODEL" if purpose == "news" else "REASONING_MODEL"
+    return (os.getenv(f"{provider.upper()}_{suffix}") or default).strip()
+
+
+def configured_llm_providers(purpose: str = "reasoning") -> list[LLMProviderConfig]:
+    """Return configured providers in failover order; credentials are never logged."""
+    configs: dict[str, LLMProviderConfig] = {}
+    for name, (key_env, url_env, url_default, model_env, model_default) in _OPENAI_COMPATIBLE_PROVIDERS.items():
+        key = os.getenv(key_env, "").strip()
+        if key:
+            default_model = os.getenv(model_env, model_default).strip() or model_default
+            configs[name] = LLMProviderConfig(
+                name=name,
+                api_key=key,
+                api_url=os.getenv(url_env, url_default).strip() or url_default,
+                model=_purpose_model(name, default_model, purpose),
+            )
+
+    provider, api_key, api_url, model, oauth_path = _llm_config()
+    if provider and api_key:
+        if provider == "gemini":
+            configs["gemini"] = LLMProviderConfig(
+                "gemini", api_key, "", _purpose_model("gemini", model, purpose), "gemini", oauth_path
+            )
+        elif _is_openrouter_url(api_url):
+            configs["openrouter"] = LLMProviderConfig(
+                "openrouter", api_key, api_url, _purpose_model("openrouter", model, purpose)
+            )
+        else:
+            configs["openai"] = LLMProviderConfig("openai", api_key, api_url, model)
+
+    # GEMINI_API_KEY can coexist with an OpenRouter primary.
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if gemini_key and "gemini" not in configs:
+        configs["gemini"] = LLMProviderConfig(
+            "gemini",
+            gemini_key,
+            "",
+            _purpose_model("gemini", os.getenv("GEMINI_MODEL", "gemini-2.0-flash"), purpose),
+            "gemini",
+            os.getenv("GEMINI_OAUTH_TOKEN_PATH", "").strip() or None,
+        )
+
+    ordered = [configs[name] for name in _provider_order() if name in configs]
+    for name, config in configs.items():
+        if name not in {item.name for item in ordered}:
+            ordered.append(config)
+    return ordered
+
+
+def _provider_available(name: str) -> bool:
+    if name == "openrouter" and not _llm_quota_available():
+        return False
+    return _time.time() >= _provider_not_before.get(name, 0.0)
+
+
+def _record_provider_failure(name: str, message: str) -> None:
+    text = (message or "").lower()
+    retryable = any(token in text for token in ("429", "quota", "rate limit", "402", "503", "529", "timeout"))
+    if not retryable:
+        return
+    until = quota_not_before_unix(message)
+    _provider_not_before[name] = until
+    if name == "openrouter" and _is_account_wide_quota(message):
+        _record_quota_error(message)
+    _log.warning("LLM provider %s cooling down for %.0fs", name, max(0.0, until - _time.time()))
+
+
+def call_llm_with_fallback(
+    prompt: str,
+    system_instruction: str,
+    *,
+    purpose: str = "reasoning",
+    max_tokens: int | None = None,
+    timeout: int = LLM_CALL_TIMEOUT_SECONDS,
+) -> tuple[str, str, str]:
+    """Sequential provider failover. Never fans out or retries a successful request."""
+    global _last_good_provider
+    providers = configured_llm_providers(purpose)
+    if not providers:
+        raise RuntimeError("No LLM provider configured")
+    last_good = _last_good_provider
+    if last_good:
+        providers.sort(key=lambda item: item.name != last_good)
+    try:
+        cap = max(1, min(int(os.getenv("LLM_PROVIDER_ATTEMPTS", "3")), 7))
+    except ValueError:
+        cap = 3
+    candidates = [item for item in providers if _provider_available(item.name)][:cap]
+    if not candidates:
+        raise RuntimeError("All configured LLM providers are cooling down")
+    errors: list[str] = []
+    for config in candidates:
+        try:
+            if config.kind == "gemini":
+                text = _call_gemini(
+                    prompt, config.api_key, config.model, system_instruction, timeout,
+                    oauth_token_path=config.oauth_token_path,
+                )
+            else:
+                text = _call_openai(
+                    f"{system_instruction}\n\n{prompt}", config.api_key, config.api_url,
+                    config.model, timeout, max_tokens=max_tokens,
+                )
+            _last_good_provider = config.name
+            _log.info("LLM completion purpose=%s provider=%s model=%s", purpose, config.name, config.model)
+            return text, config.name, config.model
+        except Exception as exc:
+            message = str(exc)
+            errors.append(f"{config.name}: {message[:180]}")
+            _record_provider_failure(config.name, message)
+            _log.warning("LLM provider %s failed; trying next configured provider: %s", config.name, message[:160])
+    raise RuntimeError("LLM provider failover exhausted: " + "; ".join(errors))
 
 
 OPENROUTER_FREE_ROUTER = "openrouter/free"
@@ -188,7 +372,7 @@ _DEFAULT_OPENROUTER_FREE = [
     "nvidia/nemotron-3-nano-30b-a3b:free",
 ]
 _SKIP_FREE_SUBSTR = ("content-safety", "lyria")
-_MAX_FREE_FAILOVER = 12
+_MAX_FREE_FAILOVER = 4
 _live_free_models: list[str] = []
 _live_free_models_at: float = 0.0
 
@@ -248,7 +432,7 @@ def _list_openrouter_free_models() -> list[str]:
 def _failover_cap() -> int:
     raw = os.getenv("LLM_FREE_FAILOVER_MAX", "").strip()
     if raw.isdigit():
-        return max(3, min(int(raw), 24))
+        return max(1, min(int(raw), 12))
     return _MAX_FREE_FAILOVER
 
 

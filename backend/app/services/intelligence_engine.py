@@ -15,7 +15,7 @@ import re
 import logging as _logging
 import requests
 from .desk_ic_criteria import prefer_intraday_blocks
-from .llm_client import LLM_CALL_TIMEOUT_SECONDS, _call_gemini, _call_openai, _llm_config, _llm_quota_available, _record_quota_error
+from .llm_client import call_llm_with_fallback, configured_llm_providers
 
 
 class CompleteSecurityAnalysisPayload(BaseModel):
@@ -780,11 +780,8 @@ def _build_ticker_reason_prompt(ticker: str, stock: dict[str, Any], score: float
 
 def _on_demand_ticker_selection_reason(ticker: str, stock: dict[str, Any], score: float | None) -> str:
     fallback = _build_dynamic_selection_reason(stock, score)
-    llm_config = _llm_config()
-    if llm_config is None or not _llm_quota_available():
+    if not configured_llm_providers("reasoning"):
         return fallback
-
-    provider, api_key, api_url, model, _oauth_tp = llm_config
     system_instruction = (
         "You are an institutional trading co-pilot. "
         "Produce one ticker-specific selection reason from supplied live metrics only. "
@@ -793,18 +790,13 @@ def _on_demand_ticker_selection_reason(ticker: str, stock: dict[str, Any], score
     prompt = _build_ticker_reason_prompt(ticker, stock, score)
 
     try:
-        if provider == "gemini":
-            raw = _call_gemini(prompt, api_key, model, system_instruction, LLM_CALL_TIMEOUT_SECONDS, oauth_token_path=_oauth_tp)
-        else:
-            raw = _call_openai(prompt, api_key, api_url, model, LLM_CALL_TIMEOUT_SECONDS)
+        raw, _provider, _model = call_llm_with_fallback(prompt, system_instruction, purpose="reasoning", max_tokens=400)
 
         data = json.loads(_json_block(raw))
         reason = _clean_value((data or {}).get("selection_reason"))
         return reason or fallback
     except Exception as exc:
         err = str(exc)
-        if "429" in err:
-            _record_quota_error(err)
         _logging.getLogger(__name__).warning("On-demand ticker reason LLM call failed for %s: %s", ticker, err)
         return fallback
 
@@ -1234,11 +1226,8 @@ def _analyze_forensic_wl_policy(
     """Forensic-only LLM pass: derive W/L ratio and Kelly policy percentages
     from ONLY the forensic highlights (not raw price/volume data).
     """
-    llm_config = _llm_config()
-    if llm_config is None or not _llm_quota_available():
+    if not configured_llm_providers("reasoning"):
         return None
-
-    provider, api_key, api_url, model, _oauth_tp = llm_config
 
     forensic_context = {
         "forensic_metrics": snapshot.get("terminalIntelligence", {}).get("active_scoring_matrix", {}),
@@ -1277,10 +1266,9 @@ def _analyze_forensic_wl_policy(
     )
 
     try:
-        if provider == "gemini":
-            raw = _call_gemini(prompt, api_key, model, sys_instruction, LLM_CALL_TIMEOUT_SECONDS, oauth_token_path=_oauth_tp)
-        else:
-            raw = _call_openai(prompt, api_key, api_url, model, LLM_CALL_TIMEOUT_SECONDS)
+        raw, _provider, _model = call_llm_with_fallback(
+            prompt, sys_instruction, purpose="reasoning", max_tokens=800
+        )
 
         data = json.loads(_json_block(raw))
         if not isinstance(data, dict):
@@ -1353,9 +1341,7 @@ def execute_terminal_intelligence_pipeline(live_unstructured_stream: str) -> Com
     focus_match = re.search(r"FOCUS_TICKER:\s*([A-Z0-9._-]+)", live_unstructured_stream or "")
     focus_ticker = focus_match.group(1) if focus_match else None
 
-    llm_config = _llm_config()
-    if llm_config is not None and _llm_quota_available():
-        provider, api_key, api_url, model, _oauth_tp = llm_config
+    if configured_llm_providers("reasoning"):
         try:
             system_instruction = (
                 "You are an elite institutional financial terminal compiler. "
@@ -1372,10 +1358,9 @@ def execute_terminal_intelligence_pipeline(live_unstructured_stream: str) -> Com
             if focus_ticker:
                 system_instruction += f"\nFOCUS: Provide deep analysis specifically on {focus_ticker}."
 
-            if provider == "gemini":
-                raw = _call_gemini(live_unstructured_stream, api_key, model, system_instruction, LLM_CALL_TIMEOUT_SECONDS, oauth_token_path=_oauth_tp)
-            else:
-                raw = _call_openai(live_unstructured_stream, api_key, api_url, model, LLM_CALL_TIMEOUT_SECONDS)
+            raw, _provider, _model = call_llm_with_fallback(
+                live_unstructured_stream, system_instruction, purpose="reasoning", max_tokens=2000
+            )
 
             from .ai_ticker_news import _parse_json_response
             raw_clean = _json_block(raw)
@@ -1398,8 +1383,6 @@ def execute_terminal_intelligence_pipeline(live_unstructured_stream: str) -> Com
             return CompleteSecurityAnalysisPayload.model_validate(_sanitize_llm_analysis_data(final_data))
         except Exception as exc:
             err_str = str(exc)
-            if "429" in err_str:
-                _record_quota_error(err_str)
             _logging.getLogger(__name__).warning("OpenRouter/LLM call failed; using snapshot facts only: %s", err_str)
 
     snapshot = _compile_market_context_snapshot()
