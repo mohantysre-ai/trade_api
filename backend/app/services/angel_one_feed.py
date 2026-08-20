@@ -86,6 +86,7 @@ from .intelligence_engine import (
     execute_terminal_intelligence_pipeline,
 )
 from .eod_engine.api import wire_eod_into_app
+from .tinyfish_news import search_tinyfish, tinyfish_enabled
 
 _TI_TOP_SELECTION_COUNT = TOP_SELECTION_COUNT
 
@@ -2086,6 +2087,37 @@ def fetch_live_news(limit: int = 40, per_feed: int = 4) -> list[dict[str, str]]:
         seen.add(key)
         deduped.append(item)
 
+    deduped.sort(key=lambda item: item.get("publishedAt", ""), reverse=True)
+    if len(deduped) < 8:
+        try:
+            if tinyfish_enabled():
+                extra = search_tinyfish(
+                    "India NSE stock market news today",
+                    location="IN",
+                    language="en",
+                    domain_type="news",
+                    recency_minutes=24 * 60,
+                )
+                for row in extra:
+                    key = _normalize_title(row.get("title", ""))
+                    if not key or key in seen:
+                        continue
+                    seen.add(key)
+                    title = row["title"]
+                    summary = row.get("summary") or ""
+                    deduped.append(
+                        {
+                            "source": row.get("source") or "TinyFish",
+                            "title": title[:300],
+                            "link": row.get("url") or "",
+                            "summary": summary[:400],
+                            "publishedAt": row.get("published_at") or "",
+                            "sentiment": _classify_sentiment(title, summary),
+                            "category": _classify_category(title, summary, "Market"),
+                        }
+                    )
+        except Exception:
+            pass
     deduped.sort(key=lambda item: item.get("publishedAt", ""), reverse=True)
     return deduped[:limit]
 

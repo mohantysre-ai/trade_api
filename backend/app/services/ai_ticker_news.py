@@ -37,6 +37,8 @@ import httpx
 import requests
 from bs4 import BeautifulSoup
 
+from .tinyfish_news import backup_min_articles, search_tinyfish, tinyfish_enabled
+
 # Cap concurrent outbound scrapes (batch × 7 sources was melting DNS).
 _SCRAPE_CONCURRENCY = int(os.getenv("NEWS_SCRAPE_CONCURRENCY", "3"))
 _SCRAPE_SEMAPHORE: asyncio.Semaphore | None = None
@@ -1002,40 +1004,40 @@ async def scrape_nse_announcements(ticker: str, session: httpx.AsyncClient) -> l
 
 
 async def scrape_all_sources(ticker: str, company_name: str | None = None) -> list[TickerNewsArticle]:
-    """Run scrapers with shared concurrency limit; skip when DNS circuit is open."""
-    if _dns_circuit_open():
-        logger.warning("Skipping news scrapers for %s — DNS/connect circuit open", ticker)
-        return []
-
-    async with httpx.AsyncClient(
-        verify=False,
-        timeout=20.0,
-        follow_redirects=True,
-        headers={
-            "User-Agent": HEADERS["User-Agent"],
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Referer": "https://www.google.com/",
-        },
-    ) as session:
-        tasks = [
-            _guarded_scrape("Moneycontrol", scrape_moneycontrol(ticker, session)),
-            _guarded_scrape("ET", scrape_economic_times(ticker, session)),
-            _guarded_scrape("Google News", scrape_google_news(ticker, session, company_name)),
-            _guarded_scrape("NSE announcements", scrape_nse_announcements(ticker, session)),
-            _guarded_scrape("BSE announcements", scrape_bse_announcements(ticker, session, company_name)),
-            _guarded_scrape("Yahoo Finance", scrape_yahoo_finance(ticker, session)),
-            _guarded_scrape("Zerodha Pulse", _scrape_zerodha_pulse(ticker, session)),
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
+    """Run scrapers with shared concurrency limit; TinyFish Search backs up a thin scrape."""
     all_articles: list[TickerNewsArticle] = []
-    for r in results:
-        if isinstance(r, list):
-            all_articles.extend(r)
-        elif isinstance(r, Exception):
-            _trip_dns_circuit(r)
-            logger.error("Scraper error: %s", r)
+    results: list = []
+    if _dns_circuit_open():
+        logger.warning("Skipping HTML news scrapers for %s — DNS/connect circuit open", ticker)
+    else:
+        async with httpx.AsyncClient(
+            verify=False,
+            timeout=20.0,
+            follow_redirects=True,
+            headers={
+                "User-Agent": HEADERS["User-Agent"],
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+                "Referer": "https://www.google.com/",
+            },
+        ) as session:
+            tasks = [
+                _guarded_scrape("Moneycontrol", scrape_moneycontrol(ticker, session)),
+                _guarded_scrape("ET", scrape_economic_times(ticker, session)),
+                _guarded_scrape("Google News", scrape_google_news(ticker, session, company_name)),
+                _guarded_scrape("NSE announcements", scrape_nse_announcements(ticker, session)),
+                _guarded_scrape("BSE announcements", scrape_bse_announcements(ticker, session, company_name)),
+                _guarded_scrape("Yahoo Finance", scrape_yahoo_finance(ticker, session)),
+                _guarded_scrape("Zerodha Pulse", _scrape_zerodha_pulse(ticker, session)),
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for r in results:
+            if isinstance(r, list):
+                all_articles.extend(r)
+            elif isinstance(r, Exception):
+                _trip_dns_circuit(r)
+                logger.error("Scraper error: %s", r)
 
     # Deduplicate by title similarity
     seen_titles: set[str] = set()
@@ -1046,6 +1048,36 @@ async def scrape_all_sources(ticker: str, company_name: str | None = None) -> li
         if key not in seen_titles:
             seen_titles.add(key)
             deduped.append(art)
+
+    if tinyfish_enabled() and len(deduped) < backup_min_articles():
+        query = f'("{company_name or _company_name(ticker)}" OR {ticker}) NSE stock'
+        extra = await asyncio.to_thread(
+            search_tinyfish,
+            query,
+            location="IN",
+            language="en",
+            domain_type="news",
+            recency_minutes=NEWS_LOOKBACK_DAYS * 24 * 60,
+        )
+        added = 0
+        for row in extra:
+            key = re.sub(r"\s+", " ", row["title"].lower())[:60]
+            if key in seen_titles:
+                continue
+            seen_titles.add(key)
+            added += 1
+            deduped.append(
+                TickerNewsArticle(
+                    title=row["title"],
+                    source=row["source"],
+                    url=row["url"],
+                    summary=row["summary"],
+                    published_at=row["published_at"],
+                    relevance="general",
+                )
+            )
+        if added:
+            logger.info("TinyFish backup added %d news items for %s (now %d articles)", added, ticker, len(deduped))
 
     logger.info(
         "Scraped %d articles from %d sources for %s (after dedup: %d)",
@@ -1414,6 +1446,7 @@ async def generate_ticker_news_report(
                     "sources_checked": [
                         "NSE Announcements", "BSE Announcements", "Moneycontrol",
                         "Economic Times", "Google News publishers", "Yahoo Finance", "Zerodha Pulse",
+                        "TinyFish Search",
                     ],
                 },
             )
@@ -1431,6 +1464,7 @@ async def generate_ticker_news_report(
         sources_checked=[
             "NSE Announcements", "BSE Announcements", "Moneycontrol",
             "Economic Times", "Google News publishers", "Yahoo Finance", "Zerodha Pulse",
+            "TinyFish Search",
         ],
         **llm_fields,
     )

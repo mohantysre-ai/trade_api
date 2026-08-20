@@ -40,6 +40,9 @@ LLM_API_KEY = os.getenv("LLM_API_KEY", "") or os.getenv("GEMINI_API_KEY", "") or
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
 LLM_API_URL = os.getenv("LLM_API_URL", "")
 
+# TinyFish Search (backup news fetch)
+TINYFISH_API_KEY = os.getenv("TINYFISH_API_KEY", "")
+
 # Server
 MARKET_API_HOST = os.getenv("MARKET_API_HOST", "0.0.0.0")
 MARKET_API_PORT = int(os.getenv("MARKET_API_PORT", "8000"))
