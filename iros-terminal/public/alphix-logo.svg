@@ -1,19 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Alphix">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="alphix-title alphix-desc">
+  <title id="alphix-title">Alphix</title>
+  <desc id="alphix-desc">A geometric letter A shaped like an ascending market structure</desc>
   <defs>
-    <linearGradient id="alphix-g" x1="8" y1="56" x2="56" y2="8" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#48d7b5"/>
-      <stop offset="1" stop-color="#8de8d2"/>
+    <linearGradient id="alphix-face" x1="14" y1="52" x2="48" y2="12" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0284c7"/>
+      <stop offset="0.55" stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#67e8f9"/>
+    </linearGradient>
+    <linearGradient id="alphix-edge" x1="12" y1="48" x2="50" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#075985"/>
+      <stop offset="1" stop-color="#0c4a6e"/>
     </linearGradient>
   </defs>
-  <!-- Clean mark: ascending bars form the Alphix A — no nested wordmark -->
-  <rect width="64" height="64" rx="12" fill="#101717"/>
-  <rect x="2.5" y="2.5" width="59" height="59" rx="10" fill="none" stroke="url(#alphix-g)" stroke-width="1.5" opacity="0.55"/>
-  <g fill="url(#alphix-g)">
-    <rect class="alphix-bar" x="14" y="38" width="6" height="14" rx="1.2" opacity="0.55"/>
-    <rect class="alphix-bar" x="24" y="30" width="6" height="22" rx="1.2" opacity="0.72"/>
-    <rect class="alphix-bar" x="34" y="22" width="6" height="30" rx="1.2" opacity="0.88"/>
-    <rect class="alphix-bar" x="44" y="16" width="6" height="36" rx="1.2"/>
-  </g>
-  <path d="M16 48 L32 18 L48 48" fill="none" stroke="#e2e8f0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.92"/>
-  <line x1="23" y1="36" x2="41" y2="36" stroke="#e2e8f0" stroke-width="2" stroke-linecap="round"/>
+
+  <rect width="64" height="64" rx="13" fill="#0a2130"/>
+  <path d="M11 50.5 28.8 12.7c1.2-2.6 5-2.6 6.2 0l18 37.8H42.4l-4.1-9.2H24.7l-4.1 9.2H11Z" fill="url(#alphix-face)"/>
+  <path d="m31.6 24.3-5.1 11.4h10.4l-5.3-11.4Z" fill="#0a2130"/>
+  <path d="M15.6 40.7h10.9l-4.6 9.8H11l4.6-9.8Z" fill="#0369a1"/>
+  <path d="M22.9 36.9h17.5l2.2 4.9H20.7l2.2-4.9Z" fill="#7dd3fc"/>
+  <path d="M11 50.5h42l-3.1-6.6H14.1L11 50.5Z" fill="url(#alphix-edge)"/>
+  <path d="M32 10.8c1.3 0 2.5.7 3 1.9l18 37.8h-5.6L32 18.1V10.8Z" fill="#082f49" opacity="0.56"/>
 </svg>
