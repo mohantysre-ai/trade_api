@@ -1,3 +1,5 @@
+import threading
+
 from app.services.angel_index_options import (
     INDEXES,
     _contracts,
@@ -58,3 +60,16 @@ def test_angel_snapshot_and_strategy_input_preserve_real_greeks():
     assert converted["contract"] is None
     assert converted["gates"]["structure"] is None
     assert "WEIGHTED_CONSTITUENT_BREADTH_NOT_CONFIRMED" in converted["dataLimitations"]
+
+
+def test_index_snapshot_uses_one_thread_for_shared_client():
+    seen: list[int] = []
+
+    class Tracking(FakeClient):
+        def fetch_quote(self, exchange, symbol, token):
+            seen.append(threading.get_ident())
+            return super().fetch_quote(exchange, symbol, token)
+
+    fetch_angel_index_option_snapshot(Tracking(), master=_master())
+    assert seen
+    assert len(set(seen)) == 1

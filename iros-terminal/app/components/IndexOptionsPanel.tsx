@@ -179,12 +179,6 @@ function gateChips(row: Candidate) {
   return keys.slice(0, 4).map((key) => GATE_LABEL[key] ?? key);
 }
 
-function sourceLabel(source: string | null | undefined) {
-  if (source === 'LEMONN_FALLBACK') return 'Lemonn fallback';
-  if (source === 'SCANX_FALLBACK') return 'ScanX fallback';
-  return 'Angel';
-}
-
 function sessionLabel(iso: string | undefined) {
   if (!iso) return 'Last Friday';
   const [year, month, day] = iso.split('-').map(Number);

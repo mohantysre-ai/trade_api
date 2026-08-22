@@ -3,7 +3,9 @@ from zoneinfo import ZoneInfo
 
 from app.services.angel_index_options import index_structure_from_candles, walk_forward_structure
 from app.services.index_options_replay import (
+    load_replay_cache,
     paper_long_option_pnl,
+    parse_session_date,
     previous_friday,
     replay_index_options_session,
 )
@@ -25,7 +27,15 @@ def _rising_bars(n: int = 25, start: float = 100.0, premium: bool = False):
 
 
 def test_previous_friday_from_sunday_is_21_aug_2026():
-    assert previous_friday(date(2026, 8, 23)) == date(2026, 8, 21)
+    assert previous_friday(date(2026, 8, 23), now=datetime(2026, 8, 23, 12, 0, tzinfo=IST)) == date(2026, 8, 21)
+
+
+def test_previous_friday_skips_open_cash_session():
+    friday_open = datetime(2026, 8, 21, 11, 0, tzinfo=IST)
+    friday_close = datetime(2026, 8, 21, 16, 0, tzinfo=IST)
+    assert previous_friday(date(2026, 8, 21), now=friday_open) == date(2026, 8, 14)
+    assert previous_friday(date(2026, 8, 21), now=friday_close) == date(2026, 8, 21)
+    assert parse_session_date("last-friday", today=date(2026, 8, 21), now=friday_open) == date(2026, 8, 14)
 
 
 def test_walk_forward_confirms_call_after_orb_and_ema():
@@ -88,3 +98,68 @@ def test_friday_replay_selects_one_broad_and_one_financial_call():
     assert "INDEX_CANDLES_UNAVAILABLE" not in payload["limitations"]
     blocked = [row["index"] for row in payload["buySideContracts"] if row.get("blockedBy") == "CORRELATION_GUARD"]
     assert "FINNIFTY" in blocked or "SENSEX" in blocked
+
+
+def test_success_only_cache_file_is_not_reused(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.services.index_options_replay.EOD_DATA_ROOT", str(tmp_path))
+    folder = tmp_path / "2026-08-21"
+    folder.mkdir()
+    (folder / "index_options_replay.json").write_text(
+        '{"success": true, "indices": [], "limitations": ["INDEX_CANDLES_UNAVAILABLE"]}',
+        encoding="utf-8",
+    )
+    after_close = datetime(2026, 8, 21, 16, 0, tzinfo=IST)
+    assert load_replay_cache(date(2026, 8, 21), now=after_close) is None
+
+
+def test_empty_candles_are_not_frozen_to_disk(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.services.index_options_replay.EOD_DATA_ROOT", str(tmp_path))
+
+    class Empty:
+        def fetch_candles(self, *args, **kwargs):
+            return []
+
+    after_close = datetime(2026, 8, 21, 16, 0, tzinfo=IST)
+    payload = replay_index_options_session(
+        Empty(), date(2026, 8, 21), master=_master_for_replay(), persist=True, now=after_close,
+    )
+    assert payload["complete"] is False
+    assert load_replay_cache(date(2026, 8, 21), now=after_close) is None
+    assert not (tmp_path / "2026-08-21" / "index_options_replay.json").exists()
+
+
+def test_open_friday_session_is_not_cached(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.services.index_options_replay.EOD_DATA_ROOT", str(tmp_path))
+    mid = datetime(2026, 8, 21, 11, 0, tzinfo=IST)
+    payload = replay_index_options_session(
+        _ReplayClient(), date(2026, 8, 21), master=_master_for_replay(), persist=True, now=mid,
+    )
+    assert payload["complete"] is False
+    assert load_replay_cache(date(2026, 8, 21), now=mid) is None
+
+
+def test_complete_replay_is_reused_after_close(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.services.index_options_replay.EOD_DATA_ROOT", str(tmp_path))
+    after = datetime(2026, 8, 21, 16, 0, tzinfo=IST)
+    calls = {"n": 0}
+
+    class Counting:
+        def fetch_candles(self, exchange, token, interval, start, end):
+            calls["n"] += 1
+            return _ReplayClient().fetch_candles(exchange, token, interval, start, end)
+
+    first = replay_index_options_session(
+        Counting(), date(2026, 8, 21), master=_master_for_replay(), persist=True, now=after,
+    )
+    assert first["complete"] is True
+    assert calls["n"] > 0
+
+    class Boom:
+        def fetch_candles(self, *args, **kwargs):
+            raise AssertionError("cache should have been reused")
+
+    cached = replay_index_options_session(
+        Boom(), date(2026, 8, 21), master=_master_for_replay(), persist=True, now=after,
+    )
+    assert cached["complete"] is True
+    assert cached["sessionDate"] == "2026-08-21"

@@ -6,12 +6,13 @@ structure and, when option 5m bars exist, paper long-premium P&L only.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time as dt_time, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from .angel_index_options import (
     INDEXES,
+    IST_ZONE,
     _contracts,
     _float,
     ist_session_bounds,
@@ -25,20 +26,36 @@ from .json_atomic import load_json_with_fallback
 
 BUY_SIDE_CAP = 10
 INDEX_TIE_BREAK = ("NIFTY", "SENSEX", "BANKNIFTY", "FINNIFTY")
+MIN_COMPLETE_BARS = 20
 
 
-def previous_friday(today: date) -> date:
+def _as_ist(stamp: datetime) -> datetime:
+    if stamp.tzinfo is None:
+        return stamp.replace(tzinfo=IST_ZONE)
+    return stamp.astimezone(IST_ZONE)
+
+
+def previous_friday(today: date, *, now: datetime | None = None) -> date:
+    """Last *completed* Friday cash session (IST).
+
+    During Friday 09:15–15:30 this is the prior week, so a mid-session
+    ``last-friday`` request cannot freeze an incomplete book.
+    """
     offset = (today.weekday() - 4) % 7
-    if offset == 0:
-        return today
-    return today - timedelta(days=offset)
+    friday = today if offset == 0 else today - timedelta(days=offset)
+    clock = _as_ist(now or datetime.now(IST_ZONE))
+    session_end = datetime.combine(friday, dt_time(15, 30), tzinfo=IST_ZONE)
+    if clock < session_end:
+        return friday - timedelta(days=7)
+    return friday
 
 
-def parse_session_date(raw: str | None, *, today: date | None = None) -> date:
-    now = today or datetime.now(timezone.utc).date()
+def parse_session_date(raw: str | None, *, today: date | None = None, now: datetime | None = None) -> date:
+    clock = _as_ist(now or datetime.now(IST_ZONE))
+    day = today or clock.date()
     text = str(raw or "").strip().lower()
     if not text or text in {"last-friday", "last_friday", "friday"}:
-        return previous_friday(now)
+        return previous_friday(day, now=clock)
     return date.fromisoformat(text)
 
 
@@ -46,12 +63,39 @@ def _replay_path(session_date: date) -> str:
     return str(Path(EOD_DATA_ROOT) / session_date.isoformat() / "index_options_replay.json")
 
 
-def load_replay_cache(session_date: date) -> dict[str, Any] | None:
+def _index_bar_count(row: dict[str, Any]) -> int:
+    try:
+        return int((row.get("structure") or {}).get("barCount") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def replay_is_complete(payload: dict[str, Any], *, session_date: date, now: datetime | None = None) -> bool:
+    """True only for a frozen post-close book with real index 5m bars."""
+    if not isinstance(payload, dict) or not payload.get("success"):
+        return False
+    indices = payload.get("indices") if isinstance(payload.get("indices"), list) else []
+    if len(indices) < len(INDEXES):
+        return False
+    if "INDEX_CANDLES_UNAVAILABLE" in (payload.get("limitations") or []):
+        return False
+    if not any(_index_bar_count(row) >= MIN_COMPLETE_BARS for row in indices):
+        return False
+    clock = _as_ist(now or datetime.now(IST_ZONE))
+    session_end = datetime.combine(session_date, dt_time(15, 30), tzinfo=IST_ZONE)
+    return clock >= session_end
+
+
+def load_replay_cache(session_date: date, *, now: datetime | None = None) -> dict[str, Any] | None:
     try:
         payload = load_json_with_fallback(_replay_path(session_date))
     except FileNotFoundError:
         return None
-    return payload if isinstance(payload, dict) and payload.get("success") else None
+    if not isinstance(payload, dict):
+        return None
+    if not replay_is_complete(payload, session_date=session_date, now=now):
+        return None
+    return payload
 
 
 def paper_long_option_pnl(candles: list[list[Any]], confirmed_at: str | None, lot_size: float | None) -> dict[str, Any]:
@@ -156,8 +200,10 @@ def replay_index_options_session(
     *,
     master: list[dict[str, Any]] | None = None,
     persist: bool = True,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
-    cached = load_replay_cache(session_date)
+    clock = _as_ist(now or datetime.now(IST_ZONE))
+    cached = load_replay_cache(session_date, now=clock) if persist else None
     if cached:
         return cached
 
@@ -250,7 +296,9 @@ def replay_index_options_session(
         "implemented": [row for row in buy_side if row.get("implemented")],
         "buySideContracts": buy_side[:BUY_SIDE_CAP],
         "limitations": limitations,
+        "complete": False,
     }
-    if persist:
+    payload["complete"] = replay_is_complete(payload, session_date=session_date, now=clock)
+    if persist and payload["complete"]:
         atomic_write_json(_replay_path(session_date), payload)
     return payload

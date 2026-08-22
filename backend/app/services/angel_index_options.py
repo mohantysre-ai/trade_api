@@ -6,7 +6,6 @@ import math
 import os
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, time as dt_time, timezone
 from pathlib import Path
 from typing import Any
@@ -265,15 +264,18 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
 
 
 def fetch_angel_index_option_snapshot(client: Any, *, master: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Fetch four indexes sequentially.
+
+    AngelOneClient holds one SmartConnect/TOTP session with no safe concurrent
+    use. Parallel submits on the same client race login, reset, and in-flight
+    quotes.
+    """
     rows = master if master is not None else load_angel_scrip_master()
     output: dict[str, Any] = {}
-    with ThreadPoolExecutor(max_workers=len(INDEXES)) as pool:
-        futures = [pool.submit(_fetch_one_index, client, rows, config) for config in INDEXES]
-        for future in as_completed(futures):
-            key, payload = future.result()
-            output[key] = payload
-    ordered = {config["key"]: output.get(config["key"]) or {"source": "ANGEL_ONE", "status": "SOURCE_UNAVAILABLE", "chain": []} for config in INDEXES}
-    return {"source": "ANGEL_ONE", "fetchedAt": datetime.now(timezone.utc).isoformat(), "indices": ordered}
+    for config in INDEXES:
+        key, payload = _fetch_one_index(client, rows, config)
+        output[key] = payload
+    return {"source": "ANGEL_ONE", "fetchedAt": datetime.now(timezone.utc).isoformat(), "indices": output}
 
 
 def radar_cache_path() -> Path:
