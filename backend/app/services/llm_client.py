@@ -229,10 +229,14 @@ _OPENAI_COMPATIBLE_PROVIDERS = {
 }
 
 
+def _env_enabled(name: str, default: str = "0") -> bool:
+    return os.getenv(name, default).strip().lower() in ("1", "true", "yes", "on")
+
+
 def _provider_order() -> list[str]:
     raw = os.getenv(
         "LLM_PROVIDER_ORDER",
-        "nvidia,groq,cerebras,sambanova,huggingface,openrouter,gemini",
+        "nvidia,groq,cerebras,sambanova,huggingface,openrouter,omniroute,gemini",
     )
     seen: set[str] = set()
     result: list[str] = []
@@ -262,6 +266,25 @@ def configured_llm_providers(purpose: str = "reasoning") -> list[LLMProviderConf
                 api_url=os.getenv(url_env, url_default).strip() or url_default,
                 model=_purpose_model(name, default_model, purpose),
             )
+
+    # OmniRoute is a self-hosted OpenAI-compatible gateway, not a source of
+    # tokens by itself. It is opt-in because the local service may route to
+    # third-party upstreams selected by its own configuration.
+    omniroute_key = os.getenv("OMNIROUTE_API_KEY", "").strip()
+    if omniroute_key or _env_enabled("OMNIROUTE_ENABLED"):
+        default_model = os.getenv("OMNIROUTE_MODEL", "auto/best-free").strip() or "auto/best-free"
+        configs["omniroute"] = LLMProviderConfig(
+            name="omniroute",
+            api_key=omniroute_key or "omniroute-local",
+            api_url=(
+                os.getenv(
+                    "OMNIROUTE_API_URL",
+                    "http://127.0.0.1:20128/v1/chat/completions",
+                ).strip()
+                or "http://127.0.0.1:20128/v1/chat/completions"
+            ),
+            model=_purpose_model("omniroute", default_model, purpose),
+        )
 
     provider, api_key, api_url, model, oauth_path = _llm_config()
     if provider and api_key:

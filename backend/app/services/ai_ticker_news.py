@@ -195,6 +195,8 @@ class AITickerNewsReport:
     risk_flags: str = ""
     summary_headline: str = ""
     llmUsed: bool = False
+    llmProvider: str = ""
+    llmModel: str = ""
     llmError: str = ""
     digestSource: str = ""
     digestMode: str = ""
@@ -1391,6 +1393,8 @@ Respond ONLY in valid JSON format with these exact keys: insider_activity, insti
         for key in expected_keys:
             result.setdefault(key, "No recent news found.")
         result["llmUsed"] = True
+        result["llmProvider"] = provider
+        result["llmModel"] = model
         logger.info("LLM ticker-news summary complete for %s via %s/%s", ticker, provider, model)
         return result
     except Exception as exc:

@@ -101,11 +101,24 @@ def backup_min_articles() -> int:
 
 
 def tinyfish_ticker_news_failover() -> bool:
-    """Ticker-news uses TinyFish Search instead of OpenRouter when a key is set."""
+    """Return whether TinyFish should produce the primary evidence digest.
+
+    ``TICKER_NEWS_LLM=router`` sends verified articles through the shared LLM
+    provider chain first. TinyFish remains the evidence-search backup and is
+    used only after that chain is exhausted. The empty/default setting keeps
+    the existing TinyFish-first deployment behavior for backward compatibility.
+    """
     if not tinyfish_enabled():
         return False
     override = os.getenv("TICKER_NEWS_LLM", "").strip().lower()
-    return override not in ("openrouter", "openai", "gemini")
+    return override not in (
+        "router",
+        "llm",
+        "openrouter",
+        "openai",
+        "omniroute",
+        "gemini",
+    )
 
 
 _CATEGORY_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (

@@ -159,6 +159,8 @@ export type AITickerNewsReport = {
   risk_flags: string;
   summary_headline: string;
   llmUsed?: boolean;
+  llmProvider?: string;
+  llmModel?: string;
   llmError?: string;
   digestSource?: string;
   digestMode?: string;

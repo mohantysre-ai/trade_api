@@ -214,6 +214,14 @@ def test_summarize_uses_tinyfish_not_openrouter(monkeypatch):
     assert "Q1 results" in str(result["earnings_results"])
 
 
+def test_router_override_keeps_tinyfish_as_quota_fallback(monkeypatch):
+    from app.services.tinyfish_news import tinyfish_ticker_news_failover
+
+    monkeypatch.setenv("TINYFISH_API_KEY", "sk-tinyfish-test")
+    monkeypatch.setenv("TICKER_NEWS_LLM", "router")
+    assert tinyfish_ticker_news_failover() is False
+
+
 def test_quota_path_tinyfish_digest_is_not_complete(monkeypatch):
     import asyncio
 

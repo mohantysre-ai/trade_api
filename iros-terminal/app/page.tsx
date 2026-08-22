@@ -177,6 +177,8 @@ type NseEquityStock = Record<string, unknown> & {
   symbol?: string;
   pChange?: number;
   lastPrice?: number;
+  close?: number;
+  previousClose?: number;
   change?: number;
 };
 
@@ -905,14 +907,20 @@ function NseHeatMapTooltip({ stock, ticker, colors }: { stock: NseEquityStock; t
   const pchange = typeof stock.pChange === 'number' ? stock.pChange : null;
   const positive = pchange !== null && pchange >= 0;
   const symbol = stock.symbol ?? ticker;
+  const lastPrice =
+    typeof stock.lastPrice === 'number'
+      ? stock.lastPrice
+      : typeof stock.close === 'number'
+        ? stock.close
+        : typeof stock.previousClose === 'number'
+          ? stock.previousClose
+          : null;
+  const priceLabel = lastPrice != null
+    ? `₹${lastPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : 'Price —';
   const changeLabel =
     pchange != null
-      ? typeof stock.change === 'number'
-        ? `${Math.abs(stock.change).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${Math.abs(pchange).toFixed(2)}%)`
-        : formatPtsPctLabel(
-            typeof stock.lastPrice === 'number' ? stock.lastPrice : null,
-            pchange,
-          )
+      ? `${pchange >= 0 ? '+' : ''}${pchange.toFixed(2)}%`
       : 'N/A';
 
   const handleClick = () => {
@@ -937,13 +945,15 @@ function NseHeatMapTooltip({ stock, ticker, colors }: { stock: NseEquityStock; t
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter') handleClick(); }}
       >
-        <div className="relative z-10 flex min-w-0 items-center justify-center gap-1">
-          <MarketSymbolBadge symbol={symbol} size="sm" className="!h-5 !w-5 !rounded-md" />
-          <span className="truncate text-[9px] font-bold leading-tight" style={{ color: colors.text }}>
+        <div className="relative z-10 flex min-w-0 items-center justify-center">
+          <span className="truncate text-[9px] font-black leading-tight tracking-tight" style={{ color: colors.text }}>
             {ticker}
           </span>
         </div>
-        <span className="text-[7px] font-semibold mt-0.5 relative z-10 text-center leading-tight" style={{ color: colors.text }}>
+        <span className="relative z-10 mt-0.5 text-center text-[8px] font-extrabold leading-tight tabular-nums" style={{ color: colors.text }}>
+          {priceLabel}
+        </span>
+        <span className="relative z-10 mt-0.5 text-center text-[7px] font-semibold leading-tight tabular-nums opacity-90" style={{ color: colors.text }}>
           {changeLabel}
         </span>
       </div>
@@ -1158,10 +1168,13 @@ function SectorRotationHeatMap() {
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-6">
           {sorted.map((row) => {
             const tone = row.changePct >= 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800';
-            return <div key={row.name} className={`flex min-w-0 items-center gap-2 border px-2 py-2 ${tone}`} title={`${row.name}: ${row.changePct.toFixed(2)}%`}>
-              <MarketSymbolBadge symbol={row.name} kind="index" size="sm" />
+            const lastLabel = typeof row.last === 'number'
+              ? row.last.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              : '—';
+            return <div key={row.name} className={`flex min-w-0 items-center border px-2 py-2 ${tone}`} title={`${row.name}: ${lastLabel} · ${row.changePct.toFixed(2)}%`}>
               <div className="min-w-0">
                 <div className="truncate text-[9px] font-extrabold uppercase">{row.name.replace(/^NIFTY\s+/i, '')}</div>
+                <div className="mt-0.5 text-[9px] font-bold tabular-nums">Last {lastLabel}</div>
                 <div className="mt-0.5 text-sm font-black tabular-nums">{row.changePct >= 0 ? '+' : ''}{row.changePct.toFixed(2)}%</div>
               </div>
             </div>;

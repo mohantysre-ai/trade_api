@@ -319,6 +319,8 @@ def _clear_provider_env(monkeypatch):
         "LLM_PROVIDER", "LLM_API_KEY", "LLM_API_URL", "LLM_MODEL",
         "NVIDIA_API_KEY", "GROQ_API_KEY", "CEREBRAS_API_KEY",
         "SAMBANOVA_API_KEY", "HUGGINGFACE_API_KEY", "GEMINI_API_KEY",
+        "OMNIROUTE_ENABLED", "OMNIROUTE_API_KEY", "OMNIROUTE_API_URL",
+        "OMNIROUTE_MODEL", "OMNIROUTE_NEWS_MODEL", "OMNIROUTE_REASONING_MODEL",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -335,6 +337,18 @@ def test_provider_router_discovers_configured_open_model_endpoints(monkeypatch):
     assert [item.name for item in providers] == ["groq", "nvidia", "cerebras"]
     assert providers[1].model == "nvidia/news-small"
     assert providers[1].api_url == "https://integrate.api.nvidia.com/v1/chat/completions"
+
+
+def test_provider_router_discovers_opt_in_omniroute(monkeypatch):
+    _reset_llm_state()
+    _clear_provider_env(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER_ORDER", "omniroute")
+    monkeypatch.setenv("OMNIROUTE_ENABLED", "1")
+    monkeypatch.setenv("OMNIROUTE_NEWS_MODEL", "auto/best-free")
+    providers = llm_client.configured_llm_providers("news")
+    assert [item.name for item in providers] == ["omniroute"]
+    assert providers[0].api_url == "http://127.0.0.1:20128/v1/chat/completions"
+    assert providers[0].model == "auto/best-free"
 
 
 def test_openrouter_daily_quota_does_not_block_other_provider(monkeypatch):
@@ -360,6 +374,36 @@ def test_openrouter_daily_quota_does_not_block_other_provider(monkeypatch):
     assert text == '{"summary":"ok"}'
     assert provider == "nvidia"
     assert seen == ["https://integrate.api.nvidia.com/v1/chat/completions"]
+
+
+def test_openrouter_daily_quota_falls_through_to_omniroute(monkeypatch):
+    _reset_llm_state()
+    _clear_provider_env(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER_ORDER", "openrouter,omniroute")
+    monkeypatch.setenv("LLM_PROVIDER_ATTEMPTS", "2")
+    monkeypatch.setenv("LLM_PROVIDER", "openrouter")
+    monkeypatch.setenv("LLM_API_KEY", "sk-or-test")
+    monkeypatch.setenv("LLM_API_URL", "https://openrouter.ai/api/v1/chat/completions")
+    monkeypatch.setenv("OMNIROUTE_ENABLED", "1")
+    seen: list[str] = []
+
+    def fake_call(prompt, api_key, api_url, model, timeout, max_tokens=None):
+        seen.append(api_url)
+        if "openrouter.ai" in api_url:
+            raise RuntimeError("429 free-models-per-day")
+        return '{"summary_headline":"Reliance evidence summarized"}'
+
+    monkeypatch.setattr(llm_client, "_call_openai", fake_call)
+    text, provider, model = llm_client.call_llm_with_fallback(
+        "RELIANCE evidence", "json only", purpose="news", max_tokens=300
+    )
+    assert text == '{"summary_headline":"Reliance evidence summarized"}'
+    assert provider == "omniroute"
+    assert model == "auto/best-free"
+    assert seen == [
+        "https://openrouter.ai/api/v1/chat/completions",
+        "http://127.0.0.1:20128/v1/chat/completions",
+    ]
 
 
 def test_provider_router_is_sequential_and_stops_after_success(monkeypatch):

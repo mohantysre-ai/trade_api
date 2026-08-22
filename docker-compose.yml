@@ -69,6 +69,8 @@ services:
       INTRADAY_SESSION_FILE: /app/state/intraday_session.json
     ports:
       - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - iros-backend-data:/app/backend/app/data
       - iros-eod-archive:/app/backend/app/services/eod_archive
@@ -120,6 +122,8 @@ services:
       ]
     ports:
       - "8001:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - iros-backend-data:/app/backend/app/data
       - iros-eod-archive:/app/backend/app/services/eod_archive
