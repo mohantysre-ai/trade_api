@@ -18,6 +18,7 @@ import RightDrawer from './components/RightDrawer';
 import NseSymbolSearchBar from './components/NseSymbolSearchBar';
 import AssetMetricsPanel from './components/AssetMetricsPanel';
 import EodDeskPanel from './components/EodDeskPanel';
+import IndexOptionsPanel from './components/IndexOptionsPanel';
 import DeskControls from './components/DeskControls';
 import DeskActivityAlerts from './components/DeskActivityAlerts';
 import MarketSymbolBadge from './components/MarketSymbolBadge';
@@ -88,7 +89,7 @@ function dedupedDrawerFetch<T>(key: string, url: string): Promise<T> {
   return request;
 }
 
-type TabKey = 'marketSnapshot' | 'stockHeatMap' | 'assetMatrix' | 'intradayMatrix' | 'eod';
+type TabKey = 'marketSnapshot' | 'stockHeatMap' | 'assetMatrix' | 'intradayMatrix' | 'indexOptions' | 'eod';
 
 const INDIA_MARKET_LABELS = new Set(['NIFTY 100', 'SENSEX', 'NIFTY BANK', 'NIFTY IT', 'NIFTY PHARMA', 'NIFTY MIDCAP', 'NIFTY SMALLCAP', 'GIFT NIFTY']);
 const GLOBAL_ONLY_LABELS = new Set(['BRENT CRUDE', 'BRENT CRUDE OIL']);
@@ -2628,6 +2629,7 @@ export default function IrosMasterAdvancedTerminal() {
             { key: 'stockHeatMap' as TabKey, label: 'HEATMAP' },
             { key: 'assetMatrix' as TabKey, label: 'SWING' },
             { key: 'intradayMatrix' as TabKey, label: 'INTRADAY' },
+            { key: 'indexOptions' as TabKey, label: 'INDEX OPTIONS' },
             { key: 'eod' as TabKey, label: 'EOD' },
           ]).map((tab) => (
             <button
@@ -2702,6 +2704,12 @@ export default function IrosMasterAdvancedTerminal() {
         {activeTab === 'intradayMatrix' && (
           <div key="intradayMatrix" className="desk-panel-enter space-y-3 min-w-0">
             <AssetMetricsPanel refreshToken={deskRefreshKey} />
+          </div>
+        )}
+
+        {activeTab === 'indexOptions' && (
+          <div key="indexOptions" className="desk-panel-enter space-y-3 min-w-0">
+            <IndexOptionsPanel refreshToken={deskRefreshKey} />
           </div>
         )}
 

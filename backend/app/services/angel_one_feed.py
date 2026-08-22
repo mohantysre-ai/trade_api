@@ -2276,6 +2276,29 @@ class AngelOneClient:
                 return _try_fetch()
             return None
 
+    def fetch_option_greeks(self, name: str, expirydate: str) -> list[dict[str, Any]]:
+        """Fetch Angel One live Greeks/IV for one NSE underlying and expiry."""
+        params = {"name": name.upper().strip(), "expirydate": expirydate.upper().strip()}
+
+        def _fetch() -> list[dict[str, Any]]:
+            smart = self.connect()
+            method = getattr(smart, "optionGreek", None)
+            response = method(params) if callable(method) else smart._postRequest("api.optionGreek", params)
+            if not isinstance(response, dict) or not response.get("status"):
+                message = response.get("message") if isinstance(response, dict) else "invalid response"
+                code = response.get("errorcode") if isinstance(response, dict) else None
+                raise RuntimeError(f"Angel option Greeks unavailable: {code or 'UNKNOWN'} {message}")
+            data = response.get("data") or []
+            return [row for row in data if isinstance(row, dict)]
+
+        try:
+            return _fetch()
+        except Exception as exc:
+            if self._is_auth_error(exc):
+                self._reset_connection()
+                return _fetch()
+            raise
+
     def fetch_candles(
         self,
         exchange: str,
@@ -4456,6 +4479,7 @@ def create_app() -> FastAPI:
                 "count": len(recs),
                 "source": "lemonn.co.in",
             }
+
         except Exception:
             # Fallback: When lemonn.co.in is unreachable, return mock data
             # so the frontend never shows a 404 error page.
@@ -4498,6 +4522,31 @@ def create_app() -> FastAPI:
                 "source": "lemonn.co.in (mock fallback)",
                 "isMock": True,
             }
+
+    @app.get("/api/index-options")
+    def index_options(live: bool = True) -> dict[str, Any]:
+        """Return the deterministic index-options radar; never mock missing chain data."""
+        from .angel_index_options import active_index_expiries, cached_angel_index_option_snapshot, option_data_to_strategy_inputs, unavailable_provider_snapshot
+        from .dhan_scanx_options import apply_scanx_fallback
+        from .index_options_engine import build_index_options_radar
+
+        snapshot = dict(_load_last_snapshot() or {})
+        if live:
+            try:
+                option_data = cached_angel_index_option_snapshot(AngelOneClient())
+            except Exception as exc:
+                option_data = unavailable_provider_snapshot(exc)
+            try:
+                option_data = apply_scanx_fallback(option_data, active_index_expiries())
+            except Exception as exc:
+                option_data["fallbackSource"] = "SCANX"
+                option_data["fallbackError"] = str(exc)
+            snapshot["indexOptions"] = option_data_to_strategy_inputs(option_data, snapshot)
+            snapshot["indexOptionProvider"] = option_data
+        result = build_index_options_radar(snapshot)
+        result["provider"] = "ANGEL_ONE_WITH_SCANX_FALLBACK"
+        result["providerEvidence"] = snapshot.get("indexOptionProvider")
+        return result
 
     @app.get("/api/dhan-scanner-matrix")
     def dhan_scanner_matrix() -> dict[str, Any]:
