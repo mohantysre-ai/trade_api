@@ -680,11 +680,11 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
               rel="noopener noreferrer"
               className="desk-screener-row group cursor-pointer border-b border-slate-100 last:border-b-0 py-2 hover:bg-slate-50 transition-colors"
             >
-              <div className="min-w-0 overflow-visible flex items-center gap-1.5">
-                <span className={`w-1.5 h-1.5 rounded-full ${dotCls} flex-shrink-0`} />
+              <div className="desk-screener-name">
+                <span className={`w-1.5 h-1.5 rounded-full ${dotCls} flex-shrink-0 mt-1`} />
                 <TrendlyneTickerTooltip item={item} />
               </div>
-              <div className="flex items-baseline gap-2 overflow-visible">
+              <div className="desk-screener-quotes">
                 <span className={`desk-screener-px text-[11px] font-semibold ${textAccentCls}`}>{formatLargeNumber(item.value)}</span>
                 <span className="desk-screener-px text-[11px] text-slate-500">₹{currentPrice}</span>
               </div>
@@ -747,10 +747,10 @@ function ScreenerStockList({
             key={`${categoryKey}-${ticker}`}
             className="desk-screener-row group cursor-default border-b border-slate-100 last:border-b-0 py-2"
           >
-            <div className="min-w-0 overflow-visible">
+            <div className="desk-screener-name">
               <NseTickerTooltip stock={stock} ticker={ticker} />
             </div>
-            <div className="flex items-baseline gap-1 overflow-visible">
+            <div className="desk-screener-quotes">
               <span className="desk-screener-px text-[11px] text-slate-600 tabular-nums desk-num">
                 ₹{formatNseNumber(stock.lastPrice)}
               </span>
