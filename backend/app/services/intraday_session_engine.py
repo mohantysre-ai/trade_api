@@ -181,6 +181,10 @@ REPLACEMENT_MAX_PER_SIDE = int(os.environ.get("INTRADAY_REPLACEMENT_MAX_PER_SIDE
 # high-turnover scanner.  This is a session-wide cap on *new* entries after
 # the morning lock (normal replacements plus permitted re-entries).
 MAX_DAILY_REPLACEMENTS = int(os.environ.get("INTRADAY_MAX_DAILY_REPLACEMENTS", "10"))
+# Hard session ledger ceiling. This counts every executed entry, including the
+# morning lock, ordinary replacements and same-symbol re-entries. It is not a
+# concurrent-position limit; LOCK_SIZE remains the live-book risk limit.
+MAX_DAILY_POSITIONS = int(os.environ.get("INTRADAY_MAX_DAILY_POSITIONS", "20"))
 
 # Re-entry policy.  A completed target or a genuinely profitable trailing exit
 # may receive one smaller, independently-qualified continuation attempt.  An
@@ -2486,6 +2490,7 @@ def generate_candidates(
             "maxConcurrentNames": MAX_CONCURRENT_NAMES,
             "replacementCutoff": REPLACEMENT_CUTOFF_HHMM,
             "maxDailyReplacements": MAX_DAILY_REPLACEMENTS,
+            "maxDailyPositions": MAX_DAILY_POSITIONS,
             "reentry": {
                 "enabled": REENTRY_ENABLED,
                 "maxPerSymbol": REENTRY_MAX_PER_SYMBOL,
@@ -2687,6 +2692,7 @@ def _plan_row_from_session(row: dict[str, Any], direction: str, session_date: st
         "currentPrice": row.get("ltp") or row.get("currentPrice"),
         "score": row.get("score"),
         "sector": row.get("sector"),
+        "sleeve": row.get("sleeve"),
         "rewardRisk": row.get("rewardRisk"),
         "status": status,
         "closed": bool(row.get("closed")),
@@ -2705,6 +2711,14 @@ def _plan_row_from_session(row: dict[str, Any], direction: str, session_date: st
         "source": row.get("source"),
         "replacedFrom": row.get("replacedFrom"),
         "replacedAt": row.get("replacedAt"),
+        "reentryOf": row.get("reentryOf"),
+        "reentryExitKind": row.get("reentryExitKind"),
+        "reentryPreviousCloseAt": row.get("reentryPreviousCloseAt"),
+        "reentryReferencePrice": row.get("reentryReferencePrice"),
+        "reentryPreviousEconomicR": row.get("reentryPreviousEconomicR"),
+        "reentryRiskScale": row.get("reentryRiskScale"),
+        "reentrySameLogicConfirmed": row.get("reentrySameLogicConfirmed"),
+        "reentryLogic": row.get("reentryLogic"),
     }
 
 
@@ -3191,6 +3205,36 @@ def _replacement_count(rows: list[dict[str, Any]]) -> int:
     )
 
 
+def _is_executed_entry(row: dict[str, Any]) -> bool:
+    """True when a durable book row represents an actual session entry."""
+    if not isinstance(row, dict) or not row.get("symbol"):
+        return False
+    execution = str(row.get("executionStatus") or "").upper().strip()
+    if execution in {"NOT_TRIGGERED", "PENDING_ENTRY", "CANCELLED", "REJECTED"}:
+        return False
+    if row.get("triggered") is False and not _is_closed_trade(row):
+        return False
+    return bool(
+        row.get("triggered")
+        or execution in {"TRIGGERED", "FILLED", "EXECUTED"}
+        or _is_closed_trade(row)
+        # Legacy locked rows pre-date executionStatus but are still durable
+        # entries. Explicit non-execution states above always take precedence.
+        or row.get("adopted")
+    )
+
+
+def _daily_position_count(rows: list[dict[str, Any]]) -> int:
+    """Count executed session entries; each permitted re-entry counts again."""
+    return sum(1 for row in rows if _is_executed_entry(row))
+
+
+def _trade_logic(row: dict[str, Any]) -> str | None:
+    """Return the deterministic sleeve used to generate an entry."""
+    value = str(row.get("sleeve") or "").upper().strip()
+    return value or None
+
+
 def _reentry_decision(
     rows: list[dict[str, Any]],
     cand: dict[str, Any],
@@ -3215,6 +3259,9 @@ def _reentry_decision(
         "riskScale": 1.0,
         "previousCloseAt": None,
         "referencePrice": None,
+        "sameLogicConfirmed": False,
+        "priorLogic": None,
+        "currentLogic": None,
     }
     if not sym or side not in {"LONG", "SHORT"}:
         return base
@@ -3241,6 +3288,22 @@ def _reentry_decision(
     prior = next((row for row in reversed(symbol_rows) if _is_closed_trade(row)), None)
     if prior is None:
         return {**base, "reason": "missing_closed_trade"}
+    gate_state = str(gate.get("entryState") or gate.get("state") or "").upper()
+    if gate_state != ENTRY_QUALIFIED:
+        return {**base, "reason": "reentry_base_logic_not_qualified"}
+    candidate_direction = str(cand.get("direction") or side).upper().strip()
+    if candidate_direction != side:
+        return {**base, "reason": "reentry_direction_logic_changed"}
+    prior_logic = _trade_logic(prior)
+    current_logic = _trade_logic(cand)
+    logic_context = {
+        "priorLogic": prior_logic,
+        "currentLogic": current_logic,
+    }
+    if prior_logic is None or current_logic is None:
+        return {**base, **logic_context, "reason": "reentry_logic_missing"}
+    if prior_logic != current_logic:
+        return {**base, **logic_context, "reason": "reentry_logic_changed"}
     profile = _exit_profile(prior)
     kind = str(profile.get("kind") or "UNKNOWN_EXIT")
     if kind == "TARGET_COMPLETE":
@@ -3343,6 +3406,9 @@ def _reentry_decision(
         "previousEconomicR": profile.get("economicR"),
         "minScore": min_score,
         "minExpectedR": min_expected_r,
+        "sameLogicConfirmed": True,
+        "priorLogic": prior_logic,
+        "currentLogic": current_logic,
     }
 
 
@@ -3463,7 +3529,10 @@ def propose_replacements(
     if free["total"] <= 0:
         return []
 
-    replacement_capacity = max(0, MAX_DAILY_REPLACEMENTS - _replacement_count(all_rows))
+    replacement_capacity = min(
+        max(0, MAX_DAILY_REPLACEMENTS - _replacement_count(all_rows)),
+        max(0, MAX_DAILY_POSITIONS - _daily_position_count(all_rows)),
+    )
     if replacement_capacity <= 0:
         return []
 
@@ -3638,6 +3707,8 @@ def propose_replacements(
                     "reentryReferencePrice": reentry.get("referencePrice"),
                     "reentryRiskScale": reentry.get("riskScale"),
                     "reentryPreviousEconomicR": reentry.get("previousEconomicR"),
+                    "reentrySameLogicConfirmed": reentry.get("sameLogicConfirmed"),
+                    "reentryLogic": reentry.get("currentLogic"),
                     "proposalOnly": True,
                 }
             )
@@ -3696,7 +3767,10 @@ def apply_replacements(
     if free["total"] <= 0:
         return []
 
-    replacement_capacity = max(0, MAX_DAILY_REPLACEMENTS - _replacement_count(all_rows))
+    replacement_capacity = min(
+        max(0, MAX_DAILY_REPLACEMENTS - _replacement_count(all_rows)),
+        max(0, MAX_DAILY_POSITIONS - _daily_position_count(all_rows)),
+    )
     if replacement_capacity <= 0:
         return []
 
@@ -3935,6 +4009,10 @@ def apply_replacements(
                 "reentryReferencePrice": reentry.get("referencePrice") if is_reentry else None,
                 "reentryPreviousEconomicR": reentry.get("previousEconomicR") if is_reentry else None,
                 "reentryRiskScale": reentry.get("riskScale") if is_reentry else None,
+                "reentrySameLogicConfirmed": (
+                    reentry.get("sameLogicConfirmed") if is_reentry else None
+                ),
+                "reentryLogic": reentry.get("currentLogic") if is_reentry else None,
                 "entryState": gate.get("entryState"),
                 "excludeReason": gate.get("excludeReason"),
                 "qualityAdjustedExpectedR": gate.get("qualityAdjustedExpectedR"),
@@ -3982,6 +4060,8 @@ def apply_replacements(
             "reentryExitKind": r.get("reentryExitKind"),
             "reentryPreviousCloseAt": r.get("reentryPreviousCloseAt"),
             "reentryReferencePrice": r.get("reentryReferencePrice"),
+            "reentrySameLogicConfirmed": r.get("reentrySameLogicConfirmed"),
+            "reentryLogic": r.get("reentryLogic"),
         }
         for r in applied
     ]
@@ -4023,6 +4103,8 @@ def apply_replacements(
                     "previousCloseAt": r.get("reentryPreviousCloseAt"),
                     "referencePrice": r.get("reentryReferencePrice"),
                     "riskScale": r.get("reentryRiskScale"),
+                    "sameLogicConfirmed": r.get("reentrySameLogicConfirmed"),
+                    "logic": r.get("reentryLogic"),
                 }
             )
     session["events"] = events[-200:]
@@ -4555,6 +4637,8 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
     realized_book = risk_flags.get("realizedPnl")
     replacements_used = _replacement_count(long_rows + short_rows)
     replacements_remaining = max(0, MAX_DAILY_REPLACEMENTS - replacements_used)
+    daily_positions_used = _daily_position_count(long_rows + short_rows)
+    daily_positions_remaining = max(0, MAX_DAILY_POSITIONS - daily_positions_used)
     replacement_blocked_reason: str | None = None
     replacement_candidates: list[dict[str, Any]] = []
     cash_held = False
@@ -4573,6 +4657,9 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
             replacement_blocked_reason = win_reason or rot_code
         elif free_slots["total"] <= 0:
             replacement_blocked_reason = "no_free_slots"
+        elif daily_positions_remaining <= 0:
+            replacement_blocked_reason = "daily_position_cap"
+            cash_held = True
         elif replacements_remaining <= 0:
             replacement_blocked_reason = "daily_replacement_cap"
             cash_held = True
@@ -4645,6 +4732,8 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
                 realized_book = risk_flags.get("realizedPnl")
                 replacements_used = _replacement_count(long_rows + short_rows)
                 replacements_remaining = max(0, MAX_DAILY_REPLACEMENTS - replacements_used)
+                daily_positions_used = _daily_position_count(long_rows + short_rows)
+                daily_positions_remaining = max(0, MAX_DAILY_POSITIONS - daily_positions_used)
                 replacements_applied = list(session.get("replacementsApplied") or [])[-len(applied_rows) :]
                 # Mark just-applied proposals for UI (no longer proposal-only)
                 applied_syms = {
@@ -4663,7 +4752,11 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
     # Persist proposal / cash-held ledger for EOD attribution (dedupe by symbol set)
     if persist and session.get("locked") and (
         replacement_candidates
-        or replacement_blocked_reason in {"prefer_cash_no_qualified", "daily_replacement_cap"}
+        or replacement_blocked_reason in {
+            "prefer_cash_no_qualified",
+            "daily_replacement_cap",
+            "daily_position_cap",
+        }
     ):
         try:
             cand_key = tuple(
@@ -4836,6 +4929,12 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
             "limit": MAX_DAILY_REPLACEMENTS,
             "remaining": replacements_remaining,
         },
+        "dailyPositionBudget": {
+            "used": daily_positions_used,
+            "limit": MAX_DAILY_POSITIONS,
+            "remaining": daily_positions_remaining,
+            "includesReentries": True,
+        },
         "reentryPolicy": {
             "enabled": REENTRY_ENABLED,
             "maxPerSymbol": REENTRY_MAX_PER_SYMBOL,
@@ -4847,6 +4946,7 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
             "minExpectedR": REENTRY_MIN_EXPECTED_R,
             "breakoutBufferBps": REENTRY_BREAKOUT_BUFFER_BPS,
             "profitRiskScale": REENTRY_PROFIT_RISK_SCALE,
+            "sameLogicRequired": True,
         },
         "cashHeld": cash_held,
         "portfolioRisk": risk_flags,
@@ -4877,6 +4977,12 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
                 "used": replacements_used,
                 "limit": MAX_DAILY_REPLACEMENTS,
                 "remaining": replacements_remaining,
+            },
+            "dailyPositionBudget": {
+                "used": daily_positions_used,
+                "limit": MAX_DAILY_POSITIONS,
+                "remaining": daily_positions_remaining,
+                "includesReentries": True,
             },
             "dailyLossHit": bool(risk_flags.get("dailyLossHit")),
             "maxNamesHit": bool(risk_flags.get("maxNamesHit")),

@@ -206,6 +206,8 @@ def _build_rotation_attribution(
                     "previousCloseAt": ev.get("previousCloseAt"),
                     "referencePrice": ev.get("referencePrice"),
                     "riskScale": ev.get("riskScale"),
+                    "sameLogicConfirmed": ev.get("sameLogicConfirmed"),
+                    "logic": ev.get("logic"),
                 }
             )
         elif et in ("POSITION_CLOSED", "STOP_LOSS_HIT", "TRAIL_STOP_HIT", "TARGET_HIT"):
@@ -237,6 +239,8 @@ def _build_rotation_attribution(
                 "source": t.get("source"),
                 "adoptReason": t.get("adoptReason"),
                 "reentryExitKind": t.get("reentryExitKind"),
+                "reentrySameLogicConfirmed": t.get("reentrySameLogicConfirmed"),
+                "reentryLogic": t.get("reentryLogic"),
                 "slotFreed": bool(
                     t.get("slotFreed")
                     or str(t.get("slotStatus") or "").upper() == "REPLACEABLE"

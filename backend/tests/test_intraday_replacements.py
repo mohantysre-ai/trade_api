@@ -19,6 +19,7 @@ def _closed_long(sym: str = "LOSER") -> dict:
         "slotFreed": True,
         "slotStatus": "REPLACEABLE",
         "sector": "AUTO",
+        "sleeve": "MOMENTUM",
         "entryPrice": 100.0,
         "approxQty": 10,
     }
@@ -33,6 +34,7 @@ def _closed_target_long(sym: str = "WINNER") -> dict:
         "slotFreed": True,
         "slotStatus": "REPLACEABLE",
         "sector": "PHARMA",
+        "sleeve": "MOMENTUM",
         "entryPrice": 100.0,
         "riskPerShare": 2.0,
         "target1": 103.0,
@@ -64,6 +66,7 @@ def _closed_profit_trail(sym: str = "RUNNER") -> dict:
         "slotFreed": True,
         "slotStatus": "REPLACEABLE",
         "sector": "PHARMA",
+        "sleeve": "MOMENTUM",
         "entryPrice": 100.0,
         "riskPerShare": 2.0,
         "approxQty": 100,
@@ -87,6 +90,7 @@ def _open_long(sym: str, sector: str = "IT") -> dict:
         "closed": False,
         "status": "RUNNING",
         "sector": sector,
+        "sleeve": "MOMENTUM",
         "entryPrice": 100.0,
         "riskPerShare": 2.0,
         "approxQty": 10,
@@ -99,6 +103,7 @@ def _pool_cand(sym: str, *, score: float = 70.0) -> dict:
         "symbol": sym,
         "direction": "LONG",
         "sector": "PHARMA",
+        "sleeve": "MOMENTUM",
         "score": score,
         "entryPrice": 200.0,
         "ltp": 200.0,
@@ -232,6 +237,36 @@ def test_target_reentry_requires_cooldown_and_fresh_breakout():
     assert allowed["isReentry"] is True
     assert allowed["reason"] == "REENTRY_AFTER_TARGET"
     assert allowed["riskScale"] == eng.REENTRY_PROFIT_RISK_SCALE
+    assert allowed["sameLogicConfirmed"] is True
+    assert allowed["currentLogic"] == "MOMENTUM"
+
+
+def test_reentry_requires_same_deterministic_sleeve():
+    prior = _closed_target_long()
+    changed_logic = eng._reentry_decision(
+        [prior],
+        {**_reentry_cand("WINNER", ltp=107.0), "sleeve": "MEAN_REVERSION"},
+        "LONG",
+        _reentry_qualified_gate(),
+        now=datetime(2026, 8, 11, 10, 25, tzinfo=IST),
+    )
+    assert changed_logic["allowed"] is False
+    assert changed_logic["reason"] == "reentry_logic_changed"
+    assert changed_logic["priorLogic"] == "MOMENTUM"
+    assert changed_logic["currentLogic"] == "MEAN_REVERSION"
+
+
+def test_reentry_requires_full_current_entry_gate():
+    prior = _closed_target_long()
+    decision = eng._reentry_decision(
+        [prior],
+        _reentry_cand("WINNER", ltp=107.0),
+        "LONG",
+        {**_reentry_qualified_gate(), "entryState": eng.ENTRY_WAIT_RETEST},
+        now=datetime(2026, 8, 11, 10, 25, tzinfo=IST),
+    )
+    assert decision["allowed"] is False
+    assert decision["reason"] == "reentry_base_logic_not_qualified"
 
 
 def test_profitable_trail_reentry_requires_new_high_beyond_prior_mfe():
@@ -304,6 +339,8 @@ def test_propose_target_reentry_exposes_auditable_policy_fields():
     assert proposed[0]["replaceReason"] == "REENTRY_AFTER_TARGET"
     assert proposed[0]["reentryExitKind"] == "TARGET_COMPLETE"
     assert proposed[0]["reentryReferencePrice"] == 106.0
+    assert proposed[0]["reentrySameLogicConfirmed"] is True
+    assert proposed[0]["reentryLogic"] == "MOMENTUM"
 
 
 def test_apply_target_reentry_is_tagged_and_smaller():
@@ -327,6 +364,8 @@ def test_apply_target_reentry_is_tagged_and_smaller():
     assert applied[0]["adoptReason"] == "REENTRY_AFTER_TARGET"
     assert applied[0]["replacedFrom"] == "WINNER"
     assert applied[0]["reentryExitKind"] == "TARGET_COMPLETE"
+    assert applied[0]["reentrySameLogicConfirmed"] is True
+    assert applied[0]["reentryLogic"] == "MOMENTUM"
     assert applied[0]["riskScale"] <= 0.5
     assert any(event.get("type") == "REENTRY_APPLIED" for event in session["events"])
 
@@ -348,6 +387,53 @@ def test_daily_replacement_cap_blocks_further_rotation():
     proposals = [{"symbol": "NEWONE", "direction": "LONG", "score": 70, "ltp": 200.0}]
     with patch.object(eng, "entry_quality_gate", side_effect=_qualified_gate):
         assert eng.apply_replacements(session, proposals, {}, {}, bypass_window=True) == []
+
+
+def test_daily_position_count_includes_reentry_but_not_pending_rows():
+    rows = [
+        {**_open_long("LOCKED"), "adopted": True, "triggered": True},
+        {
+            **_closed_target_long("REPEAT"),
+            "source": "REENTRY",
+            "adoptReason": "REENTRY_AFTER_TARGET",
+        },
+        {
+            **_open_long("PENDING"),
+            "adopted": True,
+            "triggered": False,
+            "executionStatus": "PENDING_ENTRY",
+        },
+    ]
+    assert eng._daily_position_count(rows) == 2
+
+
+def test_twenty_entry_session_cap_blocks_replacements_and_reentries():
+    used = [
+        {
+            **_closed_target_long(f"USED{i}"),
+            "source": "LOCK" if i < 5 else "ROTATION",
+            "triggered": True,
+            "executionStatus": "TRIGGERED",
+        }
+        for i in range(20)
+    ]
+    session = {
+        "locked": True,
+        "sessionDate": "2026-08-11",
+        "long": used,
+        "short": [],
+        "candidatePoolLong": [_pool_cand("NEWONE")],
+        "candidatePoolShort": [],
+        "events": [],
+    }
+    proposals = [{"symbol": "NEWONE", "direction": "LONG", "score": 70, "ltp": 200.0}]
+    with patch.object(eng, "MAX_DAILY_POSITIONS", 20):
+        with patch.object(eng, "MAX_DAILY_REPLACEMENTS", 50):
+            with patch.object(eng, "entry_quality_gate", side_effect=_qualified_gate):
+                applied = eng.apply_replacements(
+                    session, proposals, {}, {}, bypass_window=True
+                )
+    assert applied == []
 
 
 def test_outside_rotation_window_no_apply():

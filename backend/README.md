@@ -105,6 +105,13 @@ ten new entries after the morning lock (`INTRADAY_MAX_DAILY_REPLACEMENTS=10`).
 This is a shared ceiling across ordinary replacements and same-symbol re-entries,
 not a target number of trades.
 
+The separate hard session ledger cap is 20 executed entries
+(`INTRADAY_MAX_DAILY_POSITIONS=20`). It counts the initial lock, replacements,
+and every re-entry. Pending or never-triggered rows do not count. With the
+default five-position morning lock and ten post-lock replacements, the normal
+reachable maximum is 15; the 20-entry cap remains a fail-closed ceiling if
+other deployment limits are raised.
+
 A symbol that reaches a completed target, or exits through a profitable trail,
 can receive **one** same-day re-entry only when all of these checks pass:
 
@@ -113,6 +120,8 @@ can receive **one** same-day re-entry only when all of these checks pass:
   quality-adjusted Expected-R of at least 1.50;
 - any available F&O OI is aligned with the direction;
 - price breaks beyond the prior target/peak by 10 bps; and
+- the same deterministic sleeve (`MOMENTUM` or `MEAN_REVERSION`) qualifies
+  again in the same direction through the full current entry-quality gate; and
 - the repeat position uses a 50% risk-scale multiplier, subject to the
   engine's existing 40% minimum risk-scale floor.
 
@@ -121,6 +130,7 @@ event-level replay shows a positive out-of-sample contribution:
 
 ```env
 INTRADAY_MAX_DAILY_REPLACEMENTS=10
+INTRADAY_MAX_DAILY_POSITIONS=20
 INTRADAY_MAX_REENTRIES_PER_SYMBOL=1
 INTRADAY_REENTRY_TARGET_COOLDOWN_MIN=20
 INTRADAY_REENTRY_TRAIL_COOLDOWN_MIN=30
