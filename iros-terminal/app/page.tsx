@@ -2475,8 +2475,24 @@ export default function IrosMasterAdvancedTerminal() {
       });
     const [intelResult, newsResult] = await Promise.allSettled([intelligencePromise, newsPromise]);
     if (requestId !== drawerRequestRef.current) return;
-    const intelligence = intelResult.status === 'fulfilled' ? intelResult.value : null;
+    let intelligence = intelResult.status === 'fulfilled' ? intelResult.value : null;
     const news = newsResult.status === 'fulfilled' ? newsResult.value : null;
+    // The ticker-news request persists verified evidence into the backend snapshot.
+    // Rebuild the deterministic terminal report once so News Catalysts and Q3 use
+    // that same evidence immediately instead of waiting for the next drawer open.
+    if (news && !news.error) {
+      try {
+        const refreshed = await dedupedDrawerFetch<Record<string, unknown>>(
+          `intelligence-after-news:${t}:${news.generated_at || 'latest'}`,
+          `/api/terminal-intelligence?${params}`,
+        );
+        intelligence = (refreshed.terminalIntelligence ?? refreshed) as TerminalIntelligence;
+        drawerIntelligenceCache.set(t, intelligence);
+      } catch {
+        // Keep the first deterministic report if the lightweight rebuild fails.
+      }
+    }
+    if (requestId !== drawerRequestRef.current) return;
     if (intelligence) setTickerIntelligence(intelligence);
     setDrawerContent({
       stock,

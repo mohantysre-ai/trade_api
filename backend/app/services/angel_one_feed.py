@@ -422,18 +422,25 @@ def _intraday_metrics_usable(intraday: Any) -> bool:
     """True when cached metrics come from 5m or daily candles, not a dummy stub."""
     if not isinstance(intraday, dict):
         return False
-    source = str(intraday.get("data_source") or "")
-    if source not in ("candles", "daily_candles"):
-        return False
-    reasons = [str(r) for r in (intraday.get("hard_filter_reasons") or [])]
-    if any(r == "not in intraday candidate set" for r in reasons):
-        return False
 
     def _num(key: str) -> float:
         try:
             return float(intraday.get(key) or 0)
         except (TypeError, ValueError):
             return 0.0
+
+    source = str(intraday.get("data_source") or "")
+    reasons = [str(r) for r in (intraday.get("hard_filter_reasons") or [])]
+    if any(r == "not in intraday candidate set" for r in reasons):
+        return False
+    if source not in ("candles", "daily_candles"):
+        if any("estimated from quote" in reason.lower() for reason in reasons):
+            return False
+        # Backward compatibility for full candle blocks persisted before the
+        # source tag was added.  A partial quote/stub cannot satisfy this set.
+        legacy_required = ("vwap", "ema9", "atr_pct", "turnover_cr", "avg_daily_volume_20")
+        if not all(_num(key) > 0 for key in legacy_required):
+            return False
 
     return (
         _num("vwap") > 0
@@ -3653,28 +3660,28 @@ def _build_macro_strips(macro_raw: dict[str, Any]) -> tuple[list[dict[str, Any]]
         # Attach sparkline from Yahoo if available for this label
         label_upper = label.upper()
         sparkline = yahoo_sparklines.get(label_upper, [])
-        morning.append({"label": label, "val": f"{ltp:,.2f}", "delta": delta, "state": state, "sparkline": sparkline})
-        evening.append({"label": f"{label} Close", "val": f"{ltp:,.2f}", "delta": delta, "state": state, "sparkline": sparkline})
+        morning.append({"label": label, "val": f"{ltp:,.2f}", "delta": delta, "state": state, "source": "angel_one_live", "sparkline": sparkline})
+        evening.append({"label": f"{label} Close", "val": f"{ltp:,.2f}", "delta": delta, "state": state, "source": "angel_one_live", "sparkline": sparkline})
         seen_labels.add(label_upper)
 
     for row in fetch_domestic_index_macro():
         label = str(row["label"])
         if label.upper() in seen_labels:
             continue
-        morning.append({k: row.get(k) for k in ("label", "val", "delta", "state", "sparkline")})
-        evening.append({"label": f"{row['label']} Close", "val": row["val"], "delta": row["delta"], "state": row["state"], "sparkline": row.get("sparkline", [])})
+        morning.append({k: row.get(k) for k in ("label", "val", "delta", "state", "source", "sparkline")})
+        evening.append({"label": f"{row['label']} Close", "val": row["val"], "delta": row["delta"], "state": row["state"], "source": row.get("source"), "sparkline": row.get("sparkline", [])})
         seen_labels.add(label.upper())
 
     for row in fetch_domestic_yahoo_macro():
-        morning.append({k: row.get(k) for k in ("label", "val", "delta", "state", "sparkline")})
-        evening.append({"label": f"{row['label']} Close", "val": row["val"], "delta": row["delta"], "state": row["state"], "sparkline": row.get("sparkline", [])})
+        morning.append({k: row.get(k) for k in ("label", "val", "delta", "state", "source", "sparkline")})
+        evening.append({"label": f"{row['label']} Close", "val": row["val"], "delta": row["delta"], "state": row["state"], "source": row.get("source"), "sparkline": row.get("sparkline", [])})
 
     # GIFT NIFTY from NSE India API (has no sparkline data, so default to [])
     gift_nifty = fetch_gift_nifty()
     if gift_nifty and gift_nifty["label"].upper() not in seen_labels:
         gs = gift_nifty.get("sparkline", []) or []
-        morning.append({"label": gift_nifty["label"], "val": gift_nifty["val"], "delta": gift_nifty["delta"], "state": gift_nifty["state"], "sparkline": gs})
-        evening.append({"label": f"{gift_nifty['label']} Close", "val": gift_nifty["val"], "delta": gift_nifty["delta"], "state": gift_nifty["state"], "sparkline": gs})
+        morning.append({"label": gift_nifty["label"], "val": gift_nifty["val"], "delta": gift_nifty["delta"], "state": gift_nifty["state"], "source": gift_nifty.get("source") or "nse_india", "sparkline": gs})
+        evening.append({"label": f"{gift_nifty['label']} Close", "val": gift_nifty["val"], "delta": gift_nifty["delta"], "state": gift_nifty["state"], "source": gift_nifty.get("source") or "nse_india", "sparkline": gs})
         seen_labels.add(gift_nifty["label"].upper())
 
     return morning, evening
@@ -4796,7 +4803,14 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=503, detail="Market snapshot unavailable.")
             snapshot = dict(snapshot)
             if ticker:
-                snapshot = ensure_snapshot_ticker_facts(snapshot, str(ticker).strip().upper())
+                resolved = str(ticker).strip().upper()
+                snapshot = ensure_snapshot_ticker_facts(snapshot, resolved)
+                try:
+                    from .ticker_financial_evidence import ensure_ticker_financial_evidence
+
+                    snapshot = ensure_ticker_financial_evidence(snapshot, resolved)
+                except Exception as exc:
+                    logging.getLogger(__name__).warning("ticker financial evidence unavailable for %s: %s", resolved, exc)
             payload = _hydrate_ticker_intelligence_map(snapshot)
             if pool:
                 payload["activePool"] = pool
@@ -5126,7 +5140,10 @@ def create_app() -> FastAPI:
         force_refresh: bool = False,
     ) -> dict[str, Any]:
         try:
-            from .ai_ticker_news import ticker_news_report_is_llm_complete
+            from .ai_ticker_news import (
+                ticker_news_report_has_deterministic_evidence,
+                ticker_news_report_is_llm_complete,
+            )
 
             resolved_ticker = ticker.strip().upper()
             if not resolved_ticker:
@@ -5139,7 +5156,10 @@ def create_app() -> FastAPI:
 
             if (
                 not force_refresh
-                and ticker_news_report_is_llm_complete(cached_report)
+                and (
+                    ticker_news_report_is_llm_complete(cached_report)
+                    or ticker_news_report_has_deterministic_evidence(cached_report)
+                )
             ):
                 cached_report = dict(cached_report)
                 cached_report["cached"] = True
@@ -5162,7 +5182,10 @@ def create_app() -> FastAPI:
 
             report_data["cached"] = False
 
-            if snapshot and ticker_news_report_is_llm_complete(report_data):
+            if snapshot and (
+                ticker_news_report_is_llm_complete(report_data)
+                or ticker_news_report_has_deterministic_evidence(report_data)
+            ):
                 updated_map = dict(snapshot.get("tickerNewsByTicker") or {})
                 updated_map[resolved_ticker] = report_data
                 snapshot = dict(snapshot)

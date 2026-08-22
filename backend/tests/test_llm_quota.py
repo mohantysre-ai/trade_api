@@ -8,6 +8,7 @@ from app.services.ai_ticker_news import (
     _article_fingerprint,
     _ticker_news_cache_ttl,
     get_cached_summary,
+    ticker_news_report_has_deterministic_evidence,
     ticker_news_report_is_llm_complete,
 )
 from app.services.llm_client import parse_openrouter_reset_unix, quota_not_before_unix
@@ -62,6 +63,40 @@ def test_ticker_news_incomplete_not_cacheable():
         "llmUsed": False,
         "summary_headline": "LLM summary unavailable for KOTAKBANK (20 articles scraped).",
     }) is False
+
+
+def test_verified_news_survives_llm_quota_or_unavailability():
+    fresh = {
+        "news_schema_version": NEWS_SCHEMA_VERSION,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    verified = {
+        "ticker": "ADANIENT",
+        "generated_at": fresh["generated_at"],
+        "llmUsed": False,
+        "summary_headline": "LLM summary unavailable for Adani Enterprises (6 articles scraped).",
+        "evidence_status": "VERIFIED_RECENT",
+        "latest_verified_headlines": [
+            {
+                "title": "Change in Management",
+                "source": "NSE Announcements",
+                "published_at": "2026-08-21T18:29:13+00:00",
+            }
+        ],
+    }
+    no_recent = {
+        "ticker": "ABC",
+        "generated_at": fresh["generated_at"],
+        "llmUsed": False,
+        "evidence_status": "NO_RECENT_EVIDENCE",
+        "source_diagnostics": [
+            {"source": "NSE Announcements", "status": "ZERO_RESULTS", "accepted": 0}
+        ],
+    }
+
+    assert ticker_news_report_is_llm_complete(verified) is False
+    assert ticker_news_report_has_deterministic_evidence(verified) is True
+    assert ticker_news_report_has_deterministic_evidence(no_recent) is True
     assert ticker_news_report_is_llm_complete({
         **fresh,
         "ticker": "KOTAKBANK",

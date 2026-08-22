@@ -499,55 +499,13 @@ def _looks_like_placeholder(value: Any) -> bool:
     return any(text.startswith(prefix) for prefix in KNOWN_PLACEHOLDER_PREFIXES)
 
 
-def _estimate_fundamentals_from_snapshot(snapshot: dict[str, Any]) -> dict[str, str]:
-    active_scoring_matrix = (snapshot.get("terminalIntelligence") or {}).get(
-        "active_scoring_matrix"
-    ) or {}
-    beneish = active_scoring_matrix.get("beneish_m_score")
-    altman = active_scoring_matrix.get("altman_z_score")
-    ocf = active_scoring_matrix.get("ocf_ebitda_ratio")
-    mansfield = active_scoring_matrix.get("mansfield_relative_strength")
-
-    if beneish and altman and ocf and mansfield and not any(
-        _looks_like_placeholder(v) for v in (beneish, altman, ocf, mansfield)
-    ):
-        return {
-            "beneish_m_score": str(beneish),
-            "altman_z_score": str(altman),
-            "ocf_ebitda_ratio": str(ocf),
-            "mansfield_relative_strength": str(mansfield),
-        }
-
-    stocks = snapshot.get("stocks") or []
-    stock_quotes = snapshot.get("stockQuotes") or {}
-    fundamentals: dict[str, str] = {}
-
-    for stock in stocks:
-        ticker = stock.get("ticker")
-        if not ticker:
-            continue
-        quote = stock_quotes.get(ticker, stock)
-        ltp = float(quote.get("ltpRaw") or stock.get("ltpRaw") or 0)
-        close = float(quote.get("close") or stock.get("close") or 0)
-        volume = float(quote.get("volume") or stock.get("volume") or 0)
-        delta = _parse_percent(quote.get("delta") or stock.get("delta"))
-
-        positive_trend = 1 if delta > 0 else -1 if delta < 0 else 0
-        volume_quality = min(max((volume / 1_000_000) / 2.0, -1.0), 1.0)
-        price_stability = max(min((ltp / (close or ltp)) - 1.0, 1.0), -1.0)
-
-        beneish_score = -0.5 + (positive_trend * 0.08) + (volume_quality * 0.05)
-        altman_score = 2.5 + (positive_trend * 0.25) + (volume_quality * 0.3) + (price_stability * 0.4)
-        ocf_ratio = 0.6 + (positive_trend * 0.06) + (volume_quality * 0.04)
-        mansfield_rs = 0.7 + (positive_trend * 0.05) + (volume_quality * 0.03)
-
-        fundamentals[ticker] = {
-            "beneish_m_score": f"{beneish_score:.2f}",
-            "altman_z_score": f"{altman_score:.2f}",
-            "ocf_ebitda_ratio": f"{ocf_ratio:.2f}",
-            "mansfield_relative_strength": f"{mansfield_rs:.2f}",
-        }
-
+def _estimate_fundamentals_from_snapshot(snapshot: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """Return only source-backed ticker evidence; never infer ratios from price/volume."""
+    fundamentals: dict[str, dict[str, str]] = {}
+    for ticker, evidence in (snapshot.get("tickerEvidenceByTicker") or {}).items():
+        metrics = evidence.get("metrics") if isinstance(evidence, dict) else None
+        if isinstance(metrics, dict) and metrics:
+            fundamentals[str(ticker).upper()] = {str(key): str(value) for key, value in metrics.items()}
     return fundamentals
 
 
@@ -612,19 +570,30 @@ def _default_factor_hub(stocks: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _ticker_fundamentals(payload: dict[str, Any], ticker: str) -> dict[str, str]:
-    active_scoring_matrix = (payload.get("terminalIntelligence") or {}).get("active_scoring_matrix") or {}
+    ticker_evidence = (payload.get("tickerEvidenceByTicker") or {}).get(str(ticker).upper())
+    if isinstance(ticker_evidence, dict):
+        metrics = ticker_evidence.get("metrics")
+        if isinstance(metrics, dict) and metrics:
+            return {
+                key: str(metrics.get(key) or "NOT_CALCULATED — required source fields unavailable")
+                for key in ("beneish_m_score", "altman_z_score", "ocf_ebitda_ratio", "mansfield_relative_strength")
+            }
+
+    terminal = payload.get("terminalIntelligence") or {}
+    active_scoring_matrix = terminal.get("active_scoring_matrix") or {}
+    matrix_ticker = str(terminal.get("focusTicker") or terminal.get("ticker") or "").upper()
     if all(
-        active_scoring_matrix.get(key)
+        matrix_ticker == str(ticker).upper() and active_scoring_matrix.get(key)
         and str(active_scoring_matrix.get(key)).strip().lower() not in {"n/a", "na", "none", "-", ""}
         for key in ("beneish_m_score", "altman_z_score", "ocf_ebitda_ratio", "mansfield_relative_strength")
     ):
         return {key: str(active_scoring_matrix[key]) for key in active_scoring_matrix}
 
     return {
-        "beneish_m_score": "INSUFFICIENT — financial-statement inputs unavailable",
-        "altman_z_score": "INSUFFICIENT — balance-sheet inputs unavailable",
-        "ocf_ebitda_ratio": "INSUFFICIENT — cash-flow and EBITDA inputs unavailable",
-        "mansfield_relative_strength": "INSUFFICIENT — benchmark price history unavailable",
+        "beneish_m_score": "SOURCE_UNAVAILABLE — financial statements were not loaded",
+        "altman_z_score": "SOURCE_UNAVAILABLE — balance-sheet inputs were not loaded",
+        "ocf_ebitda_ratio": "SOURCE_UNAVAILABLE — cash-flow and EBITDA inputs were not loaded",
+        "mansfield_relative_strength": "SOURCE_UNAVAILABLE — benchmark price history was not loaded",
     }
 
 
@@ -656,20 +625,31 @@ def _intraday_bar_source(intraday: Any) -> str:
     if not isinstance(intraday, dict):
         return ""
     src = str(intraday.get("data_source") or "")
-    if src not in ("candles", "daily_candles"):
-        return ""
     reasons = [str(r) for r in (intraday.get("hard_filter_reasons") or [])]
     if "not in intraday candidate set" in reasons:
+        return ""
+    if src not in ("candles", "daily_candles"):
+        # Older persisted snapshots predate data_source tagging but still carry
+        # the full candle-derived metric set.  Accept only that complete shape;
+        # never accept the explicitly estimated quote fallback.
+        if any("estimated from quote" in reason.lower() for reason in reasons):
+            return ""
+        required = ("vwap", "ema9", "atr_pct", "turnover_cr", "avg_daily_volume_20")
+        if all(_finite_number(intraday.get(key)) not in (None, 0) for key in required):
+            return "candles"
         return ""
     return src
 
 
 def _ticker_score(stock: dict[str, Any], ledger_row: dict[str, Any]) -> float | None:
-    raw = ledger_row.get("score")
-    if raw is None:
-        raw = stock.get("score")
-    if raw is None:
-        raw = (stock.get("intraday") or {}).get("score")
+    raw = None
+    for container in (ledger_row, stock, stock.get("intraday") or {}):
+        for key in ("score", "alpha_score", "engine_score", "rank_score"):
+            if container.get(key) not in (None, ""):
+                raw = container.get(key)
+                break
+        if raw is not None:
+            break
     if raw is None or raw == "":
         return None
     try:
@@ -966,8 +946,9 @@ def _ticker_risk_calc(stock: dict[str, Any], ledger_row: dict[str, Any], market_
     win_loss_ratio = market_risk.get("win_loss_ratio") or "—"
     kelly_policy_max = ledger_row.get("policy_allocation_pct") or market_risk.get("kelly_policy_max") or "—"
     wl_ratio = _parse_win_loss_ratio(win_loss_ratio)
-    has_execution_risk = src == "candles" and score is not None and wl_ratio is not None and _parse_percent_value(kelly_policy_max) is not None
-    risk_flag_score, risk_flag = (None, "INSUFFICIENT")
+    kelly_pct = _parse_percent_value(kelly_policy_max)
+    has_execution_risk = src == "candles" and score is not None
+    risk_flag_score, risk_flag = (None, "NOT_CALCULATED")
     if has_execution_risk:
         risk_flag_score, risk_flag = _risk_flag_from_metrics(
             score=score,
@@ -989,7 +970,11 @@ def _ticker_risk_calc(stock: dict[str, Any], ledger_row: dict[str, Any], market_
         "kelly_policy_max": kelly_policy_max,
         "risk_flag_score": risk_flag_score,
         "risk_flag": risk_flag,
-        "risk_method": "Requires score, win/loss ratio, and Kelly allocation; missing inputs are not imputed.",
+        "risk_method": (
+            "Deterministic technical risk score from ticker score, delta, ATR and participation; "
+            + ("win/loss included; " if wl_ratio is not None else "win/loss unavailable; ")
+            + ("Kelly allocation included." if kelly_pct is not None else "Kelly allocation unavailable.")
+        ) if has_execution_risk else "NOT_CALCULATED — usable 5-minute candle metrics and ticker score are required.",
     }
 
 
@@ -1011,7 +996,7 @@ def _ticker_news_catalyst_blurb(payload: dict[str, Any], ticker: str) -> str | N
         return None
     parts: list[str] = []
     headline = _clean_value(news.get("summary_headline"))
-    if headline:
+    if headline and not headline.lower().startswith(("llm summary unavailable", "no verified")):
         parts.append(headline)
     for key in _NEWS_CATEGORY_KEYS:
         val = _clean_value(news.get(key))
@@ -1025,6 +1010,163 @@ def _ticker_news_catalyst_blurb(payload: dict[str, Any], ticker: str) -> str | N
     if sentiment:
         parts.append(f"Sentiment: {sentiment}")
     return " | ".join(parts[:8]) if parts else None
+
+
+def _ticker_news_evidence(payload: dict[str, Any], ticker: str) -> tuple[str, str]:
+    news = (payload.get("tickerNewsByTicker") or {}).get(str(ticker).upper())
+    if not isinstance(news, dict):
+        return "SOURCE_UNAVAILABLE — ticker-news collection has not completed for this symbol.", "SOURCE_UNAVAILABLE"
+    status = str(news.get("evidence_status") or "").upper()
+    checked = [str(item) for item in (news.get("sources_checked") or []) if item]
+    checked_text = ", ".join(checked[:6]) or "configured exchange and financial-news sources"
+    lookback = int(news.get("lookback_days") or news.get("lookbackDays") or 7)
+    if status == "NO_RECENT_EVIDENCE":
+        return f"NO_RECENT_EVIDENCE — {checked_text} returned no verified ticker-specific item in {lookback} days.", status
+    if status == "SOURCE_UNAVAILABLE":
+        return f"SOURCE_UNAVAILABLE — no configured ticker-news source completed successfully ({checked_text}).", status
+    blurb = _ticker_news_catalyst_blurb(payload, ticker)
+    headlines = news.get("latest_verified_headlines") or []
+    if blurb:
+        return blurb, "READY"
+    if isinstance(headlines, list) and headlines:
+        first = headlines[0] if isinstance(headlines[0], dict) else {}
+        title = _clean_value(first.get("title"))
+        source = _clean_value(first.get("source")) or "verified source"
+        published = _clean_value(first.get("published_at")) or "date recorded"
+        if title:
+            return f"{title} ({source}, {published})", "READY"
+    return f"SOURCE_UNAVAILABLE — ticker-news result is incomplete after checking {checked_text}.", "SOURCE_UNAVAILABLE"
+
+
+def _macro_anchor_text(payload: dict[str, Any]) -> tuple[str, str]:
+    strip = payload.get("macroDataStrip") if isinstance(payload.get("macroDataStrip"), dict) else {}
+    domestic = strip.get("morning") or strip.get("evening") or []
+    global_macro = payload.get("globalMacro") if isinstance(payload.get("globalMacro"), dict) else {}
+    commodities = global_macro.get("commodities") or []
+    wanted = ("NIFTY 50", "INDIA VIX", "USD / INR", "NIFTY BANK")
+    selected: list[str] = []
+    for row in domestic:
+        if not isinstance(row, dict):
+            continue
+        label = str(row.get("label") or "")
+        if not any(key in label.upper() for key in wanted):
+            continue
+        value = _clean_value(row.get("val")) or "—"
+        delta = _clean_value(row.get("delta")) or "—"
+        source = _clean_value(row.get("source")) or "market snapshot"
+        selected.append(f"{label}: {value}, {delta} [{source}]")
+    for row in commodities:
+        if not isinstance(row, dict) or str(row.get("label") or "").upper() not in {"BRENT CRUDE OIL", "GOLD"}:
+            continue
+        selected.append(
+            f"{row.get('label')}: {_clean_value(row.get('val')) or '—'}, "
+            f"{_clean_value(row.get('delta')) or '—'} [{_clean_value(row.get('source')) or 'market snapshot'}]"
+        )
+    if not selected:
+        return "SOURCE_UNAVAILABLE — macro snapshot contains no usable NIFTY, VIX, FX, or commodity rows.", "SOURCE_UNAVAILABLE"
+    as_of = _clean_value(payload.get("macrosRefreshedAt") or payload.get("updatedAt"))
+    suffix = f" As of {as_of}." if as_of else ""
+    return " | ".join(selected[:6]) + suffix, "READY"
+
+
+def _ticker_institutional_evidence(stock: dict[str, Any], ticker_news: dict[str, Any] | None) -> tuple[str, str]:
+    intraday = stock.get("intraday") if isinstance(stock.get("intraday"), dict) else {}
+    promoter = _finite_number(stock.get("promoter_holding_pct") or intraday.get("promoter_holding_pct"))
+    delivery = _finite_number(stock.get("deliveryPct") or stock.get("delivery_pct") or intraday.get("delivery_pct"))
+    bulk_signal = bool(stock.get("bulk_deal_signal") or intraday.get("bulk_deal_signal"))
+    bulk_value = _finite_number(stock.get("bulk_deal_value_cr") or intraday.get("bulk_deal_value_cr")) or 0.0
+    institutional_news = _clean_value((ticker_news or {}).get("institutional_activity"))
+    if institutional_news and institutional_news.lower() not in {"—", "no recent news found.", "n/a", "none"}:
+        return f"PARTIAL — {institutional_news}; source-level holding/deal details are required for a deterministic fund-buying PASS.", "PARTIAL"
+    facts: list[str] = []
+    if promoter is not None:
+        facts.append(f"promoter holding {promoter:.2f}%")
+    if delivery is not None:
+        facts.append(f"delivery {delivery:.2f}%")
+    if bulk_signal:
+        facts.append(f"qualifying NSE bulk/block activity ₹{bulk_value:.2f} Cr")
+        return "PARTIAL — " + "; ".join(facts) + "; buyer classification/shareholding delta is still required for a fund-buying PASS.", "PARTIAL"
+    if facts:
+        return "NO_VERIFIED_SIGNAL — " + "; ".join(facts) + "; no qualifying bulk/block or explicit institutional-buying evidence was recorded.", "NO_VERIFIED_SIGNAL"
+    return "SOURCE_UNAVAILABLE — delivery, bulk/block deal, and shareholding evidence were not loaded.", "SOURCE_UNAVAILABLE"
+
+
+def _finite_number(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number == number else None
+
+
+def _risk_reward_gate(stock: dict[str, Any], ledger_row: dict[str, Any]) -> tuple[str, str]:
+    candidates = [ledger_row, stock, stock.get("tradePlan") or {}, stock.get("intraday") or {}]
+
+    def first(keys: tuple[str, ...]) -> float | None:
+        for row in candidates:
+            if not isinstance(row, dict):
+                continue
+            for key in keys:
+                value = _finite_number(row.get(key))
+                if value is not None and value > 0:
+                    return value
+        return None
+
+    entry = first(("entry", "entryPrice", "buyAbove", "sellBelow", "trigger_price"))
+    stop = first(("stopLoss", "stop_loss", "sl", "initial_stop"))
+    target = first(("target2", "target", "targetPrice", "t2"))
+    if entry is None or stop is None or target is None:
+        return "NOT_APPLICABLE — this watch-list row has no approved entry/stop/target trade plan.", "NOT_APPLICABLE"
+    risk = abs(entry - stop)
+    reward = abs(target - entry)
+    if risk <= 0:
+        return "INVALID_PLAN — entry and stop produce zero per-share risk.", "INVALID_PLAN"
+    rr = reward / risk
+    status = "PASS" if rr >= 1.5 else "WATCH"
+    return f"{status} — entry ₹{entry:.2f}, stop ₹{stop:.2f}, target ₹{target:.2f}; reward/risk {rr:.2f}x.", status
+
+
+def _governance_evidence(stock: dict[str, Any], ticker_news: dict[str, Any] | None) -> tuple[str, str]:
+    intraday = stock.get("intraday") if isinstance(stock.get("intraday"), dict) else {}
+    promoter = _finite_number(stock.get("promoter_holding_pct") or intraday.get("promoter_holding_pct"))
+    auditor = _clean_value((ticker_news or {}).get("auditor_changes"))
+    regulatory = _clean_value((ticker_news or {}).get("regulatory_filings"))
+    insider = _clean_value((ticker_news or {}).get("insider_activity"))
+    evidence = [item for item in (auditor, regulatory, insider) if item and item.lower() not in {"—", "no recent news found.", "n/a", "none"}]
+    if evidence:
+        prefix = f"promoter holding {promoter:.2f}%; " if promoter is not None else ""
+        return f"PARTIAL — {prefix}" + " | ".join(evidence[:3]) + ". Pledge and related-party checks remain separate.", "PARTIAL"
+    if promoter is not None:
+        return f"PARTIAL — promoter holding {promoter:.2f}% is verified; no recent auditor/regulatory evidence was attached, and pledge/RPT checks remain outstanding.", "PARTIAL"
+    return "SOURCE_UNAVAILABLE — promoter, pledge, auditor, related-party, and regulatory evidence were not loaded.", "SOURCE_UNAVAILABLE"
+
+
+def _forward_revenue_evidence(payload: dict[str, Any], ticker: str) -> tuple[str, str]:
+    evidence = (payload.get("tickerEvidenceByTicker") or {}).get(str(ticker).upper())
+    snapshot = evidence.get("financialSnapshot") if isinstance(evidence, dict) else None
+    if not isinstance(snapshot, dict):
+        return f"SOURCE_UNAVAILABLE — {ticker} financial statements and management guidance were not loaded.", "SOURCE_UNAVAILABLE"
+    revenue = _finite_number(snapshot.get("reportedRevenueCr"))
+    growth = _finite_number(snapshot.get("reportedRevenueGrowthPct"))
+    if revenue is None:
+        return f"NOT_CALCULATED — {ticker} reported revenue is absent from the loaded statement source.", "NOT_CALCULATED"
+    growth_text = f", YoY {growth:+.2f}%" if growth is not None else ""
+    return f"REPORTED_BASE — latest annual revenue ₹{revenue:,.2f} Cr{growth_text}. Forward revenue remains unmodelled until source-backed guidance/order-book timing is available.", "PARTIAL"
+
+
+def _ticker_value_factor(payload: dict[str, Any], ticker: str) -> str:
+    evidence = (payload.get("tickerEvidenceByTicker") or {}).get(str(ticker).upper())
+    snapshot = evidence.get("financialSnapshot") if isinstance(evidence, dict) else None
+    if not isinstance(snapshot, dict):
+        return "SOURCE_UNAVAILABLE — valuation source was not loaded."
+    forward_pe = _finite_number(snapshot.get("forwardPe"))
+    price_to_book = _finite_number(snapshot.get("priceToBook"))
+    values: list[str] = []
+    if forward_pe is not None:
+        values.append(f"forward P/E {forward_pe:.2f}x")
+    if price_to_book is not None:
+        values.append(f"price/book {price_to_book:.2f}x")
+    return "Yahoo Finance: " + ", ".join(values) + "." if values else "NOT_CALCULATED — forward P/E and price/book were unavailable."
 
 
 def build_ticker_intelligence_report(payload: dict[str, Any], ticker: str) -> dict[str, Any]:
@@ -1043,8 +1185,14 @@ def build_ticker_intelligence_report(payload: dict[str, Any], ticker: str) -> di
     fundamentals = _ticker_fundamentals(payload, ticker)
     market_risk = terminal.get("active_risk_calc") or {}
     market_factor_hub = terminal.get("active_factor_hub") or {}
-    enriched_news = _ticker_news_catalyst_blurb(payload, ticker)
-    market_news = enriched_news or "INSUFFICIENT — no ticker-specific, dated news catalyst was available from the current feed."
+    ticker_news = (payload.get("tickerNewsByTicker") or {}).get(str(ticker).upper())
+    ticker_news = ticker_news if isinstance(ticker_news, dict) else None
+    market_news, news_status = _ticker_news_evidence(payload, ticker)
+    macro_text, macro_status = _macro_anchor_text(payload)
+    institution_text, institution_status = _ticker_institutional_evidence(stock, ticker_news)
+    governance_text, governance_status = _governance_evidence(stock, ticker_news)
+    forward_revenue_text, revenue_status = _forward_revenue_evidence(payload, ticker)
+    risk_reward_text, risk_reward_status = _risk_reward_gate(stock, ledger_row)
 
     why_parts = [f"{ticker} is in the active terminal universe with LTP {ltp}, {delta} move, and volume {volume}."]
     if selection_reason:
@@ -1061,37 +1209,54 @@ def build_ticker_intelligence_report(payload: dict[str, Any], ticker: str) -> di
     above_vwap = intraday.get("price_above_vwap")
     above_ema9 = intraday.get("price_above_ema9")
     hard_filter = bool(intraday.get("passes_hard_filters"))
-    q2_status = "PASS" if turnover >= 50 else "FAIL" if turnover > 0 else "INSUFFICIENT"
+    q2_status = "PASS" if turnover >= 50 else "FAIL" if turnover > 0 else "SOURCE_UNAVAILABLE"
     anchor_evidence = (
         f"price_above_vwap={above_vwap}, price_above_ema9={above_ema9}"
         if above_vwap is not None or above_ema9 is not None
         else "VWAP/EMA9 relationship unavailable"
     )
+    factor_hub = _ticker_factor_hub(stock, score) if stock else dict(market_factor_hub)
+    factor_hub["value_factor"] = _ticker_value_factor(payload, ticker)
+    financial_evidence = (payload.get("tickerEvidenceByTicker") or {}).get(str(ticker).upper())
+    financial_status = str(financial_evidence.get("status") or "SOURCE_UNAVAILABLE") if isinstance(financial_evidence, dict) else "SOURCE_UNAVAILABLE"
+    q3_status = "EVIDENCE_PRESENT" if news_status == "READY" else news_status
+    q1_status = "EVIDENCE_PRESENT" if institution_status == "READY" else institution_status
     return {
         "news_catalysts_card": f"Market context for {ticker}: {market_news}",
-        "insider_insti_activity_card": f"INSUFFICIENT — volume multiplier {volume_multiplier:.2f}x and turnover {turnover:.2f} Cr do not establish institutional buying. Exchange block/bulk deals, delivery volume, or shareholding evidence is required.",
-        "macro_anchors_card": "INSUFFICIENT — no source-stamped index breadth, VIX, FX, rates, commodity, or sector-index observations were supplied for this ticker report.",
+        "insider_insti_activity_card": institution_text,
+        "macro_anchors_card": macro_text,
         "forensic_screen_card": f"{ticker} forensic screen: {forensic_bits}.",
         "why_interested": why,
-        "future_revenue_model": f"INSUFFICIENT — {ticker} forward revenue requires reported order book, execution schedule, historical revenue, margins, and management guidance; market momentum is not a revenue proxy.",
+        "future_revenue_model": forward_revenue_text,
         "current_model": f"Current market snapshot for {ticker}: LTP {ltp}, delta {delta}, volume {volume}, score {score_text}, action {action}.",
         "ledger_stocks": _canonicalize_ledger_rows([ledger_row] if ledger_row else [], ticker) or _canonicalize_ledger_rows(terminal.get("ledger_stocks") or [], ticker),
         "active_scoring_matrix": fundamentals,
         "active_seven_ic_gates": {
-            "q1_fund_buying": f"INSUFFICIENT — {ticker} volume {volume_multiplier:.2f}x and turnover ₹{turnover:.2f} Cr are participation metrics, not proof of fund buying.",
+            "q1_fund_buying": f"{q1_status} — {institution_text.split(' — ', 1)[-1]}",
             "q2_liquidity_delivery": f"{q2_status} — turnover ₹{turnover:.2f} Cr against the deterministic ₹50 Cr liquidity threshold.",
-            "q3_catalyst_validation": "INSUFFICIENT — no ticker-specific, dated catalyst with a verifiable source was supplied.",
+            "q3_catalyst_validation": f"{q3_status} — {market_news.split(' — ', 1)[-1]}",
             "q4_bear_thesis": f"WATCH — market-structure evidence only: {anchor_evidence}; delta {delta}. No fundamental bear thesis was supplied.",
-            "q5_risk_reward": "INSUFFICIENT — entry, stop-loss and target values are required to calculate reward/risk.",
+            "q5_risk_reward": risk_reward_text,
             "q6_quantitative_milestone": f"{'PASS' if hard_filter else 'FAIL'} — deterministic hard-filter status; score {score_text}.",
-            "q7_governance_gate": "INSUFFICIENT — auditor, promoter pledge, related-party, regulatory and exchange-disclosure evidence was not supplied.",
+            "q7_governance_gate": governance_text,
         },
         "active_risk_calc": _ticker_risk_calc(stock, ledger_row, market_risk, score),
-        "active_factor_hub": _ticker_factor_hub(stock, score) if stock else market_factor_hub,
+        "active_factor_hub": factor_hub,
         "focusTicker": ticker,
         "ticker": ticker,
         "dataQuality": "partial-live-metrics" if intraday_source == "candles" else "daily-candles" if intraday_source == "daily_candles" else "snapshot-quote",
-        "evidencePolicy": "Unsupported fields remain INSUFFICIENT; price/volume data is not used as a proxy for fundamentals, institutional ownership, governance, or revenue.",
+        "evidencePolicy": "Every field reports READY, PARTIAL, NO_VERIFIED_SIGNAL, NOT_APPLICABLE, NOT_CALCULATED, or SOURCE_UNAVAILABLE; price/volume is never used as a proxy for fundamentals, institutional ownership, governance, or revenue.",
+        "evidenceReadiness": {
+            "technical": "READY" if intraday_source else "SOURCE_UNAVAILABLE",
+            "score": "READY" if score is not None else "SOURCE_UNAVAILABLE",
+            "financials": financial_status,
+            "news": news_status,
+            "macro": macro_status,
+            "institutional": institution_status,
+            "governance": governance_status,
+            "tradePlan": risk_reward_status,
+            "forwardRevenue": revenue_status,
+        },
     }
 
 

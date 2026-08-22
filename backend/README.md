@@ -97,6 +97,14 @@ Set `MIN_BULK_DEAL_VALUE_CR` (default `5`) and `BULK_DEAL_LOOKBACK_HOURS` (defau
 Set `BULK_DEAL_CACHE_TTL_SECONDS` (default `3600`) to control how often NSE bulk/block deals are refreshed.
 Set `INTRADAY_CANDIDATE_LIMIT` in `.env` if you want to cap how many of those volume leaders are candle-screened before the LLM ranking pass (defaults to `VOLUME_PRESELECT_LIMIT`).
 
+Ticker Terminal Intelligence loads financial evidence only for the symbol a
+user opens; it never fans fundamentals calls across the Nifty 500 universe.
+Results are cached for 24 hours. `TICKER_FINANCIAL_EVIDENCE_ENABLED=false`
+disables the on-demand fetch, `TICKER_FINANCIAL_EVIDENCE_TTL_SECONDS` changes
+the successful-result TTL, and `TICKER_FINANCIAL_EVIDENCE_FAILURE_TTL_SECONDS`
+changes the short provider-failure cooldown. Yahoo Finance is attempted first;
+Screener.in annual tables provide a source-labelled partial fallback.
+
 ### Intraday rotation and same-symbol re-entry
 
 The intraday book is capped at five concurrent names and can hold cash. It does

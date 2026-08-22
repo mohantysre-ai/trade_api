@@ -1454,6 +1454,38 @@ def ticker_news_report_is_llm_complete(report: dict | None) -> bool:
     return bool(headline.strip())
 
 
+def ticker_news_report_has_deterministic_evidence(report: dict | None) -> bool:
+    """True when collection completed, even if every LLM provider is unavailable.
+
+    Verified headlines and honest no-evidence results must survive independently
+    of the summarizer; otherwise Terminal Intelligence incorrectly reports that
+    no source ran whenever an LLM quota is exhausted.
+    """
+    if not isinstance(report, dict) or report.get("error") is True:
+        return False
+    generated = report.get("generated_at") or report.get("generatedAt")
+    if not generated:
+        return False
+    try:
+        stamp = datetime.fromisoformat(str(generated).replace("Z", "+00:00"))
+        stamp = stamp.replace(tzinfo=stamp.tzinfo or timezone.utc).astimezone(timezone.utc)
+        if datetime.now(timezone.utc) - stamp > _ticker_news_cache_ttl(report):
+            return False
+    except (TypeError, ValueError, OverflowError):
+        return False
+    status = str(report.get("evidence_status") or "").upper()
+    if status == "VERIFIED_RECENT":
+        headlines = report.get("latest_verified_headlines")
+        return isinstance(headlines, list) and any(isinstance(item, dict) and item.get("title") for item in headlines)
+    if status == "NO_RECENT_EVIDENCE":
+        diagnostics = report.get("source_diagnostics")
+        return isinstance(diagnostics, list) and any(
+            isinstance(item, dict) and str(item.get("status") or "").upper() in {"SUCCESS", "ZERO_RESULTS", "STALE_OR_UNDATED"}
+            for item in diagnostics
+        )
+    return False
+
+
 def _article_fingerprint(articles: list[TickerNewsArticle]) -> str:
     evidence = [f"{a.source}|{a.published_at}|{a.title}|{a.url}" for a in articles]
     return hashlib.sha256("\n".join(sorted(evidence)).encode("utf-8")).hexdigest()[:20]
