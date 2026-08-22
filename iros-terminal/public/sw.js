@@ -1,6 +1,13 @@
 /* Alphix Terminal — installability assets only; never cache the Next.js shell. */
-const CACHE = "alphix-install-v2";
-const PRECACHE = ["/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
+const CACHE = "alphix-install-v3";
+const PRECACHE = [
+  "/manifest.webmanifest",
+  "/icon-192-v3.png",
+  "/icon-512-v3.png",
+  "/icon-512-maskable-v3.png",
+  "/apple-touch-icon-v3.png",
+  "/alphix-logo-v3.svg",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

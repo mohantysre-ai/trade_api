@@ -2573,7 +2573,7 @@ export default function IrosMasterAdvancedTerminal() {
             <div className="desk-brand" title="NSE / BSE · live desk">
               <div className="desk-brand-mark" aria-hidden>
                 <img
-                  src="/alphix-logo.svg"
+                  src="/alphix-logo-v3.svg"
                   alt=""
                   width={32}
                   height={32}
