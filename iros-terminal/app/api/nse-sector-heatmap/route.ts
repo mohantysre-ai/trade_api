@@ -4,6 +4,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const NSE_URL = 'https://www.nseindia.com/api/heatmap-index?type=Sectoral%20Indices';
+const NSE_ALL_INDICES_URL = 'https://www.nseindia.com/api/allIndices';
 const BACKEND_URL = process.env.MARKET_API_URL ?? 'http://127.0.0.1:8000';
 const FRESH_MS = 60_000;
 let cache: { at: number; rows: SectorRow[] } | null = null;
@@ -11,6 +12,7 @@ let cache: { at: number; rows: SectorRow[] } | null = null;
 type SectorRow = { name: string; changePct: number; last?: number };
 
 function numeric(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
   const n = typeof value === 'string' ? Number(value.replace(/,/g, '').replace('%', '')) : Number(value);
   return Number.isFinite(n) ? n : undefined;
 }
@@ -26,9 +28,43 @@ function normalize(payload: unknown): SectorRow[] {
     const name = String(row.indexName ?? row.name ?? row.symbol ?? row.index ?? '').trim();
     const changePct = numeric(row.pChange ?? row.percentChange ?? row.changePercent ?? row.perChange);
     if (!name || changePct === undefined) return [];
-    return [{ name, changePct, last: numeric(row.last ?? row.lastPrice ?? row.currentValue) }];
+    return [{
+      name,
+      changePct,
+      last: numeric(
+        row.last
+        ?? row.lastPrice
+        ?? row.indexValue
+        ?? row.indexVal
+        ?? row.index_value
+        ?? row.currentValue
+        ?? row.current
+        ?? row.ltp
+        ?? row.close
+        ?? row.value,
+      ),
+    }];
   });
 }
+
+function mergeLastLevels(rows: SectorRow[], levels: SectorRow[]): SectorRow[] {
+  const byName = new Map(
+    levels
+      .filter((row) => typeof row.last === 'number')
+      .map((row) => [row.name.trim().toUpperCase(), row.last]),
+  );
+  return rows.map((row) => ({
+    ...row,
+    last: typeof row.last === 'number' ? row.last : byName.get(row.name.trim().toUpperCase()),
+  }));
+}
+
+const NSE_HEADERS = {
+  accept: 'application/json,text/plain,*/*',
+  'accept-language': 'en-IN,en;q=0.9',
+  referer: 'https://www.nseindia.com/market-data/live-market-indices',
+  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+};
 
 export async function GET() {
   const now = Date.now();
@@ -47,17 +83,24 @@ export async function GET() {
       response = await fetch(NSE_URL, {
         cache: 'no-store',
         signal: AbortSignal.timeout(7_500),
-        headers: {
-          accept: 'application/json,text/plain,*/*',
-          'accept-language': 'en-IN,en;q=0.9',
-          referer: 'https://www.nseindia.com/market-data/live-market-indices',
-          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
-        },
+        headers: NSE_HEADERS,
       });
       if (!response.ok) throw new Error(`NSE HTTP ${response.status}`);
       rows = normalize(await response.json());
     }
     if (!rows.length) throw new Error('NSE returned no sector rows');
+    if (rows.some((row) => typeof row.last !== 'number')) {
+      try {
+        const levelsResponse = await fetch(NSE_ALL_INDICES_URL, {
+          cache: 'no-store',
+          signal: AbortSignal.timeout(7_500),
+          headers: NSE_HEADERS,
+        });
+        if (levelsResponse.ok) rows = mergeLastLevels(rows, normalize(await levelsResponse.json()));
+      } catch {
+        // Preserve valid sector percentages when NSE's secondary level lookup is unavailable.
+      }
+    }
     cache = { at: now, rows };
     return NextResponse.json({ success: true, data: rows, fetchedAt: new Date(now).toISOString(), cached: false, stale: false });
   } catch (error) {

@@ -15,6 +15,7 @@ import requests
 log = logging.getLogger(__name__)
 
 NSE_SECTOR_URL = "https://www.nseindia.com/api/heatmap-index?type=Sectoral%20Indices"
+NSE_ALL_INDICES_URL = "https://www.nseindia.com/api/allIndices"
 _CACHE_TTL = float(os.environ.get("NSE_SECTOR_CACHE_TTL", "60"))
 _STALE_TTL = float(os.environ.get("NSE_SECTOR_STALE_TTL", "21600"))
 _CACHE_FILE = Path(__file__).resolve().parents[1] / "data" / "nse_sector_heatmap.json"
@@ -93,9 +94,53 @@ def normalize_sector_payload(raw: Any) -> list[dict[str, Any]]:
         rows[key] = {
             "index": key,
             "pChange": round(change, 3),
-            "last": next((_number(item.get(k)) for k in ("last", "lastPrice", "indexValue", "value") if item.get(k) is not None), None),
+            "last": next(
+                (
+                    _number(item.get(k))
+                    for k in (
+                        "last",
+                        "lastPrice",
+                        "indexValue",
+                        "indexVal",
+                        "index_value",
+                        "currentValue",
+                        "current",
+                        "ltp",
+                        "close",
+                        "value",
+                    )
+                    if item.get(k) is not None
+                ),
+                None,
+            ),
         }
     return sorted(rows.values(), key=lambda row: (-float(row["pChange"]), row["index"]))
+
+
+def merge_sector_levels(
+    sectors: list[dict[str, Any]], index_rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Fill missing heat-map levels from NSE's all-indices response.
+
+    The heat-map endpoint has changed its price-field name more than once and
+    can omit the level while retaining percentage change.  The all-indices
+    endpoint is an independent official NSE source for the same index level.
+    Never estimate a level from percentage change.
+    """
+    levels = {
+        str(row.get("index") or "").upper(): row.get("last")
+        for row in index_rows
+        if row.get("last") is not None
+    }
+    return [
+        {
+            **row,
+            "last": row.get("last")
+            if row.get("last") is not None
+            else levels.get(str(row.get("index") or "").upper()),
+        }
+        for row in sectors
+    ]
 
 
 def _read_disk() -> dict[str, Any] | None:
@@ -125,6 +170,13 @@ def _fetch() -> dict[str, Any]:
     rows = normalize_sector_payload(response.json())
     if not rows:
         raise ValueError("NSE sector heatmap returned no recognizable sector rows")
+    if any(row.get("last") is None for row in rows):
+        try:
+            levels_response = session.get(NSE_ALL_INDICES_URL, timeout=8)
+            levels_response.raise_for_status()
+            rows = merge_sector_levels(rows, normalize_sector_payload(levels_response.json()))
+        except Exception as exc:
+            log.debug("NSE all-indices level enrichment failed: %s", exc)
     return {
         "success": True,
         "source": "NSE_SECTORAL_INDICES",

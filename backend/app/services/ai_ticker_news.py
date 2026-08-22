@@ -15,6 +15,8 @@ then uses Google Gemini to produce structured summaries covering:
   - Regulatory filings
 """
 
+from __future__ import annotations
+
 import argparse
 import asyncio
 import hashlib
@@ -29,7 +31,7 @@ import time as _time
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
-from typing import Optional
+from typing import Awaitable, Callable, Optional
 from urllib.parse import quote_plus
 from xml.etree import ElementTree
 
@@ -129,25 +131,43 @@ def _warn_scrape_failure(source: str, exc: BaseException, ticker: str | None = N
 
 
 def _reraise_if_dns(exc: BaseException) -> None:
-    """Let _guarded_scrape own DNS circuit + logging after inner scrapers trip once."""
+    """Let the source collector own DNS circuit state and diagnostic logging."""
     if _is_dns_or_connect_error(exc):
         raise exc
 
 
-async def _guarded_scrape(name: str, coro):
-    """Limit concurrency + skip when DNS circuit is open."""
+def _source_error_status(exc: BaseException) -> str:
+    text = str(exc).lower()
+    if _is_dns_or_connect_error(exc):
+        return "NETWORK_ERROR"
+    if "http " in text or isinstance(exc, httpx.HTTPStatusError):
+        return "HTTP_ERROR"
+    if isinstance(exc, (json.JSONDecodeError, ElementTree.ParseError, ValueError)):
+        return "PARSE_ERROR"
+    if "timeout" in text or isinstance(exc, (TimeoutError, httpx.TimeoutException)):
+        return "TIMEOUT"
+    if "scrip code not found" in text:
+        return "SYMBOL_NOT_RESOLVED"
+    return "ERROR"
+
+
+async def _collect_news_source(
+    name: str,
+    factory: Callable[[], Awaitable[list["TickerNewsArticle"]]],
+) -> tuple[NewsSourceDiagnostic, list["TickerNewsArticle"]]:
     if _dns_circuit_open():
-        return []
+        return NewsSourceDiagnostic(name, "SKIPPED_CIRCUIT", error="DNS/connect circuit open"), []
     async with _scrape_semaphore():
         if _dns_circuit_open():
-            return []
+            return NewsSourceDiagnostic(name, "SKIPPED_CIRCUIT", error="DNS/connect circuit open"), []
         try:
-            result = await coro
+            rows = await factory()
             _note_scrape_success()
-            return result
+            status = "SUCCESS" if rows else "ZERO_RESULTS"
+            return NewsSourceDiagnostic(name, status, fetched=len(rows)), rows
         except Exception as exc:
             _warn_scrape_failure(name, exc)
-            return []
+            return NewsSourceDiagnostic(name, _source_error_status(exc), error=str(exc)[:180]), []
 
 
 logging.basicConfig(
@@ -169,6 +189,25 @@ class TickerNewsArticle:
     published_at: str  # ISO datetime
     relevance: str = "general"  # high / medium / general
 
+
+@dataclass
+class NewsSourceDiagnostic:
+    source: str
+    status: str
+    fetched: int = 0
+    accepted: int = 0
+    error: str = ""
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class NewsScrapeBundle:
+    articles: list[TickerNewsArticle]
+    diagnostics: list[NewsSourceDiagnostic]
+
+
 @dataclass
 class AITickerNewsReport:
     ticker: str
@@ -179,6 +218,9 @@ class AITickerNewsReport:
     lookback_days: int = 7
     evidence_status: str = "NO_RECENT_EVIDENCE"
     sources_checked: list[str] | None = None
+    source_diagnostics: list[dict] | None = None
+    latest_verified_headlines: list[dict] | None = None
+    news_schema_version: int = 2
 
     # LLM-generated structured fields
     insider_activity: str = ""
@@ -463,12 +505,73 @@ def _parse_published_at(value: str) -> datetime | None:
         return parsed.replace(tzinfo=parsed.tzinfo or timezone.utc).astimezone(timezone.utc)
     except ValueError:
         pass
-    for fmt in ("%d-%b-%Y %H:%M:%S", "%d-%b-%Y", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y"):
+    for fmt in (
+        "%d-%b-%Y %H:%M:%S",
+        "%d-%b-%Y %H:%M",
+        "%d-%b-%Y",
+        "%d/%m/%Y %H:%M:%S",
+        "%d/%m/%Y %H:%M",
+        "%d/%m/%Y",
+        "%d-%m-%Y %H:%M:%S",
+        "%d-%m-%Y %H:%M",
+        "%d-%m-%Y",
+        "%d %b %Y %H:%M:%S",
+        "%d %b %Y %H:%M",
+        "%d %b %Y",
+    ):
         try:
             return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
         except ValueError:
             continue
     return None
+
+
+def _symbol_token_present(text: str, ticker: str) -> bool:
+    return bool(re.search(rf"(?<![A-Z0-9]){re.escape(ticker.upper())}(?![A-Z0-9])", text.upper()))
+
+
+def _company_search_alias(company: str) -> str:
+    words = [
+        word
+        for word in re.split(r"\s+", re.sub(r"[^A-Za-z0-9& ]+", " ", company).strip())
+        if word.upper() not in {"LIMITED", "LTD", "INDIA", "PLC"}
+    ]
+    if not words:
+        return company.strip()
+    return " ".join(words[: min(3, len(words))])
+
+
+def _article_matches_symbol(article: TickerNewsArticle, ticker: str, company: str) -> bool:
+    haystack = f" {article.title} {article.summary} ".upper()
+    alias = _company_search_alias(company).upper()
+    if alias and len(alias) >= 3 and alias in haystack:
+        return True
+    if not _symbol_token_present(haystack, ticker):
+        return False
+    alias_words = alias.split()
+    if len(alias_words) <= 1 or ticker.upper() != alias_words[0]:
+        return True
+    distinctive_words = [word for word in alias_words[1:] if len(word) >= 4]
+    if any(word in haystack for word in distinctive_words):
+        return True
+    trusted_india_source = any(
+        name in article.source.upper()
+        for name in (
+            "MONEYCONTROL",
+            "ECONOMIC TIMES",
+            "LIVEMINT",
+            "MINT",
+            "BUSINESS STANDARD",
+            "FINANCIAL EXPRESS",
+            "CNBC-TV18",
+            "ZERODHA",
+            "NSE ANNOUNCEMENTS",
+            "BSE ANNOUNCEMENTS",
+        )
+    )
+    return trusted_india_source or any(
+        marker in haystack for marker in (" NSE ", " BSE ", " INDIA ", " INDIAN ", " RIL ")
+    )
 
 
 def _recent_articles(articles: list[TickerNewsArticle]) -> list[TickerNewsArticle]:
@@ -512,33 +615,57 @@ async def scrape_google_news(
 ) -> list[TickerNewsArticle]:
     """Search seven-day publisher coverage and retain the originating publication."""
     company = company_name or _company_name(ticker)
-    query = quote_plus(f'("{ticker}" OR "{company}") stock when:{NEWS_LOOKBACK_DAYS}d')
-    url = f"https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en"
+    alias = _company_search_alias(company)
+    queries = [
+        f'("{company}" OR "{ticker}" NSE) stock when:{NEWS_LOOKBACK_DAYS}d',
+        (
+            f'"{alias}" (site:moneycontrol.com OR site:economictimes.indiatimes.com '
+            f'OR site:livemint.com OR site:business-standard.com '
+            f'OR site:financialexpress.com OR site:cnbctv18.com OR site:reuters.com) '
+            f'when:{NEWS_LOOKBACK_DAYS}d'
+        ),
+    ]
     try:
-        response = await session.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
-        if response.status_code != 200:
-            return []
-        root = ElementTree.fromstring(response.content)
         articles: list[TickerNewsArticle] = []
-        for item in root.findall(".//item")[:20]:
-            title = (item.findtext("title") or "").strip()
-            if not title:
+        seen: set[str] = set()
+        successful_requests = 0
+        last_status = 0
+        for raw_query in queries:
+            query = quote_plus(raw_query)
+            url = f"https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en"
+            response = await session.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
+            last_status = response.status_code
+            if response.status_code != 200:
                 continue
-            source_node = item.find("source")
-            source = (source_node.text or "Google News").strip() if source_node is not None else "Google News"
-            articles.append(TickerNewsArticle(
-                title=title[:300],
-                source=source[:100],
-                url=(item.findtext("link") or url)[:500],
-                summary=_clean_html(item.findtext("description") or "")[:500],
-                published_at=(item.findtext("pubDate") or "").strip(),
-                relevance="medium",
-            ))
+            successful_requests += 1
+            root = ElementTree.fromstring(response.content)
+            for item in root.findall(".//item")[:20]:
+                title = (item.findtext("title") or "").strip()
+                if not title:
+                    continue
+                source_node = item.find("source")
+                source = (source_node.text or "Google News").strip() if source_node is not None else "Google News"
+                candidate = TickerNewsArticle(
+                    title=title[:300],
+                    source=source[:100],
+                    url=(item.findtext("link") or url)[:500],
+                    summary=_clean_html(item.findtext("description") or "")[:500],
+                    published_at=(item.findtext("pubDate") or "").strip(),
+                    relevance="medium",
+                )
+                if not _article_matches_symbol(candidate, ticker, company):
+                    continue
+                key = re.sub(r"\s+", " ", title.lower())[:80]
+                if key in seen:
+                    continue
+                seen.add(key)
+                articles.append(candidate)
+        if successful_requests == 0:
+            raise RuntimeError(f"Google News HTTP {last_status or 'unavailable'}")
         return articles
     except Exception as exc:
         _reraise_if_dns(exc)
-        _warn_scrape_failure("Google News", exc, ticker)
-        return []
+        raise
 
 
 async def scrape_bse_announcements(
@@ -550,33 +677,31 @@ async def scrape_bse_announcements(
     try:
         headers = {**HEADERS, "Accept": "application/json", "Origin": "https://www.bseindia.com", "Referer": "https://www.bseindia.com/"}
         suggest = await session.get(
-            "https://api.bseindia.com/BseIndiaAPI/api/Suggest/w",
-            params={"text": ticker},
+            "https://api.bseindia.com/BseIndiaAPI/api/PeerSmartSearch/w",
+            params={"Type": "SS", "text": ticker},
             headers=headers,
             timeout=15.0,
         )
         if suggest.status_code != 200:
-            return []
-        suggestions = suggest.json()
-        rows = suggestions if isinstance(suggestions, list) else suggestions.get("Table") or suggestions.get("Data") or suggestions.get("data") or []
-        exact = next(
-            (
-                row for row in rows
-                if isinstance(row, dict)
-                and str(row.get("scrip_id") or row.get("symbol") or row.get("ScripID") or "").upper() == ticker.upper()
-            ),
-            None,
+            raise RuntimeError(f"BSE symbol lookup HTTP {suggest.status_code}")
+        lookup_html = suggest.text.replace("&nbsp;", " ")
+        ticker_pattern = re.compile(
+            rf"<(?:strong|span)>{re.escape(ticker.upper())}</(?:strong|span)>\s+"
+            rf"[A-Z0-9]{{12}}\s+(?:<(?:strong|span)>)?(\d{{6}})",
+            re.IGNORECASE,
         )
-        if exact is None:
-            company_prefix = (company_name or _company_name(ticker)).split(" ")[0].upper()
-            exact = next((row for row in rows if company_prefix in str(row).upper()), None)
-        if isinstance(exact, dict):
-            scrip = exact.get("scrip_cd") or exact.get("ScripCode") or exact.get("code") or exact.get("id")
-        else:
-            code_match = re.search(r"\b\d{6}\b", str(exact or ""))
-            scrip = code_match.group(0) if code_match else None
+        code_match = ticker_pattern.search(lookup_html)
+        if code_match is None:
+            lookup_text = BeautifulSoup(lookup_html, "html.parser").get_text(" ", strip=True)
+            code_match = re.search(
+                rf"(?<![A-Z0-9]){re.escape(ticker.upper())}(?![A-Z0-9])\s+"
+                rf"[A-Z0-9]{{12}}\s+(\d{{6}})",
+                lookup_text,
+                re.IGNORECASE,
+            )
+        scrip = code_match.group(1) if code_match else None
         if not scrip:
-            return []
+            raise RuntimeError(f"BSE exact scrip code not found for {ticker.upper()}")
         now = datetime.now(timezone.utc)
         response = await session.get(
             "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w",
@@ -584,7 +709,7 @@ async def scrape_bse_announcements(
                 "pageno": 1,
                 "strCat": -1,
                 "strPrevDate": (now - timedelta(days=NEWS_LOOKBACK_DAYS)).strftime("%Y%m%d"),
-                "strScrip": str(scrip),
+                "strscrip": str(scrip),
                 "strSearch": "P",
                 "strToDate": now.strftime("%Y%m%d"),
                 "strType": "C",
@@ -594,7 +719,7 @@ async def scrape_bse_announcements(
             timeout=15.0,
         )
         if response.status_code != 200:
-            return []
+            raise RuntimeError(f"BSE announcements HTTP {response.status_code}")
         payload = response.json()
         announcements = payload.get("Table") or payload.get("data") or []
         result: list[TickerNewsArticle] = []
@@ -614,8 +739,7 @@ async def scrape_bse_announcements(
         return result
     except Exception as exc:
         _reraise_if_dns(exc)
-        _warn_scrape_failure("BSE announcements", exc, ticker)
-        return []
+        raise
 
 
 async def scrape_moneycontrol(ticker: str, session: httpx.AsyncClient) -> list[TickerNewsArticle]:
@@ -627,11 +751,15 @@ async def scrape_moneycontrol(ticker: str, session: httpx.AsyncClient) -> list[T
         f"https://www.moneycontrol.com/news/business/stocks/page-1/?search={search_q}",
     ]
 
+    successful_requests = 0
+    last_status = 0
     for url in urls:
         try:
             resp = await session.get(url, headers=HEADERS, timeout=15.0)
+            last_status = resp.status_code
             if resp.status_code != 200:
                 continue
+            successful_requests += 1
             soup = BeautifulSoup(resp.text, "html.parser")
             items = soup.select("li.clearfix") or soup.select("li.grp_list") or soup.select("li a")
             count = 0
@@ -670,7 +798,10 @@ async def scrape_moneycontrol(ticker: str, session: httpx.AsyncClient) -> list[T
                 count += 1
         except Exception as e:
             _reraise_if_dns(e)
-            _warn_scrape_failure("Moneycontrol", e, ticker)
+            raise
+
+    if successful_requests == 0:
+        raise RuntimeError(f"Moneycontrol HTTP {last_status or 'unavailable'}")
 
     return articles
 
@@ -688,7 +819,7 @@ async def scrape_economic_times(ticker: str, session: httpx.AsyncClient) -> list
             url = f"https://economictimes.indiatimes.com/search?q={search_q}"
             resp = await session.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
         if resp.status_code != 200:
-            return articles
+            raise RuntimeError(f"Economic Times HTTP {resp.status_code}")
 
         soup = BeautifulSoup(resp.text, "html.parser")
         for link_tag in soup.select("a[href*='articleshow']"):
@@ -725,7 +856,7 @@ async def scrape_economic_times(ticker: str, session: httpx.AsyncClient) -> list
                 break
     except Exception as e:
         _reraise_if_dns(e)
-        _warn_scrape_failure("ET", e, ticker)
+        raise
 
     return articles
 
@@ -740,7 +871,7 @@ async def scrape_yahoo_finance(ticker: str, session: httpx.AsyncClient) -> list[
     try:
         resp = await session.get(url, headers=HEADERS, timeout=15.0)
         if resp.status_code != 200:
-            return articles
+            raise RuntimeError(f"Yahoo Finance HTTP {resp.status_code}")
 
         soup = BeautifulSoup(resp.text, "html.parser")
         # Yahoo finance news stream
@@ -770,7 +901,7 @@ async def scrape_yahoo_finance(ticker: str, session: httpx.AsyncClient) -> list[
                 break
     except Exception as e:
         _reraise_if_dns(e)
-        _warn_scrape_failure("Yahoo Finance", e, ticker)
+        raise
 
     return articles
 
@@ -842,7 +973,7 @@ class PulseNewsCollector:
         try:
             response = await client.get(self.base_url, headers=HEADERS, timeout=15.0, follow_redirects=True)
             if response.status_code != 200:
-                return articles
+                raise RuntimeError(f"Zerodha Pulse HTTP {response.status_code}")
 
             soup = BeautifulSoup(response.text, "html.parser")
             seen_titles: set[str] = set()
@@ -887,8 +1018,7 @@ class PulseNewsCollector:
             return articles
         except Exception as e:
             _reraise_if_dns(e)
-            _warn_scrape_failure("Zerodha Pulse", e)
-            return []
+            raise
         finally:
             if should_close_client:
                 await client.aclose()
@@ -993,58 +1123,89 @@ async def scrape_nse_announcements(ticker: str, session: httpx.AsyncClient) -> l
             "Referer": "https://www.nseindia.com/",
         }
         now = datetime.now(timezone.utc)
-        resp = await session.get(
-            url,
-            params={
-                "index": "equities",
-                "symbol": ticker.upper(),
-                "from_date": (now - timedelta(days=NEWS_LOOKBACK_DAYS)).strftime("%d-%m-%Y"),
-                "to_date": now.strftime("%d-%m-%Y"),
-            },
-            headers=headers,
-            timeout=15.0,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            items = data if isinstance(data, list) else data.get("data", [])
-            # Filter by ticker symbol
-            ticker_upper = ticker.upper()
-            for item in items:
-                sym = (item.get("symbol") or "").upper()
-                if sym and sym != ticker_upper:
-                    continue
-                title = item.get("desc") or item.get("heading") or item.get("subject", "")
-                if not title:
-                    continue
-                desc = item.get("attchmntText") or item.get("details") or item.get("description", "")
-                dt = item.get("an_dt") or item.get("dt") or item.get("date", "")
-                attachment_url = item.get("attchmntFile", "")
-                if attachment_url and not str(attachment_url).startswith("http"):
-                    attachment_url = f"https://nsearchives.nseindia.com/corporate/{attachment_url}"
+        params = {
+            "index": "equities",
+            "symbol": ticker.upper(),
+            "from_date": (now - timedelta(days=NEWS_LOOKBACK_DAYS)).strftime("%d-%m-%Y"),
+            "to_date": now.strftime("%d-%m-%Y"),
+        }
+        resp = await session.get(url, params=params, headers=headers, timeout=15.0)
+        if resp.status_code in (401, 403):
+            bootstrap_headers = {
+                **HEADERS,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Referer": "https://www.nseindia.com/",
+            }
+            await session.get(
+                "https://www.nseindia.com/",
+                headers=bootstrap_headers,
+                timeout=15.0,
+                follow_redirects=True,
+            )
+            await session.get(
+                "https://www.nseindia.com/companies-listing/corporate-filings-announcements",
+                headers=bootstrap_headers,
+                timeout=15.0,
+                follow_redirects=True,
+            )
+            resp = await session.get(url, params=params, headers=headers, timeout=15.0)
+        if resp.status_code != 200:
+            raise RuntimeError(f"NSE announcements HTTP {resp.status_code}")
+        data = resp.json()
+        items = data if isinstance(data, list) else data.get("data", [])
+        ticker_upper = ticker.upper()
+        for item in items:
+            sym = (item.get("symbol") or "").upper()
+            if sym and sym != ticker_upper:
+                continue
+            title = item.get("desc") or item.get("heading") or item.get("subject", "")
+            if not title:
+                continue
+            desc = item.get("attchmntText") or item.get("details") or item.get("description", "")
+            dt = item.get("an_dt") or item.get("dt") or item.get("date", "")
+            attachment_url = item.get("attchmntFile", "")
+            if attachment_url and not str(attachment_url).startswith("http"):
+                attachment_url = f"https://nsearchives.nseindia.com/corporate/{attachment_url}"
 
-                articles.append(TickerNewsArticle(
-                    title=str(title)[:300],
-                    source="NSE Announcements",
-                    url=str(attachment_url) if attachment_url else "https://www.nseindia.com/",
-                    summary=str(desc)[:500],
-                    published_at=str(dt) if dt else "",
-                    relevance="high",
-                ))
-                if len(articles) >= 15:
-                    break
+            articles.append(TickerNewsArticle(
+                title=str(title)[:300],
+                source="NSE Announcements",
+                url=str(attachment_url) if attachment_url else "https://www.nseindia.com/",
+                summary=str(desc)[:500],
+                published_at=str(dt) if dt else "",
+                relevance="high",
+            ))
+            if len(articles) >= 15:
+                break
     except Exception as e:
         _reraise_if_dns(e)
-        _warn_scrape_failure("NSE announcements", e)
+        raise
 
     return articles
 
 
-async def scrape_all_sources(ticker: str, company_name: str | None = None) -> list[TickerNewsArticle]:
-    """Run scrapers with shared concurrency limit; TinyFish Search backs up a thin scrape."""
-    all_articles: list[TickerNewsArticle] = []
-    results: list = []
+async def _scrape_all_sources_bundle(
+    ticker: str,
+    company_name: str | None = None,
+) -> NewsScrapeBundle:
+    """Collect recent evidence plus explicit per-source health diagnostics."""
+    company = company_name or _company_name(ticker)
+    diagnostics: list[NewsSourceDiagnostic] = []
+    all_recent: list[TickerNewsArticle] = []
+    source_names = [
+        "Moneycontrol",
+        "Economic Times",
+        "Google News publishers",
+        "NSE Announcements",
+        "BSE Announcements",
+        "Yahoo Finance",
+        "Zerodha Pulse",
+    ]
     if _dns_circuit_open():
-        logger.warning("Skipping HTML news scrapers for %s — DNS/connect circuit open", ticker)
+        results = [
+            (NewsSourceDiagnostic(name, "SKIPPED_CIRCUIT", error="DNS/connect circuit open"), [])
+            for name in source_names
+        ]
     else:
         async with httpx.AsyncClient(
             verify=False,
@@ -1058,64 +1219,82 @@ async def scrape_all_sources(ticker: str, company_name: str | None = None) -> li
             },
         ) as session:
             tasks = [
-                _guarded_scrape("Moneycontrol", scrape_moneycontrol(ticker, session)),
-                _guarded_scrape("ET", scrape_economic_times(ticker, session)),
-                _guarded_scrape("Google News", scrape_google_news(ticker, session, company_name)),
-                _guarded_scrape("NSE announcements", scrape_nse_announcements(ticker, session)),
-                _guarded_scrape("BSE announcements", scrape_bse_announcements(ticker, session, company_name)),
-                _guarded_scrape("Yahoo Finance", scrape_yahoo_finance(ticker, session)),
-                _guarded_scrape("Zerodha Pulse", _scrape_zerodha_pulse(ticker, session)),
+                _collect_news_source("Moneycontrol", lambda: scrape_moneycontrol(ticker, session)),
+                _collect_news_source("Economic Times", lambda: scrape_economic_times(ticker, session)),
+                _collect_news_source("Google News publishers", lambda: scrape_google_news(ticker, session, company)),
+                _collect_news_source("NSE Announcements", lambda: scrape_nse_announcements(ticker, session)),
+                _collect_news_source("BSE Announcements", lambda: scrape_bse_announcements(ticker, session, company)),
+                _collect_news_source("Yahoo Finance", lambda: scrape_yahoo_finance(ticker, session)),
+                _collect_news_source("Zerodha Pulse", lambda: _scrape_zerodha_pulse(ticker, session)),
             ]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            results = await asyncio.gather(*tasks)
 
-        for r in results:
-            if isinstance(r, list):
-                all_articles.extend(r)
-            elif isinstance(r, Exception):
-                _trip_dns_circuit(r)
-                logger.error("Scraper error: %s", r)
+    for diagnostic, rows in results:
+        recent = _recent_articles(rows)
+        diagnostic.accepted = len(recent)
+        if diagnostic.fetched and not diagnostic.accepted and diagnostic.status == "SUCCESS":
+            diagnostic.status = "STALE_OR_UNDATED"
+        diagnostics.append(diagnostic)
+        all_recent.extend(recent)
 
-    # Deduplicate by title similarity
     seen_titles: set[str] = set()
     deduped: list[TickerNewsArticle] = []
-    for art in _recent_articles(all_articles):
-        # Simple dedup: normalize and compare first 60 chars
+    for art in all_recent:
         key = re.sub(r"\s+", " ", art.title.lower())[:60]
         if key not in seen_titles:
             seen_titles.add(key)
             deduped.append(art)
 
     if tinyfish_enabled() and len(deduped) < backup_min_articles():
-        query = f'("{company_name or _company_name(ticker)}" OR {ticker}) NSE stock'
-        extra = await asyncio.to_thread(
-            search_tinyfish,
-            query,
-            location="IN",
-            language="en",
-            domain_type="news",
-            recency_minutes=NEWS_LOOKBACK_DAYS * 24 * 60,
-        )
-        added = 0
-        for art in _tinyfish_recent_articles(extra):
-            key = re.sub(r"\s+", " ", art.title.lower())[:60]
-            if key in seen_titles:
-                continue
-            seen_titles.add(key)
-            added += 1
-            deduped.append(art)
-        if added:
-            logger.info("TinyFish backup added %d news items for %s (now %d articles)", added, ticker, len(deduped))
-        elif extra:
-            logger.info("TinyFish backup returned %d rows for %s but none passed the %d-day lookback", len(extra), ticker, NEWS_LOOKBACK_DAYS)
+        query = f'("{company}" OR {ticker}) NSE stock'
+        try:
+            extra = await asyncio.to_thread(
+                search_tinyfish,
+                query,
+                location="IN",
+                language="en",
+                domain_type="news",
+                recency_minutes=NEWS_LOOKBACK_DAYS * 24 * 60,
+            )
+            recent_extra = _tinyfish_recent_articles(extra)
+            added = 0
+            for art in recent_extra:
+                if not _article_matches_symbol(art, ticker, company):
+                    continue
+                key = re.sub(r"\s+", " ", art.title.lower())[:60]
+                if key in seen_titles:
+                    continue
+                seen_titles.add(key)
+                added += 1
+                deduped.append(art)
+            tiny_status = "SUCCESS" if added else ("STALE_OR_UNDATED" if extra else "ZERO_RESULTS")
+            diagnostics.append(
+                NewsSourceDiagnostic("TinyFish Search", tiny_status, fetched=len(extra), accepted=added)
+            )
+            if added:
+                logger.info("TinyFish backup added %d news items for %s (now %d articles)", added, ticker, len(deduped))
+        except Exception as exc:
+            diagnostics.append(
+                NewsSourceDiagnostic("TinyFish Search", _source_error_status(exc), error=str(exc)[:180])
+            )
+    elif tinyfish_enabled():
+        diagnostics.append(NewsSourceDiagnostic("TinyFish Search", "SKIPPED_SUFFICIENT_EVIDENCE"))
+    else:
+        diagnostics.append(NewsSourceDiagnostic("TinyFish Search", "NOT_CONFIGURED"))
 
     logger.info(
-        "Scraped %d articles from %d sources for %s (after dedup: %d)",
-        len(all_articles),
-        len(results),
+        "Collected %d recent rows from %d sources for %s (after dedup: %d)",
+        len(all_recent),
+        len(diagnostics),
         ticker,
         len(deduped),
     )
-    return deduped
+    return NewsScrapeBundle(deduped, diagnostics)
+
+
+async def scrape_all_sources(ticker: str, company_name: str | None = None) -> list[TickerNewsArticle]:
+    """Compatibility wrapper returning only verified recent articles."""
+    return (await _scrape_all_sources_bundle(ticker, company_name)).articles
 
 # ---------------------------------------------------------------------------
 # LLM Summarizer
@@ -1136,6 +1315,20 @@ _llm_cache: dict[str, dict] = {}
 _CACHE_WRITE_LOCK = threading.RLock()
 _LLM_CACHE_HOURS = max(1, int(os.getenv("NEWS_LLM_CACHE_HOURS", "6")))
 _EMPTY_CACHE_MINUTES = max(5, int(os.getenv("NEWS_EMPTY_CACHE_MINUTES", "30")))
+NEWS_SCHEMA_VERSION = 2
+_CATEGORY_FIELDS = (
+    "insider_activity",
+    "institutional_activity",
+    "order_book_block_deals",
+    "future_expansion_capex",
+    "auditor_changes",
+    "dividend_news",
+    "new_orders_contracts",
+    "earnings_results",
+    "management_changes",
+    "regulatory_filings",
+)
+_EMPTY_CATEGORY_VALUES = {"", "—", "-", "–", "none", "n/a", "na", "nil", "no data", "no recent news found"}
 
 
 def _load_llm_cache() -> None:
@@ -1193,6 +1386,34 @@ def _digest_mode(report: dict) -> str:
     return str(report.get("digestMode") or "").strip().lower()
 
 
+def _category_is_empty(value: object) -> bool:
+    normalized = str(value or "").strip().lower().rstrip(".!")
+    return normalized in _EMPTY_CATEGORY_VALUES
+
+
+def _all_categories_empty(report: dict) -> bool:
+    return all(_category_is_empty(report.get(key)) for key in _CATEGORY_FIELDS)
+
+
+def _news_schema_is_current(report: dict) -> bool:
+    try:
+        return int(report.get("news_schema_version") or 0) >= NEWS_SCHEMA_VERSION
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
+def _report_cache_fresh(report: dict) -> bool:
+    generated_at = report.get("generated_at")
+    if not generated_at:
+        return False
+    try:
+        parsed = datetime.fromisoformat(str(generated_at).replace("Z", "+00:00"))
+        parsed = parsed.replace(tzinfo=parsed.tzinfo or timezone.utc).astimezone(timezone.utc)
+        return datetime.now(timezone.utc) - parsed <= _ticker_news_cache_ttl(report)
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
 def _tinyfish_digest_has_evidence(report: dict) -> bool:
     if _digest_source(report) != "tinyfish":
         return False
@@ -1203,6 +1424,8 @@ def _tinyfish_digest_has_evidence(report: dict) -> bool:
 def _ticker_news_cache_ttl(entry: dict) -> timedelta:
     """Durable LLM / primary TinyFish evidence uses the long TTL; empty and quota fallbacks do not."""
     if entry.get("llmUsed") is True:
+        if entry.get("articles_scraped") and _all_categories_empty(entry):
+            return timedelta(minutes=_EMPTY_CACHE_MINUTES)
         return timedelta(hours=_LLM_CACHE_HOURS)
     if _digest_mode(entry) != "quota" and _tinyfish_digest_has_evidence(entry):
         return timedelta(hours=_LLM_CACHE_HOURS)
@@ -1212,6 +1435,10 @@ def _ticker_news_cache_ttl(entry: dict) -> timedelta:
 def ticker_news_report_is_llm_complete(report: dict | None) -> bool:
     """Accept completed LLM reports, durable TinyFish digests, or explicit no-evidence reports."""
     if not isinstance(report, dict) or report.get("error"):
+        return False
+    if not _news_schema_is_current(report):
+        return False
+    if not _report_cache_fresh(report):
         return False
     if report.get("llmUsed") is True:
         return True
@@ -1245,6 +1472,8 @@ def get_cached_summary(
     entry = _llm_cache.get(key)
     if not entry:
         return None
+    if not _news_schema_is_current(entry):
+        return None
     if articles and entry.get("articleFingerprint") != _article_fingerprint(articles):
         return None
     if _digest_mode(entry) == "quota" and _llm_quota_available():
@@ -1256,8 +1485,8 @@ def get_cached_summary(
             dt = dt.replace(tzinfo=dt.tzinfo or timezone.utc).astimezone(timezone.utc)
             if datetime.now(timezone.utc) - dt > _ticker_news_cache_ttl(entry):
                 return None
-        except Exception:
-            pass
+        except (TypeError, ValueError, OverflowError):
+            return None
     return entry
 
 
@@ -1273,6 +1502,7 @@ def set_cached_summary(
     entry["ticker"] = ticker.upper()
     entry["articleFingerprint"] = _article_fingerprint(articles)
     entry["lookbackDays"] = NEWS_LOOKBACK_DAYS
+    entry["news_schema_version"] = NEWS_SCHEMA_VERSION
     _llm_cache[key] = entry
     _save_llm_cache()
 
@@ -1459,6 +1689,48 @@ def _llm_unavailable_summary(ticker: str, company: str, articles: list[TickerNew
         "llmError": _short_llm_error(error),
     }
 
+
+def _verified_headlines(articles: list[TickerNewsArticle], limit: int = 5) -> list[dict]:
+    return [
+        {
+            "title": article.title,
+            "source": article.source,
+            "url": article.url,
+            "published_at": article.published_at,
+            "relevance": article.relevance,
+        }
+        for article in articles[:limit]
+    ]
+
+
+def _official_filing_line(articles: list[TickerNewsArticle]) -> str | None:
+    for article in articles:
+        if article.source not in {"NSE Announcements", "BSE Announcements"}:
+            continue
+        published = _parse_published_at(article.published_at)
+        date_label = published.strftime("%d %b %Y") if published else "date unavailable"
+        return f"{article.title} ({article.source}, {date_label})"
+    return None
+
+
+def _merge_deterministic_news_evidence(summary: dict, articles: list[TickerNewsArticle]) -> dict:
+    """Add source-proven evidence without inventing category or sentiment claims."""
+    merged = dict(summary)
+    official_filing = _official_filing_line(articles)
+    if official_filing and _category_is_empty(merged.get("regulatory_filings")):
+        merged["regulatory_filings"] = official_filing
+    return merged
+
+
+def _evidence_status(bundle: NewsScrapeBundle) -> str:
+    if bundle.articles:
+        return "VERIFIED_RECENT"
+    source_worked = any(
+        item.status in {"SUCCESS", "ZERO_RESULTS", "STALE_OR_UNDATED", "SKIPPED_SUFFICIENT_EVIDENCE"}
+        for item in bundle.diagnostics
+    )
+    return "NO_RECENT_EVIDENCE" if source_worked else "SOURCE_UNAVAILABLE"
+
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
@@ -1475,9 +1747,18 @@ async def generate_ticker_news_report(
     company = company_name or _company_name(ticker)
 
     # Step 1: Scrape
-    articles = await scrape_all_sources(ticker, company)
+    bundle = await _scrape_all_sources_bundle(ticker, company)
+    articles = bundle.articles
     if len(articles) > max_articles:
         articles = articles[:max_articles]
+    source_diagnostics = [item.to_dict() for item in bundle.diagnostics]
+    latest_headlines = _verified_headlines(articles)
+    evidence_status = _evidence_status(NewsScrapeBundle(articles, bundle.diagnostics))
+    sources_checked = [
+        item.source
+        for item in bundle.diagnostics
+        if item.status not in {"NOT_CONFIGURED", "SKIPPED_SUFFICIENT_EVIDENCE"}
+    ]
 
     # Step 2: LLM Summarize (with snapshot cache to preserve quota)
     cached = get_cached_summary(ticker, articles, max_articles, force_refresh=force_refresh)
@@ -1486,6 +1767,7 @@ async def generate_ticker_news_report(
         llm_result = cached
     else:
         llm_result = await summarize_with_llm(ticker, company, articles)
+        llm_result = _merge_deterministic_news_evidence(llm_result, articles)
         # Cache successful LLM summaries, durable TinyFish evidence, and honest
         # no-evidence results. Quota fallbacks use the short TTL and expire once
         # OpenRouter/Gemini quota is available again.
@@ -1500,17 +1782,36 @@ async def generate_ticker_news_report(
                     "articles_scraped": len(articles),
                     "articles_after_dedup": len(articles),
                     "lookback_days": NEWS_LOOKBACK_DAYS,
-                    "evidence_status": "VERIFIED_RECENT" if articles else "NO_RECENT_EVIDENCE",
-                    "sources_checked": [
-                        "NSE Announcements", "BSE Announcements", "Moneycontrol",
-                        "Economic Times", "Google News publishers", "Yahoo Finance", "Zerodha Pulse",
-                        "TinyFish Search",
-                    ],
+                    "evidence_status": evidence_status,
+                    "sources_checked": sources_checked,
+                    "source_diagnostics": source_diagnostics,
+                    "latest_verified_headlines": latest_headlines,
+                    "news_schema_version": NEWS_SCHEMA_VERSION,
                 },
             )
 
+    llm_result = _merge_deterministic_news_evidence(llm_result, articles)
+
     # Step 3: Build report
-    llm_fields = {k: v for k, v in llm_result.items() if k in AITickerNewsReport.__dataclass_fields__ and k not in ("generated_at", "ticker")}
+    deterministic_fields = {
+        "ticker",
+        "company_name",
+        "articles_scraped",
+        "articles_after_dedup",
+        "generated_at",
+        "lookback_days",
+        "evidence_status",
+        "sources_checked",
+        "source_diagnostics",
+        "latest_verified_headlines",
+        "news_schema_version",
+        "raw_articles",
+    }
+    llm_fields = {
+        key: value
+        for key, value in llm_result.items()
+        if key in AITickerNewsReport.__dataclass_fields__ and key not in deterministic_fields
+    }
     report = AITickerNewsReport(
         ticker=ticker,
         company_name=company,
@@ -1518,12 +1819,11 @@ async def generate_ticker_news_report(
         articles_after_dedup=len(articles),
         generated_at=str(llm_result.get("generated_at") or datetime.now(timezone.utc).isoformat()),
         lookback_days=NEWS_LOOKBACK_DAYS,
-        evidence_status="VERIFIED_RECENT" if articles else "NO_RECENT_EVIDENCE",
-        sources_checked=[
-            "NSE Announcements", "BSE Announcements", "Moneycontrol",
-            "Economic Times", "Google News publishers", "Yahoo Finance", "Zerodha Pulse",
-            "TinyFish Search",
-        ],
+        evidence_status=evidence_status,
+        sources_checked=sources_checked,
+        source_diagnostics=source_diagnostics,
+        latest_verified_headlines=latest_headlines,
+        news_schema_version=NEWS_SCHEMA_VERSION,
         **llm_fields,
     )
 

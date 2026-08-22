@@ -4,6 +4,7 @@ import app.services.llm_client as llm_client
 from app.services.ai_ticker_news import (
     _EMPTY_CACHE_MINUTES,
     _LLM_CACHE_HOURS,
+    NEWS_SCHEMA_VERSION,
     _article_fingerprint,
     _ticker_news_cache_ttl,
     get_cached_summary,
@@ -50,18 +51,25 @@ def test_quota_not_before_honors_reset(monkeypatch):
 
 
 def test_ticker_news_incomplete_not_cacheable():
+    fresh = {
+        "news_schema_version": NEWS_SCHEMA_VERSION,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
     assert ticker_news_report_is_llm_complete(None) is False
     assert ticker_news_report_is_llm_complete({
+        **fresh,
         "ticker": "KOTAKBANK",
         "llmUsed": False,
         "summary_headline": "LLM summary unavailable for KOTAKBANK (20 articles scraped).",
     }) is False
     assert ticker_news_report_is_llm_complete({
+        **fresh,
         "ticker": "KOTAKBANK",
         "llmUsed": True,
         "summary_headline": "Kotak reports Q1 update.",
     }) is True
     assert ticker_news_report_is_llm_complete({
+        **fresh,
         "ticker": "RELIANCE",
         "llmUsed": False,
         "digestSource": "tinyfish",
@@ -69,6 +77,7 @@ def test_ticker_news_incomplete_not_cacheable():
         "summary_headline": "Reliance wins new order",
     }) is True
     assert ticker_news_report_is_llm_complete({
+        **fresh,
         "ticker": "RELIANCE",
         "llmUsed": False,
         "digestSource": "tinyfish",
@@ -76,6 +85,7 @@ def test_ticker_news_incomplete_not_cacheable():
         "summary_headline": "No verified Reliance Industries (RELIANCE) news found.",
     }) is False
     assert ticker_news_report_is_llm_complete({
+        **fresh,
         "ticker": "RELIANCE",
         "llmUsed": False,
         "digestSource": "tinyfish",
@@ -108,6 +118,46 @@ def test_tinyfish_cache_ttl_empty_and_quota_are_short():
     assert durable == timedelta(hours=_LLM_CACHE_HOURS)
 
 
+def test_all_empty_llm_categories_use_short_cache_ttl():
+    report = {
+        "llmUsed": True,
+        "articles_scraped": 3,
+        **{
+            key: "No recent news found."
+            for key in (
+                "insider_activity",
+                "institutional_activity",
+                "order_book_block_deals",
+                "future_expansion_capex",
+                "auditor_changes",
+                "dividend_news",
+                "new_orders_contracts",
+                "earnings_results",
+                "management_changes",
+                "regulatory_filings",
+            )
+        },
+    }
+    assert _ticker_news_cache_ttl(report) == timedelta(minutes=_EMPTY_CACHE_MINUTES)
+
+
+def test_old_news_schema_is_invalidated():
+    assert ticker_news_report_is_llm_complete({
+        "ticker": "RELIANCE",
+        "llmUsed": True,
+        "summary_headline": "Old cached summary",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "news_schema_version": NEWS_SCHEMA_VERSION - 1,
+    }) is False
+    assert ticker_news_report_is_llm_complete({
+        "ticker": "RELIANCE",
+        "llmUsed": True,
+        "summary_headline": "Malformed cached summary",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "news_schema_version": "not-a-version",
+    }) is False
+
+
 def test_quota_tinyfish_cache_released_when_quota_available(monkeypatch):
     from app.services import ai_ticker_news as news
 
@@ -123,6 +173,7 @@ def test_quota_tinyfish_cache_released_when_quota_available(monkeypatch):
                 "summary_headline": "Reliance wins new order",
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "articleFingerprint": _article_fingerprint([]),
+                "news_schema_version": NEWS_SCHEMA_VERSION,
             }
         },
     )
@@ -144,6 +195,7 @@ def test_quota_tinyfish_cache_held_during_cooldown(monkeypatch):
                 "summary_headline": "Reliance wins new order",
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "articleFingerprint": _article_fingerprint([]),
+                "news_schema_version": NEWS_SCHEMA_VERSION,
             }
         },
     )

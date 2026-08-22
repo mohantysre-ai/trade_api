@@ -153,6 +153,29 @@ def test_nse_sector_payload_normalization_accepts_nested_shapes():
     assert rows == [{"index": "NIFTY IT", "pChange": 1.25, "last": 42100.0}]
 
 
+def test_nse_sector_payload_normalization_accepts_index_val():
+    rows = sector_rotation.normalize_sector_payload(
+        {"data": [{"index": "NIFTY METAL", "pChange": "0.86", "indexVal": "10,245.30"}]}
+    )
+    assert rows == [{"index": "NIFTY METAL", "pChange": 0.86, "last": 10245.3}]
+
+
+def test_nse_sector_levels_fill_from_official_all_indices_without_estimation():
+    sectors = [
+        {"index": "NIFTY METAL", "pChange": 0.86, "last": None},
+        {"index": "NIFTY BANK", "pChange": 0.46, "last": 55991.2},
+        {"index": "NIFTY MEDIA", "pChange": -0.54, "last": None},
+    ]
+    levels = [
+        {"index": "NIFTY METAL", "pChange": 0.86, "last": 10245.3},
+        {"index": "NIFTY BANK", "pChange": 0.46, "last": 56001.1},
+    ]
+    merged = sector_rotation.merge_sector_levels(sectors, levels)
+    assert merged[0]["last"] == 10245.3
+    assert merged[1]["last"] == 55991.2
+    assert merged[2]["last"] is None
+
+
 def test_sector_signal_rewards_directional_sector_leader(monkeypatch):
     monkeypatch.setattr(
         sector_rotation,
