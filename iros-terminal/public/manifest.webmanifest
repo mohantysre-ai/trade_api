@@ -6,8 +6,8 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#07111f",
-  "theme_color": "#07111f",
+  "background_color": "#101717",
+  "theme_color": "#101717",
   "categories": ["finance", "business"],
   "icons": [
     {

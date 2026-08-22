@@ -1281,12 +1281,12 @@ function deskTileAccent(kind: 'gold' | 'silver' | 'energy' | 'metal' | 'crypto' 
     case 'sensex': return '#60a5fa';
     case 'mid': return '#fbbf24';
     case 'small': return '#f472b6';
-    case 'fx': return '#22d3ee';
+    case 'fx': return 'var(--terminal-cyan)';
     case 'us': return '#60a5fa';
     case 'asia': return '#f87171';
     case 'eu': return '#a78bfa';
     case 'latam': return '#34d399';
-    default: return '#22d3ee';
+    default: return 'var(--terminal-cyan)';
   }
 }
 

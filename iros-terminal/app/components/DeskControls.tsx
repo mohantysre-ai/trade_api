@@ -57,13 +57,13 @@ export default function DeskControls({
         </span>
       </div>
 
-      <div className="desk-seg shrink-0" role="group" aria-label="Theme">
+      <div className="desk-seg shrink-0" role="group" aria-label="Skymint and Graphite theme">
         <button
           type="button"
           className={theme === "dark" ? "is-on" : undefined}
           aria-pressed={theme === "dark"}
           onClick={() => setTheme("dark" as DeskTheme)}
-          title="Dark background · light text"
+          title="Graphite dark · Skymint highlights"
         >
           Dark
         </button>
@@ -72,7 +72,7 @@ export default function DeskControls({
           className={theme === "light" ? "is-on" : undefined}
           aria-pressed={theme === "light"}
           onClick={() => setTheme("light" as DeskTheme)}
-          title="Light background · dark text"
+          title="Skymint light · Graphite text"
         >
           Light
         </button>

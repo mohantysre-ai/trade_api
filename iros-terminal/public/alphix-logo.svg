@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Alphix">
   <defs>
     <linearGradient id="alphix-g" x1="8" y1="56" x2="56" y2="8" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#22d3ee"/>
-      <stop offset="1" stop-color="#38bdf8"/>
+      <stop stop-color="#48d7b5"/>
+      <stop offset="1" stop-color="#8de8d2"/>
     </linearGradient>
   </defs>
   <!-- Clean mark: ascending bars form the Alphix A — no nested wordmark -->
-  <rect width="64" height="64" rx="12" fill="#04101a"/>
+  <rect width="64" height="64" rx="12" fill="#101717"/>
   <rect x="2.5" y="2.5" width="59" height="59" rx="10" fill="none" stroke="url(#alphix-g)" stroke-width="1.5" opacity="0.55"/>
   <g fill="url(#alphix-g)">
     <rect class="alphix-bar" x="14" y="38" width="6" height="14" rx="1.2" opacity="0.55"/>
