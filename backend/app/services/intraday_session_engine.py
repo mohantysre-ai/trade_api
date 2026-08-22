@@ -180,7 +180,7 @@ REPLACEMENT_MAX_PER_SIDE = int(os.environ.get("INTRADAY_REPLACEMENT_MAX_PER_SIDE
 # A locked book may rotate, but it must never turn a five-name desk into a
 # high-turnover scanner.  This is a session-wide cap on *new* entries after
 # the morning lock (normal replacements plus permitted re-entries).
-MAX_DAILY_REPLACEMENTS = int(os.environ.get("INTRADAY_MAX_DAILY_REPLACEMENTS", "3"))
+MAX_DAILY_REPLACEMENTS = int(os.environ.get("INTRADAY_MAX_DAILY_REPLACEMENTS", "10"))
 
 # Re-entry policy.  A completed target or a genuinely profitable trailing exit
 # may receive one smaller, independently-qualified continuation attempt.  An

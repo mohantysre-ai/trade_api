@@ -101,7 +101,9 @@ Set `INTRADAY_CANDIDATE_LIMIT` in `.env` if you want to cap how many of those vo
 
 The intraday book is capped at five concurrent names and can hold cash. It does
 not fill every freed slot. To prevent replacement churn, the default is at most
-three new entries after the morning lock (`INTRADAY_MAX_DAILY_REPLACEMENTS=3`).
+ten new entries after the morning lock (`INTRADAY_MAX_DAILY_REPLACEMENTS=10`).
+This is a shared ceiling across ordinary replacements and same-symbol re-entries,
+not a target number of trades.
 
 A symbol that reaches a completed target, or exits through a profitable trail,
 can receive **one** same-day re-entry only when all of these checks pass:
@@ -118,7 +120,7 @@ An initial stop-loss re-entry is disabled by default. Enable it only after
 event-level replay shows a positive out-of-sample contribution:
 
 ```env
-INTRADAY_MAX_DAILY_REPLACEMENTS=3
+INTRADAY_MAX_DAILY_REPLACEMENTS=10
 INTRADAY_MAX_REENTRIES_PER_SYMBOL=1
 INTRADAY_REENTRY_TARGET_COOLDOWN_MIN=20
 INTRADAY_REENTRY_TRAIL_COOLDOWN_MIN=30
