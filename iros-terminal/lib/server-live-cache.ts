@@ -7,22 +7,25 @@ export async function cachedBackendJson<T>(
   url: string,
   freshMs: number,
   staleMs = 30_000,
+  timeoutMs = 12_000,
 ): Promise<{ data: T; cacheStatus: "HIT" | "MISS" | "STALE" }> {
   const now = Date.now();
   const entry = entries.get(key);
+  const fetchJson = () =>
+    fetch(url, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    }).then(async (response) => {
+      if (!response.ok) throw new Error(`Backend HTTP ${response.status}`);
+      return response.json() as Promise<T>;
+    });
   if (entry?.value !== undefined && now < entry.expiresAt) {
     return { data: entry.value as T, cacheStatus: "HIT" };
   }
   if (entry?.value !== undefined && now < entry.staleUntil) {
     if (!entry.pending) {
-      const refresh = fetch(url, {
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(12_000),
-      }).then(async (response) => {
-        if (!response.ok) throw new Error(`Backend HTTP ${response.status}`);
-        return response.json() as Promise<T>;
-      });
+      const refresh = fetchJson();
       entries.set(key, { ...entry, pending: refresh });
       void refresh.then((value) => {
         entries.set(key, { value, expiresAt: Date.now() + freshMs, staleUntil: Date.now() + staleMs });
@@ -36,14 +39,7 @@ export async function cachedBackendJson<T>(
     return { data: (await entry.pending) as T, cacheStatus: "HIT" };
   }
 
-  const pending = fetch(url, {
-    cache: "no-store",
-    headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(12_000),
-  }).then(async (response) => {
-    if (!response.ok) throw new Error(`Backend HTTP ${response.status}`);
-    return response.json() as Promise<T>;
-  });
+  const pending = fetchJson();
   entries.set(key, { ...entry, expiresAt: entry?.expiresAt ?? 0, staleUntil: entry?.staleUntil ?? 0, pending });
 
   try {

@@ -4524,29 +4524,84 @@ def create_app() -> FastAPI:
             }
 
     @app.get("/api/index-options")
-    def index_options(live: bool = True) -> dict[str, Any]:
+    def index_options(
+        background_tasks: BackgroundTasks,
+        live: bool = True,
+        sessionDate: str | None = None,
+    ) -> dict[str, Any]:
         """Return the deterministic index-options radar; never mock missing chain data."""
-        from .angel_index_options import active_index_expiries, cached_angel_index_option_snapshot, option_data_to_strategy_inputs, unavailable_provider_snapshot
+        from .angel_index_options import (
+            _RADAR_REFRESH_LOCK,
+            active_index_expiries,
+            cached_angel_index_option_snapshot,
+            load_persisted_radar,
+            option_data_to_strategy_inputs,
+            persist_radar,
+            unavailable_provider_snapshot,
+        )
         from .dhan_scanx_options import apply_scanx_fallback
         from .index_options_engine import build_index_options_radar
+        from .index_options_replay import parse_session_date, replay_index_options_session
 
-        snapshot = dict(_load_last_snapshot() or {})
-        if live:
+        if sessionDate:
+            ist_today = datetime.now(tz=IST_ZONE).date()
             try:
-                option_data = cached_angel_index_option_snapshot(AngelOneClient())
-            except Exception as exc:
-                option_data = unavailable_provider_snapshot(exc)
+                replay_day = parse_session_date(sessionDate, today=ist_today)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"Invalid sessionDate: {exc}") from exc
             try:
-                option_data = apply_scanx_fallback(option_data, active_index_expiries())
+                return replay_index_options_session(AngelOneClient(), replay_day)
             except Exception as exc:
-                option_data["fallbackSource"] = "SCANX"
-                option_data["fallbackError"] = str(exc)
-            snapshot["indexOptions"] = option_data_to_strategy_inputs(option_data, snapshot)
-            snapshot["indexOptionProvider"] = option_data
-        result = build_index_options_radar(snapshot)
-        result["provider"] = "ANGEL_ONE_WITH_SCANX_FALLBACK"
-        result["providerEvidence"] = snapshot.get("indexOptionProvider")
-        return result
+                return {
+                    "success": False,
+                    "mode": "SESSION_REPLAY",
+                    "sessionDate": replay_day.isoformat(),
+                    "executionPolicy": "MANUAL_ONLY",
+                    "candidates": [],
+                    "selected": [],
+                    "buySideContracts": [],
+                    "implemented": [],
+                    "error": str(exc),
+                }
+
+        def _compose() -> dict[str, Any]:
+            snapshot = dict(_load_last_snapshot() or {})
+            if live:
+                try:
+                    option_data = cached_angel_index_option_snapshot(AngelOneClient())
+                except Exception as exc:
+                    option_data = unavailable_provider_snapshot(exc)
+                try:
+                    option_data = apply_scanx_fallback(option_data, active_index_expiries())
+                except Exception as exc:
+                    option_data["fallbackSource"] = "SCANX"
+                    option_data["fallbackError"] = str(exc)
+                snapshot["indexOptions"] = option_data_to_strategy_inputs(option_data, snapshot)
+                snapshot["indexOptionProvider"] = option_data
+            result = build_index_options_radar(snapshot)
+            result["provider"] = "ANGEL_ONE_WITH_SCANX_FALLBACK"
+            result["providerEvidence"] = snapshot.get("indexOptionProvider")
+            persist_radar(result)
+            return result
+
+        def _refresh_bg() -> None:
+            if not _RADAR_REFRESH_LOCK.acquire(blocking=False):
+                return
+            try:
+                _compose()
+            finally:
+                _RADAR_REFRESH_LOCK.release()
+
+        cached = load_persisted_radar()
+        if cached:
+            age_ok = load_persisted_radar(max_age_seconds=15.0) is not None
+            if not age_ok:
+                background_tasks.add_task(_refresh_bg)
+                cached = {**cached, "cacheStatus": "STALE"}
+            else:
+                cached = {**cached, "cacheStatus": "HIT"}
+            return cached
+        return _compose()
 
     @app.get("/api/dhan-scanner-matrix")
     def dhan_scanner_matrix() -> dict[str, Any]:

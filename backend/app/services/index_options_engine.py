@@ -186,6 +186,7 @@ def _candidate(index: dict[str, str], snapshot: dict[str, Any]) -> dict[str, Any
         "expiry": supplied.get("expiry"),
         "dataLimitations": supplied.get("dataLimitations") or [],
         "chain": supplied.get("rawChain") or [],
+        "structure": supplied.get("structure"),
         "eligible": eligible,
     }
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, time, timezone
 from typing import Any, Callable
 from urllib.request import Request, urlopen
@@ -106,15 +107,29 @@ def fetch_scanx_option_chain(index_key: str, expiry: date, *, requester: Callabl
 def apply_scanx_fallback(angel_payload: dict[str, Any], expiries: dict[str, date], *, fetcher: Callable[[str, date], dict[str, Any]] = fetch_scanx_option_chain) -> dict[str, Any]:
     merged = {**angel_payload, "indices": dict(angel_payload.get("indices") or {})}
     used: list[str] = []
-    for key, sid in SCANX_SIDS.items():
+    needed = []
+    for key in SCANX_SIDS:
         angel = merged["indices"].get(key) if isinstance(merged["indices"].get(key), dict) else {}
         usable = angel.get("status") == "LIVE" and bool(angel.get("chain"))
         if usable or key not in expiries:
             continue
+        needed.append(key)
+
+    def _one(key: str) -> tuple[str, dict[str, Any]]:
         try:
-            fallback = fetcher(key, expiries[key])
+            return key, fetcher(key, expiries[key])
         except Exception as exc:
-            fallback = {"source": "SCANX_FALLBACK", "status": "SOURCE_UNAVAILABLE", "error": str(exc), "chain": []}
+            return key, {"source": "SCANX_FALLBACK", "status": "SOURCE_UNAVAILABLE", "error": str(exc), "chain": []}
+
+    fetched: dict[str, dict[str, Any]] = {}
+    if needed:
+        with ThreadPoolExecutor(max_workers=len(needed)) as pool:
+            futures = [pool.submit(_one, key) for key in needed]
+            for future in as_completed(futures):
+                key, fallback = future.result()
+                fetched[key] = fallback
+    for key, fallback in fetched.items():
+        angel = merged["indices"].get(key) if isinstance(merged["indices"].get(key), dict) else {}
         if fallback.get("status") == "LIVE" and fallback.get("chain"):
             merged["indices"][key] = {**angel, **fallback, "primarySource": "ANGEL_ONE", "fallbackReason": angel.get("error") or angel.get("status")}
             used.append(key)

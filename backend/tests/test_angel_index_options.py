@@ -42,6 +42,9 @@ class FakeClient:
     def fetch_option_greeks(self, name, expiry):
         return [{"strikePrice": "25000", "optionType": "CE", "delta": "0.55", "gamma": "0.001", "theta": "-12", "vega": "10", "impliedVolatility": "14"}]
 
+    def fetch_candles(self, exchange, symboltoken, interval, fromdate, todate):
+        return []
+
 
 def test_angel_snapshot_and_strategy_input_preserve_real_greeks():
     payload = fetch_angel_index_option_snapshot(FakeClient(), master=_master())

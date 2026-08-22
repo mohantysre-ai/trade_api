@@ -3,13 +3,21 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import threading
 import time
-from datetime import date, datetime, time as dt_time, timedelta, timezone
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date, datetime, time as dt_time, timezone
+from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 from ..utils.symbols import Instrument
+from .json_atomic import atomic_write_json, load_json_with_fallback
+from .market_snapshot_store import market_snapshot_path
+
+IST_ZONE = ZoneInfo("Asia/Kolkata")
 
 SCRIP_MASTER_URL = "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json"
 INDEXES: tuple[dict[str, Any], ...] = (
@@ -23,6 +31,7 @@ _MASTER_LOCK = threading.Lock()
 _MASTER_CACHE: tuple[float, list[dict[str, Any]]] = (0.0, [])
 _OPTION_LOCK = threading.Lock()
 _OPTION_CACHE: tuple[float, dict[str, Any]] = (0.0, {})
+_RADAR_REFRESH_LOCK = threading.Lock()
 
 
 def _float(value: Any) -> float | None:
@@ -123,6 +132,8 @@ def _quote_row(contract: dict[str, Any], quote: dict[str, Any], greek: dict[str,
         "delta": _float((greek or {}).get("delta")), "gamma": _float((greek or {}).get("gamma")),
         "theta": _float((greek or {}).get("theta")), "vega": _float((greek or {}).get("vega")),
         "iv": _float((greek or {}).get("impliedVolatility")), "greeksSource": "ANGEL_ONE" if greek else None,
+        "lotSize": _float(contract.get("lotsize")),
+        "exchange": str(contract.get("exch_seg") or ""),
     }
 
 
@@ -136,14 +147,38 @@ def _ema(values: list[float], period: int) -> float | None:
     return value
 
 
+def parse_candle_ts(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            parsed = datetime.strptime(text.replace("Z", "+0000").replace("+05:30", "+0530"), fmt)
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=IST_ZONE)
+        except ValueError:
+            continue
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=IST_ZONE)
+
+
+def ist_session_bounds(session_date: date) -> tuple[datetime, datetime]:
+    start = datetime.combine(session_date, dt_time(9, 15), tzinfo=IST_ZONE)
+    end = datetime.combine(session_date, dt_time(15, 30), tzinfo=IST_ZONE)
+    return start, end
+
+
 def index_structure_from_candles(candles: list[list[Any]]) -> dict[str, Any]:
     """Derive direction only after a 5-minute close clears ORB and aligned EMAs."""
     parsed = [row for row in candles if isinstance(row, list) and len(row) >= 5 and _float(row[4]) is not None]
     closes = [_float(row[4]) for row in parsed]
     closes = [value for value in closes if value is not None]
     ema9, ema20 = _ema(closes, 9), _ema(closes, 20)
+    incomplete = {"status": "DATA_INCOMPLETE", "direction": None, "barCount": len(parsed), "last": closes[-1] if closes else None}
     if len(parsed) < 20 or ema9 is None or ema20 is None:
-        return {"status": "DATA_INCOMPLETE", "direction": None}
+        return incomplete
     orb_rows = parsed[:3]
     orb_high = max(_float(row[2]) or -math.inf for row in orb_rows)
     orb_low = min(_float(row[3]) or math.inf for row in orb_rows)
@@ -154,63 +189,127 @@ def index_structure_from_candles(candles: list[list[Any]]) -> dict[str, Any]:
         "status": "CONFIRMED" if call or put else "NO_BREAKOUT",
         "direction": "CALL" if call else "PUT" if put else None,
         "last": last, "ema9": round(ema9, 4), "ema20": round(ema20, 4),
-        "orbHigh": orb_high, "orbLow": orb_low,
+        "orbHigh": orb_high, "orbLow": orb_low, "barCount": len(parsed),
     }
+
+
+def walk_forward_structure(candles: list[list[Any]]) -> dict[str, Any]:
+    """First 5m close that confirms ORB+EMA, plus the end-of-window structure."""
+    parsed = [row for row in candles if isinstance(row, list) and len(row) >= 5 and _float(row[4]) is not None]
+    eod = index_structure_from_candles(parsed)
+    confirmed_at = None
+    first_direction = None
+    for index in range(19, len(parsed)):
+        snapshot = index_structure_from_candles(parsed[: index + 1])
+        direction = snapshot.get("direction")
+        if direction in {"CALL", "PUT"}:
+            confirmed_at = parse_candle_ts(parsed[index][0])
+            first_direction = direction
+            break
+    return {
+        **eod,
+        "firstDirection": first_direction,
+        "confirmedAt": confirmed_at.isoformat() if confirmed_at else None,
+    }
+
+
+def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    key = config["key"]
+    try:
+        spot_quote = client.fetch_quote(config["exchange"], config["spotSymbol"], config["spotToken"])
+        spot = _float(spot_quote.get("ltp"))
+        if spot is None or spot <= 0:
+            raise RuntimeError("spot quote unavailable")
+        expiry, contracts, future = _contracts(rows, config, spot)
+        if expiry is None or not contracts:
+            raise RuntimeError("active option contracts unavailable in Angel scrip master")
+        instruments = [_instrument(row, f"{key}:{row.get('token')}") for row in contracts]
+        if future:
+            instruments.append(_instrument(future, f"{key}:FUT"))
+        quotes = client.fetch_batch_quotes(instruments)
+        greek_rows: list[dict[str, Any]] = []
+        greek_error = None
+        if config["segment"] == "NFO":
+            try:
+                greek_rows = client.fetch_option_greeks(config["name"], expiry.strftime("%d%b%Y").upper())
+            except Exception as exc:
+                greek_error = str(exc)
+        else:
+            greek_error = "ANGEL_GREEKS_NSE_ONLY"
+        greek_map = {(round(_float(row.get("strikePrice")) or -1, 4), str(row.get("optionType") or "").upper()): row for row in greek_rows}
+        chain = []
+        for contract in contracts:
+            option_type = "CE" if str(contract.get("symbol") or "").endswith("CE") else "PE"
+            greek = greek_map.get((round(contract.get("_strike") or -1, 4), option_type))
+            chain.append(_quote_row(contract, quotes.get(f"{key}:{contract.get('token')}") or {}, greek))
+        future_quote = quotes.get(f"{key}:FUT") if future else None
+        now_ist = datetime.now(IST_ZONE)
+        session_start, _session_end = ist_session_bounds(now_ist.date())
+        try:
+            candles = client.fetch_candles(config["exchange"], config["spotToken"], "FIVE_MINUTE", session_start, now_ist)
+        except Exception:
+            candles = []
+        return key, {
+            "source": "ANGEL_ONE", "status": "LIVE" if chain else "DATA_INCOMPLETE",
+            "fetchedAt": datetime.now(timezone.utc).isoformat(), "spot": spot, "spotClose": _float(spot_quote.get("close")),
+            "expiry": expiry.isoformat(), "chain": chain,
+            "structure": walk_forward_structure(candles) if candles else index_structure_from_candles(candles),
+            "future": ({"symbol": future.get("symbol"), "ltp": _float((future_quote or {}).get("ltp")),
+                        "close": _float((future_quote or {}).get("close")),
+                        "oi": _float((future_quote or {}).get("opnInterest") or (future_quote or {}).get("oi")),
+                        "previousOi": _float((future_quote or {}).get("previousOI") or (future_quote or {}).get("prev_oi"))} if future else None),
+            "greeksStatus": "LIVE" if greek_rows else "UNAVAILABLE", "greeksError": greek_error,
+        }
+    except Exception as exc:
+        return key, {"source": "ANGEL_ONE", "status": "SOURCE_UNAVAILABLE", "error": str(exc), "chain": []}
 
 
 def fetch_angel_index_option_snapshot(client: Any, *, master: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     rows = master if master is not None else load_angel_scrip_master()
     output: dict[str, Any] = {}
-    for config in INDEXES:
-        key = config["key"]
-        try:
-            spot_quote = client.fetch_quote(config["exchange"], config["spotSymbol"], config["spotToken"])
-            spot = _float(spot_quote.get("ltp"))
-            if spot is None or spot <= 0:
-                raise RuntimeError("spot quote unavailable")
-            expiry, contracts, future = _contracts(rows, config, spot)
-            if expiry is None or not contracts:
-                raise RuntimeError("active option contracts unavailable in Angel scrip master")
-            instruments = [_instrument(row, f"{key}:{row.get('token')}") for row in contracts]
-            if future:
-                instruments.append(_instrument(future, f"{key}:FUT"))
-            quotes = client.fetch_batch_quotes(instruments)
-            greek_rows: list[dict[str, Any]] = []
-            greek_error = None
-            if config["segment"] == "NFO":
-                try:
-                    greek_rows = client.fetch_option_greeks(config["name"], expiry.strftime("%d%b%Y").upper())
-                except Exception as exc:
-                    greek_error = str(exc)
-            else:
-                greek_error = "ANGEL_GREEKS_NSE_ONLY"
-            greek_map = {(round(_float(row.get("strikePrice")) or -1, 4), str(row.get("optionType") or "").upper()): row for row in greek_rows}
-            chain = []
-            for contract in contracts:
-                option_type = "CE" if str(contract.get("symbol") or "").endswith("CE") else "PE"
-                greek = greek_map.get((round(contract.get("_strike") or -1, 4), option_type))
-                chain.append(_quote_row(contract, quotes.get(f"{key}:{contract.get('token')}") or {}, greek))
-            future_quote = quotes.get(f"{key}:FUT") if future else None
-            now = datetime.now(timezone.utc)
-            session_start = datetime.combine(now.date(), dt_time(3, 45), tzinfo=timezone.utc)  # 09:15 IST
-            try:
-                candles = client.fetch_candles(config["exchange"], config["spotToken"], "FIVE_MINUTE", session_start, now)
-            except Exception:
-                candles = []
-            output[key] = {
-                "source": "ANGEL_ONE", "status": "LIVE" if chain else "DATA_INCOMPLETE",
-                "fetchedAt": datetime.now(timezone.utc).isoformat(), "spot": spot, "spotClose": _float(spot_quote.get("close")),
-                "expiry": expiry.isoformat(), "chain": chain,
-                "structure": index_structure_from_candles(candles),
-                "future": ({"symbol": future.get("symbol"), "ltp": _float((future_quote or {}).get("ltp")),
-                            "close": _float((future_quote or {}).get("close")),
-                            "oi": _float((future_quote or {}).get("opnInterest") or (future_quote or {}).get("oi")),
-                            "previousOi": _float((future_quote or {}).get("previousOI") or (future_quote or {}).get("prev_oi"))} if future else None),
-                "greeksStatus": "LIVE" if greek_rows else "UNAVAILABLE", "greeksError": greek_error,
-            }
-        except Exception as exc:
-            output[key] = {"source": "ANGEL_ONE", "status": "SOURCE_UNAVAILABLE", "error": str(exc), "chain": []}
-    return {"source": "ANGEL_ONE", "fetchedAt": datetime.now(timezone.utc).isoformat(), "indices": output}
+    with ThreadPoolExecutor(max_workers=len(INDEXES)) as pool:
+        futures = [pool.submit(_fetch_one_index, client, rows, config) for config in INDEXES]
+        for future in as_completed(futures):
+            key, payload = future.result()
+            output[key] = payload
+    ordered = {config["key"]: output.get(config["key"]) or {"source": "ANGEL_ONE", "status": "SOURCE_UNAVAILABLE", "chain": []} for config in INDEXES}
+    return {"source": "ANGEL_ONE", "fetchedAt": datetime.now(timezone.utc).isoformat(), "indices": ordered}
+
+
+def radar_cache_path() -> Path:
+    env = (os.environ.get("INDEX_OPTIONS_RADAR_FILE") or "").strip()
+    if env:
+        return Path(env)
+    return market_snapshot_path().with_name("index_options_radar.json")
+
+
+def load_persisted_radar(*, max_age_seconds: float | None = None) -> dict[str, Any] | None:
+    try:
+        payload = load_json_with_fallback(radar_cache_path())
+    except FileNotFoundError:
+        return None
+    if not isinstance(payload, dict) or not payload.get("success"):
+        return None
+    if max_age_seconds is None:
+        return payload
+    fetched = payload.get("persistedAt") or payload.get("updatedAt")
+    if not fetched:
+        return None
+    try:
+        stamp = datetime.fromisoformat(str(fetched).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    age = (datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)).total_seconds()
+    return payload if age <= max_age_seconds else None
+
+
+def persist_radar(payload: dict[str, Any]) -> None:
+    if not isinstance(payload, dict) or not payload.get("success"):
+        return
+    stamped = {**payload, "persistedAt": datetime.now(timezone.utc).isoformat()}
+    atomic_write_json(radar_cache_path(), stamped)
 
 
 def cached_angel_index_option_snapshot(client: Any, *, ttl_seconds: float = 15.0) -> dict[str, Any]:
