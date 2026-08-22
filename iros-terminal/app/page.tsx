@@ -139,13 +139,23 @@ type TrendlyneScreenData = {
   screenData: TrendlyneStock[];
 };
 
-const TRENDLYNE_SCREENS: { key: TrendlyneScreenKey; label: string; accent: 'emerald' | 'red' | 'amber' | 'indigo' }[] = [
-  { key: 'risingDelivery', label: 'RISING DELIVERY %', accent: 'emerald' },
-  { key: 'topLosersVolume', label: 'TOP LOSERS BY VOLUME', accent: 'red' },
-  { key: 'volumeShockers', label: 'VOLUME SHOCKERS', accent: 'amber' },
-  { key: 'highVolumeGain', label: 'HIGH VOLUME/GAIN', accent: 'emerald' },
-  { key: 'highVolumeLoss', label: 'HIGH VOLUME/LOSS', accent: 'red' },
-  { key: 'outPerformanceWeek', label: 'OUTPERFORMANCE /WEEK', accent: 'indigo' },
+type TapeSpan = 3 | 4 | 5 | 6;
+type TapeVariant = 'lead' | 'wide' | 'std' | 'dense' | 'compact' | 'pulse';
+type TapeAccent = 'emerald' | 'red' | 'amber' | 'indigo';
+
+const TRENDLYNE_SCREENS: {
+  key: TrendlyneScreenKey;
+  label: string;
+  accent: TapeAccent;
+  span: TapeSpan;
+  variant: TapeVariant;
+}[] = [
+  { key: 'risingDelivery', label: 'RISING DELIVERY %', accent: 'emerald', span: 5, variant: 'wide' },
+  { key: 'volumeShockers', label: 'VOLUME SHOCKERS', accent: 'amber', span: 3, variant: 'pulse' },
+  { key: 'topLosersVolume', label: 'TOP LOSERS BY VOLUME', accent: 'red', span: 3, variant: 'dense' },
+  { key: 'highVolumeGain', label: 'HIGH VOLUME/GAIN', accent: 'emerald', span: 3, variant: 'std' },
+  { key: 'highVolumeLoss', label: 'HIGH VOLUME/LOSS', accent: 'red', span: 3, variant: 'compact' },
+  { key: 'outPerformanceWeek', label: 'OUTPERFORMANCE /WEEK', accent: 'indigo', span: 3, variant: 'wide' },
 ];
 
 type NseTopFiveCategoryKey = 'topGainers' | 'topLoosers' | 'mostActiveValue' | 'mostActiveVolume';
@@ -154,6 +164,9 @@ type NseTopFiveCategory = {
   label: string;
   flag: 'G' | 'L' | 'MAVA' | 'MAVO';
   key: NseTopFiveCategoryKey;
+  accent: TapeAccent;
+  span: TapeSpan;
+  variant: TapeVariant;
 };
 
 type NseStock = Record<string, unknown> & {
@@ -187,10 +200,10 @@ type NseEquityStockIndicesResponse = {
 };
 
 const NSE_TOP_FIVE_CATEGORIES: NseTopFiveCategory[] = [
-  { label: 'TOP GAINERS', flag: 'G', key: 'topGainers' },
-  { label: 'TOP LOSERS', flag: 'L', key: 'topLoosers' },
-  { label: 'MOST ACTIVE', flag: 'MAVA', key: 'mostActiveValue' },
-  { label: 'HIGHEST VOLUME', flag: 'MAVO', key: 'mostActiveVolume' },
+  { label: 'TOP GAINERS', flag: 'G', key: 'topGainers', accent: 'emerald', span: 6, variant: 'lead' },
+  { label: 'TOP LOSERS', flag: 'L', key: 'topLoosers', accent: 'red', span: 3, variant: 'dense' },
+  { label: 'MOST ACTIVE', flag: 'MAVA', key: 'mostActiveValue', accent: 'indigo', span: 3, variant: 'compact' },
+  { label: 'HIGHEST VOLUME', flag: 'MAVO', key: 'mostActiveVolume', accent: 'amber', span: 4, variant: 'std' },
 ];
 
 function formatNseNumber(value: number | undefined) {
@@ -221,18 +234,50 @@ function formatNseKey(key: string) {
   return key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase());
 }
 
-function getCategoryAccentClass(categoryKey: NseTopFiveCategoryKey) {
-  if (categoryKey === 'topGainers') return 'text-emerald-600';
-  if (categoryKey === 'topLoosers') return 'text-red-500';
-  if (categoryKey === 'mostActiveValue') return 'text-indigo-600';
-  return 'text-amber-600';
+function tapeAccentToken(accent: TapeAccent): string {
+  switch (accent) {
+    case 'emerald':
+      return 'var(--terminal-green)';
+    case 'red':
+      return 'var(--terminal-red)';
+    case 'amber':
+      return 'var(--terminal-amber)';
+    case 'indigo':
+      return 'var(--terminal-cyan)';
+    default: {
+      const _never: never = accent;
+      return _never;
+    }
+  }
 }
 
-function getCategoryDotClass(categoryKey: NseTopFiveCategoryKey) {
-  if (categoryKey === 'topGainers') return 'bg-emerald-500';
-  if (categoryKey === 'topLoosers') return 'bg-red-500';
-  if (categoryKey === 'mostActiveValue') return 'bg-indigo-500';
-  return 'bg-amber-500';
+function TapeCard({
+  span,
+  variant,
+  accent,
+  title,
+  children,
+}: {
+  span: TapeSpan;
+  variant: TapeVariant;
+  accent: TapeAccent;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <article
+      className="desk-tape-card"
+      data-span={span}
+      data-variant={variant}
+      style={{ '--tape-accent': tapeAccentToken(accent) } as React.CSSProperties}
+    >
+      <h3 className="desk-tape-title">
+        <span className="desk-tape-dot" aria-hidden />
+        {title}
+      </h3>
+      {children}
+    </article>
+  );
 }
 
 function getCategoryRowStyle(categoryKey: NseTopFiveCategoryKey): React.CSSProperties {
@@ -620,7 +665,19 @@ function TrendlyneTickerTooltip({ item }: { item: TrendlyneStock }) {
   );
 }
 
-function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: TrendlyneScreenKey; label: string; accentClass: string }) {
+function TrendlyneCategoryPanel({
+  screenKey,
+  label,
+  accent,
+  span,
+  variant,
+}: {
+  screenKey: TrendlyneScreenKey;
+  label: string;
+  accent: TapeAccent;
+  span: TapeSpan;
+  variant: TapeVariant;
+}) {
   const [items, setItems] = useState<TrendlyneStock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -654,15 +711,8 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
     return () => { cancelled = true; window.clearInterval(id); };
   }, [fetchData]);
 
-  const dotCls = accentClass === 'emerald' ? 'bg-emerald-500' : accentClass === 'red' ? 'bg-red-500' : accentClass === 'indigo' ? 'bg-indigo-500' : 'bg-amber-500';
-  const textAccentCls = accentClass === 'emerald' ? 'text-emerald-600' : accentClass === 'red' ? 'text-red-500' : accentClass === 'indigo' ? 'text-indigo-600' : 'text-amber-600';
-
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-2 min-h-[200px] overflow-visible shadow-sm">
-      <div className={`text-[13px] uppercase tracking-wider ${textAccentCls} font-bold mb-2 flex items-center gap-1.5`}>
-        <span className={`w-2 h-2 rounded-full ${dotCls}`} />
-        {label}
-      </div>
+    <TapeCard span={span} variant={variant} accent={accent} title={label}>
       {error && items.length === 0 && (
         <div className="text-[11px] text-red-500 px-2 py-1 mb-1">{error}</div>
       )}
@@ -678,21 +728,21 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
               href={item.stockurl}
               target="_blank"
               rel="noopener noreferrer"
-              className="desk-screener-row group cursor-pointer border-b border-slate-100 last:border-b-0 py-2 hover:bg-slate-50 transition-colors"
+              className="desk-screener-row group cursor-pointer border-b border-slate-100 last:border-b-0 py-2"
             >
               <div className="desk-screener-name">
-                <span className={`w-1.5 h-1.5 rounded-full ${dotCls} flex-shrink-0 mt-1`} />
+                <span className="desk-tape-dot mt-1" aria-hidden />
                 <TrendlyneTickerTooltip item={item} />
               </div>
               <div className="desk-screener-quotes">
-                <span className={`desk-screener-px text-[11px] font-semibold ${textAccentCls}`}>{formatLargeNumber(item.value)}</span>
+                <span className="desk-screener-px desk-tape-metric text-[11px] font-semibold">{formatLargeNumber(item.value)}</span>
                 <span className="desk-screener-px text-[11px] text-slate-500">₹{currentPrice}</span>
               </div>
             </a>
           );
         })}
       </div>
-    </div>
+    </TapeCard>
   );
 }
 
@@ -824,41 +874,39 @@ function GainersLosersHeatmap() {
   );
 
   return (
-    <div className="glass-card p-2.5 min-h-[160px] overflow-visible">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">NIFTY TOP 5 GAINERS & LOSERS</span>
-      </div>
+    <div className="desk-tape-board glass-card p-3 min-h-[160px] overflow-visible">
+      <header className="desk-tape-kicker">
+        <span className="desk-live-dot is-live" aria-hidden />
+        <h2>NIFTY TOP 5 GAINERS & LOSERS</h2>
+        <span className="desk-tape-kicker-meta">Delivery · Volume · Shockers</span>
+      </header>
       {error && totalStocks === 0 && (
         <div className="text-[9px] text-red-500 px-2 py-1 mb-1">{error}</div>
       )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
+      <div className="desk-tape-grid">
         {NSE_TOP_FIVE_CATEGORIES.map((category) => {
           const stocks = categories[category.key] ?? [];
-          const accentClass = getCategoryAccentClass(category.key);
-          const dotClass = getCategoryDotClass(category.key);
-
           return (
-            <div key={category.key} className="glass-flat p-2 min-h-[200px] overflow-visible">
-              <div className={`text-[13px] uppercase tracking-wider ${accentClass} font-bold mb-2 flex items-center gap-1.5`}>
-                <span className={`w-2 h-2 rounded-full ${dotClass}`} />
-                {category.label}
-              </div>
+            <TapeCard
+              key={category.key}
+              span={category.span}
+              variant={category.variant}
+              accent={category.accent}
+              title={category.label}
+            >
               <ScreenerStockList stocks={stocks} categoryKey={category.key} loading={loading} />
-            </div>
+            </TapeCard>
           );
         })}
-        <TrendlyneCategoryPanel screenKey={TRENDLYNE_SCREENS[0].key} label={TRENDLYNE_SCREENS[0].label} accentClass={TRENDLYNE_SCREENS[0].accent} />
-      </div>
-
-      {/* NIFTY SCREENERS Panels */}
-      <div className="flex items-center gap-1.5 mb-1.5 mt-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-        <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">NIFTY SCREENERS</span>
-      </div>
-      {/* Remaining 5 Trendlyne screens in one row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
-        {TRENDLYNE_SCREENS.slice(1).map((screen) => (
-          <TrendlyneCategoryPanel key={screen.key} screenKey={screen.key} label={screen.label} accentClass={screen.accent} />
+        {TRENDLYNE_SCREENS.map((screen) => (
+          <TrendlyneCategoryPanel
+            key={screen.key}
+            screenKey={screen.key}
+            label={screen.label}
+            accent={screen.accent}
+            span={screen.span}
+            variant={screen.variant}
+          />
         ))}
       </div>
     </div>

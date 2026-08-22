@@ -4,10 +4,12 @@ import React, { Component, useCallback, useEffect, useRef, useState, type ReactN
 import {
   fetchEodDates,
   fetchEodLlmStatus,
+  fetchEodMonthPnl,
   fetchEodSummary,
   runEodAnalysis,
   runEodPmLlmOnce,
   type EodLlmStatus,
+  type EodMonthPnl,
   type EodPmCommentary,
 } from '@/lib/market-api';
 import EodAnalysisPanel from './EodAnalysisPanel';
@@ -75,6 +77,18 @@ function getIstMarketState(now = new Date()) {
   const mins = hour * 60 + minute;
   const marketClosed = isWeekday && mins > 15 * 60 + 30;
   return { today, marketClosed, isWeekday };
+}
+
+function fmtMonthPnl(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(Number(v))) return '—';
+  const n = Number(v);
+  const sign = n > 0 ? '+' : '';
+  return `${sign}₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+}
+
+function monthPnlTone(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(Number(v)) || Number(v) === 0) return 'text-slate-500';
+  return Number(v) > 0 ? 'text-emerald-600' : 'text-red-500';
 }
 
 const POST_CLOSE_POLL_MS = 45_000;
@@ -186,6 +200,7 @@ export default function EodDeskPanel({
   const [postCloseAuto, setPostCloseAuto] = useState(false);
   const [llmStatus, setLlmStatus] = useState<EodLlmStatus | null>(null);
   const [pmCommentary, setPmCommentary] = useState<EodPmCommentary | null>(null);
+  const [monthPnl, setMonthPnl] = useState<EodMonthPnl | null>(null);
   const forcedForDateRef = useRef<string | null>(null);
 
   const loadLlmStatus = useCallback(async (date: string) => {
@@ -269,6 +284,25 @@ export default function EodDeskPanel({
     void loadLlmStatus(dateStr);
   }, [dateStr, refreshKey, loadLlmStatus]);
 
+  useEffect(() => {
+    const month = dateStr.slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      setMonthPnl(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchEodMonthPnl(month)
+      .then((payload) => {
+        if (!cancelled) setMonthPnl(payload);
+      })
+      .catch(() => {
+        if (!cancelled) setMonthPnl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dateStr, refreshKey]);
+
   // Top desk Refresh — bump local key so Book / status reload without force rebuild.
   useEffect(() => {
     if (refreshToken > 0) {
@@ -346,7 +380,8 @@ export default function EodDeskPanel({
       // After close (or viewing today), force rebuild so locked INTRADAY/SWING
       // baskets replace any stale morning book cache — never invents picks.
       const { today, marketClosed } = getIstMarketState();
-      const force = marketClosed && dateStr === today;
+      const liveDate = dateStr === today;
+      const force = marketClosed && liveDate;
       const result = (await runEodAnalysis(dateStr, { force })) as {
         skipped?: boolean;
         reason?: string;
@@ -356,7 +391,7 @@ export default function EodDeskPanel({
       const list = await fetchEodDates().catch(() => [] as string[]);
       const sorted = [...list].sort((a, b) => b.localeCompare(a));
       setDates(sorted);
-      setForceBookRebuild(true);
+      setForceBookRebuild(liveDate && force);
       setRefreshKey((k) => k + 1);
       window.setTimeout(() => setForceBookRebuild(false), 500);
       if (result?.skipped && !force) {
@@ -530,6 +565,28 @@ export default function EodDeskPanel({
 
         {runMsg && (
           <div className="eod-desk__toast relative mt-2 text-[11px] text-slate-600">{runMsg}</div>
+        )}
+        {monthPnl && (
+          <div className="relative mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-slate-200 pt-2 text-[11px]">
+            <span className="font-bold uppercase tracking-wider text-slate-500">
+              {monthPnl.label} · {monthPnl.scope}
+            </span>
+            <span className={`tabular-nums font-semibold ${monthPnlTone(monthPnl.combinedPnl)}`}>
+              Combined {fmtMonthPnl(monthPnl.combinedPnl)}
+            </span>
+            <span className={`tabular-nums ${monthPnlTone(monthPnl.intradayPnl)}`}>
+              Intraday {fmtMonthPnl(monthPnl.intradayPnl)}
+            </span>
+            <span className={`tabular-nums ${monthPnlTone(monthPnl.swingPnl)}`}>
+              Swing {fmtMonthPnl(monthPnl.swingPnl)}
+            </span>
+            <span className="text-slate-500">
+              {monthPnl.sessionCount} archived session{monthPnl.sessionCount === 1 ? '' : 's'}
+              {monthPnl.sessionCount > 0
+                ? ` · ${monthPnl.winDays}W / ${monthPnl.lossDays}L`
+                : ''}
+            </span>
+          </div>
         )}
         {!llmDone && llmAvailable && (
           <div className="relative mt-1.5 text-[9px] text-slate-400">

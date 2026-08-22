@@ -296,6 +296,49 @@ function pnlFmt(v: number | null | undefined, digits = 2): string {
   return dash(v, digits);
 }
 
+function rowClosed(r: PositionRow): boolean {
+  return r.closed === true || r.exitState?.closed === true || Boolean(r.status?.toUpperCase().includes('CLOSED'));
+}
+
+function rowPnl(r: PositionRow): number | null {
+  const v = rowClosed(r)
+    ? (r.totalPnl ?? r.realizedPnl ?? r.exitState?.realizedPnl ?? r.unrealizedPnl)
+    : (r.totalPnl ?? r.unrealizedPnl);
+  if (v == null || Number.isNaN(v)) return null;
+  return v;
+}
+
+type BookSortKey = 'pnl' | 'pnlPct';
+type BookSortDir = 'asc' | 'desc';
+
+function sortBookRows(rows: PositionRow[], key: BookSortKey | null, dir: BookSortDir): PositionRow[] {
+  if (!key) return rows;
+  const sign = dir === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    let av: number | null;
+    let bv: number | null;
+    switch (key) {
+      case 'pnl':
+        av = rowPnl(a);
+        bv = rowPnl(b);
+        break;
+      case 'pnlPct':
+        av = a.pnlPct ?? null;
+        bv = b.pnlPct ?? null;
+        break;
+      default: {
+        const _never: never = key;
+        return _never;
+      }
+    }
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (av === bv) return (a.symbol || '').localeCompare(b.symbol || '');
+    return av < bv ? -sign : sign;
+  });
+}
+
 function pct(v: number | null | undefined, digits = 2): string {
   if (v === null || v === undefined || Number.isNaN(v)) return '—';
   const sign = v > 0 ? '+' : '';
@@ -702,15 +745,71 @@ function PositionTable({
   onSelect: (symbol: string) => void;
   emptyHint: string;
 }) {
-  const cols = [
-    '#', 'Symbol', 'Sleeve', 'LTP', 'Entry', 'Qty', 'Value', 'P&L', '%',
-    'Score', 'Rank%', 'Gap/Intra', 'Play', 'RS', 'SL', 'T1', 'T2', 'R:R', '→SL', '→T1', 'Status',
+  const [sortKey, setSortKey] = useState<BookSortKey | null>(null);
+  const [sortDir, setSortDir] = useState<BookSortDir>('desc');
+  const ordered = useMemo(() => sortBookRows(rows, sortKey, sortDir), [rows, sortKey, sortDir]);
+
+  const toggleSort = (key: BookSortKey) => {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDir('desc');
+      return;
+    }
+    if (sortDir === 'desc') {
+      setSortDir('asc');
+      return;
+    }
+    setSortKey(null);
+    setSortDir('desc');
+  };
+
+  const cols: { id: string; label: string; sort?: BookSortKey }[] = [
+    { id: 'rank', label: '#' },
+    { id: 'symbol', label: 'Symbol' },
+    { id: 'sleeve', label: 'Sleeve' },
+    { id: 'ltp', label: 'LTP' },
+    { id: 'entry', label: 'Entry' },
+    { id: 'qty', label: 'Qty' },
+    { id: 'value', label: 'Value' },
+    { id: 'pnl', label: 'P&L', sort: 'pnl' },
+    { id: 'pct', label: '%', sort: 'pnlPct' },
+    { id: 'score', label: 'Score' },
+    { id: 'rankpct', label: 'Rank%' },
+    { id: 'gap', label: 'Gap/Intra' },
+    { id: 'play', label: 'Play' },
+    { id: 'rs', label: 'RS' },
+    { id: 'sl', label: 'SL' },
+    { id: 't1', label: 'T1' },
+    { id: 't2', label: 'T2' },
+    { id: 'rr', label: 'R:R' },
+    { id: 'tosl', label: '→SL' },
+    { id: 'tot1', label: '→T1' },
+    { id: 'status', label: 'Status' },
   ];
+
+  const sortHint = (key: BookSortKey) => {
+    if (sortKey !== key) return 'Sort descending';
+    if (sortDir === 'desc') return 'Sort ascending';
+    return 'Clear sort';
+  };
   return (
     <div className="bg-white/80 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
       <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
         <h3 className="desk-panel-title text-slate-900">{title}</h3>
-        <span className="text-[9px] text-slate-500 tabular-nums">{rows.length} names</span>
+        <span className="flex items-center gap-2">
+          {rows.length > 0 ? (
+            <button
+              type="button"
+              className={`desk-sort-th md:hidden ${sortKey === 'pnl' ? 'is-on' : ''}`}
+              aria-pressed={sortKey === 'pnl'}
+              aria-label={sortHint('pnl')}
+              onClick={() => toggleSort('pnl')}
+            >
+              P&L{sortKey === 'pnl' ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''}
+            </button>
+          ) : null}
+          <span className="text-[9px] text-slate-500 tabular-nums">{rows.length} names</span>
+        </span>
       </div>
 
       {/* Mobile / small: card list essentials */}
@@ -718,7 +817,7 @@ function PositionTable({
         {rows.length === 0 ? (
           <p className="px-3 py-6 text-center text-[10px] text-slate-400">{emptyHint}</p>
         ) : (
-          rows.map((r, i) => {
+          ordered.map((r, i) => {
             const sym = r.symbol;
             const isSel = selected === sym;
             const isClosed = r.closed === true || r.exitState?.closed === true || r.status?.toUpperCase().includes('CLOSED');
@@ -784,7 +883,32 @@ function PositionTable({
           <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[8px]">
             <tr>
               {cols.map((h) => (
-                <th key={h} className="px-2 py-2.5 font-semibold whitespace-nowrap">{h}</th>
+                <th
+                  key={h.id}
+                  className="px-2 py-2.5 font-semibold whitespace-nowrap"
+                  aria-sort={
+                    h.sort && sortKey === h.sort
+                      ? sortDir === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
+                  {h.sort ? (
+                    <button
+                      type="button"
+                      className={`desk-sort-th ${sortKey === h.sort ? 'is-on' : ''}`}
+                      onClick={() => toggleSort(h.sort as BookSortKey)}
+                      title={sortHint(h.sort)}
+                      aria-label={`${h.label}. ${sortHint(h.sort)}`}
+                    >
+                      {h.label}
+                      {sortKey === h.sort ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''}
+                    </button>
+                  ) : (
+                    h.label
+                  )}
+                </th>
               ))}
             </tr>
           </thead>
@@ -796,7 +920,7 @@ function PositionTable({
                 </td>
               </tr>
             ) : (
-              rows.map((r, i) => {
+              ordered.map((r, i) => {
                 const sym = r.symbol;
                 const isSel = selected === sym;
                 const rs = rowRsVsIndex(r);
@@ -831,16 +955,8 @@ function PositionTable({
                     <td className="px-2 py-2.5 tabular-nums">{dash(r.entryPrice)}</td>
                     <td className="px-2 py-2.5 tabular-nums">{r.approxQty ?? '—'}{r.exitState?.remainingQty != null && r.exitState.remainingQty !== r.approxQty ? <span className="text-amber-600 ml-1">/{r.exitState.remainingQty}rem</span> : null}</td>
                     <td className="px-2 py-2.5 tabular-nums">{inr(r.positionValue ?? r.deployedCapital ?? null)}</td>
-                    <td className={`px-2 py-2.5 tabular-nums font-semibold ${pnlClass(
-                      r.status?.toUpperCase().includes('CLOSED') || r.closed
-                        ? (r.totalPnl ?? r.realizedPnl ?? r.exitState?.realizedPnl ?? r.unrealizedPnl)
-                        : (r.totalPnl ?? r.unrealizedPnl)
-                    )}`}>
-                      {pnlFmt(
-                        r.status?.toUpperCase().includes('CLOSED') || r.closed
-                          ? (r.totalPnl ?? r.realizedPnl ?? r.exitState?.realizedPnl ?? r.unrealizedPnl)
-                          : (r.totalPnl ?? r.unrealizedPnl)
-                      )}
+                    <td className={`px-2 py-2.5 tabular-nums font-semibold ${pnlClass(rowPnl(r))}`}>
+                      {pnlFmt(rowPnl(r))}
                     </td>
                     <td className={`px-2 py-2.5 tabular-nums ${pnlClass(r.pnlPct)}`}>{pct(r.pnlPct)}</td>
                     <td className="px-2 py-2.5 tabular-nums">{r.score == null ? 'UNRATED' : dash(r.score, 1)}</td>

@@ -766,6 +766,14 @@ def generate_swing_eod_report(
     market_phase = cash_session_phase(as_of)
     after_close = market_phase == "CLOSED"
     all_picks, is_mock, symbol_source, desk_counts = _load_swing_book_picks(as_of)
+    from .swing_session import load_swing_session
+
+    swing_live = load_swing_session()
+    live_for_date = str(swing_live.get("sessionDate") or "")[:10] == as_of.isoformat()
+    cached_hist = load_book_cache(as_of, "swing")
+    if not live_for_date:
+        if cached_hist is not None:
+            return cached_hist
 
     if not force:
         cached = load_book_cache(as_of, "swing")
@@ -812,7 +820,7 @@ def generate_swing_eod_report(
             "activePicks": 0,
             "skippedNotTriggered": 0,
             "totalDeployed": 0,
-            "totalPnl": 0,
+            "totalPnl": None if not live_for_date else 0,
             "totalPnlPct": None,
             "winCount": 0,
             "lossCount": 0,
@@ -821,6 +829,7 @@ def generate_swing_eod_report(
             "pnlByDayBucket": {},
             "isMock": False,
             "symbolSource": symbol_source or "swing_session_empty",
+            "archiveStatus": "NO_BOOK" if not live_for_date else None,
             "deskCounts": desk_counts,
             "attribution": {
                 "locked": 0,
@@ -831,6 +840,8 @@ def generate_swing_eod_report(
                 "deployed": 0,
             },
         }
+        if not live_for_date:
+            return empty
         return save_book_cache(as_of, "swing", empty)
 
     alerts = get_alert_history(since=as_of.isoformat(), limit=200)

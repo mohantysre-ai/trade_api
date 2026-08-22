@@ -52,6 +52,17 @@ def eod_dates() -> dict[str, Any]:
     return {"dates": list_eod_dates(), "root": EOD_DATA_ROOT}
 
 
+@router.get("/api/eod/month-pnl")
+def eod_month_pnl(month: Optional[str] = Query(None)) -> dict[str, Any]:
+    """Calendar-month Book P&L from archived daily JSON only."""
+    try:
+        from ..eod_book_cache import month_book_pnl
+
+        return month_book_pnl(month)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.get("/api/eod/summary/{analysis_date}")
 def eod_summary(analysis_date: str) -> dict[str, Any]:
     return _read_json_file(_day_path(analysis_date, "master_eod_payload.json"))

@@ -862,6 +862,36 @@ export async function fetchEodDates(): Promise<string[]> {
   return [];
 }
 
+export type EodMonthDayPnl = {
+  date: string;
+  intradayPnl: number | null;
+  swingPnl: number | null;
+  combinedPnl: number | null;
+  hasIntraday: boolean;
+  hasSwing: boolean;
+};
+
+export type EodMonthPnl = {
+  month: string;
+  label: string;
+  scope: "MTD" | "MONTH" | string;
+  sessionCount: number;
+  intradayPnl: number | null;
+  swingPnl: number | null;
+  combinedPnl: number | null;
+  winDays: number;
+  lossDays: number;
+  flatDays: number;
+  days: EodMonthDayPnl[];
+};
+
+export async function fetchEodMonthPnl(month: string): Promise<EodMonthPnl> {
+  const res = await fetch(`/api/eod/month-pnl?month=${encodeURIComponent(month)}`, {
+    cache: "no-store",
+  });
+  return readEodJson<EodMonthPnl>(res);
+}
+
 export async function fetchEodSummary(date: string): Promise<EodMasterPayload> {
   const res = await fetch(`/api/eod/summary/${encodeURIComponent(date)}`, { cache: "no-store" });
   return readEodJson<EodMasterPayload>(res);

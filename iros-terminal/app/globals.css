@@ -1620,6 +1620,237 @@ html[data-perf="1"] .desk-sources-track {
   font-variant-numeric: tabular-nums;
 }
 
+.desk-sort-th {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  min-height: 1.5rem;
+}
+.desk-sort-th:hover,
+.desk-sort-th:focus-visible {
+  color: var(--terminal-cyan);
+  outline: none;
+}
+.desk-sort-th.is-on {
+  color: var(--fg-strong);
+}
+
+/* ─── Nifty tape board (asymmetric bento, not equal cards) ─────────────── */
+.desk-tape-board.glass-card:hover,
+.desk-tape-board.glass-card:focus-within,
+.desk-tape-board.glass-card:active {
+  transform: none;
+  background: var(--glass-1);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-edge), 0 12px 32px rgba(0, 0, 0, 0.22);
+}
+.desk-tape-kicker {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+  margin-bottom: 0.85rem;
+}
+.desk-tape-kicker h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.desk-tape-kicker-meta {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.desk-tape-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.7rem 0.55rem;
+  align-items: start;
+}
+.desk-tape-card {
+  --tape-accent: var(--terminal-cyan);
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  overflow: hidden;
+  padding: 11px 12px 10px;
+  min-height: 216px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--tape-accent) 7%, var(--glass-flat));
+  border: 1px solid color-mix(in srgb, var(--tape-accent) 24%, var(--glass-border));
+  box-shadow: var(--glass-edge);
+  animation: desk-fade-up var(--dur-entrance) var(--ease-out-strong) both;
+  transition:
+    transform var(--dur-fast) var(--ease-out-strong),
+    border-color var(--dur-fast) var(--ease-collapse),
+    box-shadow var(--dur-med) var(--ease-collapse);
+}
+.desk-tape-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--tape-accent);
+  opacity: 0.9;
+  pointer-events: none;
+}
+.desk-tape-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--tape-accent) 52%, var(--glass-border));
+  box-shadow:
+    var(--glass-edge),
+    0 12px 28px color-mix(in srgb, var(--tape-accent) 14%, transparent);
+}
+.desk-tape-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.55rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tape-accent);
+  line-height: 1.25;
+}
+.desk-tape-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: var(--tape-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--tape-accent) 55%, transparent);
+}
+.desk-tape-metric {
+  color: var(--tape-accent);
+}
+.desk-tape-card .desk-screener-row {
+  border-radius: 6px;
+  padding-inline: 4px;
+  margin-inline: -4px;
+  transition:
+    background-color var(--dur-fast) var(--ease-out-strong),
+    transform var(--dur-fast) var(--ease-out-strong);
+}
+.desk-tape-card .desk-screener-row:hover {
+  background: color-mix(in srgb, var(--tape-accent) 11%, transparent);
+  transform: translateX(3px);
+}
+.desk-tape-card[data-variant="lead"] {
+  padding: 14px 16px 12px;
+  min-height: 268px;
+  border-radius: 16px;
+}
+.desk-tape-card[data-variant="lead"]::before { width: 4px; }
+.desk-tape-card[data-variant="lead"] .desk-tape-title {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  margin-bottom: 0.7rem;
+}
+.desk-tape-card[data-variant="wide"] {
+  padding: 13px 14px 11px;
+  min-height: 244px;
+  border-radius: 15px;
+}
+.desk-tape-card[data-variant="std"] {
+  padding: 11px 12px 10px;
+  min-height: 224px;
+}
+.desk-tape-card[data-variant="dense"] {
+  padding: 8px 10px 8px;
+  min-height: 196px;
+  border-radius: 10px;
+}
+.desk-tape-card[data-variant="dense"] .desk-screener-row { padding-block: 0.4rem; }
+.desk-tape-card[data-variant="dense"] .desk-tape-title {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.4rem;
+}
+.desk-tape-card[data-variant="compact"] {
+  padding: 8px 9px 7px;
+  min-height: 188px;
+  border-radius: 10px;
+}
+.desk-tape-card[data-variant="compact"] .desk-screener-row { padding-block: 0.35rem; }
+.desk-tape-card[data-variant="compact"] .desk-tape-title {
+  font-size: 10px;
+  margin-bottom: 0.35rem;
+}
+.desk-tape-card[data-variant="pulse"] {
+  padding: 12px 13px 10px;
+  min-height: 232px;
+}
+.desk-tape-card[data-variant="pulse"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 38%,
+    color-mix(in srgb, var(--tape-accent) 16%, transparent) 50%,
+    transparent 62%
+  );
+  background-size: 220% 100%;
+  animation: desk-tape-sheen 4.8s var(--ease-out-strong) infinite;
+  opacity: 0.5;
+}
+@keyframes desk-tape-sheen {
+  from { background-position: 120% 0; }
+  to { background-position: -20% 0; }
+}
+.desk-tape-grid > :nth-child(1) { animation-delay: 0ms; }
+.desk-tape-grid > :nth-child(2) { animation-delay: 40ms; }
+.desk-tape-grid > :nth-child(3) { animation-delay: 80ms; }
+.desk-tape-grid > :nth-child(4) { animation-delay: 120ms; }
+.desk-tape-grid > :nth-child(5) { animation-delay: 160ms; }
+.desk-tape-grid > :nth-child(6) { animation-delay: 200ms; }
+.desk-tape-grid > :nth-child(7) { animation-delay: 240ms; }
+.desk-tape-grid > :nth-child(8) { animation-delay: 280ms; }
+.desk-tape-grid > :nth-child(9) { animation-delay: 320ms; }
+.desk-tape-grid > :nth-child(10) { animation-delay: 360ms; }
+@media (min-width: 640px) {
+  .desk-tape-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.75rem 0.7rem; }
+  .desk-tape-card[data-span="3"],
+  .desk-tape-card[data-span="4"] { grid-column: span 3; }
+  .desk-tape-card[data-span="5"],
+  .desk-tape-card[data-span="6"] { grid-column: span 6; }
+}
+@media (min-width: 1024px) {
+  .desk-tape-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 0.8rem 0.85rem; }
+  .desk-tape-card[data-span="3"] { grid-column: span 3; }
+  .desk-tape-card[data-span="4"] { grid-column: span 4; }
+  .desk-tape-card[data-span="5"] { grid-column: span 5; }
+  .desk-tape-card[data-span="6"] { grid-column: span 6; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .desk-tape-card {
+    animation: none;
+  }
+  .desk-tape-card:hover,
+  .desk-tape-card .desk-screener-row:hover {
+    transform: none;
+  }
+  .desk-tape-card[data-variant="pulse"]::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* Desk activity alert toasts */
 .desk-activity-alert {
   --alert-ease: cubic-bezier(0.22, 1, 0.36, 1);

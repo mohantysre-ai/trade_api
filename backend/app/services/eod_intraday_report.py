@@ -1057,8 +1057,42 @@ def generate_intraday_eod_report(
     after_close = market_phase == "CLOSED"
     session_live = load_intraday_session(for_date)
     sess_idx: dict[tuple[str, str], dict[str, Any]] = {}
-    if str(session_live.get("sessionDate") or "")[:10] == for_date.isoformat():
+    live_for_date = str(session_live.get("sessionDate") or "")[:10] == for_date.isoformat()
+    if live_for_date:
         sess_idx = _session_leg_index(session_live)
+
+    cached_hist = load_book_cache(for_date, "intraday")
+    if not live_for_date:
+        if cached_hist is not None:
+            return cached_hist
+        if not picks:
+            return {
+                "date": for_date.isoformat(),
+                "capital": capital,
+                "totalDeployed": 0.0,
+                "bookTurnover": 0.0,
+                "totalPnl": None,
+                "remainingCapital": capital,
+                "hitBreakdown": {
+                    "T1_HIT": 0,
+                    "T2_HIT": 0,
+                    "SL_HIT": 0,
+                    "EOD_SQUAREOFF": 0,
+                    "TRAIL_SL_HIT": 0,
+                    "PARTIAL_SCALE": 0,
+                },
+                "hitRatePct": 0.0,
+                "missCount": 0,
+                "hitCount": 0,
+                "isMock": False,
+                "symbolSource": "historical_missing",
+                "archiveStatus": "NO_BOOK",
+                "executionPolicy": "MANUAL_ONLY",
+                "executionBasis": "MODELED_PAPER",
+                "marketPhase": market_phase,
+                "deskCounts": desk_counts,
+                "trades": [],
+            }
 
     if not force:
         cached = load_book_cache(for_date, "intraday")

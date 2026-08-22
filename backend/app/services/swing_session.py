@@ -1648,6 +1648,16 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
         )
         force = True
 
+    if stale_day and existing_date:
+        try:
+            from datetime import date as _date
+
+            from .eod_book_cache import freeze_dated_books_from_live
+
+            freeze_dated_books_from_live(_date.fromisoformat(existing_date[:10]))
+        except Exception as exc:
+            log.warning("Prior-day swing EOD freeze failed for %s: %s", existing_date, exc)
+
     hunt_ok, hunt_code = swing_entry_hunt_allowed(
         allow_manual_override=bool(bypass_lock_window)
     )

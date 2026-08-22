@@ -149,6 +149,30 @@ def _f(v: Any) -> float | None:
         return None
 
 
+def _picks_from_archived_books(for_date: date) -> list[dict[str, Any]]:
+    """Date-matched Book JSON → pick rows when live session files belong to another day."""
+    from ..eod_book_cache import load_book_cache
+
+    out: list[dict[str, Any]] = []
+    intra = load_book_cache(for_date, "intraday") or {}
+    if str(intra.get("archiveStatus") or "") != "NO_BOOK":
+        for row in intra.get("trades") or []:
+            if not isinstance(row, dict):
+                continue
+            pick = _normalize_pick(row, "book_intraday", book="INTRADAY")
+            if pick:
+                out.append(pick)
+    swing = load_book_cache(for_date, "swing") or {}
+    if str(swing.get("archiveStatus") or "") != "NO_BOOK":
+        for row in swing.get("picks") or []:
+            if not isinstance(row, dict):
+                continue
+            pick = _normalize_pick(row, "book_swing", book="SWING")
+            if pick:
+                out.append(pick)
+    return out
+
+
 def load_day_picks(for_date: date) -> dict[str, Any]:
     """Union locked Swing + Intraday baskets for EOD (target ~10 + 10 + 10 = 30).
 
@@ -253,6 +277,17 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
                 continue
             pick = _normalize_pick(item, "eod_archive", book=book)
             if not pick:
+                continue
+            key = f"{pick['symbol']}:{pick['direction']}:{pick['book']}"
+            if key not in by_key:
+                by_key[key] = pick
+
+    if not session_ok or not swing_ok:
+        for pick in _picks_from_archived_books(for_date):
+            book = str(pick.get("book") or "").upper()
+            if book == "INTRADAY" and session_ok:
+                continue
+            if book == "SWING" and swing_ok:
                 continue
             key = f"{pick['symbol']}:{pick['direction']}:{pick['book']}"
             if key not in by_key:
@@ -438,6 +473,14 @@ def load_persisted_candles(for_date: date, ticker: str) -> dict[str, Any]:
     return _read_json(path)
 
 
+_EOD_DATE_MARKERS = (
+    "master_eod_payload.json",
+    "book_intraday.json",
+    "book_swing.json",
+    "scorecards.json",
+)
+
+
 def list_eod_dates() -> list[str]:
     if not os.path.isdir(EOD_DATA_ROOT):
         return []
@@ -446,7 +489,6 @@ def list_eod_dates() -> list[str]:
         day_path = os.path.join(EOD_DATA_ROOT, name)
         if not os.path.isdir(day_path):
             continue
-        master = os.path.join(day_path, "master_eod_payload.json")
-        if os.path.isfile(master):
+        if any(os.path.isfile(os.path.join(day_path, marker)) for marker in _EOD_DATE_MARKERS):
             dates.append(name)
     return sorted(dates)

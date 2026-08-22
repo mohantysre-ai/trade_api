@@ -246,7 +246,17 @@ def _ensure_book_reports_cached(for_date: date, *, force: bool = False) -> None:
         from ..eod_book_cache import warm_book_caches
         from ..eod_intraday_report import generate_intraday_eod_report
         from ..eod_swing_report import generate_swing_eod_report
+        from ..swing_session import load_swing_session
+        from .ingestion import load_intraday_session
 
+        sess = load_intraday_session(for_date)
+        swing = load_swing_session()
+        live = (
+            str(sess.get("sessionDate") or "")[:10] == for_date.isoformat()
+            or str(swing.get("sessionDate") or "")[:10] == for_date.isoformat()
+        )
+        if force and not live:
+            force = False
         if force:
             warm_book_caches(for_date)
         else:

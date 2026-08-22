@@ -112,7 +112,7 @@ type IntradayReport = {
   date: string;
   capital: number;
   totalDeployed: number;
-  totalPnl: number;
+  totalPnl: number | null;
   remainingCapital: number;
   hitBreakdown: { T1_HIT: number; T2_HIT: number; SL_HIT: number; EOD_SQUAREOFF: number };
   hitRatePct: number;
@@ -121,6 +121,7 @@ type IntradayReport = {
   missScorecardCoverage?: number;
   isMock?: boolean;
   symbolSource?: string;
+  archiveStatus?: string;
   executionPolicy?: string;
   executionBasis?: string;
   marketPhase?: string;
@@ -208,7 +209,7 @@ type SwingReport = {
   activePicks?: number;
   skippedNotTriggered?: number;
   totalDeployed: number;
-  totalPnl: number;
+  totalPnl: number | null;
   totalPnlPct: number | null;
   winCount: number;
   lossCount: number;
@@ -219,6 +220,7 @@ type SwingReport = {
   picks: SwingPick[];
   isMock?: boolean;
   symbolSource?: string;
+  archiveStatus?: string;
   executionPolicy?: string;
   executionBasis?: string;
   marketPhase?: string;
@@ -1084,7 +1086,9 @@ export default function EodAnalysisPanel({
         loadOne<SwingReport>(`/api/reports/eod-swing${buildQs(swingDate)}`, 'Swing'),
       ]);
       if (intraData) setIntraday(intraData);
+      else setIntraday(null);
       if (swingData) setSwing(swingData);
+      else setSwing(null);
       if (!intraData && !swingData) {
         setError((prev) => prev || 'Book P&L failed to load');
       }
@@ -1779,7 +1783,11 @@ export default function EodAnalysisPanel({
             </div>
 
             {noIntraday ? (
-              <div className="p-4 text-[11px] text-slate-400 text-center">No archived intraday picks for this date.</div>
+              <div className="p-4 text-[11px] text-slate-400 text-center">
+                {displayIntraday?.archiveStatus === 'NO_BOOK' || displayIntraday?.symbolSource === 'historical_missing'
+                  ? `No archived Intraday book for ${dateStr}. Run EOD on that session to persist it.`
+                  : 'No archived intraday picks for this date.'}
+              </div>
             ) : displayIntraday ? (
               <>
                 <AttributionStrip attribution={displayIntraday.attribution} label="Fill / skip" />
@@ -1947,7 +1955,9 @@ export default function EodAnalysisPanel({
 
             {noSwing ? (
               <div className="p-4 text-[11px] text-slate-400 text-center">
-                No locked swing portfolio. Lock swing from Asset Matrix BUY set first.
+                {displaySwing?.archiveStatus === 'NO_BOOK' || displaySwing?.symbolSource === 'historical_missing'
+                  ? `No archived Swing book for ${swingDateStr || dateStr}. Run EOD on that session to persist it.`
+                  : 'No locked swing portfolio. Lock swing from Asset Matrix BUY set first.'}
               </div>
             ) : displaySwing ? (
               <>

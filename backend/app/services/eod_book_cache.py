@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -240,4 +240,126 @@ def warm_book_caches(for_date) -> dict[str, Any]:
         "intraday": bool(intra),
         "swing": bool(swing),
         "date": for_date.isoformat() if hasattr(for_date, "isoformat") else str(for_date),
+    }
+
+
+def freeze_dated_books_from_live(for_date: date | str) -> dict[str, Any]:
+    """Snapshot live books into ``data/eod/{date}/`` before a daily rotate.
+
+    Call while the live session files still carry ``sessionDate == for_date``.
+    Existing archived trades are left untouched.
+    """
+    day = date.fromisoformat(str(for_date)[:10]) if not isinstance(for_date, date) else for_date
+    intra = load_book_cache(day, "intraday")
+    swing = load_book_cache(day, "swing")
+    have_intra = bool(intra and intra.get("trades"))
+    have_swing = bool(swing and (swing.get("picks") or swing.get("totalPicks")))
+    if have_intra and have_swing:
+        return {"skipped": True, "reason": "already_archived", "date": day.isoformat()}
+    from .eod_intraday_report import generate_intraday_eod_report
+    from .eod_swing_report import generate_swing_eod_report
+
+    if not have_intra:
+        generate_intraday_eod_report(day, force=True)
+    if not have_swing:
+        generate_swing_eod_report(day, force=True)
+    return {"skipped": False, "date": day.isoformat()}
+
+
+def _book_total_pnl(book: dict[str, Any] | None) -> float | None:
+    if not book or str(book.get("archiveStatus") or "") == "NO_BOOK":
+        return None
+    raw = book.get("totalPnl")
+    if raw is None:
+        return None
+    try:
+        return round(float(raw), 2)
+    except (TypeError, ValueError):
+        return None
+
+
+def month_book_pnl(month: str | None = None) -> dict[str, Any]:
+    """Sum archived daily Book P&L for a calendar month. Missing days stay missing."""
+    from zoneinfo import ZoneInfo
+
+    from .eod_engine.ingestion import list_eod_dates
+
+    ist = ZoneInfo("Asia/Kolkata")
+    today = datetime.now(tz=ist).date()
+    if month:
+        parts = str(month).strip().split("-")
+        if len(parts) != 2:
+            raise ValueError(f"Invalid month: {month}")
+        try:
+            year_i, mon_i = int(parts[0]), int(parts[1])
+        except ValueError as exc:
+            raise ValueError(f"Invalid month: {month}") from exc
+        if not (1 <= mon_i <= 12):
+            raise ValueError(f"Invalid month: {month}")
+        prefix = f"{year_i:04d}-{mon_i:02d}"
+    else:
+        prefix = today.strftime("%Y-%m")
+        year_i, mon_i = today.year, today.month
+
+    label = date(year_i, mon_i, 1).strftime("%b %Y").upper()
+    current_month = prefix == today.strftime("%Y-%m")
+    days_out: list[dict[str, Any]] = []
+    intra_sum = 0.0
+    swing_sum = 0.0
+    intra_n = 0
+    swing_n = 0
+    win_days = 0
+    loss_days = 0
+    flat_days = 0
+
+    for day_key in list_eod_dates():
+        if not day_key.startswith(prefix):
+            continue
+        try:
+            day = date.fromisoformat(day_key)
+        except ValueError:
+            continue
+        intra = load_book_cache(day, "intraday")
+        swing = load_book_cache(day, "swing")
+        ip = _book_total_pnl(intra)
+        sp = _book_total_pnl(swing)
+        has_intra = bool(intra and (intra.get("trades") or ip is not None) and str(intra.get("archiveStatus") or "") != "NO_BOOK")
+        has_swing = bool(swing and (swing.get("picks") or sp is not None) and str(swing.get("archiveStatus") or "") != "NO_BOOK")
+        if not has_intra and not has_swing:
+            continue
+        combined = round((ip or 0.0) + (sp or 0.0), 2) if (ip is not None or sp is not None) else None
+        if ip is not None:
+            intra_sum += ip
+            intra_n += 1
+        if sp is not None:
+            swing_sum += sp
+            swing_n += 1
+        if combined is not None:
+            if combined > 0.005:
+                win_days += 1
+            elif combined < -0.005:
+                loss_days += 1
+            else:
+                flat_days += 1
+        days_out.append({
+            "date": day_key,
+            "intradayPnl": ip,
+            "swingPnl": sp,
+            "combinedPnl": combined,
+            "hasIntraday": has_intra,
+            "hasSwing": has_swing,
+        })
+
+    return {
+        "month": prefix,
+        "label": label,
+        "scope": "MTD" if current_month else "MONTH",
+        "sessionCount": len(days_out),
+        "intradayPnl": round(intra_sum, 2) if intra_n else None,
+        "swingPnl": round(swing_sum, 2) if swing_n else None,
+        "combinedPnl": round(intra_sum + swing_sum, 2) if (intra_n or swing_n) else None,
+        "winDays": win_days,
+        "lossDays": loss_days,
+        "flatDays": flat_days,
+        "days": days_out,
     }
