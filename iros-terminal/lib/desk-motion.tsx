@@ -391,9 +391,9 @@ export function DeskLiveTile({
       role="link"
       aria-label={`View ${label} details`}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-2 z-10 overflow-hidden">
+      <div className="flex min-w-0 flex-1 items-center gap-2 z-10 overflow-visible">
         <MarketSymbolBadge symbol={label} kind="index" size="sm" />
-        <div className="flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col justify-center overflow-visible">
           <span className="desk-metric-label">{label}</span>
           <LiveTickNumber value={value} className="desk-metric-value" />
           {deltaLabel != null && (

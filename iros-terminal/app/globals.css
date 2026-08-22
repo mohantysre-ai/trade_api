@@ -1406,6 +1406,7 @@ html[data-perf="1"] .desk-sources-track {
 .desk-metric-tile {
   position: relative;
   overflow: hidden;
+  container-type: inline-size;
   border-radius: var(--radius-card);
   min-height: 80px;
   padding: 10px;
@@ -1522,7 +1523,6 @@ html[data-perf="1"] .desk-sources-track {
 .desk-metric-tile .desk-metric-value,
 .desk-metric-tile .desk-metric-delta {
   min-width: 0;
-  max-width: 100%;
 }
 .desk-metric-tile .desk-metric-label {
   display: -webkit-box;
@@ -1540,19 +1540,22 @@ html[data-perf="1"] .desk-sources-track {
   padding-inline-end: 0.06em;
 }
 .desk-metric-tile .desk-metric-value,
+.desk-metric-tile .desk-metric-value.desk-live-tick,
 .desk-metric-tile .desk-metric-value .desk-live-tick {
   display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
   white-space: nowrap;
+  width: max-content;
+  max-width: 100%;
 }
 .desk-metric-tile .desk-metric-value {
-  font-size: var(--desk-kpi);
+  font-size: clamp(0.72rem, 0.62rem + 3.8cqi, var(--desk-kpi));
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--fg-strong);
   letter-spacing: -0.02em;
-  line-height: 1.1;
+  line-height: 1.15;
   margin-top: 2px;
 }
 .desk-metric-tile .desk-metric-delta {
@@ -1566,6 +1569,39 @@ html[data-perf="1"] .desk-sources-track {
 }
 .desk-metric-tile .desk-metric-delta.is-up { color: var(--terminal-green); }
 .desk-metric-tile .desk-metric-delta.is-down { color: var(--terminal-red); }
+.desk-tile-spark {
+  pointer-events: none;
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  z-index: 0;
+  width: 2.75rem;
+  height: 2.15rem;
+  transform: translateY(-50%);
+  opacity: 0.42;
+}
+.desk-screener-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.5rem;
+  min-width: 0;
+}
+.desk-screener-sym {
+  display: inline-block;
+  max-width: 100%;
+  overflow: visible;
+  white-space: nowrap;
+  text-overflow: clip;
+}
+.desk-screener-px {
+  display: inline-block;
+  flex-shrink: 0;
+  overflow: visible;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 
 /* Desk activity alert toasts */
 .desk-activity-alert {

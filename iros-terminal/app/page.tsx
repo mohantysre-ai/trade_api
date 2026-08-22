@@ -513,7 +513,7 @@ function NseTickerTooltip({ stock, ticker }: { stock: NseStock; ticker: string }
     <>
       <span
         ref={triggerRef as React.RefObject<HTMLSpanElement | null>}
-        className="text-[12px] font-bold cursor-pointer transition-colors text-slate-800 hover:text-indigo-600"
+        className="desk-screener-sym text-[12px] font-bold cursor-pointer transition-colors text-slate-800 hover:text-indigo-600"
         onClick={handleClick}
         onKeyDown={(e) => { if (e.key === 'Enter') handleClick(); }}
         onMouseEnter={showTooltip}
@@ -571,7 +571,7 @@ function TrendlyneTickerTooltip({ item }: { item: TrendlyneStock }) {
     <>
       <span
         ref={triggerRef as React.RefObject<HTMLSpanElement | null>}
-        className="text-[11px] font-semibold text-slate-800 truncate cursor-pointer hover:text-indigo-600 transition-colors"
+        className="desk-screener-sym text-[11px] font-semibold text-slate-800 cursor-pointer hover:text-indigo-600 transition-colors"
         onMouseEnter={showTooltip}
         onMouseLeave={scheduleClose}
         onFocus={showTooltip}
@@ -678,15 +678,15 @@ function TrendlyneCategoryPanel({ screenKey, label, accentClass }: { screenKey: 
               href={item.stockurl}
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-center justify-between py-2 cursor-pointer border-b border-slate-100 last:border-b-0 hover:bg-slate-50 transition-colors"
+              className="desk-screener-row group cursor-pointer border-b border-slate-100 last:border-b-0 py-2 hover:bg-slate-50 transition-colors"
             >
-              <div className="flex-1 min-w-0 flex items-center gap-1.5">
+              <div className="min-w-0 overflow-visible flex items-center gap-1.5">
                 <span className={`w-1.5 h-1.5 rounded-full ${dotCls} flex-shrink-0`} />
                 <TrendlyneTickerTooltip item={item} />
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <span className={`text-[11px] font-semibold ${textAccentCls}`}>{formatLargeNumber(item.value)}</span>
-                <span className="text-[11px] text-slate-500">₹{currentPrice}</span>
+              <div className="flex items-baseline gap-2 overflow-visible">
+                <span className={`desk-screener-px text-[11px] font-semibold ${textAccentCls}`}>{formatLargeNumber(item.value)}</span>
+                <span className="desk-screener-px text-[11px] text-slate-500">₹{currentPrice}</span>
               </div>
             </a>
           );
@@ -745,16 +745,16 @@ function ScreenerStockList({
         return (
           <div
             key={`${categoryKey}-${ticker}`}
-            className="group flex items-center justify-between py-2 cursor-default border-b border-slate-100 last:border-b-0"
+            className="desk-screener-row group cursor-default border-b border-slate-100 last:border-b-0 py-2"
           >
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 overflow-visible">
               <NseTickerTooltip stock={stock} ticker={ticker} />
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <span className="text-[11px] text-slate-600 tabular-nums desk-num">
+            <div className="flex items-baseline gap-1 overflow-visible">
+              <span className="desk-screener-px text-[11px] text-slate-600 tabular-nums desk-num">
                 ₹{formatNseNumber(stock.lastPrice)}
               </span>
-              <span className={`text-[10px] font-semibold tabular-nums min-w-[72px] text-right ${changeClass}`}>
+              <span className={`desk-screener-px text-[10px] font-semibold tabular-nums text-right ${changeClass}`}>
                 {changeText}
               </span>
             </div>
@@ -1223,11 +1223,11 @@ function GlobalIndicesGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
               tilesUpdating={tilesUpdating}
               onActivate={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
               sparkline={
-                <div className="w-12 h-10 sm:w-16 sm:h-14 flex-shrink-0 relative max-[380px]:hidden">
+                <div className="desk-tile-spark max-[380px]:hidden">
                   {item.sparkline && item.sparkline.length >= 2 ? (
                     <SparklineSVG positive={isPositive} data={item.sparkline} />
                   ) : (
-                    <div className="absolute top-0 right-0 w-full h-full opacity-70">
+                    <div className="absolute inset-0">
                       <MiniSparkline positive={isPositive} />
                     </div>
                   )}
@@ -1421,11 +1421,11 @@ function CommoditiesFxGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
               tilesUpdating={tilesUpdating}
               onActivate={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
               sparkline={
-                <div className="w-12 h-10 sm:w-16 sm:h-14 flex-shrink-0 relative max-[380px]:hidden">
+                <div className="desk-tile-spark max-[380px]:hidden">
                   {item.sparkline && item.sparkline.length >= 2 ? (
                     <SparklineSVG positive={isPositive} data={item.sparkline} />
                   ) : (
-                    <div className="absolute top-0 right-0 w-full h-full opacity-70">
+                    <div className="absolute inset-0">
                       <MiniSparkline positive={isPositive} />
                     </div>
                   )}
@@ -1479,11 +1479,11 @@ function IndiaMarketsGrid({ items, staleLabel, tilesLive, tilesUpdating }: { ite
               tilesUpdating={tilesUpdating}
               onActivate={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
               sparkline={
-                <div className="w-12 h-10 sm:w-16 sm:h-14 flex-shrink-0 relative max-[380px]:hidden">
+                <div className="desk-tile-spark max-[380px]:hidden">
                   {item.sparkline && item.sparkline.length >= 2 ? (
                     <SparklineSVG positive={isPositive} data={item.sparkline} />
                   ) : (
-                    <div className="absolute top-0 right-0 w-full h-full opacity-70">
+                    <div className="absolute inset-0">
                       <MiniSparkline positive={isPositive} />
                     </div>
                   )}
