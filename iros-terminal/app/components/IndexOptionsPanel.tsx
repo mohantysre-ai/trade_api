@@ -92,12 +92,18 @@ type Radar = {
   error?: string;
 };
 
-const tone = (state: Candidate['state']) =>
-  state === 'ELIGIBLE'
-    ? 'border-emerald-500/50 text-emerald-600'
-    : state === 'WATCH'
-      ? 'border-amber-500/50 text-amber-600'
-      : 'border-[var(--terminal-line)] text-[var(--fg-muted)]';
+const GATE_LABEL: Record<string, string> = {
+  breadth: 'Breadth',
+  breakout: 'Breakout',
+  contract: 'Contract',
+  contractEconomics: 'Economics',
+  futuresOi: 'Futures OI',
+  optionChain: 'Chain',
+  riskReward: 'R:R',
+  structure: 'Structure',
+  trend: 'Trend',
+  fresh: 'Live quotes',
+};
 
 function fmtSpot(value: number | null | undefined) {
   return value == null ? '—' : value.toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -113,10 +119,84 @@ function fmtNum(value: number | null | undefined, digits = 2) {
   return value == null ? '—' : value.toLocaleString('en-IN', { maximumFractionDigits: digits });
 }
 
-function structureLine(row: Structure | null | undefined) {
-  if (!row) return '5m candles —';
-  const bars = row.barCount == null ? '—' : String(row.barCount);
-  return `5m ${bars} bars · ORB ${fmtNum(row.orbHigh)} / ${fmtNum(row.orbLow)} · EMA9/20 ${fmtNum(row.ema9, 1)} / ${fmtNum(row.ema20, 1)}`;
+function pnlClass(value: number | null | undefined) {
+  if (value == null || value === 0) return 'text-slate-500';
+  return value > 0 ? 'text-emerald-600' : 'text-red-500';
+}
+
+function statePill(state: Candidate['state']) {
+  switch (state) {
+    case 'ELIGIBLE':
+      return { label: 'Eligible', className: 'desk-pill desk-pill--ok' };
+    case 'WATCH':
+      return { label: 'Watch', className: 'desk-pill desk-pill--warn' };
+    case 'NO_TRADE':
+      return { label: 'No trade', className: 'desk-pill desk-pill--muted' };
+    default: {
+      const _never: never = state;
+      return { label: String(_never), className: 'desk-pill desk-pill--muted' };
+    }
+  }
+}
+
+function tileAccent(state: Candidate['state']) {
+  switch (state) {
+    case 'ELIGIBLE':
+      return 'var(--terminal-green)';
+    case 'WATCH':
+      return 'var(--terminal-amber)';
+    case 'NO_TRADE':
+      return 'var(--fg-muted)';
+    default: {
+      const _never: never = state;
+      return String(_never);
+    }
+  }
+}
+
+function candidateHeadline(row: Candidate) {
+  const bars = row.structure?.barCount ?? 0;
+  if (row.state === 'ELIGIBLE') return 'All gates passed';
+  if (row.state === 'WATCH') return 'Score below 80';
+  if (row.reason.startsWith('HARD_GATE_FAILED:') && row.failedGates.includes('fresh')) {
+    return bars === 0 ? 'Quotes not live' : 'Stale quotes';
+  }
+  if (row.reason.startsWith('DATA_INCOMPLETE:')) {
+    return bars === 0 ? 'No live 5m session' : 'Incomplete evidence';
+  }
+  if (row.reason === 'DIRECTION_NOT_PROVEN') return 'No ORB breakout';
+  return 'No trade';
+}
+
+function gateChips(row: Candidate) {
+  const keys = [...row.failedGates, ...row.missingInputs].filter((name, index, list) => list.indexOf(name) === index);
+  return keys.slice(0, 4).map((key) => GATE_LABEL[key] ?? key);
+}
+
+function sessionLabel(iso: string | undefined) {
+  if (!iso) return 'Last Friday';
+  const [year, month, day] = iso.split('-').map(Number);
+  if (!year || !month || !day) return iso;
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+function clock(iso: string | null | undefined) {
+  if (!iso) return '—';
+  const match = iso.match(/T(\d{2}:\d{2})/);
+  return match ? match[1] : iso;
+}
+
+function contractStatus(row: BuySideContract): { label: string; className: string } {
+  if (row.implemented) return { label: 'Implemented', className: 'desk-pill desk-pill--ok' };
+  if (row.blockedBy === 'CORRELATION_GUARD') return { label: 'Bucket filled', className: 'desk-pill desk-pill--warn' };
+  if (row.limitation === 'OPTION_CANDLES_UNAVAILABLE') return { label: 'No option 5m', className: 'desk-pill desk-pill--muted' };
+  if (row.atmProxy) return { label: 'ATM', className: 'desk-pill desk-pill--info' };
+  return { label: 'ATM±3', className: 'desk-pill desk-pill--muted' };
 }
 
 function loadRadar(url: string, signal: AbortSignal) {
@@ -154,157 +234,161 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
 
   const buySide = replay?.buySideContracts ?? [];
   const implemented = replay?.implemented ?? [];
-  const buyPnl = buySide.reduce<number | null>((sum, row) => {
-    if (row.pnlRupees == null) return sum;
-    return (sum ?? 0) + row.pnlRupees;
-  }, null);
   const implementedPnl = implemented.reduce<number | null>((sum, row) => {
     if (row.pnlRupees == null) return sum;
     return (sum ?? 0) + row.pnlRupees;
   }, null);
 
   return (
-    <section className="space-y-3" aria-label="Index options radar">
+    <section className="ix-radar space-y-3" aria-label="Index options radar">
       <div className="desk-card p-3 sm:p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="desk-panel-title text-[var(--fg-strong)]">INDEX OPTIONS RADAR</h2>
-            <p className="mt-1 text-[10px] text-[var(--fg-muted)]">Direction first · futures OI · option chain · weighted constituents · contract economics</p>
+            <p className="mt-1 text-[11px] text-[var(--fg-muted)]">Direction first · futures OI · option chain · weighted constituents · contract economics</p>
           </div>
-          <div className="flex flex-wrap gap-2 text-[9px] font-bold uppercase tracking-wider">
-            <span className="rounded border border-[var(--terminal-line)] px-2 py-1 text-[var(--fg-muted)]">Manual only</span>
-            <span className="rounded border border-[var(--terminal-line)] px-2 py-1 text-[var(--fg-muted)]">Max {radar?.limits?.maxDailyEntries ?? 10}/day</span>
-            <span className="rounded border border-[var(--terminal-line)] px-2 py-1 text-[var(--fg-muted)]">Max {radar?.limits?.maxConcurrent ?? 2} open</span>
-            {radar?.cacheStatus === 'STALE' && <span className="rounded border border-amber-500/40 px-2 py-1 text-amber-600">Stale cache</span>}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="desk-pill desk-pill--muted">Manual only</span>
+            <span className="desk-pill desk-pill--muted">Max {radar?.limits?.maxDailyEntries ?? 10}/day</span>
+            <span className="desk-pill desk-pill--muted">Max {radar?.limits?.maxConcurrent ?? 2} open</span>
+            {radar?.cacheStatus === 'STALE' && <span className="desk-pill desk-pill--warn">Cached</span>}
           </div>
         </div>
-        <p className="mt-2 text-[9px] leading-relaxed text-[var(--fg-subtle)]">
-          Max 10/day is a session entry cap, not a 10-name basket. Correlation allows one BROAD (NIFTY or SENSEX) and one FINANCIAL (BANKNIFTY or FINNIFTY) at a time.
-        </p>
       </div>
 
-      {radar?.error && <div className="desk-card border border-red-500/40 p-3 text-xs text-red-600">{radar.error}</div>}
+      {radar?.error && (
+        <div className="desk-card border border-red-500/40 p-3 text-[12px] text-red-600">{radar.error}</div>
+      )}
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {(radar?.candidates ?? []).map((row) => (
-          <article key={row.key} className={`desk-card border-l-2 p-3 ${tone(row.state)}`}>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="text-xs font-black text-[var(--fg-strong)]">{row.label}</div>
-                <div className="mt-0.5 text-[9px] uppercase tracking-wider text-[var(--fg-subtle)]">{row.exchange} · {row.bucket}</div>
+      <div className="desk-metric-grid grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {(radar?.candidates ?? []).map((row) => {
+          const pill = statePill(row.state);
+          const chips = gateChips(row);
+          return (
+            <article
+              key={row.key}
+              className="desk-metric-tile flex-col items-stretch justify-start"
+              style={{ ['--tile-accent' as string]: tileAccent(row.state) }}
+            >
+              <div className="flex w-full items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="desk-metric-label">{row.label}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--fg-subtle)]">{row.exchange} · {row.bucket}</div>
+                </div>
+                <span className={pill.className}>{pill.label}</span>
               </div>
-              <span className="text-[9px] font-black">{row.state.replace('_', ' ')}</span>
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-[9px]">
-              <div><div className="text-[var(--fg-subtle)]">SPOT</div><div className="mt-0.5 font-bold text-[var(--fg-strong)]">{fmtSpot(row.spot)}</div></div>
-              <div><div className="text-[var(--fg-subtle)]">SIDE</div><div className="mt-0.5 font-bold text-[var(--fg-strong)]">{row.direction ?? '—'}</div></div>
-              <div><div className="text-[var(--fg-subtle)]">SCORE</div><div className="mt-0.5 font-bold text-[var(--fg-strong)]">{row.score == null ? 'UNRATED' : row.score.toFixed(1)}</div></div>
-            </div>
-            <div className="mt-2 text-[8px] text-[var(--fg-subtle)]">{structureLine(row.structure)}</div>
-            <div className="mt-3 border-t border-[var(--terminal-line)] pt-2 text-[9px] leading-relaxed text-[var(--fg-muted)]">
-              {row.reason}
-            </div>
-            {row.contract && <div className="mt-2 rounded border border-[var(--terminal-line)] p-2 text-[8px] text-[var(--fg-muted)]">
-              <div className="font-bold text-[var(--fg-strong)]">{row.dataSource === 'SCANX_FALLBACK' ? 'SCANX FALLBACK' : 'ANGEL'} · {row.contract.symbol ?? row.contract.strike ?? '—'} · ₹{row.contract.ltp ?? '—'}</div>
-              <div className="mt-1">Δ {row.contract.delta ?? '—'} · Γ {row.contract.gamma ?? '—'} · Θ {row.contract.theta ?? '—'} · Vega {row.contract.vega ?? '—'} · IV {row.contract.iv ?? '—'}</div>
-            </div>}
-            {(row.chain?.length ?? 0) > 0 && <div className="mt-2 overflow-x-auto">
-              <table className="w-full text-[7px] text-[var(--fg-muted)]">
-                <thead><tr className="text-[var(--fg-subtle)]"><th className="text-left">SIDE</th><th className="text-right">STRIKE</th><th className="text-right">LTP</th><th className="text-right">ΔOI</th><th className="text-right">DELTA</th><th className="text-right">IV</th></tr></thead>
-                <tbody>{(row.chain ?? []).slice(0, 6).map((item) => <tr key={item.symbol} className="border-t border-[var(--terminal-line)]">
-                  <td>{item.optionType}</td><td className="text-right">{item.strike ?? '—'}</td><td className="text-right">{item.ltp ?? '—'}</td><td className="text-right">{item.oiChange ?? '—'}</td><td className="text-right">{item.delta ?? '—'}</td><td className="text-right">{item.iv ?? '—'}</td>
-                </tr>)}</tbody>
-              </table>
-            </div>}
-            {row.missingInputs.length > 0 && <div className="mt-2 text-[8px] uppercase tracking-wide text-[var(--fg-subtle)]">Awaiting: {row.missingInputs.join(' · ')}</div>}
-          </article>
-        ))}
+              <div className="desk-metric-value desk-num mt-2 w-full">{fmtSpot(row.spot)}</div>
+              <div className="mt-2 grid w-full grid-cols-3 gap-2 text-[10px]">
+                <div>
+                  <div className="uppercase tracking-wider text-[var(--fg-subtle)]">Side</div>
+                  <div className="mt-0.5 font-bold tabular-nums text-[var(--fg-strong)]">{row.direction ?? '—'}</div>
+                </div>
+                <div>
+                  <div className="uppercase tracking-wider text-[var(--fg-subtle)]">Score</div>
+                  <div className="mt-0.5 font-bold tabular-nums text-[var(--fg-strong)]">{row.score == null ? '—' : row.score.toFixed(1)}</div>
+                </div>
+                <div>
+                  <div className="uppercase tracking-wider text-[var(--fg-subtle)]">5m</div>
+                  <div className="mt-0.5 font-bold tabular-nums text-[var(--fg-strong)]">{row.structure?.barCount ?? '—'}</div>
+                </div>
+              </div>
+              <div className="mt-2 text-[11px] leading-snug text-[var(--fg-muted)]">{candidateHeadline(row)}</div>
+              {chips.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {chips.map((chip) => (
+                    <span key={chip} className="desk-pill desk-pill--muted">{chip}</span>
+                  ))}
+                </div>
+              )}
+            </article>
+          );
+        })}
       </div>
 
-      {!loading && radar?.candidates.length === 0 && !radar.error && <div className="desk-card p-4 text-xs text-[var(--fg-muted)]">No index instruments returned.</div>}
-      {loading && <div className="desk-card p-4 text-xs text-[var(--fg-muted)]">Loading deterministic index-options evidence…</div>}
+      {loading && <div className="glass-skeleton h-16 rounded-xl" aria-hidden />}
+      {!loading && radar?.candidates.length === 0 && !radar.error && (
+        <div className="desk-card p-4 text-[12px] text-[var(--fg-muted)]">No index instruments returned.</div>
+      )}
 
-      <div className="desk-card p-3 sm:p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="desk-panel-title text-[var(--fg-strong)]">FRIDAY SESSION REPLAY</h3>
-            <p className="mt-1 text-[10px] text-[var(--fg-muted)]">
-              {replay?.sessionDate ?? 'last Friday'} · paper long premium from 5m candles · gates not overridden
-            </p>
-          </div>
-          <div className="flex gap-2 text-[9px] font-bold uppercase tracking-wider">
-            <span className="rounded border border-[var(--terminal-line)] px-2 py-1 text-[var(--fg-muted)]">Implemented P&amp;L {fmtPnl(implementedPnl)}</span>
-            <span className="rounded border border-[var(--terminal-line)] px-2 py-1 text-[var(--fg-muted)]">Listed buy-side {fmtPnl(buyPnl)}</span>
-          </div>
+      <div className="desk-card overflow-hidden p-3 sm:p-4">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-600">
+            Friday session replay · {sessionLabel(replay?.sessionDate)}
+          </span>
+          <span className={`glass-pill px-2 py-0.5 text-[9px] font-bold tabular-nums ${pnlClass(implementedPnl)}`}>
+            Implemented {fmtPnl(implementedPnl)}
+          </span>
         </div>
-        {replay?.disclaimer && <p className="mt-2 text-[9px] leading-relaxed text-[var(--fg-subtle)]">{replay.disclaimer}</p>}
-        {replay?.error && <div className="mt-2 text-xs text-red-600">{replay.error}</div>}
-        {replayLoading && <div className="mt-3 text-[10px] text-[var(--fg-muted)]">Fetching Friday 5m index and option candles…</div>}
 
-        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
+        {replay?.error && <div className="mb-2 text-[12px] text-red-600">{replay.error}</div>}
+        {replayLoading && <div className="glass-skeleton mb-3 h-12 rounded-xl" aria-hidden />}
+
+        <div className="desk-metric-grid eod-kpi-strip mb-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
           {(replay?.indices ?? []).map((row) => (
-            <div key={row.key} className="rounded border border-[var(--terminal-line)] p-2">
-              <div className="flex items-center justify-between gap-2 text-[10px] font-black text-[var(--fg-strong)]">
-                <span>{row.label ?? row.key}</span>
-                <span className="text-[8px] uppercase text-[var(--fg-subtle)]">{row.selected ? 'Selected' : 'Blocked'}</span>
+            <div key={row.key} className="desk-metric-tile flex-col items-stretch justify-start" style={{ ['--tile-accent' as string]: row.selected ? 'var(--terminal-cyan)' : 'var(--fg-muted)' }}>
+              <div className="flex w-full items-center justify-between gap-2">
+                <div className="desk-metric-label">{row.label ?? row.key}</div>
+                <span className={`desk-pill ${row.selected ? 'desk-pill--info' : 'desk-pill--muted'}`}>
+                  {row.selected ? 'Selected' : row.firstDirection ? 'Blocked' : 'No break'}
+                </span>
               </div>
-              <div className="mt-1 text-[9px] text-[var(--fg-muted)]">Spot {fmtSpot(row.spot)} · {row.firstDirection ?? 'NO BREAKOUT'}</div>
-              <div className="mt-1 text-[8px] text-[var(--fg-subtle)]">{structureLine(row.structure)}</div>
-              {row.confirmedAt && <div className="mt-1 text-[8px] text-[var(--fg-subtle)]">Confirmed {row.confirmedAt}</div>}
-              {row.error && <div className="mt-1 text-[8px] text-red-600">{row.error}</div>}
+              <div className="desk-metric-value desk-num mt-1">{fmtSpot(row.spot)}</div>
+              <div className="desk-metric-delta mt-1 text-[var(--fg-muted)]">
+                {row.firstDirection ?? '—'}
+                {row.confirmedAt ? ` · ${clock(row.confirmedAt)}` : ''}
+                {row.structure?.barCount != null ? ` · ${row.structure.barCount} bars` : ''}
+              </div>
             </div>
           ))}
         </div>
 
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-[8px] text-[var(--fg-muted)]">
+        <div className="overflow-x-auto desk-scroll-x">
+          <table className="ix-book-table">
             <thead>
-              <tr className="text-[var(--fg-subtle)]">
-                <th className="text-left">CONTRACT</th>
-                <th className="text-left">INDEX</th>
-                <th className="text-right">STRIKE</th>
-                <th className="text-right">5M</th>
-                <th className="text-right">ENTRY</th>
-                <th className="text-right">EXIT</th>
-                <th className="text-right">PTS</th>
-                <th className="text-right">P&amp;L ₹</th>
-                <th className="text-left">NOTE</th>
+              <tr>
+                <th className="text-left">Contract</th>
+                <th className="text-left">Index</th>
+                <th className="text-right">Strike</th>
+                <th className="text-right">Entry</th>
+                <th className="text-right">Exit</th>
+                <th className="text-right">Pts</th>
+                <th className="text-right">P&amp;L</th>
+                <th className="text-left">Status</th>
               </tr>
             </thead>
             <tbody>
-              {buySide.map((row) => (
-                <tr key={`${row.index}-${row.symbol}`} className="border-t border-[var(--terminal-line)]">
-                  <td className="py-1 font-bold text-[var(--fg-strong)]">{row.symbol ?? '—'}{row.implemented ? ' · IMPL' : ''}</td>
-                  <td>{row.index}</td>
-                  <td className="text-right">{fmtNum(row.strike, 0)}</td>
-                  <td className="text-right">{row.barCount ?? '—'}</td>
-                  <td className="text-right">{fmtNum(row.entry)}</td>
-                  <td className="text-right">{fmtNum(row.exit)}</td>
-                  <td className="text-right">{fmtPnl(row.pnlPoints)}</td>
-                  <td className="text-right">{fmtPnl(row.pnlRupees)}</td>
-                  <td>{row.limitation ?? row.blockedBy ?? (row.atmProxy ? 'ATM proxy · greeks unavailable' : '')}</td>
-                </tr>
-              ))}
+              {buySide.map((row) => {
+                const status = contractStatus(row);
+                return (
+                  <tr key={`${row.index}-${row.symbol}`} className={row.implemented ? 'is-impl' : undefined}>
+                    <td className="font-bold text-[var(--fg-strong)]">{row.symbol ?? '—'}</td>
+                    <td>{row.index}</td>
+                    <td className="text-right tabular-nums desk-num">{fmtNum(row.strike, 0)}</td>
+                    <td className="text-right tabular-nums desk-num">{fmtNum(row.entry)}</td>
+                    <td className="text-right tabular-nums desk-num">{fmtNum(row.exit)}</td>
+                    <td className={`text-right tabular-nums desk-num ${pnlClass(row.pnlPoints)}`}>{fmtPnl(row.pnlPoints)}</td>
+                    <td className={`text-right tabular-nums desk-num font-semibold ${pnlClass(row.pnlRupees)}`}>{fmtPnl(row.pnlRupees)}</td>
+                    <td><span className={status.className}>{status.label}</span></td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {!replayLoading && buySide.length === 0 && !replay?.error && (
-            <div className="mt-2 text-[10px] text-[var(--fg-muted)]">No buy-side contracts: Friday 5m ORB+EMA did not confirm CALL/PUT, or option tokens were unavailable.</div>
+            <div className="mt-3 text-[12px] text-[var(--fg-muted)]">No confirmed CALL/PUT on Friday 5m ORB, or option tokens were unavailable.</div>
           )}
         </div>
-        {(replay?.limitations?.length ?? 0) > 0 && (
-          <div className="mt-3 text-[8px] uppercase tracking-wide text-[var(--fg-subtle)]">Limitations: {(replay?.limitations ?? []).join(' · ')}</div>
-        )}
+        <p className="mt-3 text-[11px] leading-relaxed text-[var(--fg-muted)]">
+          Paper long premium from 5m option closes. Entry is the first bar after ORB+EMA confirm; exit is the last session bar. Historical OI, greeks and weighted breadth were not archived — radar gates stay closed.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="desk-card p-3">
-          <h3 className="desk-panel-title text-[var(--fg-strong)]">CORRELATION GUARD</h3>
-          <p className="mt-2 text-[10px] leading-relaxed text-[var(--fg-muted)]">Only one of NIFTY/SENSEX and one of BANKNIFTY/FINNIFTY can be selected. A missing chain, stale quote, failed hard gate, or score below 80 cannot be overridden.</p>
-        </div>
-        <div className="desk-card p-3">
-          <h3 className="desk-panel-title text-[var(--fg-strong)]">RE-ENTRY &amp; COOLDOWN GOVERNOR</h3>
-          <p className="mt-2 text-[10px] leading-relaxed text-[var(--fg-muted)]">Two attempts per index. Target cooldown {radar?.reentryPolicy?.targetCooldownMin ?? 20}m; profitable trail {radar?.reentryPolicy?.profitTrailCooldownMin ?? 30}m; same-direction stop {radar?.reentryPolicy?.sameDirectionStopCooldownMin ?? 45}m. Every re-entry requires a fresh break, aligned OI and weighted breadth at {(radar?.reentryPolicy?.riskScale ?? 0.5) * 100}% risk.</p>
-        </div>
+      <div className="desk-card flex flex-wrap items-baseline gap-x-4 gap-y-1 p-3 text-[11px]">
+        <span className="font-bold uppercase tracking-wider text-[var(--fg-muted)]">Policy</span>
+        <span className="text-[var(--fg-muted)]">1 BROAD + 1 FINANCIAL</span>
+        <span className="tabular-nums text-[var(--fg-muted)]">
+          Re-entry {radar?.reentryPolicy?.maxAttemptsPerIndex ?? 2}× · {radar?.reentryPolicy?.targetCooldownMin ?? 20}m / {radar?.reentryPolicy?.profitTrailCooldownMin ?? 30}m / {radar?.reentryPolicy?.sameDirectionStopCooldownMin ?? 45}m · {(radar?.reentryPolicy?.riskScale ?? 0.5) * 100}% risk
+        </span>
       </div>
     </section>
   );

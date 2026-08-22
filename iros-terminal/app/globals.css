@@ -2650,3 +2650,39 @@ html[data-theme="light"] .ai-news-icon {
 html[data-theme="light"] .category-dot {
   background: linear-gradient(135deg, #6d28d9, #4f46e5);
 }
+
+/* Index options — same book table / KPI chrome as Intraday + EOD */
+.ix-radar .desk-metric-tile {
+  cursor: default;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+.ix-radar .ix-book-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.ix-radar .ix-book-table thead tr {
+  background: color-mix(in srgb, var(--fg-muted) 8%, var(--terminal-panel));
+  color: var(--fg-muted);
+}
+.ix-radar .ix-book-table th {
+  padding: 0.4rem 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.ix-radar .ix-book-table td {
+  padding: 0.45rem 0.5rem;
+  border-top: 1px solid var(--terminal-line);
+  vertical-align: middle;
+}
+.ix-radar .ix-book-table tbody tr:hover {
+  background: color-mix(in srgb, var(--terminal-cyan) 6%, transparent);
+}
+.ix-radar .ix-book-table tbody tr.is-impl {
+  background: color-mix(in srgb, var(--terminal-cyan) 10%, transparent);
+}
