@@ -51,6 +51,7 @@ _SESSION_RESPONSE_LOCK = threading.Lock()
 _SESSION_RESPONSE_CACHE: dict[str, Any] | None = None
 _SESSION_RESPONSE_CACHE_AT = 0.0
 _SESSION_RESPONSE_REFRESHING = False
+_SESSION_RESPONSE_GEN = 0
 _SESSION_RESPONSE_OPEN_TTL = float(os.environ.get("INTRADAY_RESPONSE_OPEN_TTL", "4"))
 _SESSION_RESPONSE_CLOSED_TTL = float(os.environ.get("INTRADAY_RESPONSE_CLOSED_TTL", "20"))
 # Live replacement hunt: rescore Nifty 500 QUALIFIED names; do not reuse 10:18 lock pools.
@@ -354,13 +355,20 @@ def _ensure_current_exit_policy(session: dict[str, Any], *, persist: bool = Fals
     return work
 
 
+def _invalidate_session_response_cache() -> None:
+    """Drop the coalesced GET snapshot and retire in-flight live refresh writes."""
+    global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT, _SESSION_RESPONSE_GEN
+    with _SESSION_RESPONSE_LOCK:
+        _SESSION_RESPONSE_GEN += 1
+        _SESSION_RESPONSE_CACHE = None
+        _SESSION_RESPONSE_CACHE_AT = 0.0
+
+
 def save_session(payload: dict[str, Any]) -> None:
-    global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT
     _atomic_write(_SESSION_FILE, payload)
     # Explicit mutations invalidate the response snapshot. The computing caller
     # will republish a fresh value after its state transition finishes.
-    _SESSION_RESPONSE_CACHE = None
-    _SESSION_RESPONSE_CACHE_AT = 0.0
+    _invalidate_session_response_cache()
     try:
         from .trade_outcome import invalidate_live_book_cache
 
@@ -4374,6 +4382,7 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
         return copy.deepcopy(_SESSION_RESPONSE_CACHE)
 
     start_refresh = False
+    started_gen = 0
     with _SESSION_RESPONSE_LOCK:
         now = time.monotonic()
         if _SESSION_RESPONSE_CACHE is not None and now - _SESSION_RESPONSE_CACHE_AT < ttl:
@@ -4387,6 +4396,7 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
         if not _SESSION_RESPONSE_REFRESHING:
             _SESSION_RESPONSE_REFRESHING = True
             start_refresh = True
+            started_gen = _SESSION_RESPONSE_GEN
         result = copy.deepcopy(_SESSION_RESPONSE_CACHE)
         result["liveRefreshPending"] = True
 
@@ -4394,6 +4404,7 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
         try:
             threading.Thread(
                 target=_refresh_session_response_cache,
+                args=(started_gen,),
                 name="intraday-live-refresh",
                 daemon=True,
             ).start()
@@ -4404,13 +4415,15 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
     return result
 
 
-def _refresh_session_response_cache() -> None:
+def _refresh_session_response_cache(started_gen: int) -> None:
     """Refresh the read-only response cache outside FastAPI's worker pool."""
     global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT, _SESSION_RESPONSE_REFRESHING
     try:
         result = _compute_session(include_live=True, persist=False)
         result["liveRefreshPending"] = False
         with _SESSION_RESPONSE_LOCK:
+            if started_gen != _SESSION_RESPONSE_GEN:
+                return
             _SESSION_RESPONSE_CACHE = copy.deepcopy(result)
             _SESSION_RESPONSE_CACHE_AT = time.monotonic()
     except Exception:
@@ -4422,9 +4435,10 @@ def _refresh_session_response_cache() -> None:
 
 def refresh_session_state() -> dict[str, Any]:
     """Single-writer scheduler path for durable close/replacement transitions."""
-    global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT
+    global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT, _SESSION_RESPONSE_GEN
     result = _compute_session(include_live=True, persist=True)
     with _SESSION_RESPONSE_LOCK:
+        _SESSION_RESPONSE_GEN += 1
         _SESSION_RESPONSE_CACHE = copy.deepcopy(result)
         _SESSION_RESPONSE_CACHE_AT = time.monotonic()
     return result

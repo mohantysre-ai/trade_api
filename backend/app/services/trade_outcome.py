@@ -55,6 +55,7 @@ _LIVE_BOOK_CACHE: dict[str, Any] | None = None
 _LIVE_BOOK_CACHE_AT = 0.0
 _LIVE_BOOK_CACHE_LOCK = threading.Lock()
 _LIVE_BOOK_CACHE_REFRESHING = False
+_LIVE_BOOK_CACHE_GEN = 0
 _LIVE_BOOK_CACHE_OPEN_TTL = float(os.environ.get("LIVE_BOOK_CACHE_OPEN_TTL", "4"))
 _LIVE_BOOK_CACHE_CLOSED_TTL = float(os.environ.get("LIVE_BOOK_CACHE_CLOSED_TTL", "20"))
 
@@ -1007,8 +1008,9 @@ def collect_hit_alerts_from_rows(
 
 def invalidate_live_book_cache() -> None:
     """Drop the coalesced live-book snapshot so disk P&L is not overlaid from stale rows."""
-    global _LIVE_BOOK_CACHE, _LIVE_BOOK_CACHE_AT
+    global _LIVE_BOOK_CACHE, _LIVE_BOOK_CACHE_AT, _LIVE_BOOK_CACHE_GEN
     with _LIVE_BOOK_CACHE_LOCK:
+        _LIVE_BOOK_CACHE_GEN += 1
         _LIVE_BOOK_CACHE = None
         _LIVE_BOOK_CACHE_AT = 0.0
 
@@ -1027,6 +1029,7 @@ def get_live_prices_for_plan() -> dict[str, Any]:
         return copy.deepcopy(_LIVE_BOOK_CACHE)
 
     start_refresh = False
+    started_gen = 0
     with _LIVE_BOOK_CACHE_LOCK:
         now = time.monotonic()
         ttl = _LIVE_BOOK_CACHE_OPEN_TTL if _is_market_open() else _LIVE_BOOK_CACHE_CLOSED_TTL
@@ -1044,6 +1047,7 @@ def get_live_prices_for_plan() -> dict[str, Any]:
         if not _LIVE_BOOK_CACHE_REFRESHING:
             _LIVE_BOOK_CACHE_REFRESHING = True
             start_refresh = True
+            started_gen = _LIVE_BOOK_CACHE_GEN
         result = copy.deepcopy(_LIVE_BOOK_CACHE)
         result["liveRefreshPending"] = True
 
@@ -1051,6 +1055,7 @@ def get_live_prices_for_plan() -> dict[str, Any]:
         try:
             threading.Thread(
                 target=_refresh_live_book_cache,
+                args=(started_gen,),
                 name="live-book-refresh",
                 daemon=True,
             ).start()
@@ -1061,13 +1066,15 @@ def get_live_prices_for_plan() -> dict[str, Any]:
     return result
 
 
-def _refresh_live_book_cache() -> None:
+def _refresh_live_book_cache(started_gen: int) -> None:
     """Fetch external marks without occupying an AnyIO request worker."""
     global _LIVE_BOOK_CACHE, _LIVE_BOOK_CACHE_AT, _LIVE_BOOK_CACHE_REFRESHING
     try:
         result = _compute_live_prices_for_plan(allow_external=True)
         result["liveRefreshPending"] = False
         with _LIVE_BOOK_CACHE_LOCK:
+            if started_gen != _LIVE_BOOK_CACHE_GEN:
+                return
             _LIVE_BOOK_CACHE = copy.deepcopy(result)
             _LIVE_BOOK_CACHE_AT = time.monotonic()
     except Exception:

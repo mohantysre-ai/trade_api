@@ -35,6 +35,7 @@ def test_intraday_live_response_refresh_does_not_block_concurrent_callers(monkey
     monkeypatch.setattr(intraday, "_SESSION_RESPONSE_CACHE", None)
     monkeypatch.setattr(intraday, "_SESSION_RESPONSE_CACHE_AT", 0.0)
     monkeypatch.setattr(intraday, "_SESSION_RESPONSE_REFRESHING", False)
+    monkeypatch.setattr(intraday, "_SESSION_RESPONSE_GEN", 0)
     try:
         with ThreadPoolExecutor(max_workers=20) as pool:
             results = list(pool.map(lambda _: intraday.get_session(include_live=True), range(20)))
@@ -72,6 +73,7 @@ def test_swing_live_response_refresh_does_not_block_concurrent_callers(monkeypat
     monkeypatch.setattr(swing_session, "_SWING_RESPONSE_CACHE", None)
     monkeypatch.setattr(swing_session, "_SWING_RESPONSE_CACHE_AT", 0.0)
     monkeypatch.setattr(swing_session, "_SWING_RESPONSE_REFRESHING", False)
+    monkeypatch.setattr(swing_session, "_SWING_RESPONSE_GEN", 0)
     try:
         with ThreadPoolExecutor(max_workers=20) as pool:
             results = list(pool.map(lambda _: swing_session.get_swing_session(live=True), range(20)))
@@ -111,6 +113,7 @@ def test_live_book_refresh_does_not_block_concurrent_callers(monkeypatch):
     monkeypatch.setattr(trade_outcome, "_LIVE_BOOK_CACHE", None)
     monkeypatch.setattr(trade_outcome, "_LIVE_BOOK_CACHE_AT", 0.0)
     monkeypatch.setattr(trade_outcome, "_LIVE_BOOK_CACHE_REFRESHING", False)
+    monkeypatch.setattr(trade_outcome, "_LIVE_BOOK_CACHE_GEN", 0)
     try:
         with ThreadPoolExecutor(max_workers=20) as pool:
             results = list(pool.map(lambda _: trade_outcome.get_live_prices_for_plan(), range(20)))
@@ -124,3 +127,123 @@ def test_live_book_refresh_does_not_block_concurrent_callers(monkeypatch):
 
     assert _wait_until(lambda: not trade_outcome._LIVE_BOOK_CACHE_REFRESHING)
     assert trade_outcome.get_live_prices_for_plan()["long"][0]["symbol"] == "LIVE"
+
+
+def test_intraday_stale_refresh_does_not_replace_post_lock_payload(monkeypatch):
+    live_started = Event()
+    release_live = Event()
+
+    def compute(*, include_live=True, persist=False):
+        if persist:
+            return {"locked": True, "long": [{"symbol": "POSTLOCK"}]}
+        if include_live:
+            live_started.set()
+            release_live.wait(timeout=1)
+            return {"locked": True, "long": [{"symbol": "PRELOCK"}]}
+        return {"locked": True, "long": [{"symbol": "DISK"}]}
+
+    monkeypatch.setattr(intraday, "_compute_session", compute)
+    monkeypatch.setattr(intraday, "_SESSION_RESPONSE_CACHE", None)
+    monkeypatch.setattr(intraday, "_SESSION_RESPONSE_CACHE_AT", 0.0)
+    monkeypatch.setattr(intraday, "_SESSION_RESPONSE_REFRESHING", False)
+    monkeypatch.setattr(intraday, "_SESSION_RESPONSE_GEN", 0)
+    try:
+        pending = intraday.get_session(include_live=True)
+        assert live_started.wait(timeout=0.5)
+        assert pending["long"][0]["symbol"] == "DISK"
+        published = intraday.refresh_session_state()
+        assert published["long"][0]["symbol"] == "POSTLOCK"
+    finally:
+        release_live.set()
+
+    assert _wait_until(lambda: not intraday._SESSION_RESPONSE_REFRESHING)
+    assert intraday.get_session(include_live=True)["long"][0]["symbol"] == "POSTLOCK"
+
+
+def test_intraday_stale_refresh_does_not_replace_after_save_session(monkeypatch):
+    live_started = Event()
+    release_live = Event()
+
+    def compute(*, include_live=True, persist=False):
+        if include_live:
+            live_started.set()
+            release_live.wait(timeout=1)
+            return {"locked": True, "long": [{"symbol": "PRELOCK"}]}
+        return {"locked": True, "long": [{"symbol": "DISK"}]}
+
+    monkeypatch.setattr(intraday, "_compute_session", compute)
+    monkeypatch.setattr(intraday, "_atomic_write", lambda *args, **kwargs: None)
+    monkeypatch.setattr(intraday, "_SESSION_RESPONSE_CACHE", None)
+    monkeypatch.setattr(intraday, "_SESSION_RESPONSE_CACHE_AT", 0.0)
+    monkeypatch.setattr(intraday, "_SESSION_RESPONSE_REFRESHING", False)
+    monkeypatch.setattr(intraday, "_SESSION_RESPONSE_GEN", 0)
+    monkeypatch.setattr(trade_outcome, "invalidate_live_book_cache", lambda: None)
+    try:
+        intraday.get_session(include_live=True)
+        assert live_started.wait(timeout=0.5)
+        intraday.save_session({"locked": True, "long": [{"symbol": "POSTLOCK"}]})
+    finally:
+        release_live.set()
+
+    assert _wait_until(lambda: not intraday._SESSION_RESPONSE_REFRESHING)
+    cached = intraday._SESSION_RESPONSE_CACHE
+    assert cached is None or cached["long"][0]["symbol"] != "PRELOCK"
+
+
+def test_swing_stale_refresh_does_not_replace_post_lock_payload(monkeypatch, tmp_path):
+    live_started = Event()
+    release_live = Event()
+
+    def compute(*, live=False):
+        if live:
+            live_started.set()
+            release_live.wait(timeout=1)
+            return {"locked": True, "long": [{"symbol": "PRELOCK"}]}
+        return {"locked": True, "long": [{"symbol": "DISK"}]}
+
+    monkeypatch.setattr(swing_session, "_compute_swing_session", compute)
+    monkeypatch.setattr(swing_session, "_is_market_open", lambda: True)
+    monkeypatch.setattr(swing_session, "_SWING_RESPONSE_CACHE", None)
+    monkeypatch.setattr(swing_session, "_SWING_RESPONSE_CACHE_AT", 0.0)
+    monkeypatch.setattr(swing_session, "_SWING_RESPONSE_REFRESHING", False)
+    monkeypatch.setattr(swing_session, "_SWING_RESPONSE_GEN", 0)
+    try:
+        pending = swing_session.get_swing_session(live=True)
+        assert live_started.wait(timeout=0.5)
+        assert pending["long"][0]["symbol"] == "DISK"
+        swing_session._atomic_write(str(tmp_path / "swing_session.json"), {"locked": True})
+    finally:
+        release_live.set()
+
+    assert _wait_until(lambda: not swing_session._SWING_RESPONSE_REFRESHING)
+    cached = swing_session._SWING_RESPONSE_CACHE
+    assert cached is None or cached["long"][0]["symbol"] != "PRELOCK"
+
+
+def test_live_book_stale_refresh_does_not_replace_after_invalidate(monkeypatch):
+    live_started = Event()
+    release_live = Event()
+
+    def compute(*, allow_external=True, persist_transitions=True):
+        if allow_external:
+            live_started.set()
+            release_live.wait(timeout=1)
+            return {"long": [{"symbol": "PRELOCK"}], "short": []}
+        return {"long": [{"symbol": "DISK"}], "short": []}
+
+    monkeypatch.setattr(trade_outcome, "_compute_live_prices_for_plan", compute)
+    monkeypatch.setattr(trade_outcome, "_is_market_open", lambda: True)
+    monkeypatch.setattr(trade_outcome, "_LIVE_BOOK_CACHE", None)
+    monkeypatch.setattr(trade_outcome, "_LIVE_BOOK_CACHE_AT", 0.0)
+    monkeypatch.setattr(trade_outcome, "_LIVE_BOOK_CACHE_REFRESHING", False)
+    monkeypatch.setattr(trade_outcome, "_LIVE_BOOK_CACHE_GEN", 0)
+    try:
+        trade_outcome.get_live_prices_for_plan()
+        assert live_started.wait(timeout=0.5)
+        trade_outcome.invalidate_live_book_cache()
+    finally:
+        release_live.set()
+
+    assert _wait_until(lambda: not trade_outcome._LIVE_BOOK_CACHE_REFRESHING)
+    cached = trade_outcome._LIVE_BOOK_CACHE
+    assert cached is None or cached["long"][0]["symbol"] != "PRELOCK"

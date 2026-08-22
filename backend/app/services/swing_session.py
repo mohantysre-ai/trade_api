@@ -89,6 +89,7 @@ _SWING_RESPONSE_LOCK = threading.Lock()
 _SWING_RESPONSE_CACHE: dict[str, Any] | None = None
 _SWING_RESPONSE_CACHE_AT = 0.0
 _SWING_RESPONSE_REFRESHING = False
+_SWING_RESPONSE_GEN = 0
 _SWING_RESPONSE_OPEN_TTL = float(os.environ.get("SWING_RESPONSE_OPEN_TTL", "4"))
 _SWING_RESPONSE_CLOSED_TTL = float(os.environ.get("SWING_RESPONSE_CLOSED_TTL", "20"))
 
@@ -101,8 +102,16 @@ def _ist_today() -> str:
     return datetime.now(tz=IST).strftime("%Y-%m-%d")
 
 
+def _invalidate_swing_response_cache() -> None:
+    """Drop the coalesced GET snapshot and retire in-flight live refresh writes."""
+    global _SWING_RESPONSE_CACHE, _SWING_RESPONSE_CACHE_AT, _SWING_RESPONSE_GEN
+    with _SWING_RESPONSE_LOCK:
+        _SWING_RESPONSE_GEN += 1
+        _SWING_RESPONSE_CACHE = None
+        _SWING_RESPONSE_CACHE_AT = 0.0
+
+
 def _atomic_write(path: str, payload: dict[str, Any]) -> None:
-    global _SWING_RESPONSE_CACHE, _SWING_RESPONSE_CACHE_AT
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
@@ -114,8 +123,7 @@ def _atomic_write(path: str, payload: dict[str, Any]) -> None:
     except OSError:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(payload, fh, indent=2, default=str)
-    _SWING_RESPONSE_CACHE = None
-    _SWING_RESPONSE_CACHE_AT = 0.0
+    _invalidate_swing_response_cache()
 
 
 def _read_json(path: str) -> dict[str, Any]:
@@ -2165,6 +2173,7 @@ def get_swing_session(*, live: bool = False) -> dict[str, Any]:
         return copy.deepcopy(_SWING_RESPONSE_CACHE)
 
     start_refresh = False
+    started_gen = 0
     with _SWING_RESPONSE_LOCK:
         now = time.monotonic()
         if _SWING_RESPONSE_CACHE is not None and now - _SWING_RESPONSE_CACHE_AT < ttl:
@@ -2178,6 +2187,7 @@ def get_swing_session(*, live: bool = False) -> dict[str, Any]:
         if not _SWING_RESPONSE_REFRESHING:
             _SWING_RESPONSE_REFRESHING = True
             start_refresh = True
+            started_gen = _SWING_RESPONSE_GEN
         result = copy.deepcopy(_SWING_RESPONSE_CACHE)
         result["liveRefreshPending"] = True
 
@@ -2185,6 +2195,7 @@ def get_swing_session(*, live: bool = False) -> dict[str, Any]:
         try:
             threading.Thread(
                 target=_refresh_swing_response_cache,
+                args=(started_gen,),
                 name="swing-live-refresh",
                 daemon=True,
             ).start()
@@ -2195,13 +2206,15 @@ def get_swing_session(*, live: bool = False) -> dict[str, Any]:
     return result
 
 
-def _refresh_swing_response_cache() -> None:
+def _refresh_swing_response_cache(started_gen: int) -> None:
     """Populate live marks without occupying an AnyIO request worker."""
     global _SWING_RESPONSE_CACHE, _SWING_RESPONSE_CACHE_AT, _SWING_RESPONSE_REFRESHING
     try:
         result = _compute_swing_session(live=True)
         result["liveRefreshPending"] = False
         with _SWING_RESPONSE_LOCK:
+            if started_gen != _SWING_RESPONSE_GEN:
+                return
             _SWING_RESPONSE_CACHE = copy.deepcopy(result)
             _SWING_RESPONSE_CACHE_AT = time.monotonic()
     except Exception:
