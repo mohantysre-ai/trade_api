@@ -61,10 +61,9 @@ export default function DhanRecommendedPanel({ liveMarket, onSelect }: Props) {
             </svg>
           </div>
           <div className="min-w-0">
-            <h3 className="desk-panel-title text-emerald-700">DHAN RECOMMENDED</h3>
+            <h3 className="desk-panel-title text-emerald-700">SHORT-TERM ANALYST PICKS</h3>
             <p className="text-slate-500 text-[12px] mt-0.5">
-              ScanX LONG swing picks
-              {payload?.source ? <> · {payload.source}</> : null}
+              Short-horizon swing candidates
               {typeof payload?.scannedCount === 'number' && payload.scannedCount > 0 && (
                 <> · Scanned {payload.scannedCount}</>
               )}
@@ -89,9 +88,9 @@ export default function DhanRecommendedPanel({ liveMarket, onSelect }: Props) {
 
       {picks.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-6 text-center">
-          <p className="text-[11px] text-slate-500 font-medium">No Dhan recommended picks in snapshot</p>
+          <p className="text-[11px] text-slate-500 font-medium">No short-term analyst picks in the current snapshot</p>
           <p className="text-[10px] text-slate-400 mt-1">
-            {payload ? 'Waiting for ScanX LONG hydration' : 'dhanSwingPicks missing from market feed'}
+            {payload ? 'Waiting for short-term picks to refresh' : 'Short-term picks are unavailable in the current feed'}
           </p>
         </div>
       ) : (
