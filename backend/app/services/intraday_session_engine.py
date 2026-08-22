@@ -177,6 +177,49 @@ _ENTRY_HARD_REJECT = frozenset(
 REPLACEMENT_CUTOFF_HHMM = os.environ.get("INTRADAY_REPLACEMENT_CUTOFF", "1445")
 REPLACEMENT_MIN_SCORE = float(os.environ.get("INTRADAY_REPLACEMENT_MIN_SCORE", "55"))
 REPLACEMENT_MAX_PER_SIDE = int(os.environ.get("INTRADAY_REPLACEMENT_MAX_PER_SIDE", str(LOCK_SIZE)))
+# A locked book may rotate, but it must never turn a five-name desk into a
+# high-turnover scanner.  This is a session-wide cap on *new* entries after
+# the morning lock (normal replacements plus permitted re-entries).
+MAX_DAILY_REPLACEMENTS = int(os.environ.get("INTRADAY_MAX_DAILY_REPLACEMENTS", "3"))
+
+# Re-entry policy.  A completed target or a genuinely profitable trailing exit
+# may receive one smaller, independently-qualified continuation attempt.  An
+# initial stop is deliberately disabled by default: it is the path most likely
+# to create revenge trading and should only be enabled after replay validation.
+REENTRY_ENABLED = os.environ.get("INTRADAY_REENTRY_ENABLED", "1").strip().lower() in (
+    "1", "true", "yes",
+)
+REENTRY_MAX_PER_SYMBOL = int(os.environ.get("INTRADAY_MAX_REENTRIES_PER_SYMBOL", "1"))
+REENTRY_TARGET_COOLDOWN_MIN = int(os.environ.get("INTRADAY_REENTRY_TARGET_COOLDOWN_MIN", "20"))
+REENTRY_TRAIL_COOLDOWN_MIN = int(os.environ.get("INTRADAY_REENTRY_TRAIL_COOLDOWN_MIN", "30"))
+REENTRY_ALLOW_INITIAL_STOP = os.environ.get(
+    "INTRADAY_ALLOW_INITIAL_STOP_REENTRY", "0"
+).strip().lower() in ("1", "true", "yes")
+REENTRY_INITIAL_STOP_COOLDOWN_MIN = int(
+    os.environ.get("INTRADAY_REENTRY_INITIAL_STOP_COOLDOWN_MIN", "60")
+)
+REENTRY_MIN_SCORE = float(os.environ.get("INTRADAY_REENTRY_MIN_SCORE", "65"))
+REENTRY_MIN_EXPECTED_R = float(
+    os.environ.get("INTRADAY_REENTRY_MIN_EXPECTED_R", str(PRIORITY_EXPECTED_R))
+)
+REENTRY_INITIAL_STOP_MIN_SCORE = float(
+    os.environ.get("INTRADAY_REENTRY_INITIAL_STOP_MIN_SCORE", str(ENTRY_EXCEPTIONAL_SCORE))
+)
+REENTRY_INITIAL_STOP_MIN_EXPECTED_R = float(
+    os.environ.get("INTRADAY_REENTRY_INITIAL_STOP_MIN_EXPECTED_R", str(HIGH_CONVICTION_R))
+)
+REENTRY_MIN_TRAIL_MFE_R = float(
+    os.environ.get("INTRADAY_REENTRY_MIN_TRAIL_MFE_R", "1.0")
+)
+REENTRY_BREAKOUT_BUFFER_BPS = float(
+    os.environ.get("INTRADAY_REENTRY_BREAKOUT_BUFFER_BPS", "10")
+)
+REENTRY_PROFIT_RISK_SCALE = float(
+    os.environ.get("INTRADAY_REENTRY_PROFIT_RISK_SCALE", "0.50")
+)
+REENTRY_INITIAL_STOP_RISK_SCALE = float(
+    os.environ.get("INTRADAY_REENTRY_INITIAL_STOP_RISK_SCALE", "0.25")
+)
 # Portfolio risk stops (rotation) — prefer cash when hit
 DAILY_LOSS_LIMIT_INR = float(os.environ.get("INTRADAY_DAILY_LOSS_LIMIT", "15000"))
 MAX_CONCURRENT_NAMES = int(os.environ.get("INTRADAY_MAX_CONCURRENT", str(LOCK_SIZE)))
@@ -2442,6 +2485,19 @@ def generate_candidates(
             "dailyLossLimitInr": DAILY_LOSS_LIMIT_INR,
             "maxConcurrentNames": MAX_CONCURRENT_NAMES,
             "replacementCutoff": REPLACEMENT_CUTOFF_HHMM,
+            "maxDailyReplacements": MAX_DAILY_REPLACEMENTS,
+            "reentry": {
+                "enabled": REENTRY_ENABLED,
+                "maxPerSymbol": REENTRY_MAX_PER_SYMBOL,
+                "targetCooldownMin": REENTRY_TARGET_COOLDOWN_MIN,
+                "profitTrailCooldownMin": REENTRY_TRAIL_COOLDOWN_MIN,
+                "initialStopEnabled": REENTRY_ALLOW_INITIAL_STOP,
+                "initialStopCooldownMin": REENTRY_INITIAL_STOP_COOLDOWN_MIN,
+                "minScore": REENTRY_MIN_SCORE,
+                "minExpectedR": REENTRY_MIN_EXPECTED_R,
+                "breakoutBufferBps": REENTRY_BREAKOUT_BUFFER_BPS,
+                "profitRiskScale": REENTRY_PROFIT_RISK_SCALE,
+            },
             "maxPerSector": MAX_PER_SECTOR,
             "states": [
                 ENTRY_QUALIFIED,
@@ -2957,6 +3013,339 @@ def _portfolio_risk_flags(
     }
 
 
+def _is_closed_trade(row: dict[str, Any]) -> bool:
+    """True only for an executed position that actually closed.
+
+    `NOT_TRIGGERED` and pending rows are not trades and must never become
+    re-entry candidates merely because they are not open.
+    """
+    if not isinstance(row, dict):
+        return False
+    if str(row.get("executionStatus") or "").upper() == "NOT_TRIGGERED":
+        return False
+    outcome = row.get("outcome") if isinstance(row.get("outcome"), dict) else {}
+    status = str(row.get("status") or "").upper()
+    return bool(
+        row.get("closed")
+        or outcome.get("closed")
+        or status in {"CLOSED", "STOP LOSS HIT", "TRAIL STOP HIT", "SCALE COMPLETE"}
+    )
+
+
+def _closed_at(row: dict[str, Any]) -> datetime | None:
+    """Return the first durable close timestamp as an IST-aware datetime."""
+    outcome = row.get("outcome") if isinstance(row.get("outcome"), dict) else {}
+    state = row.get("exitState") if isinstance(row.get("exitState"), dict) else {}
+    for raw in (
+        row.get("closedAt"),
+        row.get("closed_at"),
+        outcome.get("closedAt"),
+        outcome.get("resolvedAt"),
+        state.get("closedAt"),
+    ):
+        parsed = _parse_iso(str(raw)) if raw else None
+        if parsed is None:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=_IST)
+        return parsed.astimezone(_IST)
+    return None
+
+
+def _economic_r(row: dict[str, Any]) -> float | None:
+    """Read the booked economic R without manufacturing a value."""
+    outcome = row.get("outcome") if isinstance(row.get("outcome"), dict) else {}
+    state = row.get("exitState") if isinstance(row.get("exitState"), dict) else {}
+    for source in (row, state, outcome):
+        for key in ("economicR", "rMultiple"):
+            value = _safe_float(source.get(key))
+            if value is not None:
+                return value
+    return None
+
+
+def _mfe_r(row: dict[str, Any]) -> float | None:
+    state = row.get("exitState") if isinstance(row.get("exitState"), dict) else {}
+    outcome = row.get("outcome") if isinstance(row.get("outcome"), dict) else {}
+    for source in (row, state, outcome):
+        value = _safe_float(source.get("mfeR"))
+        if value is not None:
+            return value
+    return None
+
+
+def _last_exit_leg(row: dict[str, Any]) -> dict[str, Any]:
+    state = row.get("exitState") if isinstance(row.get("exitState"), dict) else {}
+    legs = state.get("legsFilled") if isinstance(state.get("legsFilled"), list) else []
+    for leg in reversed(legs):
+        if isinstance(leg, dict):
+            return leg
+    return {}
+
+
+def _exit_profile(row: dict[str, Any]) -> dict[str, Any]:
+    """Classify a closed position for re-entry policy from booked exit facts.
+
+    The generic session status is intentionally not enough because current
+    SCALE_TRAIL rows are normalised to `CLOSED`; the booked exit leg is the
+    authoritative distinction between an initial stop, trail and target exit.
+    """
+    outcome = row.get("outcome") if isinstance(row.get("outcome"), dict) else {}
+    label = str(outcome.get("label") or row.get("status") or "").upper()
+    leg = _last_exit_leg(row)
+    leg_kind = str(leg.get("r") or "").upper()
+    economic_r = _economic_r(row)
+    mfe_r = _mfe_r(row)
+
+    if leg_kind == "INITIAL_SL" or "INITIAL STOP" in label or "STOP LOSS HIT" in label:
+        return {"kind": "INITIAL_STOP", "economicR": economic_r, "mfeR": mfe_r}
+    if leg_kind == "TRAIL_SL" or "TRAIL STOP" in label:
+        profitable = (
+            economic_r is not None
+            and economic_r > 0
+            and mfe_r is not None
+            and mfe_r >= REENTRY_MIN_TRAIL_MFE_R
+        )
+        return {
+            "kind": "PROFIT_TRAIL" if profitable else "TRAIL_LOSS_OR_THIN",
+            "economicR": economic_r,
+            "mfeR": mfe_r,
+        }
+    if leg_kind == "EOD_SQUAREOFF" or "EOD" in label or "SESSION CLOSED" in label:
+        return {"kind": "EOD_EXIT", "economicR": economic_r, "mfeR": mfe_r}
+    if (
+        "SCALE COMPLETE" in label
+        or "TARGET 2 HIT" in label
+        or "TARGET COMPLETE" in label
+    ):
+        return {"kind": "TARGET_COMPLETE", "economicR": economic_r, "mfeR": mfe_r}
+    return {"kind": "UNKNOWN_EXIT", "economicR": economic_r, "mfeR": mfe_r}
+
+
+def _exit_reference_price(row: dict[str, Any], profile: dict[str, Any]) -> float | None:
+    """Price that must be reclaimed/broken before a continuation re-entry."""
+    direction = str(row.get("direction") or "LONG").upper()
+    entry = _safe_float(row.get("entryPrice"))
+    risk = _safe_float(row.get("riskPerShare"))
+    mfe_r = _safe_float(profile.get("mfeR"))
+    if profile.get("kind") == "PROFIT_TRAIL" and entry and risk and mfe_r and mfe_r > 0:
+        sign = -1.0 if direction == "SHORT" else 1.0
+        return round(entry + sign * risk * mfe_r, 4)
+    # If a future replay proves initial-stop retries are useful, a LONG must
+    # first reclaim its original entry (SHORT must break back below it).  The
+    # stopped price itself is not a meaningful new-setup reference.
+    if profile.get("kind") == "INITIAL_STOP" and entry and entry > 0:
+        return entry
+
+    leg = _last_exit_leg(row)
+    candidates: list[Any] = [
+        leg.get("price"),
+        row.get("target2") if profile.get("kind") == "TARGET_COMPLETE" else None,
+        row.get("target1") if profile.get("kind") == "TARGET_COMPLETE" else None,
+        row.get("effectiveStop"),
+    ]
+    outcome = row.get("outcome") if isinstance(row.get("outcome"), dict) else {}
+    candidates.append(outcome.get("ltp"))
+    for value in candidates:
+        price = _safe_float(value)
+        if price is not None and price > 0:
+            return price
+    return None
+
+
+def _candidate_is_in_play(cand: dict[str, Any]) -> bool:
+    """Require a current activity catalyst for a repeat trade, not stale rank."""
+    if bool(cand.get("inPlay")):
+        return True
+    intra = cand.get("intraday") if isinstance(cand.get("intraday"), dict) else {}
+    rvol, _ = _rvol_time(intra)
+    if rvol is not None and rvol >= INPLAY_RVOL:
+        return True
+    gap_pct, _, _ = _gap_and_intraday(cand)
+    atr = _safe_float(cand.get("atrPct") if cand.get("atrPct") is not None else intra.get("atr_pct"))
+    return bool(
+        gap_pct is not None
+        and atr is not None
+        and atr > 0
+        and abs(gap_pct) >= INPLAY_GAP_ATR_MULT * atr
+    )
+
+
+def _is_reentry_row(row: dict[str, Any]) -> bool:
+    source = str(row.get("source") or "").upper()
+    reason = str(row.get("adoptReason") or "").upper()
+    return source == "REENTRY" or reason.startswith("REENTRY_")
+
+
+def _replacement_count(rows: list[dict[str, Any]]) -> int:
+    """Count durable after-lock entries; event history is intentionally ignored."""
+    return sum(
+        1
+        for row in rows
+        if isinstance(row, dict)
+        and (
+            str(row.get("source") or "").upper() == "REPLACEMENT"
+            or _is_reentry_row(row)
+            or str(row.get("adoptReason") or "").upper() == "REPLACEMENT_FREE_SLOT"
+        )
+    )
+
+
+def _reentry_decision(
+    rows: list[dict[str, Any]],
+    cand: dict[str, Any],
+    direction: str,
+    gate: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Return an evidence-only decision for a potential same-symbol re-entry.
+
+    New symbols pass through unchanged.  Re-entries are a separate strategy:
+    one attempt only, after the cooldown, through a fresh price break, with
+    stronger score/Expected-R requirements and lower risk sizing.
+    """
+    sym = str(cand.get("symbol") or "").upper().strip()
+    side = str(direction or "").upper()
+    base = {
+        "allowed": False,
+        "isReentry": False,
+        "reason": "invalid_symbol_or_direction",
+        "exitKind": None,
+        "riskScale": 1.0,
+        "previousCloseAt": None,
+        "referencePrice": None,
+    }
+    if not sym or side not in {"LONG", "SHORT"}:
+        return base
+
+    symbol_rows = [
+        row for row in rows
+        if isinstance(row, dict) and str(row.get("symbol") or "").upper().strip() == sym
+    ]
+    if not symbol_rows:
+        return {**base, "allowed": True, "reason": "new_symbol"}
+    if any(_position_is_open(row) for row in symbol_rows):
+        return {**base, "reason": "symbol_already_open"}
+    if any(not _is_closed_trade(row) for row in symbol_rows):
+        return {**base, "reason": "prior_entry_not_a_closed_trade"}
+    if any(str(row.get("direction") or "").upper() != side for row in symbol_rows):
+        return {**base, "reason": "opposite_direction_seen_today"}
+    if not REENTRY_ENABLED:
+        return {**base, "reason": "reentry_disabled"}
+
+    prior_reentries = sum(1 for row in symbol_rows if _is_reentry_row(row))
+    if REENTRY_MAX_PER_SYMBOL <= 0 or prior_reentries >= REENTRY_MAX_PER_SYMBOL:
+        return {**base, "reason": "symbol_reentry_limit"}
+
+    prior = next((row for row in reversed(symbol_rows) if _is_closed_trade(row)), None)
+    if prior is None:
+        return {**base, "reason": "missing_closed_trade"}
+    profile = _exit_profile(prior)
+    kind = str(profile.get("kind") or "UNKNOWN_EXIT")
+    if kind == "TARGET_COMPLETE":
+        cooldown = REENTRY_TARGET_COOLDOWN_MIN
+        min_score = REENTRY_MIN_SCORE
+        min_expected_r = REENTRY_MIN_EXPECTED_R
+        risk_scale = REENTRY_PROFIT_RISK_SCALE
+        reason = "REENTRY_AFTER_TARGET"
+    elif kind == "PROFIT_TRAIL":
+        cooldown = REENTRY_TRAIL_COOLDOWN_MIN
+        min_score = REENTRY_MIN_SCORE
+        min_expected_r = REENTRY_MIN_EXPECTED_R
+        risk_scale = REENTRY_PROFIT_RISK_SCALE
+        reason = "REENTRY_AFTER_PROFIT_TRAIL"
+    elif kind == "INITIAL_STOP":
+        if not REENTRY_ALLOW_INITIAL_STOP:
+            return {**base, "reason": "initial_stop_reentry_disabled", "exitKind": kind}
+        cooldown = REENTRY_INITIAL_STOP_COOLDOWN_MIN
+        min_score = REENTRY_INITIAL_STOP_MIN_SCORE
+        min_expected_r = REENTRY_INITIAL_STOP_MIN_EXPECTED_R
+        risk_scale = REENTRY_INITIAL_STOP_RISK_SCALE
+        reason = "REENTRY_AFTER_INITIAL_STOP"
+    else:
+        return {**base, "reason": f"exit_not_eligible:{kind.lower()}", "exitKind": kind}
+
+    closed_at = _closed_at(prior)
+    if closed_at is None:
+        return {**base, "reason": "close_timestamp_missing", "exitKind": kind}
+    current = now or _ist_now()
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=_IST)
+    age_minutes = (current.astimezone(_IST) - closed_at).total_seconds() / 60.0
+    if age_minutes < cooldown:
+        return {
+            **base,
+            "reason": "reentry_cooldown",
+            "exitKind": kind,
+            "previousCloseAt": closed_at.isoformat(),
+            "cooldownRemainingMin": round(max(0.0, cooldown - age_minutes), 1),
+        }
+
+    score = _safe_float(cand.get("score"))
+    if score is None or score < min_score:
+        return {
+            **base,
+            "reason": "reentry_score_below_floor",
+            "exitKind": kind,
+            "previousCloseAt": closed_at.isoformat(),
+        }
+    expected_r = _safe_float(gate.get("qualityAdjustedExpectedR"))
+    if expected_r is None or expected_r < min_expected_r:
+        return {
+            **base,
+            "reason": "reentry_expected_r_below_floor",
+            "exitKind": kind,
+            "previousCloseAt": closed_at.isoformat(),
+        }
+    if not _candidate_is_in_play(cand):
+        return {
+            **base,
+            "reason": "reentry_not_in_play",
+            "exitKind": kind,
+            "previousCloseAt": closed_at.isoformat(),
+        }
+    if gate.get("oiAligned") is False:
+        return {
+            **base,
+            "reason": "reentry_oi_misaligned",
+            "exitKind": kind,
+            "previousCloseAt": closed_at.isoformat(),
+        }
+
+    reference = _exit_reference_price(prior, profile)
+    ltp = _safe_float(cand.get("ltpRaw") or cand.get("ltp") or cand.get("entryPrice"))
+    if reference is None or ltp is None or ltp <= 0:
+        return {
+            **base,
+            "reason": "reentry_breakout_reference_missing",
+            "exitKind": kind,
+            "previousCloseAt": closed_at.isoformat(),
+        }
+    buffer = max(0.0, REENTRY_BREAKOUT_BUFFER_BPS) / 10_000.0
+    fresh_break = ltp >= reference * (1.0 + buffer) if side == "LONG" else ltp <= reference * (1.0 - buffer)
+    if not fresh_break:
+        return {
+            **base,
+            "reason": "reentry_fresh_breakout_not_confirmed",
+            "exitKind": kind,
+            "previousCloseAt": closed_at.isoformat(),
+            "referencePrice": round(reference, 4),
+        }
+    return {
+        "allowed": True,
+        "isReentry": True,
+        "reason": reason,
+        "exitKind": kind,
+        "riskScale": max(0.0, min(1.0, risk_scale)),
+        "previousCloseAt": closed_at.isoformat(),
+        "referencePrice": round(reference, 4),
+        "previousEconomicR": profile.get("economicR"),
+        "minScore": min_score,
+        "minExpectedR": min_expected_r,
+    }
+
+
 def _open_sector_counts(
     long_rows: list[dict[str, Any]],
     short_rows: list[dict[str, Any]],
@@ -3055,11 +3444,13 @@ def propose_replacements(
     (or when hunt_pools is omitted) uses the morning lock pools.
     Prefer cash over weak / exhausted / stale candidates. Proposal-only — does not mutate.
     Uses entry_quality_gate (EXHAUSTED / STALE / NO_EDGE / WAIT_RETEST skipped).
-    No revenge replace of SL'd symbols (closed set excluded). Sector caps enforced.
+    Same-symbol re-entry is permitted only through `_reentry_decision`; it is
+    never a generic replacement of every closed symbol. Sector caps enforced.
     """
     regime = regime or session.get("regime") or {}
     long_rows = list(session.get("long") or [])
     short_rows = list(session.get("short") or [])
+    all_rows = long_rows + short_rows
     risk = _portfolio_risk_flags(long_rows, short_rows)
     allowed, _block = replacement_window_open(
         daily_loss_hit=bool(risk["dailyLossHit"]),
@@ -3072,9 +3463,11 @@ def propose_replacements(
     if free["total"] <= 0:
         return []
 
+    replacement_capacity = max(0, MAX_DAILY_REPLACEMENTS - _replacement_count(all_rows))
+    if replacement_capacity <= 0:
+        return []
+
     current_syms: set[str] = set()
-    closed_syms: set[str] = set()
-    sl_closed: set[str] = set()
     for side in (long_rows, short_rows):
         for r in side:
             sym = str(r.get("symbol") or "").upper().strip()
@@ -3082,19 +3475,27 @@ def propose_replacements(
                 continue
             if _position_is_open(r):
                 current_syms.add(sym)
-            else:
-                closed_syms.add(sym)
-                st = str(r.get("status") or "").upper()
-                if "STOP LOSS" in st or st == "TRAIL STOP HIT":
-                    sl_closed.add(sym)
 
     try:
         swing_held = swing_locked_symbols(_ist_now().strftime("%Y-%m-%d"))
     except Exception:
         swing_held = set()
 
-    # No revenge after SL / no re-entry of any closed name today; no averaging down.
-    exclude = current_syms | closed_syms | set(swing_held or set()) | sl_closed
+    # `replacementsApplied` is a secondary ledger.  Only block entries which
+    # no longer exist in the durable position rows; normal historical rows are
+    # evaluated by the explicit re-entry policy below.
+    row_symbols = {
+        str(row.get("symbol") or "").upper().strip()
+        for row in all_rows
+        if isinstance(row, dict) and row.get("symbol")
+    }
+    prior_applied = {
+        str(item.get("symbol") or "").upper().strip()
+        for item in (session.get("replacementsApplied") or [])
+        if isinstance(item, dict) and item.get("symbol")
+    }
+    ledger_only = prior_applied - row_symbols
+    exclude = current_syms | set(swing_held or set()) | ledger_only
     sector_counts = _open_sector_counts(long_rows, short_rows)
     proposals: list[dict[str, Any]] = []
 
@@ -3142,7 +3543,7 @@ def propose_replacements(
         ("SHORT", free["short"], _pool_rows(pool_short_raw)),
     )
     for direction, slots, pool in side_specs:
-        if slots <= 0 or not pool:
+        if slots <= 0 or not pool or len(proposals) >= replacement_capacity:
             continue
         allowed_oi = OI_LONG_OK if direction == "LONG" else OI_SHORT_OK
         ranked = sorted(
@@ -3168,7 +3569,10 @@ def propose_replacements(
         )
         taken = 0
         for cand in ranked:
-            if taken >= min(slots, REPLACEMENT_MAX_PER_SIDE):
+            if (
+                taken >= min(slots, REPLACEMENT_MAX_PER_SIDE)
+                or len(proposals) >= replacement_capacity
+            ):
                 break
             sym = str(cand.get("symbol") or "").upper().strip()
             if not sym or sym in exclude:
@@ -3193,6 +3597,9 @@ def propose_replacements(
             q_r = gate.get("qualityAdjustedExpectedR")
             if q_r is not None and float(q_r) < ENTRY_MIN_EXPECTED_R:
                 continue
+            reentry = _reentry_decision(all_rows, merged, direction, gate)
+            if not reentry.get("allowed"):
+                continue
             ltp_val = _safe_float((live or {}).get("ltp")) if live and live.get("ltp") is not None else _safe_float(
                 merged.get("ltp") or cand.get("ltp") or cand.get("entryPrice")
             )
@@ -3204,7 +3611,13 @@ def propose_replacements(
                     "sector": sector,
                     "sleeve": cand.get("sleeve"),
                     "entryState": state,
-                    "excludeReason": gate.get("excludeReason"),
+                    # Existing terminal UI renders this as the proposal note;
+                    # surface an approved re-entry reason without requiring a
+                    # second, UI-only interpretation layer.
+                    "excludeReason": (
+                        gate.get("excludeReason")
+                        or (reentry.get("reason") if reentry.get("isReentry") else None)
+                    ),
                     "flags": gate.get("flags") or [],
                     "ltpSource": gate.get("ltpSource")
                     or merged.get("ltpSource")
@@ -3218,7 +3631,13 @@ def propose_replacements(
                     "inPlay": cand.get("inPlay"),
                     "oiSetup": gate.get("oiSetup") or merged.get("oiSetup") or cand.get("oiSetup"),
                     "oiAligned": gate.get("oiAligned"),
-                    "replaceReason": "FREE_SLOT",
+                    "replaceReason": reentry.get("reason") if reentry.get("isReentry") else "FREE_SLOT",
+                    "isReentry": bool(reentry.get("isReentry")),
+                    "reentryExitKind": reentry.get("exitKind"),
+                    "reentryPreviousCloseAt": reentry.get("previousCloseAt"),
+                    "reentryReferencePrice": reentry.get("referencePrice"),
+                    "reentryRiskScale": reentry.get("riskScale"),
+                    "reentryPreviousEconomicR": reentry.get("previousEconomicR"),
                     "proposalOnly": True,
                 }
             )
@@ -3263,6 +3682,7 @@ def apply_replacements(
     regime = regime or session.get("regime") or {}
     long_rows = list(session.get("long") or [])
     short_rows = list(session.get("short") or [])
+    all_rows = long_rows + short_rows
     risk = _portfolio_risk_flags(long_rows, short_rows)
     if not bypass_window:
         allowed, _block = replacement_window_open(
@@ -3276,22 +3696,29 @@ def apply_replacements(
     if free["total"] <= 0:
         return []
 
+    replacement_capacity = max(0, MAX_DAILY_REPLACEMENTS - _replacement_count(all_rows))
+    if replacement_capacity <= 0:
+        return []
+
     already_open = {
         str(r.get("symbol") or "").upper()
-        for r in long_rows + short_rows
+        for r in all_rows
         if _position_is_open(r) and r.get("symbol")
     }
-    closed_syms = {
-        str(r.get("symbol") or "").upper()
-        for r in long_rows + short_rows
-        if r.get("symbol") and not _position_is_open(r)
+    row_symbols = {
+        str(r.get("symbol") or "").upper().strip()
+        for r in all_rows
+        if isinstance(r, dict) and r.get("symbol")
     }
     prior_applied = {
         str(x.get("symbol") or "").upper()
         for x in (session.get("replacementsApplied") or [])
         if isinstance(x, dict) and x.get("symbol")
     }
-    exclude = already_open | closed_syms | prior_applied
+    # Do not trust a stray historical ledger item over the position book.  The
+    # book itself is the source of truth for whether a same-symbol repeat can
+    # enter via `_reentry_decision`.
+    exclude = already_open | (prior_applied - row_symbols)
     sector_counts = _open_sector_counts(long_rows, short_rows)
 
     if hunt_pools is not None:
@@ -3336,8 +3763,8 @@ def apply_replacements(
     used_freed: set[str] = set()
 
     slots_left = {"LONG": int(free["long"]), "SHORT": int(free["short"])}
-    total_slots_left = int(free["total"])
-    open_rows = [r for r in long_rows + short_rows if _position_is_open(r)]
+    total_slots_left = min(int(free["total"]), replacement_capacity)
+    open_rows = [r for r in all_rows if _position_is_open(r)]
     remaining_capital = max(
         0.0,
         INTRADAY_CAPITAL
@@ -3352,7 +3779,12 @@ def apply_replacements(
     risk_scale_cache: dict[str, float] = {}
 
     for prop in proposals:
-        if total_slots_left <= 0 or remaining_capital <= 0 or remaining_risk <= 0:
+        if (
+            total_slots_left <= 0
+            or len(applied) >= replacement_capacity
+            or remaining_capital <= 0
+            or remaining_risk <= 0
+        ):
             break
         if not isinstance(prop, dict):
             continue
@@ -3392,6 +3824,9 @@ def apply_replacements(
         q_r = gate.get("qualityAdjustedExpectedR")
         if q_r is not None and float(q_r) < ENTRY_MIN_EXPECTED_R:
             continue
+        reentry = _reentry_decision(all_rows, cand, direction, gate)
+        if not reentry.get("allowed"):
+            continue
 
         sector = str(cand.get("sector") or _sector_of(sym, cand) or "OTHER")
         if sector_counts.get(sector, 0) >= MAX_PER_SECTOR:
@@ -3416,15 +3851,28 @@ def apply_replacements(
 
         if direction not in risk_scale_cache:
             risk_scale_cache[direction] = _regime_risk_scale(regime, direction)
+        sizing_risk_scale = risk_scale_cache[direction]
+        if reentry.get("isReentry"):
+            sizing_risk_scale = max(
+                0.40,
+                min(1.0, sizing_risk_scale * float(reentry.get("riskScale") or 1.0)),
+            )
         expected_r = float(gate.get("qualityAdjustedExpectedR") or 0)
         band = 0.30 if expected_r >= HIGH_CONVICTION_R else (0.20 if expected_r >= PRIORITY_EXPECTED_R else 0.10)
         freed_q = freed_long if direction == "LONG" else freed_short
         replaced_from = None
-        for src in freed_q:
-            if src not in used_freed and src != sym:
-                replaced_from = src
-                used_freed.add(src)
-                break
+        if reentry.get("isReentry"):
+            for src in freed_q:
+                if src == sym and src not in used_freed:
+                    replaced_from = src
+                    used_freed.add(src)
+                    break
+        if replaced_from is None:
+            for src in freed_q:
+                if src not in used_freed and src != sym:
+                    replaced_from = src
+                    used_freed.add(src)
+                    break
         src_rows = long_rows if direction == "LONG" else short_rows
         freed_notional = _closed_notional_for(src_rows, replaced_from) if replaced_from else 0.0
         slot_budget = remaining_capital / max(1, total_slots_left)
@@ -3439,7 +3887,7 @@ def apply_replacements(
             entry,
             risk,
             sleeve,
-            risk_scale=risk_scale_cache[direction],
+            risk_scale=sizing_risk_scale,
             basket_slots=1,
         )
         qty_by_risk_cap = int(min(INTRADAY_CAPITAL * MAX_SINGLE_TRADE_RISK, remaining_risk) // risk)
@@ -3461,6 +3909,9 @@ def apply_replacements(
             continue
 
         at = _utc_now_iso()
+        is_reentry = bool(reentry.get("isReentry"))
+        source = "REENTRY" if is_reentry else "REPLACEMENT"
+        adopt_reason = reentry.get("reason") if is_reentry else "REPLACEMENT_FREE_SLOT"
         row = attach_exit_plan(
             {
                 **cand,
@@ -3474,10 +3925,16 @@ def apply_replacements(
                 "slotFreed": False,
                 "slotStatus": "RUNNING",
                 "adopted": True,
-                "adoptReason": "REPLACEMENT_FREE_SLOT",
-                "source": "REPLACEMENT",
+                "adoptReason": adopt_reason,
+                "source": source,
                 "replacedFrom": replaced_from,
                 "replacedAt": at,
+                "reentryOf": sym if is_reentry else None,
+                "reentryExitKind": reentry.get("exitKind") if is_reentry else None,
+                "reentryPreviousCloseAt": reentry.get("previousCloseAt") if is_reentry else None,
+                "reentryReferencePrice": reentry.get("referencePrice") if is_reentry else None,
+                "reentryPreviousEconomicR": reentry.get("previousEconomicR") if is_reentry else None,
+                "reentryRiskScale": reentry.get("riskScale") if is_reentry else None,
                 "entryState": gate.get("entryState"),
                 "excludeReason": gate.get("excludeReason"),
                 "qualityAdjustedExpectedR": gate.get("qualityAdjustedExpectedR"),
@@ -3497,6 +3954,7 @@ def apply_replacements(
             long_rows.append(row)
         else:
             short_rows.append(row)
+        all_rows.append(row)
         exclude.add(sym)
         sector_counts[sector] = sector_counts.get(sector, 0) + 1
         slots_left[direction] = slots_left[direction] - 1
@@ -3520,7 +3978,10 @@ def apply_replacements(
             "entryPrice": r.get("entryPrice"),
             "approxQty": r.get("approxQty"),
             "score": r.get("score"),
-            "source": "REPLACEMENT",
+            "source": r.get("source"),
+            "reentryExitKind": r.get("reentryExitKind"),
+            "reentryPreviousCloseAt": r.get("reentryPreviousCloseAt"),
+            "reentryReferencePrice": r.get("reentryReferencePrice"),
         }
         for r in applied
     ]
@@ -3551,6 +4012,19 @@ def apply_replacements(
                 "replacedFrom": r.get("replacedFrom"),
             }
         )
+        if str(r.get("source") or "").upper() == "REENTRY":
+            events.append(
+                {
+                    "type": "REENTRY_APPLIED",
+                    "at": r.get("replacedAt"),
+                    "symbol": r.get("symbol"),
+                    "direction": r.get("direction"),
+                    "exitKind": r.get("reentryExitKind"),
+                    "previousCloseAt": r.get("reentryPreviousCloseAt"),
+                    "referencePrice": r.get("reentryReferencePrice"),
+                    "riskScale": r.get("reentryRiskScale"),
+                }
+            )
     session["events"] = events[-200:]
     session["updatedAt"] = _utc_now_iso()
     try:
@@ -3970,6 +4444,9 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
             orig = session.get(side_key) or []
             for i, row in enumerate(rows):
                 if row.get("closed") and i < len(orig) and not orig[i].get("closed"):
+                    close_at = _closed_at(row)
+                    close_at_iso = close_at.isoformat() if close_at is not None else _utc_now_iso()
+                    exit_kind = _exit_profile(row).get("kind")
                     keep = {
                         k: row.get(k)
                         for k in (
@@ -3985,6 +4462,10 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
                             "remainingQty",
                             "exitPlan",
                             "scaleProgress",
+                            "economicR",
+                            "rMultiple",
+                            "closedAt",
+                            "exitKind",
                         )
                         if row.get(k) is not None
                     }
@@ -3993,6 +4474,8 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
                         **keep,
                         "closed": True,
                         "status": "CLOSED",
+                        "closedAt": close_at_iso,
+                        "exitKind": exit_kind,
                         "slotFreed": True,
                         "slotStatus": "REPLACEABLE",
                     }
@@ -4004,6 +4487,8 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
                         "symbol": row.get("symbol"),
                         "direction": row.get("direction"),
                         "slotFreed": True,
+                        "closedAt": close_at_iso,
+                        "exitKind": exit_kind,
                     })
                     session["events"] = events[-200:]
         if changed:
@@ -4068,6 +4553,8 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
     free_slots = compute_free_slots(long_rows, short_rows)
     risk_flags = _portfolio_risk_flags(long_rows, short_rows)
     realized_book = risk_flags.get("realizedPnl")
+    replacements_used = _replacement_count(long_rows + short_rows)
+    replacements_remaining = max(0, MAX_DAILY_REPLACEMENTS - replacements_used)
     replacement_blocked_reason: str | None = None
     replacement_candidates: list[dict[str, Any]] = []
     cash_held = False
@@ -4086,6 +4573,9 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
             replacement_blocked_reason = win_reason or rot_code
         elif free_slots["total"] <= 0:
             replacement_blocked_reason = "no_free_slots"
+        elif replacements_remaining <= 0:
+            replacement_blocked_reason = "daily_replacement_cap"
+            cash_held = True
         elif persist:
             if market_open_now:
                 try:
@@ -4153,6 +4643,8 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
                 free_slots = compute_free_slots(long_rows, short_rows)
                 risk_flags = _portfolio_risk_flags(long_rows, short_rows)
                 realized_book = risk_flags.get("realizedPnl")
+                replacements_used = _replacement_count(long_rows + short_rows)
+                replacements_remaining = max(0, MAX_DAILY_REPLACEMENTS - replacements_used)
                 replacements_applied = list(session.get("replacementsApplied") or [])[-len(applied_rows) :]
                 # Mark just-applied proposals for UI (no longer proposal-only)
                 applied_syms = {
@@ -4170,7 +4662,8 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
 
     # Persist proposal / cash-held ledger for EOD attribution (dedupe by symbol set)
     if persist and session.get("locked") and (
-        replacement_candidates or replacement_blocked_reason == "prefer_cash_no_qualified"
+        replacement_candidates
+        or replacement_blocked_reason in {"prefer_cash_no_qualified", "daily_replacement_cap"}
     ):
         try:
             cand_key = tuple(
@@ -4338,6 +4831,23 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
             f"{_hhmm_to_minutes(REPLACEMENT_CUTOFF_HHMM) // 60:02d}:"
             f"{_hhmm_to_minutes(REPLACEMENT_CUTOFF_HHMM) % 60:02d}"
         ),
+        "replacementBudget": {
+            "used": replacements_used,
+            "limit": MAX_DAILY_REPLACEMENTS,
+            "remaining": replacements_remaining,
+        },
+        "reentryPolicy": {
+            "enabled": REENTRY_ENABLED,
+            "maxPerSymbol": REENTRY_MAX_PER_SYMBOL,
+            "targetCooldownMin": REENTRY_TARGET_COOLDOWN_MIN,
+            "profitTrailCooldownMin": REENTRY_TRAIL_COOLDOWN_MIN,
+            "initialStopEnabled": REENTRY_ALLOW_INITIAL_STOP,
+            "initialStopCooldownMin": REENTRY_INITIAL_STOP_COOLDOWN_MIN,
+            "minScore": REENTRY_MIN_SCORE,
+            "minExpectedR": REENTRY_MIN_EXPECTED_R,
+            "breakoutBufferBps": REENTRY_BREAKOUT_BUFFER_BPS,
+            "profitRiskScale": REENTRY_PROFIT_RISK_SCALE,
+        },
         "cashHeld": cash_held,
         "portfolioRisk": risk_flags,
         "rotationWindow": rot_cfg,
@@ -4363,6 +4873,11 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
             "freeSlots": free_slots,
             "dailyLossLimitInr": DAILY_LOSS_LIMIT_INR,
             "maxConcurrentNames": MAX_CONCURRENT_NAMES,
+            "replacementBudget": {
+                "used": replacements_used,
+                "limit": MAX_DAILY_REPLACEMENTS,
+                "remaining": replacements_remaining,
+            },
             "dailyLossHit": bool(risk_flags.get("dailyLossHit")),
             "maxNamesHit": bool(risk_flags.get("maxNamesHit")),
             "cashHeld": cash_held or bool(long_rows or short_rows) and all(

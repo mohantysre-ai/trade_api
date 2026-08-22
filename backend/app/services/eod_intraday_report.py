@@ -168,6 +168,7 @@ def _build_rotation_attribution(
     freed: list[dict[str, Any]] = []
     proposed: list[dict[str, Any]] = []
     cash_held_events: list[dict[str, Any]] = []
+    reentries: list[dict[str, Any]] = []
     for ev in events:
         if not isinstance(ev, dict):
             continue
@@ -195,6 +196,18 @@ def _build_rotation_attribution(
                     "freeSlots": ev.get("freeSlots"),
                 }
             )
+        elif et == "REENTRY_APPLIED":
+            reentries.append(
+                {
+                    "at": ev.get("at"),
+                    "symbol": ev.get("symbol"),
+                    "direction": ev.get("direction"),
+                    "exitKind": ev.get("exitKind"),
+                    "previousCloseAt": ev.get("previousCloseAt"),
+                    "referencePrice": ev.get("referencePrice"),
+                    "riskScale": ev.get("riskScale"),
+                }
+            )
         elif et in ("POSITION_CLOSED", "STOP_LOSS_HIT", "TRAIL_STOP_HIT", "TARGET_HIT"):
             freed.append(
                 {
@@ -203,6 +216,7 @@ def _build_rotation_attribution(
                     "direction": ev.get("direction"),
                     "status": ev.get("status") or et,
                     "realizedPnl": ev.get("realizedPnl"),
+                    "exitKind": ev.get("exitKind"),
                 }
             )
 
@@ -220,6 +234,9 @@ def _build_rotation_attribution(
                 "direction": t.get("direction"),
                 "exitReason": t.get("exitReason") or t.get("status"),
                 "pnl": pnl,
+                "source": t.get("source"),
+                "adoptReason": t.get("adoptReason"),
+                "reentryExitKind": t.get("reentryExitKind"),
                 "slotFreed": bool(
                     t.get("slotFreed")
                     or str(t.get("slotStatus") or "").upper() == "REPLACEABLE"
@@ -258,6 +275,8 @@ def _build_rotation_attribution(
         "proposedSymbolCount": len(proposed_syms),
         "proposedSymbols": sorted(proposed_syms),
         "cashHeldEvents": cash_held_events[-20:],
+        "reentries": reentries[-50:],
+        "reentryCount": len(reentries),
         "cashHeld": bool(cash_held_events) or bool(
             isinstance(session, dict) and session.get("lastCashHeldAt")
         ),

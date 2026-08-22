@@ -1,9 +1,13 @@
-"""Auto-apply free-slot replacements after SL / complete."""
+"""Auto-apply free-slot replacements and evidence-gated re-entries."""
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from app.services import intraday_session_engine as eng
+
+
+IST = timezone(timedelta(hours=5, minutes=30))
 
 
 def _closed_long(sym: str = "LOSER") -> dict:
@@ -17,6 +21,62 @@ def _closed_long(sym: str = "LOSER") -> dict:
         "sector": "AUTO",
         "entryPrice": 100.0,
         "approxQty": 10,
+    }
+
+
+def _closed_target_long(sym: str = "WINNER") -> dict:
+    return {
+        "symbol": sym,
+        "direction": "LONG",
+        "closed": True,
+        "status": "CLOSED",
+        "slotFreed": True,
+        "slotStatus": "REPLACEABLE",
+        "sector": "PHARMA",
+        "entryPrice": 100.0,
+        "riskPerShare": 2.0,
+        "target1": 103.0,
+        "target2": 106.0,
+        "approxQty": 400,
+        "deployedCapital": 40_000.0,
+        "exitState": {
+            "legsFilled": [
+                {"r": 1.5, "price": 103.0},
+                {"r": 3.0, "price": 106.0},
+            ],
+            "economicR": 2.4,
+            "mfeR": 3.0,
+        },
+        "outcome": {
+            "label": "SCALE COMPLETE",
+            "closed": True,
+            "resolvedAt": "2026-08-11T04:30:00+00:00",
+        },
+    }
+
+
+def _closed_profit_trail(sym: str = "RUNNER") -> dict:
+    return {
+        "symbol": sym,
+        "direction": "LONG",
+        "closed": True,
+        "status": "CLOSED",
+        "slotFreed": True,
+        "slotStatus": "REPLACEABLE",
+        "sector": "PHARMA",
+        "entryPrice": 100.0,
+        "riskPerShare": 2.0,
+        "approxQty": 100,
+        "exitState": {
+            "legsFilled": [{"r": "TRAIL_SL", "price": 102.0}],
+            "economicR": 0.6,
+            "mfeR": 1.5,
+        },
+        "outcome": {
+            "label": "TRAIL STOP HIT",
+            "closed": True,
+            "resolvedAt": "2026-08-11T04:30:00+00:00",
+        },
     }
 
 
@@ -58,6 +118,26 @@ def _qualified_gate(*_a, **_k) -> dict:
         "flags": [],
         "oiSetup": "LONG_BUILDUP",
         "oiAligned": True,
+    }
+
+
+def _reentry_qualified_gate(*_a, **_k) -> dict:
+    return {
+        "entryState": eng.ENTRY_QUALIFIED,
+        "qualityAdjustedExpectedR": 1.6,
+        "flags": ["IN_PLAY", "OI_PREFERRED"],
+        "oiSetup": "LONG_BUILDUP",
+        "oiAligned": True,
+    }
+
+
+def _reentry_cand(sym: str, *, ltp: float = 107.0, score: float = 70.0) -> dict:
+    return {
+        **_pool_cand(sym, score=score),
+        "entryPrice": ltp,
+        "ltp": ltp,
+        "ltpRaw": ltp,
+        "riskPerShare": 2.0,
     }
 
 
@@ -116,6 +196,158 @@ def test_sl_symbol_excluded_from_reentry():
             applied = eng.apply_replacements(session, proposals, {}, {}, bypass_window=True)
     assert applied == []
     assert eng.compute_free_slots(session["long"], session["short"])["openLong"] == 0
+
+
+def test_target_reentry_requires_cooldown_and_fresh_breakout():
+    prior = _closed_target_long()
+    gate = _reentry_qualified_gate()
+    before_cooldown = eng._reentry_decision(
+        [prior],
+        _reentry_cand("WINNER", ltp=107.0),
+        "LONG",
+        gate,
+        now=datetime(2026, 8, 11, 10, 10, tzinfo=IST),
+    )
+    assert before_cooldown["allowed"] is False
+    assert before_cooldown["reason"] == "reentry_cooldown"
+
+    no_new_break = eng._reentry_decision(
+        [prior],
+        _reentry_cand("WINNER", ltp=106.0),
+        "LONG",
+        gate,
+        now=datetime(2026, 8, 11, 10, 25, tzinfo=IST),
+    )
+    assert no_new_break["allowed"] is False
+    assert no_new_break["reason"] == "reentry_fresh_breakout_not_confirmed"
+
+    allowed = eng._reentry_decision(
+        [prior],
+        _reentry_cand("WINNER", ltp=107.0),
+        "LONG",
+        gate,
+        now=datetime(2026, 8, 11, 10, 25, tzinfo=IST),
+    )
+    assert allowed["allowed"] is True
+    assert allowed["isReentry"] is True
+    assert allowed["reason"] == "REENTRY_AFTER_TARGET"
+    assert allowed["riskScale"] == eng.REENTRY_PROFIT_RISK_SCALE
+
+
+def test_profitable_trail_reentry_requires_new_high_beyond_prior_mfe():
+    prior = _closed_profit_trail()
+    gate = _reentry_qualified_gate()
+    no_reclaim = eng._reentry_decision(
+        [prior],
+        _reentry_cand("RUNNER", ltp=102.9),
+        "LONG",
+        gate,
+        now=datetime(2026, 8, 11, 10, 35, tzinfo=IST),
+    )
+    assert no_reclaim["allowed"] is False
+    assert no_reclaim["reason"] == "reentry_fresh_breakout_not_confirmed"
+
+    allowed = eng._reentry_decision(
+        [prior],
+        _reentry_cand("RUNNER", ltp=103.2),
+        "LONG",
+        gate,
+        now=datetime(2026, 8, 11, 10, 35, tzinfo=IST),
+    )
+    assert allowed["allowed"] is True
+    assert allowed["exitKind"] == "PROFIT_TRAIL"
+    assert allowed["referencePrice"] == 103.0
+
+
+def test_initial_stop_reentry_stays_disabled_by_default():
+    prior = {
+        **_closed_long("STOPPED"),
+        "riskPerShare": 2.0,
+        "closedAt": "2026-08-11T04:30:00+00:00",
+        "outcome": {"label": "INITIAL STOP HIT", "closed": True},
+        "exitState": {"legsFilled": [{"r": "INITIAL_SL", "price": 98.0}]},
+    }
+    decision = eng._reentry_decision(
+        [prior],
+        _reentry_cand("STOPPED", ltp=108.0, score=90.0),
+        "LONG",
+        {**_reentry_qualified_gate(), "qualityAdjustedExpectedR": 2.2},
+        now=datetime(2026, 8, 11, 12, 0, tzinfo=IST),
+    )
+    assert decision["allowed"] is False
+    assert decision["reason"] == "initial_stop_reentry_disabled"
+
+
+def test_propose_target_reentry_exposes_auditable_policy_fields():
+    session = {
+        "locked": True,
+        "sessionDate": "2026-08-11",
+        "long": [_closed_target_long("WINNER")],
+        "short": [],
+        "candidatePoolLong": [],
+        "candidatePoolShort": [],
+        "events": [],
+    }
+    now = datetime(2026, 8, 11, 10, 25, tzinfo=IST)
+    with patch.object(eng, "replacement_window_open", return_value=(True, None)):
+        with patch.object(eng, "swing_locked_symbols", return_value=set()):
+            with patch.object(eng, "_ist_now", return_value=now):
+                with patch.object(eng, "entry_quality_gate", side_effect=_reentry_qualified_gate):
+                    proposed = eng.propose_replacements(
+                        session,
+                        {},
+                        {},
+                        hunt_pools=([_reentry_cand("WINNER")], []),
+                    )
+    assert len(proposed) == 1
+    assert proposed[0]["isReentry"] is True
+    assert proposed[0]["replaceReason"] == "REENTRY_AFTER_TARGET"
+    assert proposed[0]["reentryExitKind"] == "TARGET_COMPLETE"
+    assert proposed[0]["reentryReferencePrice"] == 106.0
+
+
+def test_apply_target_reentry_is_tagged_and_smaller():
+    session = {
+        "locked": True,
+        "sessionDate": "2026-08-11",
+        "long": [_closed_target_long("WINNER")],
+        "short": [],
+        "candidatePoolLong": [_reentry_cand("WINNER")],
+        "candidatePoolShort": [],
+        "events": [],
+    }
+    proposals = [{"symbol": "WINNER", "direction": "LONG", "score": 70, "ltp": 107.0}]
+    with patch.object(eng, "entry_quality_gate", side_effect=_reentry_qualified_gate):
+        with patch.object(eng, "sync_fixed_plan_from_session"):
+            with patch("app.services.trade_outcome.emit_replacement_alerts", return_value=[]):
+                applied = eng.apply_replacements(session, proposals, {}, {}, bypass_window=True)
+    assert len(applied) == 1
+    assert applied[0]["symbol"] == "WINNER"
+    assert applied[0]["source"] == "REENTRY"
+    assert applied[0]["adoptReason"] == "REENTRY_AFTER_TARGET"
+    assert applied[0]["replacedFrom"] == "WINNER"
+    assert applied[0]["reentryExitKind"] == "TARGET_COMPLETE"
+    assert applied[0]["riskScale"] <= 0.5
+    assert any(event.get("type") == "REENTRY_APPLIED" for event in session["events"])
+
+
+def test_daily_replacement_cap_blocks_further_rotation():
+    used = [
+        {**_closed_long(f"OLD{i}"), "source": "REPLACEMENT"}
+        for i in range(eng.MAX_DAILY_REPLACEMENTS)
+    ]
+    session = {
+        "locked": True,
+        "sessionDate": "2026-08-11",
+        "long": [_closed_long("LOSER"), *used],
+        "short": [],
+        "candidatePoolLong": [_pool_cand("NEWONE")],
+        "candidatePoolShort": [],
+        "events": [],
+    }
+    proposals = [{"symbol": "NEWONE", "direction": "LONG", "score": 70, "ltp": 200.0}]
+    with patch.object(eng, "entry_quality_gate", side_effect=_qualified_gate):
+        assert eng.apply_replacements(session, proposals, {}, {}, bypass_window=True) == []
 
 
 def test_outside_rotation_window_no_apply():

@@ -97,6 +97,43 @@ Set `MIN_BULK_DEAL_VALUE_CR` (default `5`) and `BULK_DEAL_LOOKBACK_HOURS` (defau
 Set `BULK_DEAL_CACHE_TTL_SECONDS` (default `3600`) to control how often NSE bulk/block deals are refreshed.
 Set `INTRADAY_CANDIDATE_LIMIT` in `.env` if you want to cap how many of those volume leaders are candle-screened before the LLM ranking pass (defaults to `VOLUME_PRESELECT_LIMIT`).
 
+### Intraday rotation and same-symbol re-entry
+
+The intraday book is capped at five concurrent names and can hold cash. It does
+not fill every freed slot. To prevent replacement churn, the default is at most
+three new entries after the morning lock (`INTRADAY_MAX_DAILY_REPLACEMENTS=3`).
+
+A symbol that reaches a completed target, or exits through a profitable trail,
+can receive **one** same-day re-entry only when all of these checks pass:
+
+- target cooldown: 20 minutes; profitable-trail cooldown: 30 minutes;
+- the live candidate is still `inPlay`, has a score of at least 65 and
+  quality-adjusted Expected-R of at least 1.50;
+- any available F&O OI is aligned with the direction;
+- price breaks beyond the prior target/peak by 10 bps; and
+- the repeat position uses a 50% risk-scale multiplier, subject to the
+  engine's existing 40% minimum risk-scale floor.
+
+An initial stop-loss re-entry is disabled by default. Enable it only after
+event-level replay shows a positive out-of-sample contribution:
+
+```env
+INTRADAY_MAX_DAILY_REPLACEMENTS=3
+INTRADAY_MAX_REENTRIES_PER_SYMBOL=1
+INTRADAY_REENTRY_TARGET_COOLDOWN_MIN=20
+INTRADAY_REENTRY_TRAIL_COOLDOWN_MIN=30
+INTRADAY_REENTRY_MIN_SCORE=65
+INTRADAY_REENTRY_MIN_EXPECTED_R=1.50
+INTRADAY_REENTRY_BREAKOUT_BUFFER_BPS=10
+INTRADAY_REENTRY_PROFIT_RISK_SCALE=0.50
+INTRADAY_ALLOW_INITIAL_STOP_REENTRY=0
+```
+
+The session and EOD attribution record the exit class, close timestamp,
+breakout reference and re-entry risk scale. This makes each repeat trade
+auditable; it does not claim a statistically calibrated probability until it
+has been validated against replayed trades.
+
 ### Complete-universe market data
 
 The official NSE Nifty 500 index snapshot (the same endpoint used by the heat
