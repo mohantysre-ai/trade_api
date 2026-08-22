@@ -139,23 +139,19 @@ type TrendlyneScreenData = {
   screenData: TrendlyneStock[];
 };
 
-type TapeSpan = 3 | 4 | 5 | 6;
-type TapeVariant = 'lead' | 'wide' | 'std' | 'dense' | 'compact' | 'pulse';
 type TapeAccent = 'emerald' | 'red' | 'amber' | 'indigo';
 
 const TRENDLYNE_SCREENS: {
   key: TrendlyneScreenKey;
   label: string;
   accent: TapeAccent;
-  span: TapeSpan;
-  variant: TapeVariant;
 }[] = [
-  { key: 'risingDelivery', label: 'RISING DELIVERY %', accent: 'emerald', span: 5, variant: 'wide' },
-  { key: 'volumeShockers', label: 'VOLUME SHOCKERS', accent: 'amber', span: 3, variant: 'pulse' },
-  { key: 'topLosersVolume', label: 'TOP LOSERS BY VOLUME', accent: 'red', span: 3, variant: 'dense' },
-  { key: 'highVolumeGain', label: 'HIGH VOLUME/GAIN', accent: 'emerald', span: 3, variant: 'std' },
-  { key: 'highVolumeLoss', label: 'HIGH VOLUME/LOSS', accent: 'red', span: 3, variant: 'compact' },
-  { key: 'outPerformanceWeek', label: 'OUTPERFORMANCE /WEEK', accent: 'indigo', span: 3, variant: 'wide' },
+  { key: 'risingDelivery', label: 'RISING DELIVERY %', accent: 'emerald' },
+  { key: 'volumeShockers', label: 'VOLUME SHOCKERS', accent: 'amber' },
+  { key: 'topLosersVolume', label: 'TOP LOSERS BY VOLUME', accent: 'red' },
+  { key: 'highVolumeGain', label: 'HIGH VOLUME/GAIN', accent: 'emerald' },
+  { key: 'highVolumeLoss', label: 'HIGH VOLUME/LOSS', accent: 'red' },
+  { key: 'outPerformanceWeek', label: 'OUTPERFORMANCE /WEEK', accent: 'indigo' },
 ];
 
 type NseTopFiveCategoryKey = 'topGainers' | 'topLoosers' | 'mostActiveValue' | 'mostActiveVolume';
@@ -165,8 +161,6 @@ type NseTopFiveCategory = {
   flag: 'G' | 'L' | 'MAVA' | 'MAVO';
   key: NseTopFiveCategoryKey;
   accent: TapeAccent;
-  span: TapeSpan;
-  variant: TapeVariant;
 };
 
 type NseStock = Record<string, unknown> & {
@@ -200,10 +194,10 @@ type NseEquityStockIndicesResponse = {
 };
 
 const NSE_TOP_FIVE_CATEGORIES: NseTopFiveCategory[] = [
-  { label: 'TOP GAINERS', flag: 'G', key: 'topGainers', accent: 'emerald', span: 6, variant: 'lead' },
-  { label: 'TOP LOSERS', flag: 'L', key: 'topLoosers', accent: 'red', span: 3, variant: 'dense' },
-  { label: 'MOST ACTIVE', flag: 'MAVA', key: 'mostActiveValue', accent: 'indigo', span: 3, variant: 'compact' },
-  { label: 'HIGHEST VOLUME', flag: 'MAVO', key: 'mostActiveVolume', accent: 'amber', span: 4, variant: 'std' },
+  { label: 'TOP GAINERS', flag: 'G', key: 'topGainers', accent: 'emerald' },
+  { label: 'TOP LOSERS', flag: 'L', key: 'topLoosers', accent: 'red' },
+  { label: 'MOST ACTIVE', flag: 'MAVA', key: 'mostActiveValue', accent: 'indigo' },
+  { label: 'HIGHEST VOLUME', flag: 'MAVO', key: 'mostActiveVolume', accent: 'amber' },
 ];
 
 function formatNseNumber(value: number | undefined) {
@@ -252,14 +246,10 @@ function tapeAccentToken(accent: TapeAccent): string {
 }
 
 function TapeCard({
-  span,
-  variant,
   accent,
   title,
   children,
 }: {
-  span: TapeSpan;
-  variant: TapeVariant;
   accent: TapeAccent;
   title: string;
   children: React.ReactNode;
@@ -267,8 +257,6 @@ function TapeCard({
   return (
     <article
       className="desk-tape-card"
-      data-span={span}
-      data-variant={variant}
       style={{ '--tape-accent': tapeAccentToken(accent) } as React.CSSProperties}
     >
       <h3 className="desk-tape-title">
@@ -669,14 +657,10 @@ function TrendlyneCategoryPanel({
   screenKey,
   label,
   accent,
-  span,
-  variant,
 }: {
   screenKey: TrendlyneScreenKey;
   label: string;
   accent: TapeAccent;
-  span: TapeSpan;
-  variant: TapeVariant;
 }) {
   const [items, setItems] = useState<TrendlyneStock[]>([]);
   const [loading, setLoading] = useState(true);
@@ -712,7 +696,7 @@ function TrendlyneCategoryPanel({
   }, [fetchData]);
 
   return (
-    <TapeCard span={span} variant={variant} accent={accent} title={label}>
+    <TapeCard accent={accent} title={label}>
       {error && items.length === 0 && (
         <div className="text-[11px] text-red-500 px-2 py-1 mb-1">{error}</div>
       )}
@@ -889,8 +873,6 @@ function GainersLosersHeatmap() {
           return (
             <TapeCard
               key={category.key}
-              span={category.span}
-              variant={category.variant}
               accent={category.accent}
               title={category.label}
             >
@@ -904,8 +886,6 @@ function GainersLosersHeatmap() {
             screenKey={screen.key}
             label={screen.label}
             accent={screen.accent}
-            span={screen.span}
-            variant={screen.variant}
           />
         ))}
       </div>
