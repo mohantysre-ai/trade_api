@@ -154,6 +154,12 @@ function tileAccent(state: Candidate['state']) {
   }
 }
 
+function chainSourceLabel(source: string | null | undefined) {
+  if (source === 'LEMONN_FALLBACK') return 'Lemonn';
+  if (source === 'SCANX_FALLBACK') return 'ScanX';
+  return 'Angel';
+}
+
 function candidateHeadline(row: Candidate) {
   const bars = row.structure?.barCount ?? 0;
   if (row.state === 'ELIGIBLE') return 'All gates passed';
@@ -171,6 +177,12 @@ function candidateHeadline(row: Candidate) {
 function gateChips(row: Candidate) {
   const keys = [...row.failedGates, ...row.missingInputs].filter((name, index, list) => list.indexOf(name) === index);
   return keys.slice(0, 4).map((key) => GATE_LABEL[key] ?? key);
+}
+
+function sourceLabel(source: string | null | undefined) {
+  if (source === 'LEMONN_FALLBACK') return 'Lemonn fallback';
+  if (source === 'SCANX_FALLBACK') return 'ScanX fallback';
+  return 'Angel';
 }
 
 function sessionLabel(iso: string | undefined) {
@@ -298,6 +310,18 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
                   {chips.map((chip) => (
                     <span key={chip} className="desk-pill desk-pill--muted">{chip}</span>
                   ))}
+                </div>
+              )}
+              {row.contract && (
+                <div className="mt-2 w-full border-t border-[var(--terminal-line)] pt-2 text-[10px] text-[var(--fg-muted)]">
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className="desk-pill desk-pill--muted">{chainSourceLabel(row.dataSource)}</span>
+                    <span className="font-bold text-[var(--fg-strong)]">{row.contract.symbol ?? row.contract.strike ?? '—'}</span>
+                    <span className="tabular-nums desk-num">₹{row.contract.ltp ?? '—'}</span>
+                  </div>
+                  <div className="mt-1 tabular-nums desk-num">
+                    Δ {fmtNum(row.contract.delta)} · Γ {fmtNum(row.contract.gamma, 4)} · Θ {fmtNum(row.contract.theta)} · Vega {fmtNum(row.contract.vega)} · IV {fmtNum(row.contract.iv)}
+                  </div>
                 </div>
               )}
             </article>

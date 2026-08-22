@@ -24,7 +24,7 @@ from urllib.parse import quote
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 import httpx # Added for internal API calls
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 from xml.etree import ElementTree as ET
@@ -4530,59 +4530,25 @@ def create_app() -> FastAPI:
         sessionDate: str | None = None,
     ) -> dict[str, Any]:
         """Return the deterministic index-options radar; never mock missing chain data."""
-        from .angel_index_options import (
-            _RADAR_REFRESH_LOCK,
-            active_index_expiries,
-            cached_angel_index_option_snapshot,
-            load_persisted_radar,
-            option_data_to_strategy_inputs,
-            persist_radar,
-            unavailable_provider_snapshot,
-        )
-        from .dhan_scanx_options import apply_scanx_fallback
-        from .index_options_engine import build_index_options_radar
-        from .index_options_replay import parse_session_date, replay_index_options_session
+        from .angel_index_options import _RADAR_REFRESH_LOCK, load_persisted_radar
+        from .index_options_live import compose_live_index_options_radar, replay_session_payload
 
         if sessionDate:
-            ist_today = datetime.now(tz=IST_ZONE).date()
             try:
-                replay_day = parse_session_date(sessionDate, today=ist_today)
+                return replay_session_payload(
+                    AngelOneClient(),
+                    sessionDate,
+                    today=datetime.now(tz=IST_ZONE).date(),
+                )
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=f"Invalid sessionDate: {exc}") from exc
-            try:
-                return replay_index_options_session(AngelOneClient(), replay_day)
-            except Exception as exc:
-                return {
-                    "success": False,
-                    "mode": "SESSION_REPLAY",
-                    "sessionDate": replay_day.isoformat(),
-                    "executionPolicy": "MANUAL_ONLY",
-                    "candidates": [],
-                    "selected": [],
-                    "buySideContracts": [],
-                    "implemented": [],
-                    "error": str(exc),
-                }
 
         def _compose() -> dict[str, Any]:
-            snapshot = dict(_load_last_snapshot() or {})
-            if live:
-                try:
-                    option_data = cached_angel_index_option_snapshot(AngelOneClient())
-                except Exception as exc:
-                    option_data = unavailable_provider_snapshot(exc)
-                try:
-                    option_data = apply_scanx_fallback(option_data, active_index_expiries())
-                except Exception as exc:
-                    option_data["fallbackSource"] = "SCANX"
-                    option_data["fallbackError"] = str(exc)
-                snapshot["indexOptions"] = option_data_to_strategy_inputs(option_data, snapshot)
-                snapshot["indexOptionProvider"] = option_data
-            result = build_index_options_radar(snapshot)
-            result["provider"] = "ANGEL_ONE_WITH_SCANX_FALLBACK"
-            result["providerEvidence"] = snapshot.get("indexOptionProvider")
-            persist_radar(result)
-            return result
+            return compose_live_index_options_radar(
+                dict(_load_last_snapshot() or {}),
+                live=live,
+                client=AngelOneClient(),
+            )
 
         def _refresh_bg() -> None:
             if not _RADAR_REFRESH_LOCK.acquire(blocking=False):

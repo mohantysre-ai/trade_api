@@ -24,6 +24,13 @@ Angel's live instrument master. It is intentionally not calculated as “last
 Thursday,” because exchange expiry weekdays and weekly/monthly availability can
 change.
 
+If both Angel and ScanX remain unusable, Lemonn is the third chain source. It
+posts `{"symbol":"NIFTY","expiry":"01SEP2026"}` (with the corresponding
+index symbol) to `https://lemonn.co.in/api/get-option-chain`. Expiry is still
+resolved dynamically: Angel's active master is preferred; when it is
+unavailable, the nearest non-expired date is parsed from the applicable Lemonn
+option-page expiry dropdown. Those page results are cached for six hours.
+
 SENSEX option quotes come from Angel's BFO instruments. Angel's Greeks endpoint
 is treated as NSE-only; SENSEX cannot pass the contract gate without separately
 validated Greeks/IV evidence.
