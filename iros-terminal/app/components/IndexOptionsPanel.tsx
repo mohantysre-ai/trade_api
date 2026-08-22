@@ -107,7 +107,7 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
               {row.reason}
             </div>
             {row.contract && <div className="mt-2 rounded border border-[var(--terminal-line)] p-2 text-[8px] text-[var(--fg-muted)]">
-              <div className="font-bold text-[var(--fg-strong)]">{row.dataSource === 'SCANX_FALLBACK' ? 'SCANX FALLBACK' : 'ANGEL'} · {row.contract.symbol ?? row.contract.strike ?? '—'} · ₹{row.contract.ltp ?? '—'}</div>
+              <div className="font-bold text-[var(--fg-strong)]">{row.dataSource === 'LEMONN_FALLBACK' ? 'LEMONN FALLBACK' : row.dataSource === 'SCANX_FALLBACK' ? 'SCANX FALLBACK' : 'ANGEL'} · {row.contract.symbol ?? row.contract.strike ?? '—'} · ₹{row.contract.ltp ?? '—'}</div>
               <div className="mt-1">Δ {row.contract.delta ?? '—'} · Γ {row.contract.gamma ?? '—'} · Θ {row.contract.theta ?? '—'} · Vega {row.contract.vega ?? '—'} · IV {row.contract.iv ?? '—'}</div>
             </div>}
             {(row.chain?.length ?? 0) > 0 && <div className="mt-2 overflow-x-auto">

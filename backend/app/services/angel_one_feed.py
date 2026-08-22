@@ -24,7 +24,7 @@ from urllib.parse import quote
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 import httpx # Added for internal API calls
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 from xml.etree import ElementTree as ET
@@ -4528,6 +4528,7 @@ def create_app() -> FastAPI:
         """Return the deterministic index-options radar; never mock missing chain data."""
         from .angel_index_options import active_index_expiries, cached_angel_index_option_snapshot, option_data_to_strategy_inputs, unavailable_provider_snapshot
         from .dhan_scanx_options import apply_scanx_fallback
+        from .lemonn_options import apply_lemonn_fallback, discover_lemonn_expiries
         from .index_options_engine import build_index_options_radar
 
         snapshot = dict(_load_last_snapshot() or {})
@@ -4536,15 +4537,29 @@ def create_app() -> FastAPI:
                 option_data = cached_angel_index_option_snapshot(AngelOneClient())
             except Exception as exc:
                 option_data = unavailable_provider_snapshot(exc)
+            expiries: dict[str, date] = {}
             try:
-                option_data = apply_scanx_fallback(option_data, active_index_expiries())
+                expiries.update(active_index_expiries())
+            except Exception as exc:
+                option_data["fallbackSource"] = "SCANX"
+                option_data["expiryMasterError"] = str(exc)
+            missing_expiries = [key for key in ("NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX") if key not in expiries]
+            if missing_expiries:
+                expiries.update(discover_lemonn_expiries(missing_expiries))
+            try:
+                option_data = apply_scanx_fallback(option_data, expiries)
             except Exception as exc:
                 option_data["fallbackSource"] = "SCANX"
                 option_data["fallbackError"] = str(exc)
+            try:
+                option_data = apply_lemonn_fallback(option_data, expiries)
+            except Exception as exc:
+                option_data["thirdFallbackSource"] = "LEMONN"
+                option_data["thirdFallbackError"] = str(exc)
             snapshot["indexOptions"] = option_data_to_strategy_inputs(option_data, snapshot)
             snapshot["indexOptionProvider"] = option_data
         result = build_index_options_radar(snapshot)
-        result["provider"] = "ANGEL_ONE_WITH_SCANX_FALLBACK"
+        result["provider"] = "ANGEL_ONE_WITH_SCANX_AND_LEMONN_FALLBACK"
         result["providerEvidence"] = snapshot.get("indexOptionProvider")
         return result
 
