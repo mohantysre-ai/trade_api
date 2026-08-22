@@ -7,7 +7,10 @@ export default function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
     const ready = () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      navigator.serviceWorker
+        .register("/sw.js", { updateViaCache: "none" })
+        .then((registration) => registration.update())
+        .catch(() => {});
     };
     if (document.readyState === "complete") ready();
     else window.addEventListener("load", ready, { once: true });

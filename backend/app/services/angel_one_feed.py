@@ -95,8 +95,14 @@ ORCHESTRATION_DELAY = 30
 
 BASE_DIR = Path(__file__).resolve().parent
 # Load only backend/.env for local development. Explicit process/container
-# environment variables retain precedence over values from the file.
-load_dotenv(BASE_DIR.parent.parent / ".env", override=False)
+# environment variables retain precedence over values from the file. Some
+# Windows editors save comments with cp1252 punctuation, so fall back without
+# changing or exposing the user's credentials.
+try:
+    load_dotenv(BASE_DIR.parent.parent / ".env", override=False, encoding="utf-8-sig")
+except UnicodeDecodeError:
+    logging.getLogger(__name__).warning("backend/.env is not UTF-8; reading it as cp1252")
+    load_dotenv(BASE_DIR.parent.parent / ".env", override=False, encoding="cp1252")
 
 NIFTY_500_CACHE_PATH = BASE_DIR / "nifty500_instruments.json"
 NIFTY_500_SYMBOLS_PATH = BASE_DIR.parent / "data" / "nifty500_symbols.json"
@@ -125,6 +131,7 @@ _REFRESH_TASKS: dict[str, dict[str, Any]] = {}
 _ONDEMAND_ACTIVE_BY_KEY: dict[str, str] = {}
 _REFRESH_TASK_LOCK = threading.Lock()
 _MACRO_REFRESH_LOCK = threading.Lock()
+_MACRO_REFRESH_TIMEOUT_SECONDS = float(os.getenv("MACRO_REFRESH_TIMEOUT_SECONDS", "18"))
 LLM_UNIVERSE_LIMIT = int(os.getenv("LLM_UNIVERSE_LIMIT", "30"))
 # last_market_snapshot.json: persisted market payload for GET /api/market-data (prefer_cache=True).
 # Reused during on-demand refresh for fresh intraday metrics (INTRADAY_METRICS_TTL) and AI output (AI_CACHE_TTL).
@@ -4124,27 +4131,49 @@ def refresh_snapshot_macros(client: AngelOneClient | None = None) -> dict[str, A
             "payload": snapshot,
         }
 
+    result_box: dict[str, Any] = {}
+    done = threading.Event()
+
+    def run_refresh() -> None:
+        try:
+            result_box["result"] = _refresh_snapshot_macros_body(client)
+        except BaseException as exc:  # keep the lock releasable even on unusual provider failures
+            result_box["error"] = exc
+        finally:
+            _MACRO_REFRESH_LOCK.release()
+            done.set()
+
     try:
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            fut = pool.submit(_refresh_snapshot_macros_body, client)
-            try:
-                return fut.result(timeout=18)
-            except Exception as exc:
-                logging.getLogger(__name__).warning("refresh_snapshot_macros timed out/failed: %s", exc)
-                snapshot = _load_last_snapshot()
-                snapshot = dict(snapshot) if isinstance(snapshot, dict) else {}
-                return {
-                    "success": True,
-                    "timedOut": True,
-                    "updatedAt": snapshot.get("updatedAt"),
-                    "macrosRefreshedAt": snapshot.get("macrosRefreshedAt"),
-                    "macroCount": len((snapshot.get("macroDataStrip") or {}).get("morning") or []),
-                    "globalIndexCount": len((snapshot.get("globalMacro") or {}).get("indices") or []),
-                    "commodityCount": len((snapshot.get("globalMacro") or {}).get("commodities") or []),
-                    "payload": snapshot,
-                }
-    finally:
+        threading.Thread(
+            target=run_refresh,
+            name="macro-snapshot-refresh",
+            daemon=True,
+        ).start()
+    except Exception:
         _MACRO_REFRESH_LOCK.release()
+        raise
+
+    if done.wait(timeout=_MACRO_REFRESH_TIMEOUT_SECONDS) and "error" not in result_box:
+        return result_box["result"]
+
+    exc = result_box.get("error")
+    logging.getLogger(__name__).warning(
+        "refresh_snapshot_macros timed out/failed: %s",
+        exc or f"exceeded {_MACRO_REFRESH_TIMEOUT_SECONDS}s",
+    )
+    snapshot = _load_last_snapshot()
+    snapshot = dict(snapshot) if isinstance(snapshot, dict) else {}
+    return {
+        "success": True,
+        "timedOut": not done.is_set(),
+        "failed": exc is not None,
+        "updatedAt": snapshot.get("updatedAt"),
+        "macrosRefreshedAt": snapshot.get("macrosRefreshedAt"),
+        "macroCount": len((snapshot.get("macroDataStrip") or {}).get("morning") or []),
+        "globalIndexCount": len((snapshot.get("globalMacro") or {}).get("indices") or []),
+        "commodityCount": len((snapshot.get("globalMacro") or {}).get("commodities") or []),
+        "payload": snapshot,
+    }
 
 
 def _refresh_snapshot_macros_body(client: AngelOneClient | None = None) -> dict[str, Any]:

@@ -88,6 +88,7 @@ _RISK_VETOES = frozenset({
 _SWING_RESPONSE_LOCK = threading.Lock()
 _SWING_RESPONSE_CACHE: dict[str, Any] | None = None
 _SWING_RESPONSE_CACHE_AT = 0.0
+_SWING_RESPONSE_REFRESHING = False
 _SWING_RESPONSE_OPEN_TTL = float(os.environ.get("SWING_RESPONSE_OPEN_TTL", "4"))
 _SWING_RESPONSE_CLOSED_TTL = float(os.environ.get("SWING_RESPONSE_CLOSED_TTL", "20"))
 
@@ -2149,26 +2150,65 @@ def _enrich_swing_row_prices(
 
 
 def get_swing_session(*, live: bool = False) -> dict[str, Any]:
-    """Return a coalesced live snapshot instead of fetching marks per user.
+    """Return cached marks immediately and refresh them outside request workers.
 
     Always returns a deep copy. Concurrent GET callers cannot mutate the
-    persisted portfolio or each other's response payloads.
+    persisted portfolio or each other's response payloads. A slow broker/Yahoo
+    call must never hold the response lock or exhaust FastAPI's sync worker pool.
     """
-    global _SWING_RESPONSE_CACHE, _SWING_RESPONSE_CACHE_AT
+    global _SWING_RESPONSE_CACHE, _SWING_RESPONSE_CACHE_AT, _SWING_RESPONSE_REFRESHING
     if not live:
         return copy.deepcopy(_compute_swing_session(live=False))
     ttl = _SWING_RESPONSE_OPEN_TTL if _is_market_open() else _SWING_RESPONSE_CLOSED_TTL
     now = time.monotonic()
     if _SWING_RESPONSE_CACHE is not None and now - _SWING_RESPONSE_CACHE_AT < ttl:
         return copy.deepcopy(_SWING_RESPONSE_CACHE)
+
+    start_refresh = False
     with _SWING_RESPONSE_LOCK:
         now = time.monotonic()
         if _SWING_RESPONSE_CACHE is not None and now - _SWING_RESPONSE_CACHE_AT < ttl:
             return copy.deepcopy(_SWING_RESPONSE_CACHE)
+        if _SWING_RESPONSE_CACHE is None:
+            fallback = _compute_swing_session(live=False)
+            fallback["dataStale"] = True
+            fallback["liveRefreshPending"] = True
+            _SWING_RESPONSE_CACHE = copy.deepcopy(fallback)
+            _SWING_RESPONSE_CACHE_AT = 0.0
+        if not _SWING_RESPONSE_REFRESHING:
+            _SWING_RESPONSE_REFRESHING = True
+            start_refresh = True
+        result = copy.deepcopy(_SWING_RESPONSE_CACHE)
+        result["liveRefreshPending"] = True
+
+    if start_refresh:
+        try:
+            threading.Thread(
+                target=_refresh_swing_response_cache,
+                name="swing-live-refresh",
+                daemon=True,
+            ).start()
+        except Exception:
+            with _SWING_RESPONSE_LOCK:
+                _SWING_RESPONSE_REFRESHING = False
+            log.exception("failed to start swing live refresh")
+    return result
+
+
+def _refresh_swing_response_cache() -> None:
+    """Populate live marks without occupying an AnyIO request worker."""
+    global _SWING_RESPONSE_CACHE, _SWING_RESPONSE_CACHE_AT, _SWING_RESPONSE_REFRESHING
+    try:
         result = _compute_swing_session(live=True)
-        _SWING_RESPONSE_CACHE = copy.deepcopy(result)
-        _SWING_RESPONSE_CACHE_AT = time.monotonic()
-        return copy.deepcopy(result)
+        result["liveRefreshPending"] = False
+        with _SWING_RESPONSE_LOCK:
+            _SWING_RESPONSE_CACHE = copy.deepcopy(result)
+            _SWING_RESPONSE_CACHE_AT = time.monotonic()
+    except Exception:
+        log.exception("swing live refresh failed; serving persisted marks")
+    finally:
+        with _SWING_RESPONSE_LOCK:
+            _SWING_RESPONSE_REFRESHING = False
 
 
 def _compute_swing_session(*, live: bool = False) -> dict[str, Any]:

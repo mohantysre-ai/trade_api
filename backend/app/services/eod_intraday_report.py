@@ -855,13 +855,44 @@ def _load_canonical_intraday_picks(for_date: date) -> tuple[list[dict[str, Any]]
     session = load_intraday_session(for_date)
     session_date = str(session.get("sessionDate") or "").strip()[:10]
     session_ok = bool(session.get("locked") and session_date == day_key)
+    session_long = [p for p in (session.get("long") or []) if isinstance(p, dict) and p.get("symbol")] if session_ok else []
+    session_short = [p for p in (session.get("short") or []) if isinstance(p, dict) and p.get("symbol")] if session_ok else []
+    desk_counts = {
+        "swing": 0,
+        "intradayLong": len(session_long),
+        "intradayShort": len(session_short),
+        "total": 0,
+    }
+    try:
+        day = load_day_picks(for_date)
+        desk_counts["swing"] = int((day.get("deskCounts") or {}).get("swing") or 0)
+    except Exception as exc:
+        log.warning("load_day_picks for intradAy book failed: %s", exc)
+    desk_counts["total"] = desk_counts["swing"] + desk_counts["intradayLong"] + desk_counts["intradayShort"]
+
+    # Live locked session is the Book universe — do not drop names that fail forensic level checks.
+    if session_long or session_short:
+        rows = []
+        for p in session_long + session_short:
+            rows.append({
+                **p,
+                "symbol": str(p.get("symbol") or "").upper(),
+                "direction": str(p.get("direction") or "LONG").upper(),
+                "book": "INTRADAY",
+                "source": "intraday_session",
+                "approxQty": p.get("approxQty") or 0,
+                "deployedCapital": p.get("deployedCapital") or 0,
+                "currentPrice": p.get("currentPrice") or p.get("ltp") or p.get("entryPrice"),
+                "outcome": p.get("outcome"),
+            })
+        return rows, False, "intraday_session", desk_counts
 
     # Prefer unified loader (also supplies truthful deskCounts incl. swing)
     try:
         day = load_day_picks(for_date)
-        desk_counts = dict(day.get("deskCounts") or {})
+        desk_counts = dict(day.get("deskCounts") or desk_counts)
         sources = day.get("sources") or {}
-        if sources.get("intradayDateParity") or session_ok:
+        if sources.get("intradayDateParity"):
             intra_rows = [
                 p
                 for p in (day.get("picks") or [])
@@ -896,33 +927,6 @@ def _load_canonical_intraday_picks(for_date: date) -> tuple[list[dict[str, Any]]
             session_date,
             day_key,
         )
-        # Fall through — do not hard-empty the Book
-
-    session_long = [p for p in (session.get("long") or []) if isinstance(p, dict) and p.get("symbol")] if session_ok else []
-    session_short = [p for p in (session.get("short") or []) if isinstance(p, dict) and p.get("symbol")] if session_ok else []
-    desk_counts = {
-        "swing": int(desk_counts.get("swing") or 0) if isinstance(desk_counts, dict) else 0,
-        "intradayLong": len(session_long),
-        "intradayShort": len(session_short),
-        "total": 0,
-    }
-    desk_counts["total"] = desk_counts["swing"] + desk_counts["intradayLong"] + desk_counts["intradayShort"]
-
-    if session_long or session_short:
-        rows = []
-        for p in session_long + session_short:
-            rows.append({
-                **p,
-                "symbol": str(p.get("symbol") or "").upper(),
-                "direction": str(p.get("direction") or "LONG").upper(),
-                "book": "INTRADAY",
-                "source": "intraday_session",
-                "approxQty": p.get("approxQty") or 0,
-                "deployedCapital": p.get("deployedCapital") or 0,
-                "currentPrice": p.get("currentPrice") or p.get("ltp") or p.get("entryPrice"),
-                "outcome": p.get("outcome"),
-            })
-        return rows, False, "intraday_session", desk_counts
 
     plan = load_fixed_trade_plan(for_date)
     plan_date = str(plan.get("sessionDate") or "").strip()[:10]
@@ -1049,27 +1053,38 @@ def generate_intraday_eod_report(
             )
             if stale_reason:
                 log.info("Rebuilding intraday book for %s (%s)", for_date.isoformat(), stale_reason)
-            elif market_phase == "CLOSED" and str(cached.get("marketPhase") or "") == market_phase:
+            if not after_close:
+                # RTH GET must not candle-walk. Rebuild only for missing/ghost books or a
+                # changed symbol set; P&L ticks are overlaid live in the UI.
+                if stale_reason in ("ghost", "mock") or (
+                    stale_reason == "symbol_set" and picks
+                ):
+                    pass
+                elif cached.get("trades") or not picks:
+                    return cached
+            elif not stale_reason and str(cached.get("marketPhase") or "") == market_phase:
                 return cached
 
     # Prefetch close marks in parallel (cached) so Book UI does not hang
     from .eod_reference import prefetch_close_marks
 
-    marks = prefetch_close_marks([str(p.get("symbol") or "") for p in picks])
-    for pick in picks:
-        if not isinstance(pick, dict):
-            continue
-        sym = str(pick.get("symbol") or "").upper()
-        mark = marks.get(sym)
-        if mark:
-            pick["currentPrice"] = mark
-            pick["ltp"] = mark
+    if after_close or force:
+        marks = prefetch_close_marks([str(p.get("symbol") or "") for p in picks])
+        for pick in picks:
+            if not isinstance(pick, dict):
+                continue
+            sym = str(pick.get("symbol") or "").upper()
+            mark = marks.get(sym)
+            if mark:
+                pick["currentPrice"] = mark
+                pick["ltp"] = mark
 
-    # Persist date-matched minute bars once; these are execution evidence, not
-    # merely analytics. Failure to fetch leaves rows untriggered rather than
-    # inventing fills from a close or daily range.
-    from .eod_engine.ingestion import fetch_and_persist_candles
-    fetch_and_persist_candles(for_date, [str(p.get("symbol") or "") for p in picks])
+        # Persist date-matched minute bars once; these are execution evidence, not
+        # merely analytics. Failure to fetch leaves rows untriggered rather than
+        # inventing fills from a close or daily range. Skip during RTH so Book GET
+        # stays inside the UI timeout; live session economics remain the source.
+        from .eod_engine.ingestion import fetch_and_persist_candles
+        fetch_and_persist_candles(for_date, [str(p.get("symbol") or "") for p in picks])
     committed_at = session_live.get("committedAt") if isinstance(session_live, dict) else None
 
     scorecards = _load_scorecard_by_ticker(for_date)
@@ -1082,7 +1097,8 @@ def generate_intraday_eod_report(
     ohlc_cache: dict[str, tuple] = {}
 
     for pick in picks:
-        pick = _enrich_pick_day_range(pick, ohlc_cache)
+        if after_close or force:
+            pick = _enrich_pick_day_range(pick, ohlc_cache, for_date=for_date)
         ticker = str(pick.get("symbol") or "").upper()
         card = scorecards.get(ticker)
 

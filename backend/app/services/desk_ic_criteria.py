@@ -10,8 +10,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from datetime import datetime, timezone
 from typing import Any
 
@@ -49,6 +49,8 @@ _INTRADAY_STUB_REASON = 'not in intraday candidate set'
 
 AI_CACHE_TTL_SECONDS = int(os.getenv("AI_CACHE_TTL_SECONDS", "900"))
 DESK_IC_LLM_TIMEOUT_SECONDS = int(os.getenv("DESK_IC_LLM_TIMEOUT_SECONDS", "20"))
+_DESK_IC_LLM_GRACE_SECONDS = float(os.getenv("DESK_IC_LLM_GRACE_SECONDS", "2"))
+_DESK_IC_LLM_LOCK = threading.Lock()
 
 CRITERION_DEFS: list[dict[str, str]] = [
     {"id": "price_floor", "label": "Price floor"},
@@ -616,17 +618,43 @@ def _call_desk_ic_llm_inner(
 def _call_desk_ic_llm(fact_pack: dict[str, Any]) -> dict[str, Any] | None:
     if not configured_llm_providers("reasoning"):
         return None
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        fut = pool.submit(_call_desk_ic_llm_inner, fact_pack)
+    if not _DESK_IC_LLM_LOCK.acquire(blocking=False):
+        log.info("Desk IC LLM busy; using deterministic result for %s", fact_pack.get("ticker"))
+        return None
+
+    result_box: dict[str, Any] = {}
+    done = threading.Event()
+
+    def run_llm() -> None:
         try:
-            return fut.result(timeout=DESK_IC_LLM_TIMEOUT_SECONDS + 2)
-        except FuturesTimeoutError:
-            log.warning(
-                "Desk IC LLM timed out for %s after %ss",
-                fact_pack.get("ticker"),
-                DESK_IC_LLM_TIMEOUT_SECONDS,
-            )
-            return None
+            result_box["result"] = _call_desk_ic_llm_inner(fact_pack)
+        except BaseException as exc:
+            result_box["error"] = exc
+        finally:
+            _DESK_IC_LLM_LOCK.release()
+            done.set()
+
+    try:
+        threading.Thread(
+            target=run_llm,
+            name=f"desk-ic-{fact_pack.get('ticker') or 'unknown'}",
+            daemon=True,
+        ).start()
+    except Exception:
+        _DESK_IC_LLM_LOCK.release()
+        raise
+
+    if not done.wait(timeout=DESK_IC_LLM_TIMEOUT_SECONDS + _DESK_IC_LLM_GRACE_SECONDS):
+        log.warning(
+            "Desk IC LLM timed out for %s after %ss",
+            fact_pack.get("ticker"),
+            DESK_IC_LLM_TIMEOUT_SECONDS,
+        )
+        return None
+    if "error" in result_box:
+        log.warning("Desk IC LLM worker failed for %s: %s", fact_pack.get("ticker"), result_box["error"])
+        return None
+    return result_box.get("result")
 
 
 def evaluate_desk_ic(

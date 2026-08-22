@@ -1,19 +1,19 @@
 "use client";
 
-import React, { lazy, Suspense, useState } from "react";
+import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "motion/react";
 import type { AITickerNewsReport, DeskIcSummary, TerminalIntelligence } from "@/lib/market-api";
 import { isNseCashSessionNow } from "@/lib/market-api";
 import type { IntradayMetrics } from "@/lib/drawer-research";
-const AITickerNewsPanel = lazy(() => import("./AITickerNewsPanel"));
-const ConfidenceCheckerPanel = lazy(() => import("./ConfidenceCheckerPanel"));
-const TechnicalAnalysisPanel = lazy(() => import("./TechnicalAnalysisPanel"));
-const SwotAnalysisPanel = lazy(() => import("./SwotAnalysisPanel"));
 import { parseNewsCatalystsCard, type TrendlyneCardSummary } from "@/lib/intelligence-summary";
 import { deskDrawerVariants } from "@/lib/motion-tokens";
+import AITickerNewsPanel from "./AITickerNewsPanel";
 import MarketSymbolBadge from "./MarketSymbolBadge";
 import CashSessionClosedBanner from "./CashSessionClosedBanner";
+import ConfidenceCheckerPanel from "./ConfidenceCheckerPanel";
+import TechnicalAnalysisPanel from "./TechnicalAnalysisPanel";
+import SwotAnalysisPanel from "./SwotAnalysisPanel";
 
 type DrawerAnalysis = TerminalIntelligence & {
   error?: string;
@@ -615,7 +615,6 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
 
       {/* Tab content */}
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-3 [overflow-wrap:anywhere] sm:p-5">
-       <Suspense fallback={<div className="flex min-h-48 items-center justify-center text-xs text-slate-500">Loading research module…</div>}>
          {/* AI News Tab */}
          {activeTab === "aiNews" && (
            ticker ? (
@@ -795,8 +794,6 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
             )}
           </div>
         )}
-       </Suspense>
-
       </div>
           </motion.div>
         </>

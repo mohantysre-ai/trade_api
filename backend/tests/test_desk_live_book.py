@@ -64,7 +64,7 @@ def test_dummy_quote_stub_is_not_reused_as_candle_cache():
     snap = {
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "stockQuotes": {
-            "REAL": {"intraday": {"vwap": 100.0, "rsi": 60.0}},
+            "REAL": {"intraday": {"data_source": "candles", "vwap": 100.0, "rsi": 60.0}},
             "DUMMY": {
                 "intraday": {
                     "vwap": 0.0,

@@ -50,6 +50,7 @@ _CLOSE_FREEZE_LOCK = threading.Lock()
 _SESSION_RESPONSE_LOCK = threading.Lock()
 _SESSION_RESPONSE_CACHE: dict[str, Any] | None = None
 _SESSION_RESPONSE_CACHE_AT = 0.0
+_SESSION_RESPONSE_REFRESHING = False
 _SESSION_RESPONSE_OPEN_TTL = float(os.environ.get("INTRADAY_RESPONSE_OPEN_TTL", "4"))
 _SESSION_RESPONSE_CLOSED_TTL = float(os.environ.get("INTRADAY_RESPONSE_CLOSED_TTL", "20"))
 # Live replacement hunt: rescore Nifty 500 QUALIFIED names; do not reuse 10:18 lock pools.
@@ -3797,14 +3798,14 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
 
 
 def get_session(include_live: bool = True) -> dict[str, Any]:
-    """Return one coalesced session snapshot to all concurrent UI callers.
+    """Return a non-blocking session snapshot to all concurrent UI callers.
 
     Read-only GET path (`persist=False`) — never writes session JSON.
     Current SCALE_TRAIL notes still attach in memory so the UI is not stuck
     on a prior 0.25R plan. Path replay stays on the scheduler persist path.
-    Coalesced so concurrent UI polls share one compute window.
+    Live quote enrichment runs outside the FastAPI request worker pool.
     """
-    global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT
+    global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT, _SESSION_RESPONSE_REFRESHING
     if not include_live:
         return _compute_session(include_live=False)
     try:
@@ -3815,24 +3816,62 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
     now = time.monotonic()
     if _SESSION_RESPONSE_CACHE is not None and now - _SESSION_RESPONSE_CACHE_AT < ttl:
         return copy.deepcopy(_SESSION_RESPONSE_CACHE)
+
+    start_refresh = False
     with _SESSION_RESPONSE_LOCK:
         now = time.monotonic()
         if _SESSION_RESPONSE_CACHE is not None and now - _SESSION_RESPONSE_CACHE_AT < ttl:
             return copy.deepcopy(_SESSION_RESPONSE_CACHE)
+        if _SESSION_RESPONSE_CACHE is None:
+            fallback = _compute_session(include_live=False, persist=False)
+            fallback["dataStale"] = True
+            fallback["liveRefreshPending"] = True
+            _SESSION_RESPONSE_CACHE = copy.deepcopy(fallback)
+            _SESSION_RESPONSE_CACHE_AT = 0.0
+        if not _SESSION_RESPONSE_REFRESHING:
+            _SESSION_RESPONSE_REFRESHING = True
+            start_refresh = True
+        result = copy.deepcopy(_SESSION_RESPONSE_CACHE)
+        result["liveRefreshPending"] = True
+
+    if start_refresh:
+        try:
+            threading.Thread(
+                target=_refresh_session_response_cache,
+                name="intraday-live-refresh",
+                daemon=True,
+            ).start()
+        except Exception:
+            with _SESSION_RESPONSE_LOCK:
+                _SESSION_RESPONSE_REFRESHING = False
+            log.exception("failed to start intraday live refresh")
+    return result
+
+
+def _refresh_session_response_cache() -> None:
+    """Refresh the read-only response cache outside FastAPI's worker pool."""
+    global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT, _SESSION_RESPONSE_REFRESHING
+    try:
         result = _compute_session(include_live=True, persist=False)
-        _SESSION_RESPONSE_CACHE = copy.deepcopy(result)
-        _SESSION_RESPONSE_CACHE_AT = time.monotonic()
-        return result
+        result["liveRefreshPending"] = False
+        with _SESSION_RESPONSE_LOCK:
+            _SESSION_RESPONSE_CACHE = copy.deepcopy(result)
+            _SESSION_RESPONSE_CACHE_AT = time.monotonic()
+    except Exception:
+        log.exception("intraday live refresh failed; serving persisted session")
+    finally:
+        with _SESSION_RESPONSE_LOCK:
+            _SESSION_RESPONSE_REFRESHING = False
 
 
 def refresh_session_state() -> dict[str, Any]:
     """Single-writer scheduler path for durable close/replacement transitions."""
     global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT
+    result = _compute_session(include_live=True, persist=True)
     with _SESSION_RESPONSE_LOCK:
-        result = _compute_session(include_live=True, persist=True)
         _SESSION_RESPONSE_CACHE = copy.deepcopy(result)
         _SESSION_RESPONSE_CACHE_AT = time.monotonic()
-        return result
+    return result
 
 
 def _compute_session(include_live: bool = True, *, persist: bool = False) -> dict[str, Any]:

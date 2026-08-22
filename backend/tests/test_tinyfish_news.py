@@ -221,10 +221,13 @@ def test_quota_path_tinyfish_digest_is_not_complete(monkeypatch):
 
     monkeypatch.setenv("TINYFISH_API_KEY", "sk-tinyfish-test")
     monkeypatch.setenv("TICKER_NEWS_LLM", "openrouter")
-    monkeypatch.setattr("app.services.ai_ticker_news._llm_quota_available", lambda: False)
     monkeypatch.setattr(
-        "app.services.ai_ticker_news._llm_config",
-        lambda: ("openai", "sk-or-test", "https://openrouter.ai/api/v1/chat/completions", "openrouter/free", None),
+        "app.services.ai_ticker_news.configured_llm_providers",
+        lambda _purpose: ["openrouter"],
+    )
+    monkeypatch.setattr(
+        "app.services.ai_ticker_news.call_llm_with_fallback",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("quota cooling down")),
     )
     now = datetime.now(timezone.utc).isoformat()
     monkeypatch.setattr(

@@ -2273,11 +2273,12 @@ html[data-perf="1"] .desk-sources-track {
   .desk-sources-gap {
     display: none !important;
   }
-  .desk-sources-seg:not([aria-hidden]) {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
+  .eod-desk__pane,
+  .eod-panel-card,
+  .eod-kpi-strip > * {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 }
 

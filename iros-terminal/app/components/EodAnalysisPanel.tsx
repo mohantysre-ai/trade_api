@@ -1052,11 +1052,11 @@ export default function EodAnalysisPanel({
       return s ? `?${s}` : '';
     };
     const swingDate = swingDateStr || dateStr;
-    const ctrl = new AbortController();
-    // Cache loads are fast; force rebuild may fetch close marks — allow up to 60s
-    const timer = window.setTimeout(() => ctrl.abort(), force ? 60_000 : 20_000);
+    const timeoutMs = force ? 60_000 : 45_000;
 
     const loadOne = async <T,>(url: string, label: string): Promise<T | null> => {
+      const ctrl = new AbortController();
+      const timer = window.setTimeout(() => ctrl.abort(), timeoutMs);
       try {
         const res = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
         if (!res.ok) {
@@ -1068,11 +1068,13 @@ export default function EodAnalysisPanel({
         const msg =
           err instanceof Error
             ? err.name === 'AbortError'
-              ? `${label} timed out (${force ? '60s' : '20s'})`
+              ? `${label} timed out (${force ? '60s' : '45s'})`
               : err.message
             : `${label} failed`;
         setError((prev) => (prev ? `${prev} · ${msg}` : msg));
         return null;
+      } finally {
+        window.clearTimeout(timer);
       }
     };
 
@@ -1087,7 +1089,6 @@ export default function EodAnalysisPanel({
         setError((prev) => prev || 'Book P&L failed to load');
       }
     } finally {
-      window.clearTimeout(timer);
       setLoading(false);
     }
   }, [dateStr, swingDateStr]);

@@ -1,6 +1,6 @@
-/* Alphix Terminal — minimal installability SW (network-first shell) */
-const CACHE = "alphix-shell-v1";
-const PRECACHE = ["/", "/privacy", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
+/* Alphix Terminal — installability assets only; never cache the Next.js shell. */
+const CACHE = "alphix-install-v2";
+const PRECACHE = ["/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -21,18 +21,20 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  // Never cache API / live market
-  if (url.pathname.startsWith("/api/")) return;
+  // Next.js HTML and hashed chunks must always come from the same deployment.
+  // Serving an old shell during a container restart leaves the research drawer
+  // waiting on chunks that the new deployment no longer has.
+  if (!PRECACHE.includes(url.pathname)) return;
 
   event.respondWith(
     fetch(req)
       .then((res) => {
         const copy = res.clone();
-        if (res.ok && (req.mode === "navigate" || url.pathname.match(/\.(js|css|png|svg|webmanifest|ico)$/))) {
+        if (res.ok) {
           caches.open(CACHE).then((cache) => cache.put(req, copy)).catch(() => {});
         }
         return res;
       })
-      .catch(() => caches.match(req).then((hit) => hit || caches.match("/")))
+      .catch(async () => (await caches.match(req)) || Response.error())
   );
 });

@@ -1,8 +1,11 @@
 from datetime import date, datetime, timezone
+from unittest.mock import patch
 
 from app.services.eod_intraday_report import (
+    _load_canonical_intraday_picks,
     _session_leg_is_triggered,
     apply_session_leg_economics,
+    generate_intraday_eod_report,
     intraday_book_cache_stale,
     session_realized_pnl,
 )
@@ -133,3 +136,92 @@ def test_apply_session_leg_overrides_candle_walk():
     assert exit_price == 99.0
     assert pnl == 120.5
     assert meta["exitState"]["closed"] is True
+
+
+def test_canonical_picks_include_session_names_missing_levels():
+    day = date(2026, 8, 20)
+    session = {
+        "locked": True,
+        "sessionDate": "2026-08-20",
+        "long": [
+            {
+                "symbol": "AAA",
+                "direction": "LONG",
+                "entryPrice": 100.0,
+                "stopLoss": 95.0,
+                "target1": 110.0,
+            },
+            {"symbol": "BBB", "direction": "LONG"},
+        ],
+        "short": [{"symbol": "CCC", "direction": "SHORT"}],
+    }
+    day_picks = {
+        "deskCounts": {"swing": 2, "intradayLong": 1, "intradayShort": 0, "total": 3},
+        "sources": {"intradayDateParity": True},
+        "picks": [
+            {
+                "symbol": "AAA",
+                "book": "INTRADAY",
+                "entryPrice": 100.0,
+                "stopLoss": 95.0,
+                "target1": 110.0,
+            },
+        ],
+    }
+    with (
+        patch("app.services.eod_engine.ingestion.load_intraday_session", return_value=session),
+        patch("app.services.eod_engine.ingestion.load_day_picks", return_value=day_picks),
+        patch("app.services.eod_engine.ingestion.load_fixed_trade_plan", return_value={}),
+    ):
+        rows, is_mock, source, counts = _load_canonical_intraday_picks(day)
+    assert is_mock is False
+    assert source == "intraday_session"
+    assert {r["symbol"] for r in rows} == {"AAA", "BBB", "CCC"}
+    assert counts["intradayLong"] == 2
+    assert counts["intradayShort"] == 1
+
+
+def test_open_book_serves_cache_on_pnl_mismatch():
+    day = date(2026, 8, 20)
+    cached = {
+        "isMock": False,
+        "symbolSource": "intraday_session",
+        "marketPhase": "OPEN",
+        "totalPnl": 100.0,
+        "cachedAt": datetime(2026, 8, 20, 4, 0, tzinfo=timezone.utc).isoformat(),
+        "trades": [{"symbol": "AAA", "pnl": 100.0}],
+    }
+    session = {
+        "locked": True,
+        "sessionDate": "2026-08-20",
+        "long": [
+            {
+                "symbol": "AAA",
+                "direction": "LONG",
+                "realizedPnl": 250.0,
+                "exitReason": "EOD_SQUAREOFF",
+                "executionStatus": "TRIGGERED",
+            }
+        ],
+        "short": [],
+    }
+    with (
+        patch(
+            "app.services.eod_intraday_report._load_canonical_intraday_picks",
+            return_value=(
+                [{"symbol": "AAA"}],
+                False,
+                "intraday_session",
+                {"swing": 0, "intradayLong": 1, "intradayShort": 0, "total": 1},
+            ),
+        ),
+        patch("app.services.desk_clock.cash_session_phase", return_value="OPEN"),
+        patch("app.services.eod_engine.ingestion.load_intraday_session", return_value=session),
+        patch("app.services.eod_book_cache.load_book_cache", return_value=cached),
+        patch("app.services.eod_book_cache.save_book_cache") as save,
+        patch("app.services.eod_reference.prefetch_close_marks") as prefetch,
+    ):
+        out = generate_intraday_eod_report(day, force=False)
+    assert out is cached
+    save.assert_not_called()
+    prefetch.assert_not_called()

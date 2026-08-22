@@ -54,6 +54,7 @@ _YAHOO_FINANCE_CACHE_TTL = 30  # seconds
 _LIVE_BOOK_CACHE: dict[str, Any] | None = None
 _LIVE_BOOK_CACHE_AT = 0.0
 _LIVE_BOOK_CACHE_LOCK = threading.Lock()
+_LIVE_BOOK_CACHE_REFRESHING = False
 _LIVE_BOOK_CACHE_OPEN_TTL = float(os.environ.get("LIVE_BOOK_CACHE_OPEN_TTL", "4"))
 _LIVE_BOOK_CACHE_CLOSED_TTL = float(os.environ.get("LIVE_BOOK_CACHE_CLOSED_TTL", "20"))
 
@@ -1013,29 +1014,74 @@ def invalidate_live_book_cache() -> None:
 
 
 def get_live_prices_for_plan() -> dict[str, Any]:
-    """Return a process-wide coalesced live-book snapshot.
+    """Return a process-wide stale-while-refresh live-book snapshot.
 
     A deep copy protects the cached payload from endpoint-specific enrichment.
-    The first caller after expiry performs the work while concurrent callers
-    wait and reuse its result.
+    External marks are fetched in a daemon thread so request workers never wait
+    on Angel One or Yahoo and cannot pile up behind the cache lock.
     """
-    global _LIVE_BOOK_CACHE, _LIVE_BOOK_CACHE_AT
+    global _LIVE_BOOK_CACHE, _LIVE_BOOK_CACHE_AT, _LIVE_BOOK_CACHE_REFRESHING
     now = time.monotonic()
     ttl = _LIVE_BOOK_CACHE_OPEN_TTL if _is_market_open() else _LIVE_BOOK_CACHE_CLOSED_TTL
     if _LIVE_BOOK_CACHE is not None and now - _LIVE_BOOK_CACHE_AT < ttl:
         return copy.deepcopy(_LIVE_BOOK_CACHE)
+
+    start_refresh = False
     with _LIVE_BOOK_CACHE_LOCK:
         now = time.monotonic()
         ttl = _LIVE_BOOK_CACHE_OPEN_TTL if _is_market_open() else _LIVE_BOOK_CACHE_CLOSED_TTL
         if _LIVE_BOOK_CACHE is not None and now - _LIVE_BOOK_CACHE_AT < ttl:
             return copy.deepcopy(_LIVE_BOOK_CACHE)
-        result = _compute_live_prices_for_plan()
-        _LIVE_BOOK_CACHE = copy.deepcopy(result)
-        _LIVE_BOOK_CACHE_AT = time.monotonic()
-        return result
+        if _LIVE_BOOK_CACHE is None:
+            fallback = _compute_live_prices_for_plan(
+                allow_external=False,
+                persist_transitions=False,
+            )
+            fallback["dataStale"] = True
+            fallback["liveRefreshPending"] = True
+            _LIVE_BOOK_CACHE = copy.deepcopy(fallback)
+            _LIVE_BOOK_CACHE_AT = 0.0
+        if not _LIVE_BOOK_CACHE_REFRESHING:
+            _LIVE_BOOK_CACHE_REFRESHING = True
+            start_refresh = True
+        result = copy.deepcopy(_LIVE_BOOK_CACHE)
+        result["liveRefreshPending"] = True
+
+    if start_refresh:
+        try:
+            threading.Thread(
+                target=_refresh_live_book_cache,
+                name="live-book-refresh",
+                daemon=True,
+            ).start()
+        except Exception:
+            with _LIVE_BOOK_CACHE_LOCK:
+                _LIVE_BOOK_CACHE_REFRESHING = False
+            log.exception("failed to start live-book refresh")
+    return result
 
 
-def _compute_live_prices_for_plan() -> dict[str, Any]:
+def _refresh_live_book_cache() -> None:
+    """Fetch external marks without occupying an AnyIO request worker."""
+    global _LIVE_BOOK_CACHE, _LIVE_BOOK_CACHE_AT, _LIVE_BOOK_CACHE_REFRESHING
+    try:
+        result = _compute_live_prices_for_plan(allow_external=True)
+        result["liveRefreshPending"] = False
+        with _LIVE_BOOK_CACHE_LOCK:
+            _LIVE_BOOK_CACHE = copy.deepcopy(result)
+            _LIVE_BOOK_CACHE_AT = time.monotonic()
+    except Exception:
+        log.exception("live-book refresh failed; serving cached marks")
+    finally:
+        with _LIVE_BOOK_CACHE_LOCK:
+            _LIVE_BOOK_CACHE_REFRESHING = False
+
+
+def _compute_live_prices_for_plan(
+    *,
+    allow_external: bool = True,
+    persist_transitions: bool = True,
+) -> dict[str, Any]:
     """Return prices + evaluated outcomes for symbols in the fixed plan.
 
     Honesty contract:
@@ -1119,7 +1165,7 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
     # on 50+ closed names blocks GET /api/intraday-session past the UI timeout.
     live_quotes: dict[str, float] = {}
     live_attempted = False
-    if _should_refresh_plan_ltps(market_open, after_close) and open_symbols:
+    if allow_external and _should_refresh_plan_ltps(market_open, after_close) and open_symbols:
         live_attempted = True
         if market_open:
             angel_quotes = _fetch_angel_plan_prices(open_symbols)
@@ -1311,7 +1357,7 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
     enriched_long = [enrich_pick(p) for p in long_plan]
     enriched_short = [enrich_pick(p) for p in short_plan]
 
-    if plan_changed and book_source == "fixed_trade_plan":
+    if persist_transitions and plan_changed and book_source == "fixed_trade_plan":
         # Preserve lock metadata when rewriting plan after outcomes
         merged_plan = {
             **{k: v for k, v in fixed.items() if k not in ("long", "short")},
@@ -1321,7 +1367,7 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
             "sessionDate": fixed.get("sessionDate") or _today_ist(),
         }
         save_fixed_trade_plan(merged_plan)
-    elif plan_changed and book_source == "intraday_session":
+    elif persist_transitions and plan_changed and book_source == "intraday_session":
         try:
             from .intraday_session_engine import save_session, sync_fixed_plan_from_session
 
@@ -1334,7 +1380,7 @@ def _compute_live_prices_for_plan() -> dict[str, Any]:
         except Exception:
             log.exception("intraday session persist after live SL evaluation failed")
 
-    if new_alerts:
+    if persist_transitions and new_alerts:
         _record_alert(new_alerts[0])
         for a in new_alerts[1:]:
             _record_alert(a)
