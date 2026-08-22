@@ -140,7 +140,25 @@ export type AITickerNewsReport = {
   articles_scraped: number;
   articles_after_dedup: number;
   generated_at: string;
+  lookback_days?: number;
   cached?: boolean;
+  evidence_status?: "VERIFIED_RECENT" | "NO_RECENT_EVIDENCE" | "SOURCE_UNAVAILABLE" | string;
+  news_schema_version?: number;
+  sources_checked?: string[];
+  source_diagnostics?: Array<{
+    source: string;
+    status: string;
+    fetched: number;
+    accepted: number;
+    error?: string;
+  }>;
+  latest_verified_headlines?: Array<{
+    title: string;
+    source: string;
+    url: string;
+    published_at: string;
+    relevance: string;
+  }>;
 
   // LLM-generated categories
   insider_activity: string;

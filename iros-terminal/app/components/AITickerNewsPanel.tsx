@@ -280,6 +280,14 @@ export default function AITickerNewsPanel({
     const value = report?.[cat.key] as string | undefined;
     return !isBlankIntel(value);
   });
+  const verifiedHeadlines = report?.latest_verified_headlines ?? [];
+  const sourceDiagnostics = report?.source_diagnostics ?? [];
+  const unavailableSources = sourceDiagnostics.filter((item) =>
+    ["NETWORK_ERROR", "HTTP_ERROR", "PARSE_ERROR", "TIMEOUT", "ERROR", "SYMBOL_NOT_RESOLVED", "SKIPPED_CIRCUIT"].includes(item.status)
+  );
+  const workingSources = sourceDiagnostics.filter((item) =>
+    ["SUCCESS", "ZERO_RESULTS", "STALE_OR_UNDATED", "SKIPPED_SUFFICIENT_EVIDENCE"].includes(item.status)
+  );
 
   return (
     <div className="bg-gradient-to-br from-white to-slate-50/80 border border-slate-200 rounded-2xl shadow-sm overflow-hidden relative">
@@ -382,6 +390,50 @@ export default function AITickerNewsPanel({
 
         {hasNews && (
           <div className="space-y-4">
+            {verifiedHeadlines.length > 0 && (
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="desk-panel-title">Latest Verified Headlines</span>
+                  <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[9px] font-semibold text-teal-700">
+                    {verifiedHeadlines.length} · last {report.lookback_days ?? 7} days
+                  </span>
+                </div>
+                <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  {verifiedHeadlines.map((headline) => (
+                    <a
+                      key={`${headline.source}-${headline.url}-${headline.title}`}
+                      href={headline.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block px-3.5 py-2.5 transition-colors hover:bg-slate-50"
+                    >
+                      <p className="line-clamp-2 text-[10px] font-semibold leading-relaxed text-slate-800">
+                        {headline.title}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[8px] text-slate-500">
+                        <span className="font-bold uppercase tracking-wider text-teal-700">{headline.source}</span>
+                        {headline.published_at && (
+                          <time dateTime={headline.published_at}>
+                            {new Date(headline.published_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                          </time>
+                        )}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {sourceDiagnostics.length > 0 && (
+              <div className={`rounded-lg border px-3 py-2 text-[9px] ${unavailableSources.length ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                <span className="font-bold">Source health:</span>{" "}
+                {workingSources.length} responding
+                {unavailableSources.length > 0 && (
+                  <span> · {unavailableSources.length} unavailable ({unavailableSources.map((item) => item.source).join(", ")})</span>
+                )}
+              </div>
+            )}
+
             {/* ── Sentiment + Risk row ── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Sentiment */}
