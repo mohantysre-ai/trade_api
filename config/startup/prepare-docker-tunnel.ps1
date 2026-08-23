@@ -3,6 +3,8 @@
 #  - Copy host credentials into config/cloudflare/credentials.json
 #  - Always generate only the approved public routes:
 #      calendar.sigq.in -> host.docker.internal:8088
+#      job.sigq.in      -> host.docker.internal:7777
+#      mantra.sigq.in   -> host.docker.internal:7800
 #      sigq.in          -> frontend:3000
 #  - Ignore stale/legacy hostnames such as iros.sigq.in.
 # Exit 0 = ready, 2 = missing setup (caller may skip tunnel)
@@ -48,6 +50,8 @@ Copy-Item -Path $credSrc -Destination $CredDest -Force
 # only the approved public hostnames, so stale iros.sigq.in cannot reappear.
 $ingressPairs = @(
   [pscustomobject]@{ Hostname = "calendar.sigq.in"; Service = "http://host.docker.internal:8088" },
+  [pscustomobject]@{ Hostname = "job.sigq.in"; Service = "http://host.docker.internal:7777" },
+  [pscustomobject]@{ Hostname = "mantra.sigq.in"; Service = "http://host.docker.internal:7800" },
   [pscustomobject]@{ Hostname = "sigq.in"; Service = "http://frontend:3000" }
 )
 

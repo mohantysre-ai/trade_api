@@ -1,12 +1,8 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useAutoAnimate } from '@formkit/auto-animate/react';
 import type { SparkFlag } from '@/lib/market-api';
-import { fetchNseSparkline, isNseCashSessionNow } from '@/lib/market-api';
-import { LiveTickNumber } from '@/lib/desk-motion';
-import { fetchLiveDesk, subscribeLiveDesk } from '@/lib/live-desk';
-import CashSessionClosedBanner from './CashSessionClosedBanner';
+import { fetchNseSparkline } from '@/lib/market-api';
 
 /* ── Smooth sparkline SVG with Catmull-Rom spline ─────────────────────── */
 let intraSparkIdCounter = 0;
@@ -51,9 +47,9 @@ function StockSparklineSVG({ data, direction }: { data: number[]; direction?: st
     ? (last <= first ? '#10b981' : '#ef4444')
     : (positive ? '#10b981' : '#ef4444');
 
-  const W = 200;
-  const H = 56;
-  const pad = 8;
+  const W = 120;
+  const H = 40;
+  const pad = 3;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
@@ -74,9 +70,10 @@ function StockSparklineSVG({ data, direction }: { data: number[]; direction?: st
 
   return (
     <svg
-      className="w-full h-14"
+      className="w-full h-10"
       viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="xMidYMid meet"
+      preserveAspectRatio="none"
+      style={{ filter: `drop-shadow(0 1px 2px ${color}20)` }}
     >
       <defs>
         {/* Rich multi-stop gradient for area fill */}
@@ -85,8 +82,8 @@ function StockSparklineSVG({ data, direction }: { data: number[]; direction?: st
           <stop offset="50%" stopColor={color} stopOpacity="0.15" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
-        {/* Glow filter for the stroke — expanded region so pulse/glow aren't cropped */}
-        <filter id={glowId} x="-40%" y="-40%" width="180%" height="180%">
+        {/* Glow filter for the stroke */}
+        <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur stdDeviation="1.2" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
@@ -220,7 +217,6 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag, di
 
   let changeLabel = '';
   let changeColor = 'text-slate-400';
-  let favorable = true;
   if (hasData) {
     const first = data![0];
     const last = data![data!.length - 1];
@@ -229,31 +225,26 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag, di
     // For SHORT picks, a falling price (negative pct) is favorable
     const isShort = direction === 'SHORT';
     if (isShort) {
-      favorable = pct <= 0;
-      changeColor = favorable ? 'text-emerald-600' : 'text-red-500';
+      changeColor = pct <= 0 ? 'text-emerald-600' : 'text-red-500';
     } else {
-      favorable = pct >= 0;
-      changeColor = favorable ? 'text-emerald-600' : 'text-red-500';
+      changeColor = pct >= 0 ? 'text-emerald-600' : 'text-red-500';
     }
   }
 
   return (
     <div className="mb-1.5 relative z-10">
-      {/* Chart band — no overflow-hidden so glow / pulse ring are not clipped */}
       <div
-        className="rounded-lg transition-all px-0.5 py-0.5"
+        className="rounded-lg overflow-hidden transition-all"
         style={{
           background: hasData
-            ? favorable
-              ? 'linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(16,185,129,0.12) 100%)'
-              : 'linear-gradient(135deg, rgba(239,68,68,0.06) 0%, rgba(239,68,68,0.12) 100%)'
+            ? 'linear-gradient(135deg, rgba(100,116,139,0.03) 0%, rgba(100,116,139,0.06) 100%)'
             : 'transparent',
         }}
       >
         {hasData ? (
           <StockSparklineSVG data={data!} direction={direction} />
         ) : (
-          <div className="h-14 flex items-center justify-center">
+          <div className="h-10 flex items-center justify-center">
             <div className="flex items-center gap-1">
               <div className="w-1 h-1 rounded-full bg-slate-300 animate-pulse" />
               <div className="w-1 h-1 rounded-full bg-slate-300 animate-pulse" style={{ animationDelay: '0.2s' }} />
@@ -268,8 +259,10 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag, di
             <button
               key={f}
               onClick={(e) => { e.stopPropagation(); e.preventDefault(); onFlagChange(f); }}
-              className={`min-h-10 min-w-10 py-2 px-2.5 sm:min-h-0 sm:min-w-0 sm:px-1.5 sm:py-0.5 rounded-md desk-chip ${
-                f === currentFlag ? 'is-on' : ''
+              className={`px-1.5 py-0.5 rounded-md text-[7px] font-bold uppercase tracking-wider transition-all ${
+                f === currentFlag
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'bg-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-100'
               }`}
             >
               {f}
@@ -277,7 +270,7 @@ function SparklineFlagSlider({ ticker, sparklines, onFlagChange, currentFlag, di
           ))}
         </div>
         {hasData && (
-          <span className={`text-[10px] sm:text-[7px] font-bold tabular-nums ${changeColor}`}>{changeLabel}</span>
+          <span className={`text-[7px] font-bold tabular-nums ${changeColor}`}>{changeLabel}</span>
         )}
       </div>
     </div>
@@ -321,11 +314,6 @@ type DhanRecommendation = {
   deliveryPct?: number;
   score?: number;
   reasons?: string[];
-  currentPrice?: number | null;
-  outcome?: TradeOutcome | null;
-  approxQty?: number;
-  deployedCapital?: number;
-  riskAmount?: number;
 };
 
 type CapitalAllocation = {
@@ -337,40 +325,13 @@ type CapitalAllocation = {
 };
 
 /* ── Trade Outcome types ─────────────────────────────────────────────────── */
-type ExitLeg = { r: number; label?: string; qty?: number; price?: number };
-
-type ExitPlan = {
-  mode?: string;
-  notes?: string[];
-  policyVersion?: string;
-  legs?: ExitLeg[];
-  runnerQty?: number | null;
-};
-
-type ExitState = {
-  legsFilled?: Array<number | { r: number | string; qty?: number; price?: number; pnl?: number }>;
-  remainingQty?: number | null;
-  effectiveStop?: number | null;
-  realizedPnl?: number | null;
-  unrealizedPnl?: number | null;
-  rMultiple?: number | null;
-  closed?: boolean;
-};
-
 type TradeOutcome = {
     label: string;  // "TARGET 1 HIT", "TARGET 2 HIT", "STOP LOSS HIT", "PENDING"
     detail: string;
-    hitLevel: "t1" | "t2" | "sl" | "partial" | null;
+    hitLevel: "t1" | "t2" | "sl" | null;
     ltp: number;
     pctChange: number;
     resolvedAt: string | null;
-    /** Scale-trail enrichment — present when backend SCALE_TRAIL mode */
-    scaleTrail?: boolean;
-    remainingQty?: number | null;
-    effectiveStop?: number | null;
-    realizedPnl?: number | null;
-    unrealizedPnl?: number | null;
-    rMultiple?: number | null;
 };
 
 type OutcomePick = {
@@ -387,12 +348,6 @@ type OutcomePick = {
     updatedAt: string;
     riskPerShare?: number;
     rrT2?: number;
-    approxQty?: number;
-    deployedCapital?: number;
-    riskAmount?: number;
-    /** Scale-trail plan and state — from backend */
-    exitPlan?: ExitPlan | null;
-    exitState?: ExitState | null;
 };
 
 type DhanScannerResponse = {
@@ -457,7 +412,7 @@ type AlertRecord = {
   key: string;
   symbol: string;
   direction: 'LONG' | 'SHORT';
-  hitLevel: 't1' | 't2' | 'sl' | 'partial';
+  hitLevel: 't1' | 't2' | 'sl';
   label: string;
   ltp: number;
   planDate: string;
@@ -474,373 +429,64 @@ type LivePricesResponse = {
   error?: string;
   marketOpen?: boolean;
   sessionClosed?: boolean;
-  dataStale?: boolean;
-  ltpSourceMix?: Record<string, number>;
-  priceSourcesNote?: string;
 };
 
 async function fetchLivePrices(): Promise<LivePricesResponse> {
-  return fetchLiveDesk<LivePricesResponse>('live-prices');
-}
-
-function formatIstClock(iso?: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleTimeString('en-IN', { hour12: false, timeZone: 'Asia/Kolkata' });
-}
-
-function summarizePlanLtpSources(
-  data: LivePricesResponse | null
-): { live: number; snapshot: number; cached: number; total: number; label: string } {
-  const all = [...(data?.long ?? []), ...(data?.short ?? [])];
-  let live = 0;
-  let snapshot = 0;
-  let cached = 0;
-  for (const pick of all) {
-    const src = String(pick.ltpSource || '').toLowerCase();
-    if (src === 'live') live += 1;
-    else if (src === 'snapshot') snapshot += 1;
-    else cached += 1;
+  const res = await fetch('/api/live-prices', { cache: 'no-store' });
+  if (!res.ok) {
+    return { long: [], short: [], updatedAt: null, source: 'none' };
   }
-  const parts: string[] = [];
-  if (live) parts.push(`yahoo ${live}`);
-  if (snapshot) parts.push(`snapshot ${snapshot}`);
-  if (cached) parts.push(`plan-cache ${cached}`);
-  return {
-    live,
-    snapshot,
-    cached,
-    total: all.length,
-    label: parts.length ? parts.join(' · ') : 'no LTPs',
-  };
-}
-
-function buildMonitorStatusLine(data: LivePricesResponse | null, sessionClosed: boolean, marketOpen: boolean): string {
-  const sources = summarizePlanLtpSources(data);
-  const evalAt = formatIstClock(data?.updatedAt);
-  const snapAt = formatIstClock(data?.snapshotUpdatedAt);
-  const pollPart = sessionClosed
-    ? 'poll ~2s (market closed · close marks)'
-    : marketOpen
-      ? 'Eval poll ~2s'
-      : 'Market closed · poll ~2s';
-  const mixFromApi = data?.ltpSourceMix
-    ? Object.entries(data.ltpSourceMix)
-        .filter(([, n]) => typeof n === 'number' && n > 0)
-        .map(([k, n]) => `${k}:${n}`)
-        .join(' · ')
-    : '';
-  const parts = [
-    'MONITOR · MANUAL EXECUTION',
-    pollPart,
-    evalAt ? `eval@ ${evalAt} IST` : 'eval@ —',
-    snapAt ? `snapshot@ ${snapAt} IST` : 'snapshot@ —',
-    data?.priceSourcesNote || null,
-    `sources ${mixFromApi || sources.label || '—'}`,
-    marketOpen ? 'session OPEN' : sessionClosed ? 'session CLOSED' : 'session —',
-    data?.dataStale ? 'DATA STALE' : null,
-  ].filter(Boolean);
-  return parts.join(' · ');
-}
-
-function pnlAccentVar(pct: number | null | undefined): string {
-  if (pct == null || Math.abs(pct) < 0.001) return 'var(--terminal-line)';
-  return pct > 0 ? 'var(--terminal-green)' : 'var(--terminal-red)';
-}
-
-function MonitorStatusPills({
-  data,
-  sessionClosed,
-  marketOpen,
-}: {
-  data: LivePricesResponse | null;
-  sessionClosed: boolean;
-  marketOpen: boolean;
-}) {
-  const stale = Boolean(data?.dataStale);
-  const sources = summarizePlanLtpSources(data);
-  const evalAt = formatIstClock(data?.updatedAt);
-  const snapAt = formatIstClock(data?.snapshotUpdatedAt);
-  const mixFromApi = data?.ltpSourceMix
-    ? Object.entries(data.ltpSourceMix)
-        .filter(([, n]) => typeof n === 'number' && n > 0)
-        .map(([k, n]) => `${k}:${n}`)
-        .join(' · ')
-    : '';
-
-  const liveDotClass = stale
-    ? 'desk-breathe-dot is-warn'
-    : sessionClosed
-      ? 'w-2 h-2 rounded-full bg-slate-500 shrink-0'
-      : marketOpen
-        ? 'desk-breathe-dot'
-        : 'desk-breathe-dot is-warn';
-
-  const pollLabel = sessionClosed
-    ? 'poll ~2s · close marks'
-    : marketOpen
-      ? 'Eval poll ~2s'
-      : 'Market closed · poll ~2s';
-
-  const sessionLabel = marketOpen ? 'SESSION OPEN' : sessionClosed ? 'SESSION CLOSED' : 'SESSION —';
-
-  return (
-    <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-lg glass-flat text-slate-900">
-      <span className="glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
-        <span className={liveDotClass} aria-hidden />
-        MONITOR · MANUAL EXECUTION
-      </span>
-      <span className="glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-600">
-        {!sessionClosed && marketOpen && !stale && <span className="desk-breathe-dot" aria-hidden />}
-        {pollLabel}
-      </span>
-      {evalAt && (
-        <span className="glass-pill px-2 py-0.5 text-[9px] text-slate-500 tabular-nums">
-          eval@ {evalAt} IST
-        </span>
-      )}
-      {snapAt && (
-        <span className="glass-pill px-2 py-0.5 text-[9px] text-slate-500 tabular-nums">
-          snapshot@ {snapAt} IST
-        </span>
-      )}
-      <span className="glass-pill px-2 py-0.5 text-[9px] text-slate-500">
-        sources {mixFromApi || sources.label || '—'}
-      </span>
-      <span className={`glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
-        marketOpen ? 'text-emerald-700' : sessionClosed ? 'text-slate-600' : 'text-amber-700'
-      }`}>
-        {marketOpen && !stale && <span className="desk-breathe-dot" aria-hidden />}
-        {sessionClosed && <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0" aria-hidden />}
-        {!marketOpen && !sessionClosed && <span className="desk-breathe-dot is-warn" aria-hidden />}
-        {sessionLabel}
-      </span>
-      {stale && (
-        <span className="glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700">
-          <span className="desk-breathe-dot is-warn" aria-hidden />
-          FEED STALE
-        </span>
-      )}
-    </div>
-  );
-}
-
-type PlanRowItem = {
-  symbol: string;
-  entryPrice?: number;
-  stopLoss?: number;
-  target1?: number;
-  target2?: number;
-  riskPerShare?: number;
-  rrT2?: number;
-  currentPrice?: number | null;
-  outcome?: TradeOutcome | null;
-  exitPlan?: ExitPlan | null;
-  exitState?: ExitState | null;
-};
-
-function BookPlanRow({
-  tp,
-  entryClass,
-  hoverClass,
-}: {
-  tp: PlanRowItem;
-  entryClass: string;
-  hoverClass: string;
-}) {
-  const prevPriceRef = useRef<number | null>(null);
-  const [rowFlash, setRowFlash] = useState<'up' | 'down' | null>(null);
-  const ltp = tp.currentPrice ?? null;
-  const pct = tp.outcome?.pctChange;
-
-  useEffect(() => {
-    if (ltp == null) return;
-    const prev = prevPriceRef.current;
-    if (prev != null && prev !== ltp) {
-      setRowFlash(ltp > prev ? 'up' : 'down');
-      const id = window.setTimeout(() => setRowFlash(null), 280);
-      prevPriceRef.current = ltp;
-      return () => window.clearTimeout(id);
-    }
-    prevPriceRef.current = ltp;
-    return undefined;
-  }, [ltp, tp.symbol]);
-
-  const flashClass = rowFlash === 'up' ? 'is-flash-up' : rowFlash === 'down' ? 'is-flash-down' : '';
-
-  return (
-    <tr
-      className={`glass-flat desk-book-row border-b border-slate-100 ${hoverClass} cursor-pointer ${flashClass}`}
-      style={{ ['--row-pnl-accent' as string]: pnlAccentVar(pct) }}
-    >
-      <td className="p-1.5 font-bold text-slate-900">
-        <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
-      </td>
-      <td className="p-1.5 text-right font-mono text-slate-900 font-bold">
-        {ltp != null ? (
-          <LiveTickNumber value={ltp.toFixed(2)} className="font-mono text-slate-900 font-bold" />
-        ) : '—'}
-      </td>
-      <td className={`p-1.5 text-right font-mono font-bold ${entryClass}`}>{tp.entryPrice?.toFixed(2) ?? '—'}</td>
-      <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
-      <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
-      <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
-      <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
-      <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
-      <td className="p-1.5 text-center">
-        <OutcomeBadge outcome={tp.outcome} exitPlan={tp.exitPlan} exitState={tp.exitState} />
-      </td>
-    </tr>
-  );
-}
-
-/** Phone essentials for 9-col trade plan (table remains md+) */
-function BookPlanMobileCard({
-  tp,
-  entryClass,
-  entryLabel,
-}: {
-  tp: PlanRowItem;
-  entryClass: string;
-  entryLabel: string;
-}) {
-  const ltp = tp.currentPrice ?? null;
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-2.5 space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <a
-          href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="desk-metric-value font-mono hover:text-indigo-600 transition-colors"
-        >
-          {tp.symbol}
-        </a>
-        <OutcomeBadge outcome={tp.outcome} exitPlan={tp.exitPlan} exitState={tp.exitState} />
-      </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-        <div className="text-slate-500">
-          LTP{' '}
-          <span className="font-mono font-bold text-slate-900">
-            {ltp != null ? <LiveTickNumber value={ltp.toFixed(2)} className="font-mono font-bold text-slate-900" /> : '—'}
-          </span>
-        </div>
-        <div className="text-slate-500">
-          {entryLabel}{' '}
-          <span className={`font-mono font-bold ${entryClass}`}>{tp.entryPrice?.toFixed(2) ?? '—'}</span>
-        </div>
-        <div className="text-slate-500">
-          SL <span className="font-mono font-bold text-red-500">{tp.stopLoss?.toFixed(2) ?? '—'}</span>
-        </div>
-        <div className="text-slate-500">
-          T1/T2{' '}
-          <span className="font-mono text-blue-600">
-            {tp.target1?.toFixed(2) ?? '—'} / {tp.target2?.toFixed(2) ?? '—'}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Scale-trail exit progress string ──────────────────────────────────── */
-function exitProgressStr(exitPlan: ExitPlan | null | undefined, exitState: ExitState | null | undefined, outcome: TradeOutcome | null | undefined): string | null {
-  const state = exitState ?? (outcome?.scaleTrail ? {
-    remainingQty: outcome.remainingQty,
-    effectiveStop: outcome.effectiveStop,
-    realizedPnl: outcome.realizedPnl,
-    unrealizedPnl: outcome.unrealizedPnl,
-    rMultiple: outcome.rMultiple,
-  } : null);
-  if (!state && !exitPlan) return null;
-  const parts: string[] = [];
-  const notes = exitPlan?.notes ?? [];
-  if (notes.includes('be_at_0p5r')) parts.push('0.5R BE');
-  else if (notes.includes('be_at_0p25r')) parts.push('0.25R BE');
-  if (notes.includes('max_stop_0p5pct')) parts.push('SL≤0.5%');
-  const legs = exitPlan?.legs ?? [];
-  const filled = state?.legsFilled ?? [];
-  const filledRs = new Set(
-    filled.map((x) => (typeof x === 'number' ? x : Number(x?.r))).filter((n) => Number.isFinite(n)),
-  );
-  for (const leg of legs) {
-    const hit = filledRs.has(leg.r) || (outcome?.rMultiple != null && Number(outcome.rMultiple) >= leg.r);
-    parts.push(`${leg.r}R${hit ? '✓' : '·'}`);
-  }
-  if (state?.remainingQty != null) parts.push(`rem ${state.remainingQty}`);
-  if (state?.effectiveStop != null) parts.push(`trail SL ${state.effectiveStop.toFixed(2)}`);
-  if (!parts.length) return null;
-  return parts.join(' ');
+  const data: LivePricesResponse = await res.json();
+  return data;
 }
 
 /* ── Outcome Badge ───────────────────────────────────────────────────── */
-function OutcomeBadge({ outcome, exitPlan, exitState }: {
-  outcome: TradeOutcome | null | undefined;
-  exitPlan?: ExitPlan | null;
-  exitState?: ExitState | null;
-}) {
+function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null }) {
   if (!outcome) {
-    return <span className="text-[10px] sm:text-[8px] text-slate-400">—</span>;
+    return <span className="text-[8px] text-slate-400">—</span>;
   }
   
-  const baseClasses = "inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] sm:text-[8px] font-bold uppercase tracking-wider";
+  const baseClasses = "inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider";
   const hitLevel = outcome.hitLevel;
-  const isScaleTrail = Boolean(outcome.scaleTrail || exitPlan?.mode === 'SCALE_TRAIL');
-  const progress = isScaleTrail ? exitProgressStr(exitPlan, exitState, outcome) : null;
 
   if (outcome.label === "NOT TRIGGERED") {
     return (
-      <span className={`${baseClasses} bg-slate-200 text-slate-500 border border-slate-400 glass-pill`}>
-        <span className="desk-breathe-dot shrink-0 mr-1 opacity-60" style={{ animation: 'none' }} />
+      <span className={`${baseClasses} bg-slate-200 text-slate-500 border border-slate-400`}>
+        <span className="w-1 h-1 rounded-full bg-slate-500 mr-1" />
         NOT TRIGGERED
-      </span>
-    );
-  }
-
-  if (hitLevel === "partial" || (isScaleTrail && hitLevel === "t1")) {
-    return (
-      <span className="inline-flex flex-col gap-0.5 items-start">
-        <span className={`${baseClasses} bg-amber-100 text-amber-800 border border-amber-300 glass-pill`}>
-          <span className="desk-breathe-dot shrink-0 mr-1" style={{ background: 'var(--terminal-amber, #f59e0b)' }} />
-          {exitState?.closed ? 'TRAIL CLOSED' : 'PARTIAL · TRAIL'}
-        </span>
-        {progress && (
-          <span className="text-[10px] sm:text-[7px] text-slate-500 font-mono tabular-nums pl-0.5 whitespace-nowrap">{progress}</span>
-        )}
       </span>
     );
   }
 
   if (hitLevel === "t2") {
     return (
-      <span className={`${baseClasses} bg-emerald-100 text-emerald-700 border border-emerald-300 glass-pill`}>
-        <span className="desk-breathe-dot shrink-0 mr-1" />
-        {isScaleTrail ? 'TRAIL ✓ T2' : 'TARGET 2 HIT'}
+      <span className={`${baseClasses} bg-emerald-100 text-emerald-700 border border-emerald-300 animate-pulse`}>
+        <span className="w-1 h-1 rounded-full bg-emerald-500 mr-1" />
+        TARGET 2 HIT
       </span>
     );
   }
   if (hitLevel === "t1") {
     return (
-      <span className={`${baseClasses} bg-blue-100 text-blue-700 border border-blue-300 glass-pill`}>
-        <span className="desk-breathe-dot shrink-0 mr-1" style={{ background: 'var(--terminal-cyan)', animation: 'none' }} />
+      <span className={`${baseClasses} bg-blue-100 text-blue-700 border border-blue-300`}>
+        <span className="w-1 h-1 rounded-full bg-blue-500 mr-1" />
         TARGET 1 HIT
       </span>
     );
   }
   if (hitLevel === "sl") {
     return (
-      <span className={`${baseClasses} bg-red-100 text-red-700 border border-red-300 glass-pill`}>
-        <span className="desk-breathe-dot is-error shrink-0 mr-1" />
-        {isScaleTrail ? 'TRAIL STOP HIT' : 'STOP LOSS HIT'}
+      <span className={`${baseClasses} bg-red-100 text-red-700 border border-red-300`}>
+        <span className="w-1 h-1 rounded-full bg-red-500 mr-1" />
+        STOP LOSS HIT
       </span>
     );
   }
   // PENDING
   return (
-    <span className={`${baseClasses} bg-slate-100 text-slate-600 border border-slate-300 glass-pill`}>
-      <span className="desk-breathe-dot shrink-0 mr-1 opacity-70" />
-      {isScaleTrail ? 'TRAIL · RUNNING' : 'PENDING'}
+    <span className={`${baseClasses} bg-slate-100 text-slate-600 border border-slate-300`}>
+      <span className="w-1 h-1 rounded-full bg-slate-400 mr-1 animate-pulse" />
+      PENDING
     </span>
   );
 }
@@ -848,7 +494,7 @@ function OutcomeBadge({ outcome, exitPlan, exitState }: {
 function DirectionBadge({ dir }: { dir: string }) {
   const isBuy = dir === 'BUY';
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[8px] font-black uppercase tracking-wider ${
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
       isBuy ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
             : 'bg-red-100 text-red-700 border border-red-300'}`}>
       <span className={`w-1 h-1 rounded-full ${isBuy ? 'bg-emerald-500' : 'bg-red-500'} animate-pulse`} />
@@ -861,7 +507,7 @@ function DirectionBadge({ dir }: { dir: string }) {
 function LoadingSpinner({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-      <div className="w-10 h-10 rounded-full border-2 border-cyan-400/40 border-t-cyan-400 animate-spin mb-3" />
+      <div className="w-10 h-10 rounded-full border-2 border-violet-300 border-t-violet-600 animate-spin mb-3" />
       <span className="text-[10px] uppercase tracking-wider font-bold">{label}</span>
     </div>
   );
@@ -890,11 +536,10 @@ export default function IntradayMatrixPanel() {
   const [monitorMode, setMonitorMode] = useState(false);
   const [alerts, setAlerts] = useState<AlertRecord[]>([]);
   const [alertBanner, setAlertBanner] = useState<AlertRecord | null>(null);
-  const [marketOpen, setMarketOpen] = useState(() => isNseCashSessionNow());
-  const [sessionClosed, setSessionClosed] = useState(() => !isNseCashSessionNow());
+  const [marketOpen, setMarketOpen] = useState(true);
+  const [sessionClosed, setSessionClosed] = useState(false);
+  const sessionClosedRef = useRef(false);
   const prevOutcomeRef = useRef<Record<string, string | null>>({});
-  const [longBookRef] = useAutoAnimate({ duration: 200, easing: 'ease-in-out' });
-  const [shortBookRef] = useAutoAnimate({ duration: 200, easing: 'ease-in-out' });
 
   /* last fetch times */
   const [lemonnTime, setLemonnTime] = useState('');
@@ -939,11 +584,9 @@ export default function IntradayMatrixPanel() {
   }, []);
 
   /* Live prices (monitor mode) */
-  const loadLivePrices = useCallback(async (snapshotData?: LivePricesResponse) => {
+  const loadLivePrices = useCallback(async () => {
     try {
-      const data = snapshotData ?? await fetchLivePrices();
-      if (data.sessionClosed != null) setSessionClosed(Boolean(data.sessionClosed));
-      if (data.marketOpen != null) setMarketOpen(data.marketOpen !== false);
+      const data = await fetchLivePrices();
       if (data.source === 'none' || ((data.long?.length ?? 0) === 0 && (data.short?.length ?? 0) === 0)) {
         // No fixed plan — fall back to normal mode
         setMonitorMode(false);
@@ -952,11 +595,12 @@ export default function IntradayMatrixPanel() {
       setMonitorMode(true);
       setLivePricesData(data);
 
-      // Track market session state for banner / UI
+      // Track market session state (used to halt polling after close)
       const closed = Boolean(data.sessionClosed);
       const open = data.marketOpen !== false;
       setMarketOpen(open);
       setSessionClosed(closed);
+      sessionClosedRef.current = closed;
       // Detect new alerts (transition from PENDING → t1/t2/sl)
       const newAlerts = data.newAlerts ?? [];
       if (newAlerts.length > 0) {
@@ -994,24 +638,25 @@ export default function IntradayMatrixPanel() {
 
     // Standard 2-min refresh for scanner/lemonn feeds
     const slowId = window.setInterval(() => {
-      if (!cancelled && document.visibilityState === 'visible') {
+      if (!cancelled) {
         loadLemonn();
         loadDhan();
         loadOutcomes();
       }
     }, 120_000);
 
-    // Fast monitor-mode poll (proxies /api/live-prices — continues after close for close marks).
-    const unsubscribe = subscribeLiveDesk((snapshot) => {
-      if (!cancelled && document.visibilityState === 'visible') {
-        void loadLivePrices(snapshot['live-prices'] as unknown as LivePricesResponse);
+    // Fast monitor-mode poll (only reads local snapshot, no external calls).
+    // Halt once the session has closed so we stop recalculating on stale prices.
+    const fastId = window.setInterval(() => {
+      if (!cancelled && !sessionClosedRef.current) {
+        loadLivePrices();
       }
-    });
+    }, 2000);
 
     return () => {
       cancelled = true;
       window.clearInterval(slowId);
-      unsubscribe();
+      window.clearInterval(fastId);
     };
   }, [loadLemonn, loadDhan, loadOutcomes, loadLivePrices]);
 
@@ -1063,22 +708,10 @@ export default function IntradayMatrixPanel() {
     return merged;
   }, [allTickers, stockSparklines1D, stockSparklines1M, stockSparklines1Y]);
 
-  const cashClosed = Boolean(sessionClosed) || !isNseCashSessionNow();
-
   /* ── RENDER ───────────────────────────────────────────────────────────── */
 
   return (
     <div className="space-y-4">
-      {cashClosed && (
-        <CashSessionClosedBanner
-          lastPrint={
-            livePricesData?.updatedAt
-              ? new Date(livePricesData.updatedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false })
-              : null
-          }
-        />
-      )}
-      <div className={`space-y-4${cashClosed ? " opacity-[0.72] grayscale-[0.4]" : ""}`}>
       {/* ── ALERT BANNER ─────────────────────────────────────────────────── */}
       {alertBanner && (
         <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl shadow-2xl border-2 animate-pulse ${
@@ -1098,11 +731,15 @@ export default function IntradayMatrixPanel() {
 
       {/* ── MONITOR MODE INDICATOR ──────────────────────────────────────── */}
       {monitorMode && (
-        <MonitorStatusPills
-          data={livePricesData}
-          sessionClosed={!!sessionClosed}
-          marketOpen={!!marketOpen}
-        />
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-[9px] font-semibold uppercase tracking-wider">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          MONITOR MODE — Fixed plan active · Live prices every 2s · No external API calls
+          {livePricesData?.snapshotUpdatedAt && (
+            <span className="text-slate-400 ml-1">
+              (snapshot @{new Date(livePricesData.snapshotUpdatedAt).toLocaleTimeString('en-IN', { hour12: false })})
+            </span>
+          )}
+        </div>
       )}
 
       {/* ── RECENT ALERTS ───────────────────────────────────────────────── */}
@@ -1110,7 +747,7 @@ export default function IntradayMatrixPanel() {
         <div className="flex flex-col gap-1">
           {alerts.map((a, idx) => (
             <div key={`alert-${idx}`} className={`flex items-center justify-between px-3 py-1.5 rounded-lg border text-[10px] ${
-              a.hitLevel === 'sl' ? 'bg-red-50 border-red-200 text-red-700' : a.hitLevel === 'partial' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              a.hitLevel === 'sl' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
             }`}>
               <span className="font-bold uppercase tracking-wider">
                 {a.symbol} ({a.direction}) — {a.label}
@@ -1125,20 +762,20 @@ export default function IntradayMatrixPanel() {
       )}
 
       {/* ═══════════════════ UPPER PANEL — LEMOON ═══════════════════ */}
-      <div className="bg-gradient-to-br from-white via-slate-50/10 to-white border border-slate-300 rounded-xl p-4 shadow-lg overflow-auto">
+      <div className="bg-gradient-to-br from-white via-purple-50/10 to-white border border-slate-300 rounded-xl p-4 shadow-lg overflow-auto">
         {/* Header */}
         <div className="relative mb-3">
-          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-400 via-cyan-400 to-transparent rounded-t-xl" />
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500 rounded-t-xl" />
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl lemonn-icon flex items-center justify-center shadow-lg">
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center shadow-lg">
                 <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                 </svg>
               </div>
               <div>
-                <h3 className="desk-panel-title text-slate-900">LEMOON CO.IN — 10 INTRADAY PICKS</h3>
-                <p className="text-[10px] sm:text-[7px] text-slate-500">
+                <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">LEMOON CO.IN — 10 INTRADAY PICKS</h3>
+                <p className="text-[7px] text-slate-500">
                   {lemonnData?.source ?? 'lemonn.co.in'}
                   {lemonnData?.isMock && <span className="ml-1 text-amber-500 font-bold">(mock fallback)</span>}
                   {lemonnTime && <span className="ml-1 text-slate-400">@{lemonnTime}</span>}
@@ -1146,9 +783,12 @@ export default function IntradayMatrixPanel() {
               </div>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="px-1.5 py-0.5 rounded-lg bg-cyan-500/10 border border-cyan-400/25">
-                <span className="text-[10px] sm:text-[8px] text-cyan-300 font-semibold">{lemonnData?.count ?? 0} picks</span>
+              <div className="px-1.5 py-0.5 rounded-lg bg-gradient-to-r from-violet-100 to-purple-50 border border-violet-200">
+                <span className="text-[8px] text-violet-700 font-semibold">{lemonnData?.count ?? 0} picks</span>
               </div>
+              <button onClick={loadLemonn} className="px-2 py-0.5 rounded-lg bg-slate-100 border border-slate-200 text-[8px] text-slate-600 font-semibold uppercase tracking-wider hover:bg-slate-200 transition-colors">
+                Refresh
+              </button>
             </div>
           </div>
         </div>
@@ -1173,17 +813,17 @@ export default function IntradayMatrixPanel() {
                   <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full opacity-15 blur-2xl"
                     style={{ backgroundColor: isBuy ? '#10b981' : '#ef4444' }} />
                   <div className="flex items-center justify-between mb-1.5 relative z-10">
-                    <span className="desk-metric-value font-mono">{rec.symbol}</span>
+                    <span className="text-[12px] font-black text-slate-900 font-mono">{rec.symbol}</span>
                     <DirectionBadge dir={rec.direction} />
                   </div>
-                  <p className="text-[10px] sm:text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
+                  <p className="text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
                   <SparklineFlagSlider
                     ticker={rec.symbol}
                     sparklines={allSparklines[rec.symbol] ?? ({} as Record<SparkFlag, number[]>)}
                     currentFlag={getFlag(rec.symbol)}
                     onFlagChange={(f) => setFlag(rec.symbol, f)}
                   />
-                  <div className="space-y-1 text-[10px] sm:text-[8px] relative z-10">
+                  <div className="space-y-1 text-[8px] relative z-10">
                     <div className="flex justify-between"><span className="text-slate-400">Buy</span><span className="font-bold text-emerald-600">₹{rec.buyPrice.toFixed(2)}</span></div>
                     <div className="flex justify-between"><span className="text-slate-400">Sell</span><span className="font-bold text-blue-600">₹{rec.sellPrice.toFixed(2)}</span></div>
                     <div className="flex justify-between"><span className="text-slate-400">Stop Loss</span><span className="font-bold text-red-500">₹{rec.stopLoss.toFixed(2)}</span></div>
@@ -1209,16 +849,16 @@ export default function IntradayMatrixPanel() {
           <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-t-xl" />
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl dhan-icon flex items-center justify-center shadow-lg">
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center shadow-lg">
                 <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M4 7h16M4 7l2-3h12l2 3" />
                 </svg>
               </div>
               <div>
-                <h3 className="desk-panel-title text-slate-900">
+                <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">
                   DHAN ScanX → FEED SCANNER — TOP 10 + TRADE PLAN
                 </h3>
-                <p className="text-[10px] sm:text-[7px] text-slate-500">
+                <p className="text-[7px] text-slate-500">
                   {dhanData?.source ?? 'dhan-scanx'}
                   {dhanData?.isMock && <span className="ml-1 text-amber-500 font-bold">(mock fallback — Dhan API unreachable)</span>}
                   &nbsp;·&nbsp;Scanned {dhanData?.scannedCount ?? 0} stocks
@@ -1230,8 +870,11 @@ export default function IntradayMatrixPanel() {
             </div>
             <div className="flex items-center gap-1.5">
               <div className="px-1.5 py-0.5 rounded-lg bg-gradient-to-r from-emerald-100 to-teal-50 border border-emerald-200">
-                <span className="text-[10px] sm:text-[8px] text-emerald-700 font-semibold">{dhanData?.recommendations?.length ?? 0} stocks</span>
+                <span className="text-[8px] text-emerald-700 font-semibold">{dhanData?.recommendations?.length ?? 0} stocks</span>
               </div>
+              <button onClick={loadDhan} className="px-2 py-0.5 rounded-lg bg-slate-100 border border-slate-200 text-[8px] text-slate-600 font-semibold uppercase tracking-wider hover:bg-slate-200 transition-colors">
+                Refresh
+              </button>
             </div>
           </div>
         </div>
@@ -1265,14 +908,14 @@ export default function IntradayMatrixPanel() {
                       <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full opacity-15 blur-2xl"
                         style={{ backgroundColor: isBuy ? '#10b981' : '#ef4444' }} />
                       <div className="flex items-center justify-between mb-1.5 relative z-10">
-                        <span className="desk-metric-value font-mono">{rec.symbol}</span>
+                        <span className="text-[12px] font-black text-slate-900 font-mono">{rec.symbol}</span>
                         {rec.score != null && (
-                          <span className="text-[10px] sm:text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                          <span className="text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                             {rec.score.toFixed(0)}
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] sm:text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
+                      <p className="text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
                       <SparklineFlagSlider
                         ticker={rec.symbol}
                         sparklines={allSparklines[rec.symbol] ?? ({} as Record<SparkFlag, number[]>)}
@@ -1280,7 +923,7 @@ export default function IntradayMatrixPanel() {
                         onFlagChange={(f) => setFlag(rec.symbol, f)}
                         direction="LONG"
                       />
-                      <div className="space-y-1 text-[10px] sm:text-[8px] relative z-10">
+                      <div className="space-y-1 text-[8px] relative z-10">
                         <div className="flex justify-between"><span className="text-slate-400">Buy Above</span><span className="font-bold text-emerald-600">{rec.buyAbove?.toFixed(2) ?? '—'}</span></div>
                         <div className="flex justify-between"><span className="text-slate-400">T1 / T2</span><span className="font-bold text-blue-600">{rec.target1?.toFixed(2) ?? '—'} / {rec.target2?.toFixed(2) ?? '—'}</span></div>
                         <div className="flex justify-between"><span className="text-slate-400">Stop Loss</span><span className="font-bold text-red-500">{rec.stopLoss?.toFixed(2) ?? '—'}</span></div>
@@ -1315,14 +958,14 @@ export default function IntradayMatrixPanel() {
                         <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full opacity-15 blur-2xl"
                           style={{ backgroundColor: isBuy ? '#10b981' : '#ef4444' }} />
                         <div className="flex items-center justify-between mb-1.5 relative z-10">
-                          <span className="desk-metric-value font-mono">{rec.symbol}</span>
+                          <span className="text-[12px] font-black text-slate-900 font-mono">{rec.symbol}</span>
                           {rec.score != null && (
-                            <span className="text-[10px] sm:text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                            <span className="text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                               {rec.score.toFixed(0)}
                             </span>
                           )}
                         </div>
-                        <p className="text-[10px] sm:text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
+                        <p className="text-[8px] text-slate-500 mb-1 truncate relative z-10">{rec.name}</p>
                         <SparklineFlagSlider
                           ticker={rec.symbol}
                           sparklines={allSparklines[rec.symbol] ?? ({} as Record<SparkFlag, number[]>)}
@@ -1330,7 +973,7 @@ export default function IntradayMatrixPanel() {
                           onFlagChange={(f) => setFlag(rec.symbol, f)}
                           direction="SHORT"
                         />
-                        <div className="space-y-1 text-[10px] sm:text-[8px] relative z-10">
+                        <div className="space-y-1 text-[8px] relative z-10">
                           <div className="flex justify-between"><span className="text-slate-400">Sell Below</span><span className="font-bold text-rose-600">{rec.buyAbove?.toFixed(2) ?? '—'}</span></div>
                           <div className="flex justify-between"><span className="text-slate-400">T1 / T2</span><span className="font-bold text-blue-600">{rec.target1?.toFixed(2) ?? '—'} / {rec.target2?.toFixed(2) ?? '—'}</span></div>
                           <div className="flex justify-between"><span className="text-slate-400">Stop Loss</span><span className="font-bold text-red-500">{rec.stopLoss?.toFixed(2) ?? '—'}</span></div>
@@ -1346,54 +989,9 @@ export default function IntradayMatrixPanel() {
 
             {/* ── TRADE PLAN — from persistent picks (stable across the day) ── */}
             {(() => {
-              function enrichPlan(plan: any[], outcomes?: any[]) {
-                if (!plan?.length) return plan;
-                const outcomeMap = new Map((outcomes || []).map(o => [o.symbol, o]));
-                return plan.map(item => {
-                  const entry = item.entryPrice ?? item.buyAbove ?? 0;
-                  const sl = item.stopLoss ?? 0;
-                  const t1 = item.target1 ?? 0;
-                  const t2 = item.target2 ?? 0;
-                  const direction = item.direction || 'LONG';
-                  const risk = entry - sl;
-                  const rewardToT2 = Math.abs(t2 - entry);
-                  const rrT2 = risk > 0 ? rewardToT2 / risk : 0;
-                  const currentPrice = item.currentPrice ?? outcomeMap.get(item.symbol)?.currentPrice ?? entry;
-                  const backendOutcome = item.outcome ?? outcomeMap.get(item.symbol)?.outcome;
-                  // Gate: if pick has exitPlan (SCALE_TRAIL) or backend returned scaleTrail, do not
-                  // invent client-side binary T1/T2/SL hits — use backend outcome only.
-                  const hasScaleTrail = Boolean(item.exitPlan) || Boolean(backendOutcome?.scaleTrail) || Boolean(outcomeMap.get(item.symbol)?.exitPlan);
-                  const outcome = backendOutcome != null ? backendOutcome : (() => {
-                    if (hasScaleTrail) return null;
-                    if (!entry || !sl || !t1 || !t2) return null;
-                    if (direction === 'LONG') {
-                      if (currentPrice >= t2) return { label: 'TARGET 2 HIT', detail: `LTP ${currentPrice.toFixed(2)} >= T2 ${t2.toFixed(2)}`, hitLevel: 't2', ltp: currentPrice, pctChange: +(((currentPrice - entry) / entry) * 100), resolvedAt: new Date().toISOString() };
-                      if (currentPrice >= t1) return { label: 'TARGET 1 HIT', detail: `LTP ${currentPrice.toFixed(2)} >= T1 ${t1.toFixed(2)}`, hitLevel: 't1', ltp: currentPrice, pctChange: +(((currentPrice - entry) / entry) * 100), resolvedAt: new Date().toISOString() };
-                      if (currentPrice <= sl) return { label: 'STOP LOSS HIT', detail: `LTP ${currentPrice.toFixed(2)} <= SL ${sl.toFixed(2)}`, hitLevel: 'sl', ltp: currentPrice, pctChange: +(((currentPrice - entry) / entry) * 100), resolvedAt: new Date().toISOString() };
-                      return { label: 'PENDING', detail: `LTP ${currentPrice.toFixed(2)} | Entry ${entry.toFixed(2)} | ${(((currentPrice - entry) / entry) * 100).toFixed(2)}%`, hitLevel: null, ltp: currentPrice, pctChange: +(((currentPrice - entry) / entry) * 100), resolvedAt: null };
-                    } else {
-                      if (currentPrice <= t2) return { label: 'TARGET 2 HIT', detail: `LTP ${currentPrice.toFixed(2)} <= T2 ${t2.toFixed(2)}`, hitLevel: 't2', ltp: currentPrice, pctChange: +(((entry - currentPrice) / entry) * 100), resolvedAt: new Date().toISOString() };
-                      if (currentPrice <= t1) return { label: 'TARGET 1 HIT', detail: `LTP ${currentPrice.toFixed(2)} <= T1 ${t1.toFixed(2)}`, hitLevel: 't1', ltp: currentPrice, pctChange: +(((entry - currentPrice) / entry) * 100), resolvedAt: new Date().toISOString() };
-                      if (currentPrice >= sl) return { label: 'STOP LOSS HIT', detail: `LTP ${currentPrice.toFixed(2)} >= SL ${sl.toFixed(2)}`, hitLevel: 'sl', ltp: currentPrice, pctChange: +(((entry - currentPrice) / entry) * 100), resolvedAt: new Date().toISOString() };
-                      return { label: 'PENDING', detail: `LTP ${currentPrice.toFixed(2)} | Entry ${entry.toFixed(2)} | ${(((entry - currentPrice) / entry) * 100).toFixed(2)}%`, hitLevel: null, ltp: currentPrice, pctChange: +(((entry - currentPrice) / entry) * 100), resolvedAt: null };
-                    }
-                  })();
-                  return {
-                    ...item,
-                    riskPerShare: item.riskPerShare ?? (risk > 0 ? risk : 0),
-                    rrT2: item.rrT2 ?? (rrT2 > 0 ? parseFloat(rrT2.toFixed(1)) : 0),
-                    currentPrice,
-                    outcome,
-                    exitPlan: item.exitPlan ?? outcomeMap.get(item.symbol)?.exitPlan ?? null,
-                    exitState: item.exitState ?? outcomeMap.get(item.symbol)?.exitState ?? null,
-                  };
-                });
-              }
-
-              const rawLong = monitorMode && livePricesData ? (livePricesData.long?.length ? livePricesData.long : (dhanData?.tradePlan || [])) : (outcomesData?.long || dhanData?.tradePlan || []);
-              const rawShort = monitorMode && livePricesData ? (livePricesData.short?.length ? livePricesData.short : (dhanData?.shortTradePlan || [])) : (outcomesData?.short || dhanData?.shortTradePlan || []);
-              const planLong = enrichPlan(rawLong, outcomesData?.long);
-              const planShort = enrichPlan(rawShort, outcomesData?.short);
+              // Monitor mode uses livePricesData (fresh every 2s, no external calls)
+              const planLong = monitorMode && livePricesData ? (livePricesData.long || []) : (outcomesData?.long || []);
+              const planShort = monitorMode && livePricesData ? (livePricesData.short || []) : (outcomesData?.short || []);
               const planTime = monitorMode && livePricesData?.updatedAt
                 ? new Date(livePricesData.updatedAt).toLocaleTimeString('en-IN', { hour12: false })
                 : outcomesTime;
@@ -1403,49 +1001,28 @@ export default function IntradayMatrixPanel() {
 
               return (
                 <>
-                  <div className="mb-3">
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <span className={`glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
-                        monitorMode
-                          ? sessionClosed
-                            ? 'text-slate-600'
-                            : marketOpen
-                              ? 'text-emerald-700'
-                              : 'text-amber-700'
-                          : 'text-amber-700'
-                      }`}>
-                        {monitorMode && !sessionClosed && marketOpen && (
-                          <span className="desk-breathe-dot shrink-0" aria-hidden />
-                        )}
-                        {monitorMode && sessionClosed && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0" aria-hidden />
-                        )}
-                        {(!monitorMode || (!sessionClosed && !marketOpen)) && (
-                          <span className="desk-breathe-dot is-warn shrink-0" aria-hidden />
-                        )}
-                        TRADE PLAN — CONFIGURED SLEEVE{' '}
-                        {monitorMode &&
-                          (sessionClosed
-                            ? '(MONITOR · POLL HALTED)'
-                            : marketOpen
-                              ? '(LIVE MONITOR)'
-                              : '(MONITOR · MARKET CLOSED)')}
+                  {sessionClosed && (
+                    <div className="mb-3 flex items-center gap-2 rounded-md bg-slate-100 border border-slate-300 px-3 py-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                      <span className="text-[11px] uppercase tracking-wider text-slate-600 font-bold">
+                        Market Closed — Session Finalized
                       </span>
-                      <span className="glass-pill px-2 py-0.5 text-[9px] text-slate-400 tabular-nums">updated @{planTime || '—'}</span>
+                      <span className="text-[9px] text-slate-500 ml-1">
+                        Unfilled picks marked NOT TRIGGERED. Monitoring halted.
+                      </span>
+                    </div>
+                  )}
+                  <div className="mb-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`w-1.5 h-1.5 rounded-full ${monitorMode ? (sessionClosed ? 'bg-slate-500' : 'bg-emerald-500') : 'bg-amber-500'}`} />
+                      <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
+                        TRADE PLAN — ₹5,00,000 DEPLOYMENT {monitorMode && '(LIVE MONITOR)'}
+                      </span>
+                      <span className="text-[9px] text-slate-400 ml-2">(updated @{planTime || '—'})</span>
                     </div>
 
-                    {/* Trade plan — LONG: mobile cards / md+ table */}
-                    <div className="md:hidden space-y-2">
-                      {planLong.slice(0, 5).map((tp, idx) => (
-                        <BookPlanMobileCard
-                          key={`lp-long-m-${tp.symbol}-${idx}`}
-                          tp={tp}
-                          entryClass="text-emerald-600"
-                          entryLabel="Buy"
-                        />
-                      ))}
-                    </div>
-                    <div className="hidden md:block overflow-x-auto desk-scroll-x">
+                    {/* Trade plan table — LONG */}
+                    <div className="overflow-x-auto">
                       <table className="w-full text-[12px] border-collapse">
                         <thead>
                           <tr className="bg-slate-100 text-slate-600">
@@ -1460,22 +1037,31 @@ export default function IntradayMatrixPanel() {
                             <th className="p-1.5 text-center font-bold uppercase tracking-wider">Outcome</th>
                           </tr>
                         </thead>
-                        <tbody ref={longBookRef}>
+                        <tbody>
                           {planLong.slice(0, 5).map((tp, idx) => (
-                            <BookPlanRow
-                              key={`lp-long-${tp.symbol}-${idx}`}
-                              tp={tp}
-                              entryClass="text-emerald-600"
-                              hoverClass="hover:bg-slate-50"
-                            />
+                            <tr key={`lp-long-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer">
+                              <td className="p-1.5 font-bold text-slate-900">
+                                <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
+                              </td>
+                              <td className="p-1.5 text-right font-mono text-slate-900 font-bold">{tp.currentPrice != null ? tp.currentPrice.toFixed(2) : '—'}</td>
+                              <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">{tp.entryPrice?.toFixed(2) ?? '—'}</td>
+                              <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
+                              <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
+                              <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
+                              <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
+                              <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
+                              <td className="p-1.5 text-center">
+                                <OutcomeBadge outcome={tp.outcome} />
+                              </td>
+                            </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
                   </div>
 
-                  {/* ── LONG CAPITAL ALLOCATION TABLE — same source as trade plan ── */}
-                  {planLong.filter(p => (p.approxQty ?? 0) > 0).length > 0 && (
+                  {/* ── LONG CAPITAL ALLOCATION TABLE ────────────────────────── */}
+                  {dhanData?.capitalAllocation && dhanData.capitalAllocation.length > 0 && (
                     <div className="mb-3">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -1483,7 +1069,7 @@ export default function IntradayMatrixPanel() {
                           LONG CAPITAL ALLOCATION (~₹1,00,000 per stock)
                         </span>
                       </div>
-                      <div className="overflow-x-auto desk-scroll-x">
+                      <div className="overflow-x-auto">
                         <table className="w-full text-[12px] border-collapse">
                           <thead>
                             <tr className="bg-emerald-50 text-slate-600">
@@ -1495,28 +1081,28 @@ export default function IntradayMatrixPanel() {
                             </tr>
                           </thead>
                           <tbody>
-                            {planLong.filter(p => (p.approxQty ?? 0) > 0).slice(0, 5).map((ca, idx) => (
+                            {dhanData.capitalAllocation.map((ca, idx) => (
                               <tr key={`lca-${ca.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-emerald-50 cursor-pointer">
                                 <td className="p-1.5 font-bold text-slate-900">
                                   <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(ca.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{ca.symbol}</a>
                                 </td>
-                                <td className="p-1.5 text-right font-mono text-slate-700">₹{ca.entryPrice?.toFixed(2) ?? '—'}</td>
-                                <td className="p-1.5 text-right font-mono text-slate-700">{ca.approxQty?.toLocaleString('en-IN') ?? '—'}</td>
-                                <td className="p-1.5 text-right font-mono text-slate-700">₹{(ca.deployedCapital ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                                <td className="p-1.5 text-right font-mono text-red-600">₹{(ca.riskAmount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                                <td className="p-1.5 text-right font-mono text-slate-600">₹{ca.buyAbove?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-slate-700 font-bold">{ca.approxQty?.toLocaleString('en-IN') ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-emerald-600 font-bold">₹{ca.deployedCapital?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-red-500">₹{ca.riskAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ?? '—'}</td>
                               </tr>
                             ))}
                           </tbody>
                           <tfoot>
-                            <tr className="total-row-long font-bold">
-                              <td className="p-1.5 uppercase tracking-wider desk-panel-title">TOTAL</td>
+                            <tr className="bg-emerald-100 font-bold text-slate-900">
+                              <td className="p-1.5 uppercase tracking-wider text-[12px]">TOTAL</td>
                               <td className="p-1.5"></td>
                               <td className="p-1.5"></td>
                               <td className="p-1.5 text-right font-mono text-emerald-700 text-[12px]">
-                                ≈ ₹{planLong.filter(p => (p.approxQty ?? 0) > 0).slice(0, 5).reduce((s, c) => s + (c.deployedCapital ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                ≈ ₹{dhanData.capitalAllocation.reduce((s, c) => s + (c.deployedCapital ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                               </td>
                               <td className="p-1.5 text-right font-mono text-red-600 text-[12px]">
-                                ≈ ₹{planLong.filter(p => (p.approxQty ?? 0) > 0).slice(0, 5).reduce((s, c) => s + (c.riskAmount ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                ≈ ₹{dhanData.capitalAllocation.reduce((s, c) => s + (c.riskAmount ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                               </td>
                             </tr>
                           </tfoot>
@@ -1528,43 +1114,13 @@ export default function IntradayMatrixPanel() {
                   {/* ── SHORT TRADE PLAN — from persistent picks (stable across the day) ── */}
                   {planShort.length > 0 && (
                     <div className="mb-3">
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <span className={`glass-pill inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
-                          monitorMode
-                            ? sessionClosed
-                              ? 'text-slate-600'
-                              : 'text-rose-700'
-                            : 'text-rose-700'
-                        }`}>
-                          {monitorMode && !sessionClosed && (
-                            <span className="desk-breathe-dot shrink-0" aria-hidden />
-                          )}
-                          {monitorMode && sessionClosed && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0" aria-hidden />
-                          )}
-                          {!monitorMode && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" aria-hidden />
-                          )}
-                          SHORT TRADE PLAN — SELL BOOK (CONFIGURED SLEEVE){' '}
-                          {monitorMode &&
-                            (sessionClosed
-                              ? '(MONITOR · POLL HALTED)'
-                              : marketOpen
-                                ? '(LIVE MONITOR)'
-                                : '(MONITOR · MARKET CLOSED)')}
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`w-1.5 h-1.5 rounded-full ${monitorMode ? 'bg-emerald-500' : 'bg-rose-500'} animate-pulse`} />
+                        <span className="text-[12px] uppercase tracking-wider text-slate-500 font-bold">
+                          SHORT TRADE PLAN — SELL BOOK (₹5,00,000 DEPLOYMENT) {monitorMode && '(LIVE MONITOR)'}
                         </span>
                       </div>
-                      <div className="md:hidden space-y-2">
-                        {planShort.slice(0, 5).map((tp, idx) => (
-                          <BookPlanMobileCard
-                            key={`lp-short-m-${tp.symbol}-${idx}`}
-                            tp={tp}
-                            entryClass="text-rose-600"
-                            entryLabel="Sell"
-                          />
-                        ))}
-                      </div>
-                      <div className="hidden md:block overflow-x-auto desk-scroll-x">
+                      <div className="overflow-x-auto">
                         <table className="w-full text-[12px] border-collapse">
                           <thead>
                             <tr className="bg-rose-50 text-slate-600">
@@ -1579,14 +1135,23 @@ export default function IntradayMatrixPanel() {
                               <th className="p-1.5 text-center font-bold uppercase tracking-wider">Outcome</th>
                             </tr>
                           </thead>
-                          <tbody ref={shortBookRef}>
+                          <tbody>
                             {planShort.slice(0, 5).map((tp, idx) => (
-                              <BookPlanRow
-                                key={`lp-short-${tp.symbol}-${idx}`}
-                                tp={tp}
-                                entryClass="text-rose-600"
-                                hoverClass="hover:bg-rose-50"
-                              />
+                              <tr key={`lp-short-${tp.symbol}-${idx}`} className="border-b border-slate-100 hover:bg-rose-50 cursor-pointer">
+                                <td className="p-1.5 font-bold text-slate-900">
+                                  <a href={`https://lemonn.co.in/stocks/${encodeURIComponent(tp.symbol.toLowerCase())}`} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">{tp.symbol}</a>
+                                </td>
+                                <td className="p-1.5 text-right font-mono text-slate-900 font-bold">{tp.currentPrice != null ? tp.currentPrice.toFixed(2) : '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-rose-600 font-bold">{tp.entryPrice?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-red-500 font-bold">{tp.stopLoss?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-blue-600">{tp.target1?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-blue-600 font-bold">{tp.target2?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-slate-600">₹{tp.riskPerShare?.toFixed(2) ?? '—'}</td>
+                                <td className="p-1.5 text-right font-mono text-slate-700 font-bold">~{tp.rrT2?.toFixed(1) ?? '—'}</td>
+                                <td className="p-1.5 text-center">
+                                  <OutcomeBadge outcome={tp.outcome} />
+                                </td>
+                              </tr>
                             ))}
                           </tbody>
                         </table>
@@ -1606,7 +1171,7 @@ export default function IntradayMatrixPanel() {
                     SHORT CAPITAL ALLOCATION (~₹1,00,000 per stock)
                   </span>
                 </div>
-                <div className="overflow-x-auto desk-scroll-x">
+                <div className="overflow-x-auto">
                   <table className="w-full text-[12px] border-collapse">
                     <thead>
                       <tr className="bg-rose-50 text-slate-600">
@@ -1631,8 +1196,8 @@ export default function IntradayMatrixPanel() {
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="total-row-short font-bold">
-                        <td className="p-1.5 uppercase tracking-wider desk-panel-title">TOTAL</td>
+                      <tr className="bg-rose-100 font-bold text-slate-900">
+                        <td className="p-1.5 uppercase tracking-wider text-[12px]">TOTAL</td>
                         <td className="p-1.5"></td>
                         <td className="p-1.5"></td>
                         <td className="p-1.5 text-right font-mono text-rose-700 text-[12px]">
@@ -1661,8 +1226,8 @@ export default function IntradayMatrixPanel() {
       {/* Footer */}
       <div className="text-center text-[7px] text-slate-400 pt-1">
         {monitorMode
-          ? buildMonitorStatusLine(livePricesData, !!sessionClosed, !!marketOpen)
-          : 'lemonn.co.in · Dhan ScanX + feed_scanner · Research refresh ~2 minutes'}
+          ? 'FIXED PLAN ACTIVE · Monitor mode · Live prices every 2s · No external API calls'
+          : 'lemonn.co.in · Dhan ScanX + feed_scanner · Data refreshes every 2 minutes'}
       </div>
 
       <style>{`
@@ -1684,7 +1249,6 @@ export default function IntradayMatrixPanel() {
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-      </div>
     </div>
   );
 }

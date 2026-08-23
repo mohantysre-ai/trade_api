@@ -5,6 +5,10 @@ credentials-file: /etc/cloudflared/credentials.json
 ingress:
   - hostname: calendar.sigq.in
     service: http://host.docker.internal:8088
+  - hostname: job.sigq.in
+    service: http://host.docker.internal:7777
+  - hostname: mantra.sigq.in
+    service: http://host.docker.internal:7800
   - hostname: sigq.in
     service: http://frontend:3000
   - service: http_status:404

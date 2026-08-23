@@ -4,7 +4,9 @@
 ## Status
 - Public URLs:
   - https://sigq.in → IROS desk (frontend:3000)
-  - https://calendar.sigq.in → Panchang platform (panchang-api:8089)
+  - https://calendar.sigq.in → Panchang platform (host:8088)
+  - https://job.sigq.in → host localhost:7777
+  - https://mantra.sigq.in → host localhost:7800
 - Legacy subdomain references removed; public URL is sigq.in
 - Logo: iros-terminal/public/iros-logo.svg (+ png favicon)
 

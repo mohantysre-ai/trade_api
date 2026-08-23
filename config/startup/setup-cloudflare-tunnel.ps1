@@ -7,7 +7,7 @@
   1) Ensures cloudflared is available
   2) Opens browser login (you must approve + select sigq.in zone)
   3) Creates tunnel "iros-desk" if missing
-  4) Routes DNS calendar.sigq.in and sigq.in -> tunnel
+  4) Routes DNS calendar/job/mantra.sigq.in and sigq.in -> tunnel
   5) Writes %USERPROFILE%\.cloudflared\config.yml
 
 .NOTES
@@ -23,6 +23,8 @@ $CloudflaredDir = Join-Path $env:USERPROFILE ".cloudflared"
 $ConfigPath = Join-Path $CloudflaredDir "config.yml"
 $Ingress = @(
   @{ Hostname = "calendar.sigq.in"; Service = "http://127.0.0.1:8088" },
+  @{ Hostname = "job.sigq.in"; Service = "http://127.0.0.1:7777" },
+  @{ Hostname = "mantra.sigq.in"; Service = "http://127.0.0.1:7800" },
   @{ Hostname = "sigq.in"; Service = "http://127.0.0.1:3000" }
 )
 
@@ -166,6 +168,8 @@ Write-Host "1. Start IROS:  config\startup\start_app.bat"
 Write-Host "2. Start tunnel: config\startup\start-tunnel.bat"
 Write-Host "3. Open: https://sigq.in"
 Write-Host "4. Calendar: https://calendar.sigq.in"
+Write-Host "5. Job:      https://job.sigq.in"
+Write-Host "6. Mantra:   https://mantra.sigq.in"
 Write-Host ""
-Write-Host "Optional: Cloudflare Zero Trust -> Access -> protect sigq.in/calendar.sigq.in with email login."
+Write-Host "Optional: Cloudflare Zero Trust -> Access -> protect sigq.in hostnames with email login."
 Write-Host ""

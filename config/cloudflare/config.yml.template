@@ -6,6 +6,10 @@ credentials-file: C:\Users\REPLACE_ME\.cloudflared\REPLACE_TUNNEL_UUID.json
 ingress:
   - hostname: calendar.sigq.in
     service: http://127.0.0.1:8088
+  - hostname: job.sigq.in
+    service: http://127.0.0.1:7777
+  - hostname: mantra.sigq.in
+    service: http://127.0.0.1:7800
   - hostname: sigq.in
     service: http://127.0.0.1:3000
   - service: http_status:404
