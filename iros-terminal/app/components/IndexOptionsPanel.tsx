@@ -53,7 +53,7 @@ type Radar = {
   disclaimer?: string;
   candidates: Candidate[];
   selected: Candidate[];
-  limits?: { maxDailyEntries: number; maxConcurrent: number; maxPerCorrelationBucket: number; scoreFloor?: number; buySideCap?: number };
+  limits?: { minDailyEntries?: number; maxDailyEntries: number; maxConcurrent: number; maxPerCorrelationBucket: number; scoreFloor?: number; buySideCap?: number; huntMode?: string };
   reentryPolicy?: {
     maxAttemptsPerIndex: number;
     targetCooldownMin: number;
@@ -194,7 +194,9 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="desk-pill desk-pill--muted">Manual only</span>
-            <span className="desk-pill desk-pill--muted">Max {radar?.limits?.maxDailyEntries ?? 10}/day</span>
+            <span className="desk-pill desk-pill--muted">Continuous hunt</span>
+            <span className="desk-pill desk-pill--muted">No minimum</span>
+            <span className="desk-pill desk-pill--muted">Max {radar?.limits?.maxDailyEntries ?? 20}/day</span>
             <span className="desk-pill desk-pill--muted">Max {radar?.limits?.maxConcurrent ?? 2} open</span>
             {radar?.cacheStatus === 'STALE' && <span className="desk-pill desk-pill--warn">Cached</span>}
           </div>
