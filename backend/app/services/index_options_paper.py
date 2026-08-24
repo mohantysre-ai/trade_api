@@ -11,7 +11,8 @@ from datetime import datetime, time as dt_time
 from pathlib import Path
 from typing import Any
 
-from .angel_index_options import IST_ZONE, _float
+from ..utils.symbols import Instrument
+from .angel_index_options import IST_ZONE, _float, load_angel_scrip_master
 from .index_options_engine import (
     MAX_CONCURRENT_TRADES,
     MAX_DAILY_ENTRIES,
@@ -64,6 +65,51 @@ def _mark_for(position: dict[str, Any], candidates: list[dict[str, Any]]) -> flo
     return None
 
 
+def _hydrate_locked_instruments(positions: list[dict[str, Any]], candidates: list[dict[str, Any]]) -> None:
+    by_symbol: dict[str, dict[str, Any]] = {}
+    for row in candidates:
+        for contract in row.get("chain") or []:
+            if isinstance(contract, dict) and contract.get("symbol"):
+                by_symbol[str(contract["symbol"])] = contract
+    unresolved = [row for row in positions if not row.get("token") or not row.get("exchange")]
+    if unresolved:
+        try:
+            for raw in load_angel_scrip_master():
+                symbol = str(raw.get("symbol") or "")
+                if symbol and symbol not in by_symbol:
+                    by_symbol[symbol] = {"token": raw.get("token"), "exchange": raw.get("exch_seg")}
+        except Exception:
+            pass
+    for position in positions:
+        contract = by_symbol.get(str(position.get("symbol") or "")) or {}
+        if not position.get("token") and contract.get("token"):
+            position["token"] = str(contract["token"])
+        if not position.get("exchange") and (contract.get("exchange") or contract.get("exch_seg")):
+            position["exchange"] = str(contract.get("exchange") or contract.get("exch_seg"))
+
+
+def _direct_locked_marks(client: Any, positions: list[dict[str, Any]]) -> tuple[dict[str, float], str | None]:
+    if client is None:
+        return {}, None
+    instruments: list[Instrument] = []
+    for position in positions:
+        symbol, token, exchange = str(position.get("symbol") or ""), str(position.get("token") or ""), str(position.get("exchange") or "")
+        if symbol and token and exchange:
+            instruments.append(Instrument(f"PAPER:{symbol}", exchange, symbol, token, symbol))
+    if not instruments:
+        return {}, "LOCKED_CONTRACT_TOKEN_UNAVAILABLE" if positions else None
+    try:
+        quotes = client.fetch_batch_quotes(instruments)
+    except Exception as exc:
+        return {}, str(exc)
+    marks: dict[str, float] = {}
+    for instrument in instruments:
+        mark = _float((quotes.get(instrument.key) or {}).get("ltp"))
+        if mark is not None and mark > 0:
+            marks[instrument.tradingsymbol] = mark
+    return marks, None
+
+
 def _close(position: dict[str, Any], mark: float, reason: str, now: datetime) -> dict[str, Any]:
     entry, qty = float(position["entryPremium"]), int(position["quantity"])
     return {**position, "status": "CLOSED", "exitPremium": round(mark, 2), "exitReason": reason,
@@ -107,6 +153,7 @@ def _new_position(row: dict[str, Any], now: datetime, sequence: int) -> dict[str
         "id": f"{now.astimezone(IST_ZONE).date().isoformat()}-{sequence:02d}-{row['key']}",
         "index": row["key"], "bucket": row["bucket"], "direction": row["direction"],
         "symbol": contract.get("symbol"), "strike": contract.get("strike"), "expiry": contract.get("expiry"),
+        "token": contract.get("token"), "exchange": contract.get("exchange"),
         "quantity": int(lot), "lotSize": int(lot), "entryPremium": round(premium, 2),
         "currentPremium": round(premium, 2), "peakPremium": round(premium, 2),
         "initialStopPremium": round(stop, 2), "effectiveStopPremium": round(stop, 2),
@@ -134,19 +181,33 @@ def _governor(book: dict[str, Any]) -> IndexOptionReEntryGovernor:
     return governor
 
 
-def reconcile_paper_book(radar: dict[str, Any], *, now: datetime | None = None, persist: bool = True) -> dict[str, Any]:
+def reconcile_paper_book(
+    radar: dict[str, Any], *, client: Any = None, now: datetime | None = None, persist: bool = True,
+) -> dict[str, Any]:
     clock = (now or datetime.now(IST_ZONE)).astimezone(IST_ZONE)
     session = clock.date().isoformat()
     with _PAPER_LOCK:
         book = _load_book(session)
         candidates = radar.get("candidates") if isinstance(radar.get("candidates"), list) else []
+        _hydrate_locked_instruments(book["open"], candidates)
+        direct_marks, direct_error = _direct_locked_marks(client, book["open"])
         next_open: list[dict[str, Any]] = []
         closed_now: list[dict[str, Any]] = []
         for position in book["open"]:
-            mark = _mark_for(position, candidates)
+            mark = direct_marks.get(str(position.get("symbol") or ""))
+            mark_source = "ANGEL_DIRECT_LOCKED_CONTRACT"
             if mark is None:
+                mark = _mark_for(position, candidates)
+                mark_source = "RADAR_CHAIN_FALLBACK"
+            if mark is None:
+                position["markStatus"] = "UNAVAILABLE"
+                position["markError"] = direct_error
                 next_open.append(position)
                 continue
+            position["markSource"] = mark_source
+            position["markedAt"] = clock.isoformat()
+            position["markStatus"] = "LIVE"
+            position["markError"] = direct_error if mark_source != "ANGEL_DIRECT_LOCKED_CONTRACT" else None
             active, closed = _update_open(position, mark, clock)
             if active:
                 next_open.append(active)

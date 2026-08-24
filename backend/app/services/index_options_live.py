@@ -65,7 +65,7 @@ def compose_live_index_options_radar(
         book["indexOptions"] = option_data_to_strategy_inputs(option_data, book)
         book["indexOptionProvider"] = option_data
     result = build_index_options_radar(book)
-    result["paperBook"] = reconcile_paper_book(result, persist=persist)
+    result["paperBook"] = reconcile_paper_book(result, client=client, persist=persist)
     result["provider"] = "ANGEL_ONE_WITH_SCANX_AND_LEMONN_FALLBACK"
     result["providerEvidence"] = book.get("indexOptionProvider")
     if persist:

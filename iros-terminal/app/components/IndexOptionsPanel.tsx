@@ -27,7 +27,7 @@ type Candidate = {
   score: number | null;
   missingInputs: string[];
   failedGates: string[];
-  contract?: { symbol?: string; strike?: number; expiry?: string; ltp?: number; delta?: number; gamma?: number; theta?: number; vega?: number; iv?: number; lotSize?: number } | null;
+  contract?: { symbol?: string; strike?: number; expiry?: string; ltp?: number; delta?: number; gamma?: number; theta?: number; vega?: number; iv?: number; lotSize?: number; token?: string; exchange?: string } | null;
   providerStatus?: string | null;
   dataSource?: string | null;
   expiry?: string | null;
@@ -72,6 +72,7 @@ type PaperPosition = {
   id: string; index: string; symbol: string; direction: string; quantity: number; status: string;
   entryPremium: number; currentPremium: number; effectiveStopPremium: number; targetPremium: number;
   unrealizedPnl?: number; pnl?: number; pnlPct?: number; exitReason?: string; enteredAt?: string;
+  markSource?: string; markedAt?: string; markStatus?: string; markError?: string | null;
 };
 
 const GATE_LABEL: Record<string, string> = {
@@ -185,13 +186,26 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    loadRadar('/api/index-options', controller.signal)
-      .then(setRadar)
-      .catch((error) => {
-        if (!controller.signal.aborted) setRadar({ success: false, candidates: [], selected: [], error: error instanceof Error ? error.message : 'Radar unavailable' });
-      })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
+    let inFlight = false;
+    const refresh = () => {
+      if (inFlight || controller.signal.aborted) return;
+      inFlight = true;
+      loadRadar('/api/index-options', controller.signal)
+        .then(setRadar)
+        .catch((error) => {
+          if (!controller.signal.aborted) setRadar({ success: false, candidates: [], selected: [], error: error instanceof Error ? error.message : 'Radar unavailable' });
+        })
+        .finally(() => {
+          inFlight = false;
+          if (!controller.signal.aborted) setLoading(false);
+        });
+    };
+    refresh();
+    const id = window.setInterval(refresh, 15_000);
+    return () => {
+      window.clearInterval(id);
+      controller.abort();
+    };
   }, [refreshToken]);
 
   return (
@@ -318,7 +332,10 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
                       <td>₹{fmtNum(position.entryPremium)}</td><td>₹{fmtNum(position.currentPremium)}</td>
                       <td>₹{fmtNum(position.effectiveStopPremium)}</td><td>₹{fmtNum(position.targetPremium)}</td>
                       <td className={(pnl ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}>₹{fmtNum(pnl)}</td>
-                      <td>{position.status === 'CLOSED' ? position.exitReason ?? 'CLOSED' : 'OPEN'}</td>
+                      <td>
+                        <div>{position.status === 'CLOSED' ? position.exitReason ?? 'CLOSED' : 'OPEN'}</div>
+                        {position.markSource && <div className="text-[8px] text-[var(--fg-subtle)]">{position.markSource.replaceAll('_', ' ')}</div>}
+                      </td>
                     </tr>
                   );
                 })}

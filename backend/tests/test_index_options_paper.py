@@ -5,7 +5,8 @@ from app.services.index_options_paper import reconcile_paper_book
 
 
 def _candidate(mark=100.0, *, key="BANKNIFTY", bucket="FINANCIAL", lot=30):
-    contract = {"symbol": f"{key}TESTPE", "strike": 57000, "expiry": "2026-08-25", "ltp": mark, "lotSize": lot}
+    contract = {"symbol": f"{key}TESTPE", "strike": 57000, "expiry": "2026-08-25", "ltp": mark, "lotSize": lot,
+                "token": "12345", "exchange": "NFO"}
     return {
         "key": key, "bucket": bucket, "direction": "PUT", "state": "ELIGIBLE", "score": 95.0,
         "contract": contract, "chain": [contract], "dataSource": "ANGEL_ONE",
@@ -59,3 +60,21 @@ def test_open_position_squares_off_before_session_end(tmp_path, monkeypatch):
     closed = reconcile_paper_book(_radar(105), now=datetime(2026, 8, 24, 15, 29, tzinfo=IST_ZONE))
     assert closed["open"] == []
     assert closed["closed"][0]["exitReason"] == "EOD_SQUAREOFF"
+
+
+def test_open_position_uses_direct_locked_contract_quote_not_moving_atm_chain(tmp_path, monkeypatch):
+    monkeypatch.setenv("INDEX_OPTIONS_PAPER_BOOK_FILE", str(tmp_path / "paper.json"))
+
+    class Client:
+        def fetch_batch_quotes(self, instruments):
+            assert instruments[0].tradingsymbol == "BANKNIFTYTESTPE"
+            return {instruments[0].key: {"ltp": 111}}
+
+    now = datetime(2026, 8, 24, 11, 0, tzinfo=IST_ZONE)
+    reconcile_paper_book(_radar(100), client=Client(), now=now)
+    # The radar chain is still stale at 100; the exact locked-token quote is 111.
+    marked = reconcile_paper_book(_radar(100), client=Client(), now=now + timedelta(seconds=15))
+    position = marked["open"][0]
+    assert position["currentPremium"] == 111
+    assert position["unrealizedPnl"] == 330
+    assert position["markSource"] == "ANGEL_DIRECT_LOCKED_CONTRACT"
