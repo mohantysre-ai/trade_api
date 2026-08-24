@@ -6,7 +6,7 @@ import math
 import os
 import threading
 import time
-from datetime import date, datetime, time as dt_time, timezone
+from datetime import date, datetime, time as dt_time, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
@@ -31,6 +31,21 @@ _MASTER_CACHE: tuple[float, list[dict[str, Any]]] = (0.0, [])
 _OPTION_LOCK = threading.Lock()
 _OPTION_CACHE: tuple[float, dict[str, Any]] = (0.0, {})
 _RADAR_REFRESH_LOCK = threading.Lock()
+
+# A transparent fallback when an official weight file has not yet been attached
+# to the market snapshot. Values are relative leader weights, not claimed as the
+# complete official index composition. Deployments can override these by
+# populating snapshot["indexConstituentWeights"] from their licensed source.
+INDEX_LEADER_WEIGHTS: dict[str, tuple[tuple[str, float], ...]] = {
+    "NIFTY": (("HDFCBANK", 13.0), ("ICICIBANK", 9.0), ("RELIANCE", 8.5), ("BHARTIARTL", 4.8),
+              ("INFY", 4.5), ("LT", 3.2), ("ITC", 3.0), ("SBIN", 2.9), ("AXISBANK", 2.8), ("KOTAKBANK", 2.5)),
+    "BANKNIFTY": (("HDFCBANK", 29.0), ("ICICIBANK", 23.0), ("SBIN", 11.0), ("KOTAKBANK", 10.0),
+                  ("AXISBANK", 9.0), ("INDUSINDBK", 3.0), ("BANKBARODA", 3.0), ("FEDERALBNK", 2.0)),
+    "FINNIFTY": (("HDFCBANK", 24.0), ("ICICIBANK", 20.0), ("SBIN", 9.0), ("BAJFINANCE", 8.0),
+                 ("KOTAKBANK", 8.0), ("AXISBANK", 7.0), ("BAJAJFINSV", 5.0), ("HDFCLIFE", 3.0), ("SBILIFE", 3.0)),
+    "SENSEX": (("HDFCBANK", 14.0), ("ICICIBANK", 10.0), ("RELIANCE", 9.0), ("BHARTIARTL", 6.0),
+                ("INFY", 5.5), ("LT", 4.0), ("ITC", 3.5), ("SBIN", 3.5), ("AXISBANK", 3.0), ("KOTAKBANK", 3.0)),
+}
 
 
 def _float(value: Any) -> float | None:
@@ -169,37 +184,47 @@ def ist_session_bounds(session_date: date) -> tuple[datetime, datetime]:
     return start, end
 
 
-def index_structure_from_candles(candles: list[list[Any]]) -> dict[str, Any]:
-    """Derive direction only after a 5-minute close clears ORB and aligned EMAs."""
+def index_structure_from_candles(candles: list[list[Any]], *, session_date: date | None = None) -> dict[str, Any]:
+    """Derive direction from today's ORB, with prior bars allowed to seed EMA20."""
     parsed = [row for row in candles if isinstance(row, list) and len(row) >= 5 and _float(row[4]) is not None]
+    current = parsed
+    if session_date is not None:
+        current = [row for row in parsed if (parse_candle_ts(row[0]) and parse_candle_ts(row[0]).astimezone(IST_ZONE).date() == session_date)]
     closes = [_float(row[4]) for row in parsed]
     closes = [value for value in closes if value is not None]
     ema9, ema20 = _ema(closes, 9), _ema(closes, 20)
-    incomplete = {"status": "DATA_INCOMPLETE", "direction": None, "barCount": len(parsed), "last": closes[-1] if closes else None}
-    if len(parsed) < 20 or ema9 is None or ema20 is None:
+    current_closes = [_float(row[4]) for row in current]
+    current_closes = [value for value in current_closes if value is not None]
+    incomplete = {"status": "DATA_INCOMPLETE", "direction": None, "barCount": len(current),
+                  "seedBarCount": max(0, len(parsed) - len(current)), "last": current_closes[-1] if current_closes else None}
+    if len(current) < 3 or len(parsed) < 20 or ema9 is None or ema20 is None:
         return incomplete
-    orb_rows = parsed[:3]
+    orb_rows = current[:3]
     orb_high = max(_float(row[2]) or -math.inf for row in orb_rows)
     orb_low = min(_float(row[3]) or math.inf for row in orb_rows)
-    last = closes[-1]
+    last = current_closes[-1]
     call = last > orb_high and last > ema9 > ema20
     put = last < orb_low and last < ema9 < ema20
     return {
         "status": "CONFIRMED" if call or put else "NO_BREAKOUT",
         "direction": "CALL" if call else "PUT" if put else None,
         "last": last, "ema9": round(ema9, 4), "ema20": round(ema20, 4),
-        "orbHigh": orb_high, "orbLow": orb_low, "barCount": len(parsed),
+        "orbHigh": orb_high, "orbLow": orb_low, "barCount": len(current),
+        "seedBarCount": max(0, len(parsed) - len(current)),
     }
 
 
-def walk_forward_structure(candles: list[list[Any]]) -> dict[str, Any]:
+def walk_forward_structure(candles: list[list[Any]], *, session_date: date | None = None) -> dict[str, Any]:
     """First 5m close that confirms ORB+EMA, plus the end-of-window structure."""
     parsed = [row for row in candles if isinstance(row, list) and len(row) >= 5 and _float(row[4]) is not None]
-    eod = index_structure_from_candles(parsed)
+    eod = index_structure_from_candles(parsed, session_date=session_date)
     confirmed_at = None
     first_direction = None
-    for index in range(19, len(parsed)):
-        snapshot = index_structure_from_candles(parsed[: index + 1])
+    for index in range(len(parsed)):
+        stamp = parse_candle_ts(parsed[index][0])
+        if session_date is not None and (stamp is None or stamp.astimezone(IST_ZONE).date() != session_date):
+            continue
+        snapshot = index_structure_from_candles(parsed[: index + 1], session_date=session_date)
         direction = snapshot.get("direction")
         if direction in {"CALL", "PUT"}:
             confirmed_at = parse_candle_ts(parsed[index][0])
@@ -210,6 +235,30 @@ def walk_forward_structure(candles: list[list[Any]]) -> dict[str, Any]:
         "firstDirection": first_direction,
         "confirmedAt": confirmed_at.isoformat() if confirmed_at else None,
     }
+
+
+def _fetch_candles_with_retry(
+    client: Any,
+    exchange: str,
+    token: str,
+    start: datetime,
+    end: datetime,
+    *,
+    attempts: int = 3,
+) -> tuple[list[list[Any]], str | None]:
+    """Angel historical calls are per token; retry transient/empty responses."""
+    last_error: str | None = None
+    for attempt in range(max(1, attempts)):
+        try:
+            rows = client.fetch_candles(exchange, token, "FIVE_MINUTE", start, end)
+            if rows:
+                return rows, None
+            last_error = "EMPTY_CANDLE_RESPONSE"
+        except Exception as exc:
+            last_error = str(exc)
+        if attempt + 1 < attempts:
+            time.sleep(0.25 * (attempt + 1))
+    return [], last_error
 
 
 def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, Any]) -> tuple[str, dict[str, Any]]:
@@ -243,16 +292,30 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
             chain.append(_quote_row(contract, quotes.get(f"{key}:{contract.get('token')}") or {}, greek))
         future_quote = quotes.get(f"{key}:FUT") if future else None
         now_ist = datetime.now(IST_ZONE)
-        session_start, _session_end = ist_session_bounds(now_ist.date())
-        try:
-            candles = client.fetch_candles(config["exchange"], config["spotToken"], "FIVE_MINUTE", session_start, now_ist)
-        except Exception:
-            candles = []
+        # Seed EMA20 from recent history while ORB/direction remains restricted
+        # to the current IST session. Angel candle history is per token, not a
+        # multi-symbol batch endpoint.
+        history_start = datetime.combine(now_ist.date() - timedelta(days=7), dt_time(9, 15), tzinfo=IST_ZONE)
+        candles, candle_error = _fetch_candles_with_retry(
+            client, config["exchange"], config["spotToken"], history_start, now_ist,
+        )
+        structure_source = "INDEX_SPOT"
+        if not candles and future:
+            candles, future_error = _fetch_candles_with_retry(
+                client, str(future.get("exch_seg") or config["segment"]), str(future.get("token") or ""), history_start, now_ist,
+            )
+            if candles:
+                structure_source = "INDEX_FUTURES_PROXY"
+            elif future_error:
+                candle_error = f"SPOT:{candle_error}; FUTURE:{future_error}"
+        structure = walk_forward_structure(candles, session_date=now_ist.date()) if candles else index_structure_from_candles([], session_date=now_ist.date())
         return key, {
             "source": "ANGEL_ONE", "status": "LIVE" if chain else "DATA_INCOMPLETE",
             "fetchedAt": datetime.now(timezone.utc).isoformat(), "spot": spot, "spotClose": _float(spot_quote.get("close")),
             "expiry": expiry.isoformat(), "chain": chain,
-            "structure": walk_forward_structure(candles) if candles else index_structure_from_candles(candles),
+            "structure": {**structure, "source": structure_source},
+            "candleStatus": "LIVE" if candles else "SOURCE_UNAVAILABLE",
+            "candleError": candle_error,
             "future": ({"symbol": future.get("symbol"), "ltp": _float((future_quote or {}).get("ltp")),
                         "close": _float((future_quote or {}).get("close")),
                         "oi": _float((future_quote or {}).get("opnInterest") or (future_quote or {}).get("oi")),
@@ -362,9 +425,13 @@ def active_index_expiries(master: list[dict[str, Any]] | None = None) -> dict[st
 
 def _weighted_breadth(snapshot: dict[str, Any], key: str, direction: str | None) -> dict[str, Any]:
     weights = ((snapshot.get("indexConstituentWeights") or {}).get(key) or [])
+    weight_source = "OFFICIAL_SNAPSHOT"
+    if not isinstance(weights, list) or not weights:
+        weights = [{"symbol": symbol, "weight": weight} for symbol, weight in INDEX_LEADER_WEIGHTS.get(key, ())]
+        weight_source = "LEADER_BASKET_PROXY"
     quotes = snapshot.get("stockQuotes") if isinstance(snapshot.get("stockQuotes"), dict) else {}
     if not isinstance(weights, list) or not weights:
-        return {"status": "WEIGHTS_UNAVAILABLE", "aligned": None, "score": None, "coveragePct": 0.0}
+        return {"status": "WEIGHTS_UNAVAILABLE", "aligned": None, "score": None, "coveragePct": 0.0, "source": weight_source}
     total_weight = sum(_float(row.get("weight")) or 0 for row in weights if isinstance(row, dict))
     covered = 0.0
     signed = 0.0
@@ -384,8 +451,11 @@ def _weighted_breadth(snapshot: dict[str, Any], key: str, direction: str | None)
         signed += weight * (1.0 if ltp > vwap and ltp > ema9 else -1.0 if ltp < vwap and ltp < ema9 else 0.0)
     coverage = covered / total_weight * 100.0 if total_weight > 0 else 0.0
     breadth = signed / covered if covered > 0 else None
-    aligned = None if coverage < 90 or breadth is None or direction is None else breadth >= 0.55 if direction == "CALL" else breadth <= -0.55
-    return {"status": "LIVE" if coverage >= 90 else "COVERAGE_INCOMPLETE", "aligned": aligned, "score": breadth, "coveragePct": round(coverage, 2)}
+    minimum_coverage = 90.0 if weight_source == "OFFICIAL_SNAPSHOT" else 80.0
+    aligned = None if coverage < minimum_coverage or breadth is None or direction is None else breadth >= 0.55 if direction == "CALL" else breadth <= -0.55
+    return {"status": "LIVE" if coverage >= minimum_coverage else "COVERAGE_INCOMPLETE", "aligned": aligned,
+            "score": breadth, "coveragePct": round(coverage, 2), "source": weight_source,
+            "minimumCoveragePct": minimum_coverage}
 
 
 def _vix_regime(snapshot: dict[str, Any]) -> tuple[str | None, float | None]:
