@@ -6,7 +6,7 @@ import math
 import os
 import threading
 import time
-from datetime import date, datetime, time as dt_time, timedelta, timezone
+from datetime import date, datetime, time as dt_time, timezone
 from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
@@ -29,24 +29,8 @@ INDEXES: tuple[dict[str, Any], ...] = (
 _MASTER_LOCK = threading.Lock()
 _MASTER_CACHE: tuple[float, list[dict[str, Any]]] = (0.0, [])
 _OPTION_LOCK = threading.Lock()
-_OI_BASELINE_LOCK = threading.Lock()
 _OPTION_CACHE: tuple[float, dict[str, Any]] = (0.0, {})
 _RADAR_REFRESH_LOCK = threading.Lock()
-
-# A transparent fallback when an official weight file has not yet been attached
-# to the market snapshot. Values are relative leader weights, not claimed as the
-# complete official index composition. Deployments can override these by
-# populating snapshot["indexConstituentWeights"] from their licensed source.
-INDEX_LEADER_WEIGHTS: dict[str, tuple[tuple[str, float], ...]] = {
-    "NIFTY": (("HDFCBANK", 13.0), ("ICICIBANK", 9.0), ("RELIANCE", 8.5), ("BHARTIARTL", 4.8),
-              ("INFY", 4.5), ("LT", 3.2), ("ITC", 3.0), ("SBIN", 2.9), ("AXISBANK", 2.8), ("KOTAKBANK", 2.5)),
-    "BANKNIFTY": (("HDFCBANK", 29.0), ("ICICIBANK", 23.0), ("SBIN", 11.0), ("KOTAKBANK", 10.0),
-                  ("AXISBANK", 9.0), ("INDUSINDBK", 3.0), ("BANKBARODA", 3.0), ("FEDERALBNK", 2.0)),
-    "FINNIFTY": (("HDFCBANK", 24.0), ("ICICIBANK", 20.0), ("SBIN", 9.0), ("BAJFINANCE", 8.0),
-                 ("KOTAKBANK", 8.0), ("AXISBANK", 7.0), ("BAJAJFINSV", 5.0), ("HDFCLIFE", 3.0), ("SBILIFE", 3.0)),
-    "SENSEX": (("HDFCBANK", 14.0), ("ICICIBANK", 10.0), ("RELIANCE", 9.0), ("BHARTIARTL", 6.0),
-                ("INFY", 5.5), ("LT", 4.0), ("ITC", 3.5), ("SBIN", 3.5), ("AXISBANK", 3.0), ("KOTAKBANK", 3.0)),
-}
 
 
 def _float(value: Any) -> float | None:
@@ -185,58 +169,37 @@ def ist_session_bounds(session_date: date) -> tuple[datetime, datetime]:
     return start, end
 
 
-def index_structure_from_candles(candles: list[list[Any]], *, session_date: date | None = None) -> dict[str, Any]:
-    """Derive direction from today's ORB, with prior bars allowed to seed EMA20."""
+def index_structure_from_candles(candles: list[list[Any]]) -> dict[str, Any]:
+    """Derive direction only after a 5-minute close clears ORB and aligned EMAs."""
     parsed = [row for row in candles if isinstance(row, list) and len(row) >= 5 and _float(row[4]) is not None]
-    current = parsed
-    if session_date is not None:
-        current = [row for row in parsed if (parse_candle_ts(row[0]) and parse_candle_ts(row[0]).astimezone(IST_ZONE).date() == session_date)]
     closes = [_float(row[4]) for row in parsed]
     closes = [value for value in closes if value is not None]
     ema9, ema20 = _ema(closes, 9), _ema(closes, 20)
-    current_closes = [_float(row[4]) for row in current]
-    current_closes = [value for value in current_closes if value is not None]
-    true_ranges: list[float] = []
-    previous_close: float | None = None
-    for row in current:
-        high, low, close = _float(row[2]), _float(row[3]), _float(row[4])
-        if high is None or low is None or close is None:
-            continue
-        true_ranges.append(max(high - low, abs(high - previous_close), abs(low - previous_close)) if previous_close is not None else high - low)
-        previous_close = close
-    atr5 = (sum(true_ranges[-14:]) / min(14, len(true_ranges))) if true_ranges else None
-    incomplete = {"status": "DATA_INCOMPLETE", "direction": None, "barCount": len(current),
-                  "seedBarCount": max(0, len(parsed) - len(current)), "last": current_closes[-1] if current_closes else None,
-                  "atr5m": round(atr5, 4) if atr5 is not None else None}
-    if len(current) < 3 or len(parsed) < 20 or ema9 is None or ema20 is None:
+    incomplete = {"status": "DATA_INCOMPLETE", "direction": None, "barCount": len(parsed), "last": closes[-1] if closes else None}
+    if len(parsed) < 20 or ema9 is None or ema20 is None:
         return incomplete
-    orb_rows = current[:3]
+    orb_rows = parsed[:3]
     orb_high = max(_float(row[2]) or -math.inf for row in orb_rows)
     orb_low = min(_float(row[3]) or math.inf for row in orb_rows)
-    last = current_closes[-1]
+    last = closes[-1]
     call = last > orb_high and last > ema9 > ema20
     put = last < orb_low and last < ema9 < ema20
     return {
         "status": "CONFIRMED" if call or put else "NO_BREAKOUT",
         "direction": "CALL" if call else "PUT" if put else None,
         "last": last, "ema9": round(ema9, 4), "ema20": round(ema20, 4),
-        "orbHigh": orb_high, "orbLow": orb_low, "barCount": len(current),
-        "atr5m": round(atr5, 4) if atr5 is not None else None,
-        "seedBarCount": max(0, len(parsed) - len(current)),
+        "orbHigh": orb_high, "orbLow": orb_low, "barCount": len(parsed),
     }
 
 
-def walk_forward_structure(candles: list[list[Any]], *, session_date: date | None = None) -> dict[str, Any]:
+def walk_forward_structure(candles: list[list[Any]]) -> dict[str, Any]:
     """First 5m close that confirms ORB+EMA, plus the end-of-window structure."""
     parsed = [row for row in candles if isinstance(row, list) and len(row) >= 5 and _float(row[4]) is not None]
-    eod = index_structure_from_candles(parsed, session_date=session_date)
+    eod = index_structure_from_candles(parsed)
     confirmed_at = None
     first_direction = None
-    for index in range(len(parsed)):
-        stamp = parse_candle_ts(parsed[index][0])
-        if session_date is not None and (stamp is None or stamp.astimezone(IST_ZONE).date() != session_date):
-            continue
-        snapshot = index_structure_from_candles(parsed[: index + 1], session_date=session_date)
+    for index in range(19, len(parsed)):
+        snapshot = index_structure_from_candles(parsed[: index + 1])
         direction = snapshot.get("direction")
         if direction in {"CALL", "PUT"}:
             confirmed_at = parse_candle_ts(parsed[index][0])
@@ -247,30 +210,6 @@ def walk_forward_structure(candles: list[list[Any]], *, session_date: date | Non
         "firstDirection": first_direction,
         "confirmedAt": confirmed_at.isoformat() if confirmed_at else None,
     }
-
-
-def _fetch_candles_with_retry(
-    client: Any,
-    exchange: str,
-    token: str,
-    start: datetime,
-    end: datetime,
-    *,
-    attempts: int = 3,
-) -> tuple[list[list[Any]], str | None]:
-    """Angel historical calls are per token; retry transient/empty responses."""
-    last_error: str | None = None
-    for attempt in range(max(1, attempts)):
-        try:
-            rows = client.fetch_candles(exchange, token, "FIVE_MINUTE", start, end)
-            if rows:
-                return rows, None
-            last_error = "EMPTY_CANDLE_RESPONSE"
-        except Exception as exc:
-            last_error = str(exc)
-        if attempt + 1 < attempts:
-            time.sleep(0.25 * (attempt + 1))
-    return [], last_error
 
 
 def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, Any]) -> tuple[str, dict[str, Any]]:
@@ -304,30 +243,16 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
             chain.append(_quote_row(contract, quotes.get(f"{key}:{contract.get('token')}") or {}, greek))
         future_quote = quotes.get(f"{key}:FUT") if future else None
         now_ist = datetime.now(IST_ZONE)
-        # Seed EMA20 from recent history while ORB/direction remains restricted
-        # to the current IST session. Angel candle history is per token, not a
-        # multi-symbol batch endpoint.
-        history_start = datetime.combine(now_ist.date() - timedelta(days=7), dt_time(9, 15), tzinfo=IST_ZONE)
-        candles, candle_error = _fetch_candles_with_retry(
-            client, config["exchange"], config["spotToken"], history_start, now_ist,
-        )
-        structure_source = "INDEX_SPOT"
-        if not candles and future:
-            candles, future_error = _fetch_candles_with_retry(
-                client, str(future.get("exch_seg") or config["segment"]), str(future.get("token") or ""), history_start, now_ist,
-            )
-            if candles:
-                structure_source = "INDEX_FUTURES_PROXY"
-            elif future_error:
-                candle_error = f"SPOT:{candle_error}; FUTURE:{future_error}"
-        structure = walk_forward_structure(candles, session_date=now_ist.date()) if candles else index_structure_from_candles([], session_date=now_ist.date())
+        session_start, _session_end = ist_session_bounds(now_ist.date())
+        try:
+            candles = client.fetch_candles(config["exchange"], config["spotToken"], "FIVE_MINUTE", session_start, now_ist)
+        except Exception:
+            candles = []
         return key, {
             "source": "ANGEL_ONE", "status": "LIVE" if chain else "DATA_INCOMPLETE",
             "fetchedAt": datetime.now(timezone.utc).isoformat(), "spot": spot, "spotClose": _float(spot_quote.get("close")),
             "expiry": expiry.isoformat(), "chain": chain,
-            "structure": {**structure, "source": structure_source},
-            "candleStatus": "LIVE" if candles else "SOURCE_UNAVAILABLE",
-            "candleError": candle_error,
+            "structure": walk_forward_structure(candles) if candles else index_structure_from_candles(candles),
             "future": ({"symbol": future.get("symbol"), "ltp": _float((future_quote or {}).get("ltp")),
                         "close": _float((future_quote or {}).get("close")),
                         "oi": _float((future_quote or {}).get("opnInterest") or (future_quote or {}).get("oi")),
@@ -358,66 +283,6 @@ def radar_cache_path() -> Path:
     if env:
         return Path(env)
     return market_snapshot_path().with_name("index_options_radar.json")
-
-
-def oi_baseline_path() -> Path:
-    env = (os.environ.get("INDEX_OPTIONS_OI_BASELINE_FILE") or "").strip()
-    if env:
-        return Path(env)
-    return market_snapshot_path().with_name("index_options_oi_baseline.json")
-
-
-def _apply_oi_baselines(option_data: dict[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
-    """Add a labelled intraday OI comparison when Angel omits previous OI."""
-    stamp = (now or datetime.now(timezone.utc)).astimezone(IST_ZONE)
-    session = stamp.date().isoformat()
-    with _OI_BASELINE_LOCK:
-        try:
-            stored = load_json_with_fallback(oi_baseline_path())
-        except (FileNotFoundError, ValueError, TypeError):
-            stored = {}
-        if not isinstance(stored, dict) or stored.get("sessionDate") != session:
-            stored = {"sessionDate": session, "instruments": {}}
-        instruments = stored.setdefault("instruments", {})
-        changed = False
-        for key, row in (option_data.get("indices") or {}).items():
-            if not isinstance(row, dict):
-                continue
-            observations: list[tuple[str, dict[str, Any]]] = []
-            future = row.get("future")
-            if isinstance(future, dict):
-                observations.append((f"{key}:FUT:{future.get('symbol') or ''}", future))
-            for contract in row.get("chain") or []:
-                if isinstance(contract, dict):
-                    observations.append((f"{key}:OPT:{contract.get('symbol') or contract.get('token') or ''}", contract))
-            for instrument_key, quote in observations:
-                current = _float(quote.get("oi"))
-                provider_previous = _float(quote.get("previousOi"))
-                if current is None or current < 0:
-                    continue
-                if provider_previous is not None and provider_previous > 0:
-                    quote["oiChange"] = current - provider_previous
-                    quote["oiBaseline"] = {"basis": "PROVIDER_PREVIOUS_OI", "oi": provider_previous,
-                                           "ageSeconds": None, "capturedAt": None}
-                    continue
-                baseline = instruments.get(instrument_key)
-                if not isinstance(baseline, dict) or _float(baseline.get("oi")) is None:
-                    instruments[instrument_key] = {"oi": current, "capturedAt": stamp.isoformat()}
-                    quote["oiBaseline"] = {"basis": "WARMING_UP", "oi": current, "ageSeconds": 0,
-                                           "capturedAt": stamp.isoformat()}
-                    changed = True
-                    continue
-                captured = parse_candle_ts(baseline.get("capturedAt"))
-                age = max(0.0, (stamp - captured.astimezone(IST_ZONE)).total_seconds()) if captured else 0.0
-                basis = "INTRADAY_SESSION_BASELINE" if age >= 60.0 else "WARMING_UP"
-                quote["oiBaseline"] = {"basis": basis, "oi": _float(baseline.get("oi")),
-                                       "ageSeconds": round(age), "capturedAt": baseline.get("capturedAt")}
-                if age >= 60.0:
-                    quote["previousOi"] = _float(baseline.get("oi"))
-                    quote["oiChange"] = current - (_float(baseline.get("oi")) or 0.0)
-        if changed:
-            atomic_write_json(oi_baseline_path(), stored)
-    return option_data
 
 
 def load_persisted_radar(*, max_age_seconds: float | None = None) -> dict[str, Any] | None:
@@ -497,17 +362,12 @@ def active_index_expiries(master: list[dict[str, Any]] | None = None) -> dict[st
 
 def _weighted_breadth(snapshot: dict[str, Any], key: str, direction: str | None) -> dict[str, Any]:
     weights = ((snapshot.get("indexConstituentWeights") or {}).get(key) or [])
-    weight_source = "OFFICIAL_SNAPSHOT"
-    if not isinstance(weights, list) or not weights:
-        weights = [{"symbol": symbol, "weight": weight} for symbol, weight in INDEX_LEADER_WEIGHTS.get(key, ())]
-        weight_source = "LEADER_BASKET_PROXY"
     quotes = snapshot.get("stockQuotes") if isinstance(snapshot.get("stockQuotes"), dict) else {}
     if not isinstance(weights, list) or not weights:
-        return {"status": "WEIGHTS_UNAVAILABLE", "aligned": None, "score": None, "coveragePct": 0.0, "source": weight_source}
+        return {"status": "WEIGHTS_UNAVAILABLE", "aligned": None, "score": None, "coveragePct": 0.0}
     total_weight = sum(_float(row.get("weight")) or 0 for row in weights if isinstance(row, dict))
     covered = 0.0
     signed = 0.0
-    quote_proxy_weight = 0.0
     for item in weights:
         if not isinstance(item, dict):
             continue
@@ -518,129 +378,14 @@ def _weighted_breadth(snapshot: dict[str, Any], key: str, direction: str | None)
         intra = quote.get("intraday") if isinstance(quote.get("intraday"), dict) else {}
         ltp = _float(quote.get("ltpRaw") or quote.get("ltp"))
         vwap, ema9 = _float(intra.get("vwap")), _float(intra.get("ema9"))
-        signal = None
-        if ltp and vwap and ema9:
-            signal = 1.0 if ltp > vwap and ltp > ema9 else -1.0 if ltp < vwap and ltp < ema9 else 0.0
-        elif ltp:
-            # Angel batch quotes always carry open/previous close even when a
-            # constituent candle call is not in the scanner's top-volume set.
-            open_price, previous_close = _float(quote.get("open")), _float(quote.get("close"))
-            if open_price and previous_close:
-                signal = 1.0 if ltp > open_price and ltp > previous_close else -1.0 if ltp < open_price and ltp < previous_close else 0.0
-                quote_proxy_weight += weight
-        if signal is None:
+        if not ltp or not vwap or not ema9:
             continue
         covered += weight
-        signed += weight * signal
+        signed += weight * (1.0 if ltp > vwap and ltp > ema9 else -1.0 if ltp < vwap and ltp < ema9 else 0.0)
     coverage = covered / total_weight * 100.0 if total_weight > 0 else 0.0
     breadth = signed / covered if covered > 0 else None
-    uses_quote_proxy = quote_proxy_weight > 0
-    minimum_coverage = 90.0 if weight_source == "OFFICIAL_SNAPSHOT" or uses_quote_proxy else 80.0
-    alignment_floor = 0.70 if uses_quote_proxy else 0.55
-    aligned = None if coverage < minimum_coverage or breadth is None or direction is None else breadth >= alignment_floor if direction == "CALL" else breadth <= -alignment_floor
-    return {"status": "LIVE" if coverage >= minimum_coverage else "COVERAGE_INCOMPLETE", "aligned": aligned,
-            "score": breadth, "coveragePct": round(coverage, 2), "source": weight_source,
-            "minimumCoveragePct": minimum_coverage, "alignmentFloor": alignment_floor,
-            "quoteProxyPct": round(quote_proxy_weight / total_weight * 100.0, 2) if total_weight > 0 else 0.0}
-
-
-def _normal_cdf(value: float) -> float:
-    return 0.5 * (1.0 + math.erf(value / math.sqrt(2.0)))
-
-
-def _normal_pdf(value: float) -> float:
-    return math.exp(-0.5 * value * value) / math.sqrt(2.0 * math.pi)
-
-
-def _bs_price(spot: float, strike: float, years: float, rate: float, sigma: float, option_type: str) -> float:
-    if min(spot, strike, years, sigma) <= 0:
-        return 0.0
-    root_t = math.sqrt(years)
-    d1 = (math.log(spot / strike) + (rate + 0.5 * sigma * sigma) * years) / (sigma * root_t)
-    d2 = d1 - sigma * root_t
-    discounted = strike * math.exp(-rate * years)
-    if option_type == "CALL":
-        return spot * _normal_cdf(d1) - discounted * _normal_cdf(d2)
-    return discounted * _normal_cdf(-d2) - spot * _normal_cdf(-d1)
-
-
-def _local_greeks(item: dict[str, Any], spot: float | None, expiry_value: Any, *, now: datetime | None = None) -> dict[str, Any]:
-    """Fill missing IV/Greeks from live premium; never overwrite provider values."""
-    strike, premium = _float(item.get("strike")), _float(item.get("ltp"))
-    option_type = str(item.get("optionType") or "").upper()
-    expiry_date = _expiry(expiry_value)
-    now_ist = (now or datetime.now(IST_ZONE)).astimezone(IST_ZONE)
-    if not spot or not strike or not premium or expiry_date is None or option_type not in {"CALL", "PUT"}:
-        return item
-    expiry_at = datetime.combine(expiry_date, dt_time(15, 30), tzinfo=IST_ZONE)
-    years = max((expiry_at - now_ist).total_seconds(), 60.0) / (365.0 * 24.0 * 3600.0)
-    rate = 0.065
-    sigma = _float(item.get("iv"))
-    sigma = sigma / 100.0 if sigma and sigma > 1 else sigma
-    if not sigma or sigma <= 0:
-        low, high = 0.01, 5.0
-        for _ in range(64):
-            mid = (low + high) / 2.0
-            if _bs_price(spot, strike, years, rate, mid, option_type) > premium:
-                high = mid
-            else:
-                low = mid
-        sigma = (low + high) / 2.0
-    root_t = math.sqrt(years)
-    d1 = (math.log(spot / strike) + (rate + 0.5 * sigma * sigma) * years) / (sigma * root_t)
-    d2 = d1 - sigma * root_t
-    delta = _normal_cdf(d1) if option_type == "CALL" else _normal_cdf(d1) - 1.0
-    gamma = _normal_pdf(d1) / (spot * sigma * root_t)
-    vega = spot * _normal_pdf(d1) * root_t / 100.0
-    first = -(spot * _normal_pdf(d1) * sigma) / (2.0 * root_t)
-    discounted = strike * math.exp(-rate * years)
-    theta_year = first - rate * discounted * _normal_cdf(d2) if option_type == "CALL" else first + rate * discounted * _normal_cdf(-d2)
-    enriched = dict(item)
-    defaults = {"delta": delta, "gamma": gamma, "vega": vega, "theta": theta_year / 365.0, "iv": sigma * 100.0}
-    changed = False
-    for name, value in defaults.items():
-        if _float(enriched.get(name)) is None:
-            enriched[name] = round(value, 6)
-            changed = True
-    if changed:
-        enriched["greeksSource"] = enriched.get("greeksSource") or "LOCAL_BLACK_SCHOLES"
-    return enriched
-
-
-def _futures_oi_state(future: dict[str, Any]) -> dict[str, Any]:
-    ltp, close = _float(future.get("ltp")), _float(future.get("close"))
-    oi, previous_oi = _float(future.get("oi")), _float(future.get("previousOi"))
-    baseline = future.get("oiBaseline") if isinstance(future.get("oiBaseline"), dict) else {}
-    if not ltp or not close or oi is None or previous_oi is None or previous_oi <= 0:
-        return {"state": "BASELINE_WARMING_UP" if baseline.get("basis") == "WARMING_UP" else "UNAVAILABLE",
-                "priceChangePct": round((ltp - close) / close * 100.0, 3) if ltp and close else None,
-                "oiChangePct": None, "baseline": baseline or None}
-    price_up, oi_up = ltp > close, oi > previous_oi
-    state = "LONG_BUILDUP" if price_up and oi_up else "SHORT_COVERING" if price_up else "SHORT_BUILDUP" if oi_up else "LONG_UNWINDING"
-    return {"state": state, "priceChangePct": round((ltp - close) / close * 100.0, 3),
-            "oiChangePct": round((oi - previous_oi) / previous_oi * 100.0, 3), "baseline": baseline or None}
-
-
-def _chain_confirmation(chain: list[dict[str, Any]], direction: str | None, selected: dict[str, Any] | None) -> dict[str, Any]:
-    if direction not in {"CALL", "PUT"} or not selected:
-        return {"aligned": None, "score": None, "reason": "DIRECTION_OR_CONTRACT_UNAVAILABLE"}
-    side = [row for row in chain if row.get("optionType") == direction]
-    opposite_type = "PUT" if direction == "CALL" else "CALL"
-    opposite = [row for row in chain if row.get("optionType") == opposite_type]
-    usable = [row for row in chain if _float(row.get("oiChange")) is not None]
-    if not usable:
-        warming = any(((row.get("oiBaseline") or {}).get("basis") == "WARMING_UP") for row in chain if isinstance(row, dict))
-        return {"aligned": None, "score": None, "reason": "OI_BASELINE_WARMING_UP" if warming else "OI_CHANGE_UNAVAILABLE"}
-    selected_change = _float(selected.get("oiChange"))
-    selected_ltp, selected_close = _float(selected.get("ltp")), _float(selected.get("close"))
-    premium_buildup = bool(selected_change is not None and selected_change > 0 and selected_ltp and selected_close and selected_ltp > selected_close)
-    side_change = sum(_float(row.get("oiChange")) or 0.0 for row in side)
-    opposite_change = sum(_float(row.get("oiChange")) or 0.0 for row in opposite)
-    wall_shift = opposite_change > 0 and side_change < 0
-    aligned = premium_buildup or wall_shift
-    reason = "DIRECTIONAL_PREMIUM_OI_BUILDUP" if premium_buildup else "OPPOSING_WALL_BUILDUP_AND_SUPPORT_UNWIND" if wall_shift else "CHAIN_NOT_ALIGNED"
-    return {"aligned": aligned, "score": 100.0 if premium_buildup else 85.0 if wall_shift else 0.0,
-            "reason": reason, "directionalOiChange": round(side_change, 2), "opposingOiChange": round(opposite_change, 2)}
+    aligned = None if coverage < 90 or breadth is None or direction is None else breadth >= 0.55 if direction == "CALL" else breadth <= -0.55
+    return {"status": "LIVE" if coverage >= 90 else "COVERAGE_INCOMPLETE", "aligned": aligned, "score": breadth, "coveragePct": round(coverage, 2)}
 
 
 def _vix_regime(snapshot: dict[str, Any]) -> tuple[str | None, float | None]:
@@ -656,56 +401,29 @@ def _vix_regime(snapshot: dict[str, Any]) -> tuple[str | None, float | None]:
     return None, None
 
 
-def _contract_risk_reward(selected: dict[str, Any] | None, structure: dict[str, Any], direction: str | None) -> dict[str, Any]:
-    """Project option R from ORB invalidation and the nearest ATR/ORB target."""
+def _contract_risk_reward(selected: dict[str, Any] | None, structure: dict[str, Any], direction: str | None) -> float | None:
     if not selected or direction not in {"CALL", "PUT"}:
-        return {"expectedR": None, "basis": "STRUCTURE_UNAVAILABLE"}
+        return None
     last, ema9 = _float(structure.get("last")), _float(structure.get("ema9"))
-    orb_high, orb_low, atr = _float(structure.get("orbHigh")), _float(structure.get("orbLow")), _float(structure.get("atr5m"))
     delta, gamma = abs(_float(selected.get("delta")) or 0), abs(_float(selected.get("gamma")) or 0)
     premium = _float(selected.get("ltp"))
-    if not last or not ema9 or not orb_high or not orb_low or not atr or delta <= 0 or not premium:
-        return {"expectedR": None, "basis": "STRUCTURE_OR_ATR_UNAVAILABLE"}
-    opening_range = orb_high - orb_low
-    if opening_range <= 0:
-        return {"expectedR": None, "basis": "OPENING_RANGE_INVALID"}
-    if direction == "CALL":
-        stop = max(level for level in (orb_high, ema9) if level < last) if any(level < last for level in (orb_high, ema9)) else None
-        targets = [orb_high + opening_range, last + atr]
-        target = min(level for level in targets if level > last) if any(level > last for level in targets) else None
-    else:
-        stop = min(level for level in (orb_low, ema9) if level > last) if any(level > last for level in (orb_low, ema9)) else None
-        targets = [orb_low - opening_range, last - atr]
-        target = max(level for level in targets if level < last) if any(level < last for level in targets) else None
-    if stop is None or target is None:
-        return {"expectedR": 0.0, "basis": "STRUCTURAL_TARGET_ALREADY_EXHAUSTED", "stop": stop, "target": target}
-    risk_move, reward_move = abs(stop - last), abs(target - last)
-    # Project the contract at the actual underlying invalidation/target.  A
-    # percentage-of-premium loss floor is not structural risk and severely
-    # understates R when the breakout stop is tight.  Charge one full quoted
-    # spread instead, which represents buying at the ask and exiting at bid.
-    spread_pct = max(0.0, _float(selected.get("spreadPct")) or 0.0)
-    spread_cost = premium * spread_pct / 100.0
-    theoretical_loss = delta * risk_move - 0.5 * gamma * risk_move * risk_move
-    theoretical_gain = delta * reward_move + 0.5 * gamma * reward_move * reward_move
-    option_loss = max(theoretical_loss + spread_cost, 0.05)
-    option_gain = max(theoretical_gain - spread_cost, 0.0)
-    expected_r = round(option_gain / option_loss, 3)
-    return {"expectedR": expected_r, "basis": "ORB_INVALIDATION_NEAREST_ATR_OR_MEASURED_MOVE",
-            "entryUnderlying": round(last, 4), "stop": round(stop, 4), "target": round(target, 4),
-            "riskPoints": round(risk_move, 4), "rewardPoints": round(reward_move, 4),
-            "projectedOptionLoss": round(option_loss, 4), "projectedOptionGain": round(option_gain, 4),
-            "spreadCost": round(spread_cost, 4), "atr5m": round(atr, 4),
-            "openingRangePoints": round(opening_range, 4)}
+    if not last or not ema9 or delta <= 0 or not premium:
+        return None
+    underlying_risk = abs(last - ema9)
+    if underlying_risk <= 0:
+        return None
+    projected = underlying_risk * 1.5
+    loss = max(delta * underlying_risk, premium * 0.20)
+    gain = delta * projected + 0.5 * gamma * projected * projected
+    return round(gain / loss, 3) if loss > 0 else None
 
 
 def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
     market_snapshot = snapshot if isinstance(snapshot, dict) else {}
     converted: dict[str, Any] = {}
     for key, row in (option_data.get("indices") or {}).items():
-        raw_chain = row.get("chain") if isinstance(row.get("chain"), list) else []
+        chain = row.get("chain") if isinstance(row.get("chain"), list) else []
         spot, close = _float(row.get("spot")), _float(row.get("spotClose"))
-        chain = [_local_greeks(item, spot, row.get("expiry")) for item in raw_chain if isinstance(item, dict)]
         change_pct = ((spot - close) / close * 100.0) if spot and close else None
         structure = row.get("structure") if isinstance(row.get("structure"), dict) else {}
         direction = structure.get("direction")
@@ -721,50 +439,36 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
                 delta_ok.append(item)
         selected = min(delta_ok, key=lambda item: abs(abs(_float(item.get("delta")) or 0) - 0.55)) if delta_ok else None
         future = row.get("future") if isinstance(row.get("future"), dict) else {}
+        f_ltp, f_close = _float(future.get("ltp")), _float(future.get("close"))
+        f_oi, f_prev_oi = _float(future.get("oi")), _float(future.get("previousOi"))
+        oi_aligned = None
+        if direction and f_ltp and f_close and f_oi is not None and f_prev_oi is not None:
+            oi_aligned = (direction == "CALL" and f_ltp > f_close and f_oi > f_prev_oi) or (direction == "PUT" and f_ltp < f_close and f_oi > f_prev_oi)
         breadth = _weighted_breadth(market_snapshot, key, direction)
-        futures_oi = _futures_oi_state(future)
-        oi_state = futures_oi["state"]
-        strong_oi = (direction == "CALL" and oi_state == "LONG_BUILDUP") or (direction == "PUT" and oi_state == "SHORT_BUILDUP")
-        secondary_oi = (direction == "CALL" and oi_state == "SHORT_COVERING") or (direction == "PUT" and oi_state == "LONG_UNWINDING")
-        strong_breadth = breadth.get("aligned") is True and abs(_float(breadth.get("score")) or 0) >= 0.70
-        oi_aligned = True if strong_oi or (secondary_oi and strong_breadth) else False if direction and oi_state != "UNAVAILABLE" else None
         regime, vix = _vix_regime(market_snapshot)
-        risk_reward = _contract_risk_reward(selected, structure, direction)
-        expected_r = _float(risk_reward.get("expectedR"))
-        chain_evidence = _chain_confirmation(chain, direction, selected)
-        chain_aligned = chain_evidence.get("aligned")
+        expected_r = _contract_risk_reward(selected, structure, direction)
+        premium_buildup = bool(selected and (_float(selected.get("ltp")) or 0) > (_float(selected.get("close")) or math.inf) and (_float(selected.get("oiChange")) or 0) > 0)
         structure_gate = True if direction else False if structure.get("status") == "NO_BREAKOUT" else None
-        contract_gate = True if selected else False if direction and any(_float(item.get("delta")) is not None for item in chain) else None
-        greeks_source = selected.get("greeksSource") if selected else None
+        contract_gate = True if selected else False if row.get("greeksStatus") == "LIVE" and direction else None
         converted[key] = {
             "spot": spot, "direction": direction, "source": row.get("source") or "ANGEL_ONE", "providerStatus": row.get("status"),
             "expiry": row.get("expiry"), "rawChain": chain,
             "scores": {"trend": 100.0 if direction else None, "breakout": 100.0 if direction else None,
-                       "futuresOi": 100.0 if strong_oi else 75.0 if oi_aligned is True else 0.0 if oi_aligned is False else None,
+                       "futuresOi": 100.0 if oi_aligned is True else 0.0 if oi_aligned is False else None,
                        "contract": 100.0 if selected else None,
-                       "optionChain": chain_evidence.get("score"),
+                       "optionChain": 100.0 if premium_buildup else 0.0 if selected else None,
                        "breadth": (50.0 + 50.0 * abs(_float(breadth.get("score")) or 0)) if breadth.get("score") is not None else None,
                        "regime": 100.0 if regime in {"NORMAL", "ELEVATED"} else 70.0 if regime == "CALM" else 0.0 if regime == "FEAR" else None},
             "gates": {"fresh": True if row.get("status") == "LIVE" else False, "structure": structure_gate, "breakout": structure_gate,
-                      "futuresOi": oi_aligned, "optionChain": chain_aligned, "breadth": breadth.get("aligned"),
+                      "futuresOi": oi_aligned, "optionChain": premium_buildup if selected else None, "breadth": breadth.get("aligned"),
                       "contractEconomics": contract_gate, "riskReward": (expected_r >= 1.5) if expected_r is not None else None},
             "contract": ({"symbol": selected.get("symbol"), "strike": selected.get("strike"), "expiry": row.get("expiry"),
                           "ltp": selected.get("ltp"), "delta": selected.get("delta"), "gamma": selected.get("gamma"),
-                          "theta": selected.get("theta"), "vega": selected.get("vega"), "iv": selected.get("iv"),
-                          "lotSize": selected.get("lotSize")} if selected else None),
+                          "theta": selected.get("theta"), "vega": selected.get("vega"), "iv": selected.get("iv")} if selected else None),
             "breadth": breadth, "structure": structure, "vixRegime": regime, "indiaVix": vix, "expectedR": expected_r,
-            "gateEvidence": {
-                "futuresOi": {**futures_oi, "aligned": oi_aligned, "secondaryConfirmation": bool(secondary_oi and strong_breadth)},
-                "optionChain": chain_evidence,
-                "breadth": breadth,
-                "contractEconomics": {"aligned": contract_gate, "greeksSource": greeks_source,
-                                      "spreadPct": selected.get("spreadPct") if selected else None},
-                "riskReward": {**risk_reward, "aligned": (expected_r >= 1.5) if expected_r is not None else None,
-                               "minimumR": 1.5},
-            },
-            "dataLimitations": [value for value in (None if greeks_source else row.get("greeksError"),
+            "dataLimitations": [value for value in (row.get("greeksError"),
                                None if direction else "INDEX_CANDLE_STRUCTURE_NOT_CONFIRMED",
                                None if breadth.get("aligned") is not None else "WEIGHTED_CONSTITUENT_BREADTH_NOT_CONFIRMED",
-                               None if expected_r is not None else "RISK_REWARD_NOT_YET_CONFIRMED") if value],
+                               "RISK_REWARD_NOT_YET_CONFIRMED") if value],
         }
     return {"indices": converted}

@@ -19,9 +19,7 @@ INDEX_CONFIG: tuple[dict[str, str], ...] = (
     {"key": "FINNIFTY", "label": "NIFTY FIN SERVICE", "bucket": "FINANCIAL", "exchange": "NSE"},
 )
 
-MIN_DAILY_ENTRIES = 0
-MAX_DAILY_ENTRIES = 20
-MAX_ATTEMPTS_PER_INDEX = 20
+MAX_DAILY_ENTRIES = 10
 MAX_CONCURRENT_TRADES = 2
 MIN_ELIGIBLE_SCORE = 80.0
 
@@ -93,16 +91,12 @@ def can_reenter_index_option(
     key = instrument.upper().strip()
     direction = candidate_direction.upper().strip()
     attempts = governor.trade_counts.get(key, 0)
-    daily_entries = sum(max(0, int(value)) for value in governor.trade_counts.values())
     stops = governor.sl_counts.get(key, 0)
-    base = {"allowed": False, "instrument": key, "attempts": attempts, "dailyEntries": daily_entries,
-            "dailyEntryCap": MAX_DAILY_ENTRIES, "slHits": stops}
+    base = {"allowed": False, "instrument": key, "attempts": attempts, "slHits": stops}
     if not key or direction not in {"CALL", "PUT"}:
         return {**base, "reason": "INVALID_INSTRUMENT_OR_DIRECTION"}
-    if daily_entries >= MAX_DAILY_ENTRIES:
-        return {**base, "reason": "MAX_DAILY_ENTRIES_REACHED"}
-    if attempts >= MAX_ATTEMPTS_PER_INDEX:
-        return {**base, "reason": "MAX_INDEX_ATTEMPTS_REACHED"}
+    if attempts >= 2:
+        return {**base, "reason": "MAX_DAILY_ATTEMPTS_REACHED"}
     if stops >= 2:
         return {**base, "reason": "HARD_BAN_TWO_SL_HITS"}
     prior = governor.last_exits.get(key)
@@ -191,7 +185,6 @@ def _candidate(index: dict[str, str], snapshot: dict[str, Any]) -> dict[str, Any
         "dataSource": supplied.get("source"),
         "expiry": supplied.get("expiry"),
         "dataLimitations": supplied.get("dataLimitations") or [],
-        "gateEvidence": supplied.get("gateEvidence") or {},
         "chain": supplied.get("rawChain") or [],
         "structure": supplied.get("structure"),
         "eligible": eligible,
@@ -211,21 +204,19 @@ def build_index_options_radar(snapshot: dict[str, Any] | None) -> dict[str, Any]
         used_buckets.add(row["bucket"])
     return {
         "success": True,
-        "executionPolicy": "AUTO_PAPER_ONLY",
+        "executionPolicy": "MANUAL_ONLY",
         "strategy": "INDEX_DIRECTION_CONFIRMATION_THEN_OPTION",
         "updatedAt": payload.get("updatedAt"),
         "candidates": candidates,
         "selected": selected,
         "limits": {
-            "minDailyEntries": MIN_DAILY_ENTRIES,
             "maxDailyEntries": MAX_DAILY_ENTRIES,
             "maxConcurrent": MAX_CONCURRENT_TRADES,
             "maxPerCorrelationBucket": 1,
             "scoreFloor": MIN_ELIGIBLE_SCORE,
-            "huntMode": "CONTINUOUS_MARKET_SESSION",
         },
         "reentryPolicy": {
-            "maxAttemptsPerIndex": MAX_ATTEMPTS_PER_INDEX,
+            "maxAttemptsPerIndex": 2,
             "hardBanAfterStopLosses": 2,
             "targetCooldownMin": 20,
             "profitTrailCooldownMin": 30,
