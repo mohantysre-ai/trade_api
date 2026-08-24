@@ -32,6 +32,13 @@ type Candidate = {
   dataSource?: string | null;
   expiry?: string | null;
   dataLimitations?: string[];
+  gateEvidence?: {
+    futuresOi?: { state?: string; priceChangePct?: number | null; oiChangePct?: number | null; aligned?: boolean | null };
+    optionChain?: { reason?: string; aligned?: boolean | null; directionalOiChange?: number | null; opposingOiChange?: number | null };
+    breadth?: { score?: number | null; coveragePct?: number | null; aligned?: boolean | null; source?: string };
+    contractEconomics?: { aligned?: boolean | null; greeksSource?: string | null; spreadPct?: number | null };
+    riskReward?: { aligned?: boolean | null; expectedR?: number | null };
+  };
   chain?: Array<{ symbol?: string; strike?: number; optionType?: string; ltp?: number; oi?: number; oiChange?: number; delta?: number; gamma?: number; theta?: number; vega?: number; iv?: number }>;
   structure?: Structure | null;
 };
@@ -121,6 +128,9 @@ function candidateHeadline(row: Candidate) {
   if (row.reason.startsWith('HARD_GATE_FAILED:') && row.failedGates.includes('fresh')) {
     return bars === 0 ? 'Quotes not live' : 'Stale quotes';
   }
+  if (row.reason.startsWith('HARD_GATE_FAILED:')) {
+    return `Blocked: ${row.failedGates.map((key) => GATE_LABEL[key] ?? key).join(' · ')}`;
+  }
   if (row.reason.startsWith('DATA_INCOMPLETE:')) {
     if (bars === 0) return '5m price feed unavailable';
     if (bars < 20) return `EMA20 warm-up · ${20 - bars} bars left`;
@@ -128,6 +138,21 @@ function candidateHeadline(row: Candidate) {
   }
   if (row.reason === 'DIRECTION_NOT_PROVEN') return 'No ORB breakout';
   return 'No trade';
+}
+
+function compactEvidence(row: Candidate) {
+  const evidence = row.gateEvidence;
+  if (!evidence) return [];
+  const breadth = evidence.breadth;
+  const futures = evidence.futuresOi;
+  const chain = evidence.optionChain;
+  const rr = evidence.riskReward;
+  return [
+    { label: 'Fut OI', value: futures?.state?.replaceAll('_', ' ') ?? 'Missing', aligned: futures?.aligned },
+    { label: 'Breadth', value: breadth?.score == null ? 'Missing' : `${(breadth.score * 100).toFixed(0)}% · ${fmtNum(breadth.coveragePct, 0)}% cov`, aligned: breadth?.aligned },
+    { label: 'Chain', value: chain?.reason?.replaceAll('_', ' ') ?? 'Missing', aligned: chain?.aligned },
+    { label: 'R:R', value: rr?.expectedR == null ? 'Missing' : `${fmtNum(rr.expectedR)}R`, aligned: rr?.aligned },
+  ];
 }
 
 function gateChips(row: Candidate) {
@@ -184,6 +209,7 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
         {(radar?.candidates ?? []).map((row) => {
           const pill = statePill(row.state);
           const chips = gateChips(row);
+          const evidence = compactEvidence(row);
           return (
             <article
               key={row.key}
@@ -217,6 +243,18 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
                 <div className="mt-2 flex flex-wrap gap-1">
                   {chips.map((chip) => (
                     <span key={chip} className="desk-pill desk-pill--muted">{chip}</span>
+                  ))}
+                </div>
+              )}
+              {evidence.length > 0 && (
+                <div className="mt-2 grid w-full grid-cols-2 gap-1 border-t border-[var(--terminal-line)] pt-2 text-[9px]">
+                  {evidence.map((item) => (
+                    <div key={item.label} className="min-w-0">
+                      <span className="uppercase tracking-wider text-[var(--fg-subtle)]">{item.label} </span>
+                      <span className={item.aligned === true ? 'text-emerald-600' : item.aligned === false ? 'text-red-500' : 'text-[var(--fg-muted)]'}>
+                        {item.value}
+                      </span>
+                    </div>
                   ))}
                 </div>
               )}

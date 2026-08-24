@@ -435,6 +435,7 @@ def _weighted_breadth(snapshot: dict[str, Any], key: str, direction: str | None)
     total_weight = sum(_float(row.get("weight")) or 0 for row in weights if isinstance(row, dict))
     covered = 0.0
     signed = 0.0
+    quote_proxy_weight = 0.0
     for item in weights:
         if not isinstance(item, dict):
             continue
@@ -445,17 +446,125 @@ def _weighted_breadth(snapshot: dict[str, Any], key: str, direction: str | None)
         intra = quote.get("intraday") if isinstance(quote.get("intraday"), dict) else {}
         ltp = _float(quote.get("ltpRaw") or quote.get("ltp"))
         vwap, ema9 = _float(intra.get("vwap")), _float(intra.get("ema9"))
-        if not ltp or not vwap or not ema9:
+        signal = None
+        if ltp and vwap and ema9:
+            signal = 1.0 if ltp > vwap and ltp > ema9 else -1.0 if ltp < vwap and ltp < ema9 else 0.0
+        elif ltp:
+            # Angel batch quotes always carry open/previous close even when a
+            # constituent candle call is not in the scanner's top-volume set.
+            open_price, previous_close = _float(quote.get("open")), _float(quote.get("close"))
+            if open_price and previous_close:
+                signal = 1.0 if ltp > open_price and ltp > previous_close else -1.0 if ltp < open_price and ltp < previous_close else 0.0
+                quote_proxy_weight += weight
+        if signal is None:
             continue
         covered += weight
-        signed += weight * (1.0 if ltp > vwap and ltp > ema9 else -1.0 if ltp < vwap and ltp < ema9 else 0.0)
+        signed += weight * signal
     coverage = covered / total_weight * 100.0 if total_weight > 0 else 0.0
     breadth = signed / covered if covered > 0 else None
-    minimum_coverage = 90.0 if weight_source == "OFFICIAL_SNAPSHOT" else 80.0
-    aligned = None if coverage < minimum_coverage or breadth is None or direction is None else breadth >= 0.55 if direction == "CALL" else breadth <= -0.55
+    uses_quote_proxy = quote_proxy_weight > 0
+    minimum_coverage = 90.0 if weight_source == "OFFICIAL_SNAPSHOT" or uses_quote_proxy else 80.0
+    alignment_floor = 0.70 if uses_quote_proxy else 0.55
+    aligned = None if coverage < minimum_coverage or breadth is None or direction is None else breadth >= alignment_floor if direction == "CALL" else breadth <= -alignment_floor
     return {"status": "LIVE" if coverage >= minimum_coverage else "COVERAGE_INCOMPLETE", "aligned": aligned,
             "score": breadth, "coveragePct": round(coverage, 2), "source": weight_source,
-            "minimumCoveragePct": minimum_coverage}
+            "minimumCoveragePct": minimum_coverage, "alignmentFloor": alignment_floor,
+            "quoteProxyPct": round(quote_proxy_weight / total_weight * 100.0, 2) if total_weight > 0 else 0.0}
+
+
+def _normal_cdf(value: float) -> float:
+    return 0.5 * (1.0 + math.erf(value / math.sqrt(2.0)))
+
+
+def _normal_pdf(value: float) -> float:
+    return math.exp(-0.5 * value * value) / math.sqrt(2.0 * math.pi)
+
+
+def _bs_price(spot: float, strike: float, years: float, rate: float, sigma: float, option_type: str) -> float:
+    if min(spot, strike, years, sigma) <= 0:
+        return 0.0
+    root_t = math.sqrt(years)
+    d1 = (math.log(spot / strike) + (rate + 0.5 * sigma * sigma) * years) / (sigma * root_t)
+    d2 = d1 - sigma * root_t
+    discounted = strike * math.exp(-rate * years)
+    if option_type == "CALL":
+        return spot * _normal_cdf(d1) - discounted * _normal_cdf(d2)
+    return discounted * _normal_cdf(-d2) - spot * _normal_cdf(-d1)
+
+
+def _local_greeks(item: dict[str, Any], spot: float | None, expiry_value: Any, *, now: datetime | None = None) -> dict[str, Any]:
+    """Fill missing IV/Greeks from live premium; never overwrite provider values."""
+    strike, premium = _float(item.get("strike")), _float(item.get("ltp"))
+    option_type = str(item.get("optionType") or "").upper()
+    expiry_date = _expiry(expiry_value)
+    now_ist = (now or datetime.now(IST_ZONE)).astimezone(IST_ZONE)
+    if not spot or not strike or not premium or expiry_date is None or option_type not in {"CALL", "PUT"}:
+        return item
+    expiry_at = datetime.combine(expiry_date, dt_time(15, 30), tzinfo=IST_ZONE)
+    years = max((expiry_at - now_ist).total_seconds(), 60.0) / (365.0 * 24.0 * 3600.0)
+    rate = 0.065
+    sigma = _float(item.get("iv"))
+    sigma = sigma / 100.0 if sigma and sigma > 1 else sigma
+    if not sigma or sigma <= 0:
+        low, high = 0.01, 5.0
+        for _ in range(64):
+            mid = (low + high) / 2.0
+            if _bs_price(spot, strike, years, rate, mid, option_type) > premium:
+                high = mid
+            else:
+                low = mid
+        sigma = (low + high) / 2.0
+    root_t = math.sqrt(years)
+    d1 = (math.log(spot / strike) + (rate + 0.5 * sigma * sigma) * years) / (sigma * root_t)
+    d2 = d1 - sigma * root_t
+    delta = _normal_cdf(d1) if option_type == "CALL" else _normal_cdf(d1) - 1.0
+    gamma = _normal_pdf(d1) / (spot * sigma * root_t)
+    vega = spot * _normal_pdf(d1) * root_t / 100.0
+    first = -(spot * _normal_pdf(d1) * sigma) / (2.0 * root_t)
+    discounted = strike * math.exp(-rate * years)
+    theta_year = first - rate * discounted * _normal_cdf(d2) if option_type == "CALL" else first + rate * discounted * _normal_cdf(-d2)
+    enriched = dict(item)
+    defaults = {"delta": delta, "gamma": gamma, "vega": vega, "theta": theta_year / 365.0, "iv": sigma * 100.0}
+    changed = False
+    for name, value in defaults.items():
+        if _float(enriched.get(name)) is None:
+            enriched[name] = round(value, 6)
+            changed = True
+    if changed:
+        enriched["greeksSource"] = enriched.get("greeksSource") or "LOCAL_BLACK_SCHOLES"
+    return enriched
+
+
+def _futures_oi_state(future: dict[str, Any]) -> dict[str, Any]:
+    ltp, close = _float(future.get("ltp")), _float(future.get("close"))
+    oi, previous_oi = _float(future.get("oi")), _float(future.get("previousOi"))
+    if not ltp or not close or oi is None or previous_oi is None or previous_oi <= 0:
+        return {"state": "UNAVAILABLE", "priceChangePct": None, "oiChangePct": None}
+    price_up, oi_up = ltp > close, oi > previous_oi
+    state = "LONG_BUILDUP" if price_up and oi_up else "SHORT_COVERING" if price_up else "SHORT_BUILDUP" if oi_up else "LONG_UNWINDING"
+    return {"state": state, "priceChangePct": round((ltp - close) / close * 100.0, 3),
+            "oiChangePct": round((oi - previous_oi) / previous_oi * 100.0, 3)}
+
+
+def _chain_confirmation(chain: list[dict[str, Any]], direction: str | None, selected: dict[str, Any] | None) -> dict[str, Any]:
+    if direction not in {"CALL", "PUT"} or not selected:
+        return {"aligned": None, "score": None, "reason": "DIRECTION_OR_CONTRACT_UNAVAILABLE"}
+    side = [row for row in chain if row.get("optionType") == direction]
+    opposite_type = "PUT" if direction == "CALL" else "CALL"
+    opposite = [row for row in chain if row.get("optionType") == opposite_type]
+    usable = [row for row in chain if _float(row.get("oiChange")) is not None]
+    if not usable:
+        return {"aligned": None, "score": None, "reason": "OI_CHANGE_UNAVAILABLE"}
+    selected_change = _float(selected.get("oiChange"))
+    selected_ltp, selected_close = _float(selected.get("ltp")), _float(selected.get("close"))
+    premium_buildup = bool(selected_change is not None and selected_change > 0 and selected_ltp and selected_close and selected_ltp > selected_close)
+    side_change = sum(_float(row.get("oiChange")) or 0.0 for row in side)
+    opposite_change = sum(_float(row.get("oiChange")) or 0.0 for row in opposite)
+    wall_shift = opposite_change > 0 and side_change < 0
+    aligned = premium_buildup or wall_shift
+    reason = "DIRECTIONAL_PREMIUM_OI_BUILDUP" if premium_buildup else "OPPOSING_WALL_BUILDUP_AND_SUPPORT_UNWIND" if wall_shift else "CHAIN_NOT_ALIGNED"
+    return {"aligned": aligned, "score": 100.0 if premium_buildup else 85.0 if wall_shift else 0.0,
+            "reason": reason, "directionalOiChange": round(side_change, 2), "opposingOiChange": round(opposite_change, 2)}
 
 
 def _vix_regime(snapshot: dict[str, Any]) -> tuple[str | None, float | None]:
@@ -492,8 +601,9 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
     market_snapshot = snapshot if isinstance(snapshot, dict) else {}
     converted: dict[str, Any] = {}
     for key, row in (option_data.get("indices") or {}).items():
-        chain = row.get("chain") if isinstance(row.get("chain"), list) else []
+        raw_chain = row.get("chain") if isinstance(row.get("chain"), list) else []
         spot, close = _float(row.get("spot")), _float(row.get("spotClose"))
+        chain = [_local_greeks(item, spot, row.get("expiry")) for item in raw_chain if isinstance(item, dict)]
         change_pct = ((spot - close) / close * 100.0) if spot and close else None
         structure = row.get("structure") if isinstance(row.get("structure"), dict) else {}
         direction = structure.get("direction")
@@ -509,36 +619,47 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
                 delta_ok.append(item)
         selected = min(delta_ok, key=lambda item: abs(abs(_float(item.get("delta")) or 0) - 0.55)) if delta_ok else None
         future = row.get("future") if isinstance(row.get("future"), dict) else {}
-        f_ltp, f_close = _float(future.get("ltp")), _float(future.get("close"))
-        f_oi, f_prev_oi = _float(future.get("oi")), _float(future.get("previousOi"))
-        oi_aligned = None
-        if direction and f_ltp and f_close and f_oi is not None and f_prev_oi is not None:
-            oi_aligned = (direction == "CALL" and f_ltp > f_close and f_oi > f_prev_oi) or (direction == "PUT" and f_ltp < f_close and f_oi > f_prev_oi)
         breadth = _weighted_breadth(market_snapshot, key, direction)
+        futures_oi = _futures_oi_state(future)
+        oi_state = futures_oi["state"]
+        strong_oi = (direction == "CALL" and oi_state == "LONG_BUILDUP") or (direction == "PUT" and oi_state == "SHORT_BUILDUP")
+        secondary_oi = (direction == "CALL" and oi_state == "SHORT_COVERING") or (direction == "PUT" and oi_state == "LONG_UNWINDING")
+        strong_breadth = breadth.get("aligned") is True and abs(_float(breadth.get("score")) or 0) >= 0.70
+        oi_aligned = True if strong_oi or (secondary_oi and strong_breadth) else False if direction and oi_state != "UNAVAILABLE" else None
         regime, vix = _vix_regime(market_snapshot)
         expected_r = _contract_risk_reward(selected, structure, direction)
-        premium_buildup = bool(selected and (_float(selected.get("ltp")) or 0) > (_float(selected.get("close")) or math.inf) and (_float(selected.get("oiChange")) or 0) > 0)
+        chain_evidence = _chain_confirmation(chain, direction, selected)
+        chain_aligned = chain_evidence.get("aligned")
         structure_gate = True if direction else False if structure.get("status") == "NO_BREAKOUT" else None
-        contract_gate = True if selected else False if row.get("greeksStatus") == "LIVE" and direction else None
+        contract_gate = True if selected else False if direction and any(_float(item.get("delta")) is not None for item in chain) else None
+        greeks_source = selected.get("greeksSource") if selected else None
         converted[key] = {
             "spot": spot, "direction": direction, "source": row.get("source") or "ANGEL_ONE", "providerStatus": row.get("status"),
             "expiry": row.get("expiry"), "rawChain": chain,
             "scores": {"trend": 100.0 if direction else None, "breakout": 100.0 if direction else None,
-                       "futuresOi": 100.0 if oi_aligned is True else 0.0 if oi_aligned is False else None,
+                       "futuresOi": 100.0 if strong_oi else 75.0 if oi_aligned is True else 0.0 if oi_aligned is False else None,
                        "contract": 100.0 if selected else None,
-                       "optionChain": 100.0 if premium_buildup else 0.0 if selected else None,
+                       "optionChain": chain_evidence.get("score"),
                        "breadth": (50.0 + 50.0 * abs(_float(breadth.get("score")) or 0)) if breadth.get("score") is not None else None,
                        "regime": 100.0 if regime in {"NORMAL", "ELEVATED"} else 70.0 if regime == "CALM" else 0.0 if regime == "FEAR" else None},
             "gates": {"fresh": True if row.get("status") == "LIVE" else False, "structure": structure_gate, "breakout": structure_gate,
-                      "futuresOi": oi_aligned, "optionChain": premium_buildup if selected else None, "breadth": breadth.get("aligned"),
+                      "futuresOi": oi_aligned, "optionChain": chain_aligned, "breadth": breadth.get("aligned"),
                       "contractEconomics": contract_gate, "riskReward": (expected_r >= 1.5) if expected_r is not None else None},
             "contract": ({"symbol": selected.get("symbol"), "strike": selected.get("strike"), "expiry": row.get("expiry"),
                           "ltp": selected.get("ltp"), "delta": selected.get("delta"), "gamma": selected.get("gamma"),
                           "theta": selected.get("theta"), "vega": selected.get("vega"), "iv": selected.get("iv")} if selected else None),
             "breadth": breadth, "structure": structure, "vixRegime": regime, "indiaVix": vix, "expectedR": expected_r,
-            "dataLimitations": [value for value in (row.get("greeksError"),
+            "gateEvidence": {
+                "futuresOi": {**futures_oi, "aligned": oi_aligned, "secondaryConfirmation": bool(secondary_oi and strong_breadth)},
+                "optionChain": chain_evidence,
+                "breadth": breadth,
+                "contractEconomics": {"aligned": contract_gate, "greeksSource": greeks_source,
+                                      "spreadPct": selected.get("spreadPct") if selected else None},
+                "riskReward": {"aligned": (expected_r >= 1.5) if expected_r is not None else None, "expectedR": expected_r},
+            },
+            "dataLimitations": [value for value in (None if greeks_source else row.get("greeksError"),
                                None if direction else "INDEX_CANDLE_STRUCTURE_NOT_CONFIRMED",
                                None if breadth.get("aligned") is not None else "WEIGHTED_CONSTITUENT_BREADTH_NOT_CONFIRMED",
-                               "RISK_REWARD_NOT_YET_CONFIRMED") if value],
+                               None if expected_r is not None else "RISK_REWARD_NOT_YET_CONFIRMED") if value],
         }
     return {"indices": converted}

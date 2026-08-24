@@ -2,8 +2,12 @@ import threading
 
 from app.services.angel_index_options import (
     INDEXES,
+    IST_ZONE,
+    _chain_confirmation,
     _contracts,
     _fetch_candles_with_retry,
+    _futures_oi_state,
+    _local_greeks,
     fetch_angel_index_option_snapshot,
     index_structure_from_candles,
     option_data_to_strategy_inputs,
@@ -130,3 +134,33 @@ def test_leader_basket_supplies_breadth_when_official_weights_absent():
     assert converted["breadth"]["source"] == "LEADER_BASKET_PROXY"
     assert converted["breadth"]["coveragePct"] == 100.0
     assert converted["gates"]["breadth"] is True
+
+
+def test_local_black_scholes_fills_missing_sensex_put_greeks():
+    result = _local_greeks(
+        {"strike": 77300, "ltp": 420, "optionType": "PUT"},
+        77321,
+        "2026-08-25",
+        now=datetime(2026, 8, 24, 10, 0, tzinfo=IST_ZONE),
+    )
+    assert -1 < result["delta"] < 0
+    assert result["gamma"] > 0
+    assert result["iv"] > 0
+    assert result["greeksSource"] == "LOCAL_BLACK_SCHOLES"
+
+
+def test_futures_oi_classifies_all_directional_regimes():
+    assert _futures_oi_state({"ltp": 99, "close": 100, "oi": 110, "previousOi": 100})["state"] == "SHORT_BUILDUP"
+    assert _futures_oi_state({"ltp": 99, "close": 100, "oi": 90, "previousOi": 100})["state"] == "LONG_UNWINDING"
+    assert _futures_oi_state({"ltp": 101, "close": 100, "oi": 110, "previousOi": 100})["state"] == "LONG_BUILDUP"
+    assert _futures_oi_state({"ltp": 101, "close": 100, "oi": 90, "previousOi": 100})["state"] == "SHORT_COVERING"
+
+
+def test_chain_confirmation_uses_atm_band_wall_migration():
+    chain = [
+        {"optionType": "PUT", "oiChange": -200, "ltp": 90, "close": 100},
+        {"optionType": "CALL", "oiChange": 300, "ltp": 80, "close": 85},
+    ]
+    evidence = _chain_confirmation(chain, "PUT", chain[0])
+    assert evidence["aligned"] is True
+    assert evidence["reason"] == "OPPOSING_WALL_BUILDUP_AND_SUPPORT_UNWIND"
