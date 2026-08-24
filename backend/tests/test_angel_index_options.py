@@ -198,14 +198,16 @@ def test_provider_previous_oi_is_preferred_over_intraday_baseline(tmp_path, monk
 
 def test_contract_risk_reward_uses_orb_invalidation_and_atr_target():
     evidence = _contract_risk_reward(
-        {"ltp": 100, "delta": 0.55, "gamma": 0.001},
-        {"last": 250, "ema9": 246, "orbHigh": 245, "orbLow": 235, "atr5m": 12},
+        {"ltp": 100, "delta": 0.55, "gamma": 0.001, "spreadPct": 1.0},
+        {"last": 247, "ema9": 246, "orbHigh": 245, "orbLow": 235, "atr5m": 12},
         "CALL",
     )
     assert evidence["basis"] == "ORB_INVALIDATION_NEAREST_ATR_OR_MEASURED_MOVE"
     assert evidence["stop"] == 246
     assert evidence["target"] == 255
-    assert evidence["expectedR"] > 0
+    assert evidence["projectedOptionLoss"] < 20
+    assert evidence["spreadCost"] == 1
+    assert evidence["expectedR"] > 1.5
 
 
 def test_contract_risk_reward_rejects_exhausted_orb_target():

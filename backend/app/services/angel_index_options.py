@@ -680,13 +680,23 @@ def _contract_risk_reward(selected: dict[str, Any] | None, structure: dict[str, 
     if stop is None or target is None:
         return {"expectedR": 0.0, "basis": "STRUCTURAL_TARGET_ALREADY_EXHAUSTED", "stop": stop, "target": target}
     risk_move, reward_move = abs(stop - last), abs(target - last)
-    option_loss = max(delta * risk_move - 0.5 * gamma * risk_move * risk_move, premium * 0.20)
-    option_gain = delta * reward_move + 0.5 * gamma * reward_move * reward_move
-    expected_r = round(option_gain / option_loss, 3) if option_loss > 0 else None
+    # Project the contract at the actual underlying invalidation/target.  A
+    # percentage-of-premium loss floor is not structural risk and severely
+    # understates R when the breakout stop is tight.  Charge one full quoted
+    # spread instead, which represents buying at the ask and exiting at bid.
+    spread_pct = max(0.0, _float(selected.get("spreadPct")) or 0.0)
+    spread_cost = premium * spread_pct / 100.0
+    theoretical_loss = delta * risk_move - 0.5 * gamma * risk_move * risk_move
+    theoretical_gain = delta * reward_move + 0.5 * gamma * reward_move * reward_move
+    option_loss = max(theoretical_loss + spread_cost, 0.05)
+    option_gain = max(theoretical_gain - spread_cost, 0.0)
+    expected_r = round(option_gain / option_loss, 3)
     return {"expectedR": expected_r, "basis": "ORB_INVALIDATION_NEAREST_ATR_OR_MEASURED_MOVE",
             "entryUnderlying": round(last, 4), "stop": round(stop, 4), "target": round(target, 4),
             "riskPoints": round(risk_move, 4), "rewardPoints": round(reward_move, 4),
-            "atr5m": round(atr, 4), "openingRangePoints": round(opening_range, 4)}
+            "projectedOptionLoss": round(option_loss, 4), "projectedOptionGain": round(option_gain, 4),
+            "spreadCost": round(spread_cost, 4), "atr5m": round(atr, 4),
+            "openingRangePoints": round(opening_range, 4)}
 
 
 def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
