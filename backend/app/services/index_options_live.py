@@ -5,6 +5,7 @@ from datetime import date
 from typing import Any, Callable
 
 from .angel_index_options import (
+    _apply_oi_baselines,
     active_index_expiries,
     cached_angel_index_option_snapshot,
     option_data_to_strategy_inputs,
@@ -59,6 +60,7 @@ def compose_live_index_options_radar(
         except Exception as exc:
             option_data["thirdFallbackSource"] = "LEMONN"
             option_data["thirdFallbackError"] = str(exc)
+        option_data = _apply_oi_baselines(option_data)
         book["indexOptions"] = option_data_to_strategy_inputs(option_data, book)
         book["indexOptionProvider"] = option_data
     result = build_index_options_radar(book)

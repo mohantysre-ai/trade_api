@@ -33,11 +33,11 @@ type Candidate = {
   expiry?: string | null;
   dataLimitations?: string[];
   gateEvidence?: {
-    futuresOi?: { state?: string; priceChangePct?: number | null; oiChangePct?: number | null; aligned?: boolean | null };
+    futuresOi?: { state?: string; priceChangePct?: number | null; oiChangePct?: number | null; aligned?: boolean | null; baseline?: { basis?: string; ageSeconds?: number | null } | null };
     optionChain?: { reason?: string; aligned?: boolean | null; directionalOiChange?: number | null; opposingOiChange?: number | null };
     breadth?: { score?: number | null; coveragePct?: number | null; aligned?: boolean | null; source?: string };
     contractEconomics?: { aligned?: boolean | null; greeksSource?: string | null; spreadPct?: number | null };
-    riskReward?: { aligned?: boolean | null; expectedR?: number | null };
+    riskReward?: { aligned?: boolean | null; expectedR?: number | null; basis?: string; stop?: number | null; target?: number | null; minimumR?: number | null };
   };
   chain?: Array<{ symbol?: string; strike?: number; optionType?: string; ltp?: number; oi?: number; oiChange?: number; delta?: number; gamma?: number; theta?: number; vega?: number; iv?: number }>;
   structure?: Structure | null;
@@ -151,7 +151,7 @@ function compactEvidence(row: Candidate) {
     { label: 'Fut OI', value: futures?.state?.replaceAll('_', ' ') ?? 'Missing', aligned: futures?.aligned },
     { label: 'Breadth', value: breadth?.score == null ? 'Missing' : `${(breadth.score * 100).toFixed(0)}% · ${fmtNum(breadth.coveragePct, 0)}% cov`, aligned: breadth?.aligned },
     { label: 'Chain', value: chain?.reason?.replaceAll('_', ' ') ?? 'Missing', aligned: chain?.aligned },
-    { label: 'R:R', value: rr?.expectedR == null ? 'Missing' : `${fmtNum(rr.expectedR)}R`, aligned: rr?.aligned },
+    { label: 'R:R', value: rr?.expectedR == null ? rr?.basis?.replaceAll('_', ' ') ?? 'Missing' : `${fmtNum(rr.expectedR)}R · S ${fmtNum(rr.stop)} · T ${fmtNum(rr.target)}`, aligned: rr?.aligned },
   ];
 }
 

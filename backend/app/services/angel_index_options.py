@@ -29,6 +29,7 @@ INDEXES: tuple[dict[str, Any], ...] = (
 _MASTER_LOCK = threading.Lock()
 _MASTER_CACHE: tuple[float, list[dict[str, Any]]] = (0.0, [])
 _OPTION_LOCK = threading.Lock()
+_OI_BASELINE_LOCK = threading.Lock()
 _OPTION_CACHE: tuple[float, dict[str, Any]] = (0.0, {})
 _RADAR_REFRESH_LOCK = threading.Lock()
 
@@ -195,8 +196,18 @@ def index_structure_from_candles(candles: list[list[Any]], *, session_date: date
     ema9, ema20 = _ema(closes, 9), _ema(closes, 20)
     current_closes = [_float(row[4]) for row in current]
     current_closes = [value for value in current_closes if value is not None]
+    true_ranges: list[float] = []
+    previous_close: float | None = None
+    for row in current:
+        high, low, close = _float(row[2]), _float(row[3]), _float(row[4])
+        if high is None or low is None or close is None:
+            continue
+        true_ranges.append(max(high - low, abs(high - previous_close), abs(low - previous_close)) if previous_close is not None else high - low)
+        previous_close = close
+    atr5 = (sum(true_ranges[-14:]) / min(14, len(true_ranges))) if true_ranges else None
     incomplete = {"status": "DATA_INCOMPLETE", "direction": None, "barCount": len(current),
-                  "seedBarCount": max(0, len(parsed) - len(current)), "last": current_closes[-1] if current_closes else None}
+                  "seedBarCount": max(0, len(parsed) - len(current)), "last": current_closes[-1] if current_closes else None,
+                  "atr5m": round(atr5, 4) if atr5 is not None else None}
     if len(current) < 3 or len(parsed) < 20 or ema9 is None or ema20 is None:
         return incomplete
     orb_rows = current[:3]
@@ -210,6 +221,7 @@ def index_structure_from_candles(candles: list[list[Any]], *, session_date: date
         "direction": "CALL" if call else "PUT" if put else None,
         "last": last, "ema9": round(ema9, 4), "ema20": round(ema20, 4),
         "orbHigh": orb_high, "orbLow": orb_low, "barCount": len(current),
+        "atr5m": round(atr5, 4) if atr5 is not None else None,
         "seedBarCount": max(0, len(parsed) - len(current)),
     }
 
@@ -346,6 +358,66 @@ def radar_cache_path() -> Path:
     if env:
         return Path(env)
     return market_snapshot_path().with_name("index_options_radar.json")
+
+
+def oi_baseline_path() -> Path:
+    env = (os.environ.get("INDEX_OPTIONS_OI_BASELINE_FILE") or "").strip()
+    if env:
+        return Path(env)
+    return market_snapshot_path().with_name("index_options_oi_baseline.json")
+
+
+def _apply_oi_baselines(option_data: dict[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
+    """Add a labelled intraday OI comparison when Angel omits previous OI."""
+    stamp = (now or datetime.now(timezone.utc)).astimezone(IST_ZONE)
+    session = stamp.date().isoformat()
+    with _OI_BASELINE_LOCK:
+        try:
+            stored = load_json_with_fallback(oi_baseline_path())
+        except (FileNotFoundError, ValueError, TypeError):
+            stored = {}
+        if not isinstance(stored, dict) or stored.get("sessionDate") != session:
+            stored = {"sessionDate": session, "instruments": {}}
+        instruments = stored.setdefault("instruments", {})
+        changed = False
+        for key, row in (option_data.get("indices") or {}).items():
+            if not isinstance(row, dict):
+                continue
+            observations: list[tuple[str, dict[str, Any]]] = []
+            future = row.get("future")
+            if isinstance(future, dict):
+                observations.append((f"{key}:FUT:{future.get('symbol') or ''}", future))
+            for contract in row.get("chain") or []:
+                if isinstance(contract, dict):
+                    observations.append((f"{key}:OPT:{contract.get('symbol') or contract.get('token') or ''}", contract))
+            for instrument_key, quote in observations:
+                current = _float(quote.get("oi"))
+                provider_previous = _float(quote.get("previousOi"))
+                if current is None or current < 0:
+                    continue
+                if provider_previous is not None and provider_previous > 0:
+                    quote["oiChange"] = current - provider_previous
+                    quote["oiBaseline"] = {"basis": "PROVIDER_PREVIOUS_OI", "oi": provider_previous,
+                                           "ageSeconds": None, "capturedAt": None}
+                    continue
+                baseline = instruments.get(instrument_key)
+                if not isinstance(baseline, dict) or _float(baseline.get("oi")) is None:
+                    instruments[instrument_key] = {"oi": current, "capturedAt": stamp.isoformat()}
+                    quote["oiBaseline"] = {"basis": "WARMING_UP", "oi": current, "ageSeconds": 0,
+                                           "capturedAt": stamp.isoformat()}
+                    changed = True
+                    continue
+                captured = parse_candle_ts(baseline.get("capturedAt"))
+                age = max(0.0, (stamp - captured.astimezone(IST_ZONE)).total_seconds()) if captured else 0.0
+                basis = "INTRADAY_SESSION_BASELINE" if age >= 60.0 else "WARMING_UP"
+                quote["oiBaseline"] = {"basis": basis, "oi": _float(baseline.get("oi")),
+                                       "ageSeconds": round(age), "capturedAt": baseline.get("capturedAt")}
+                if age >= 60.0:
+                    quote["previousOi"] = _float(baseline.get("oi"))
+                    quote["oiChange"] = current - (_float(baseline.get("oi")) or 0.0)
+        if changed:
+            atomic_write_json(oi_baseline_path(), stored)
+    return option_data
 
 
 def load_persisted_radar(*, max_age_seconds: float | None = None) -> dict[str, Any] | None:
@@ -538,12 +610,15 @@ def _local_greeks(item: dict[str, Any], spot: float | None, expiry_value: Any, *
 def _futures_oi_state(future: dict[str, Any]) -> dict[str, Any]:
     ltp, close = _float(future.get("ltp")), _float(future.get("close"))
     oi, previous_oi = _float(future.get("oi")), _float(future.get("previousOi"))
+    baseline = future.get("oiBaseline") if isinstance(future.get("oiBaseline"), dict) else {}
     if not ltp or not close or oi is None or previous_oi is None or previous_oi <= 0:
-        return {"state": "UNAVAILABLE", "priceChangePct": None, "oiChangePct": None}
+        return {"state": "BASELINE_WARMING_UP" if baseline.get("basis") == "WARMING_UP" else "UNAVAILABLE",
+                "priceChangePct": round((ltp - close) / close * 100.0, 3) if ltp and close else None,
+                "oiChangePct": None, "baseline": baseline or None}
     price_up, oi_up = ltp > close, oi > previous_oi
     state = "LONG_BUILDUP" if price_up and oi_up else "SHORT_COVERING" if price_up else "SHORT_BUILDUP" if oi_up else "LONG_UNWINDING"
     return {"state": state, "priceChangePct": round((ltp - close) / close * 100.0, 3),
-            "oiChangePct": round((oi - previous_oi) / previous_oi * 100.0, 3)}
+            "oiChangePct": round((oi - previous_oi) / previous_oi * 100.0, 3), "baseline": baseline or None}
 
 
 def _chain_confirmation(chain: list[dict[str, Any]], direction: str | None, selected: dict[str, Any] | None) -> dict[str, Any]:
@@ -554,7 +629,8 @@ def _chain_confirmation(chain: list[dict[str, Any]], direction: str | None, sele
     opposite = [row for row in chain if row.get("optionType") == opposite_type]
     usable = [row for row in chain if _float(row.get("oiChange")) is not None]
     if not usable:
-        return {"aligned": None, "score": None, "reason": "OI_CHANGE_UNAVAILABLE"}
+        warming = any(((row.get("oiBaseline") or {}).get("basis") == "WARMING_UP") for row in chain if isinstance(row, dict))
+        return {"aligned": None, "score": None, "reason": "OI_BASELINE_WARMING_UP" if warming else "OI_CHANGE_UNAVAILABLE"}
     selected_change = _float(selected.get("oiChange"))
     selected_ltp, selected_close = _float(selected.get("ltp")), _float(selected.get("close"))
     premium_buildup = bool(selected_change is not None and selected_change > 0 and selected_ltp and selected_close and selected_ltp > selected_close)
@@ -580,21 +656,37 @@ def _vix_regime(snapshot: dict[str, Any]) -> tuple[str | None, float | None]:
     return None, None
 
 
-def _contract_risk_reward(selected: dict[str, Any] | None, structure: dict[str, Any], direction: str | None) -> float | None:
+def _contract_risk_reward(selected: dict[str, Any] | None, structure: dict[str, Any], direction: str | None) -> dict[str, Any]:
+    """Project option R from ORB invalidation and the nearest ATR/ORB target."""
     if not selected or direction not in {"CALL", "PUT"}:
-        return None
+        return {"expectedR": None, "basis": "STRUCTURE_UNAVAILABLE"}
     last, ema9 = _float(structure.get("last")), _float(structure.get("ema9"))
+    orb_high, orb_low, atr = _float(structure.get("orbHigh")), _float(structure.get("orbLow")), _float(structure.get("atr5m"))
     delta, gamma = abs(_float(selected.get("delta")) or 0), abs(_float(selected.get("gamma")) or 0)
     premium = _float(selected.get("ltp"))
-    if not last or not ema9 or delta <= 0 or not premium:
-        return None
-    underlying_risk = abs(last - ema9)
-    if underlying_risk <= 0:
-        return None
-    projected = underlying_risk * 1.5
-    loss = max(delta * underlying_risk, premium * 0.20)
-    gain = delta * projected + 0.5 * gamma * projected * projected
-    return round(gain / loss, 3) if loss > 0 else None
+    if not last or not ema9 or not orb_high or not orb_low or not atr or delta <= 0 or not premium:
+        return {"expectedR": None, "basis": "STRUCTURE_OR_ATR_UNAVAILABLE"}
+    opening_range = orb_high - orb_low
+    if opening_range <= 0:
+        return {"expectedR": None, "basis": "OPENING_RANGE_INVALID"}
+    if direction == "CALL":
+        stop = max(level for level in (orb_high, ema9) if level < last) if any(level < last for level in (orb_high, ema9)) else None
+        targets = [orb_high + opening_range, last + atr]
+        target = min(level for level in targets if level > last) if any(level > last for level in targets) else None
+    else:
+        stop = min(level for level in (orb_low, ema9) if level > last) if any(level > last for level in (orb_low, ema9)) else None
+        targets = [orb_low - opening_range, last - atr]
+        target = max(level for level in targets if level < last) if any(level < last for level in targets) else None
+    if stop is None or target is None:
+        return {"expectedR": 0.0, "basis": "STRUCTURAL_TARGET_ALREADY_EXHAUSTED", "stop": stop, "target": target}
+    risk_move, reward_move = abs(stop - last), abs(target - last)
+    option_loss = max(delta * risk_move - 0.5 * gamma * risk_move * risk_move, premium * 0.20)
+    option_gain = delta * reward_move + 0.5 * gamma * reward_move * reward_move
+    expected_r = round(option_gain / option_loss, 3) if option_loss > 0 else None
+    return {"expectedR": expected_r, "basis": "ORB_INVALIDATION_NEAREST_ATR_OR_MEASURED_MOVE",
+            "entryUnderlying": round(last, 4), "stop": round(stop, 4), "target": round(target, 4),
+            "riskPoints": round(risk_move, 4), "rewardPoints": round(reward_move, 4),
+            "atr5m": round(atr, 4), "openingRangePoints": round(opening_range, 4)}
 
 
 def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -627,7 +719,8 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
         strong_breadth = breadth.get("aligned") is True and abs(_float(breadth.get("score")) or 0) >= 0.70
         oi_aligned = True if strong_oi or (secondary_oi and strong_breadth) else False if direction and oi_state != "UNAVAILABLE" else None
         regime, vix = _vix_regime(market_snapshot)
-        expected_r = _contract_risk_reward(selected, structure, direction)
+        risk_reward = _contract_risk_reward(selected, structure, direction)
+        expected_r = _float(risk_reward.get("expectedR"))
         chain_evidence = _chain_confirmation(chain, direction, selected)
         chain_aligned = chain_evidence.get("aligned")
         structure_gate = True if direction else False if structure.get("status") == "NO_BREAKOUT" else None
@@ -655,7 +748,8 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
                 "breadth": breadth,
                 "contractEconomics": {"aligned": contract_gate, "greeksSource": greeks_source,
                                       "spreadPct": selected.get("spreadPct") if selected else None},
-                "riskReward": {"aligned": (expected_r >= 1.5) if expected_r is not None else None, "expectedR": expected_r},
+                "riskReward": {**risk_reward, "aligned": (expected_r >= 1.5) if expected_r is not None else None,
+                               "minimumR": 1.5},
             },
             "dataLimitations": [value for value in (None if greeks_source else row.get("greeksError"),
                                None if direction else "INDEX_CANDLE_STRUCTURE_NOT_CONFIRMED",

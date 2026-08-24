@@ -3,7 +3,9 @@ import threading
 from app.services.angel_index_options import (
     INDEXES,
     IST_ZONE,
+    _apply_oi_baselines,
     _chain_confirmation,
+    _contract_risk_reward,
     _contracts,
     _fetch_candles_with_retry,
     _futures_oi_state,
@@ -164,3 +166,54 @@ def test_chain_confirmation_uses_atm_band_wall_migration():
     evidence = _chain_confirmation(chain, "PUT", chain[0])
     assert evidence["aligned"] is True
     assert evidence["reason"] == "OPPOSING_WALL_BUILDUP_AND_SUPPORT_UNWIND"
+
+
+def test_intraday_oi_baseline_persists_and_warms_before_use(tmp_path, monkeypatch):
+    monkeypatch.setenv("INDEX_OPTIONS_OI_BASELINE_FILE", str(tmp_path / "oi.json"))
+    first = {"indices": {"NIFTY": {"future": {"symbol": "NIFTYFUT", "oi": 1000},
+                                      "chain": [{"symbol": "NIFTYCE", "oi": 500}]}}}
+    start = datetime(2026, 8, 24, 10, 0, tzinfo=IST_ZONE)
+    _apply_oi_baselines(first, now=start)
+    assert first["indices"]["NIFTY"]["future"]["oiBaseline"]["basis"] == "WARMING_UP"
+
+    second = {"indices": {"NIFTY": {"future": {"symbol": "NIFTYFUT", "oi": 1120},
+                                       "chain": [{"symbol": "NIFTYCE", "oi": 450}]}}}
+    _apply_oi_baselines(second, now=start + timedelta(minutes=2))
+    future = second["indices"]["NIFTY"]["future"]
+    option = second["indices"]["NIFTY"]["chain"][0]
+    assert future["previousOi"] == 1000
+    assert future["oiChange"] == 120
+    assert future["oiBaseline"]["basis"] == "INTRADAY_SESSION_BASELINE"
+    assert option["oiChange"] == -50
+
+
+def test_provider_previous_oi_is_preferred_over_intraday_baseline(tmp_path, monkeypatch):
+    monkeypatch.setenv("INDEX_OPTIONS_OI_BASELINE_FILE", str(tmp_path / "oi.json"))
+    payload = {"indices": {"NIFTY": {"future": {"symbol": "NIFTYFUT", "oi": 1200, "previousOi": 900}, "chain": []}}}
+    _apply_oi_baselines(payload, now=datetime(2026, 8, 24, 10, 0, tzinfo=IST_ZONE))
+    future = payload["indices"]["NIFTY"]["future"]
+    assert future["oiChange"] == 300
+    assert future["oiBaseline"]["basis"] == "PROVIDER_PREVIOUS_OI"
+
+
+def test_contract_risk_reward_uses_orb_invalidation_and_atr_target():
+    evidence = _contract_risk_reward(
+        {"ltp": 100, "delta": 0.55, "gamma": 0.001},
+        {"last": 250, "ema9": 246, "orbHigh": 245, "orbLow": 235, "atr5m": 12},
+        "CALL",
+    )
+    assert evidence["basis"] == "ORB_INVALIDATION_NEAREST_ATR_OR_MEASURED_MOVE"
+    assert evidence["stop"] == 246
+    assert evidence["target"] == 255
+    assert evidence["expectedR"] > 0
+
+
+def test_contract_risk_reward_rejects_exhausted_orb_target():
+    evidence = _contract_risk_reward(
+        {"ltp": 100, "delta": -0.55, "gamma": 0.001},
+        {"last": 220, "ema9": 225, "orbHigh": 245, "orbLow": 235, "atr5m": 10},
+        "PUT",
+    )
+    assert evidence["basis"] == "ORB_INVALIDATION_NEAREST_ATR_OR_MEASURED_MOVE"
+    assert evidence["stop"] == 225
+    assert evidence["target"] == 210
