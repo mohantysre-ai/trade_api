@@ -7,11 +7,12 @@ stale headline numbers on screen.
 """
 from __future__ import annotations
 
-import json
 import logging
 import os
 from datetime import date, datetime, timezone
 from typing import Any
+
+from .json_atomic import atomic_update_json, atomic_write_json, load_json_with_fallback
 
 log = logging.getLogger(__name__)
 BOOK_CACHE_SCHEMA_VERSION = 8
@@ -31,16 +32,16 @@ def _read_json(path: str) -> dict[str, Any] | None:
     if not os.path.isfile(path):
         return None
     try:
-        with open(path, "r", encoding="utf-8-sig") as fh:
-            data = json.load(fh)
+        data = load_json_with_fallback(path)
         return data if isinstance(data, dict) else None
+    except FileNotFoundError:
+        return None
     except Exception as exc:
         log.warning("EOD cache read failed %s: %s", path, exc)
         return None
 
 
 def _write_json(path: str, payload: dict[str, Any]) -> None:
-    from .eod_engine.ingestion import atomic_write_json
     atomic_write_json(path, payload)
 
 
@@ -65,19 +66,12 @@ def _is_triggered_swing(row: dict[str, Any]) -> bool:
     return not bool(row.get("skipped")) and str(row.get("status") or "").upper() != "NOT_TRIGGERED"
 
 
-def _reconcile_master_from_books(for_date) -> None:
-    """Make the headline EOD artifact agree with canonical Book caches."""
-    day_dir = _day_dir(for_date)
-    master_path = os.path.join(day_dir, "master_eod_payload.json")
-    master = _read_json(master_path)
-    if master is None:
-        return
-
-    intra = _read_json(os.path.join(day_dir, "book_intraday.json"))
-    swing = _read_json(os.path.join(day_dir, "book_swing.json"))
-    if intra is None or swing is None:
-        return
-
+def _apply_book_reconciliation(
+    master: dict[str, Any],
+    intra: dict[str, Any],
+    swing: dict[str, Any],
+) -> dict[str, Any]:
+    """Patch headline EOD fields from canonical Book caches."""
     intra_rows = [r for r in (intra.get("trades") or []) if isinstance(r, dict)]
     swing_rows = [r for r in (swing.get("picks") or []) if isinstance(r, dict)]
     active_swing = [r for r in swing_rows if _is_triggered_swing(r)]
@@ -114,7 +108,6 @@ def _reconcile_master_from_books(for_date) -> None:
     wins = sum(1 for r in active_rows if str(r.get("outcomeBucket") or "").upper() == "WIN")
     losses = sum(1 for r in active_rows if str(r.get("outcomeBucket") or "").upper() == "LOSS")
     if wins == 0 and losses == 0:
-        # Fallback for pre-v4 rows without outcomeBucket
         wins = sum(1 for p in pnls if p > 0)
         losses = sum(1 for p in pnls if p < 0)
     win_rate = round(wins / triggered * 100.0, 2) if triggered else None
@@ -191,7 +184,30 @@ def _reconcile_master_from_books(for_date) -> None:
     if "book_reconciled_headline_metrics" not in notes:
         notes.append("book_reconciled_headline_metrics")
     master["notes"] = notes
-    _write_json(master_path, master)
+    return master
+
+
+def _reconcile_master_from_books(for_date) -> None:
+    """Make the headline EOD artifact agree with canonical Book caches."""
+    day_dir = _day_dir(for_date)
+    master_path = os.path.join(day_dir, "master_eod_payload.json")
+    if not os.path.isfile(master_path):
+        return
+
+    intra = _read_json(os.path.join(day_dir, "book_intraday.json"))
+    swing = _read_json(os.path.join(day_dir, "book_swing.json"))
+    if intra is None or swing is None:
+        return
+
+    try:
+        master = atomic_update_json(
+            master_path,
+            lambda current: _apply_book_reconciliation(current, intra, swing),
+        )
+    except (FileNotFoundError, RuntimeError) as exc:
+        log.warning("EOD master reconcile failed %s: %s", master_path, exc)
+        return
+
     _write_json(os.path.join(day_dir, "pm_commentary.json"), master["pm_commentary"])
 
 
