@@ -211,7 +211,7 @@ def build_index_options_radar(snapshot: dict[str, Any] | None) -> dict[str, Any]
         used_buckets.add(row["bucket"])
     return {
         "success": True,
-        "executionPolicy": "MANUAL_ONLY",
+        "executionPolicy": "AUTO_PAPER_ONLY",
         "strategy": "INDEX_DIRECTION_CONFIRMATION_THEN_OPTION",
         "updatedAt": payload.get("updatedAt"),
         "candidates": candidates,

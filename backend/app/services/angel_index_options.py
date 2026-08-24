@@ -750,7 +750,8 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
                       "contractEconomics": contract_gate, "riskReward": (expected_r >= 1.5) if expected_r is not None else None},
             "contract": ({"symbol": selected.get("symbol"), "strike": selected.get("strike"), "expiry": row.get("expiry"),
                           "ltp": selected.get("ltp"), "delta": selected.get("delta"), "gamma": selected.get("gamma"),
-                          "theta": selected.get("theta"), "vega": selected.get("vega"), "iv": selected.get("iv")} if selected else None),
+                          "theta": selected.get("theta"), "vega": selected.get("vega"), "iv": selected.get("iv"),
+                          "lotSize": selected.get("lotSize")} if selected else None),
             "breadth": breadth, "structure": structure, "vixRegime": regime, "indiaVix": vix, "expectedR": expected_r,
             "gateEvidence": {
                 "futuresOi": {**futures_oi, "aligned": oi_aligned, "secondaryConfirmation": bool(secondary_oi and strong_breadth)},

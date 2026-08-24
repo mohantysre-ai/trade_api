@@ -27,7 +27,7 @@ type Candidate = {
   score: number | null;
   missingInputs: string[];
   failedGates: string[];
-  contract?: { symbol?: string; strike?: number; expiry?: string; ltp?: number; delta?: number; gamma?: number; theta?: number; vega?: number; iv?: number } | null;
+  contract?: { symbol?: string; strike?: number; expiry?: string; ltp?: number; delta?: number; gamma?: number; theta?: number; vega?: number; iv?: number; lotSize?: number } | null;
   providerStatus?: string | null;
   dataSource?: string | null;
   expiry?: string | null;
@@ -53,6 +53,10 @@ type Radar = {
   disclaimer?: string;
   candidates: Candidate[];
   selected: Candidate[];
+  paperBook?: {
+    mode?: string; entryCount?: number; dailyEntryCap?: number; openPnl?: number; realizedPnl?: number; totalPnl?: number;
+    open?: PaperPosition[]; closed?: PaperPosition[];
+  };
   limits?: { minDailyEntries?: number; maxDailyEntries: number; maxConcurrent: number; maxPerCorrelationBucket: number; scoreFloor?: number; buySideCap?: number; huntMode?: string };
   reentryPolicy?: {
     maxAttemptsPerIndex: number;
@@ -62,6 +66,12 @@ type Radar = {
     riskScale: number;
   };
   error?: string;
+};
+
+type PaperPosition = {
+  id: string; index: string; symbol: string; direction: string; quantity: number; status: string;
+  entryPremium: number; currentPremium: number; effectiveStopPremium: number; targetPremium: number;
+  unrealizedPnl?: number; pnl?: number; pnlPct?: number; exitReason?: string; enteredAt?: string;
 };
 
 const GATE_LABEL: Record<string, string> = {
@@ -193,7 +203,7 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
             <p className="mt-1 text-[11px] text-[var(--fg-muted)]">Direction first · futures OI · option chain · weighted constituents · contract economics</p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="desk-pill desk-pill--muted">Manual only</span>
+            <span className="desk-pill desk-pill--ok">Auto paper only</span>
             <span className="desk-pill desk-pill--muted">Continuous hunt</span>
             <span className="desk-pill desk-pill--muted">No minimum</span>
             <span className="desk-pill desk-pill--muted">Max {radar?.limits?.maxDailyEntries ?? 20}/day</span>
@@ -276,6 +286,47 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
           );
         })}
       </div>
+
+      {radar?.paperBook && (
+        <div className="desk-card p-3 sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="desk-panel-title">PAPER OPTION BOOK</div>
+              <div className="mt-1 text-[10px] text-[var(--fg-muted)]">
+                Automatic paper fills · no broker orders · {radar.paperBook.entryCount ?? 0}/{radar.paperBook.dailyEntryCap ?? 20} entries
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5 text-[10px]">
+              <span className="desk-pill desk-pill--muted">Open ₹{fmtNum(radar.paperBook.openPnl)}</span>
+              <span className="desk-pill desk-pill--muted">Realized ₹{fmtNum(radar.paperBook.realizedPnl)}</span>
+              <span className={(radar.paperBook.totalPnl ?? 0) >= 0 ? 'desk-pill desk-pill--ok' : 'desk-pill desk-pill--warn'}>
+                Total ₹{fmtNum(radar.paperBook.totalPnl)}
+              </span>
+            </div>
+          </div>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-[10px]">
+              <thead className="uppercase tracking-wider text-[var(--fg-subtle)]">
+                <tr><th className="pb-2">Contract</th><th>Index</th><th>Qty</th><th>Entry</th><th>Mark</th><th>Trail SL</th><th>Target</th><th>P&amp;L</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                {[...(radar.paperBook.open ?? []), ...(radar.paperBook.closed ?? []).slice(-5).reverse()].map((position) => {
+                  const pnl = position.status === 'OPEN' ? position.unrealizedPnl : position.pnl;
+                  return (
+                    <tr key={position.id} className="border-t border-[var(--terminal-line)] tabular-nums">
+                      <td className="py-2 font-bold text-[var(--fg-strong)]">{position.symbol}</td><td>{position.index}</td><td>{position.quantity}</td>
+                      <td>₹{fmtNum(position.entryPremium)}</td><td>₹{fmtNum(position.currentPremium)}</td>
+                      <td>₹{fmtNum(position.effectiveStopPremium)}</td><td>₹{fmtNum(position.targetPremium)}</td>
+                      <td className={(pnl ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}>₹{fmtNum(pnl)}</td>
+                      <td>{position.status === 'CLOSED' ? position.exitReason ?? 'CLOSED' : 'OPEN'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {loading && <div className="glass-skeleton h-16 rounded-xl" aria-hidden />}
       {!loading && radar?.candidates.length === 0 && !radar.error && (
