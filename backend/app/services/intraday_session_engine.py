@@ -179,9 +179,16 @@ REPLACEMENT_CUTOFF_HHMM = os.environ.get("INTRADAY_REPLACEMENT_CUTOFF", "1445")
 REPLACEMENT_MIN_SCORE = float(os.environ.get("INTRADAY_REPLACEMENT_MIN_SCORE", "55"))
 REPLACEMENT_MAX_PER_SIDE = int(os.environ.get("INTRADAY_REPLACEMENT_MAX_PER_SIDE", str(LOCK_SIZE)))
 # A locked book may rotate, but it must never turn a five-name desk into a
-# high-turnover scanner.  This is a session-wide cap on *new* entries after
-# the morning lock (normal replacements plus permitted re-entries).
-MAX_DAILY_REPLACEMENTS = int(os.environ.get("INTRADAY_MAX_DAILY_REPLACEMENTS", "10"))
+# high-turnover scanner. This is a session-wide cap on *new* entries after
+# the morning lock (normal replacements plus permitted re-entries). Its default
+# is derived from the advertised total-entry ceiling so 5 initial + 15 later
+# entries can reach, but never exceed, the 20-entry session policy.
+MAX_DAILY_REPLACEMENTS = int(
+    os.environ.get(
+        "INTRADAY_MAX_DAILY_REPLACEMENTS",
+        str(max(0, int(os.environ.get("INTRADAY_MAX_DAILY_POSITIONS", "20")) - LOCK_SIZE)),
+    )
+)
 # Hard session ledger ceiling. This counts every executed entry, including the
 # morning lock, ordinary replacements and same-symbol re-entries. It is not a
 # concurrent-position limit; LOCK_SIZE remains the live-book risk limit.

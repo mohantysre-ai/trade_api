@@ -912,13 +912,13 @@ export function evaluateMatrixBuyCandidate(
       const rr = dhanRrValue(dhanPick);
       if (rr === null || rr < INSTITUTIONAL_MIN_RR) {
         eligible = false;
-        reason = `Dhan R:R ${rr?.toFixed(1) ?? '—'} below ${INSTITUTIONAL_MIN_RR}:1`;
+        reason = `Scanner R:R ${rr?.toFixed(1) ?? '—'} below ${INSTITUTIONAL_MIN_RR}:1`;
       }
     } else {
       const est = estimateStructuralRr(ctx?.atrPct);
       if (!est?.ok) {
         eligible = false;
-        reason = 'No Dhan LONG R:R — ATR estimate unavailable';
+        reason = 'No scanner LONG R:R — ATR estimate unavailable';
       }
     }
 

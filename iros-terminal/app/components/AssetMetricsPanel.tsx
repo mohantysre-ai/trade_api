@@ -2075,20 +2075,20 @@ export default function AssetMetricsPanel({
           }}
           className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:bg-slate-100"
         >
-          <span>Research feeds (optional) — Lemonn / Dhan</span>
+          <span>Research feeds (optional) — Backup A / Backup B</span>
           <span>{researchOpen ? '▾' : '▸'}</span>
         </button>
         {researchOpen && (
           <div className="px-3 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] text-slate-600">
             <div className="border border-slate-200 rounded-lg p-2 bg-white/70">
-              <div className="font-bold text-slate-700">Lemonn</div>
-              <div>Source: {lemonn?.source || '—'}</div>
+              <div className="font-bold text-slate-700">Research Backup B</div>
+              <div>Source: External research feed</div>
               <div>Count: {lemonn?.count ?? '—'}</div>
               {lemonn?.isMock && <div className="text-amber-600 font-semibold">mock fallback</div>}
             </div>
             <div className="border border-slate-200 rounded-lg p-2 bg-white/70">
-              <div className="font-bold text-slate-700">Dhan ScanX</div>
-              <div>Source: {dhan?.source || '—'}</div>
+              <div className="font-bold text-slate-700">Research Backup A</div>
+              <div>Source: External scanner feed</div>
               <div>Count: {dhan?.count ?? '—'}</div>
               {dhan?.isMock && <div className="text-amber-600 font-semibold">mock fallback</div>}
             </div>

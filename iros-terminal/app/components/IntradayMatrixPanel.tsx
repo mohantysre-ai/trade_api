@@ -776,7 +776,7 @@ export default function IntradayMatrixPanel() {
               <div>
                 <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">LEMOON CO.IN — 10 INTRADAY PICKS</h3>
                 <p className="text-[7px] text-slate-500">
-                  {lemonnData?.source ?? 'lemonn.co.in'}
+                  Research Backup B
                   {lemonnData?.isMock && <span className="ml-1 text-amber-500 font-bold">(mock fallback)</span>}
                   {lemonnTime && <span className="ml-1 text-slate-400">@{lemonnTime}</span>}
                 </p>
@@ -797,7 +797,7 @@ export default function IntradayMatrixPanel() {
           <div className="mb-3 p-2 rounded-lg bg-red-50 border border-red-200 text-[9px] text-red-600">{lemonnError}</div>
         )}
 
-        {lemonnLoading && <LoadingSpinner label="Fetching lemonn.co.in..." />}
+        {lemonnLoading && <LoadingSpinner label="Fetching research backup B..." />}
 
         {!lemonnLoading && lemonnData?.recommendations && lemonnData.recommendations.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
@@ -837,7 +837,7 @@ export default function IntradayMatrixPanel() {
 
         {!lemonnLoading && !lemonnError && (!lemonnData?.recommendations || lemonnData.recommendations.length === 0) && (
           <div className="flex flex-col items-center justify-center py-8 text-slate-400">
-            <span className="text-[10px] uppercase tracking-wider font-semibold">No lemonn signals today</span>
+            <span className="text-[10px] uppercase tracking-wider font-semibold">No backup B signals today</span>
           </div>
         )}
       </div>
@@ -856,11 +856,11 @@ export default function IntradayMatrixPanel() {
               </div>
               <div>
                 <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">
-                  DHAN ScanX → FEED SCANNER — TOP 10 + TRADE PLAN
+                  RESEARCH BACKUP A → FEED SCANNER — TOP 10 + TRADE PLAN
                 </h3>
                 <p className="text-[7px] text-slate-500">
-                  {dhanData?.source ?? 'dhan-scanx'}
-                  {dhanData?.isMock && <span className="ml-1 text-amber-500 font-bold">(mock fallback — Dhan API unreachable)</span>}
+                  External scanner feed
+                  {dhanData?.isMock && <span className="ml-1 text-amber-500 font-bold">(mock fallback — backup feed unreachable)</span>}
                   &nbsp;·&nbsp;Scanned {dhanData?.scannedCount ?? 0} stocks
                   &nbsp;·&nbsp;<span className="text-emerald-600 font-semibold">LONG {dhanData?.longPassedCount ?? 0}</span>
                   &nbsp;/&nbsp;<span className="text-rose-600 font-semibold">SHORT {dhanData?.shortPassedCount ?? 0}</span>
@@ -883,7 +883,7 @@ export default function IntradayMatrixPanel() {
           <div className="mb-3 p-2 rounded-lg bg-red-50 border border-red-200 text-[9px] text-red-600">{dhanError}</div>
         )}
 
-        {dhanLoading && <LoadingSpinner label="Fetching Dhan ScanX & feed_scanner..." />}
+        {dhanLoading && <LoadingSpinner label="Fetching research backup A..." />}
 
         {!dhanLoading && dhanData && ((dhanData.recommendations?.length ?? 0) > 0 || (dhanData.shortRecommendations?.length ?? 0) > 0) && (
           <>
@@ -1218,7 +1218,7 @@ export default function IntradayMatrixPanel() {
         {!dhanLoading && !dhanError && (!dhanData?.recommendations || dhanData.recommendations.length === 0) && (!dhanData?.shortRecommendations || dhanData.shortRecommendations.length === 0) && (
           <div className="flex flex-col items-center justify-center py-8 text-slate-400">
             <span className="text-[10px] uppercase tracking-wider font-semibold">No scanner signals today</span>
-            <span className="text-[8px] mt-1">Dhan ScanX API may be unreachable — check logs</span>
+            <span className="text-[8px] mt-1">Research backup A may be unreachable — check logs</span>
           </div>
         )}
       </div>
@@ -1227,7 +1227,7 @@ export default function IntradayMatrixPanel() {
       <div className="text-center text-[7px] text-slate-400 pt-1">
         {monitorMode
           ? 'FIXED PLAN ACTIVE · Monitor mode · Live prices every 2s · No external API calls'
-          : 'lemonn.co.in · Dhan ScanX + feed_scanner · Data refreshes every 2 minutes'}
+          : 'Research backups A + B · Data refreshes every 2 minutes'}
       </div>
 
       <style>{`

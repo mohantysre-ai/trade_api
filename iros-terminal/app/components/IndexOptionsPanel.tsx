@@ -127,9 +127,9 @@ function tileAccent(state: Candidate['state']) {
 }
 
 function chainSourceLabel(source: string | null | undefined) {
-  if (source === 'LEMONN_FALLBACK') return 'Lemonn';
-  if (source === 'SCANX_FALLBACK') return 'ScanX';
-  return 'Angel';
+  if (source === 'LEMONN_FALLBACK') return 'Option Backup B';
+  if (source === 'SCANX_FALLBACK') return 'Option Backup A';
+  return 'Angel One';
 }
 
 function candidateHeadline(row: Candidate) {

@@ -938,7 +938,7 @@ export default function ForensicPanel({
         score,
         scoreScale: 'angel',
         dayChangePct: merged ? parsePercent(merged.delta) : null,
-        thesis: pick.reasons?.join(' · ') || 'Dhan ScanX swing confluence',
+        thesis: pick.reasons?.join(' · ') || 'External scanner swing confluence',
         action: 'BUY',
         riskFlag: resolveRiskFlag({ stock: merged, quote, score, marketRisk }),
         passesHardFilters: enriched.passesHardFilters,
@@ -1324,7 +1324,7 @@ export default function ForensicPanel({
             ) : institutionalMode
               ? institutionalOffHours
                 ? `Institutional ₹1cr+ book — off-hours snapshot: score ≥ ${SCORE_STRONG}, Trendlyne confirm, LOW/MODERATE risk (volume gates rank-penalized)`
-                : `Institutional ₹1cr+ book — score ≥ ${SCORE_STRONG}, Trendlyne confirm, Dhan R:R ≥2 when live`
+                : `Institutional ₹1cr+ book — score ≥ ${SCORE_STRONG}, Trendlyne confirm, scanner R:R ≥2 when live`
               : live?.poolDescription || `Top ${MATRIX_BUY_MIN_DISPLAY}+ high-probability BUY setups — score ≥ ${MATRIX_BUY_MIN_SCORE}, CORE preferred`}
             {!lockedSwingMode && !staleSwingLock && typeof live?.universeSize === 'number' && live.universeSize > 0 && (
               <> · Universe {live.universeSize}</>
@@ -1333,7 +1333,7 @@ export default function ForensicPanel({
               <> · Top {live.volumeScreenedCount} by volume screened</>
             )}
             {!lockedSwingMode && !staleSwingLock && dhanPickMap.size > 0 && (
-              <> · Dhan LONG {dhanPickMap.size}</>
+              <> · Scanner LONG {dhanPickMap.size}</>
             )}
             {!lockedSwingMode && !staleSwingLock && !huntingSwing && !cashHeldSwing && (
               <>
@@ -1593,7 +1593,7 @@ export default function ForensicPanel({
                       {dhanRr !== null && (
                         <span>
                           R:R <span className="font-semibold text-violet-700">{dhanRr.toFixed(1)}:1</span>
-                          <span className="text-violet-400"> DHAN</span>
+                          <span className="text-violet-400"> SCANNER</span>
                         </span>
                       )}
                       {dhanRr === null && rrEstimate && (
@@ -1703,8 +1703,8 @@ export default function ForensicPanel({
             <p className="text-slate-500 text-[11px] mt-1">
               {institutionalMode
                 ? institutionalOffHours
-                  ? `Off-hours / snapshot mode: intraday volume gates are rank-penalized (0/${assetRows.filter((r) => !r.isMetaRow).length} hard-filter passers in pool). Still requires quant score ≥ ${SCORE_STRONG}, Trendlyne confirm, LOW/MODERATE risk, and Dhan R:R ≥2 or ATR-based estimate. No filler names — refresh after market open for live volume confirms.`
-                  : `₹1cr+ book requires quant score ≥ ${SCORE_STRONG}, hard+quality filters, Trendlyne confirm (checklist ≥70% preferred), LOW/MODERATE risk, and Dhan R:R ≥2 when in Dhan LONG set. No filler names — refresh after market open.`
+                  ? `Off-hours / snapshot mode: intraday volume gates are rank-penalized (0/${assetRows.filter((r) => !r.isMetaRow).length} hard-filter passers in pool). Still requires quant score ≥ ${SCORE_STRONG}, Trendlyne confirm, LOW/MODERATE risk, and scanner R:R ≥2 or ATR-based estimate. No filler names — refresh after market open for live volume confirms.`
+                  : `₹1cr+ book requires quant score ≥ ${SCORE_STRONG}, hard+quality filters, Trendlyne confirm (checklist ≥70% preferred), LOW/MODERATE risk, and scanner R:R ≥2 when in the scanner LONG set. No filler names — refresh after market open.`
                 : `Up to ${MATRIX_BUY_TOP_N} picks from the ranked pool. At least ${MATRIX_BUY_MIN_DISPLAY} shown when enough CORE setups exist; otherwise best hard-filter passers (score ≥ ${SCORE_MODERATE}) fill the floor. Refresh after market open for live confirms.`}
             </p>
           </div>
