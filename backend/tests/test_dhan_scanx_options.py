@@ -6,6 +6,7 @@ from app.services.dhan_scanx_options import (
     expiry_epoch,
     fetch_scanx_option_chain,
     normalize_scanx_chain,
+    has_usable_option_chain,
 )
 
 
@@ -57,3 +58,28 @@ def test_sensex_uses_scanx_sid_51():
     result = fetch_scanx_option_chain("SENSEX", date(2026, 8, 25), requester=requester)
     assert seen["Data"]["Sid"] == 51
     assert result["status"] == "LIVE"
+
+
+def test_live_chain_without_executable_direction_quote_uses_fallback():
+    angel = {"source": "ANGEL_ONE", "indices": {
+        "NIFTY": {
+            "status": "LIVE",
+            "structure": {"direction": "CALL"},
+            "chain": [{"strike": 25000, "optionType": "CALL", "ltp": 100,
+                       "volume": 1000, "bestBid": 0, "bestAsk": 100}],
+        },
+    }}
+
+    assert has_usable_option_chain(angel["indices"]["NIFTY"]) is False
+    merged = apply_scanx_fallback(
+        angel,
+        {"NIFTY": date(2026, 8, 25)},
+        fetcher=lambda key, expiry: {
+            "source": "SCANX_FALLBACK", "status": "LIVE", "expiry": expiry.isoformat(),
+            "chain": [{"strike": 25000, "optionType": "CALL", "ltp": 101,
+                       "volume": 1200, "bestBid": 100.5, "bestAsk": 101}],
+        },
+    )
+    assert merged["fallbackUsedFor"] == ["NIFTY"]
+    assert merged["indices"]["NIFTY"]["source"] == "SCANX_FALLBACK"
+    assert merged["indices"]["NIFTY"]["structure"]["direction"] == "CALL"

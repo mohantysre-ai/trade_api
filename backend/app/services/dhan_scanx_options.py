@@ -87,6 +87,28 @@ def normalize_scanx_chain(payload: Any) -> tuple[float | None, list[dict[str, An
     return spot, [row for row in chain if row.get("strike") is not None]
 
 
+def has_usable_option_chain(row: dict[str, Any]) -> bool:
+    """A live chain must contain an executable quote for the proven side."""
+    chain = row.get("chain") if isinstance(row.get("chain"), list) else []
+    if row.get("status") != "LIVE" or not chain:
+        return False
+    structure = row.get("structure") if isinstance(row.get("structure"), dict) else {}
+    direction = str(structure.get("direction") or "").upper()
+    if direction not in {"CALL", "PUT"}:
+        return True
+    for item in chain:
+        if not isinstance(item, dict) or str(item.get("optionType") or "").upper() != direction:
+            continue
+        ltp, volume = _number(item.get("ltp")), _number(item.get("volume"))
+        bid, ask = _number(item.get("bestBid")), _number(item.get("bestAsk"))
+        if not ltp or not volume or not bid or not ask or ask < bid:
+            continue
+        mid = (bid + ask) / 2.0
+        if mid > 0 and (ask - bid) / mid * 100.0 <= 1.5:
+            return True
+    return False
+
+
 def _post(payload: bytes, timeout: float) -> Any:
     request = Request(SCANX_OPTION_URL, data=payload, headers={"Content-Type": "text/plain", "User-Agent": "Alphix-Terminal/1.0"}, method="POST")
     with urlopen(request, timeout=timeout) as response:  # nosec - fixed ScanX URL
@@ -110,7 +132,7 @@ def apply_scanx_fallback(angel_payload: dict[str, Any], expiries: dict[str, date
     needed = []
     for key in SCANX_SIDS:
         angel = merged["indices"].get(key) if isinstance(merged["indices"].get(key), dict) else {}
-        usable = angel.get("status") == "LIVE" and bool(angel.get("chain"))
+        usable = has_usable_option_chain(angel)
         if usable or key not in expiries:
             continue
         needed.append(key)

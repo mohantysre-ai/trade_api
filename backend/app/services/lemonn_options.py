@@ -10,7 +10,7 @@ from datetime import date, datetime, timezone
 from typing import Any, Callable
 from urllib.request import Request, urlopen
 
-from .dhan_scanx_options import normalize_scanx_chain
+from .dhan_scanx_options import has_usable_option_chain, normalize_scanx_chain
 
 LEMONN_CHAIN_URL = "https://lemonn.co.in/api/get-option-chain"
 LEMONN_PAGE_TEMPLATE = os.getenv("LEMONN_OPTION_PAGE_TEMPLATE", "https://lemonn.co.in/futures-and-options/options/{slug}")
@@ -116,7 +116,7 @@ def apply_lemonn_fallback(
     used: list[str] = []
     for key in LEMONN_SLUGS:
         current = merged["indices"].get(key) if isinstance(merged["indices"].get(key), dict) else {}
-        if current.get("status") == "LIVE" and current.get("chain"):
+        if has_usable_option_chain(current):
             continue
         expiry = expiries.get(key)
         if expiry is None:

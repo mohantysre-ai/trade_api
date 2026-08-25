@@ -151,6 +151,21 @@ def test_local_black_scholes_fills_missing_sensex_put_greeks():
     assert result["greeksSource"] == "LOCAL_BLACK_SCHOLES"
 
 
+def test_local_black_scholes_replaces_expiry_day_zero_greeks():
+    result = _local_greeks(
+        {"strike": 24300, "ltp": 92, "optionType": "CALL", "delta": 0, "gamma": 0,
+         "theta": 0, "vega": 0, "iv": 0, "greeksSource": "ANGEL_ONE"},
+        24334,
+        "2026-08-25",
+        now=datetime(2026, 8, 25, 11, 0, tzinfo=IST_ZONE),
+    )
+    assert 0 < result["delta"] < 1
+    assert result["gamma"] > 0
+    assert result["iv"] > 0
+    assert result["greeksSource"] == "LOCAL_BLACK_SCHOLES"
+    assert result["providerGreeksSource"] == "ANGEL_ONE"
+
+
 def test_futures_oi_classifies_all_directional_regimes():
     assert _futures_oi_state({"ltp": 99, "close": 100, "oi": 110, "previousOi": 100})["state"] == "SHORT_BUILDUP"
     assert _futures_oi_state({"ltp": 99, "close": 100, "oi": 90, "previousOi": 100})["state"] == "LONG_UNWINDING"

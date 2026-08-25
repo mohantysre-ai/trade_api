@@ -126,11 +126,13 @@ def _instrument(row: dict[str, Any], key: str) -> Instrument:
 
 def _best_price(quote: dict[str, Any], side: str) -> float | None:
     direct = quote.get("bestBidPrice" if side == "buy" else "bestAskPrice")
-    if direct is not None:
-        return _float(direct)
+    direct_value = _float(direct)
+    if direct_value is not None and direct_value > 0:
+        return direct_value
     depth = quote.get("depth") if isinstance(quote.get("depth"), dict) else {}
     rows = depth.get(side) if isinstance(depth.get(side), list) else []
-    return _float(rows[0].get("price")) if rows and isinstance(rows[0], dict) else None
+    depth_value = _float(rows[0].get("price")) if rows and isinstance(rows[0], dict) else None
+    return depth_value if depth_value is not None and depth_value > 0 else None
 
 
 def _quote_row(contract: dict[str, Any], quote: dict[str, Any], greek: dict[str, Any] | None) -> dict[str, Any]:
@@ -565,7 +567,12 @@ def _bs_price(spot: float, strike: float, years: float, rate: float, sigma: floa
 
 
 def _local_greeks(item: dict[str, Any], spot: float | None, expiry_value: Any, *, now: datetime | None = None) -> dict[str, Any]:
-    """Fill missing IV/Greeks from live premium; never overwrite provider values."""
+    """Fill missing/non-physical IV/Greeks from the live premium.
+
+    Angel sometimes emits an all-zero Greek row on expiry day. Exact zero is
+    not usable for an ATM±3 index contract and must not be treated as verified
+    provider evidence.
+    """
     strike, premium = _float(item.get("strike")), _float(item.get("ltp"))
     option_type = str(item.get("optionType") or "").upper()
     expiry_date = _expiry(expiry_value)
@@ -597,13 +604,23 @@ def _local_greeks(item: dict[str, Any], spot: float | None, expiry_value: Any, *
     theta_year = first - rate * discounted * _normal_cdf(d2) if option_type == "CALL" else first + rate * discounted * _normal_cdf(-d2)
     enriched = dict(item)
     defaults = {"delta": delta, "gamma": gamma, "vega": vega, "theta": theta_year / 365.0, "iv": sigma * 100.0}
+    invalid = {
+        "delta": lambda value: value is None or abs(value) < 1e-6,
+        "gamma": lambda value: value is None or value <= 0,
+        "vega": lambda value: value is None or value <= 0,
+        "theta": lambda value: value is None or abs(value) < 1e-6,
+        "iv": lambda value: value is None or value <= 0,
+    }
     changed = False
     for name, value in defaults.items():
-        if _float(enriched.get(name)) is None:
+        if invalid[name](_float(enriched.get(name))):
             enriched[name] = round(value, 6)
             changed = True
     if changed:
-        enriched["greeksSource"] = enriched.get("greeksSource") or "LOCAL_BLACK_SCHOLES"
+        provider_source = enriched.get("greeksSource")
+        if provider_source:
+            enriched["providerGreeksSource"] = provider_source
+        enriched["greeksSource"] = "LOCAL_BLACK_SCHOLES"
     return enriched
 
 
