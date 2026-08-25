@@ -210,7 +210,7 @@ export default function SwotAnalysisPanel({
             activeView === 'widget' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          Trendlyne Widget
+          SIGQ Widget
         </button>
         <button
           onClick={() => setActiveView('analysis')}
@@ -268,7 +268,7 @@ export default function SwotAnalysisPanel({
                   </div>
                   <div className="space-y-2 text-center">
                     <p className="text-xs font-black uppercase tracking-[0.3em] text-amber-600">Loading SWOT</p>
-                    <p className="max-w-xs text-[11px] leading-relaxed text-slate-400">Fetching Trendlyne SWOT report for {normalizedTicker}.</p>
+                    <p className="max-w-xs text-[11px] leading-relaxed text-slate-400">Fetching SIGQ SWOT report for {normalizedTicker}.</p>
                   </div>
                 </div>
               )}
@@ -280,16 +280,16 @@ export default function SwotAnalysisPanel({
                     </svg>
                   </div>
                   <p className="text-xs font-bold uppercase tracking-wider text-amber-700">Widget Unavailable</p>
-                  <p className="max-w-xs text-[11px] leading-relaxed text-slate-500">Open the Trendlyne SWOT widget directly.</p>
+                  <p className="max-w-xs text-[11px] leading-relaxed text-slate-500">Open the SIGQ SWOT widget directly.</p>
                   <a href={widgetUrl} target="_blank" rel="noopener noreferrer" className="rounded-full bg-amber-500 px-4 py-2 text-[11px] font-black text-white transition hover:bg-amber-400">
-                    Open Trendlyne SWOT
+                    Open SIGQ SWOT
                   </a>
                 </div>
               )}
               <iframe
                 key={widgetUrl}
                 src={widgetUrl}
-                title={`Trendlyne SWOT analysis for ${normalizedTicker}`}
+                title={`SIGQ SWOT analysis for ${normalizedTicker}`}
                 loading="lazy"
                 referrerPolicy="strict-origin-when-cross-origin"
                 onLoad={() => setLoaded(true)}

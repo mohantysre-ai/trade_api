@@ -1323,8 +1323,8 @@ export default function ForensicPanel({
               </>
             ) : institutionalMode
               ? institutionalOffHours
-                ? `Institutional ₹1cr+ book — off-hours snapshot: score ≥ ${SCORE_STRONG}, Trendlyne confirm, LOW/MODERATE risk (volume gates rank-penalized)`
-                : `Institutional ₹1cr+ book — score ≥ ${SCORE_STRONG}, Trendlyne confirm, scanner R:R ≥2 when live`
+                ? `Institutional ₹1cr+ book — off-hours snapshot: score ≥ ${SCORE_STRONG}, SIGQ Research confirm, LOW/MODERATE risk (volume gates rank-penalized)`
+                : `Institutional ₹1cr+ book — score ≥ ${SCORE_STRONG}, SIGQ Research confirm, scanner R:R ≥2 when live`
               : live?.poolDescription || `Top ${MATRIX_BUY_MIN_DISPLAY}+ high-probability BUY setups — score ≥ ${MATRIX_BUY_MIN_SCORE}, CORE preferred`}
             {!lockedSwingMode && !staleSwingLock && typeof live?.universeSize === 'number' && live.universeSize > 0 && (
               <> · Universe {live.universeSize}</>
@@ -1555,7 +1555,7 @@ export default function ForensicPanel({
                   )}
                   {showTrendlyneHint && intelligence.chips.length === 0 && (
                     <p className="text-[10px] sm:text-[8px] text-slate-400 mb-1">
-                      Open card for full Trendlyne analysis
+                      Open card for full SIGQ Research analysis
                     </p>
                   )}
 
@@ -1696,15 +1696,15 @@ export default function ForensicPanel({
             <p className="text-slate-700 text-[13px] font-semibold">
               {institutionalMode
                 ? institutionalOffHours
-                  ? 'No off-hours institutional BUY setups pass quant + Trendlyne gates'
+                  ? 'No off-hours institutional BUY setups pass quant + SIGQ Research gates'
                   : 'No institutional-grade BUY setups pass all gates'
                 : 'No high-probability BUY setups right now'}
             </p>
             <p className="text-slate-500 text-[11px] mt-1">
               {institutionalMode
                 ? institutionalOffHours
-                  ? `Off-hours / snapshot mode: intraday volume gates are rank-penalized (0/${assetRows.filter((r) => !r.isMetaRow).length} hard-filter passers in pool). Still requires quant score ≥ ${SCORE_STRONG}, Trendlyne confirm, LOW/MODERATE risk, and scanner R:R ≥2 or ATR-based estimate. No filler names — refresh after market open for live volume confirms.`
-                  : `₹1cr+ book requires quant score ≥ ${SCORE_STRONG}, hard+quality filters, Trendlyne confirm (checklist ≥70% preferred), LOW/MODERATE risk, and scanner R:R ≥2 when in the scanner LONG set. No filler names — refresh after market open.`
+                  ? `Off-hours / snapshot mode: intraday volume gates are rank-penalized (0/${assetRows.filter((r) => !r.isMetaRow).length} hard-filter passers in pool). Still requires quant score ≥ ${SCORE_STRONG}, SIGQ Research confirm, LOW/MODERATE risk, and scanner R:R ≥2 or ATR-based estimate. No filler names — refresh after market open for live volume confirms.`
+                  : `₹1cr+ book requires quant score ≥ ${SCORE_STRONG}, hard+quality filters, SIGQ Research confirm (checklist ≥70% preferred), LOW/MODERATE risk, and scanner R:R ≥2 when in the scanner LONG set. No filler names — refresh after market open.`
                 : `Up to ${MATRIX_BUY_TOP_N} picks from the ranked pool. At least ${MATRIX_BUY_MIN_DISPLAY} shown when enough CORE setups exist; otherwise best hard-filter passers (score ≥ ${SCORE_MODERATE}) fill the floor. Refresh after market open for live confirms.`}
             </p>
           </div>

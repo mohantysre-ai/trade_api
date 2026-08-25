@@ -754,6 +754,9 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
                           "lotSize": selected.get("lotSize"), "token": selected.get("token"),
                           "exchange": selected.get("exchange")} if selected else None),
             "breadth": breadth, "structure": structure, "vixRegime": regime, "indiaVix": vix, "expectedR": expected_r,
+            "oiResearch": {"pcr": row.get("pcr"), "source": "SIGQ_RESEARCH" if row.get("pcr") is not None or any(
+                isinstance(item, dict) and item.get("oiEnrichmentSource") == "SIGQ_RESEARCH" for item in chain
+            ) else None},
             "gateEvidence": {
                 "futuresOi": {**futures_oi, "aligned": oi_aligned, "secondaryConfirmation": bool(secondary_oi and strong_breadth)},
                 "optionChain": chain_evidence,

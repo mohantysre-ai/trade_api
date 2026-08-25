@@ -41,6 +41,7 @@ type Candidate = {
   };
   chain?: Array<{ symbol?: string; strike?: number; optionType?: string; ltp?: number; oi?: number; oiChange?: number; delta?: number; gamma?: number; theta?: number; vega?: number; iv?: number }>;
   structure?: Structure | null;
+  oiResearch?: { pcr?: number | null; source?: string | null };
 };
 
 type Radar = {
@@ -282,6 +283,12 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
                       </span>
                     </div>
                   ))}
+                </div>
+              )}
+              {row.oiResearch?.source && (
+                <div className="mt-2 flex items-center gap-1 text-[9px] text-[var(--fg-muted)]">
+                  <span className="desk-pill desk-pill--muted">SIGQ OI</span>
+                  <span>PCR {fmtNum(row.oiResearch.pcr)}</span>
                 </div>
               )}
               {row.contract && (

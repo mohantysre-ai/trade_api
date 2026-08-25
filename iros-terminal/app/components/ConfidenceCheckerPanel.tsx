@@ -313,7 +313,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
             activeView === "widget" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
           }`}
         >
-          Trendlyne Widget
+          SIGQ Widget
         </button>
       </div>
 
@@ -355,14 +355,14 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
                 <div className="relative z-10 flex flex-col items-center justify-center gap-3 p-6 text-center min-h-[240px]">
                   <p className="text-xs font-bold uppercase tracking-wider text-amber-700">Widget Unavailable</p>
                   <a href={widgetUrl} target="_blank" rel="noopener noreferrer" className="rounded-full bg-amber-500 px-4 py-2 text-[11px] font-black text-white">
-                    Open Trendlyne Checklist
+                    Open SIGQ Checklist
                   </a>
                 </div>
               )}
               <iframe
                 key={widgetUrl}
                 src={widgetUrl}
-                title={`Trendlyne confidence checker for ${normalizedTicker}`}
+                title={`SIGQ confidence checker for ${normalizedTicker}`}
                 loading="lazy"
                 referrerPolicy="strict-origin-when-cross-origin"
                 onLoad={() => setLoaded(true)}

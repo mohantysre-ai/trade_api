@@ -8,6 +8,7 @@ import { isNseCashSessionNow } from "@/lib/market-api";
 import type { IntradayMetrics } from "@/lib/drawer-research";
 import { parseNewsCatalystsCard, type TrendlyneCardSummary } from "@/lib/intelligence-summary";
 import { deskDrawerVariants } from "@/lib/motion-tokens";
+import SigqQvtPanel from "./SigqQvtPanel";
 import AITickerNewsPanel from "./AITickerNewsPanel";
 import MarketSymbolBadge from "./MarketSymbolBadge";
 import CashSessionClosedBanner from "./CashSessionClosedBanner";
@@ -355,7 +356,7 @@ type DrawerContent = {
   }) | null;
 };
 
-type DrawerTab = "aiNews" | "analysis" | "confidenceChecker" | "technicalAnalysis" | "swotAnalysis";
+type DrawerTab = "aiNews" | "analysis" | "confidenceChecker" | "technicalAnalysis" | "swotAnalysis" | "sigqQvt";
 
 export default function RightDrawer({ open, onClose, content }: { open: boolean; onClose: () => void; content?: DrawerContent | null }) {
   const [activeTab, setActiveTab] = useState<DrawerTab>("aiNews");
@@ -610,6 +611,17 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
               <span className="absolute inset-x-0 -bottom-px h-0.5 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full" />
             )}
           </button>
+          <button
+            onClick={() => setActiveTab("sigqQvt")}
+            className={`relative py-2.5 px-1 min-h-11 shrink-0 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ml-3 sm:ml-5 ${
+              activeTab === "sigqQvt" ? "text-teal-700" : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            SIGQ QVT
+            {activeTab === "sigqQvt" && (
+              <span className="absolute inset-x-0 -bottom-px h-0.5 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full" />
+            )}
+          </button>
         </div>
       </div>
 
@@ -665,6 +677,8 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
             researchError={trendlyneError}
           />
         )}
+
+        {activeTab === "sigqQvt" && <SigqQvtPanel key={ticker} ticker={ticker} />}
 
         {/* Analysis Tab */}
         {activeTab === "analysis" && (

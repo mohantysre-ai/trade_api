@@ -194,6 +194,7 @@ def _candidate(index: dict[str, str], snapshot: dict[str, Any]) -> dict[str, Any
         "gateEvidence": supplied.get("gateEvidence") or {},
         "chain": supplied.get("rawChain") or [],
         "structure": supplied.get("structure"),
+        "oiResearch": supplied.get("oiResearch") or {},
         "eligible": eligible,
     }
 

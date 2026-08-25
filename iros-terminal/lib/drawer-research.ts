@@ -66,8 +66,8 @@ export function buildTechnicalSignals(
   const atr = snapshotAtr ?? parseNumeric(trendlyne?.atrPct);
   const aboveVwap = snapshotVwap ?? trendlyne?.priceAboveSma5 ?? null;
   const aboveEma9 = snapshotEma9 ?? trendlyne?.priceAboveEma9 ?? trendlyne?.priceAboveEma5 ?? null;
-  const vwapLabel = snapshotVwap != null ? "VWAP" : "SMA5 (Trendlyne)";
-  const emaLabel = snapshotEma9 != null ? "EMA9" : "EMA (Trendlyne)";
+  const vwapLabel = snapshotVwap != null ? "VWAP" : "SMA5 (SIGQ Research)";
+  const emaLabel = snapshotEma9 != null ? "EMA9" : "EMA (SIGQ Research)";
 
   let maSignal: "BUY" | "SELL" | "NEUTRAL" = "NEUTRAL";
   if (aboveVwap === true && aboveEma9 === true) maSignal = "BUY";
@@ -291,7 +291,7 @@ export function buildFactSwot(params: {
   const overall = hasData ? Math.round(Math.min(92, Math.max(12, 50 + balance * 7))) : null;
   const score = (count: number, base: number) => count ? Math.min(88, base + count * 11) : null;
   const coverage = [
-    hasTrendlyne ? "Trendlyne SWOT" : null,
+    hasTrendlyne ? "SIGQ Research SWOT" : null,
     intra ? "intraday metrics" : null,
     news ? "ticker news" : null,
     params.terminalAnalysis ? "IC gates" : null,

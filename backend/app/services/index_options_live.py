@@ -17,6 +17,7 @@ from .index_options_engine import build_index_options_radar
 from .index_options_paper import reconcile_paper_book
 from .index_options_replay import parse_session_date, replay_index_options_session
 from .lemonn_options import LEMONN_SLUGS, apply_lemonn_fallback, discover_lemonn_expiries
+from .trendlyne_oi import apply_oi_enrichment
 
 
 def compose_live_index_options_radar(
@@ -28,6 +29,7 @@ def compose_live_index_options_radar(
     scanx_fn: Callable[..., dict[str, Any]] = apply_scanx_fallback,
     lemonn_fn: Callable[..., dict[str, Any]] = apply_lemonn_fallback,
     lemonn_discover_fn: Callable[..., dict[str, date]] = discover_lemonn_expiries,
+    oi_enrichment_fn: Callable[..., dict[str, Any]] = apply_oi_enrichment,
     expiries_fn: Callable[..., dict[str, date]] = active_index_expiries,
     snapshot_fn: Callable[..., dict[str, Any]] = cached_angel_index_option_snapshot,
 ) -> dict[str, Any]:
@@ -61,6 +63,14 @@ def compose_live_index_options_radar(
         except Exception as exc:
             option_data["thirdFallbackSource"] = "LEMONN"
             option_data["thirdFallbackError"] = str(exc)
+        try:
+            option_data = oi_enrichment_fn(option_data, expiries)
+        except Exception as exc:
+            option_data["oiEnrichment"] = {
+                "source": "SIGQ_RESEARCH",
+                "status": "UNAVAILABLE",
+                "error": str(exc),
+            }
         option_data = _apply_oi_baselines(option_data)
         book["indexOptions"] = option_data_to_strategy_inputs(option_data, book)
         book["indexOptionProvider"] = option_data

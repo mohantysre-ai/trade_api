@@ -42,7 +42,7 @@ export const INSTITUTIONAL_CHECKLIST_MIN = 70;
 export type ScoreScale = 'angel' | 'dhan' | 'unknown';
 
 export type MatrixSourceChip = {
-  label: 'QUANT' | 'DHAN' | 'TRENDLYNE';
+  label: 'QUANT' | 'DHAN' | 'SIGQ';
   active: boolean;
 };
 
@@ -501,7 +501,7 @@ export function computeWinEdge(
       display: `Win edge ${Math.round(checklistPct)}%`,
       kind: 'win_edge',
       value: Math.round(checklistPct),
-      source: 'Trendlyne checklist pass rate',
+      source: 'SIGQ Research checklist pass rate',
     };
   }
 
@@ -635,7 +635,7 @@ export function adjustConvictionWithIntelligence(
 
   if (tier === 'TACTICAL' && boostScore >= 2 && dragScore === 0) {
     tier = 'SATELLITE';
-    reason = 'Trendlyne confirms swing — satellite weight';
+    reason = 'SIGQ Research confirms swing — satellite weight';
     rankScore += 15;
   } else if (tier === 'SATELLITE' && boostScore >= 2 && dragScore === 0) {
     tier = 'CORE';
@@ -786,7 +786,7 @@ export function buildMatrixSourceChips(
   const chips: MatrixSourceChip[] = [
     { label: 'QUANT', active: hasQuant },
     { label: 'DHAN', active: hasDhan },
-    { label: 'TRENDLYNE', active: hasTrendlyne },
+    { label: 'SIGQ', active: hasTrendlyne },
   ];
   return chips.filter((c) => c.active);
 }
@@ -885,14 +885,14 @@ export function evaluateMatrixBuyCandidate(
 
     if (!summary.hasTrendlyneData) {
       eligible = false;
-      reason = 'Trendlyne confirm required — data pending';
+      reason = 'SIGQ Research confirmation required — data pending';
     } else if (!hasTrendlyneInstitutionalConfirm(summary)) {
       eligible = false;
-      reason = 'Trendlyne confirm below institutional bar';
+      reason = 'SIGQ Research confirmation below institutional bar';
     }
     if (summary.trendlyne?.technicalBias === 'bearish') {
       eligible = false;
-      reason = 'Trendlyne bearish bias — blocked';
+      reason = 'SIGQ Research bearish bias — blocked';
     }
 
     const angelQuantStrong =

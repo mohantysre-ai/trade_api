@@ -637,7 +637,7 @@ function TrendlyneTickerTooltip({ item }: { item: TrendlyneStock }) {
           <div className="flex items-center gap-2 mb-2 flex-shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" />
             <span className="text-[9px] uppercase tracking-widest font-bold text-slate-500">
-              {item.name} · TRENDLYNE
+              {item.name} · SIGQ RESEARCH
             </span>
           </div>
           <div className="space-y-0.5">
@@ -680,7 +680,7 @@ function TrendlyneCategoryPanel({
       setItems(data.screenData?.slice(0, 5) ?? []);
       setLoading(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Trendlyne unavailable');
+      setError(err instanceof Error ? err.message : 'SIGQ Research unavailable');
       setLoading(false);
     }
   }, [screenKey]);

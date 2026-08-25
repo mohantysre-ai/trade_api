@@ -42,7 +42,7 @@ function OscillatorGauge({ rsi, macd }: { rsi: number | null; macd: number | nul
   if (rsi == null && macd == null) {
     return (
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center text-[11px] text-slate-500">
-        Intraday RSI / trend metrics not available in snapshot or Trendlyne.
+        Intraday RSI / trend metrics not available in snapshot or SIGQ Research.
       </div>
     );
   }
@@ -171,7 +171,7 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
             activeView === 'widget' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          Trendlyne Widget
+          SIGQ Widget
         </button>
         <button
           onClick={() => setActiveView('dashboard')}
@@ -229,16 +229,16 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
                     </svg>
                   </div>
                   <p className="text-xs font-bold uppercase tracking-wider text-amber-700">Widget Unavailable</p>
-                  <p className="max-w-xs text-[11px] leading-relaxed text-slate-500">Open the Trendlyne technical widget directly.</p>
+                  <p className="max-w-xs text-[11px] leading-relaxed text-slate-500">Open the SIGQ technical widget directly.</p>
                   <a href={widgetUrl} target="_blank" rel="noopener noreferrer" className="rounded-full bg-amber-500 px-4 py-2 text-[11px] font-black text-white transition hover:bg-amber-400">
-                    Open Trendlyne Technicals
+                    Open SIGQ Technicals
                   </a>
                 </div>
               )}
               <iframe
                 key={widgetUrl}
                 src={widgetUrl}
-                title={`Trendlyne technical analysis for ${normalizedTicker}`}
+                title={`SIGQ technical analysis for ${normalizedTicker}`}
                 loading="lazy"
                 referrerPolicy="strict-origin-when-cross-origin"
                 onLoad={() => setLoaded(true)}
@@ -258,7 +258,7 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
           )}
           {!signals.hasData && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-semibold text-amber-900">
-              {researchLoading ? `Loading Trendlyne technicals for ${normalizedTicker}…` : `Partial desk view — live 5m metrics and Trendlyne technicals are unavailable for ${normalizedTicker}. Missing values remain unscored.`}
+              {researchLoading ? `Loading SIGQ technicals for ${normalizedTicker}…` : `Partial desk view — live 5m metrics and SIGQ technicals are unavailable for ${normalizedTicker}. Missing values remain unscored.`}
             </div>
           )}
           {/* Header card */}
@@ -270,7 +270,7 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
                   <MarketSymbolBadge symbol={normalizedTicker} size="md" />
                   <div>
                     <div className="text-sm font-black text-slate-900">{companyName ?? normalizedTicker}</div>
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">{normalizedTicker} · {sessionOpen ? "LIVE SIGNALS" : "SESSION CLOSED"}{signals.metricSource === "trendlyne" ? " · TRENDLYNE" : signals.metricSource === "mixed" ? " · 5M + TRENDLYNE" : ""}</div>
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">{normalizedTicker} · {sessionOpen ? "LIVE SIGNALS" : "SESSION CLOSED"}{signals.metricSource === "trendlyne" ? " · SIGQ" : signals.metricSource === "mixed" ? " · 5M + SIGQ" : ""}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -302,7 +302,7 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
             </div>
             <div className="rounded-lg bg-slate-50 px-3 py-2 text-[10px] text-slate-500">
               {signals.metricSource === "trendlyne" || signals.metricSource === "mixed"
-                ? "Trendlyne widget technicals fill RSI/MACD/MA when 5m candle anchors are missing. No synthetic price path is generated."
+                ? "SIGQ widget technicals fill RSI/MACD/MA when 5m candle anchors are missing. No synthetic price path is generated."
                 : "Only sourced VWAP/EMA9 relationships are shown; no synthetic price path is generated."}
             </div>
           </div>

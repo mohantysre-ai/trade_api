@@ -72,6 +72,7 @@ def test_compose_applies_lemonn_after_scanx():
             "SENSEX": date(2026, 8, 25),
         },
         lemonn_discover_fn=lambda keys: {},
+        oi_enrichment_fn=lambda payload, expiries: payload,
     )
     assert lemonn_calls == ["hit"]
     assert result["provider"] == "ANGEL_ONE_WITH_SCANX_AND_LEMONN_FALLBACK"
