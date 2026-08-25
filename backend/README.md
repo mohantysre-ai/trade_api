@@ -109,16 +109,16 @@ Screener.in annual tables provide a source-labelled partial fallback.
 
 The intraday book is capped at five concurrent names and can hold cash. It does
 not fill every freed slot. To prevent replacement churn, the default is at most
-ten new entries after the morning lock (`INTRADAY_MAX_DAILY_REPLACEMENTS=10`).
+fifteen new entries after the morning lock (`INTRADAY_MAX_DAILY_REPLACEMENTS=15`).
 This is a shared ceiling across ordinary replacements and same-symbol re-entries,
 not a target number of trades.
 
 The separate hard session ledger cap is 20 executed entries
 (`INTRADAY_MAX_DAILY_POSITIONS=20`). It counts the initial lock, replacements,
 and every re-entry. Pending or never-triggered rows do not count. With the
-default five-position morning lock and ten post-lock replacements, the normal
-reachable maximum is 15; the 20-entry cap remains a fail-closed ceiling if
-other deployment limits are raised.
+default five-position morning lock and fifteen post-lock replacements, the
+normal reachable maximum is 20; the 20-entry cap remains the fail-closed
+session ceiling.
 
 A symbol that reaches a completed target, or exits through a profitable trail,
 can receive **one** same-day re-entry only when all of these checks pass:
@@ -137,7 +137,7 @@ An initial stop-loss re-entry is disabled by default. Enable it only after
 event-level replay shows a positive out-of-sample contribution:
 
 ```env
-INTRADAY_MAX_DAILY_REPLACEMENTS=10
+INTRADAY_MAX_DAILY_REPLACEMENTS=15
 INTRADAY_MAX_DAILY_POSITIONS=20
 INTRADAY_MAX_REENTRIES_PER_SYMBOL=1
 INTRADAY_REENTRY_TARGET_COOLDOWN_MIN=20

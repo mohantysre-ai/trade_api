@@ -1270,11 +1270,14 @@ export default function ForensicPanel({
   };
 
   return (
-    <section className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm relative overflow-hidden min-w-0">
+    <section className={`signal-widget signal-widget--swing ${lockedSwingMode ? 'is-active' : huntingSwing ? 'is-hunting' : cashHeldSwing ? 'is-cash' : ''} bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm relative overflow-hidden min-w-0`}>
       <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-400 via-cyan-400 to-transparent pointer-events-none" aria-hidden />
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
         <div className="min-w-0">
-          <h3 className="desk-panel-title text-emerald-700">SWING PORTFOLIO</h3>
+          <div className="flex items-center gap-2">
+            <span className={`signal-live-orb ${lockedSwingMode ? 'is-active' : huntingSwing ? 'is-hunting' : ''}`} aria-hidden />
+            <h3 className="desk-panel-title text-emerald-700">SWING PORTFOLIO</h3>
+          </div>
           <p className="text-slate-500 text-[12px] mt-0.5">
             {lockedSwingMode ? (
               <>

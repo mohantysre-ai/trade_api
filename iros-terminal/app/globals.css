@@ -2652,6 +2652,133 @@ html[data-theme="light"] .category-dot {
 }
 
 /* Index options — same book table / KPI chrome as Intraday + EOD */
+.signal-widget {
+  --signal-accent: var(--terminal-cyan);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--signal-accent) 24%, var(--terminal-line)) !important;
+  background:
+    radial-gradient(circle at 94% -18%, color-mix(in srgb, var(--signal-accent) 14%, transparent) 0, transparent 44%),
+    linear-gradient(145deg, color-mix(in srgb, var(--terminal-panel) 96%, var(--signal-accent)), var(--terminal-panel)) !important;
+  box-shadow:
+    0 16px 44px color-mix(in srgb, var(--signal-accent) 8%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 9%, transparent);
+  transition: transform 260ms var(--ease-out-strong), border-color 260ms ease, box-shadow 260ms ease;
+}
+.signal-widget::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, transparent, var(--signal-accent), transparent);
+  opacity: 0.88;
+  animation: signal-rail-breathe 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+.signal-widget::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  width: 180px;
+  height: 180px;
+  right: -95px;
+  top: -115px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--signal-accent) 20%, transparent);
+  box-shadow: 0 0 70px color-mix(in srgb, var(--signal-accent) 12%, transparent);
+  animation: signal-orbit-drift 8s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+.signal-widget:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--signal-accent) 42%, var(--terminal-line)) !important;
+  box-shadow: 0 20px 52px color-mix(in srgb, var(--signal-accent) 13%, transparent);
+}
+.signal-widget--radar { --signal-accent: var(--terminal-cyan); }
+.signal-widget--book,
+.signal-widget--swing { --signal-accent: var(--terminal-green); }
+.signal-widget--intraday { --signal-accent: var(--terminal-violet); }
+.signal-widget.is-hunting { --signal-accent: var(--terminal-amber); }
+.signal-widget.is-active { --signal-accent: var(--terminal-green); }
+.signal-widget.is-cash { --signal-accent: var(--fg-subtle); }
+
+.signal-live-orb {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--signal-accent, var(--terminal-cyan));
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--signal-accent, var(--terminal-cyan)) 45%, transparent);
+  animation: signal-live-pulse 2.1s ease-out infinite;
+}
+.signal-live-orb.is-hunting { background: var(--terminal-amber); }
+.signal-live-orb.is-active { background: var(--terminal-green); }
+
+.signal-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 224px;
+  border-color: color-mix(in srgb, var(--tile-accent) 22%, var(--terminal-line)) !important;
+  background:
+    linear-gradient(155deg, color-mix(in srgb, var(--tile-accent) 7%, var(--terminal-panel)), var(--terminal-panel)) !important;
+  transition: transform 240ms var(--ease-out-strong), box-shadow 240ms ease, border-color 240ms ease;
+  animation: signal-card-arrive 480ms var(--ease-out-strong) both;
+}
+.signal-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(110deg, transparent 18%, color-mix(in srgb, var(--tile-accent) 9%, transparent) 48%, transparent 72%);
+  transform: translateX(-110%);
+  animation: signal-card-sheen 7s ease-in-out infinite;
+  pointer-events: none;
+}
+.signal-card:hover {
+  transform: translateY(-4px) scale(1.008);
+  border-color: color-mix(in srgb, var(--tile-accent) 45%, var(--terminal-line)) !important;
+  box-shadow: 0 18px 42px color-mix(in srgb, var(--tile-accent) 14%, transparent);
+}
+.signal-card--eligible { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--terminal-green) 18%, transparent); }
+.signal-card--watch { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--terminal-amber) 14%, transparent); }
+.signal-card:nth-child(2) { animation-delay: 55ms; }
+.signal-card:nth-child(3) { animation-delay: 110ms; }
+.signal-card:nth-child(4) { animation-delay: 165ms; }
+
+@keyframes signal-card-arrive {
+  from { opacity: 0; transform: translateY(12px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes signal-card-sheen {
+  0%, 58% { transform: translateX(-110%); opacity: 0; }
+  68% { opacity: 1; }
+  84%, 100% { transform: translateX(110%); opacity: 0; }
+}
+@keyframes signal-live-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--signal-accent, var(--terminal-cyan)) 42%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 8px transparent; }
+}
+@keyframes signal-rail-breathe {
+  0%, 100% { opacity: 0.45; transform: scaleY(0.72); }
+  50% { opacity: 1; transform: scaleY(1); }
+}
+@keyframes signal-orbit-drift {
+  from { transform: translate3d(0, 0, 0) rotate(0deg); }
+  to { transform: translate3d(-18px, 18px, 0) rotate(18deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signal-widget::before,
+  .signal-widget::after,
+  .signal-live-orb,
+  .signal-card,
+  .signal-card::after { animation: none !important; }
+  .signal-widget:hover,
+  .signal-card:hover { transform: none; }
+}
+
 .ix-radar .desk-metric-tile {
   cursor: default;
   flex-direction: column;

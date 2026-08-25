@@ -17,14 +17,14 @@ SCALE_LEGS: list[tuple[float, float]] = [
 RUNNER_FRAC = 0.40
 
 # NSE hybrid trail, expressed in R (desk 1R = initial risk).
-# 0–0.5R: fixed initial SL (no ratchet below 0.5).
-# 0.5R: breakeven.  1R–1.5R: still BE so T1 can develop.
+# 0–1R: fixed initial SL. The first +1R scale fill must happen before BE.
+# 1R–1.5R: breakeven after 20% has been booked, so the whole trade cannot
+# close flat merely because it first reached +0.5R.
 # 2R: ATR×1.5 analogue → lock mfe−1.5 = 0.5R.
 # 3R+: structure analogue → tighter lock, still room to run.
 # Initial SL and trail gap are also capped at MAX_STOP_PCT (0.5%) of price.
 # Stop is monotonic and never loosens.
 TRAIL_RATCHET: dict[float, float] = {
-    0.50: 0.00,
     1.00: 0.00,
     1.50: 0.00,
     2.00: 0.50,
@@ -33,12 +33,13 @@ TRAIL_RATCHET: dict[float, float] = {
     5.00: 3.50,
 }
 
-PROFIT_GUARD_TRIGGER_R = 0.5
+PROFIT_GUARD_TRIGGER_R = 1.0
 PROFIT_GUARD_LOCK_R = 0.0
+PCT_TRAIL_TRIGGER_R = 2.0
 MAX_STOP_PCT = 0.005
 REF_T1_R = 1.5
 REF_T2_R = 3.0
-EXIT_POLICY_VERSION = "0p5r_max_0p5pct"
+EXIT_POLICY_VERSION = "1r_be_2r_trail_max_0p5pct"
 # 40R at 0.5% risk = 20% (upper circuit class). 80–100R trails are not market.
 MAX_STATE_MFE_R = 40.0
 MAX_INTRADAY_PRICE_RATIO = 1.50
@@ -200,7 +201,7 @@ def build_exit_plan(
         "notes": [
             "40pct_runner",
             "monotonic_r_ratchet",
-            "be_at_0p5r",
+            "be_after_1r_scale",
             "max_stop_0p5pct",
             "nse_hybrid_trail",
             "no_stop_loosen",
@@ -250,7 +251,7 @@ def exit_plan_is_current(plan: dict[str, Any] | None) -> bool:
     if not isinstance(plan, dict) or plan.get("mode") != "SCALE_TRAIL":
         return False
     notes = plan.get("notes") or []
-    return "be_at_0p5r" in notes and "max_stop_0p5pct" in notes
+    return "be_after_1r_scale" in notes and "max_stop_0p5pct" in notes
 
 
 def refresh_exit_policy(row: dict[str, Any], *, keep_exit_state: bool = True) -> dict[str, Any]:
@@ -282,10 +283,21 @@ def refresh_exit_policy(row: dict[str, Any], *, keep_exit_state: bool = True) ->
         if not closed and attached.get("stopLoss") is not None:
             out["stopLoss"] = attached["stopLoss"]
     if keep_exit_state and isinstance(row.get("exitState"), dict):
-        out["exitState"] = row["exitState"]
+        state = dict(row["exitState"])
         closed = bool(row.get("closed") or str(row.get("status") or "").upper() == "CLOSED")
+        legacy_half_r = isinstance(booked, dict) and "be_at_0p5r" in (booked.get("notes") or [])
+        numeric_fills = [
+            float(x.get("r")) for x in (state.get("legsFilled") or [])
+            if isinstance(x, dict) and isinstance(x.get("r"), (int, float))
+        ]
+        peak_r = float(state.get("mfeR") or 0)
+        if legacy_half_r and not closed and peak_r < 1.0 and not any(r >= 1.0 for r in numeric_fills):
+            # Explicit policy migration: a legacy +0.5R BE must not survive
+            # into the +1R policy before any profit has actually been booked.
+            state["profitGuardActive"] = False
+            state["effectiveStop"] = plan.get("initialStop") if isinstance(plan, dict) else out.get("stopLoss")
+        out["exitState"] = state
         if closed:
-            state = row["exitState"]
             if state.get("effectiveStop") is not None:
                 out["effectiveStop"] = state["effectiveStop"]
             if state.get("remainingQty") is not None:
@@ -571,7 +583,7 @@ def _ratchet_stop(
     ratchet = trail_ratchet if trail_ratchet is not None else TRAIL_RATCHET
     if r_now + 1e-9 >= trigger_r:
         stop = _tighter_stop(direction, stop, _stop_at_r(entry, risk, PROFIT_GUARD_LOCK_R, direction))
-        if use_pct_trail:
+        if use_pct_trail and r_now + 1e-9 >= PCT_TRAIL_TRIGGER_R:
             stop = _tighter_stop(direction, stop, _pct_trail_from_mfe(entry, risk, direction, r_now))
     for trigger, lock_r in ratchet.items():
         if r_now + 1e-9 < trigger:

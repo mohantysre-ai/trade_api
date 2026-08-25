@@ -211,10 +211,13 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
 
   return (
     <section className="ix-radar space-y-3" aria-label="Index options radar">
-      <div className="desk-card p-3 sm:p-4">
+      <div className="desk-card signal-widget signal-widget--radar p-3 sm:p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="desk-panel-title text-[var(--fg-strong)]">INDEX OPTIONS RADAR</h2>
+            <div className="flex items-center gap-2">
+              <span className="signal-live-orb" aria-hidden />
+              <h2 className="desk-panel-title text-[var(--fg-strong)]">INDEX OPTIONS RADAR</h2>
+            </div>
             <p className="mt-1 text-[11px] text-[var(--fg-muted)]">Direction first · futures OI · option chain · weighted constituents · contract economics</p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -240,7 +243,7 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
           return (
             <article
               key={row.key}
-              className="desk-metric-tile flex-col items-stretch justify-start"
+              className={`desk-metric-tile signal-card signal-card--${row.state.toLowerCase()} flex-col items-stretch justify-start`}
               style={{ ['--tile-accent' as string]: tileAccent(row.state) }}
             >
               <div className="flex w-full items-start justify-between gap-2">
@@ -309,7 +312,7 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
       </div>
 
       {radar?.paperBook && (
-        <div className="desk-card p-3 sm:p-4">
+        <div className="desk-card signal-widget signal-widget--book p-3 sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="desk-panel-title">PAPER OPTION BOOK</div>

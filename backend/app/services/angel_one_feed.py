@@ -4144,8 +4144,9 @@ def build_market_payload(
 def refresh_snapshot_macros(client: AngelOneClient | None = None) -> dict[str, Any]:
     """Light live refresh of SNAPSHOT indices / commodities only (no LLM / stock rebuild).
 
-    Concurrent callers get the last snapshot immediately (no pile-up). Hard-capped
-    so a slow Angel/Yahoo path cannot block the desk for a minute+.
+    The refresh is detached from the HTTP request. Every caller receives the
+    last durable snapshot immediately; concurrent callers coalesce onto the
+    one running worker instead of holding a Cloudflare stream open.
     """
     if not _MACRO_REFRESH_LOCK.acquire(blocking=False):
         snapshot = _load_last_snapshot()
@@ -4161,17 +4162,15 @@ def refresh_snapshot_macros(client: AngelOneClient | None = None) -> dict[str, A
             "payload": snapshot,
         }
 
-    result_box: dict[str, Any] = {}
-    done = threading.Event()
-
     def run_refresh() -> None:
         try:
-            result_box["result"] = _refresh_snapshot_macros_body(client)
+            _refresh_snapshot_macros_body(client)
         except BaseException as exc:  # keep the lock releasable even on unusual provider failures
-            result_box["error"] = exc
+            logging.getLogger(__name__).warning(
+                "refresh_snapshot_macros background refresh failed: %s", exc
+            )
         finally:
             _MACRO_REFRESH_LOCK.release()
-            done.set()
 
     try:
         threading.Thread(
@@ -4183,20 +4182,13 @@ def refresh_snapshot_macros(client: AngelOneClient | None = None) -> dict[str, A
         _MACRO_REFRESH_LOCK.release()
         raise
 
-    if done.wait(timeout=_MACRO_REFRESH_TIMEOUT_SECONDS) and "error" not in result_box:
-        return result_box["result"]
-
-    exc = result_box.get("error")
-    logging.getLogger(__name__).warning(
-        "refresh_snapshot_macros timed out/failed: %s",
-        exc or f"exceeded {_MACRO_REFRESH_TIMEOUT_SECONDS}s",
-    )
     snapshot = _load_last_snapshot()
     snapshot = dict(snapshot) if isinstance(snapshot, dict) else {}
     return {
         "success": True,
-        "timedOut": not done.is_set(),
-        "failed": exc is not None,
+        "accepted": True,
+        "busy": False,
+        "refreshScheduled": True,
         "updatedAt": snapshot.get("updatedAt"),
         "macrosRefreshedAt": snapshot.get("macrosRefreshedAt"),
         "macroCount": len((snapshot.get("macroDataStrip") or {}).get("morning") or []),

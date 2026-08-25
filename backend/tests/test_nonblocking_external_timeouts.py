@@ -14,7 +14,7 @@ def _wait_until(predicate, timeout=1.0):
     return bool(predicate())
 
 
-def test_macro_timeout_returns_snapshot_while_worker_finishes(monkeypatch):
+def test_macro_refresh_returns_snapshot_immediately_while_worker_finishes(monkeypatch):
     started = threading.Event()
     release = threading.Event()
     lock = threading.Lock()
@@ -30,7 +30,6 @@ def test_macro_timeout_returns_snapshot_while_worker_finishes(monkeypatch):
         "globalMacro": {"indices": [], "commodities": []},
     }
     monkeypatch.setattr(angel_one_feed, "_MACRO_REFRESH_LOCK", lock)
-    monkeypatch.setattr(angel_one_feed, "_MACRO_REFRESH_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(angel_one_feed, "_refresh_snapshot_macros_body", slow_refresh)
     monkeypatch.setattr(angel_one_feed, "_load_last_snapshot", lambda: snapshot)
 
@@ -40,7 +39,8 @@ def test_macro_timeout_returns_snapshot_while_worker_finishes(monkeypatch):
         elapsed = time.monotonic() - before
         assert started.wait(timeout=0.2)
         assert elapsed < 0.2
-        assert result["timedOut"] is True
+        assert result["accepted"] is True
+        assert result["refreshScheduled"] is True
         assert result["payload"] == snapshot
         assert angel_one_feed.refresh_snapshot_macros()["busy"] is True
     finally:

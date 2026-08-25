@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import Any
 
 R_RATCHET: tuple[tuple[float, float], ...] = (
-    (0.50, 0.00),
     (1.00, 0.00),
     (1.50, 0.00),
     (2.00, 0.50),

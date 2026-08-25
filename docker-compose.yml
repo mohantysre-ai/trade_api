@@ -38,7 +38,7 @@ services:
       # Angel historical API is aggressively rate-limited (AB1021).
       # After AB1021, skip further getCandleData for ANGEL_CANDLE_CIRCUIT_SECONDS.
       INTRADAY_FETCH_WORKERS: "1"
-      INTRADAY_MAX_DAILY_REPLACEMENTS: "10"
+      INTRADAY_MAX_DAILY_REPLACEMENTS: "15"
       INTRADAY_MAX_DAILY_POSITIONS: "20"
       CANDLE_MIN_INTERVAL_SECONDS: "1.1"
       CANDLE_RATE_LIMIT_RETRIES: "0"

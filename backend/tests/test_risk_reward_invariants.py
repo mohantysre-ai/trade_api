@@ -4,9 +4,9 @@ from datetime import datetime, timedelta, timezone
 
 
 def test_r_ladder_and_runner_are_preserved():
-    assert set((0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0)).issubset(TRAIL_RATCHET)
+    assert set((1.0, 1.5, 2.0, 3.0, 4.0, 5.0)).issubset(TRAIL_RATCHET)
     assert 0.25 not in TRAIL_RATCHET
-    assert TRAIL_RATCHET[0.5] == 0.0
+    assert 0.5 not in TRAIL_RATCHET
     assert RUNNER_FRAC == 0.40
     plan = build_exit_plan(100, 10, "LONG", 100, initial_stop=90)
     assert plan["target1"] == 115.0

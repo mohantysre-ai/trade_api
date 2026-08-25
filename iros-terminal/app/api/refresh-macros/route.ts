@@ -9,7 +9,7 @@ export async function POST() {
     const res = await fetch(`${BACKEND_URL}/api/refresh-macros`, {
       method: "POST",
       cache: "no-store",
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(5_000),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {

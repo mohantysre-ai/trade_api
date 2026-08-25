@@ -235,6 +235,7 @@ type SessionResponse = {
   replacementCutoffIst?: string | null;
   rotationWindowOpen?: boolean | null;
   rotationWindowCode?: string | null;
+  liveRefreshPending?: boolean;
   error?: string;
 };
 
@@ -1168,6 +1169,7 @@ export default function AssetMetricsPanel({
   const replacementCandidates = session?.replacementCandidates || [];
   const replacementsApplied = session?.replacementsApplied || [];
   const lastReplacementAppliedAt = session?.lastReplacementAppliedAt ?? null;
+  const liveRefreshPending = session?.liveRefreshPending === true;
   const rotationOpen = session?.rotationWindowOpen;
   const replacementBlocked = session?.replacementBlockedReason ?? null;
   const replacementCutoff = session?.replacementCutoffIst ?? null;
@@ -1210,10 +1212,11 @@ export default function AssetMetricsPanel({
       </div>
 
       {/* Header chrome */}
-      <div className="bg-white/80 border border-slate-200 rounded-xl p-3 shadow-sm">
+      <div className={`signal-widget signal-widget--intraday ${openNameCount > 0 ? 'is-active' : liveRefreshPending ? 'is-hunting' : 'is-cash'} bg-white/80 border border-slate-200 rounded-xl p-3 shadow-sm`}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
+              <span className={`signal-live-orb ${openNameCount > 0 ? 'is-active' : liveRefreshPending ? 'is-hunting' : ''}`} aria-hidden />
               <h2 className="desk-panel-title text-slate-900">INTRADAY</h2>
               <StatusPill tone="desk-pill--strong">MANUAL EXECUTION</StatusPill>
               {sessionUnavailable ? (
@@ -1816,10 +1819,10 @@ export default function AssetMetricsPanel({
                         <Kpi
                           label="Policy"
                           value={
-                            selectedRow.exitPlan?.notes?.includes('be_at_0p5r')
+                            selectedRow.exitPlan?.notes?.includes('be_after_1r_scale')
                               ? selectedRow.exitPlan.notes.includes('max_stop_0p5pct')
-                                ? '0.5R BE · SL≤0.5%'
-                                : '0.5R BE'
+                                ? 'BE after +1R scale · SL≤0.5%'
+                                : 'BE after +1R scale'
                               : selectedRow.exitPlan?.notes?.includes('be_at_0p25r')
                                 ? '0.25R BE (booked)'
                                 : selectedRow.exitPlan?.policyVersion || '—'

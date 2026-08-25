@@ -276,7 +276,7 @@ function statusBadge(status: string) {
 function policyTag(notes?: string[] | null): string | null {
   if (!notes?.length) return null;
   const parts: string[] = [];
-  if (notes.includes('be_at_0p5r')) parts.push('0.5R BE');
+  if (notes.includes('be_after_1r_scale')) parts.push('BE after +1R scale');
   else if (notes.includes('be_at_1r')) parts.push('1R BE');
   else if (notes.includes('be_at_0p25r')) parts.push('0.25R BE');
   if (notes.includes('max_stop_0p5pct')) parts.push('SL≤0.5%');
