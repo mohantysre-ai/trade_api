@@ -76,11 +76,22 @@ echo [*] Pushing %HUB%/iros-desk-state:latest ...
 docker push %HUB%/iros-desk-state:latest
 if errorlevel 1 goto :pushfail
 
+echo.
+echo [*] Creating Windows transfer bundle ^(settings + Cloudflare + live state^)...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_ROOT%\scripts\export-runtime-bundle.ps1" -Output "%PROJECT_ROOT%\sigq-runtime-transfer.zip"
+if errorlevel 1 (
+    echo [FAIL] Images were pushed, but sigq-runtime-transfer.zip could not be created.
+    popd
+    if not "%IROS_NO_PAUSE%"=="1" pause
+    exit /b 1
+)
+
 popd
 echo.
 echo [PASS] Hub images updated.
-echo     Other machine: start-from-hub.bat
-echo     ^(needs backend\.env + config\cloudflare\credentials.json^)
+echo     Copy sigq-runtime-transfer.zip to the repo folder on the other PC.
+echo     Other machine: double-click start-from-hub.bat
+echo     Delete the ZIP after the other PC imports it ^(it contains credentials^).
 echo.
 if "%IROS_NO_PAUSE%"=="1" exit /b 0
 pause

@@ -17,6 +17,8 @@ config/docker/desk-state/seed/data/
 config/docker/desk-state/seed/archive/
 desk_state_hub_manifest.json
 # Local build, test, QA, and runtime artifacts
+sigq-runtime-transfer.zip
+sigq-runtime-transfer.imported.zip
 .tmp/
 .pytest_cache/
 .next/
