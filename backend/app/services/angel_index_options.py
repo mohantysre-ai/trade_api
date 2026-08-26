@@ -102,7 +102,11 @@ def _contracts(master: list[dict[str, Any]], config: dict[str, Any], spot: float
             continue
         name = str(row.get("name") or "").upper().strip()
         symbol = str(row.get("symbol") or "").upper().strip()
-        if name != config["name"] and not symbol.startswith(config["name"]):
+        # Angel's BFO master contains both SENSEX and SENSEX50. Prefix matching
+        # makes SENSEX accidentally select the SENSEX50 future (roughly 25k),
+        # which then has no usable OI for a 77k SENSEX signal. The master name
+        # is the canonical underlying identifier for index derivatives.
+        if name != config["name"]:
             continue
         expiry = _expiry(row.get("expiry"))
         if expiry is None or expiry < session_date:
