@@ -12,6 +12,7 @@ from .angel_index_options import (
     persist_radar,
     unavailable_provider_snapshot,
 )
+from .angel_index_stream import ANGEL_INDEX_STREAM
 from .dhan_scanx_options import apply_scanx_fallback
 from .index_options_engine import build_index_options_radar
 from .index_options_paper import reconcile_paper_book
@@ -78,6 +79,7 @@ def compose_live_index_options_radar(
     result["paperBook"] = reconcile_paper_book(result, client=client, persist=persist)
     result["provider"] = "ANGEL_ONE_WITH_SCANX_AND_LEMONN_FALLBACK"
     result["providerEvidence"] = book.get("indexOptionProvider")
+    result["streamStatus"] = ANGEL_INDEX_STREAM.status()
     if persist:
         persist_radar(result)
     return result

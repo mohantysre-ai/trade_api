@@ -10,7 +10,7 @@ from datetime import date, datetime, timezone
 from typing import Any, Callable
 from urllib.request import Request, urlopen
 
-from .dhan_scanx_options import has_usable_option_chain, normalize_scanx_chain
+from .dhan_scanx_options import chain_needs_oi_enrichment, enrich_chain_fields, has_usable_option_chain, normalize_scanx_chain
 
 LEMONN_CHAIN_URL = "https://lemonn.co.in/api/get-option-chain"
 LEMONN_PAGE_TEMPLATE = os.getenv("LEMONN_OPTION_PAGE_TEMPLATE", "https://lemonn.co.in/futures-and-options/options/{slug}")
@@ -116,7 +116,7 @@ def apply_lemonn_fallback(
     used: list[str] = []
     for key in LEMONN_SLUGS:
         current = merged["indices"].get(key) if isinstance(merged["indices"].get(key), dict) else {}
-        if has_usable_option_chain(current):
+        if has_usable_option_chain(current) and not chain_needs_oi_enrichment(current):
             continue
         expiry = expiries.get(key)
         if expiry is None:
@@ -126,13 +126,18 @@ def apply_lemonn_fallback(
         except Exception as exc:
             fallback = {"source": "LEMONN_FALLBACK", "status": "SOURCE_UNAVAILABLE", "error": str(exc), "chain": []}
         if fallback.get("status") == "LIVE" and fallback.get("chain"):
-            merged["indices"][key] = {
-                **current,
-                **fallback,
-                "primarySource": "ANGEL_ONE",
-                "secondarySource": "SCANX_FALLBACK",
-                "fallbackReason": current.get("error") or current.get("status"),
-            }
+            if has_usable_option_chain(current):
+                merged["indices"][key] = {**current,
+                    "chain": enrich_chain_fields(current.get("chain") or [], fallback.get("chain") or [], "LEMONN_FALLBACK"),
+                    "chainEnrichmentSource": "LEMONN_FALLBACK"}
+            else:
+                merged["indices"][key] = {
+                    **current,
+                    **fallback,
+                    "primarySource": "ANGEL_ONE",
+                    "secondarySource": "SCANX_FALLBACK",
+                    "fallbackReason": current.get("error") or current.get("status"),
+                }
             used.append(key)
         else:
             merged["indices"][key] = {**current, "lemonnFallback": fallback}

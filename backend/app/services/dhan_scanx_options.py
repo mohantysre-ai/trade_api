@@ -109,6 +109,42 @@ def has_usable_option_chain(row: dict[str, Any]) -> bool:
     return False
 
 
+def chain_needs_oi_enrichment(row: dict[str, Any]) -> bool:
+    """An executable chain can still be unusable for institutional OI evidence."""
+    chain = row.get("chain") if isinstance(row.get("chain"), list) else []
+    structure = row.get("structure") if isinstance(row.get("structure"), dict) else {}
+    direction = str(structure.get("direction") or "").upper()
+    if direction not in {"CALL", "PUT"}:
+        return False
+    relevant = [item for item in chain if isinstance(item, dict)
+                and str(item.get("optionType") or "").upper() == direction]
+    return bool(relevant) and not any(_number(item.get("oi")) is not None and _number(item.get("oiChange")) is not None
+                                      for item in relevant)
+
+
+def enrich_chain_fields(primary: list[dict[str, Any]], fallback: list[dict[str, Any]], source: str) -> list[dict[str, Any]]:
+    """Fill absent fields by exact strike/type while preserving primary values."""
+    lookup = {(round(_number(row.get("strike")) or -1, 4), str(row.get("optionType") or "").upper()): row
+              for row in fallback if isinstance(row, dict)}
+    fields = ("ltp", "volume", "oi", "previousOi", "oiChange", "bestBid", "bestAsk", "iv", "delta", "gamma", "theta", "vega")
+    output: list[dict[str, Any]] = []
+    for item in primary:
+        if not isinstance(item, dict):
+            continue
+        match = lookup.get((round(_number(item.get("strike")) or -1, 4), str(item.get("optionType") or "").upper()))
+        merged, used = dict(item), []
+        if match:
+            for field in fields:
+                if merged.get(field) is None and match.get(field) is not None:
+                    merged[field] = match[field]
+                    used.append(field)
+        if used:
+            merged["enrichedBy"] = source
+            merged["enrichedFields"] = used
+        output.append(merged)
+    return output
+
+
 def _post(payload: bytes, timeout: float) -> Any:
     request = Request(SCANX_OPTION_URL, data=payload, headers={"Content-Type": "text/plain", "User-Agent": "Alphix-Terminal/1.0"}, method="POST")
     with urlopen(request, timeout=timeout) as response:  # nosec - fixed ScanX URL
@@ -133,7 +169,7 @@ def apply_scanx_fallback(angel_payload: dict[str, Any], expiries: dict[str, date
     for key in SCANX_SIDS:
         angel = merged["indices"].get(key) if isinstance(merged["indices"].get(key), dict) else {}
         usable = has_usable_option_chain(angel)
-        if usable or key not in expiries:
+        if (usable and not chain_needs_oi_enrichment(angel)) or key not in expiries:
             continue
         needed.append(key)
 
@@ -153,7 +189,12 @@ def apply_scanx_fallback(angel_payload: dict[str, Any], expiries: dict[str, date
     for key, fallback in fetched.items():
         angel = merged["indices"].get(key) if isinstance(merged["indices"].get(key), dict) else {}
         if fallback.get("status") == "LIVE" and fallback.get("chain"):
-            merged["indices"][key] = {**angel, **fallback, "primarySource": "ANGEL_ONE", "fallbackReason": angel.get("error") or angel.get("status")}
+            if has_usable_option_chain(angel):
+                merged["indices"][key] = {**angel,
+                    "chain": enrich_chain_fields(angel.get("chain") or [], fallback.get("chain") or [], "SCANX_FALLBACK"),
+                    "chainEnrichmentSource": "SCANX_FALLBACK"}
+            else:
+                merged["indices"][key] = {**angel, **fallback, "primarySource": "ANGEL_ONE", "fallbackReason": angel.get("error") or angel.get("status")}
             used.append(key)
         else:
             merged["indices"][key] = {**angel, "fallback": fallback}

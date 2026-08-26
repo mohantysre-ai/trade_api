@@ -7,6 +7,7 @@ from app.services.dhan_scanx_options import (
     fetch_scanx_option_chain,
     normalize_scanx_chain,
     has_usable_option_chain,
+    chain_needs_oi_enrichment,
 )
 
 
@@ -83,3 +84,22 @@ def test_live_chain_without_executable_direction_quote_uses_fallback():
     assert merged["fallbackUsedFor"] == ["NIFTY"]
     assert merged["indices"]["NIFTY"]["source"] == "SCANX_FALLBACK"
     assert merged["indices"]["NIFTY"]["structure"]["direction"] == "CALL"
+
+
+def test_executable_angel_chain_is_enriched_without_overwriting_quote():
+    angel = {"source": "ANGEL_ONE", "indices": {"NIFTY": {
+        "source": "ANGEL_ONE", "status": "LIVE", "structure": {"direction": "CALL"},
+        "chain": [{"strike": 25000, "optionType": "CALL", "ltp": 100,
+                   "volume": 1000, "bestBid": 99.5, "bestAsk": 100.5, "oi": None, "oiChange": None}],
+    }}}
+    assert chain_needs_oi_enrichment(angel["indices"]["NIFTY"])
+    merged = apply_scanx_fallback(angel, {"NIFTY": date(2026, 8, 25)}, fetcher=lambda *_: {
+        "source": "SCANX_FALLBACK", "status": "LIVE",
+        "chain": [{"strike": 25000, "optionType": "CALL", "ltp": 101, "oi": 2000,
+                   "previousOi": 1800, "oiChange": 200}],
+    })
+    row = merged["indices"]["NIFTY"]["chain"][0]
+    assert row["ltp"] == 100
+    assert row["oi"] == 2000
+    assert row["oiChange"] == 200
+    assert row["enrichedBy"] == "SCANX_FALLBACK"

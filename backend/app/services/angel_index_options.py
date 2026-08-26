@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
 from ..utils.symbols import Instrument
+from .angel_index_stream import ANGEL_INDEX_STREAM
 from .json_atomic import atomic_write_json, load_json_with_fallback
 from .market_snapshot_store import market_snapshot_path
 
@@ -160,6 +161,21 @@ def _quote_row(contract: dict[str, Any], quote: dict[str, Any], greek: dict[str,
     }
 
 
+def _overlay_stream_quote(rest: dict[str, Any], stream: dict[str, Any] | None) -> dict[str, Any]:
+    """Overlay only fields actually supplied by the stream; retain REST depth."""
+    if not stream:
+        return rest
+    merged = dict(rest)
+    for source, target in (("ltp", "ltp"), ("opnInterest", "opnInterest"), ("tradeVolume", "tradeVolume"),
+                           ("close", "close"), ("bestBidPrice", "bestBidPrice"), ("bestAskPrice", "bestAskPrice")):
+        value = stream.get(source)
+        if value is not None:
+            merged[target] = value
+    merged["streamReceivedAt"] = stream.get("receivedAt")
+    merged["quoteSource"] = "ANGEL_WEBSOCKET"
+    return merged
+
+
 def _ema(values: list[float], period: int) -> float | None:
     if len(values) < period:
         return None
@@ -284,7 +300,12 @@ def _fetch_candles_with_retry(
 def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     key = config["key"]
     try:
-        spot_quote = client.fetch_quote(config["exchange"], config["spotSymbol"], config["spotToken"])
+        spot_stream = ANGEL_INDEX_STREAM.quote(config["spotToken"])
+        spot_quote = spot_stream or client.fetch_quote(config["exchange"], config["spotSymbol"], config["spotToken"])
+        # Start the daemon only after a cold REST quote has established the
+        # shared authenticated session; this avoids concurrent TOTP logins.
+        ANGEL_INDEX_STREAM.ensure(client, [{"exchange": config["exchange"], "token": config["spotToken"],
+                                            "indexKey": key, "kind": "INDEX"}])
         spot = _float(spot_quote.get("ltp"))
         if spot is None or spot <= 0:
             raise RuntimeError("spot quote unavailable")
@@ -294,7 +315,21 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
         instruments = [_instrument(row, f"{key}:{row.get('token')}") for row in contracts]
         if future:
             instruments.append(_instrument(future, f"{key}:FUT"))
-        quotes = client.fetch_batch_quotes(instruments)
+        ANGEL_INDEX_STREAM.ensure(client, [
+            {"exchange": instrument.exchange, "token": instrument.token, "indexKey": key,
+             "kind": "FUTURE" if instrument.key.endswith(":FUT") else "OPTION"}
+            for instrument in instruments
+        ])
+        streamed = {instrument.key: ANGEL_INDEX_STREAM.quote(instrument.token) for instrument in instruments}
+        stream_complete = bool(instruments) and all(
+            streamed.get(instrument.key) is not None
+            and (instrument.key.endswith(":FUT") or (
+                _float((streamed.get(instrument.key) or {}).get("bestBidPrice")) is not None
+                and _float((streamed.get(instrument.key) or {}).get("bestAskPrice")) is not None
+            )) for instrument in instruments
+        )
+        quotes = ({key_: dict(value or {}) for key_, value in streamed.items()}
+                  if stream_complete else client.fetch_batch_quotes(instruments))
         greek_rows: list[dict[str, Any]] = []
         greek_error = None
         if config["segment"] == "NFO":
@@ -309,13 +344,17 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
         for contract in contracts:
             option_type = "CE" if str(contract.get("symbol") or "").endswith("CE") else "PE"
             greek = greek_map.get((round(contract.get("_strike") or -1, 4), option_type))
-            chain.append(_quote_row(contract, quotes.get(f"{key}:{contract.get('token')}") or {}, greek))
-        future_quote = quotes.get(f"{key}:FUT") if future else None
+            quote = _overlay_stream_quote(quotes.get(f"{key}:{contract.get('token')}") or {},
+                                          ANGEL_INDEX_STREAM.quote(str(contract.get("token") or "")))
+            chain.append(_quote_row(contract, quote, greek))
+        future_quote = (_overlay_stream_quote(quotes.get(f"{key}:FUT") or {},
+                        ANGEL_INDEX_STREAM.quote(str(future.get("token") or ""))) if future else None)
         now_ist = datetime.now(IST_ZONE)
         # Seed EMA20 from recent history while ORB/direction remains restricted
         # to the current IST session. Angel candle history is per token, not a
         # multi-symbol batch endpoint.
-        cached_candles = _merge_cached_candles(key, [])
+        stream_candles = ANGEL_INDEX_STREAM.candles(key)
+        cached_candles = _merge_cached_candles(key, stream_candles)
         cached_times = [stamp for row in cached_candles if (stamp := parse_candle_ts(row[0])) is not None]
         cached_latest = max(cached_times, default=None)
         history_start = (
@@ -323,9 +362,19 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
             if cached_latest
             else datetime.combine(now_ist.date() - timedelta(days=7), dt_time(9, 15), tzinfo=IST_ZONE)
         )
-        candles, candle_error = _fetch_candles_with_retry(
-            client, config["exchange"], config["spotToken"], history_start, now_ist, attempts=1,
-        )
+        cache_age = ((now_ist - cached_latest.astimezone(IST_ZONE)).total_seconds()
+                     if cached_latest is not None else float("inf"))
+        today_cached = [stamp.astimezone(IST_ZONE) for row in cached_candles
+                        if (stamp := parse_candle_ts(row[0])) is not None
+                        and stamp.astimezone(IST_ZONE).date() == now_ist.date()]
+        has_opening_range = bool(today_cached and min(today_cached).time().replace(tzinfo=None) <= dt_time(9, 15)
+                                 and len(today_cached) >= 3)
+        if len(cached_candles) >= 20 and has_opening_range and cache_age <= 420:
+            candles, candle_error = cached_candles, None
+        else:
+            candles, candle_error = _fetch_candles_with_retry(
+                client, config["exchange"], config["spotToken"], history_start, now_ist, attempts=1,
+            )
         structure_source = "INDEX_SPOT"
         if not candles and future:
             candles, future_error = _fetch_candles_with_retry(
@@ -340,6 +389,8 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
         if candles and candle_error:
             candle_error = f"LIVE_REFRESH:{candle_error}; USING_PERSISTED_CACHE"
         structure = walk_forward_structure(candles, session_date=now_ist.date()) if candles else index_structure_from_candles([], session_date=now_ist.date())
+        quote_at = spot_stream.get("receivedAt") if spot_stream else datetime.now(timezone.utc).isoformat()
+        latest_candle = max((parse_candle_ts(row[0]) for row in candles), default=None)
         return key, {
             "source": "ANGEL_ONE", "status": "LIVE" if chain else "DATA_INCOMPLETE",
             "fetchedAt": datetime.now(timezone.utc).isoformat(), "spot": spot, "spotClose": _float(spot_quote.get("close")),
@@ -352,6 +403,18 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
                         "oi": _float((future_quote or {}).get("opnInterest") or (future_quote or {}).get("oi")),
                         "previousOi": _float((future_quote or {}).get("previousOI") or (future_quote or {}).get("prev_oi"))} if future else None),
             "greeksStatus": "LIVE" if greek_rows else "UNAVAILABLE", "greeksError": greek_error,
+            "componentFreshness": {
+                "spotQuote": {"status": "LIVE", "source": "ANGEL_WEBSOCKET" if spot_stream else "ANGEL_REST", "asOf": quote_at},
+                "optionChain": {"status": "LIVE" if chain else "UNAVAILABLE",
+                                "source": "ANGEL_WEBSOCKET" if stream_complete else "ANGEL_REST",
+                                "asOf": max((str((value or {}).get("receivedAt") or "") for value in streamed.values()), default="")
+                                        if stream_complete else datetime.now(timezone.utc).isoformat()},
+                "futuresOi": {"status": "LIVE" if _float((future_quote or {}).get("opnInterest") or (future_quote or {}).get("oi")) is not None else "UNAVAILABLE",
+                              "source": (future_quote or {}).get("quoteSource") or "ANGEL_REST", "asOf": (future_quote or {}).get("streamReceivedAt") or datetime.now(timezone.utc).isoformat()},
+                "candles5m": {"status": "LIVE" if candles else "UNAVAILABLE", "source": structure_source,
+                               "asOf": latest_candle.isoformat() if latest_candle else None},
+                "greeks": {"status": "LIVE" if greek_rows else "LOCAL_OR_UNAVAILABLE", "asOf": datetime.now(timezone.utc).isoformat()},
+            },
         }
     except Exception as exc:
         return key, {"source": "ANGEL_ONE", "status": "SOURCE_UNAVAILABLE", "error": str(exc), "chain": []}
@@ -809,7 +872,7 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
         greeks_source = selected.get("greeksSource") if selected else None
         converted[key] = {
             "spot": spot, "direction": direction, "source": row.get("source") or "ANGEL_ONE", "providerStatus": row.get("status"),
-            "expiry": row.get("expiry"), "rawChain": chain,
+            "expiry": row.get("expiry"), "rawChain": chain, "componentFreshness": row.get("componentFreshness") or {},
             "scores": {"trend": 100.0 if direction else None, "breakout": 100.0 if direction else None,
                        "futuresOi": 100.0 if strong_oi else 75.0 if oi_aligned is True else 0.0 if oi_aligned is False else None,
                        "contract": 100.0 if selected else None,

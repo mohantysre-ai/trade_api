@@ -4555,7 +4555,12 @@ def create_app() -> FastAPI:
             age_ok = load_persisted_radar(max_age_seconds=15.0) is not None
             if not age_ok:
                 background_tasks.add_task(_refresh_bg)
-                cached = {**cached, "cacheStatus": "STALE"}
+                # A complete radar refresh includes several independently fresh
+                # components. Keep serving the last durable decision while the
+                # asynchronous composer runs, and reserve STALE for genuinely
+                # old snapshots rather than every response older than 15s.
+                recent = load_persisted_radar(max_age_seconds=90.0) is not None
+                cached = {**cached, "cacheStatus": "REFRESHING" if recent else "STALE"}
             else:
                 cached = {**cached, "cacheStatus": "HIT"}
             return cached

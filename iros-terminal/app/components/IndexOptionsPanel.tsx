@@ -42,6 +42,7 @@ type Candidate = {
   chain?: Array<{ symbol?: string; strike?: number; optionType?: string; ltp?: number; oi?: number; oiChange?: number; delta?: number; gamma?: number; theta?: number; vega?: number; iv?: number }>;
   structure?: Structure | null;
   oiResearch?: { pcr?: number | null; source?: string | null };
+  componentFreshness?: Record<string, { status?: string; source?: string; asOf?: string | null }>;
 };
 
 type Radar = {
@@ -51,6 +52,7 @@ type Radar = {
   updatedAt?: string | null;
   executionPolicy?: string;
   cacheStatus?: string;
+  streamStatus?: { connected?: boolean; subscribed?: number; lastTickAt?: string | null };
   disclaimer?: string;
   candidates: Candidate[];
   selected: Candidate[];
@@ -227,6 +229,10 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
             <span className="desk-pill desk-pill--muted">Max {radar?.limits?.maxDailyEntries ?? 20}/day</span>
             <span className="desk-pill desk-pill--muted">Max {radar?.limits?.maxConcurrent ?? 2} open</span>
             {radar?.cacheStatus === 'STALE' && <span className="desk-pill desk-pill--warn">Cached</span>}
+            {radar?.cacheStatus === 'REFRESHING' && <span className="desk-pill desk-pill--muted">Refreshing</span>}
+            <span className={radar?.streamStatus?.connected ? 'desk-pill desk-pill--ok' : 'desk-pill desk-pill--warn'}>
+              Stream {radar?.streamStatus?.connected ? 'live' : 'REST fallback'}
+            </span>
           </div>
         </div>
       </div>
@@ -269,6 +275,15 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
                 </div>
               </div>
               <div className="mt-2 text-[11px] leading-snug text-[var(--fg-muted)]">{candidateHeadline(row)}</div>
+              {Object.keys(row.componentFreshness ?? {}).length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {Object.entries(row.componentFreshness ?? {}).map(([key, item]) => (
+                    <span key={key} className={item.status === 'LIVE' ? 'desk-pill desk-pill--ok' : 'desk-pill desk-pill--muted'}>
+                      {key === 'spotQuote' ? 'Quote' : key === 'optionChain' ? 'Chain' : key === 'futuresOi' ? 'Fut OI' : key === 'candles5m' ? '5m' : 'Greeks'} {item.status?.toLowerCase()}
+                    </span>
+                  ))}
+                </div>
+              )}
               {chips.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {chips.map((chip) => (
