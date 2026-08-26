@@ -52,6 +52,9 @@ _SESSION_RESPONSE_CACHE: dict[str, Any] | None = None
 _SESSION_RESPONSE_CACHE_AT = 0.0
 _SESSION_RESPONSE_REFRESHING = False
 _SESSION_RESPONSE_GEN = 0
+_SESSION_ROTATION_LOCK = threading.Lock()
+_SESSION_ROTATION_ATTEMPT_AT = 0.0
+_SESSION_ROTATION_RETRY_SEC = float(os.environ.get("INTRADAY_ROTATION_RETRY_SEC", "30"))
 _SESSION_RESPONSE_OPEN_TTL = float(os.environ.get("INTRADAY_RESPONSE_OPEN_TTL", "4"))
 _SESSION_RESPONSE_CLOSED_TTL = float(os.environ.get("INTRADAY_RESPONSE_CLOSED_TTL", "20"))
 # Live replacement hunt: rescore Nifty 500 QUALIFIED names; do not reuse 10:18 lock pools.
@@ -2970,7 +2973,10 @@ def ensure_intraday_session_locked() -> dict[str, Any]:
     existing = load_session()
     today = _ist_now().strftime("%Y-%m-%d")
     existing_date = str(existing.get("sessionDate") or "").strip()[:10]
-    if existing.get("locked") and existing_date == today and (existing.get("long") or []):
+    # A current-day cash-held lock with zero names is valid. Replacement
+    # hunting may fill it later; do not make it impossible to re-enter because
+    # commit_session correctly refuses to overwrite today's immutable lock.
+    if existing.get("locked") and existing_date == today:
         return existing
     result = commit_session(force=bool(existing.get("locked") and existing_date != today))
     if isinstance(result, dict) and result.get("locked") and result.get("sessionDate"):
@@ -4378,6 +4384,48 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
     return out
 
 
+def _schedule_stale_session_rotation(existing: dict[str, Any] | None = None) -> bool:
+    """Recover a missed scheduler tick without blocking an HTTP request.
+
+    GET remains non-blocking: it only coalesces one background call through the
+    same deterministic ensure/commit path used by the desk scheduler.
+    """
+    global _SESSION_ROTATION_ATTEMPT_AT
+    session = existing if isinstance(existing, dict) else load_session()
+    today = _ist_now().strftime("%Y-%m-%d")
+    session_date = str(session.get("sessionDate") or "").strip()[:10]
+    stale = bool(session.get("locked") and session_date and session_date != today)
+    allowed, _reason = basket_lock_allowed()
+    if not stale or not allowed:
+        return False
+    now = time.monotonic()
+    if now - _SESSION_ROTATION_ATTEMPT_AT < _SESSION_ROTATION_RETRY_SEC:
+        return True
+    if not _SESSION_ROTATION_LOCK.acquire(blocking=False):
+        return True
+    _SESSION_ROTATION_ATTEMPT_AT = now
+
+    def _rotate() -> None:
+        try:
+            result = ensure_intraday_session_locked()
+            if str(result.get("sessionDate") or "")[:10] == today and result.get("locked"):
+                refresh_session_state()
+                log.info("Recovered stale intraday session %s -> %s from read-path trigger", session_date, today)
+            else:
+                log.warning("Read-path intraday rotation remains pending: %s", result.get("commitError"))
+        except Exception:
+            log.exception("Read-path intraday rotation failed")
+        finally:
+            _SESSION_ROTATION_LOCK.release()
+
+    try:
+        threading.Thread(target=_rotate, name=f"intraday-rollover-{today}", daemon=True).start()
+    except Exception:
+        _SESSION_ROTATION_LOCK.release()
+        raise
+    return True
+
+
 def get_session(include_live: bool = True) -> dict[str, Any]:
     """Return a non-blocking session snapshot to all concurrent UI callers.
 
@@ -4389,6 +4437,15 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
     global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT, _SESSION_RESPONSE_REFRESHING
     if not include_live:
         return _compute_session(include_live=False)
+    disk_session = load_session()
+    rollover_pending = _schedule_stale_session_rotation(disk_session)
+
+    def _with_rollover_state(payload: dict[str, Any]) -> dict[str, Any]:
+        out = copy.deepcopy(payload)
+        if rollover_pending and str(out.get("sessionDate") or "")[:10] != _ist_now().strftime("%Y-%m-%d"):
+            out["rotationPending"] = True
+            out.setdefault("rotationError", "AUTOMATIC_ROTATION_IN_PROGRESS")
+        return out
     try:
         from .trade_outcome import _is_market_open
         ttl = _SESSION_RESPONSE_OPEN_TTL if _is_market_open() else _SESSION_RESPONSE_CLOSED_TTL
@@ -4396,14 +4453,14 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
         ttl = _SESSION_RESPONSE_OPEN_TTL
     now = time.monotonic()
     if _SESSION_RESPONSE_CACHE is not None and now - _SESSION_RESPONSE_CACHE_AT < ttl:
-        return copy.deepcopy(_SESSION_RESPONSE_CACHE)
+        return _with_rollover_state(_SESSION_RESPONSE_CACHE)
 
     start_refresh = False
     started_gen = 0
     with _SESSION_RESPONSE_LOCK:
         now = time.monotonic()
         if _SESSION_RESPONSE_CACHE is not None and now - _SESSION_RESPONSE_CACHE_AT < ttl:
-            return copy.deepcopy(_SESSION_RESPONSE_CACHE)
+            return _with_rollover_state(_SESSION_RESPONSE_CACHE)
         if _SESSION_RESPONSE_CACHE is None:
             fallback = _compute_session(include_live=False, persist=False)
             fallback["dataStale"] = True
@@ -4429,7 +4486,7 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
             with _SESSION_RESPONSE_LOCK:
                 _SESSION_RESPONSE_REFRESHING = False
             log.exception("failed to start intraday live refresh")
-    return result
+    return _with_rollover_state(result)
 
 
 def _refresh_session_response_cache(started_gen: int) -> None:

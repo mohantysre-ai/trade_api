@@ -1,5 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from threading import Event
+import threading
 import time
 
 from app.services import intraday_session_engine as intraday
@@ -20,6 +22,7 @@ def test_intraday_live_response_refresh_does_not_block_concurrent_callers(monkey
     calls = []
     live_started = Event()
     release_live = Event()
+    monkeypatch.setattr(intraday, "_schedule_stale_session_rotation", lambda existing=None: False)
 
     def compute(*, include_live=True, persist=False):
         calls.append((include_live, persist))
@@ -51,6 +54,43 @@ def test_intraday_live_response_refresh_does_not_block_concurrent_callers(monkey
     assert _wait_until(lambda: not intraday._SESSION_RESPONSE_REFRESHING)
     live = intraday.get_session(include_live=True)
     assert live["long"][0]["symbol"] == "LIVE"
+
+
+def test_stale_intraday_rotation_is_background_and_coalesced(monkeypatch):
+    started = Event()
+    release = Event()
+    calls: list[str] = []
+
+    def ensure():
+        calls.append("ensure")
+        started.set()
+        release.wait(timeout=1)
+        return {"locked": True, "sessionDate": "2026-08-26", "long": [], "short": []}
+
+    monkeypatch.setattr(intraday, "_ist_now", lambda: datetime(2026, 8, 26, 10, 0))
+    monkeypatch.setattr(intraday, "basket_lock_allowed", lambda: (True, "primary_window"))
+    monkeypatch.setattr(intraday, "ensure_intraday_session_locked", ensure)
+    monkeypatch.setattr(intraday, "refresh_session_state", lambda: {"locked": True})
+    monkeypatch.setattr(intraday, "_SESSION_ROTATION_LOCK", threading.Lock())
+    monkeypatch.setattr(intraday, "_SESSION_ROTATION_ATTEMPT_AT", 0.0)
+    stale = {"locked": True, "sessionDate": "2026-08-25"}
+    try:
+        assert intraday._schedule_stale_session_rotation(stale) is True
+        assert started.wait(timeout=0.2)
+        assert intraday._schedule_stale_session_rotation(stale) is True
+        assert calls == ["ensure"]
+    finally:
+        release.set()
+
+    assert _wait_until(lambda: not intraday._SESSION_ROTATION_LOCK.locked())
+
+
+def test_current_day_cash_lock_is_a_valid_intraday_session(monkeypatch):
+    current = {"locked": True, "sessionDate": "2026-08-26", "long": [], "short": [], "cashHeld": True}
+    monkeypatch.setattr(intraday, "load_session", lambda: current)
+    monkeypatch.setattr(intraday, "_ist_now", lambda: datetime(2026, 8, 26, 10, 0))
+    monkeypatch.setattr(intraday, "commit_session", lambda **kwargs: (_ for _ in ()).throw(AssertionError("must not recommit")))
+    assert intraday.ensure_intraday_session_locked() == current
 
 
 def test_swing_live_response_refresh_does_not_block_concurrent_callers(monkeypatch):
@@ -132,6 +172,7 @@ def test_live_book_refresh_does_not_block_concurrent_callers(monkeypatch):
 def test_intraday_stale_refresh_does_not_replace_post_lock_payload(monkeypatch):
     live_started = Event()
     release_live = Event()
+    monkeypatch.setattr(intraday, "_schedule_stale_session_rotation", lambda existing=None: False)
 
     def compute(*, include_live=True, persist=False):
         if persist:
@@ -163,6 +204,7 @@ def test_intraday_stale_refresh_does_not_replace_post_lock_payload(monkeypatch):
 def test_intraday_stale_refresh_does_not_replace_after_save_session(monkeypatch):
     live_started = Event()
     release_live = Event()
+    monkeypatch.setattr(intraday, "_schedule_stale_session_rotation", lambda existing=None: False)
 
     def compute(*, include_live=True, persist=False):
         if include_live:
