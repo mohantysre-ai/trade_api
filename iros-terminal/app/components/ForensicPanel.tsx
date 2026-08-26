@@ -677,6 +677,24 @@ export default function ForensicPanel({
       closed?: boolean;
       outcome?: { label?: string | null } | null;
     }>;
+    closedPositions?: Array<{
+      symbol?: string;
+      entryPrice?: number;
+      ltp?: number | null;
+      currentPrice?: number | null;
+      dayChangePct?: number | null;
+      unrealizedPnlPct?: number | null;
+      totalPnl?: number | null;
+      score?: number | null;
+      stopLoss?: number;
+      effectiveStop?: number | null;
+      target1?: number;
+      target2?: number;
+      selectionReason?: string | null;
+      status?: string | null;
+      closed?: boolean;
+      outcome?: { label?: string | null } | null;
+    }>;
     portfolio?: { realizedPnl?: number; unrealizedPnl?: number; totalPnl?: number; lockedCount?: number };
   } | null>(null);
   const [locking, setLocking] = useState(false);
@@ -1111,14 +1129,21 @@ export default function ForensicPanel({
     if (refreshToken > 0) void fetchLiveDeskSnapshot(true);
   }, [refreshToken]);
 
+  const swingBookPositions = useMemo(
+    () => uniqueSwingLongPositions([
+      ...(swingSession?.long ?? []),
+      ...(swingSession?.closedPositions ?? []),
+    ]),
+    [swingSession?.closedPositions, swingSession?.long],
+  );
   const lockedSwingMode = Boolean(
     swingSession?.locked &&
       String(swingSession?.sessionDate || '').slice(0, 10) === istToday &&
-      (swingSession?.long?.length ?? 0) > 0,
+      swingBookPositions.length > 0,
   );
   const todaySwingEmpty = Boolean(
     String(swingSession?.sessionDate || '').slice(0, 10) === istToday &&
-      (swingSession?.long?.length ?? 0) === 0 &&
+      swingBookPositions.length === 0 &&
       !lockedSwingMode,
   );
   const huntingSwing = Boolean(
@@ -1165,9 +1190,9 @@ export default function ForensicPanel({
 
   const portfolioDisplayRows: MatrixCardRow[] = useMemo(() => {
     if (huntingSwing || cashHeldSwing) return [];
-    if (!lockedSwingMode || !swingSession?.long?.length) return displayRows;
+    if (!lockedSwingMode || !swingBookPositions.length) return displayRows;
     const byTicker = new Map(displayRows.map((item) => [item.row.ticker.toUpperCase(), item]));
-    return uniqueSwingLongPositions(swingSession.long)
+    return swingBookPositions
       .map((pos) => {
         const sym = String(pos.symbol || '').toUpperCase();
         if (!sym) return null;
@@ -1236,7 +1261,7 @@ export default function ForensicPanel({
         } satisfies MatrixCardRow;
       })
       .filter((x): x is MatrixCardRow => x != null);
-  }, [cashHeldSwing, displayRows, huntingSwing, lockedSwingMode, swingSession, tickerIntelMap, tickerNewsMap, trendlyneSummaries]);
+  }, [cashHeldSwing, displayRows, huntingSwing, lockedSwingMode, swingBookPositions, swingSession, tickerIntelMap, tickerNewsMap, trendlyneSummaries]);
 
   const tickerList = useMemo(
     () => portfolioDisplayRows.map((item) => item.row.ticker),
