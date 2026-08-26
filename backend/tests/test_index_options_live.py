@@ -1,7 +1,11 @@
 from datetime import date
 from pathlib import Path
 
-from app.services.index_options_live import compose_live_index_options_radar, replay_session_payload
+from app.services.index_options_live import (
+    compose_live_index_options_radar,
+    finalize_closed_index_options_radar,
+    replay_session_payload,
+)
 from app.services.lemonn_options import apply_lemonn_fallback
 from tests.test_index_options_replay import _ReplayClient, _master_for_replay
 
@@ -77,3 +81,19 @@ def test_compose_applies_lemonn_after_scanx():
     assert lemonn_calls == ["hit"]
     assert result["provider"] == "ANGEL_ONE_WITH_SCANX_AND_LEMONN_FALLBACK"
     assert result["providerEvidence"]["thirdFallbackUsedFor"] == ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"]
+
+
+def test_closed_session_freezes_hunt_without_rebuilding_provider(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.index_options_live.reconcile_paper_book",
+        lambda radar, **kwargs: {"marketOpen": False, "open": [], "closed": []},
+    )
+    frozen = finalize_closed_index_options_radar(
+        {"candidates": [], "selected": [], "limits": {"huntMode": "CONTINUOUS_MARKET_SESSION"}},
+        client=object(),
+        persist=False,
+    )
+    assert frozen["sessionStatus"] == "CLOSED"
+    assert frozen["huntActive"] is False
+    assert frozen["cacheStatus"] == "SESSION_FROZEN"
+    assert frozen["limits"]["huntMode"] == "SESSION_CLOSED"

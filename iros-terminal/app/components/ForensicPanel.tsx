@@ -648,6 +648,9 @@ export default function ForensicPanel({
     entryHuntDiagnostics?: {
       evaluated?: number;
       qualified?: number;
+      qualifiedDuringHunt?: number;
+      eodQualified?: number;
+      diagnosticPhase?: string;
       universeSize?: number | null;
       volumeScreened?: number;
       candleMetrics?: number;
@@ -1658,7 +1661,7 @@ export default function ForensicPanel({
                 ['Hunt pool', swingSession?.entryHuntDiagnostics?.swingUniverse ?? 'Nifty 500'],
                 ['Candles', swingSession?.entryHuntDiagnostics?.candleMetrics ?? '—'],
                 ['Evaluated', swingSession?.entryHuntDiagnostics?.evaluated ?? '—'],
-                ['Qualified BUY', swingSession?.entryHuntDiagnostics?.qualified ?? 0],
+                [swingSession?.entryHuntDiagnostics?.diagnosticPhase === 'POST_HUNT_EOD' ? 'Locked in window' : 'Qualified BUY', swingSession?.entryHuntDiagnostics?.qualified ?? 0],
               ].map(([label, value]) => (
                 <div key={String(label)} className="rounded-lg border border-slate-200 bg-white/80 px-3 py-2">
                   <div className="desk-panel-title text-slate-500">{label}</div>
@@ -1669,11 +1672,16 @@ export default function ForensicPanel({
             <p className="text-slate-700 text-[13px] font-semibold">
               {huntingSwing
                 ? `Hunt open — ${swingSession?.entryHuntDiagnostics?.qualified ?? 0}/${swingSession?.entryHuntDiagnostics?.evaluated ?? '—'} qualified BUY`
-                : `Hunt closed — ${swingSession?.cashReason || 'NO_FULLY_QUALIFIED_EXPLICIT_BUY_CANDIDATES'}`}
+                : `Hunt closed — ${swingSession?.cashReason || 'NO_BUY_LOCKED_DURING_ENTRY_WINDOW'}`}
               {typeof swingSession?.entryHuntDiagnostics?.displayPool === 'number'
                 ? ` · matrix display ${swingSession.entryHuntDiagnostics.displayPool}`
                 : ''}
             </p>
+            {cashHeldSwing && swingSession?.entryHuntDiagnostics?.diagnosticPhase === 'POST_HUNT_EOD' && (
+              <p className="text-[11px] text-slate-500">
+                EOD snapshot found {swingSession.entryHuntDiagnostics.eodQualified ?? 0} qualified setup(s) after the 14:45 entry cutoff; these are analysis results, not locked trades.
+              </p>
+            )}
             {(swingSession?.entryHuntDiagnostics?.topRejectionReasons?.length ?? 0) > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {(swingSession?.entryHuntDiagnostics?.topRejectionReasons ?? []).slice(0, 8).map((item) => (

@@ -4523,7 +4523,12 @@ def create_app() -> FastAPI:
     ) -> dict[str, Any]:
         """Return the deterministic index-options radar; never mock missing chain data."""
         from .angel_index_options import _RADAR_REFRESH_LOCK, load_persisted_radar
-        from .index_options_live import compose_live_index_options_radar, replay_session_payload
+        from .index_options_live import (
+            compose_live_index_options_radar,
+            finalize_closed_index_options_radar,
+            replay_session_payload,
+        )
+        from .index_options_paper import index_options_market_open
 
         if sessionDate:
             try:
@@ -4551,6 +4556,14 @@ def create_app() -> FastAPI:
                 _RADAR_REFRESH_LOCK.release()
 
         cached = load_persisted_radar()
+        if not index_options_market_open(datetime.now(tz=IST_ZONE)):
+            if cached:
+                return finalize_closed_index_options_radar(cached, client=AngelOneClient())
+            closed = _compose()
+            closed["sessionStatus"] = "CLOSED"
+            closed["huntActive"] = False
+            closed["limits"]["huntMode"] = "SESSION_CLOSED"
+            return closed
         if cached:
             age_ok = load_persisted_radar(max_age_seconds=15.0) is not None
             if not age_ok:

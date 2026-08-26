@@ -36,6 +36,11 @@ def _market_open(now: datetime) -> bool:
     return clock.weekday() < 5 and dt_time(9, 15) <= clock.time().replace(tzinfo=None) < PAPER_SQUARE_OFF_TIME
 
 
+def index_options_market_open(now: datetime | None = None) -> bool:
+    """Public session gate shared by the API and UI payload composer."""
+    return _market_open((now or datetime.now(IST_ZONE)).astimezone(IST_ZONE))
+
+
 def _blank_book(session_date: str) -> dict[str, Any]:
     return {"sessionDate": session_date, "mode": "AUTO_PAPER_ONLY", "open": [], "closed": [], "entryCount": 0}
 

@@ -321,6 +321,9 @@ def test_empty_after_hunt_is_cash_held(monkeypatch, tmp_path: Path):
     assert sess["locked"] is True
     assert sess["cashHeld"] is True
     assert sess["hunting"] is False
+    assert sess["cashReason"] == "NO_BUY_LOCKED_DURING_ENTRY_WINDOW"
+    assert sess["entryHuntDiagnostics"]["qualified"] == 0
+    assert sess["entryHuntDiagnostics"]["diagnosticPhase"] == "POST_HUNT_EOD"
 
 
 def test_qualified_buy_locks_during_hunt_after_1015(monkeypatch, tmp_path: Path):

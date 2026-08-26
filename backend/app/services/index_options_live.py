@@ -1,7 +1,7 @@
 """Live radar compose: Angel → ScanX → Lemonn, plus session replay routing."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Callable
 
 from .angel_index_options import (
@@ -15,7 +15,7 @@ from .angel_index_options import (
 from .angel_index_stream import ANGEL_INDEX_STREAM
 from .dhan_scanx_options import apply_scanx_fallback
 from .index_options_engine import build_index_options_radar
-from .index_options_paper import reconcile_paper_book
+from .index_options_paper import index_options_market_open, reconcile_paper_book
 from .index_options_replay import parse_session_date, replay_index_options_session
 from .lemonn_options import LEMONN_SLUGS, apply_lemonn_fallback, discover_lemonn_expiries
 from .trendlyne_oi import apply_oi_enrichment
@@ -33,6 +33,7 @@ def compose_live_index_options_radar(
     oi_enrichment_fn: Callable[..., dict[str, Any]] = apply_oi_enrichment,
     expiries_fn: Callable[..., dict[str, date]] = active_index_expiries,
     snapshot_fn: Callable[..., dict[str, Any]] = cached_angel_index_option_snapshot,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """Build the live radar. Lemonn fills indexes still unusable after ScanX."""
     book = dict(snapshot)
@@ -76,10 +77,35 @@ def compose_live_index_options_radar(
         book["indexOptions"] = option_data_to_strategy_inputs(option_data, book)
         book["indexOptionProvider"] = option_data
     result = build_index_options_radar(book)
-    result["paperBook"] = reconcile_paper_book(result, client=client, persist=persist)
+    market_open = index_options_market_open(now)
+    result["paperBook"] = reconcile_paper_book(result, client=client, persist=persist, now=now)
+    result["sessionStatus"] = "OPEN" if market_open else "CLOSED"
+    result["huntActive"] = market_open
+    result["limits"]["huntMode"] = "CONTINUOUS_MARKET_SESSION" if market_open else "SESSION_CLOSED"
     result["provider"] = "ANGEL_ONE_WITH_SCANX_AND_LEMONN_FALLBACK"
     result["providerEvidence"] = book.get("indexOptionProvider")
     result["streamStatus"] = ANGEL_INDEX_STREAM.status()
+    if persist:
+        persist_radar(result)
+    return result
+
+
+def finalize_closed_index_options_radar(
+    radar: dict[str, Any], *, client: Any, persist: bool = True, now: datetime | None = None,
+) -> dict[str, Any]:
+    """Freeze decisions after close while marking/squaring off an existing paper book.
+
+    This deliberately avoids a full chain/futures/candle refresh after the entry
+    session. Direct quotes are requested only for contracts already in the book.
+    """
+    result = dict(radar)
+    result["paperBook"] = reconcile_paper_book(result, client=client, persist=persist, now=now)
+    result["sessionStatus"] = "CLOSED"
+    result["huntActive"] = False
+    limits = dict(result.get("limits") or {})
+    limits["huntMode"] = "SESSION_CLOSED"
+    result["limits"] = limits
+    result["cacheStatus"] = "SESSION_FROZEN"
     if persist:
         persist_radar(result)
     return result

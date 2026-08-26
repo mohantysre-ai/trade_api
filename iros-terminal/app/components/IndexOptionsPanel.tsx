@@ -52,6 +52,8 @@ type Radar = {
   updatedAt?: string | null;
   executionPolicy?: string;
   cacheStatus?: string;
+  sessionStatus?: 'OPEN' | 'CLOSED';
+  huntActive?: boolean;
   streamStatus?: { connected?: boolean; subscribed?: number; lastTickAt?: string | null };
   disclaimer?: string;
   candidates: Candidate[];
@@ -190,11 +192,17 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
     const controller = new AbortController();
     setLoading(true);
     let inFlight = false;
+    let timer: number | undefined;
     const refresh = () => {
       if (inFlight || controller.signal.aborted) return;
       inFlight = true;
       loadRadar('/api/index-options', controller.signal)
-        .then(setRadar)
+        .then((data) => {
+          setRadar(data);
+          if (data.huntActive !== false && !controller.signal.aborted) {
+            timer = window.setTimeout(refresh, 15_000);
+          }
+        })
         .catch((error) => {
           if (!controller.signal.aborted) setRadar({ success: false, candidates: [], selected: [], error: error instanceof Error ? error.message : 'Radar unavailable' });
         })
@@ -204,9 +212,8 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
         });
     };
     refresh();
-    const id = window.setInterval(refresh, 15_000);
     return () => {
-      window.clearInterval(id);
+      if (timer !== undefined) window.clearTimeout(timer);
       controller.abort();
     };
   }, [refreshToken]);
@@ -224,14 +231,14 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="desk-pill desk-pill--ok">Auto paper only</span>
-            <span className="desk-pill desk-pill--muted">Continuous hunt</span>
+            <span className="desk-pill desk-pill--muted">{radar?.huntActive === false ? 'Session closed' : 'Continuous hunt'}</span>
             <span className="desk-pill desk-pill--muted">No minimum</span>
             <span className="desk-pill desk-pill--muted">Max {radar?.limits?.maxDailyEntries ?? 20}/day</span>
             <span className="desk-pill desk-pill--muted">Max {radar?.limits?.maxConcurrent ?? 2} open</span>
             {radar?.cacheStatus === 'STALE' && <span className="desk-pill desk-pill--warn">Cached</span>}
             {radar?.cacheStatus === 'REFRESHING' && <span className="desk-pill desk-pill--muted">Refreshing</span>}
-            <span className={radar?.streamStatus?.connected ? 'desk-pill desk-pill--ok' : 'desk-pill desk-pill--warn'}>
-              Stream {radar?.streamStatus?.connected ? 'live' : 'REST fallback'}
+            <span className={radar?.huntActive === false ? 'desk-pill desk-pill--muted' : radar?.streamStatus?.connected ? 'desk-pill desk-pill--ok' : 'desk-pill desk-pill--warn'}>
+              {radar?.huntActive === false ? 'Radar frozen' : `Stream ${radar?.streamStatus?.connected ? 'live' : 'REST fallback'}`}
             </span>
           </div>
         </div>

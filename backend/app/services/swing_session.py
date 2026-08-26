@@ -1894,9 +1894,15 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
         "counts": {"long": 0, "short": 0, "total": 0},
         "deskGates": {"minPrice": SWING_MIN_PRICE, "rejectDvr": True},
         "crossBookExcluded": sorted(exclude),
-        "cashReason": "NO_FULLY_QUALIFIED_EXPLICIT_BUY_CANDIDATES",
+        "cashReason": "NO_BUY_LOCKED_DURING_ENTRY_WINDOW",
         "huntWindow": swing_entry_hunt_config(),
-        "entryHuntDiagnostics": diagnostics,
+        "entryHuntDiagnostics": {
+            **diagnostics,
+            "qualifiedDuringHunt": 0,
+            "eodQualified": diagnostics.get("qualified", 0),
+            "qualified": 0,
+            "diagnosticPhase": "POST_HUNT_EOD",
+        },
     }
     _atomic_write(_SWING_SESSION_PATH, cash_session)
     return {
@@ -1904,7 +1910,7 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
         "alreadyLocked": False,
         "cashHeld": True,
         "hunting": False,
-        "reason": "NO_FULLY_QUALIFIED_EXPLICIT_BUY_CANDIDATES",
+        "reason": "NO_BUY_LOCKED_DURING_ENTRY_WINDOW",
         "skipped": skipped,
         "session": cash_session,
         "staleDay": stale_day,
