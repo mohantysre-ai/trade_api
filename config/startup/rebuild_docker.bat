@@ -80,6 +80,9 @@ pushd "%PROJECT_ROOT%"
 
 echo [2/5] Stopping stack ^(volumes kept^)...
 docker compose --profile tunnel down --remove-orphans
+REM Fixed container_name values can survive a project rename / partial down.
+REM Clear known IROS names so "up" never hits "name already in use".
+docker rm -f iros-ai-news iros-market-api iros-frontend iros-cloudflared 2>nul
 echo.
 
 echo [3/5] Building new images...
@@ -102,6 +105,12 @@ echo.
 echo [4/5] Starting stack with new images...
 docker compose %COMPOSE_PROFILES% up -d --force-recreate --remove-orphans
 set UP_CODE=%ERRORLEVEL%
+if %UP_CODE% neq 0 (
+    echo [WARN] compose up failed — clearing leftover iros-* names and retrying...
+    docker rm -f iros-ai-news iros-market-api iros-frontend iros-cloudflared 2>nul
+    docker compose %COMPOSE_PROFILES% up -d --force-recreate --remove-orphans
+    set UP_CODE=!ERRORLEVEL!
+)
 if %UP_CODE% neq 0 (
     echo [FAIL] docker compose up failed ^(exit %UP_CODE%^).
     popd
