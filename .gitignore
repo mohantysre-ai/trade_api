@@ -15,6 +15,7 @@ config/docker/desk-state/seed/*.json
 config/docker/desk-state/seed/state/
 config/docker/desk-state/seed/data/
 config/docker/desk-state/seed/archive/
+config/docker/runtime-private/seed/
 desk_state_hub_manifest.json
 # Local build, test, QA, and runtime artifacts
 sigq-runtime-transfer.zip

@@ -8,7 +8,11 @@ REM   smohanty010620/iros-frontend
 REM   smohanty010620/cloudflared   (tunnel run baked in; no secrets)
 REM   smohanty010620/iros-desk-state  (desk JSON snapshot — Hub has no volumes)
 REM
-REM Does NOT push credentials.json or backend/.env
+REM   smohanty010620/sigq-runtime-private  (PRIVATE ONLY - backend/.env,
+REM     Cloudflare credentials.json, live volume snapshot)
+REM
+REM sigq-runtime-private must already exist on Docker Hub as a PRIVATE repo
+REM before this script's first run - create it once at hub.docker.com.
 REM ============================================================
 
 setlocal enabledelayedexpansion
@@ -50,8 +54,17 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [*] Building stack images ^(including cloudflared + desk-state^)...
-docker compose --profile tunnel --profile desk-state build
+echo [*] Packing backend/.env + Cloudflare credentials + live volumes into sigq-runtime-private seed...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%pack-runtime-private.ps1"
+if errorlevel 1 (
+    echo [FAIL] pack-runtime-private failed
+    popd
+    if not "%IROS_NO_PAUSE%"=="1" pause
+    exit /b 1
+)
+
+echo [*] Building stack images ^(including cloudflared + desk-state + runtime-private^)...
+docker compose --profile tunnel --profile desk-state --profile runtime-private build
 if errorlevel 1 (
     echo [FAIL] build failed
     popd
@@ -77,10 +90,13 @@ docker push %HUB%/iros-desk-state:latest
 if errorlevel 1 goto :pushfail
 
 echo.
-echo [*] Creating Windows transfer bundle ^(settings + Cloudflare + live state^)...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_ROOT%\scripts\export-runtime-bundle.ps1" -Output "%PROJECT_ROOT%\sigq-runtime-transfer.zip"
+echo [*] Pushing %HUB%/sigq-runtime-private:latest ^(PRIVATE REPO ONLY - live secrets^)...
+docker push %HUB%/sigq-runtime-private:latest
 if errorlevel 1 (
-    echo [FAIL] Images were pushed, but sigq-runtime-transfer.zip could not be created.
+    echo [FAIL] If this is the first push, create %HUB%/sigq-runtime-private
+    echo            on hub.docker.com FIRST and set its Visibility to Private.
+    echo            Hub creates repos as Public by default on first push otherwise,
+    echo            which would expose backend/.env and the Cloudflare token.
     popd
     if not "%IROS_NO_PAUSE%"=="1" pause
     exit /b 1
@@ -88,10 +104,9 @@ if errorlevel 1 (
 
 popd
 echo.
-echo [PASS] Hub images updated.
-echo     Copy sigq-runtime-transfer.zip to the repo folder on the other PC.
-echo     Other machine: double-click start-from-hub.bat
-echo     Delete the ZIP after the other PC imports it ^(it contains credentials^).
+echo [PASS] Hub images updated, including the private runtime bundle.
+echo     Other machine: double-click start-from-hub.bat - it pulls everything,
+echo     including backend/.env and Cloudflare credentials, automatically.
 echo.
 if "%IROS_NO_PAUSE%"=="1" exit /b 0
 pause

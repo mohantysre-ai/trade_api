@@ -192,6 +192,17 @@ services:
     image: smohanty010620/iros-desk-state:latest
     command: ["true"]
 
+  # Private runtime bundle: backend/.env + Cloudflare credentials.json + live volume
+  # snapshots. LIVE SECRETS LIVE HERE — this image must only ever be pushed to a
+  # PRIVATE Hub repo (smohanty010620/sigq-runtime-private). See its Dockerfile.
+  runtime-private:
+    profiles: ["runtime-private"]
+    build:
+      context: ./config/docker/runtime-private
+      dockerfile: Dockerfile
+    image: smohanty010620/sigq-runtime-private:latest
+    command: ["true"]
+
   # Cloudflare Tunnel — Hub image has `tunnel run` baked in (official image only prints version).
   # Credentials are mounted, never baked. Enabled via --profile tunnel.
   cloudflared:

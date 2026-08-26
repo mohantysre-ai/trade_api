@@ -2,7 +2,8 @@
 REM Other machines: pull Hub images, seed ALL live desk JSON from iros-desk-state, then start.
 REM Seed runs before the API process so last_market_snapshot + sessions load on first boot.
 REM Does not rebuild from source. Run push-docker-hub.bat on the live desk first.
-REM If sigq-runtime-transfer.zip is present, restore credentials, Cloudflare and volumes first.
+REM If backend\.env doesn't exist yet, this looks like a fresh machine: pull the
+REM private sigq-runtime-private image first and restore credentials + volumes from it.
 set "PATH=%PATH%;C:\Program Files\Docker\Docker\resources\bin"
 where docker >nul 2>&1
 if errorlevel 1 (
@@ -21,16 +22,19 @@ if errorlevel 1 (
     exit /b 1
   )
 )
-if exist "%~dp0sigq-runtime-transfer.zip" (
-  echo [*] Found sigq-runtime-transfer.zip - restoring complete runtime...
-  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\import-runtime-bundle.ps1" "%~dp0sigq-runtime-transfer.zip"
+if not exist "%~dp0backend\.env" (
+  echo [*] backend\.env not found - restoring from private Hub image...
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0config\startup\restore-runtime-private.ps1"
   if errorlevel 1 (
-    echo [FAIL] Runtime transfer import failed. Nothing will be started.
+    echo [FAIL] Runtime restore from sigq-runtime-private failed. Run: docker login
+    echo        Nothing will be started.
     pause
     exit /b 1
   )
-  ren "%~dp0sigq-runtime-transfer.zip" "sigq-runtime-transfer.imported.zip"
-  echo [OK] Runtime imported. The ZIP was renamed so it cannot overwrite newer state later.
+  echo [OK] Runtime restored.
+) else (
+  echo [*] backend\.env already present - skipping runtime-private restore.
+  echo     Run restore-runtime-private.bat directly to force a resync from Hub.
 )
 call "%~dp0config\startup\start_docker.bat" --pull %*
 exit /b %ERRORLEVEL%

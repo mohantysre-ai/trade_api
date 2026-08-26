@@ -21,14 +21,44 @@ Only one machine should run the `iros-desk` tunnel and live desk state at a time
 
 ## Windows migration
 
+Default flow — `push-docker-hub.bat` / `start-from-hub.bat` — no manual file copy:
+
 On the source machine:
+
+```
+push-docker-hub.bat
+```
+
+This builds and pushes the app images plus a private runtime image,
+`smohanty010620/sigq-runtime-private`, containing `backend/.env`, the Cloudflare
+tunnel credential, and a snapshot of the `sigq_iros-*` volumes. That Hub repo must
+be created as **Private** on hub.docker.com before the first push — Hub creates a
+repo as Public by default on first push otherwise, which would expose the secrets.
+
+On the destination:
+
+```
+git clone https://github.com/mohantysre-ai/trade_api.git
+cd trade_api
+start-from-hub.bat
+```
+
+`start-from-hub.bat` detects a missing `backend\.env`, pulls
+`sigq-runtime-private`, restores the secrets and volumes from it, then starts the
+stack — `docker login` to an account with pull access to that private repo is the
+only prerequisite. Run `restore-runtime-private.bat` directly to force a resync
+from Hub on a machine that already has `backend\.env`.
+
+Manual, encrypted-file alternative (no Docker Hub involved) — useful for an
+air-gapped transfer or if you'd rather not put secrets in any registry:
 
 ```powershell
 cd D:\trade_api
 .\scripts\export-runtime-bundle.ps1
 ```
 
-The generated ZIP contains live secrets. Transfer it through an encrypted channel and delete it after import.
+The generated ZIP contains live secrets. Transfer it through an encrypted channel
+and delete it after import.
 
 On the destination:
 
