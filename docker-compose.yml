@@ -1,4 +1,5 @@
 # Alphix / IROS Terminal — production compose stack
+name: sigq
 # Hub images (same on every machine): smohanty010620/iros-market-api, iros-frontend, cloudflared, iros-desk-state
 # iros-desk-state is a JSON snapshot image (Hub has no volumes). Packed by push-docker-hub.bat.
 #
@@ -21,6 +22,7 @@ services:
     image: smohanty010620/iros-market-api:latest
     container_name: iros-market-api
     restart: unless-stopped
+    init: true
     env_file:
       - ./backend/.env
     environment:
@@ -67,8 +69,13 @@ services:
       FIXED_PLAN_FILE: /app/state/fixed_trade_plan.json
       ALERT_HISTORY_FILE: /app/state/alert_history.json
       INTRADAY_SESSION_FILE: /app/state/intraday_session.json
+      INDEX_OPTIONS_RADAR_FILE: /app/state/index_options_radar.json
+      INDEX_OPTIONS_OI_BASELINE_FILE: /app/state/index_options_oi_baseline.json
+      INDEX_OPTIONS_CANDLE_CACHE_FILE: /app/state/index_options_candles.json
+      INDEX_OPTIONS_PAPER_BOOK_FILE: /app/state/index_options_paper_book.json
+      INDEX_OPTIONS_STREAM_ENABLED: "1"
     ports:
-      - "8000:8000"
+      - "${SIGQ_BIND_ADDRESS:-127.0.0.1}:8000:8000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -99,6 +106,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     restart: unless-stopped
+    init: true
     env_file:
       - ./backend/.env
     environment:
@@ -121,7 +129,7 @@ services:
         "8001",
       ]
     ports:
-      - "8001:8001"
+      - "${SIGQ_BIND_ADDRESS:-127.0.0.1}:8001:8001"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -148,6 +156,7 @@ services:
     image: smohanty010620/iros-frontend:latest
     container_name: iros-frontend
     restart: unless-stopped
+    init: true
     environment:
       MARKET_API_URL: "http://market-api:8000"
       NEXT_PUBLIC_BACKEND_URL: "http://localhost:8000"
@@ -157,7 +166,7 @@ services:
       FRONTEND_WORKERS: "6"
       TZ: Asia/Kolkata
     ports:
-      - "3000:3000"
+      - "${SIGQ_BIND_ADDRESS:-127.0.0.1}:3000:3000"
     depends_on:
       market-api:
         condition: service_healthy
@@ -193,9 +202,12 @@ services:
     image: smohanty010620/cloudflared:latest
     container_name: iros-cloudflared
     restart: unless-stopped
+    init: true
     volumes:
       - ./config/cloudflare/config.docker.yml:/etc/cloudflared/config.yml:ro
       - ./config/cloudflare/credentials.json:/etc/cloudflared/credentials.json:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       frontend:
         condition: service_healthy

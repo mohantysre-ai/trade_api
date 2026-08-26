@@ -71,6 +71,10 @@ docker-refresh.bat --pool "Nifty 500"
 Or use the UI **Refresh** button at http://localhost:3000.
 ## Other machine / Hub pull
 
+For a complete cross-machine migration—including secrets, Cloudflare credentials,
+paper books, Index Options caches and all named-volume state—use
+[`docs/PORTABLE_DEPLOYMENT.md`](docs/PORTABLE_DEPLOYMENT.md).
+
 On the build PC after image changes:
 
 ```bat

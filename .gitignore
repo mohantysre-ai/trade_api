@@ -8,6 +8,8 @@ backend/app/services/last_market_snapshot.json
 *.log
 logs/
 *.log.*
+!.env.example
+!backend/.env.example
 config/cloudflare/credentials.json
 config/docker/desk-state/seed/*.json
 config/docker/desk-state/seed/state/
