@@ -32,6 +32,18 @@ def test_contract_resolution_normalizes_angel_paise_strike():
     assert future["symbol"].endswith("FUT")
 
 
+def test_sensex_resolution_does_not_select_sensex50_future():
+    rows = _master("SENSEX", "BFO") + [
+        {"token": "bad", "symbol": "SENSEX5026AUGFUT", "name": "SENSEX50",
+         "expiry": "01JAN2098", "strike": "-1", "lotsize": "10",
+         "instrumenttype": "FUTIDX", "exch_seg": "BFO"},
+    ]
+    _, _, future = _contracts(rows, INDEXES[3], 77_750, today=date(2026, 8, 26))
+    assert future is not None
+    assert future["name"] == "SENSEX"
+    assert future["token"] != "bad"
+
+
 class FakeClient:
     def fetch_quote(self, exchange, symbol, token):
         return {"ltp": 25_050, "close": 25_000}
