@@ -30,8 +30,10 @@ _MASTER_LOCK = threading.Lock()
 _MASTER_CACHE: tuple[float, list[dict[str, Any]]] = (0.0, [])
 _OPTION_LOCK = threading.Lock()
 _OI_BASELINE_LOCK = threading.Lock()
+_CANDLE_CACHE_LOCK = threading.Lock()
 _OPTION_CACHE: tuple[float, dict[str, Any]] = (0.0, {})
 _RADAR_REFRESH_LOCK = threading.Lock()
+_CANDLE_PRIORITY_OFFSET = 0
 
 # A transparent fallback when an official weight file has not yet been attached
 # to the market snapshot. Values are relative leader weights, not claimed as the
@@ -309,26 +311,37 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
         # Seed EMA20 from recent history while ORB/direction remains restricted
         # to the current IST session. Angel candle history is per token, not a
         # multi-symbol batch endpoint.
-        history_start = datetime.combine(now_ist.date() - timedelta(days=7), dt_time(9, 15), tzinfo=IST_ZONE)
+        cached_candles = _merge_cached_candles(key, [])
+        cached_times = [stamp for row in cached_candles if (stamp := parse_candle_ts(row[0])) is not None]
+        cached_latest = max(cached_times, default=None)
+        history_start = (
+            cached_latest.astimezone(IST_ZONE) - timedelta(minutes=10)
+            if cached_latest
+            else datetime.combine(now_ist.date() - timedelta(days=7), dt_time(9, 15), tzinfo=IST_ZONE)
+        )
         candles, candle_error = _fetch_candles_with_retry(
-            client, config["exchange"], config["spotToken"], history_start, now_ist,
+            client, config["exchange"], config["spotToken"], history_start, now_ist, attempts=1,
         )
         structure_source = "INDEX_SPOT"
         if not candles and future:
             candles, future_error = _fetch_candles_with_retry(
-                client, str(future.get("exch_seg") or config["segment"]), str(future.get("token") or ""), history_start, now_ist,
+                client, str(future.get("exch_seg") or config["segment"]), str(future.get("token") or ""), history_start, now_ist, attempts=1,
             )
             if candles:
                 structure_source = "INDEX_FUTURES_PROXY"
+                candle_error = None
             elif future_error:
                 candle_error = f"SPOT:{candle_error}; FUTURE:{future_error}"
+        candles = _merge_cached_candles(key, candles)
+        if candles and candle_error:
+            candle_error = f"LIVE_REFRESH:{candle_error}; USING_PERSISTED_CACHE"
         structure = walk_forward_structure(candles, session_date=now_ist.date()) if candles else index_structure_from_candles([], session_date=now_ist.date())
         return key, {
             "source": "ANGEL_ONE", "status": "LIVE" if chain else "DATA_INCOMPLETE",
             "fetchedAt": datetime.now(timezone.utc).isoformat(), "spot": spot, "spotClose": _float(spot_quote.get("close")),
             "expiry": expiry.isoformat(), "chain": chain,
             "structure": {**structure, "source": structure_source},
-            "candleStatus": "LIVE" if candles else "SOURCE_UNAVAILABLE",
+            "candleStatus": ("CACHED" if candles and candle_error else "LIVE") if candles else "SOURCE_UNAVAILABLE",
             "candleError": candle_error,
             "future": ({"symbol": future.get("symbol"), "ltp": _float((future_quote or {}).get("ltp")),
                         "close": _float((future_quote or {}).get("close")),
@@ -347,9 +360,15 @@ def fetch_angel_index_option_snapshot(client: Any, *, master: list[dict[str, Any
     use. Parallel submits on the same client race login, reset, and in-flight
     quotes.
     """
+    global _CANDLE_PRIORITY_OFFSET
     rows = master if master is not None else load_angel_scrip_master()
     output: dict[str, Any] = {}
-    for config in INDEXES:
+    # Rotate the first historical-candle request. If Angel has opened its global
+    # AB1021 circuit, NIFTY must not monopolise every recovery window.
+    offset = _CANDLE_PRIORITY_OFFSET % len(INDEXES)
+    _CANDLE_PRIORITY_OFFSET += 1
+    ordered = INDEXES[offset:] + INDEXES[:offset]
+    for config in ordered:
         key, payload = _fetch_one_index(client, rows, config)
         output[key] = payload
     return {"source": "ANGEL_ONE", "fetchedAt": datetime.now(timezone.utc).isoformat(), "indices": output}
@@ -367,6 +386,37 @@ def oi_baseline_path() -> Path:
     if env:
         return Path(env)
     return market_snapshot_path().with_name("index_options_oi_baseline.json")
+
+
+def candle_cache_path() -> Path:
+    env = (os.environ.get("INDEX_OPTIONS_CANDLE_CACHE_FILE") or "").strip()
+    if env:
+        return Path(env)
+    return market_snapshot_path().with_name("index_options_candles.json")
+
+
+def _merge_cached_candles(key: str, fresh: list[list[Any]]) -> list[list[Any]]:
+    """Persist bounded per-index history so an Angel circuit cannot erase structure."""
+    with _CANDLE_CACHE_LOCK:
+        try:
+            stored = load_json_with_fallback(candle_cache_path())
+        except (FileNotFoundError, ValueError, TypeError):
+            stored = {}
+        if not isinstance(stored, dict):
+            stored = {}
+        indices = stored.setdefault("indices", {})
+        series = indices.get(key) or []
+        merged: dict[str, list[Any]] = {}
+        for row in [*series, *fresh]:
+            if isinstance(row, list) and len(row) >= 5 and parse_candle_ts(row[0]):
+                merged[str(row[0])] = row
+        floor = datetime.min.replace(tzinfo=timezone.utc)
+        ordered = sorted(merged.values(), key=lambda row: parse_candle_ts(row[0]) or floor)[-1500:]
+        if fresh:
+            stored["updatedAt"] = datetime.now(timezone.utc).isoformat()
+            indices[key] = ordered
+            atomic_write_json(candle_cache_path(), stored)
+        return ordered
 
 
 def _apply_oi_baselines(option_data: dict[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
