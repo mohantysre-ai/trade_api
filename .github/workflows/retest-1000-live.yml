@@ -1,0 +1,49 @@
+name: Retest rebuilt production 1000 concurrency
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/retest-1000-live.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      LOAD_BASE_URL: https://sigq.in
+      LOAD_REQUEST_TIMEOUT: '20'
+      LOAD_CONNECT_TIMEOUT: '8'
+      LOAD_MAX_ERROR_RATE: '0.02'
+      LOAD_MAX_P95_MS: '2500'
+      LOAD_MAX_P99_MS: '6000'
+      LOAD_MIN_RPS_1000: '75'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install load-test dependency
+        run: python -m pip install aiohttp
+      - name: Verify cacheable live route
+        run: |
+          set -euxo pipefail
+          for i in 1 2 3; do
+            curl -sS --max-time 25 -D /tmp/h -o /tmp/b https://sigq.in/api/market-data.csv
+            echo "--- cache probe $i ---"
+            grep -Ei '^(HTTP/|server:|cf-cache-status:|age:|cache-control:|x-iros-market-cache:|content-encoding:)' /tmp/h || true
+            wc -c /tmp/b
+            sleep 1
+          done
+      - name: Run staged 50 to 1000 concurrent client test
+        run: python performance/load_test_1000.py
+      - name: Print report
+        if: always()
+        run: if [ -f load-test-report.json ]; then cat load-test-report.json; fi
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sigq-rebuilt-load-test-1000-report
+          path: load-test-report.json
+          if-no-files-found: warn
