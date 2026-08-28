@@ -1,0 +1,45 @@
+name: Apply main live news redesign
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-live-news-redesign.yml'
+      - 'scripts/redesign_live_news.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch only page.tsx NewsFeedPanel sidebar
+        run: python3 scripts/redesign_live_news.py
+
+      - name: Install frontend dependencies
+        working-directory: iros-terminal
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: iros-terminal
+        run: npm run build
+
+      - name: Commit compiled redesign to main
+        run: |
+          if git diff --quiet -- iros-terminal/app/page.tsx; then
+            echo 'No page.tsx change to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add iros-terminal/app/page.tsx
+          git commit -m 'Redesign main dashboard live news intelligence feed'
+          git push origin HEAD:main
