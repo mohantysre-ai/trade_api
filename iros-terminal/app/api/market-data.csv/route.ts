@@ -12,45 +12,6 @@ type MarketEdgeState = { cache: Map<string, CacheEntry>; inFlight: Map<string, P
 const globalState = globalThis as typeof globalThis & { __irosMarketEdgeState?: MarketEdgeState };
 const state = globalState.__irosMarketEdgeState ??= { cache: new Map(), inFlight: new Map() };
 
-const PUBLIC_QUOTE_KEYS = [
-  "ticker",
-  "name",
-  "capSize",
-  "ltp",
-  "ltpRaw",
-  "delta",
-  "state",
-  "score",
-  "verdict",
-  "volume",
-  "open",
-  "high",
-  "low",
-  "close",
-  "promoter_holding_pct",
-  "passes_quality_filters",
-  "bulk_deal_value_cr",
-  "bulk_deal_signal",
-  "deskIcSummary",
-] as const;
-
-function slimQuote(value: unknown): unknown {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-  const source = value as JsonRecord;
-  const quote: JsonRecord = {};
-  for (const key of PUBLIC_QUOTE_KEYS) {
-    if (source[key] !== undefined) quote[key] = source[key];
-  }
-  return quote;
-}
-
-function slimQuoteMap(value: unknown): unknown {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-  return Object.fromEntries(
-    Object.entries(value as JsonRecord).map(([ticker, quote]) => [ticker, slimQuote(quote)]),
-  );
-}
-
 function slimDashboardPayload(data: unknown): unknown {
   if (!data || typeof data !== "object" || Array.isArray(data)) return data;
   const source = data as JsonRecord;
@@ -61,11 +22,12 @@ function slimDashboardPayload(data: unknown): unknown {
   delete slim.tickerNewsByTicker;
   delete slim.deskIcByTicker;
 
-  // stockQuotes is a fast lookup map in the browser. Keep the complete ticker
-  // coverage, but strip nested research/intraday payload duplicated elsewhere.
-  if (slim.stockQuotes) slim.stockQuotes = slimQuoteMap(slim.stockQuotes);
+  // stockQuotes duplicates rows already present in stocks. The browser rebuilds
+  // the lookup map client-side after download, cutting wire size substantially
+  // without changing any deterministic trading or quote values.
+  delete slim.stockQuotes;
 
-  slim.publicSnapshotMode = "COMPACT_LAZY_DETAILS_LIGHT_QUOTES";
+  slim.publicSnapshotMode = "COMPACT_LAZY_DETAILS_CLIENT_QUOTE_MAP";
   return slim;
 }
 
@@ -79,8 +41,8 @@ function reply(data: unknown, stateName: string, status = 200) {
       "x-iros-public-snapshot": "compact",
       "x-iros-payload-bytes": String(Buffer.byteLength(body)),
       "cache-control": "public, max-age=2, stale-while-revalidate=30, stale-if-error=60",
-      "cdn-cache-control": "public, max-age=14400, stale-while-revalidate=60, stale-if-error=120",
-      "cloudflare-cdn-cache-control": "public, max-age=14400, stale-while-revalidate=60, stale-if-error=120",
+      "cdn-cache-control": "public, max-age=5, stale-while-revalidate=60, stale-if-error=120",
+      "cloudflare-cdn-cache-control": "public, max-age=5, stale-while-revalidate=60, stale-if-error=120",
       "x-content-type-options": "nosniff",
     },
   });
