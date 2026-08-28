@@ -28,6 +28,8 @@ jobs:
           python -m pip install -q pytest pytest-asyncio
           python -m pip install -q -r backend/requirements.txt || true
       - name: Run ticker news tests
+        env:
+          PYTHONPATH: backend
         run: |
           python -m pytest -q backend/tests/test_ticker_news_evidence_contract.py backend/tests/test_ticker_news_sources.py
       - name: Commit applied fix
