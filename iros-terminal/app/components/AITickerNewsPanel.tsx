@@ -140,6 +140,7 @@ export default function AITickerNewsPanel({
     acc[item.tone] += 1;
     return acc;
   }, { Bullish: 0, Bearish: 0, Neutral: 0 }), [headlines]);
+  const hasHeadlineSentiment = headlines.length > 0;
   const visibleHeadlines = useMemo(() => headlines.filter((item) =>
     (toneFilter === "All" || item.tone === toneFilter) && (sourceFilter === "All" || item.source === sourceFilter)
   ), [headlines, toneFilter, sourceFilter]);
@@ -215,9 +216,9 @@ export default function AITickerNewsPanel({
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-2">
               {(["Bullish", "Bearish", "Neutral"] as Tone[]).map((tone) => (
-                <button key={tone} onClick={() => setToneFilter(toneFilter === tone ? "All" : tone)} className={`relative overflow-hidden rounded-xl border p-2 text-left transition duration-300 hover:-translate-y-0.5 motion-reduce:transform-none ${toneFilter === tone ? toneClasses(tone) : "border-white/[0.06] bg-white/[0.025] text-slate-400 hover:border-white/10 hover:bg-white/[0.045]"}`}>
+                <button key={tone} onClick={() => hasHeadlineSentiment && setToneFilter(toneFilter === tone ? "All" : tone)} disabled={!hasHeadlineSentiment} className={`relative overflow-hidden rounded-xl border p-2 text-left transition duration-300 hover:-translate-y-0.5 motion-reduce:transform-none ${toneFilter === tone ? toneClasses(tone) : "border-white/[0.06] bg-white/[0.025] text-slate-400 hover:border-white/10 hover:bg-white/[0.045]"}`}>
                   <div className="text-[7px] font-black uppercase tracking-[0.16em] opacity-70">{tone}</div>
-                  <div className="mt-1 flex items-end justify-between"><span className="text-lg font-black tabular-nums leading-none">{toneCounts[tone]}</span><span className={`mb-0.5 h-1.5 w-1.5 rounded-full ${tone === "Bullish" ? "bg-emerald-400" : tone === "Bearish" ? "bg-rose-400" : "bg-slate-400"}`} /></div>
+                  <div className="mt-1 flex items-end justify-between"><span className="text-lg font-black tabular-nums leading-none">{hasHeadlineSentiment ? toneCounts[tone] : "—"}</span><span className={`mb-0.5 h-1.5 w-1.5 rounded-full ${tone === "Bullish" ? "bg-emerald-400" : tone === "Bearish" ? "bg-rose-400" : "bg-slate-400"}`} /></div>
                 </button>
               ))}
             </div>
