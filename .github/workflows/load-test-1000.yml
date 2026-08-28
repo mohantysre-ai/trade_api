@@ -1,5 +1,6 @@
 name: Production load test 1000 concurrency
 
+# Authorized read-only capacity test for sigq.in.
 on:
   workflow_dispatch:
   push:
