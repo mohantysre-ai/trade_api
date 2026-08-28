@@ -1562,6 +1562,88 @@ def _payload_data_date(payload: dict[str, Any] | None = None) -> str:
     return _ist_now().date().isoformat()
 
 
+def _snapshot_quote_age_seconds(payload: dict[str, Any] | None) -> int | None:
+    if not isinstance(payload, dict):
+        return None
+    iso = payload.get("updatedAt") or payload.get("asOf")
+    if not iso:
+        return None
+    try:
+        stamp = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        return max(0, int((datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)).total_seconds()))
+    except Exception:
+        return None
+
+
+def _snapshot_needs_live_refresh(payload: dict[str, Any] | None, *, stale_sec: int = 900) -> bool:
+    """True when RTH quotes are from a prior IST date or older than ``stale_sec``."""
+    if not isinstance(payload, dict) or not payload:
+        return True
+    try:
+        from .trade_outcome import _is_market_open
+
+        if not _is_market_open():
+            return False
+    except Exception:
+        return False
+    today = _ist_now().date().isoformat()
+    data_date = _payload_data_date(payload)
+    if data_date and data_date != today:
+        return True
+    age = _snapshot_quote_age_seconds(payload)
+    return age is None or age > stale_sec
+
+
+_LIVE_REFRESH_KICK_LOCK = threading.Lock()
+_LIVE_REFRESH_KICKED_AT = 0.0
+_LIVE_REFRESH_KICK_GAP_SEC = float(os.environ.get("DESK_LIVE_REFRESH_KICK_GAP_SEC", "30"))
+
+
+def kick_background_live_refresh(*, reason: str) -> None:
+    """Coalesce async snapshot refresh for prefer-cache / read paths."""
+    global _LIVE_REFRESH_KICKED_AT
+    if not _snapshot_needs_live_refresh(_load_last_snapshot()):
+        return
+    now = time.monotonic()
+    if now - _LIVE_REFRESH_KICKED_AT < _LIVE_REFRESH_KICK_GAP_SEC:
+        return
+    if not _LIVE_REFRESH_KICK_LOCK.acquire(blocking=False):
+        return
+    _LIVE_REFRESH_KICKED_AT = now
+
+    def _run() -> None:
+        try:
+            run_scheduled_live_refresh(reason=reason)
+        except Exception:
+            logging.getLogger(__name__).exception("background live refresh failed (%s)", reason)
+        finally:
+            _LIVE_REFRESH_KICK_LOCK.release()
+
+    threading.Thread(target=_run, name=f"live-refresh-{reason}", daemon=True).start()
+
+
+def ensure_fresh_market_snapshot(
+    snapshot: dict[str, Any] | None = None,
+    *,
+    reason: str = "desk_breadth_refresh",
+) -> dict[str, Any]:
+    """Return the latest snapshot, refreshing synchronously when RTH data is stale."""
+    snap = dict(snapshot) if isinstance(snapshot, dict) else dict(_load_last_snapshot() or {})
+    if not _snapshot_needs_live_refresh(snap):
+        return snap
+    try:
+        result = run_scheduled_live_refresh(reason=reason)
+        if isinstance(result, dict) and result.get("success") is True:
+            fresh = _load_last_snapshot()
+            if isinstance(fresh, dict) and fresh:
+                return dict(fresh)
+    except Exception:
+        logging.getLogger(__name__).exception("synchronous live refresh failed (%s)", reason)
+    return snap
+
+
 def _apply_selection_meta(
     payload: dict[str, Any],
     *,
@@ -4031,21 +4113,30 @@ def build_market_payload(
     snapshot = _load_last_snapshot()
 
     if prefer_cache and snapshot:
-        # If preferring cache and a snapshot exists, return it immediately.
-        # The frontend can then decide to trigger an on-demand refresh if data is missing.
+        # First-paint path: serve persisted quotes as-is (real updatedAt / dataDate).
         snapshot = dict(snapshot)
         snapshot["isSnapshotFallback"] = True
-        snapshot["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        age_sec = _snapshot_quote_age_seconds(snapshot)
+        if age_sec is not None:
+            snapshot["snapshotAgeSeconds"] = age_sec
+        data_date = _payload_data_date(snapshot)
+        snapshot["snapshotDataDate"] = data_date
+        needs_refresh = _snapshot_needs_live_refresh(snapshot)
+        snapshot["liveRefreshPending"] = needs_refresh
         snapshot.setdefault("tickerNewsByTicker", {})
         if pool_name:
             snapshot["activePool"] = pool_name
-        # Prefer-cache is the SNAPSHOT first-paint path — do not block on RSS.
-        # Snapshot already carries news; live RSS can refresh via macros/on-demand.
+        if needs_refresh:
+            kick_background_live_refresh(reason="prefer_cache_stale")
         _apply_selection_meta(
             snapshot,
             mode="snapshot",
-            reason="Cache preferred. Serving the latest saved snapshot.",
-            data_date=_payload_data_date(snapshot),
+            reason=(
+                "Cache preferred. Quote age exposed; background live refresh queued."
+                if needs_refresh
+                else "Cache preferred. Serving the latest saved snapshot."
+            ),
+            data_date=data_date,
         )
         return _hydrate_ticker_intelligence_map(
             _hydrate_dhan_swing_picks(snapshot, prefer_persisted=True)
@@ -4070,7 +4161,10 @@ def build_market_payload(
             snapshot = dict(snapshot)
             snapshot["isSnapshotFallback"] = True
             snapshot["llmError"] = snapshot.get("llmError")
-            snapshot["updatedAt"] = datetime.now(timezone.utc).isoformat()
+            age_sec = _snapshot_quote_age_seconds(snapshot)
+            if age_sec is not None:
+                snapshot["snapshotAgeSeconds"] = age_sec
+            snapshot["snapshotDataDate"] = _payload_data_date(snapshot)
             snapshot.setdefault("tickerNewsByTicker", {})
             if pool_name:
                 snapshot["activePool"] = pool_name
@@ -4542,7 +4636,7 @@ def create_app() -> FastAPI:
 
         def _compose() -> dict[str, Any]:
             return compose_live_index_options_radar(
-                dict(_load_last_snapshot() or {}),
+                ensure_fresh_market_snapshot(reason="index_options_compose"),
                 live=live,
                 client=AngelOneClient(),
             )
@@ -4564,15 +4658,15 @@ def create_app() -> FastAPI:
             closed["huntActive"] = False
             closed["limits"]["huntMode"] = "SESSION_CLOSED"
             return closed
+        if _snapshot_needs_live_refresh(_load_last_snapshot()):
+            return _compose()
         if cached:
             age_ok = load_persisted_radar(max_age_seconds=15.0) is not None
+            recent = load_persisted_radar(max_age_seconds=90.0) is not None
+            if not age_ok and not recent:
+                return _compose()
             if not age_ok:
                 background_tasks.add_task(_refresh_bg)
-                # A complete radar refresh includes several independently fresh
-                # components. Keep serving the last durable decision while the
-                # asynchronous composer runs, and reserve STALE for genuinely
-                # old snapshots rather than every response older than 15s.
-                recent = load_persisted_radar(max_age_seconds=90.0) is not None
                 cached = {**cached, "cacheStatus": "REFRESHING" if recent else "STALE"}
             else:
                 cached = {**cached, "cacheStatus": "HIT"}
@@ -5284,14 +5378,27 @@ def create_app() -> FastAPI:
 
     def _persist_books_on_boot() -> None:
         try:
-            from .intraday_session_engine import refresh_session_state
+            if _snapshot_needs_live_refresh(_load_last_snapshot()):
+                run_scheduled_live_refresh(reason="desk_boot_cold_start")
+        except Exception:
+            logging.getLogger(__name__).exception("boot live snapshot refresh failed")
+        try:
+            from .intraday_session_engine import (
+                _invalidate_session_response_cache,
+                refresh_session_state,
+            )
 
+            _invalidate_session_response_cache()
             refresh_session_state()
         except Exception:
             logging.getLogger(__name__).exception("boot persist session JSON failed")
         try:
-            from .swing_session import refresh_swing_session_state
+            from .swing_session import (
+                _invalidate_swing_response_cache,
+                refresh_swing_session_state,
+            )
 
+            _invalidate_swing_response_cache()
             refresh_swing_session_state()
         except Exception:
             logging.getLogger(__name__).exception("boot persist swing session failed")

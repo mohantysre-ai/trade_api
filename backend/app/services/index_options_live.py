@@ -12,6 +12,7 @@ from .angel_index_options import (
     persist_radar,
     unavailable_provider_snapshot,
 )
+from .angel_one_feed import ensure_fresh_market_snapshot
 from .angel_index_stream import ANGEL_INDEX_STREAM
 from .dhan_scanx_options import apply_scanx_fallback
 from .index_options_engine import build_index_options_radar
@@ -36,7 +37,7 @@ def compose_live_index_options_radar(
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Build the live radar. Lemonn fills indexes still unusable after ScanX."""
-    book = dict(snapshot)
+    book = ensure_fresh_market_snapshot(snapshot, reason="index_options_breadth")
     option_data: dict[str, Any] | None = None
     if live:
         try:

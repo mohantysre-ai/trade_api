@@ -2630,23 +2630,16 @@ def _maybe_refresh_live_snapshot(*, reason: str) -> dict[str, Any]:
     Inline import: angel_one_feed imports this module for routes.
     """
     global _SNAP_REFRESH_LAST
+    from .angel_one_feed import _snapshot_needs_live_refresh
     from .angel_one_feed import run_scheduled_live_refresh
     from .trade_outcome import _is_market_open
 
     snap = load_market_snapshot()
     if not _is_market_open():
         return snap
-    snap_dt = _parse_iso(str(snap.get("updatedAt") or snap.get("asOf") or "") or None)
-    if snap_dt is not None:
-        age = max(
-            0.0,
-            (datetime.now(timezone.utc) - snap_dt.astimezone(timezone.utc)).total_seconds(),
-        )
-    else:
-        age = float(SNAPSHOT_STALE_SEC) + 1.0
-    now = time.monotonic()
-    if age <= SNAPSHOT_STALE_SEC:
+    if not _snapshot_needs_live_refresh(snap, stale_sec=SNAPSHOT_STALE_SEC):
         return snap
+    now = time.monotonic()
     if (now - _SNAP_REFRESH_LAST) < _SNAP_REFRESH_MIN_GAP_SEC:
         return snap
     try:
@@ -4530,6 +4523,8 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
         market_open_now = False
     if persist and market_open_now:
         snap = _maybe_refresh_live_snapshot(reason="intraday_replacement_hunt")
+    elif include_live and market_open_now:
+        snap = _maybe_refresh_live_snapshot(reason="intraday_session_read")
     quotes = snap.get("stockQuotes") or {}
     if market_open_now:
         regime = detect_regime(snap)
@@ -4751,18 +4746,17 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
         elif replacements_remaining <= 0:
             replacement_blocked_reason = "daily_replacement_cap"
             cash_held = True
-        elif persist:
-            if market_open_now:
-                try:
-                    long_p, short_p, replacement_hunt_source = _replacement_source_pools(
-                        {**session, "long": long_rows, "short": short_rows},
-                        snap,
-                    )
-                    hunt_pools = (long_p, short_p)
-                except Exception as exc:
-                    log.warning("replacement hunt pools failed: %s", exc)
-                    hunt_pools = None
-                    replacement_hunt_source = "lock_pool_error"
+        elif market_open_now:
+            try:
+                long_p, short_p, replacement_hunt_source = _replacement_source_pools(
+                    {**session, "long": long_rows, "short": short_rows},
+                    snap,
+                )
+                hunt_pools = (long_p, short_p)
+            except Exception as exc:
+                log.warning("replacement hunt pools failed: %s", exc)
+                hunt_pools = None
+                replacement_hunt_source = "lock_pool_error"
             try:
                 replacement_candidates = propose_replacements(
                     {
@@ -4777,6 +4771,8 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
                 )
                 for c in replacement_candidates:
                     c["huntSource"] = replacement_hunt_source
+                    if not persist:
+                        c["proposalOnly"] = True
                 if not replacement_candidates:
                     replacement_blocked_reason = "prefer_cash_no_qualified"
                     cash_held = True

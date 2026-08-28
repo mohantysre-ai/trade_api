@@ -861,13 +861,29 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
         strong_oi = (direction == "CALL" and oi_state == "LONG_BUILDUP") or (direction == "PUT" and oi_state == "SHORT_BUILDUP")
         secondary_oi = (direction == "CALL" and oi_state == "SHORT_COVERING") or (direction == "PUT" and oi_state == "LONG_UNWINDING")
         strong_breadth = breadth.get("aligned") is True and abs(_float(breadth.get("score")) or 0) >= 0.70
-        oi_aligned = True if strong_oi or (secondary_oi and strong_breadth) else False if direction and oi_state != "UNAVAILABLE" else None
         regime, vix = _vix_regime(market_snapshot)
         risk_reward = _contract_risk_reward(selected, structure, direction)
         expected_r = _float(risk_reward.get("expectedR"))
         chain_evidence = _chain_confirmation(chain, direction, selected)
         chain_aligned = chain_evidence.get("aligned")
-        structure_gate = True if direction else False if structure.get("status") == "NO_BREAKOUT" else None
+        bar_count = int(structure.get("barCount") or 0)
+        structure_status = str(structure.get("status") or "")
+        structure_warming = structure_status == "DATA_INCOMPLETE" or bar_count < 20
+        if direction:
+            structure_gate = True
+        elif structure_warming:
+            structure_gate = None
+        elif structure_status == "NO_BREAKOUT":
+            structure_gate = False
+        else:
+            structure_gate = None
+        oi_warming = oi_state in {"BASELINE_WARMING_UP", "UNAVAILABLE"}
+        if strong_oi or (secondary_oi and strong_breadth):
+            oi_aligned = True
+        elif direction and not oi_warming:
+            oi_aligned = False
+        else:
+            oi_aligned = None
         contract_gate = True if selected else False if direction and any(_float(item.get("delta")) is not None for item in chain) else None
         greeks_source = selected.get("greeksSource") if selected else None
         converted[key] = {

@@ -474,12 +474,17 @@ def _ensure_today_matrix_snapshot() -> tuple[bool, str]:
     global _SWING_MATRIX_REFRESH_AT
     snap = _read_json(_matrix_snapshot_path()) or {}
     ready, reason = _matrix_snapshot_ready_for_today(snap)
+    data_date_stale = _snapshot_data_date(snap) != _ist_today()
     age = _snapshot_age_sec(snap)
     quotes_stale = bool(_is_market_open() and (age is None or age > _SWING_MATRIX_REFRESH_TTL))
-    if ready and not quotes_stale:
+    if ready and not quotes_stale and not data_date_stale:
         return True, reason
     now = time.monotonic()
-    if _SWING_MATRIX_REFRESH_AT and now - _SWING_MATRIX_REFRESH_AT < _SWING_MATRIX_REFRESH_TTL:
+    if (
+        not data_date_stale
+        and _SWING_MATRIX_REFRESH_AT
+        and now - _SWING_MATRIX_REFRESH_AT < _SWING_MATRIX_REFRESH_TTL
+    ):
         if quotes_stale:
             return False, "MATRIX_QUOTES_STALE"
         if ready:

@@ -42,7 +42,7 @@ def test_invalid_session_date_raises():
     raise AssertionError("expected ValueError")
 
 
-def test_compose_applies_lemonn_after_scanx():
+def test_compose_applies_lemonn_after_scanx(monkeypatch):
     empty = {
         "indices": {
             "NIFTY": {"source": "ANGEL_ONE", "status": "SOURCE_UNAVAILABLE", "chain": []},
@@ -61,6 +61,10 @@ def test_compose_applies_lemonn_after_scanx():
             fetcher=lambda key, expiry: {"source": "LEMONN_FALLBACK", "status": "LIVE", "chain": [{"strike": 1}]},
         )
 
+    monkeypatch.setattr(
+        "app.services.index_options_live.ensure_fresh_market_snapshot",
+        lambda snapshot, **kwargs: dict(snapshot),
+    )
     result = compose_live_index_options_radar(
         {},
         live=True,
