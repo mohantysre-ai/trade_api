@@ -1,0 +1,40 @@
+name: Apply ticker news evidence contract
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-ticker-news-evidence-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-test-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Apply backend evidence fix
+        run: python scripts/fix_ticker_news_evidence_contract.py
+      - name: Verify source contract
+        run: |
+          grep -q 'def _enforce_evidence_contract' backend/app/services/ai_ticker_news.py
+          grep -q 'No verified recent headline for' backend/app/services/ai_ticker_news.py
+          grep -q 'f'"'"'{ticker} NSE when:{NEWS_LOOKBACK_DAYS}d'"'"'' backend/app/services/ai_ticker_news.py
+      - name: Run ticker news tests
+        run: |
+          python -m pip install -q -r backend/requirements.txt || true
+          pytest -q backend/tests/test_ticker_news_evidence_contract.py backend/tests/test_ticker_news_sources.py
+      - name: Commit applied fix
+        run: |
+          if git diff --quiet -- backend/app/services/ai_ticker_news.py; then
+            echo 'No source changes to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/app/services/ai_ticker_news.py
+          git commit -m 'Enforce ticker news headline evidence'
+          git push origin HEAD:main
