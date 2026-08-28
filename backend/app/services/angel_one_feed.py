@@ -1818,16 +1818,50 @@ def _hydrate_dhan_swing_picks(
     return payload
 
 
+_MARKET_SNAPSHOT_MEMORY_LOCK = threading.Lock()
+_MARKET_SNAPSHOT_MEMORY: dict[str, Any] | None = None
+_MARKET_SNAPSHOT_MEMORY_PATH: str | None = None
+_MARKET_SNAPSHOT_MEMORY_MTIME_NS: int | None = None
+
+
 def _load_last_snapshot() -> dict[str, Any] | None:
+    """Return the persisted snapshot without reparsing the same JSON per viewer.
+
+    The market collector writes snapshots independently.  The read path keys the
+    in-process cache by file path + nanosecond mtime, so a new deterministic
+    snapshot is observed immediately while thousands of readers share one parse.
+    """
     from .market_snapshot_store import readable_market_snapshot_path
+
+    global _MARKET_SNAPSHOT_MEMORY
+    global _MARKET_SNAPSHOT_MEMORY_PATH
+    global _MARKET_SNAPSHOT_MEMORY_MTIME_NS
 
     for path in (_snapshot_path(), readable_market_snapshot_path()):
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(payload, dict):
-                return _normalize_snapshot(payload)
+            stat = path.stat()
         except Exception:
             continue
+        path_key = str(path.resolve())
+        mtime_ns = int(stat.st_mtime_ns)
+        with _MARKET_SNAPSHOT_MEMORY_LOCK:
+            if (
+                _MARKET_SNAPSHOT_MEMORY is not None
+                and _MARKET_SNAPSHOT_MEMORY_PATH == path_key
+                and _MARKET_SNAPSHOT_MEMORY_MTIME_NS == mtime_ns
+            ):
+                return dict(_MARKET_SNAPSHOT_MEMORY)
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(payload, dict):
+                    continue
+                normalized = _normalize_snapshot(payload)
+                _MARKET_SNAPSHOT_MEMORY = normalized
+                _MARKET_SNAPSHOT_MEMORY_PATH = path_key
+                _MARKET_SNAPSHOT_MEMORY_MTIME_NS = mtime_ns
+                return dict(normalized)
+            except Exception:
+                continue
     return None
 
 

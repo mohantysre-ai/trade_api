@@ -1,46 +1,71 @@
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-const BACKEND_URL =
-  process.env.MARKET_API_URL ?? "http://127.0.0.1:8000";
+const BACKEND_URL = process.env.MARKET_API_URL ?? "http://127.0.0.1:8000";
+const CACHE_TTL_MS = Math.max(250, Number(process.env.MARKET_READ_CACHE_MS ?? 2000));
+const STALE_TTL_MS = Math.max(CACHE_TTL_MS, Number(process.env.MARKET_READ_STALE_MS ?? 30000));
+const BACKEND_TIMEOUT_MS = Math.max(1000, Number(process.env.MARKET_READ_BACKEND_TIMEOUT_MS ?? 8000));
+
+type CacheEntry = { data: unknown; expiresAt: number; staleUntil: number };
+const cache = new Map<string, CacheEntry>();
+const inFlight = new Map<string, Promise<unknown>>();
+
+function reply(data: unknown, state: string, status = 200) {
+  return NextResponse.json(data, {
+    status,
+    headers: {
+      "x-iros-market-cache": state,
+      "cache-control": "private, no-store, max-age=0",
+    },
+  });
+}
+
+async function fetchBackend(url: URL): Promise<unknown> {
+  const res = await fetch(url.toString(), {
+    cache: "no-store",
+    signal: AbortSignal.timeout(BACKEND_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(detail || `Backend HTTP ${res.status}`);
+  }
+  return res.json();
+}
 
 export async function GET(request: Request) {
+  const requestUrl = new URL(request.url);
+  const pool = requestUrl.searchParams.get("pool");
+  const prompt = requestUrl.searchParams.get("prompt");
+  const backendUrl = new URL(`${BACKEND_URL}/api/market-data`);
+  if (pool) backendUrl.searchParams.set("pool", pool);
+  if (prompt) backendUrl.searchParams.set("prompt", prompt);
+
+  // Custom prompts are not shared between users. Normal dashboard reads are.
+  const key = prompt ? `private:${crypto.randomUUID()}` : `pool:${pool ?? "default"}`;
+  const now = Date.now();
+  const cached = cache.get(key);
+  if (cached && now < cached.expiresAt) return reply(cached.data, "HIT");
+
   try {
-    const backendUrl = new URL(`${BACKEND_URL}/api/market-data`);
-    const requestUrl = new URL(request.url);
-    const pool = requestUrl.searchParams.get("pool");
-    const prompt = requestUrl.searchParams.get("prompt");
-    if (pool) {
-      backendUrl.searchParams.set("pool", pool);
+    let pending = inFlight.get(key);
+    const coalesced = Boolean(pending);
+    if (!pending) {
+      pending = fetchBackend(backendUrl);
+      inFlight.set(key, pending);
     }
-    if (prompt) {
-      backendUrl.searchParams.set("prompt", prompt);
-    }
-
-    const res = await fetch(backendUrl.toString(), {
-      cache: "no-store",
-      signal: AbortSignal.timeout(25_000),
+    const data = await pending;
+    cache.set(key, {
+      data,
+      expiresAt: Date.now() + CACHE_TTL_MS,
+      staleUntil: Date.now() + STALE_TTL_MS,
     });
-
-    if (!res.ok) {
-      const detail = await res.text();
-      return NextResponse.json(
-        { success: false, error: detail || `Backend HTTP ${res.status}` },
-        { status: 502 }
-      );
-    }
-
-    const data = await res.json();
-    return NextResponse.json(data);
+    return reply(data, coalesced ? "COALESCED" : "MISS");
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Backend unreachable";
-    return NextResponse.json(
-      {
-        success: false,
-        error: `${message}. Start the feed: cd backend && python angel_one_feed.py --serve`,
-      },
-      { status: 503 }
-    );
+    const stale = cache.get(key);
+    if (stale && Date.now() < stale.staleUntil) return reply(stale.data, "STALE");
+    const message = err instanceof Error ? err.message : "Backend unreachable";
+    return reply({ success: false, error: message }, "ERROR", 503);
+  } finally {
+    inFlight.delete(key);
   }
 }

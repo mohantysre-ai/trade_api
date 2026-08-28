@@ -163,7 +163,10 @@ services:
       NEXT_PUBLIC_MARKET_API_URL: ""
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
-      FRONTEND_WORKERS: "6"
+      FRONTEND_WORKERS: "1"
+      MARKET_READ_CACHE_MS: "2000"
+      MARKET_READ_STALE_MS: "30000"
+      MARKET_READ_BACKEND_TIMEOUT_MS: "8000"
       TZ: Asia/Kolkata
     ports:
       - "${SIGQ_BIND_ADDRESS:-127.0.0.1}:3000:3000"
