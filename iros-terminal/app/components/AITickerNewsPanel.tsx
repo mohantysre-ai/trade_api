@@ -200,10 +200,10 @@ export default function AITickerNewsPanel({
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {report?.generated_at && <span className="hidden text-[8px] tabular-nums text-slate-600 sm:inline">{relativeTime(report.generated_at)}</span>}
-            <button onClick={() => fetchNews(true)} disabled={loading || refreshing} title="Refresh news intelligence" className="grid h-7 w-7 place-items-center rounded-lg border border-white/[0.07] bg-white/[0.035] text-[12px] text-slate-400 transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-cyan-300/10 hover:text-cyan-200 disabled:opacity-40 motion-reduce:transform-none">
+            <button onClick={() => fetchNews(true)} disabled={loading || refreshing} title="Refresh news intelligence" className="grid h-7 w-7 place-items-center rounded-lg border border-slate-200 bg-slate-50 text-[12px] text-slate-600 transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-800 disabled:opacity-40 motion-reduce:transform-none dark:border-white/[0.07] dark:bg-white/[0.035] dark:text-slate-400 dark:hover:border-cyan-300/30 dark:hover:bg-cyan-300/10 dark:hover:text-cyan-200">
               <span className={refreshing ? "animate-spin motion-reduce:animate-none" : ""}>↻</span>
             </button>
-            {onClose && <button onClick={onClose} title="Close" className="grid h-7 w-7 place-items-center rounded-lg border border-white/[0.05] text-slate-500 transition hover:border-white/10 hover:bg-white/[0.05] hover:text-slate-200">×</button>}
+            {onClose && <button onClick={onClose} title="Close" className="grid h-7 w-7 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-800 dark:border-white/[0.05] dark:hover:border-white/10 dark:hover:bg-white/[0.05] dark:hover:text-slate-200">×</button>}
           </div>
         </div>
 
@@ -233,7 +233,7 @@ export default function AITickerNewsPanel({
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-2">
               {(["Bullish", "Bearish", "Neutral"] as Tone[]).map((tone) => (
-                <button key={tone} onClick={() => hasHeadlineSentiment && setToneFilter(toneFilter === tone ? "All" : tone)} disabled={!hasHeadlineSentiment} className={`relative overflow-hidden rounded-xl border p-2 text-left transition duration-300 hover:-translate-y-0.5 motion-reduce:transform-none ${toneFilter === tone ? toneClasses(tone) : "border-white/[0.06] bg-white/[0.025] text-slate-400 hover:border-white/10 hover:bg-white/[0.045]"}`}>
+                <button key={tone} onClick={() => hasHeadlineSentiment && setToneFilter(toneFilter === tone ? "All" : tone)} disabled={!hasHeadlineSentiment} className={`relative overflow-hidden rounded-xl border p-2 text-left transition duration-300 hover:-translate-y-0.5 motion-reduce:transform-none ${toneFilter === tone ? toneClasses(tone) : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-slate-100 dark:border-white/[0.06] dark:bg-white/[0.025] dark:text-slate-400 dark:hover:border-white/10 dark:hover:bg-white/[0.045]"}`}>
                   <div className="text-[7px] font-black uppercase tracking-[0.16em] opacity-70">{tone}</div>
                   <div className="mt-1 flex items-end justify-between"><span className="text-lg font-black tabular-nums leading-none">{hasHeadlineSentiment ? toneCounts[tone] : "—"}</span><span className={`mb-0.5 h-1.5 w-1.5 rounded-full ${tone === "Bullish" ? "bg-emerald-400" : tone === "Bearish" ? "bg-rose-400" : "bg-slate-400"}`} /></div>
                 </button>
@@ -242,14 +242,14 @@ export default function AITickerNewsPanel({
 
             {sources.length > 0 && (
               <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {["All", ...sources].map((source) => <button key={source} onClick={() => setSourceFilter(source)} className={`whitespace-nowrap rounded-full border px-2 py-1 text-[8px] font-bold transition ${sourceFilter === source ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-200" : "border-white/[0.06] bg-white/[0.02] text-slate-500 hover:border-white/10 hover:text-slate-300"}`}>{source === "All" ? "All sources" : source}</button>)}
+                {["All", ...sources].map((source) => <button key={source} onClick={() => setSourceFilter(source)} className={`whitespace-nowrap rounded-full border px-2 py-1 text-[8px] font-bold transition ${sourceFilter === source ? "border-cyan-600/30 bg-cyan-50 text-cyan-800 dark:border-cyan-300/30 dark:bg-cyan-300/10 dark:text-cyan-200" : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:text-slate-800 dark:border-white/[0.06] dark:bg-white/[0.02] dark:text-slate-500 dark:hover:border-white/10 dark:hover:text-slate-300"}`}>{source === "All" ? "All sources" : source}</button>)}
               </div>
             )}
 
             {diagnostics.length > 0 && (
-              <div className="flex items-center justify-between rounded-lg border border-white/[0.05] bg-black/10 px-2.5 py-2 text-[8px] text-slate-500">
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-[8px] text-slate-600 dark:border-white/[0.05] dark:bg-black/10 dark:text-slate-500">
                 <span className="flex items-center gap-1.5"><RadarPulse healthy={failedSources.length === 0} /> {healthySources.length}/{diagnostics.length} sources responding</span>
-                {failedSources.length > 0 && <span className="text-amber-300/80">{failedSources.length} degraded</span>}
+                {failedSources.length > 0 && <span className="text-amber-700 dark:text-amber-300/80">{failedSources.length} degraded</span>}
               </div>
             )}
 
@@ -260,11 +260,11 @@ export default function AITickerNewsPanel({
                   <a key={`${headline.url}-${index}`} href={headline.url} target="_blank" rel="noopener noreferrer" className="group/item relative block overflow-hidden rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300 hover:bg-cyan-50 hover:shadow-md dark:border-white/[0.055] dark:bg-white/[0.025] dark:shadow-none dark:hover:border-cyan-300/20 dark:hover:bg-cyan-300/[0.045] dark:hover:shadow-[0_10px_30px_rgba(6,182,212,.06)] motion-reduce:transform-none">
                     <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-cyan-300/40 to-transparent opacity-0 transition-opacity group-hover/item:opacity-100" />
                     <div className="flex gap-2.5">
-                      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-white/[0.07] bg-slate-950/80 text-[8px] font-black text-cyan-300/75 shadow-inner">{sourceMark(headline.source)}</div>
+                      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-slate-200 bg-cyan-50 text-[8px] font-black text-cyan-800 shadow-inner dark:border-white/[0.07] dark:bg-slate-950/80 dark:text-cyan-300/75">{sourceMark(headline.source)}</div>
                       <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[7px] font-bold uppercase tracking-wider text-slate-600"><span className="text-cyan-300/70">{headline.source}</span><span>•</span><span>{relativeTime(headline.published_at)}</span>{headline.relevance && <><span>•</span><span>{headline.relevance}</span></>}</div>
+                        <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[7px] font-bold uppercase tracking-wider text-slate-600"><span className="text-cyan-700 dark:text-cyan-300/70">{headline.source}</span><span>•</span><span>{relativeTime(headline.published_at)}</span>{headline.relevance && <><span>•</span><span>{headline.relevance}</span></>}</div>
                         <p className="line-clamp-2 text-[10px] font-semibold leading-relaxed text-slate-800 transition-colors group-hover/item:text-slate-950 dark:text-slate-200 dark:group-hover/item:text-white">{headline.title}</p>
-                        <div className="mt-2 flex items-center justify-between"><span className={`rounded border px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider ${toneClasses(headline.tone)}`}>{headline.tone}</span><span className="translate-x-1 text-[10px] text-slate-700 opacity-0 transition-all group-hover/item:translate-x-0 group-hover/item:text-cyan-300/80 group-hover/item:opacity-100 motion-reduce:transform-none">↗</span></div>
+                        <div className="mt-2 flex items-center justify-between"><span className={`rounded border px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider ${toneClasses(headline.tone)}`}>{headline.tone}</span><span className="translate-x-1 text-[10px] text-slate-500 opacity-0 transition-all group-hover/item:translate-x-0 group-hover/item:text-cyan-700 group-hover/item:opacity-100 motion-reduce:transform-none dark:group-hover/item:text-cyan-300/80">↗</span></div>
                       </div>
                     </div>
                   </a>
@@ -298,7 +298,7 @@ export default function AITickerNewsPanel({
             {report.raw_articles && report.raw_articles.length > 0 && (
               <div>
                 <button onClick={() => setShowRaw(!showRaw)} className="flex w-full items-center justify-between rounded-lg border border-white/[0.05] bg-white/[0.018] px-2.5 py-2 text-[8px] font-bold uppercase tracking-wider text-slate-500 transition hover:border-white/10 hover:text-slate-300"><span>Source ledger · {report.raw_articles.length} scraped</span><span className={`transition-transform ${showRaw ? "rotate-45" : ""}`}>+</span></button>
-                {showRaw && <div className="mt-2 max-h-64 space-y-1.5 overflow-y-auto pr-1 [scrollbar-color:rgba(100,116,139,.35)_transparent]">{report.raw_articles.map((article, index) => <a key={`${article.url}-${index}`} href={article.url} target="_blank" rel="noopener noreferrer" className="block rounded-lg border border-white/[0.045] bg-black/10 px-2.5 py-2 transition hover:border-cyan-300/15 hover:bg-cyan-300/[0.03]"><div className="mb-1 flex items-center gap-1.5 text-[7px] uppercase tracking-wider text-slate-600"><span className="text-cyan-300/60">{article.source}</span><span>•</span><span>{relativeTime(article.published_at)}</span></div><p className="line-clamp-2 text-[9px] font-medium leading-relaxed text-slate-400">{article.title}</p></a>)}</div>}
+                {showRaw && <div className="mt-2 max-h-64 space-y-1.5 overflow-y-auto pr-1 [scrollbar-color:rgba(100,116,139,.35)_transparent]">{report.raw_articles.map((article, index) => <a key={`${article.url}-${index}`} href={article.url} target="_blank" rel="noopener noreferrer" className="block rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 transition hover:border-cyan-300 hover:bg-cyan-50 dark:border-white/[0.045] dark:bg-black/10 dark:hover:border-cyan-300/15 dark:hover:bg-cyan-300/[0.03]"><div className="mb-1 flex items-center gap-1.5 text-[7px] uppercase tracking-wider text-slate-600"><span className="text-cyan-700 dark:text-cyan-300/60">{article.source}</span><span>•</span><span>{relativeTime(article.published_at)}</span></div><p className="line-clamp-2 text-[9px] font-medium leading-relaxed text-slate-600 dark:text-slate-400">{article.title}</p></a>)}</div>}
               </div>
             )}
           </div>
