@@ -1,0 +1,25 @@
+name: Probe live market cache
+
+on:
+  push:
+    paths:
+      - '.github/workflows/probe-live-market-cache.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe public market-data headers
+        shell: bash
+        run: |
+          set -euxo pipefail
+          for i in 1 2 3 4 5; do
+            curl -sS --max-time 25 -D /tmp/h -o /tmp/b https://sigq.in/api/market-data || true
+            echo "--- probe $i ---"
+            grep -Ei '^(HTTP/|server:|cf-cache-status:|age:|cache-control:|x-iros-market-cache:)' /tmp/h || true
+            wc -c /tmp/b || true
+            sleep 1
+          done
+          echo '--- parallel 20 ---'
+          seq 1 20 | xargs -I{} -P20 sh -c 'curl -sS --max-time 25 -o /dev/null -w "{} %{http_code} %{time_total}\n" https://sigq.in/api/market-data || true'
