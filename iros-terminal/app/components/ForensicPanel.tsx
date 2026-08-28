@@ -1721,7 +1721,7 @@ export default function ForensicPanel({
             )}
             {(swingSession?.entryHuntDiagnostics?.crossBookExcluded?.length ?? 0) > 0 && (
               <p className="text-[11px] text-slate-500">
-                Cross-book excluded{' '}
+                Cross-book excluded (intraday higher probability){' '}
                 {(swingSession?.entryHuntDiagnostics?.crossBookExcluded ?? []).join(' · ')}
               </p>
             )}

@@ -276,7 +276,8 @@ def _patch_hunt(monkeypatch, tmp_path, *, hunt_ok=True, hunt_code="entry_hunt", 
         if allow_manual_override
         else (hunt_ok, hunt_code),
     )
-    monkeypatch.setattr(swing_session, "intraday_locked_symbols", lambda _day: set())
+    monkeypatch.setattr(swing_session, "intraday_locked_symbols_respecting_swing", lambda _day: set())
+    monkeypatch.setattr(swing_session, "reconcile_cross_book", lambda *_a, **_k: {})
     monkeypatch.setattr(swing_session, "is_swing_desk_eligible", lambda *_a, **_k: True)
     monkeypatch.setattr(
         swing_session,

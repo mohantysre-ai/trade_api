@@ -1,8 +1,8 @@
 """Cross-book symbol exclusivity for Swing vs Intraday desks.
 
 Same ticker must not appear in both books on the same IST session date.
-Priority: intradAy lock wins; swing drops the duplicate (and new intradAy
-adopts exclude already-locked swing symbols).
+Priority: Swing wins when the Matrix BUY contract passes with higher buy
+probability than the intraday row; otherwise intraday keeps the symbol.
 """
 from __future__ import annotations
 

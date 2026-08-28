@@ -295,29 +295,49 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
 
     picks = list(by_key.values())
 
-    # Cross-book uniqueness: intradAy wins; drop colliding SWING rows for this date.
-    intra_syms = {
-        str(p.get("symbol") or "").upper().strip()
+    # Cross-book uniqueness: swing wins when Matrix BUY probability beats intraday.
+    intra_by_sym = {
+        str(p.get("symbol") or "").upper().strip(): p
         for p in picks
         if p.get("book") == "INTRADAY" and p.get("symbol")
     }
+    swing_by_sym = {
+        str(p.get("symbol") or "").upper().strip(): p
+        for p in picks
+        if p.get("book") == "SWING" and p.get("symbol")
+    }
+    swing_keeps: set[str] = set()
+    intra_keeps: set[str] = set()
+    from .cross_book_resolution import swing_prefers_over_intraday
+
+    for sym in set(intra_by_sym) & set(swing_by_sym):
+        if swing_prefers_over_intraday(sym, intra_by_sym[sym]):
+            swing_keeps.add(sym)
+        else:
+            intra_keeps.add(sym)
+
     cross_dropped: list[str] = []
-    if intra_syms:
+    promoted_to_swing: list[str] = []
+    if swing_keeps or intra_keeps:
         kept: list[dict[str, Any]] = []
         for p in picks:
             sym = str(p.get("symbol") or "").upper().strip()
-            if p.get("book") == "SWING" and sym in intra_syms:
+            if p.get("book") == "SWING" and sym in intra_keeps:
                 cross_dropped.append(sym)
                 continue
+            if p.get("book") == "INTRADAY" and sym in swing_keeps:
+                promoted_to_swing.append(sym)
+                continue
             kept.append(p)
-        if cross_dropped:
-            picks = kept
-            log.info(
-                "Dropped %d swing pick(s) already on intradAy for %s: %s",
-                len(cross_dropped),
-                day_key,
-                ",".join(sorted(set(cross_dropped))),
-            )
+        picks = kept
+        cross_dropped = sorted(set(cross_dropped))
+        promoted_to_swing = sorted(set(promoted_to_swing))
+        log.info(
+            "Cross-book EOD %s: swing kept %s; intraday kept %s",
+            day_key,
+            ",".join(promoted_to_swing) or "-",
+            ",".join(cross_dropped) or "-",
+        )
 
     swing_n = sum(1 for p in picks if p.get("book") == "SWING")
     intra_long = sum(1 for p in picks if p.get("book") == "INTRADAY" and p.get("direction") == "LONG")
@@ -353,6 +373,7 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
             "swingDateParity": swing_ok,
             "intradayDateParity": session_ok,
             "crossBookDropped": sorted(set(cross_dropped)),
+            "crossBookPromotedToSwing": sorted(set(promoted_to_swing)),
         },
     }
 

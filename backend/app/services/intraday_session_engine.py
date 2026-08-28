@@ -40,6 +40,7 @@ from .desk_clock import (
     rotation_window_config,
 )
 from .desk_book_symbols import swing_locked_symbols
+from .cross_book_resolution import reconcile_cross_book, swing_prefers_over_intraday
 from .sector_rotation import sector_signal
 
 log = logging.getLogger(__name__)
@@ -2416,8 +2417,12 @@ def generate_candidates(
 
     # Sequential construction: long first, then short excludes long basket symbols
     # (avoids wiping MR pool via premature opposite-side top-N filter)
-    # Also exclude today's locked swing symbols so books stay unique.
-    swing_exclude = swing_locked_symbols(_ist_now().strftime("%Y-%m-%d"))
+    # Also exclude today's locked swing symbols and swing-higher-probability BUY names.
+    swing_exclude = set(swing_locked_symbols(_ist_now().strftime("%Y-%m-%d")))
+    for row in long_scored + long_mr:
+        sym = str(row.get("symbol") or "").upper().strip()
+        if sym and swing_prefers_over_intraday(sym, row, snapshot=snap):
+            swing_exclude.add(sym)
     long_basket = _construct_dual_sleeve(
         long_scored[:60],
         long_mr[:60],
@@ -2779,8 +2784,9 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
     ``bypass_lock_window=True`` (operator emergency) skips the clock.
     ``force`` only means rebuild an already-locked basket — it does not open early.
     """
-    existing = load_session()
     today = _ist_now().strftime("%Y-%m-%d")
+    reconcile_cross_book(today, persist=True)
+    existing = load_session()
     existing_date = str(existing.get("sessionDate") or "").strip()[:10]
     stale_day = bool(
         existing.get("locked")
@@ -3675,6 +3681,8 @@ def propose_replacements(
                 continue
             live = live_map.get(sym) if live_map else None
             merged = _merge_live(cand, live)
+            if direction == "LONG" and swing_prefers_over_intraday(sym, merged):
+                continue
             gate = entry_quality_gate(
                 merged, direction, quotes=quotes, live_row=live, regime=regime
             )
@@ -4503,6 +4511,7 @@ def _refresh_session_response_cache(started_gen: int) -> None:
 def refresh_session_state() -> dict[str, Any]:
     """Single-writer scheduler path for durable close/replacement transitions."""
     global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT, _SESSION_RESPONSE_GEN
+    reconcile_cross_book(_ist_now().strftime("%Y-%m-%d"), persist=True)
     result = _compute_session(include_live=True, persist=True)
     with _SESSION_RESPONSE_LOCK:
         _SESSION_RESPONSE_GEN += 1

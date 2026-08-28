@@ -271,7 +271,7 @@ def test_invalid_locked_rows_are_scrubbed_but_audit_and_execution_are_preserved(
         "short": [],
         "capital": {"swingCapital": 1_000_000},
     }
-    monkeypatch.setattr(swing_session, "intraday_locked_symbols", lambda _day: set())
+    monkeypatch.setattr(swing_session, "intraday_locked_symbols_respecting_swing", lambda _day: set())
     monkeypatch.setattr(swing_session, "is_swing_desk_eligible", lambda *_args: True)
     monkeypatch.setattr(
         swing_session,

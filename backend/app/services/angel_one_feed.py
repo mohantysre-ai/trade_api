@@ -5387,7 +5387,9 @@ def create_app() -> FastAPI:
                 _invalidate_session_response_cache,
                 refresh_session_state,
             )
+            from .cross_book_resolution import reconcile_cross_book
 
+            reconcile_cross_book(_ist_now().date().isoformat(), persist=True)
             _invalidate_session_response_cache()
             refresh_session_state()
         except Exception:

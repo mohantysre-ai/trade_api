@@ -27,7 +27,12 @@ from .desk_clock import (
     swing_entry_hunt_block_message,
     swing_entry_hunt_config,
 )
-from .desk_book_symbols import filter_rows_excluding, intraday_locked_symbols
+from .desk_book_symbols import filter_rows_excluding, swing_locked_symbols
+from .cross_book_resolution import (
+    intraday_locked_symbols_respecting_swing,
+    reconcile_cross_book,
+    swing_prefers_over_intraday,
+)
 from .stock_quality import (
     MAX_DAY_MOVE_PCT,
     MAX_WICK_NOISE_RATIO,
@@ -1188,7 +1193,7 @@ def _scrub_ineligible_swing_rows(session: dict[str, Any]) -> tuple[dict[str, Any
     execution economics are retained separately from the active portfolio.
     """
     day = str(session.get("sessionDate") or _ist_today())[:10]
-    blocked = intraday_locked_symbols(day)
+    blocked = intraday_locked_symbols_respecting_swing(day)
     removed: list[str] = []
     kept_long: list[dict[str, Any]] = []
     kept_short: list[dict[str, Any]] = []
@@ -1250,12 +1255,9 @@ def _scrub_ineligible_swing_rows(session: dict[str, Any]) -> tuple[dict[str, Any
 
 
 def _scrub_cross_book_swing_rows(session: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
-    """Drop swing rows whose symbol is already on today's locked intradAy desk.
-
-    Does not re-size remaining rows — preserves qty / outcome fields.
-    """
+    """Drop swing rows only when intraday still owns them with higher probability."""
     day = str(session.get("sessionDate") or _ist_today())[:10]
-    blocked = intraday_locked_symbols(day)
+    blocked = intraday_locked_symbols_respecting_swing(day)
     if not blocked:
         return session, []
     original_long = [r for r in (session.get("long") or []) if isinstance(r, dict)]
@@ -1557,7 +1559,7 @@ def _append_new_swing_entries(session: dict[str, Any]) -> dict[str, Any] | None:
         return None
     today = str(session.get("sessionDate") or _ist_today())[:10]
     existing_syms = _swing_occupied_symbols(session)
-    exclude = set(intraday_locked_symbols(today)) | existing_syms
+    exclude = set(intraday_locked_symbols_respecting_swing(today)) | existing_syms
     raw_picks, snap_src = _picks_from_asset_matrix(exclude_symbols=exclude)
     committed_at = _utc_now_iso()
     new_rows, skipped = _normalize_candidate_rows(
@@ -1641,8 +1643,9 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
     ``bypass_lock_window=True`` skips the clock. ``force`` rebuilds during hunt
     — it does not open early and does not wipe a live book after 14:45.
     """
-    existing = load_swing_session()
     today = _ist_today()
+    reconcile_cross_book(today, persist=True)
+    existing = load_swing_session()
     existing_date = str(existing.get("sessionDate") or "").strip()[:10]
     stale_day = bool(existing.get("locked") and existing_date and existing_date != today)
     if stale_day and not force:
@@ -1709,7 +1712,7 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
 
     session_date = today
     committed_at = _utc_now_iso()
-    exclude = intraday_locked_symbols(today)
+    exclude = intraday_locked_symbols_respecting_swing(today)
     skipped: list[str] = []
     snap_src = "asset_matrix_deterministic_buy"
     long_rows: list[dict[str, Any]] = []
@@ -1980,7 +1983,8 @@ def refresh_swing_session_state() -> dict[str, Any]:
     day = str(sess.get("sessionDate") or "")[:10]
     if day != _ist_today():
         return sess
-
+    reconcile_cross_book(day, persist=True)
+    sess = load_swing_session()
     live = _compute_swing_session(live=True)
     changed = False
     sess, dupes = _dedupe_swing_session_rows(sess)
