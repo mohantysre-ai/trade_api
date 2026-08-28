@@ -791,9 +791,10 @@ def run_scheduled_morning_prework(*, force: bool = False) -> dict[str, Any]:
 
 
 def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dict[str, Any]:
-    """Live Angel/Yahoo/RSS refresh with LLM day-lock reuse (no force LLM)."""
+    """Live quote/candle refresh with LLM day-lock reuse (no force LLM)."""
     log = logging.getLogger(__name__)
-    pool = (os.getenv("MARKET_PREWORK_POOL") or NIFTY_500_LABEL).strip() or NIFTY_500_LABEL
+    swing_hunt = reason == "swing_entry_hunt"
+    pool = NIFTY_500_LABEL if swing_hunt else ((os.getenv("MARKET_PREWORK_POOL") or NIFTY_500_LABEL).strip() or NIFTY_500_LABEL)
     try:
         prior = _load_last_snapshot()
         client = AngelOneClient()
@@ -804,6 +805,7 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
             prefer_cache=False,
             allow_fallback=True,
             force_llm_refresh=False,
+            angel_first_quotes=swing_hunt,
         )
         if not payload.get("success", False):
             return {
@@ -3817,6 +3819,7 @@ def _build_payload_from_live_data(
     force_llm_refresh: bool = False,
     prior_snapshot: dict[str, Any] | None = None,
     on_progress: Callable[[str], None] | None = None,
+    angel_first_quotes: bool = False,
 ) -> dict[str, Any]:
     def progress(msg: str) -> None:
         if on_progress:
@@ -3831,7 +3834,39 @@ def _build_payload_from_live_data(
     progress("Fetching live quotes...")
     stock_universe, active_pool_label = _quote_universe(resolved_pool_name, client)
 
-    stock_quotes_raw, quote_coverage = _fetch_stock_quotes_with_coverage(client, stock_universe)
+    if angel_first_quotes:
+        # Swing contract: request every resolved Nifty 500 quote from Angel One
+        # first. Only missing Angel symbols use the existing provider failover.
+        angel_rows = client.fetch_batch_quotes(stock_universe)
+        stock_quotes_raw = {
+            str(symbol).upper(): {**dict(row), "quoteProvider": "angel"}
+            for symbol, row in angel_rows.items()
+            if isinstance(row, dict)
+        }
+        missing_instruments = [inst for inst in stock_universe if inst.key not in stock_quotes_raw]
+        fallback_rows: dict[str, dict[str, Any]] = {}
+        fallback_meta: dict[str, Any] = {}
+        if missing_instruments:
+            fallback_rows, fallback_meta = _fetch_stock_quotes_with_coverage(client, missing_instruments)
+            for symbol, row in fallback_rows.items():
+                stock_quotes_raw.setdefault(symbol, row)
+        expected = len(stock_universe)
+        received = len(stock_quotes_raw)
+        coverage_pct = round((received / expected * 100.0) if expected else 0.0, 2)
+        providers = {"angel": len(angel_rows), "nse": 0, "dhan": 0}
+        for provider, count in (fallback_meta.get("providers") or {}).items():
+            providers[provider] = providers.get(provider, 0) + int(count or 0)
+        quote_coverage = {
+            "expected": expected,
+            "received": received,
+            "coveragePct": coverage_pct,
+            "selectionAllowed": bool(expected and coverage_pct >= 99.0),
+            "providers": providers,
+            "missingSymbols": [inst.key for inst in stock_universe if inst.key not in stock_quotes_raw],
+            "pricePriority": "ANGEL_FIRST_SWING_HUNT",
+        }
+    else:
+        stock_quotes_raw, quote_coverage = _fetch_stock_quotes_with_coverage(client, stock_universe)
     if not quote_coverage["selectionAllowed"]:
         raise RuntimeError(
             "Market quote coverage below required threshold: "
@@ -4109,6 +4144,7 @@ def build_market_payload(
     prefer_cache: bool = False, # If true, try cache first, then live if cache is empty/stale
     force_llm_refresh: bool = False,  # When false, reuse day-locked / TTL-fresh snapshot AI
     on_progress: Callable[[str], None] | None = None,
+    angel_first_quotes: bool = False,
 ) -> dict[str, Any]:
     snapshot = _load_last_snapshot()
 
@@ -4151,6 +4187,7 @@ def build_market_payload(
             force_llm_refresh=force_llm_refresh,
             prior_snapshot=snapshot,
             on_progress=on_progress,
+            angel_first_quotes=angel_first_quotes,
         )
         _save_last_snapshot(payload)
         return payload

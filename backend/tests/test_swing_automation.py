@@ -527,3 +527,20 @@ def test_ensure_cooldown_does_not_fill_on_stale_quotes(monkeypatch):
     assert ready is False
     assert reason == "MATRIX_QUOTES_STALE"
     assert calls == []
+
+
+def test_auto_paper_execution_records_fill(monkeypatch):
+    monkeypatch.setattr(swing_session, "SWING_EXECUTION_POLICY", "AUTO_PAPER")
+    normalized = swing_session._normalize_swing_row(_raw_buy_pick("PAPER1"), "2026-08-13")
+    assert normalized is not None
+    row = swing_session._size_new_swing_rows([normalized])[0]
+    filled = swing_session._paper_execute_swing_row(row, filled_at="2026-08-13T05:00:00+00:00")
+    assert filled["executionStatus"] == "FILLED"
+    assert filled["executionMode"] == "PAPER"
+    assert filled["triggered"] is True
+    assert filled["qty"] == filled["approxQty"]
+    assert filled["lineage"]["executedFills"][0]["mode"] == "PAPER"
+
+
+def test_swing_refresh_ttl_defaults_to_one_minute():
+    assert swing_session._SWING_MATRIX_REFRESH_TTL <= 60

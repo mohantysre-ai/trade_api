@@ -422,7 +422,8 @@ def _hydrate_swing_contract_row(row: dict[str, Any]) -> dict[str, Any]:
 
 
 _SWING_MATRIX_REFRESH_AT = 0.0
-_SWING_MATRIX_REFRESH_TTL = float(os.environ.get("SWING_MATRIX_REFRESH_TTL", "600"))
+_SWING_MATRIX_REFRESH_TTL = float(os.environ.get("SWING_MATRIX_REFRESH_TTL", "60"))
+SWING_EXECUTION_POLICY = os.environ.get("SWING_EXECUTION_POLICY", "AUTO_PAPER").upper().strip()
 
 
 def _snapshot_data_date(snap: dict[str, Any]) -> str:
@@ -1459,6 +1460,38 @@ def _size_new_swing_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
+def _paper_execute_swing_row(row: dict[str, Any], *, filled_at: str | None = None) -> dict[str, Any]:
+    """Record an automatic PAPER fill after deterministic gates; never place a broker order."""
+    if SWING_EXECUTION_POLICY != "AUTO_PAPER":
+        return row
+    qty = int(row.get("approxQty") or 0)
+    entry = _f(row.get("entryPrice")) or 0.0
+    if qty <= 0 or entry <= 0:
+        return row
+    at = filled_at or _utc_now_iso()
+    out = dict(row)
+    lineage = dict(out.get("lineage") or {})
+    fills = list(lineage.get("executedFills") or [])
+    if not fills:
+        fills.append({"side": "BUY", "qty": qty, "price": entry, "filledAt": at, "mode": "PAPER", "source": "SWING_DETERMINISTIC_GATE"})
+    lineage["executedFills"] = fills
+    lineage["triggeredAt"] = lineage.get("triggeredAt") or at
+    out.update({
+        "executionStatus": "FILLED",
+        "executionBasis": "AUTO_PAPER_AFTER_DETERMINISTIC_GATES",
+        "executionMode": "PAPER",
+        "triggered": True,
+        "triggeredAt": out.get("triggeredAt") or at,
+        "qty": qty,
+        "lineage": lineage,
+    })
+    return out
+
+
+def _paper_execute_swing_rows(rows: list[dict[str, Any]], *, filled_at: str | None = None) -> list[dict[str, Any]]:
+    return [_paper_execute_swing_row(row, filled_at=filled_at) for row in rows]
+
+
 def _row_status_label(row: dict[str, Any]) -> str:
     outcome = row.get("outcome") if isinstance(row.get("outcome"), dict) else {}
     return str(row.get("status") or outcome.get("label") or "").upper()
@@ -1571,7 +1604,7 @@ def _append_new_swing_entries(session: dict[str, Any]) -> dict[str, Any] | None:
     )
     added = []
     seen = set(existing_syms)
-    for row in _size_new_swing_rows(new_rows):
+    for row in _paper_execute_swing_rows(_size_new_swing_rows(new_rows), filled_at=committed_at):
         sym = str(row.get("symbol") or "").upper().strip()
         if not sym or sym in seen:
             continue
@@ -1742,7 +1775,7 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
         hunt_started = str(existing.get("huntStartedAt") or existing.get("committedAt") or committed_at)
 
     if long_rows:
-        sized = _size_new_swing_rows(long_rows)
+        sized = _paper_execute_swing_rows(_size_new_swing_rows(long_rows), filled_at=committed_at)
         deployed = round(sum(float(r.get("deployedCapital") or 0) for r in sized), 2)
         portfolio_risk = round(sum(float(r.get("maxLoss") or 0) for r in sized), 2)
         if deployed > SWING_CAPITAL + 0.01 or portfolio_risk > SWING_CAPITAL * SWING_MAX_PORTFOLIO_RISK + 0.01:
@@ -1759,7 +1792,7 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
             "committedAt": committed_at,
             "updatedAt": committed_at,
             "huntStartedAt": hunt_started,
-            "executionPolicy": "MANUAL_ONLY",
+            "executionPolicy": SWING_EXECUTION_POLICY,
             "source": snap_src,
             "selectionContract": SWING_SELECTION_CONTRACT,
             "rotation": "DAILY",
@@ -1823,7 +1856,7 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
             "committedAt": hunt_started,
             "updatedAt": committed_at,
             "huntStartedAt": hunt_started,
-            "executionPolicy": "MANUAL_ONLY",
+            "executionPolicy": SWING_EXECUTION_POLICY,
             "source": snap_src,
             "selectionContract": SWING_SELECTION_CONTRACT,
             "rotation": "DAILY",
@@ -1881,7 +1914,7 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
         "committedAt": committed_at,
         "updatedAt": committed_at,
         "huntStartedAt": hunt_started,
-        "executionPolicy": "MANUAL_ONLY",
+        "executionPolicy": SWING_EXECUTION_POLICY,
         "source": snap_src,
         "selectionContract": SWING_SELECTION_CONTRACT,
         "rotation": "DAILY",
@@ -2055,7 +2088,7 @@ def refresh_swing_session_state() -> dict[str, Any]:
     sess["automation"] = {
         "lastRefreshAt": sess["updatedAt"],
         "source": "refresh_swing_session_state",
-        "executionPolicy": sess.get("executionPolicy") or "MANUAL_ONLY",
+        "executionPolicy": sess.get("executionPolicy") or SWING_EXECUTION_POLICY,
     }
     _atomic_write(_SWING_SESSION_PATH, sess)
     return sess
