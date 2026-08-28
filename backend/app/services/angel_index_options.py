@@ -627,6 +627,9 @@ def _weighted_breadth(snapshot: dict[str, Any], key: str, direction: str | None)
     covered = 0.0
     signed = 0.0
     quote_proxy_weight = 0.0
+    bullish_weight = 0.0
+    bearish_weight = 0.0
+    neutral_weight = 0.0
     for item in weights:
         if not isinstance(item, dict):
             continue
@@ -651,16 +654,75 @@ def _weighted_breadth(snapshot: dict[str, Any], key: str, direction: str | None)
             continue
         covered += weight
         signed += weight * signal
+        if signal > 0:
+            bullish_weight += weight
+        elif signal < 0:
+            bearish_weight += weight
+        else:
+            neutral_weight += weight
     coverage = covered / total_weight * 100.0 if total_weight > 0 else 0.0
     breadth = signed / covered if covered > 0 else None
-    uses_quote_proxy = quote_proxy_weight > 0
+    quote_proxy_share = quote_proxy_weight / covered if covered > 0 else 0.0
+    uses_quote_proxy = quote_proxy_share > 0
     minimum_coverage = 90.0 if weight_source == "OFFICIAL_SNAPSHOT" or uses_quote_proxy else 80.0
-    alignment_floor = 0.70 if uses_quote_proxy else 0.55
-    aligned = None if coverage < minimum_coverage or breadth is None or direction is None else breadth >= alignment_floor if direction == "CALL" else breadth <= -alignment_floor
+    # Candle-backed VWAP/EMA breadth needs 55% net alignment. Quote proxies are
+    # coarser, so scale the requirement up to 70% in proportion to how much of
+    # the covered basket actually used that proxy. One fallback constituent no
+    # longer makes the entire basket pay the maximum threshold.
+    alignment_floor = 0.55 + 0.15 * quote_proxy_share
+    directional_score = None if breadth is None or direction not in {"CALL", "PUT"} else breadth if direction == "CALL" else -breadth
+    aligned = None if coverage < minimum_coverage or directional_score is None else directional_score >= alignment_floor
+    classification = (
+        "COVERAGE_INCOMPLETE" if coverage < minimum_coverage else
+        "DIRECTION_UNAVAILABLE" if directional_score is None else
+        "CONFIRMED" if aligned else
+        "OPPOSING" if directional_score < 0 else
+        "PARTIAL" if directional_score >= max(0.35, alignment_floor - 0.20) else
+        "NEUTRAL"
+    )
+    pct = lambda value: round(value / covered * 100.0, 2) if covered > 0 else 0.0
     return {"status": "LIVE" if coverage >= minimum_coverage else "COVERAGE_INCOMPLETE", "aligned": aligned,
-            "score": breadth, "coveragePct": round(coverage, 2), "source": weight_source,
-            "minimumCoveragePct": minimum_coverage, "alignmentFloor": alignment_floor,
-            "quoteProxyPct": round(quote_proxy_weight / total_weight * 100.0, 2) if total_weight > 0 else 0.0}
+            "strictAligned": aligned, "score": breadth, "directionalScore": directional_score,
+            "classification": classification, "coveragePct": round(coverage, 2), "source": weight_source,
+            "minimumCoveragePct": minimum_coverage, "alignmentFloor": round(alignment_floor, 4),
+            "adaptiveFloor": round(max(0.35, alignment_floor - 0.20), 4),
+            "bullishPct": pct(bullish_weight), "bearishPct": pct(bearish_weight),
+            "neutralPct": pct(neutral_weight), "quoteProxyPct": round(quote_proxy_share * 100.0, 2)}
+
+
+def _effective_breadth_gate(
+    breadth: dict[str, Any], *, strong_oi: bool, chain_aligned: bool | None,
+    expected_r: float | None, spread_pct: float | None, vix_regime: str | None,
+) -> dict[str, Any]:
+    """Apply a narrow, auditable relaxation without accepting divergence.
+
+    Strict breadth remains preferred. Partial *directional* participation may
+    pass only when the independent futures, chain, R:R, spread, and VIX checks
+    are unusually strong. Neutral or opposing breadth never passes this path.
+    """
+    if breadth.get("aligned") is True:
+        return {**breadth, "confirmationMode": "STRICT", "reason": "STRICT_BREADTH_CONFIRMED"}
+    directional = _float(breadth.get("directionalScore"))
+    if directional is None or breadth.get("status") != "LIVE":
+        return {**breadth, "confirmationMode": "UNAVAILABLE", "reason": "BREADTH_EVIDENCE_INCOMPLETE"}
+    if directional < 0:
+        return {**breadth, "aligned": False, "confirmationMode": "BLOCKED", "reason": "BREADTH_OPPOSES_DIRECTION"}
+    floor = _float(breadth.get("adaptiveFloor")) or 0.35
+    if directional < floor:
+        return {**breadth, "aligned": False, "confirmationMode": "BLOCKED", "reason": "BREADTH_TOO_NEUTRAL"}
+    supporting = {
+        "strongFuturesOi": strong_oi,
+        "chainAligned": chain_aligned is True,
+        "minimumExpectedR": expected_r is not None and expected_r >= 2.0,
+        "tightSpread": spread_pct is not None and spread_pct <= 1.0,
+        "vixAcceptable": vix_regime in {"CALM", "NORMAL", "ELEVATED"},
+    }
+    if all(supporting.values()):
+        return {**breadth, "aligned": True, "classification": "PARTIAL_CONFIRMED",
+                "confirmationMode": "ADAPTIVE_STRONG_EVIDENCE", "reason": "PARTIAL_BREADTH_WITH_STRONG_INDEPENDENT_CONFIRMATION",
+                "adaptiveChecks": supporting}
+    return {**breadth, "aligned": False, "confirmationMode": "BLOCKED",
+            "reason": "PARTIAL_BREADTH_MISSING_STRONG_CONFIRMATION", "adaptiveChecks": supporting}
 
 
 def _normal_cdf(value: float) -> float:
@@ -860,12 +922,17 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
         oi_state = futures_oi["state"]
         strong_oi = (direction == "CALL" and oi_state == "LONG_BUILDUP") or (direction == "PUT" and oi_state == "SHORT_BUILDUP")
         secondary_oi = (direction == "CALL" and oi_state == "SHORT_COVERING") or (direction == "PUT" and oi_state == "LONG_UNWINDING")
-        strong_breadth = breadth.get("aligned") is True and abs(_float(breadth.get("score")) or 0) >= 0.70
         regime, vix = _vix_regime(market_snapshot)
         risk_reward = _contract_risk_reward(selected, structure, direction)
         expected_r = _float(risk_reward.get("expectedR"))
         chain_evidence = _chain_confirmation(chain, direction, selected)
         chain_aligned = chain_evidence.get("aligned")
+        breadth = _effective_breadth_gate(
+            breadth, strong_oi=strong_oi, chain_aligned=chain_aligned,
+            expected_r=expected_r, spread_pct=_float(selected.get("spreadPct")) if selected else None,
+            vix_regime=regime,
+        )
+        strong_breadth = breadth.get("aligned") is True and (_float(breadth.get("directionalScore")) or 0) >= 0.70
         bar_count = int(structure.get("barCount") or 0)
         structure_status = str(structure.get("status") or "")
         structure_warming = structure_status == "DATA_INCOMPLETE" or bar_count < 20
@@ -886,6 +953,7 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
             oi_aligned = None
         contract_gate = True if selected else False if direction and any(_float(item.get("delta")) is not None for item in chain) else None
         greeks_source = selected.get("greeksSource") if selected else None
+        directional_breadth = _float(breadth.get("directionalScore"))
         converted[key] = {
             "spot": spot, "direction": direction, "source": row.get("source") or "ANGEL_ONE", "providerStatus": row.get("status"),
             "expiry": row.get("expiry"), "rawChain": chain, "componentFreshness": row.get("componentFreshness") or {},
@@ -893,7 +961,7 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
                        "futuresOi": 100.0 if strong_oi else 75.0 if oi_aligned is True else 0.0 if oi_aligned is False else None,
                        "contract": 100.0 if selected else None,
                        "optionChain": chain_evidence.get("score"),
-                       "breadth": (50.0 + 50.0 * abs(_float(breadth.get("score")) or 0)) if breadth.get("score") is not None else None,
+                       "breadth": max(0.0, min(100.0, 50.0 + 50.0 * directional_breadth)) if directional_breadth is not None else None,
                        "regime": 100.0 if regime in {"NORMAL", "ELEVATED"} else 70.0 if regime == "CALM" else 0.0 if regime == "FEAR" else None},
             "gates": {"fresh": True if row.get("status") == "LIVE" else False, "structure": structure_gate, "breakout": structure_gate,
                       "futuresOi": oi_aligned, "optionChain": chain_aligned, "breadth": breadth.get("aligned"),

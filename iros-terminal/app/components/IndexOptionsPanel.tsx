@@ -35,7 +35,12 @@ type Candidate = {
   gateEvidence?: {
     futuresOi?: { state?: string; priceChangePct?: number | null; oiChangePct?: number | null; aligned?: boolean | null; baseline?: { basis?: string; ageSeconds?: number | null } | null };
     optionChain?: { reason?: string; aligned?: boolean | null; directionalOiChange?: number | null; opposingOiChange?: number | null };
-    breadth?: { score?: number | null; coveragePct?: number | null; aligned?: boolean | null; source?: string };
+    breadth?: {
+      score?: number | null; directionalScore?: number | null; coveragePct?: number | null;
+      aligned?: boolean | null; strictAligned?: boolean | null; source?: string; classification?: string;
+      confirmationMode?: string; reason?: string; alignmentFloor?: number | null; adaptiveFloor?: number | null;
+      bullishPct?: number | null; bearishPct?: number | null; neutralPct?: number | null; quoteProxyPct?: number | null;
+    };
     contractEconomics?: { aligned?: boolean | null; greeksSource?: string | null; spreadPct?: number | null };
     riskReward?: { aligned?: boolean | null; expectedR?: number | null; basis?: string; stop?: number | null; target?: number | null; minimumR?: number | null };
   };
@@ -144,6 +149,12 @@ function candidateHeadline(row: Candidate) {
   if (row.reason.startsWith('HARD_GATE_FAILED:') && row.failedGates.includes('fresh')) {
     return bars === 0 ? 'Quotes not live' : 'Stale quotes';
   }
+  if (row.reason.startsWith('HARD_GATE_FAILED:') && row.failedGates.length === 1 && row.failedGates[0] === 'breadth') {
+    const breadthReason = row.gateEvidence?.breadth?.reason;
+    if (breadthReason === 'BREADTH_OPPOSES_DIRECTION') return `Blocked: constituents oppose ${row.direction ?? 'direction'}`;
+    if (breadthReason === 'BREADTH_TOO_NEUTRAL') return 'Blocked: constituent breadth is neutral';
+    if (breadthReason === 'PARTIAL_BREADTH_MISSING_STRONG_CONFIRMATION') return 'Blocked: partial breadth lacks strong confirmation';
+  }
   if (row.reason.startsWith('HARD_GATE_FAILED:')) {
     return `Blocked: ${row.failedGates.map((key) => GATE_LABEL[key] ?? key).join(' · ')}`;
   }
@@ -163,9 +174,15 @@ function compactEvidence(row: Candidate) {
   const futures = evidence.futuresOi;
   const chain = evidence.optionChain;
   const rr = evidence.riskReward;
+  const breadthFloor = breadth?.alignmentFloor == null ? null : breadth.alignmentFloor * 100;
+  const breadthNeed = breadthFloor == null || !row.direction
+    ? ''
+    : row.direction === 'CALL' ? `need ≥+${breadthFloor.toFixed(0)}%` : `need ≤−${breadthFloor.toFixed(0)}%`;
+  const breadthClass = breadth?.classification?.replaceAll('_', ' ') ?? '';
+  const breadthMode = breadth?.confirmationMode === 'ADAPTIVE_STRONG_EVIDENCE' ? ' · adaptive pass' : '';
   return [
     { label: 'Fut OI', value: futures?.state?.replaceAll('_', ' ') ?? 'Missing', aligned: futures?.aligned },
-    { label: 'Breadth', value: breadth?.score == null ? 'Missing' : `${(breadth.score * 100).toFixed(0)}% · ${fmtNum(breadth.coveragePct, 0)}% cov`, aligned: breadth?.aligned },
+    { label: 'Breadth', value: breadth?.score == null ? 'Missing' : `${breadthClass ? `${breadthClass} ` : ''}${(breadth.score * 100).toFixed(0)}% · ${breadthNeed} · ${fmtNum(breadth.coveragePct, 0)}% cov${breadthMode}`, aligned: breadth?.aligned },
     { label: 'Chain', value: chain?.reason?.replaceAll('_', ' ') ?? 'Missing', aligned: chain?.aligned },
     { label: 'R:R', value: rr?.expectedR == null ? rr?.basis?.replaceAll('_', ' ') ?? 'Missing' : `${fmtNum(rr.expectedR)}R · S ${fmtNum(rr.stop)} · T ${fmtNum(rr.target)}`, aligned: rr?.aligned },
   ];
@@ -273,7 +290,7 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
                   <div className="mt-0.5 font-bold tabular-nums text-[var(--fg-strong)]">{row.direction ?? '—'}</div>
                 </div>
                 <div>
-                  <div className="uppercase tracking-wider text-[var(--fg-subtle)]">Score</div>
+                  <div className="uppercase tracking-wider text-[var(--fg-subtle)]" title="Weighted setup quality; every hard gate must still pass">Setup</div>
                   <div className="mt-0.5 font-bold tabular-nums text-[var(--fg-strong)]">{row.score == null ? 'Pending' : row.score.toFixed(1)}</div>
                 </div>
                 <div>

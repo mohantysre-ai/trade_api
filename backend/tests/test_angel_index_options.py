@@ -9,7 +9,9 @@ from app.services.angel_index_options import (
     _contracts,
     _fetch_candles_with_retry,
     _futures_oi_state,
+    _effective_breadth_gate,
     _local_greeks,
+    _weighted_breadth,
     fetch_angel_index_option_snapshot,
     index_structure_from_candles,
     option_data_to_strategy_inputs,
@@ -148,6 +150,75 @@ def test_leader_basket_supplies_breadth_when_official_weights_absent():
     assert converted["breadth"]["source"] == "LEADER_BASKET_PROXY"
     assert converted["breadth"]["coveragePct"] == 100.0
     assert converted["gates"]["breadth"] is True
+
+
+def test_put_breadth_score_penalizes_bullish_constituents():
+    intraday = {"vwap": 100, "ema9": 101}
+    snapshot = {
+        "stockQuotes": {
+            symbol: {"ltpRaw": 110, "intraday": intraday}
+            for symbol in ("HDFCBANK", "ICICIBANK", "RELIANCE", "BHARTIARTL", "INFY", "LT", "ITC", "SBIN", "AXISBANK", "KOTAKBANK")
+        }
+    }
+    converted = option_data_to_strategy_inputs({
+        "indices": {"NIFTY": {
+            "source": "ANGEL_ONE", "status": "LIVE", "spot": 25000, "spotClose": 25100,
+            "chain": [], "structure": {"status": "CONFIRMED", "direction": "PUT", "last": 25000, "ema9": 25050},
+        }}
+    }, snapshot)["indices"]["NIFTY"]
+    assert converted["breadth"]["classification"] == "OPPOSING"
+    assert converted["breadth"]["directionalScore"] == -1.0
+    assert converted["scores"]["breadth"] == 0.0
+    assert converted["gates"]["breadth"] is False
+
+
+def test_breadth_threshold_scales_with_actual_quote_proxy_share():
+    snapshot = {
+        "indexConstituentWeights": {"NIFTY": [
+            {"symbol": "CANDLE", "weight": 50}, {"symbol": "QUOTE", "weight": 50},
+        ]},
+        "stockQuotes": {
+            "CANDLE": {"ltpRaw": 110, "intraday": {"vwap": 100, "ema9": 101}},
+            "QUOTE": {"ltpRaw": 110, "open": 100, "close": 101},
+        },
+    }
+    breadth = _weighted_breadth(snapshot, "NIFTY", "CALL")
+    assert breadth["quoteProxyPct"] == 50.0
+    assert breadth["alignmentFloor"] == 0.625
+    assert breadth["aligned"] is True
+
+
+def test_partial_directional_breadth_can_pass_only_with_strong_independent_evidence():
+    partial = {
+        "status": "LIVE", "aligned": False, "strictAligned": False,
+        "directionalScore": 0.52, "adaptiveFloor": 0.50, "classification": "PARTIAL",
+    }
+    allowed = _effective_breadth_gate(
+        partial, strong_oi=True, chain_aligned=True, expected_r=2.2,
+        spread_pct=0.8, vix_regime="NORMAL",
+    )
+    assert allowed["aligned"] is True
+    assert allowed["confirmationMode"] == "ADAPTIVE_STRONG_EVIDENCE"
+
+    blocked = _effective_breadth_gate(
+        partial, strong_oi=True, chain_aligned=True, expected_r=1.9,
+        spread_pct=0.8, vix_regime="NORMAL",
+    )
+    assert blocked["aligned"] is False
+    assert blocked["adaptiveChecks"]["minimumExpectedR"] is False
+
+
+def test_opposing_breadth_never_uses_adaptive_confirmation():
+    opposing = {
+        "status": "LIVE", "aligned": False, "strictAligned": False,
+        "directionalScore": -0.05, "adaptiveFloor": 0.35, "classification": "OPPOSING",
+    }
+    result = _effective_breadth_gate(
+        opposing, strong_oi=True, chain_aligned=True, expected_r=10.0,
+        spread_pct=0.1, vix_regime="NORMAL",
+    )
+    assert result["aligned"] is False
+    assert result["reason"] == "BREADTH_OPPOSES_DIRECTION"
 
 
 def test_local_black_scholes_fills_missing_sensex_put_greeks():

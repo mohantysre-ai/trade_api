@@ -71,6 +71,7 @@ def test_scrape_all_sources_uses_tinyfish_when_html_skipped(monkeypatch):
     monkeypatch.setattr("app.services.ai_ticker_news._dns_circuit_open", lambda: True)
     monkeypatch.setattr("app.services.ai_ticker_news.tinyfish_enabled", lambda: True)
     monkeypatch.setattr("app.services.ai_ticker_news.backup_min_articles", lambda: 3)
+    published_at = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
 
     def _search(query, **kwargs):
         assert "RELIANCE" in query
@@ -82,7 +83,7 @@ def test_scrape_all_sources_uses_tinyfish_when_html_skipped(monkeypatch):
                 "source": "Moneycontrol",
                 "url": "https://www.moneycontrol.com/news/r",
                 "summary": "Results beat estimates.",
-                "published_at": "2026-08-20",
+                "published_at": published_at,
             }
         ]
 
