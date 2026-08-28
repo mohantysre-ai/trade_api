@@ -1,4 +1,4 @@
-from backend.app.services.ai_ticker_news import (
+from app.services.ai_ticker_news import (
     TickerNewsArticle,
     _enforce_evidence_contract,
     _verified_headlines,
