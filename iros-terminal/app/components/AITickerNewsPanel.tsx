@@ -36,9 +36,9 @@ function toneFor(text: string): Tone {
 }
 
 function toneClasses(tone: Tone) {
-  if (tone === "Bullish") return "border-emerald-400/30 bg-emerald-400/10 text-emerald-300";
-  if (tone === "Bearish") return "border-rose-400/30 bg-rose-400/10 text-rose-300";
-  return "border-slate-500/30 bg-slate-500/10 text-slate-300";
+  if (tone === "Bullish") return "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-300";
+  if (tone === "Bearish") return "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-400/30 dark:bg-rose-400/10 dark:text-rose-300";
+  return "border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-slate-300";
 }
 
 function relativeTime(value?: string) {
@@ -108,14 +108,31 @@ export default function AITickerNewsPanel({
   }, [initialReport, ticker]);
 
   useEffect(() => {
-    if (!ticker || initialReport) return;
+    if (!ticker) return;
+    const initialArticleCount = initialReport?.articles_after_dedup ?? initialReport?.articles_scraped ?? 0;
+    const initialHeadlineCount = initialReport?.latest_verified_headlines?.length ?? 0;
+    const initialEvidenceStatus = String(initialReport?.evidence_status ?? "").toUpperCase();
+    const initialReportNeedsHydration = Boolean(
+      initialReport &&
+      initialArticleCount > 0 &&
+      initialHeadlineCount === 0 &&
+      (initialEvidenceStatus === "VERIFIED_RECENT" || initialArticleCount > 0)
+    );
+    if (initialReport && !initialReportNeedsHydration) return;
+
     let cancelled = false;
-    setLoading(true);
+    setLoading(!initialReport);
+    setRefreshing(Boolean(initialReport));
     setError(null);
     fetchTickerNewsReport(ticker, { company: companyName, maxArticles: 8, includeRaw: true })
       .then((result) => { if (!cancelled) setReport(result); })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to fetch news report"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      });
     return () => { cancelled = true; };
   }, [ticker, companyName, initialReport]);
 
@@ -153,29 +170,29 @@ export default function AITickerNewsPanel({
   const isLive = Boolean(report && !report.cached && !refreshing);
 
   return (
-    <section className="group relative overflow-hidden rounded-2xl border border-cyan-300/10 bg-[linear-gradient(145deg,rgba(8,15,28,.98),rgba(12,22,38,.96)_45%,rgba(6,13,25,.99))] text-slate-100 shadow-[0_20px_70px_rgba(2,8,23,.42)]">
+    <section className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-[0_16px_45px_rgba(15,23,42,.10)] dark:border-cyan-300/10 dark:bg-[linear-gradient(145deg,rgba(8,15,28,.98),rgba(12,22,38,.96)_45%,rgba(6,13,25,.99))] dark:text-slate-100 dark:shadow-[0_20px_70px_rgba(2,8,23,.42)]">
       <div className="pointer-events-none absolute inset-0 opacity-70 [background-image:linear-gradient(rgba(148,163,184,.025)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,.025)_1px,transparent_1px)] [background-size:22px_22px]" />
       <div className="pointer-events-none absolute -right-24 -top-24 h-52 w-52 rounded-full bg-cyan-400/[0.06] blur-3xl transition-opacity duration-700 group-hover:opacity-100" />
       <div className="pointer-events-none absolute -bottom-24 -left-20 h-48 w-48 rounded-full bg-violet-500/[0.055] blur-3xl" />
 
-      <header className="relative border-b border-white/[0.06] px-4 pb-3.5 pt-4">
+      <header className="relative border-b border-slate-200 px-4 pb-3.5 pt-4 dark:border-white/[0.06]">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="relative">
               <div className="absolute inset-0 rounded-xl bg-cyan-400/20 blur-lg" />
-              <div className="relative rounded-xl border border-white/10 bg-slate-950/70 p-1.5">
+              <div className="relative rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-white/10 dark:bg-slate-950/70 dark:shadow-none">
                 <MarketSymbolBadge symbol={ticker} size="md" />
               </div>
             </div>
             <div className="min-w-0">
               <div className="mb-0.5 flex items-center gap-2">
-                <h3 className="truncate text-[11px] font-black uppercase tracking-[0.18em] text-slate-100">Live News Intelligence</h3>
-                <span className="flex items-center gap-1 rounded-full border border-white/[0.07] bg-white/[0.035] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                <h3 className="truncate text-[11px] font-black uppercase tracking-[0.18em] text-slate-900 dark:text-slate-100">Live News Intelligence</h3>
+                <span className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-slate-600 dark:border-white/[0.07] dark:bg-white/[0.035] dark:text-slate-400">
                   <RadarPulse healthy={isLive} /> {refreshing ? "sync" : isLive ? "live" : report?.cached ? "cached" : "standby"}
                 </span>
               </div>
-              <p className="truncate text-[9px] text-slate-500">
+              <p className="truncate text-[9px] text-slate-600 dark:text-slate-500">
                 {report?.company_name ?? companyName ?? ticker}
                 {report && <span> · {report.articles_after_dedup ?? report.articles_scraped} verified items · {report.lookback_days ?? 7}d window</span>}
               </p>
@@ -237,32 +254,32 @@ export default function AITickerNewsPanel({
             )}
 
             <div>
-              <div className="mb-2 flex items-center justify-between"><span className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">Live tape</span><span className="text-[8px] text-slate-600">{visibleHeadlines.length} shown</span></div>
+              <div className="mb-2 flex items-center justify-between"><span className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600 dark:text-slate-500">Live tape</span><span className="text-[8px] text-slate-500 dark:text-slate-600">{visibleHeadlines.length} shown</span></div>
               <div className="space-y-2">
                 {visibleHeadlines.length > 0 ? visibleHeadlines.map((headline, index) => (
-                  <a key={`${headline.url}-${index}`} href={headline.url} target="_blank" rel="noopener noreferrer" className="group/item relative block overflow-hidden rounded-xl border border-white/[0.055] bg-white/[0.025] p-3 transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/20 hover:bg-cyan-300/[0.045] hover:shadow-[0_10px_30px_rgba(6,182,212,.06)] motion-reduce:transform-none">
+                  <a key={`${headline.url}-${index}`} href={headline.url} target="_blank" rel="noopener noreferrer" className="group/item relative block overflow-hidden rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300 hover:bg-cyan-50 hover:shadow-md dark:border-white/[0.055] dark:bg-white/[0.025] dark:shadow-none dark:hover:border-cyan-300/20 dark:hover:bg-cyan-300/[0.045] dark:hover:shadow-[0_10px_30px_rgba(6,182,212,.06)] motion-reduce:transform-none">
                     <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-cyan-300/40 to-transparent opacity-0 transition-opacity group-hover/item:opacity-100" />
                     <div className="flex gap-2.5">
                       <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-white/[0.07] bg-slate-950/80 text-[8px] font-black text-cyan-300/75 shadow-inner">{sourceMark(headline.source)}</div>
                       <div className="min-w-0 flex-1">
                         <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[7px] font-bold uppercase tracking-wider text-slate-600"><span className="text-cyan-300/70">{headline.source}</span><span>•</span><span>{relativeTime(headline.published_at)}</span>{headline.relevance && <><span>•</span><span>{headline.relevance}</span></>}</div>
-                        <p className="line-clamp-2 text-[10px] font-semibold leading-relaxed text-slate-200 transition-colors group-hover/item:text-white">{headline.title}</p>
+                        <p className="line-clamp-2 text-[10px] font-semibold leading-relaxed text-slate-800 transition-colors group-hover/item:text-slate-950 dark:text-slate-200 dark:group-hover/item:text-white">{headline.title}</p>
                         <div className="mt-2 flex items-center justify-between"><span className={`rounded border px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider ${toneClasses(headline.tone)}`}>{headline.tone}</span><span className="translate-x-1 text-[10px] text-slate-700 opacity-0 transition-all group-hover/item:translate-x-0 group-hover/item:text-cyan-300/80 group-hover/item:opacity-100 motion-reduce:transform-none">↗</span></div>
                       </div>
                     </div>
                   </a>
-                )) : <div className="rounded-xl border border-dashed border-white/[0.07] px-3 py-6 text-center text-[9px] text-slate-600">No headlines match the selected filters.</div>}
+                )) : <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-6 text-center text-[9px] text-slate-500 dark:border-white/[0.07] dark:bg-transparent dark:text-slate-600">No headlines match the selected filters.</div>}
               </div>
             </div>
 
             {activeCategories.length > 0 && (
               <div>
-                <div className="mb-2 flex items-center justify-between"><span className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">Intelligence stack</span><span className="rounded-full border border-white/[0.05] px-1.5 py-0.5 text-[7px] text-slate-600">{activeCategories.length} signals</span></div>
+                <div className="mb-2 flex items-center justify-between"><span className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600 dark:text-slate-500">Intelligence stack</span><span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[7px] text-slate-600 dark:border-white/[0.05] dark:bg-transparent">{activeCategories.length} signals</span></div>
                 <div className="grid grid-cols-2 gap-2">
                   {activeCategories.map((category, index) => {
                     const value = report[category.key] as string;
                     const expanded = expandedCategory === category.key;
-                    return <button key={category.key} onClick={() => setExpandedCategory(expanded ? null : String(category.key))} className={`group/card relative overflow-hidden rounded-xl border p-2.5 text-left transition duration-300 hover:-translate-y-0.5 motion-reduce:transform-none ${expanded ? "col-span-2 border-violet-300/20 bg-violet-300/[0.055]" : "border-white/[0.055] bg-white/[0.02] hover:border-violet-300/15 hover:bg-violet-300/[0.035]"}`} style={{ transitionDelay: `${Math.min(index * 12, 80)}ms` }}>
+                    return <button key={category.key} onClick={() => setExpandedCategory(expanded ? null : String(category.key))} className={`group/card relative overflow-hidden rounded-xl border p-2.5 text-left transition duration-300 hover:-translate-y-0.5 motion-reduce:transform-none ${expanded ? "col-span-2 border-violet-300 bg-violet-50 dark:border-violet-300/20 dark:bg-violet-300/[0.055]" : "border-slate-200 bg-white shadow-sm hover:border-violet-300 hover:bg-violet-50 dark:border-white/[0.055] dark:bg-white/[0.02] dark:shadow-none dark:hover:border-violet-300/15 dark:hover:bg-violet-300/[0.035]"}`} style={{ transitionDelay: `${Math.min(index * 12, 80)}ms` }}>
                       <div className="mb-1.5 flex items-center justify-between gap-2"><span className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-wider text-slate-400"><span className="text-violet-300/80">{category.icon}</span>{category.short}</span><span className={`text-[9px] text-slate-600 transition-transform ${expanded ? "rotate-45" : ""}`}>+</span></div>
                       <p className={`${expanded ? "whitespace-pre-wrap" : "line-clamp-2"} text-[9px] leading-relaxed text-slate-500 group-hover/card:text-slate-300`}>{value}</p>
                     </button>;
