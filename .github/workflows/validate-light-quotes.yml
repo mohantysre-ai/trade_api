@@ -1,0 +1,26 @@
+name: Validate light public quote payload
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/validate-light-quotes.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify compact quote contract
+        run: |
+          grep -q 'COMPACT_LAZY_DETAILS_LIGHT_QUOTES' iros-terminal/app/api/market-data.csv/route.ts
+          grep -q 'PUBLIC_QUOTE_KEYS' iros-terminal/app/api/market-data.csv/route.ts
+          grep -q 'max-age=14400' iros-terminal/app/api/market-data.csv/route.ts
+          grep -q 'FRONTEND_WORKERS: "6"' docker-compose.yml
+      - name: Install frontend dependencies
+        working-directory: iros-terminal
+        run: npm ci
+      - name: Production build
+        working-directory: iros-terminal
+        run: npm run build
