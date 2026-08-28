@@ -1,0 +1,40 @@
+name: Apply news light theme contrast fix
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-news-light-theme-fix.yml'
+permissions:
+  contents: write
+jobs:
+  apply-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Apply targeted contrast fix
+        run: python scripts/fix_news_light_theme_contrast.py
+      - name: Verify targeted files
+        run: |
+          grep -q 'color-mix(in srgb' iros-terminal/app/page.tsx
+          grep -q 'text-cyan-700 dark:text-cyan-300/80' iros-terminal/app/components/AITickerNewsPanel.tsx
+          grep -q 'text-slate-800 dark:font-medium dark:text-slate-200' iros-terminal/app/components/AITickerNewsPanel.tsx
+      - name: Install frontend dependencies
+        working-directory: iros-terminal
+        run: npm ci
+      - name: Production build
+        working-directory: iros-terminal
+        run: npm run build
+      - name: Commit applied fix
+        run: |
+          if git diff --quiet -- iros-terminal/app/page.tsx iros-terminal/app/components/AITickerNewsPanel.tsx; then
+            echo 'No source changes to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add iros-terminal/app/page.tsx iros-terminal/app/components/AITickerNewsPanel.tsx
+          git commit -m 'Fix news light theme contrast'
+          git push origin HEAD:main
