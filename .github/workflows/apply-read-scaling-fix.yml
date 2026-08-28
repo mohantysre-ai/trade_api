@@ -1,0 +1,64 @@
+name: Apply market read scaling fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-read-scaling-fix.yml'
+      - 'scripts/fix_market_read_scaling.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply scaling repair
+        run: python3 scripts/fix_market_read_scaling.py
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Test backend snapshot cache
+        working-directory: backend
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: python -m pytest -q tests/test_market_data_read_scaling.py tests/test_desk_restart_freshness.py
+
+      - name: Compile backend
+        run: python -m py_compile backend/app/services/angel_one_feed.py
+
+      - name: Build frontend
+        working-directory: iros-terminal
+        run: |
+          npm ci
+          npm run build
+
+      - name: Assert protected ticker drawer unchanged
+        run: |
+          git diff --exit-code HEAD -- iros-terminal/app/components/AITickerNewsPanel.tsx
+
+      - name: Commit validated scaling fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/app/services/angel_one_feed.py backend/tests/test_market_data_read_scaling.py iros-terminal/app/api/market-data/route.ts docker-compose.yml
+          if git diff --cached --quiet; then
+            echo 'No source changes to commit.'
+            exit 0
+          fi
+          git commit -m 'Scale market-data read path for high concurrency'
+          git push origin HEAD:main
