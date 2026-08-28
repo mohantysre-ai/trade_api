@@ -1,0 +1,54 @@
+name: Production load test 5000 concurrency
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/load-test-5000.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LOAD_BASE_URL: https://sigq.in
+      LOAD_REQUEST_TIMEOUT: '20'
+      LOAD_CONNECT_TIMEOUT: '8'
+      LOAD_MAX_ERROR_RATE: '0.02'
+      LOAD_MAX_P95_MS: '2500'
+      LOAD_MAX_P99_MS: '6000'
+      LOAD_MIN_RPS_5000: '300'
+      LOAD_ABORT_ERROR_RATE_PCT: '5'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependency
+        run: python -m pip install aiohttp
+      - name: Verify compact production build before load
+        run: |
+          set -euo pipefail
+          curl -sS --max-time 25 -D /tmp/h -o /tmp/b https://sigq.in/api/market-data.csv
+          grep -Ei '^(HTTP/|cf-cache-status:|cache-control:|x-iros-public-snapshot:|x-iros-payload-bytes:)' /tmp/h || true
+          bytes=$(wc -c < /tmp/b)
+          echo "payload_bytes=$bytes"
+          grep -qi '^x-iros-public-snapshot: compact' /tmp/h || { echo 'Compact snapshot is not deployed; refusing 5000-user test.'; exit 2; }
+          test "$bytes" -lt 1000000 || { echo 'Payload still >= 1 MB; refusing 5000-user escalation.'; exit 3; }
+      - name: Warm Cloudflare cache
+        run: |
+          for i in 1 2 3; do curl -sS --max-time 25 -o /dev/null https://sigq.in/api/market-data.csv; sleep 1; done
+      - name: Run staged 1000 to 5000 concurrent client test
+        run: python performance/load_test_5000.py
+      - name: Print report
+        if: always()
+        run: |
+          if [ -f load-test-5000-report.json ]; then cat load-test-5000-report.json; fi
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sigq-load-test-5000-report
+          path: load-test-5000-report.json
+          if-no-files-found: warn
