@@ -1,0 +1,42 @@
+name: Apply ticker news sentiment fix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-ticker-news-sentiment-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Apply sentiment counter fix
+        run: python scripts/fix_ticker_news_sentiment_counts.py
+      - name: Verify contract
+        run: |
+          grep -q 'const hasHeadlineSentiment = headlines.length > 0;' iros-terminal/app/components/AITickerNewsPanel.tsx
+          grep -q 'hasHeadlineSentiment ? toneCounts\[tone\] : "—"' iros-terminal/app/components/AITickerNewsPanel.tsx
+          grep -q 'Headline-level sentiment unavailable for this report' iros-terminal/app/components/AITickerNewsPanel.tsx
+      - name: Install frontend dependencies
+        working-directory: iros-terminal
+        run: npm ci
+      - name: Production build
+        working-directory: iros-terminal
+        run: npm run build
+      - name: Commit applied fix
+        run: |
+          if git diff --quiet -- iros-terminal/app/components/AITickerNewsPanel.tsx; then
+            echo 'No source changes to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add iros-terminal/app/components/AITickerNewsPanel.tsx
+          git commit -m 'Fix ticker news sentiment counters'
+          git push origin HEAD:main
