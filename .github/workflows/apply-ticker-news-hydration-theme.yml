@@ -1,0 +1,43 @@
+name: Apply ticker news hydration and theme fix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-ticker-news-hydration-theme.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Apply ticker news hydration and theme fix
+        run: python scripts/fix_ticker_news_hydration_theme.py
+      - name: Verify hydration contract
+        run: |
+          grep -q 'const initialReportNeedsHydration' iros-terminal/app/components/AITickerNewsPanel.tsx
+          grep -q 'initialHeadlineCount === 0' iros-terminal/app/components/AITickerNewsPanel.tsx
+          grep -q 'dark:bg-\[linear-gradient' iros-terminal/app/components/AITickerNewsPanel.tsx
+          grep -q 'border-slate-200 bg-white text-slate-900' iros-terminal/app/components/AITickerNewsPanel.tsx
+      - name: Install frontend dependencies
+        working-directory: iros-terminal
+        run: npm ci
+      - name: Production build
+        working-directory: iros-terminal
+        run: npm run build
+      - name: Commit applied fix
+        run: |
+          if git diff --quiet -- iros-terminal/app/components/AITickerNewsPanel.tsx; then
+            echo 'No source changes to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add iros-terminal/app/components/AITickerNewsPanel.tsx
+          git commit -m 'Fix ticker news hydration and light theme'
+          git push origin HEAD:main
