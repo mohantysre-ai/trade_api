@@ -7,8 +7,11 @@ const STALE_TTL_MS = Math.max(CACHE_TTL_MS, Number(process.env.MARKET_READ_STALE
 const BACKEND_TIMEOUT_MS = Math.max(1000, Number(process.env.MARKET_READ_BACKEND_TIMEOUT_MS ?? 8000));
 
 type CacheEntry = { data: unknown; expiresAt: number; staleUntil: number };
-const cache = new Map<string, CacheEntry>();
-const inFlight = new Map<string, Promise<unknown>>();
+type MarketReadState = { cache: Map<string, CacheEntry>; inFlight: Map<string, Promise<unknown>> };
+const globalState = globalThis as typeof globalThis & { __irosMarketReadState?: MarketReadState };
+const state = globalState.__irosMarketReadState ??= { cache: new Map(), inFlight: new Map() };
+const cache = state.cache;
+const inFlight = state.inFlight;
 
 function reply(data: unknown, state: string, status = 200) {
   return NextResponse.json(data, {

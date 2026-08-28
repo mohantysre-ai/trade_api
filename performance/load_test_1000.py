@@ -35,7 +35,7 @@ STAGES = [
 # refresh/trading side effects.
 ENDPOINTS = [
     ("/", 0.70),
-    ("/api/market-data", 0.30),
+    ("/api/market-data.csv", 0.30),
 ]
 
 # Production survival thresholds.
@@ -85,7 +85,6 @@ async def one_request(session: aiohttp.ClientSession, stage_users: int) -> Resul
             f"{BASE_URL}{path}",
             headers={
                 "accept": "text/html,application/json;q=0.9,*/*;q=0.8",
-                "cache-control": "no-cache",
                 "user-agent": "sigq-authorized-load-test/1.0",
             },
             allow_redirects=True,

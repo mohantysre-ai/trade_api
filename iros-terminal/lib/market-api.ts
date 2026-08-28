@@ -314,7 +314,7 @@ export async function fetchRefreshMacros(): Promise<MarketDataResponse> {
 export async function fetchMarketData(pool?: string): Promise<MarketDataResponse> {
   const url = MARKET_API_URL
     ? new URL("/api/market-data", MARKET_API_URL)
-    : `/api/market-data${pool ? `?pool=${encodeURIComponent(pool)}` : ""}`;
+    : `/api/market-data.csv${pool ? `?pool=${encodeURIComponent(pool)}` : ""}`;
 
   if (typeof url !== "string") {
     if (pool) {
@@ -323,8 +323,8 @@ export async function fetchMarketData(pool?: string): Promise<MarketDataResponse
   }
 
   const res = await fetch(typeof url === "string" ? url : url.toString(), {
-    cache: "no-store",
-    signal: AbortSignal.timeout(25_000),
+    cache: "default",
+    signal: AbortSignal.timeout(12_000),
   });
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
