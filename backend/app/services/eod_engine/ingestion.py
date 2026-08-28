@@ -308,7 +308,7 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
     }
     swing_keeps: set[str] = set()
     intra_keeps: set[str] = set()
-    from .cross_book_resolution import swing_prefers_over_intraday
+    from ..cross_book_resolution import swing_prefers_over_intraday
 
     for sym in set(intra_by_sym) & set(swing_by_sym):
         if swing_prefers_over_intraday(sym, intra_by_sym[sym]):
