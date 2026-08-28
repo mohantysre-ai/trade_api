@@ -1,0 +1,29 @@
+name: Validate homepage concurrency scaling
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/validate-homepage-scale.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Verify scale contract
+        run: |
+          grep -q 'FRONTEND_WORKERS: "6"' docker-compose.yml
+          grep -q 'X-IROS-Homepage-Cache' iros-terminal/next.config.ts
+          grep -q 'Cloudflare-CDN-Cache-Control' iros-terminal/next.config.ts
+          grep -q 'x-iros-public-snapshot' iros-terminal/app/api/market-data.csv/route.ts
+          git diff --exit-code HEAD^ -- iros-terminal/app/components/AITickerNewsPanel.tsx
+      - name: Install frontend dependencies
+        working-directory: iros-terminal
+        run: npm ci
+      - name: Production build
+        working-directory: iros-terminal
+        run: npm run build

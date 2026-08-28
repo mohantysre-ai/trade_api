@@ -18,6 +18,28 @@ const nextConfig: NextConfig = {
     "*.id.repl.co",
     "*.replit.co",
   ],
+  async headers() {
+    return [
+      {
+        source: "/",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=60, s-maxage=300, stale-while-revalidate=3600, stale-if-error=86400",
+          },
+          {
+            key: "CDN-Cache-Control",
+            value: "public, max-age=300, stale-while-revalidate=3600, stale-if-error=86400",
+          },
+          {
+            key: "Cloudflare-CDN-Cache-Control",
+            value: "public, max-age=300, stale-while-revalidate=3600, stale-if-error=86400",
+          },
+          { key: "X-IROS-Homepage-Cache", value: "edge-ready" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
