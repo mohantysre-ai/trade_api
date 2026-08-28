@@ -6,16 +6,35 @@ const CACHE_TTL_MS = Math.max(1000, Number(process.env.MARKET_EDGE_CACHE_MS ?? 5
 const STALE_TTL_MS = Math.max(CACHE_TTL_MS, Number(process.env.MARKET_EDGE_STALE_MS ?? 60000));
 const BACKEND_TIMEOUT_MS = Math.max(1000, Number(process.env.MARKET_READ_BACKEND_TIMEOUT_MS ?? 8000));
 
+type JsonRecord = Record<string, unknown>;
 type CacheEntry = { data: unknown; expiresAt: number; staleUntil: number };
 type MarketEdgeState = { cache: Map<string, CacheEntry>; inFlight: Map<string, Promise<unknown>> };
 const globalState = globalThis as typeof globalThis & { __irosMarketEdgeState?: MarketEdgeState };
 const state = globalState.__irosMarketEdgeState ??= { cache: new Map(), inFlight: new Map() };
 
+function slimDashboardPayload(data: unknown): unknown {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return data;
+  const source = data as JsonRecord;
+  const slim: JsonRecord = { ...source };
+
+  // Large per-ticker detail maps are lazy-loaded via dedicated endpoints.
+  // Removing them from the public snapshot does not change deterministic logic.
+  delete slim.tickerIntelligenceByTicker;
+  delete slim.tickerNewsByTicker;
+  delete slim.deskIcByTicker;
+  slim.publicSnapshotMode = "COMPACT_LAZY_DETAILS";
+  return slim;
+}
+
 function reply(data: unknown, stateName: string, status = 200) {
-  return NextResponse.json(data, {
+  const body = JSON.stringify(data);
+  return new NextResponse(body, {
     status,
     headers: {
+      "content-type": "application/json; charset=utf-8",
       "x-iros-market-cache": stateName,
+      "x-iros-public-snapshot": "compact",
+      "x-iros-payload-bytes": String(Buffer.byteLength(body)),
       "cache-control": "public, max-age=2, stale-while-revalidate=30, stale-if-error=60",
       "cdn-cache-control": "public, max-age=5, stale-while-revalidate=60, stale-if-error=120",
       "cloudflare-cdn-cache-control": "public, max-age=5, stale-while-revalidate=60, stale-if-error=120",
@@ -27,7 +46,7 @@ function reply(data: unknown, stateName: string, status = 200) {
 async function fetchBackend(url: URL): Promise<unknown> {
   const res = await fetch(url.toString(), { cache: "no-store", signal: AbortSignal.timeout(BACKEND_TIMEOUT_MS) });
   if (!res.ok) throw new Error((await res.text()) || `Backend HTTP ${res.status}`);
-  return res.json();
+  return slimDashboardPayload(await res.json());
 }
 
 export async function GET(request: Request) {
