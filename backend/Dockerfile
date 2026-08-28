@@ -58,8 +58,8 @@ WORKDIR /app/backend
 
 EXPOSE 8000 8001
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD ["python", "-c", "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health' % os.environ.get('HEALTH_PORT','8000'), timeout=4)"]
+HEALTHCHECK --interval=15s --timeout=10s --start-period=120s --retries=8 \
+  CMD ["python", "-c", "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health' % os.environ.get('HEALTH_PORT','8000'), timeout=8)"]
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

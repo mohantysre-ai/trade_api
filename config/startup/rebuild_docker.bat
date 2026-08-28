@@ -103,12 +103,12 @@ if %BUILD_CODE% neq 0 (
 echo.
 
 echo [4/5] Starting stack with new images...
-docker compose %COMPOSE_PROFILES% up -d --force-recreate --remove-orphans
+docker compose %COMPOSE_PROFILES% up -d --force-recreate --remove-orphans --wait --wait-timeout 300
 set UP_CODE=%ERRORLEVEL%
 if %UP_CODE% neq 0 (
     echo [WARN] compose up failed — clearing leftover iros-* names and retrying...
     docker rm -f iros-ai-news iros-market-api iros-frontend iros-cloudflared 2>nul
-    docker compose %COMPOSE_PROFILES% up -d --force-recreate --remove-orphans
+    docker compose %COMPOSE_PROFILES% up -d --force-recreate --remove-orphans --wait --wait-timeout 300
     set UP_CODE=!ERRORLEVEL!
 )
 if %UP_CODE% neq 0 (

@@ -89,12 +89,12 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=8)",
         ]
-      interval: 30s
-      timeout: 5s
-      start_period: 40s
-      retries: 3
+      interval: 15s
+      timeout: 10s
+      start_period: 120s
+      retries: 8
     depends_on:
       ai-news:
         condition: service_healthy

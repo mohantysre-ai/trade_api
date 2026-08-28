@@ -7,7 +7,7 @@ $checks = @(
     @{ Name = "Frontend";   Uri = "http://127.0.0.1:3000/" }
 )
 
-$deadline = (Get-Date).AddSeconds(180)
+$deadline = (Get-Date).AddSeconds(300)
 $allOk = $true
 
 foreach ($check in $checks) {
