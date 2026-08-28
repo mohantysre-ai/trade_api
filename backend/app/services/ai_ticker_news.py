@@ -624,6 +624,11 @@ async def scrape_google_news(
             f'OR site:financialexpress.com OR site:cnbctv18.com OR site:reuters.com) '
             f'when:{NEWS_LOOKBACK_DAYS}d'
         ),
+        # Simple fallbacks are intentionally less clever. Google News RSS can
+        # return zero results for heavily-parenthesized queries even when there
+        # is obvious recent coverage for a liquid NSE ticker.
+        f'"{company}" when:{NEWS_LOOKBACK_DAYS}d',
+        f'{ticker} NSE when:{NEWS_LOOKBACK_DAYS}d',
     ]
     try:
         articles: list[TickerNewsArticle] = []
@@ -1754,6 +1759,46 @@ def _merge_deterministic_news_evidence(summary: dict, articles: list[TickerNewsA
     return merged
 
 
+def _enforce_evidence_contract(
+    summary: dict,
+    articles: list[TickerNewsArticle],
+    evidence_status: str,
+    ticker: str,
+) -> dict:
+    """Prevent a substantive ticker-news narrative from existing without headlines.
+
+    Verified article evidence is deterministic and authoritative. If the current
+    scrape has no accepted article, stale/cache/LLM narrative fields must not be
+    presented as current ticker intelligence.
+    """
+    if articles:
+        return dict(summary)
+
+    cleaned = dict(summary)
+    for key in (
+        "insider_activity",
+        "institutional_activity",
+        "order_book_block_deals",
+        "future_expansion_capex",
+        "auditor_changes",
+        "dividend_news",
+        "new_orders_contracts",
+        "earnings_results",
+        "management_changes",
+        "regulatory_filings",
+        "risk_flags",
+    ):
+        cleaned[key] = ""
+    cleaned["sentiment_overall"] = "Neutral"
+    if str(evidence_status).upper() == "SOURCE_UNAVAILABLE":
+        cleaned["summary_headline"] = f"No verified recent headline for {ticker} — news sources unavailable"
+    else:
+        cleaned["summary_headline"] = f"No verified recent headline found for {ticker} in the last {NEWS_LOOKBACK_DAYS} days"
+    cleaned["llmUsed"] = False
+    cleaned["digestMode"] = "no-evidence"
+    return cleaned
+
+
 def _evidence_status(bundle: NewsScrapeBundle) -> str:
     if bundle.articles:
         return "VERIFIED_RECENT"
@@ -1823,6 +1868,7 @@ async def generate_ticker_news_report(
             )
 
     llm_result = _merge_deterministic_news_evidence(llm_result, articles)
+    llm_result = _enforce_evidence_contract(llm_result, articles, evidence_status, ticker)
 
     # Step 3: Build report
     deterministic_fields = {
