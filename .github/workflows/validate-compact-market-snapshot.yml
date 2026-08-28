@@ -1,0 +1,35 @@
+name: Validate compact market snapshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/validate-compact-market-snapshot.yml'
+      - 'iros-terminal/app/api/market-data.csv/route.ts'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install frontend dependencies
+        working-directory: iros-terminal
+        run: npm ci
+      - name: Production build
+        working-directory: iros-terminal
+        run: npm run build
+      - name: Verify compact contract
+        run: |
+          grep -q 'delete slim.tickerIntelligenceByTicker' iros-terminal/app/api/market-data.csv/route.ts
+          grep -q 'delete slim.tickerNewsByTicker' iros-terminal/app/api/market-data.csv/route.ts
+          grep -q 'delete slim.deskIcByTicker' iros-terminal/app/api/market-data.csv/route.ts
+          grep -q 'COMPACT_LAZY_DETAILS' iros-terminal/app/api/market-data.csv/route.ts
+      - name: Verify drawer endpoints still exist
+        run: |
+          test -f iros-terminal/app/api/terminal-intelligence/route.ts
+          test -f iros-terminal/app/api/ticker-news/route.ts
+          test -f iros-terminal/app/api/desk-ic/route.ts
