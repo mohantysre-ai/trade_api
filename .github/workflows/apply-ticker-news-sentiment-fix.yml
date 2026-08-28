@@ -22,7 +22,7 @@ jobs:
         run: |
           grep -q 'const hasHeadlineSentiment = headlines.length > 0;' iros-terminal/app/components/AITickerNewsPanel.tsx
           grep -q 'hasHeadlineSentiment ? toneCounts\[tone\] : "—"' iros-terminal/app/components/AITickerNewsPanel.tsx
-          grep -q 'Headline-level sentiment unavailable for this report' iros-terminal/app/components/AITickerNewsPanel.tsx
+          grep -q 'disabled={!hasHeadlineSentiment}' iros-terminal/app/components/AITickerNewsPanel.tsx
       - name: Install frontend dependencies
         working-directory: iros-terminal
         run: npm ci
