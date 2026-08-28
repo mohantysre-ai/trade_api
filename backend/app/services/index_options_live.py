@@ -1,6 +1,7 @@
 """Live radar compose: Angel → ScanX → Lemonn, plus session replay routing."""
 from __future__ import annotations
 
+import math
 from datetime import date, datetime
 from typing import Any, Callable
 
@@ -20,6 +21,150 @@ from .index_options_paper import index_options_market_open, reconcile_paper_book
 from .index_options_replay import parse_session_date, replay_index_options_session
 from .lemonn_options import LEMONN_SLUGS, apply_lemonn_fallback, discover_lemonn_expiries
 from .trendlyne_oi import apply_oi_enrichment
+
+
+def _float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _live_structural_levels(row: dict[str, Any]) -> tuple[float | None, float | None, float | None]:
+    """Return the original structural stop, live target and opening-range width.
+
+    The structural stop remains anchored to the confirmed candle structure, but
+    reward is re-valued from the current streamed spot rather than the last
+    completed five-minute close.
+    """
+    direction = str(row.get("direction") or "").upper()
+    structure = row.get("structure") if isinstance(row.get("structure"), dict) else {}
+    spot = _float(row.get("spot"))
+    structure_entry = _float(structure.get("last"))
+    ema9 = _float(structure.get("ema9"))
+    orb_high = _float(structure.get("orbHigh"))
+    orb_low = _float(structure.get("orbLow"))
+    atr = _float(structure.get("atr5m"))
+    if direction not in {"CALL", "PUT"} or not spot or not structure_entry or not ema9 or not orb_high or not orb_low or not atr:
+        return None, None, None
+    opening_range = orb_high - orb_low
+    if opening_range <= 0:
+        return None, None, None
+    if direction == "CALL":
+        stops = [level for level in (orb_high, ema9) if level < structure_entry]
+        stop = max(stops) if stops else None
+        targets = [orb_high + opening_range, spot + atr]
+        target = min((level for level in targets if level > spot), default=None)
+    else:
+        stops = [level for level in (orb_low, ema9) if level > structure_entry]
+        stop = min(stops) if stops else None
+        targets = [orb_low - opening_range, spot - atr]
+        target = max((level for level in targets if level < spot), default=None)
+    return stop, target, opening_range
+
+
+def _apply_live_spot_risk_guard(strategy_inputs: dict[str, Any]) -> dict[str, Any]:
+    """Re-value option risk from live spot and block intrabar stop violations.
+
+    The candle structure still defines the setup. Once a setup exists, however,
+    the current streamed index price is the only valid entry reference. A setup
+    is invalidated immediately when live spot crosses its original structural
+    stop, even if the five-minute candle has not closed yet.
+
+    To prevent a 1-3 point structural stop from manufacturing unrealistic 9R+
+    readings, modelled underlying risk is floored at the largest of:
+      * current spot-to-structural-stop distance,
+      * 20% of five-minute ATR, and
+      * one quoted option spread translated back into underlying points by delta.
+    """
+    indices = strategy_inputs.get("indices") if isinstance(strategy_inputs.get("indices"), dict) else {}
+    for row in indices.values():
+        if not isinstance(row, dict):
+            continue
+        direction = str(row.get("direction") or "").upper()
+        spot = _float(row.get("spot"))
+        contract = row.get("contract") if isinstance(row.get("contract"), dict) else None
+        structure = row.get("structure") if isinstance(row.get("structure"), dict) else {}
+        if direction not in {"CALL", "PUT"} or not spot or not contract:
+            continue
+
+        stop, target, opening_range = _live_structural_levels(row)
+        atr = _float(structure.get("atr5m"))
+        premium = _float(contract.get("ltp"))
+        delta = abs(_float(contract.get("delta")) or 0.0)
+        gamma = abs(_float(contract.get("gamma")) or 0.0)
+        gate_evidence = row.setdefault("gateEvidence", {})
+        economics = gate_evidence.get("contractEconomics") if isinstance(gate_evidence.get("contractEconomics"), dict) else {}
+        spread_pct = max(0.0, _float(economics.get("spreadPct")) or 0.0)
+        gates = row.setdefault("gates", {})
+        limitations = row.setdefault("dataLimitations", [])
+        if not isinstance(limitations, list):
+            limitations = []
+            row["dataLimitations"] = limitations
+
+        invalidated = bool(
+            stop is not None and (
+                (direction == "CALL" and spot <= stop) or
+                (direction == "PUT" and spot >= stop)
+            )
+        )
+        if invalidated:
+            gates["structure"] = False
+            gates["breakout"] = False
+            gates["riskReward"] = False
+            row["expectedR"] = 0.0
+            if "LIVE_SPOT_CROSSED_STRUCTURAL_STOP" not in limitations:
+                limitations.append("LIVE_SPOT_CROSSED_STRUCTURAL_STOP")
+            gate_evidence["riskReward"] = {
+                "expectedR": 0.0,
+                "aligned": False,
+                "minimumR": 1.5,
+                "basis": "LIVE_SPOT_STRUCTURAL_INVALIDATION",
+                "entryUnderlying": round(spot, 4),
+                "stop": round(stop, 4),
+                "target": round(target, 4) if target is not None else None,
+                "liveInvalidated": True,
+            }
+            continue
+
+        if stop is None or target is None or not atr or not premium or delta <= 0 or not opening_range:
+            continue
+
+        structural_risk = abs(spot - stop)
+        atr_floor = atr * 0.20
+        spread_cost = premium * spread_pct / 100.0
+        spread_underlying = spread_cost / delta if spread_cost > 0 else 0.0
+        risk_move = max(structural_risk, atr_floor, spread_underlying)
+        reward_move = abs(target - spot)
+        theoretical_loss = delta * risk_move - 0.5 * gamma * risk_move * risk_move
+        theoretical_gain = delta * reward_move + 0.5 * gamma * reward_move * reward_move
+        option_loss = max(theoretical_loss + spread_cost, spread_cost, 0.05)
+        option_gain = max(theoretical_gain - spread_cost, 0.0)
+        expected_r = round(option_gain / option_loss, 3) if option_loss > 0 else 0.0
+        row["expectedR"] = expected_r
+        gates["riskReward"] = expected_r >= 1.5
+        gate_evidence["riskReward"] = {
+            "expectedR": expected_r,
+            "aligned": expected_r >= 1.5,
+            "minimumR": 1.5,
+            "basis": "LIVE_SPOT_ORB_INVALIDATION_WITH_ATR_SPREAD_RISK_FLOOR",
+            "entryUnderlying": round(spot, 4),
+            "stop": round(stop, 4),
+            "target": round(target, 4),
+            "riskPoints": round(risk_move, 4),
+            "structuralRiskPoints": round(structural_risk, 4),
+            "atrRiskFloorPoints": round(atr_floor, 4),
+            "spreadEquivalentUnderlyingPoints": round(spread_underlying, 4),
+            "rewardPoints": round(reward_move, 4),
+            "projectedOptionLoss": round(option_loss, 4),
+            "projectedOptionGain": round(option_gain, 4),
+            "spreadCost": round(spread_cost, 4),
+            "atr5m": round(atr, 4),
+            "openingRangePoints": round(opening_range, 4),
+            "liveInvalidated": False,
+        }
+    return strategy_inputs
 
 
 def compose_live_index_options_radar(
@@ -75,7 +220,8 @@ def compose_live_index_options_radar(
                 "error": str(exc),
             }
         option_data = _apply_oi_baselines(option_data)
-        book["indexOptions"] = option_data_to_strategy_inputs(option_data, book)
+        strategy_inputs = option_data_to_strategy_inputs(option_data, book)
+        book["indexOptions"] = _apply_live_spot_risk_guard(strategy_inputs)
         book["indexOptionProvider"] = option_data
     result = build_index_options_radar(book)
     market_open = index_options_market_open(now)
