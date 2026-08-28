@@ -1,5 +1,6 @@
 name: Apply main live news redesign
 
+# Trigger-safe one-shot build gate for the page.tsx NewsFeedPanel redesign.
 on:
   push:
     branches: [main]
