@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/apply-swing-hunt-fix.yml'
-      - 'scripts/fix_swing_hunt_pipeline.py'
+      - 'scripts/fix_swing_hunt_pipeline_v2.py'
   workflow_dispatch:
 
 permissions:
@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 0
 
       - name: Apply swing hunt repair
-        run: python3 scripts/fix_swing_hunt_pipeline.py
+        run: python3 scripts/fix_swing_hunt_pipeline_v2.py
 
       - name: Install backend test dependencies
         working-directory: backend
@@ -33,7 +33,7 @@ jobs:
 
       - name: Run swing and market-data tests
         working-directory: backend
-        run: pytest -q tests/test_swing_automation.py tests/test_market_data_provider.py
+        run: pytest -q tests/test_swing_automation.py tests/test_market_data_provider.py tests/test_swing_angel_first_contract.py
 
       - name: Compile patched Python
         run: |
@@ -45,7 +45,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add backend/app/services/swing_session.py backend/app/services/market_data_provider.py backend/app/services/angel_one_feed.py backend/tests/test_swing_automation.py backend/tests/test_market_data_provider.py
+          git add backend/app/services/swing_session.py backend/app/services/angel_one_feed.py backend/tests/test_swing_automation.py backend/tests/test_swing_angel_first_contract.py
           if git diff --cached --quiet; then
             echo 'No source changes to commit.'
             exit 0
