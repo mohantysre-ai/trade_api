@@ -2,6 +2,7 @@ from datetime import date
 from pathlib import Path
 
 from app.services.index_options_live import (
+    _apply_live_spot_risk_guard,
     compose_live_index_options_radar,
     finalize_closed_index_options_radar,
     replay_session_payload,
@@ -40,6 +41,74 @@ def test_invalid_session_date_raises():
     except ValueError:
         return
     raise AssertionError("expected ValueError")
+
+
+def test_live_spot_crossing_original_stop_invalidates_before_radar():
+    inputs = {
+        "indices": {
+            "NIFTY": {
+                "spot": 244.5,
+                "direction": "CALL",
+                "contract": {"ltp": 100, "delta": 0.55, "gamma": 0.001},
+                "structure": {"last": 247, "ema9": 246, "orbHigh": 245, "orbLow": 235, "atr5m": 12},
+                "gates": {"structure": True, "breakout": True, "riskReward": True},
+                "gateEvidence": {"contractEconomics": {"spreadPct": 1.0}},
+                "dataLimitations": [],
+            }
+        }
+    }
+    guarded = _apply_live_spot_risk_guard(inputs)["indices"]["NIFTY"]
+    assert guarded["gates"]["structure"] is False
+    assert guarded["gates"]["breakout"] is False
+    assert guarded["gates"]["riskReward"] is False
+    assert guarded["expectedR"] == 0.0
+    assert guarded["gateEvidence"]["riskReward"]["basis"] == "LIVE_SPOT_STRUCTURAL_INVALIDATION"
+    assert guarded["gateEvidence"]["riskReward"]["entryUnderlying"] == 244.5
+    assert "LIVE_SPOT_CROSSED_STRUCTURAL_STOP" in guarded["dataLimitations"]
+
+
+def test_live_risk_uses_current_spot_and_atr_floor_for_tiny_stop():
+    inputs = {
+        "indices": {
+            "NIFTY": {
+                "spot": 246.2,
+                "direction": "CALL",
+                "contract": {"ltp": 100, "delta": 0.55, "gamma": 0.001},
+                "structure": {"last": 247, "ema9": 246, "orbHigh": 245, "orbLow": 235, "atr5m": 12},
+                "gates": {"structure": True, "breakout": True, "riskReward": True},
+                "gateEvidence": {"contractEconomics": {"spreadPct": 1.0}},
+                "dataLimitations": [],
+            }
+        }
+    }
+    guarded = _apply_live_spot_risk_guard(inputs)["indices"]["NIFTY"]
+    evidence = guarded["gateEvidence"]["riskReward"]
+    assert evidence["basis"] == "LIVE_SPOT_ORB_INVALIDATION_WITH_ATR_SPREAD_RISK_FLOOR"
+    assert evidence["entryUnderlying"] == 246.2
+    assert evidence["structuralRiskPoints"] == 0.2
+    assert evidence["atrRiskFloorPoints"] == 2.4
+    assert evidence["riskPoints"] >= 2.4
+    assert evidence["riskPoints"] > evidence["structuralRiskPoints"]
+    assert evidence["expectedR"] < 10
+
+
+def test_live_put_stop_invalidation_is_direction_aware():
+    inputs = {
+        "indices": {
+            "BANKNIFTY": {
+                "spot": 251.0,
+                "direction": "PUT",
+                "contract": {"ltp": 120, "delta": -0.52, "gamma": 0.001},
+                "structure": {"last": 247, "ema9": 250, "orbHigh": 255, "orbLow": 249, "atr5m": 14},
+                "gates": {"structure": True, "breakout": True, "riskReward": True},
+                "gateEvidence": {"contractEconomics": {"spreadPct": 0.8}},
+                "dataLimitations": [],
+            }
+        }
+    }
+    guarded = _apply_live_spot_risk_guard(inputs)["indices"]["BANKNIFTY"]
+    assert guarded["gates"]["structure"] is False
+    assert guarded["gateEvidence"]["riskReward"]["liveInvalidated"] is True
 
 
 def test_compose_applies_lemonn_after_scanx(monkeypatch):
