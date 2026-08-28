@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/apply-live-news-redesign.yml'
       - 'scripts/redesign_live_news.py'
+      - 'scripts/redesign_live_news_v2.py'
   workflow_dispatch:
 
 permissions:
@@ -23,7 +24,7 @@ jobs:
           fetch-depth: 0
 
       - name: Patch only page.tsx NewsFeedPanel sidebar
-        run: python3 scripts/redesign_live_news.py
+        run: python3 scripts/redesign_live_news_v2.py
 
       - name: Install frontend dependencies
         working-directory: iros-terminal
