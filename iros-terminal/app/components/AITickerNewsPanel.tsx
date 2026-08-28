@@ -190,10 +190,10 @@ export default function AITickerNewsPanel({
         </div>
 
         {hasNews && report?.summary_headline && (
-          <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl border border-cyan-300/10 bg-gradient-to-r from-cyan-300/[0.07] via-white/[0.025] to-transparent p-3">
+          <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl border border-cyan-600/20 bg-white/95 p-3 shadow-sm dark:border-cyan-300/10 dark:bg-gradient-to-r dark:from-cyan-300/[0.07] dark:via-white/[0.025] dark:to-transparent dark:shadow-none">
             <div className="min-w-0">
-              <div className="mb-1 flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.18em] text-cyan-300/80"><span className="h-1 w-1 animate-pulse rounded-full bg-cyan-300 motion-reduce:animate-none" /> Desk headline</div>
-              <p className="line-clamp-2 text-[10px] font-medium leading-relaxed text-slate-200">{report.summary_headline}</p>
+              <div className="mb-1 flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300/80"><span className="h-1 w-1 animate-pulse rounded-full bg-cyan-500 dark:bg-cyan-300 motion-reduce:animate-none" /> Desk headline</div>
+              <p className="line-clamp-2 text-[10px] font-semibold leading-relaxed text-slate-800 dark:font-medium dark:text-slate-200">{report.summary_headline}</p>
             </div>
             <div className={`rounded-lg border px-2 py-1.5 text-center ${toneClasses(overallTone)}`}>
               <div className="text-[7px] font-bold uppercase tracking-widest opacity-70">Bias</div>

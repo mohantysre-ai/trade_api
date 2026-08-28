@@ -1912,7 +1912,15 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
                 <span aria-hidden className="absolute inset-x-0 top-0 h-px origin-left scale-x-0 bg-gradient-to-r from-transparent via-[var(--terminal-cyan)] to-transparent opacity-70 transition-transform duration-500 group-hover:scale-x-100" />
 
                 <div className="flex items-start gap-2.5">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 text-[8px] font-black text-white shadow-sm" style={{ background: color }} title={item.source}>{sourceInitials}</div>
+                  <div
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-[8px] font-black shadow-sm"
+                    style={{
+                      background: `color-mix(in srgb, ${color} 22%, var(--terminal-panel-2))`,
+                      borderColor: `color-mix(in srgb, ${color} 55%, var(--terminal-line))`,
+                      color: "var(--fg-strong)",
+                    }}
+                    title={item.source}
+                  >{sourceInitials}</div>
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <span className="truncate text-[8px] font-black uppercase tracking-[0.12em] text-[var(--fg-muted)]">{item.source}</span>
