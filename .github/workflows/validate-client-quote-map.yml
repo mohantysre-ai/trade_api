@@ -1,0 +1,26 @@
+name: Validate client quote map payload
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/validate-client-quote-map.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify public snapshot contract
+        run: |
+          grep -q 'delete slim.stockQuotes' iros-terminal/app/api/market-data.csv/route.ts
+          grep -q 'COMPACT_LAZY_DETAILS_CLIENT_QUOTE_MAP' iros-terminal/app/api/market-data.csv/route.ts
+          grep -q 'stocks.find' iros-terminal/app/page.tsx
+          grep -q 'FRONTEND_WORKERS: "6"' docker-compose.yml
+      - name: Install frontend dependencies
+        working-directory: iros-terminal
+        run: npm ci
+      - name: Production build
+        working-directory: iros-terminal
+        run: npm run build
