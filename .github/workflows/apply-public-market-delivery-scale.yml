@@ -1,0 +1,52 @@
+name: Apply public market delivery scale
+
+on:
+  push:
+    paths:
+      - 'scripts/scale_public_market_delivery.py'
+      - '.github/workflows/apply-public-market-delivery-scale.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}/backend
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Apply public delivery scaling patch
+        run: python scripts/scale_public_market_delivery.py
+      - name: Install frontend dependencies
+        working-directory: iros-terminal
+        run: npm ci
+      - name: Build frontend
+        working-directory: iros-terminal
+        run: npm run build
+      - name: Compile backend
+        run: python -m py_compile backend/app/services/angel_one_feed.py
+      - name: Assert protected ticker drawer unchanged
+        run: git diff --exit-code HEAD -- iros-terminal/app/components/AITickerNewsPanel.tsx
+      - name: Assert intended changes
+        run: |
+          grep -q '__irosMarketReadState' iros-terminal/app/api/market-data/route.ts
+          grep -q 'cloudflare-cdn-cache-control' iros-terminal/app/api/market-data.csv/route.ts
+          grep -q '/api/market-data.csv' iros-terminal/lib/market-api.ts
+          grep -q '/api/market-data.csv' performance/load_test_1000.py
+      - name: Commit validated delivery fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add iros-terminal/app/api/market-data/route.ts iros-terminal/app/api/market-data.csv/route.ts iros-terminal/lib/market-api.ts performance/load_test_1000.py docker-compose.yml
+          if git diff --cached --quiet; then
+            echo 'No changes to commit'
+          else
+            git commit -m 'Scale public market delivery for 1000 concurrent viewers'
+            git push origin HEAD:main
+          fi
