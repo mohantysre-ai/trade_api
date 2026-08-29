@@ -37,7 +37,7 @@ USER 65532:65532
 EXPOSE 3000
 
 # Distroless has no shell. Use the Node executable directly for health checks.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=10s --start-period=60s --retries=8 \
   CMD ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
 
 # nodejs distroless images already provide the Node executable as ENTRYPOINT.
