@@ -1,0 +1,73 @@
+name: Right drawer Trendlyne dark guard
+
+on:
+  pull_request:
+    paths:
+      - 'iros-terminal/app/components/**'
+      - '.github/workflows/right-drawer-trendlyne-dark-guard.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'iros-terminal/app/components/**'
+      - '.github/workflows/right-drawer-trendlyne-dark-guard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trendlyne-dark-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enforce dark Trendlyne widgets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          root = Path('iros-terminal/app/components')
+          violations = []
+          widgets = []
+
+          for path in root.rglob('*.tsx'):
+              text = path.read_text(encoding='utf-8')
+              if 'trendlyne.com' not in text and 'trendlyne-widgets' not in text:
+                  continue
+
+              widgets.append(str(path))
+
+              if re.search(r'dataset\.theme\s*=\s*[\"\']light[\"\']', text):
+                  violations.append(f'{path}: dataset.theme=light is forbidden')
+              if re.search(r'data-theme\s*=\s*[\"\']light[\"\']', text):
+                  violations.append(f'{path}: data-theme=light is forbidden')
+
+              if 'trendlyne-widgets' in text and not (
+                  re.search(r'dataset\.theme\s*=\s*[\"\']dark[\"\']', text)
+                  or re.search(r'data-theme\s*=\s*[\"\']dark[\"\']', text)
+              ):
+                  violations.append(f'{path}: Trendlyne embed must explicitly force dark theme')
+
+              if re.search(r'<iframe[\s\S]{0,500}(trendlyne\.com|src=\{widgetUrl\})', text, re.I):
+                  violations.append(f'{path}: raw Trendlyne iframe is forbidden; use trendlyne-widgets bootstrap')
+
+          print('Trendlyne component files:')
+          for item in widgets:
+              print(f' - {item}')
+
+          if violations:
+              print('\nViolations:')
+              for violation in violations:
+                  print(f' - {violation}')
+              sys.exit(1)
+
+          print('\nAll Trendlyne component embeds enforce dark mode.')
+          PY
+
+      - name: Production build
+        working-directory: iros-terminal
+        run: |
+          npm ci
+          npm run build

@@ -1,0 +1,62 @@
+name: Apply all right drawer Trendlyne dark
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/fix_all_right_drawer_trendlyne_dark.py'
+      - '.github/workflows/apply-all-right-drawer-trendlyne-dark.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply all Trendlyne dark patch
+        run: python scripts/fix_all_right_drawer_trendlyne_dark.py
+
+      - name: Verify all four drawer widgets use dark bootstrap
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          names = [
+            'SwotAnalysisPanel.tsx',
+            'ConfidenceCheckerPanel.tsx',
+            'TechnicalAnalysisPanel.tsx',
+            'SigqQvtPanel.tsx',
+          ]
+          root = Path('iros-terminal/app/components')
+          for name in names:
+              text = (root / name).read_text(encoding='utf-8')
+              assert 'trendlyne-widgets' in text, f'{name}: missing widget bootstrap'
+              assert 'dataset.theme = "dark"' in text, f'{name}: missing dark theme'
+              assert 'src={widgetUrl}' not in text, f'{name}: raw widget iframe still present'
+              print(f'OK {name}')
+          PY
+
+      - name: Install frontend dependencies
+        working-directory: iros-terminal
+        run: npm ci
+
+      - name: Production build
+        working-directory: iros-terminal
+        run: npm run build
+
+      - name: Commit validated source changes
+        run: |
+          if git diff --quiet -- iros-terminal/app/components/ConfidenceCheckerPanel.tsx iros-terminal/app/components/TechnicalAnalysisPanel.tsx; then
+            echo 'No source changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add iros-terminal/app/components/ConfidenceCheckerPanel.tsx iros-terminal/app/components/TechnicalAnalysisPanel.tsx
+          git commit -m 'Force all right drawer Trendlyne widgets dark'
+          git push origin HEAD:main
