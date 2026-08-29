@@ -39,18 +39,17 @@ jobs:
 
               widgets.append(str(path))
 
-              if re.search(r'data\.theme\s*=\s*[\"\']light[\"\']', text):
-                  violations.append(f'{path}: data.theme=light is forbidden')
+              if re.search(r'dataset\.theme\s*=\s*[\"\']light[\"\']', text):
+                  violations.append(f'{path}: dataset.theme=light is forbidden')
               if re.search(r'data-theme\s*=\s*[\"\']light[\"\']', text):
                   violations.append(f'{path}: data-theme=light is forbidden')
 
               if 'trendlyne-widgets' in text and not (
-                  re.search(r'data\.theme\s*=\s*[\"\']dark[\"\']', text)
+                  re.search(r'dataset\.theme\s*=\s*[\"\']dark[\"\']', text)
                   or re.search(r'data-theme\s*=\s*[\"\']dark[\"\']', text)
               ):
                   violations.append(f'{path}: Trendlyne embed must explicitly force dark theme')
 
-              # Do not bypass Trendlyne's widget bootstrap with a direct raw widget iframe.
               if re.search(r'<iframe[\s\S]{0,500}(trendlyne\.com|src=\{widgetUrl\})', text, re.I):
                   violations.append(f'{path}: raw Trendlyne iframe is forbidden; use trendlyne-widgets bootstrap')
 
