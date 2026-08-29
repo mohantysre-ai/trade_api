@@ -1,0 +1,65 @@
+name: Apply Trendlyne iframe dark render
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/force_trendlyne_iframe_dark.py'
+      - '.github/workflows/apply-trendlyne-iframe-dark-render.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply iframe dark renderer
+        run: python scripts/force_trendlyne_iframe_dark.py
+
+      - name: Verify all Trendlyne iframe renderers
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          files = [
+              Path('iros-terminal/app/components/SigqQvtPanel.tsx'),
+              Path('iros-terminal/app/components/SwotAnalysisPanel.tsx'),
+              Path('iros-terminal/app/components/ConfidenceCheckerPanel.tsx'),
+              Path('iros-terminal/app/components/TechnicalAnalysisPanel.tsx'),
+          ]
+          for path in files:
+              text = path.read_text(encoding='utf-8')
+              assert 'quote.dataset.theme = "dark"' in text, path
+              assert 'TRENDLYNE_DARK_FILTER' in text, path
+              assert 'forceTrendlyneIframeDark(host)' in text, path
+              assert 'MutationObserver' in text, path
+          print('All four Trendlyne widgets force dark iframe rendering.')
+          PY
+
+      - name: Install frontend dependencies
+        working-directory: iros-terminal
+        run: npm ci
+
+      - name: Production build
+        working-directory: iros-terminal
+        run: npm run build
+
+      - name: Commit validated source changes
+        run: |
+          if git diff --quiet -- iros-terminal/app/components; then
+            echo 'No source changes to commit.'
+            exit 0
+          fi
+          git config user.name 'mohantysre-ai'
+          git config user.email 'mohanty.sre@gmail.com'
+          git add iros-terminal/app/components/SigqQvtPanel.tsx \
+                  iros-terminal/app/components/SwotAnalysisPanel.tsx \
+                  iros-terminal/app/components/ConfidenceCheckerPanel.tsx \
+                  iros-terminal/app/components/TechnicalAnalysisPanel.tsx
+          git commit -m 'Force Trendlyne iframe rendering dark'
+          git push origin HEAD:main
