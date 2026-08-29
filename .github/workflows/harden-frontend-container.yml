@@ -1,0 +1,65 @@
+name: Harden frontend container
+
+on:
+  push:
+    paths:
+      - '.github/workflows/harden-frontend-container.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  harden-build-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Apply Docker hardening
+        run: python scripts/harden_frontend_container.py
+
+      - name: Upgrade security-sensitive Next.js packages
+        working-directory: iros-terminal
+        run: |
+          npm install --save-exact next@16.3.3 eslint-config-next@16.3.3
+
+      - name: Audit production dependencies
+        working-directory: iros-terminal
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build frontend
+        working-directory: iros-terminal
+        run: npm run build
+
+      - name: Build hardened container
+        run: docker build --pull --no-cache -t iros-frontend:security-scan ./iros-terminal
+
+      - name: Show runtime identity and Node version
+        run: |
+          docker run --rm --entrypoint node iros-frontend:security-scan --version
+          docker run --rm --entrypoint id iros-frontend:security-scan
+
+      - name: Scan fixable HIGH and CRITICAL image vulnerabilities
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image \
+            --scanners vuln \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --exit-code 1 \
+            iros-frontend:security-scan
+
+      - name: Commit hardened frontend
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add iros-terminal/Dockerfile iros-terminal/package.json iros-terminal/package-lock.json
+          if git diff --cached --quiet; then
+            echo 'No hardened source changes to commit'
+            exit 0
+          fi
+          git commit -m 'Harden frontend container and patch critical CVEs'
+          git push origin HEAD:main
