@@ -1,0 +1,68 @@
+name: Apply Trendlyne readability and drawer close
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-trendlyne-readability-drawer-close.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply readability and close-button patch
+        run: python scripts/fix_trendlyne_readability_and_drawer_close.py
+
+      - name: Verify contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          files = [
+              'SigqQvtPanel.tsx',
+              'TechnicalAnalysisPanel.tsx',
+              'ConfidenceCheckerPanel.tsx',
+              'SwotAnalysisPanel.tsx',
+          ]
+          root = Path('iros-terminal/app/components')
+          for name in files:
+              text = (root / name).read_text(encoding='utf-8')
+              assert 'quote.dataset.theme = "light";' in text, f'{name}: native light theme missing'
+              assert 'TRENDLYNE_DARK_FILTER' not in text, f'{name}: dark filter remains'
+              assert 'forceTrendlyneIframeDark' not in text, f'{name}: dark observer remains'
+              assert 'iframe.style.filter' not in text, f'{name}: iframe filter remains'
+          drawer = (root / 'RightDrawer.tsx').read_text(encoding='utf-8')
+          assert 'sticky top-0 z-[120]' in drawer, 'sticky drawer header missing'
+          assert 'right-drawer-close relative z-[130]' in drawer, 'high-z close button missing'
+          assert 'w-10 h-10' in drawer, 'larger close hit target missing'
+          print('Trendlyne readability + close-button contracts passed')
+          PY
+
+      - name: Install frontend dependencies
+        working-directory: iros-terminal
+        run: npm ci
+
+      - name: Production build
+        working-directory: iros-terminal
+        run: npm run build
+
+      - name: Commit validated source changes
+        run: |
+          if git diff --quiet; then
+            echo "No source changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add iros-terminal/app/components/SigqQvtPanel.tsx \
+                  iros-terminal/app/components/TechnicalAnalysisPanel.tsx \
+                  iros-terminal/app/components/ConfidenceCheckerPanel.tsx \
+                  iros-terminal/app/components/SwotAnalysisPanel.tsx \
+                  iros-terminal/app/components/RightDrawer.tsx
+          git commit -m "Fix Trendlyne readability and drawer close button"
+          git push origin HEAD:main
