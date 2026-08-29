@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { buildTechnicalSignals, type IntradayMetrics } from "@/lib/drawer-research";
 import type { TrendlyneCardSummary } from "@/lib/intelligence-summary";
 import { isNseCashSessionNow } from "@/lib/market-api";
@@ -150,6 +150,7 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
   const [activeView, setActiveView] = useState<'widget' | 'dashboard'>('dashboard');
+  const widgetHostRef = useRef<HTMLDivElement>(null);
 
   const signals = useMemo(() => buildTechnicalSignals(intraday, trendlyne), [intraday, trendlyne]);
   const sessionOpen = isNseCashSessionNow();
@@ -158,6 +159,37 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
     if (!normalizedTicker) return "";
     return `https://trendlyne.com/web-widget/technical-widget/Poppins/${encodeURIComponent(normalizedTicker)}`;
   }, [normalizedTicker]);
+
+  useEffect(() => {
+    if (activeView !== "widget" || !normalizedTicker) return;
+    const host = widgetHostRef.current;
+    if (!host) return;
+
+    setLoaded(false);
+    setErrored(false);
+    host.replaceChildren();
+
+    const quote = document.createElement("blockquote");
+    quote.className = "trendlyne-widgets";
+    quote.dataset.getUrl = widgetUrl;
+    quote.dataset.theme = "dark";
+    quote.dataset.posCol = "00A25B";
+    quote.dataset.primaryCol = "4DA3FF";
+    quote.dataset.negCol = "FF5A4F";
+    quote.dataset.neuCol = "F6B94A";
+    host.appendChild(quote);
+
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = "https://cdn-static.trendlyne.com/static/js/webwidgets/tl-widgets.js";
+    script.charset = "utf-8";
+    script.onload = () => setLoaded(true);
+    script.onerror = () => setErrored(true);
+    host.appendChild(script);
+
+    return () => host.replaceChildren();
+  }, [activeView, normalizedTicker, widgetUrl]);
+
 
   if (!normalizedTicker) return <EmptyState />;
 
@@ -219,7 +251,7 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
               </a>
             </div>
 
-            <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner">
+            <div className="relative overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-inner">
               {!loaded && !errored && <LoadingSkeleton />}
               {errored && (
                 <div className="relative z-10 flex flex-col items-center justify-center gap-3 p-6 text-center min-h-[240px] sm:min-h-[320px] md:min-h-[400px]">
@@ -235,15 +267,9 @@ export default function TechnicalAnalysisPanel({ ticker, companyName, intraday, 
                   </a>
                 </div>
               )}
-              <iframe
-                key={widgetUrl}
-                src={widgetUrl}
-                title={`SIGQ technical analysis for ${normalizedTicker}`}
-                loading="lazy"
-                referrerPolicy="strict-origin-when-cross-origin"
-                onLoad={() => setLoaded(true)}
-                onError={() => setErrored(true)}
-                className="min-h-[240px] sm:min-h-[320px] md:min-h-[400px] h-[min(70dvh,500px)] md:h-[500px] w-full bg-white"
+              <div
+                ref={widgetHostRef}
+                className="min-h-[240px] sm:min-h-[320px] md:min-h-[400px] h-[min(70dvh,500px)] md:h-[500px] w-full bg-slate-950"
               />
             </div>
           </div>

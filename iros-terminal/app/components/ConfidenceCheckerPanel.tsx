@@ -190,6 +190,7 @@ const CATEGORY_META: { key: keyof NonNullable<DeskIcPayload["categoryScores"]>; 
 export default function ConfidenceCheckerPanel({ ticker, companyName, initialDeskIc }: ConfidenceCheckerPanelProps) {
   const normalizedTicker = ticker?.trim().toUpperCase();
   const [activeView, setActiveView] = useState<"widget" | "dashboard">("dashboard");
+  const widgetHostRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
@@ -289,6 +290,37 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
     return `https://trendlyne.com/web-widget/checklist-widget/Poppins/${encodeURIComponent(normalizedTicker)}`;
   }, [normalizedTicker]);
 
+  useEffect(() => {
+    if (activeView !== "widget" || !normalizedTicker) return;
+    const host = widgetHostRef.current;
+    if (!host) return;
+
+    setLoaded(false);
+    setErrored(false);
+    host.replaceChildren();
+
+    const quote = document.createElement("blockquote");
+    quote.className = "trendlyne-widgets";
+    quote.dataset.getUrl = widgetUrl;
+    quote.dataset.theme = "dark";
+    quote.dataset.posCol = "00A25B";
+    quote.dataset.primaryCol = "4DA3FF";
+    quote.dataset.negCol = "FF5A4F";
+    quote.dataset.neuCol = "F6B94A";
+    host.appendChild(quote);
+
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = "https://cdn-static.trendlyne.com/static/js/webwidgets/tl-widgets.js";
+    script.charset = "utf-8";
+    script.onload = () => setLoaded(true);
+    script.onerror = () => setErrored(true);
+    host.appendChild(script);
+
+    return () => host.replaceChildren();
+  }, [activeView, normalizedTicker, widgetUrl]);
+
+
   if (!normalizedTicker) return <EmptyState />;
 
   const criteria = (deskIc?.criteria ?? []) as DeskIcCriterion[];
@@ -359,15 +391,9 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
                   </a>
                 </div>
               )}
-              <iframe
-                key={widgetUrl}
-                src={widgetUrl}
-                title={`SIGQ confidence checker for ${normalizedTicker}`}
-                loading="lazy"
-                referrerPolicy="strict-origin-when-cross-origin"
-                onLoad={() => setLoaded(true)}
-                onError={() => setErrored(true)}
-                className="min-h-[240px] sm:min-h-[320px] md:min-h-[400px] h-[min(70dvh,500px)] md:h-[500px] w-full bg-white"
+              <div
+                ref={widgetHostRef}
+                className="min-h-[240px] sm:min-h-[320px] md:min-h-[400px] h-[min(70dvh,500px)] md:h-[500px] w-full bg-slate-950"
               />
             </div>
           </div>
