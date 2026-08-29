@@ -1,4 +1,5 @@
 name: Harden frontend container
+# Runtime npm/corepack/yarn are intentionally stripped before image scanning.
 
 on:
   push:
