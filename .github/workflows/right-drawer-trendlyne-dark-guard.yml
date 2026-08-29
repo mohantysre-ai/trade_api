@@ -1,4 +1,4 @@
-name: Right drawer Trendlyne dark guard
+name: Right drawer Trendlyne readability guard
 
 on:
   pull_request:
@@ -16,12 +16,12 @@ permissions:
   contents: read
 
 jobs:
-  trendlyne-dark-contract:
+  trendlyne-readability-contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Enforce dark Trendlyne widgets
+      - name: Enforce readable Trendlyne widgets
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -39,16 +39,19 @@ jobs:
 
               widgets.append(str(path))
 
-              if re.search(r'dataset\.theme\s*=\s*[\"\']light[\"\']', text):
-                  violations.append(f'{path}: dataset.theme=light is forbidden')
-              if re.search(r'data-theme\s*=\s*[\"\']light[\"\']', text):
-                  violations.append(f'{path}: data-theme=light is forbidden')
+              if 'TRENDLYNE_DARK_FILTER' in text or 'forceTrendlyneIframeDark' in text:
+                  violations.append(f'{path}: iframe color inversion/filter is forbidden')
+              if re.search(r'iframe\.style\.filter\s*=', text):
+                  violations.append(f'{path}: iframe filter is forbidden')
 
+              # Trendlyne widget themes are not consistent across widget families.
+              # Force the native light document for reliable text contrast and keep
+              # our surrounding SIGQ shell responsible for app dark/light styling.
               if 'trendlyne-widgets' in text and not (
-                  re.search(r'dataset\.theme\s*=\s*[\"\']dark[\"\']', text)
-                  or re.search(r'data-theme\s*=\s*[\"\']dark[\"\']', text)
+                  re.search(r'dataset\.theme\s*=\s*[\"\']light[\"\']', text)
+                  or re.search(r'data-theme\s*=\s*[\"\']light[\"\']', text)
               ):
-                  violations.append(f'{path}: Trendlyne embed must explicitly force dark theme')
+                  violations.append(f'{path}: Trendlyne embed must use native light theme for readability')
 
               if re.search(r'<iframe[\s\S]{0,500}(trendlyne\.com|src=\{widgetUrl\})', text, re.I):
                   violations.append(f'{path}: raw Trendlyne iframe is forbidden; use trendlyne-widgets bootstrap')
@@ -63,7 +66,7 @@ jobs:
                   print(f' - {violation}')
               sys.exit(1)
 
-          print('\nAll Trendlyne component embeds enforce dark mode.')
+          print('\nAll Trendlyne component embeds use readable native rendering.')
           PY
 
       - name: Production build
