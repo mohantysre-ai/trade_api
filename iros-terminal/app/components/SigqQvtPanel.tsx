@@ -2,6 +2,24 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+const TRENDLYNE_DARK_FILTER = "invert(0.92) hue-rotate(180deg) brightness(0.86) contrast(1.08)";
+
+function forceTrendlyneIframeDark(host: HTMLElement) {
+  const apply = () => {
+    host.querySelectorAll("iframe").forEach((node) => {
+      const iframe = node as HTMLIFrameElement;
+      iframe.style.filter = TRENDLYNE_DARK_FILTER;
+      iframe.style.backgroundColor = "#ffffff";
+      iframe.style.colorScheme = "dark";
+    });
+  };
+
+  const observer = new MutationObserver(apply);
+  observer.observe(host, { childList: true, subtree: true });
+  apply();
+  return () => observer.disconnect();
+}
+
 export default function SigqQvtPanel({ ticker }: { ticker: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
@@ -16,6 +34,7 @@ export default function SigqQvtPanel({ ticker }: { ticker: string }) {
     if (!host || !normalizedTicker) return;
     setFailed(false);
     host.replaceChildren();
+    const stopTrendlyneDark = forceTrendlyneIframeDark(host);
     const quote = document.createElement("blockquote");
     quote.className = "trendlyne-widgets";
     quote.dataset.getUrl = widgetUrl;
@@ -31,7 +50,7 @@ export default function SigqQvtPanel({ ticker }: { ticker: string }) {
     script.charset = "utf-8";
     script.onerror = () => setFailed(true);
     host.appendChild(script);
-    return () => host.replaceChildren();
+    return () => { stopTrendlyneDark(); host.replaceChildren(); };
   }, [normalizedTicker, widgetUrl]);
 
   if (!normalizedTicker) return <div className="py-16 text-center text-xs text-slate-400">Select a stock to view SIGQ QVT.</div>;
