@@ -505,7 +505,7 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
         <span className="h-1 w-10 rounded-full bg-slate-300/80" />
       </div>
       {/* Header */}
-      <div className="z-20 shrink-0 border-b border-slate-200 bg-[var(--terminal-panel)]">
+      <div className="sticky top-0 z-[120] shrink-0 border-b border-slate-200 bg-[var(--terminal-panel)] shadow-sm">
         <div className="right-drawer-head px-3 sm:px-5 py-2 sm:py-3 flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-start gap-2.5">
             {stock?.ticker ? <MarketSymbolBadge symbol={stock.ticker} size="md" /> : null}
@@ -529,8 +529,9 @@ export default function RightDrawer({ open, onClose, content }: { open: boolean;
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="right-drawer-close ml-1 shrink-0 w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-[color,background-color] duration-150"
+            className="right-drawer-close relative z-[130] ml-2 shrink-0 w-10 h-10 flex items-center justify-center rounded-full border border-slate-200 bg-[var(--terminal-panel)] text-slate-600 shadow-sm hover:text-slate-950 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 transition-[color,background-color,box-shadow] duration-150"
             aria-label="Close analysis drawer"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}>
