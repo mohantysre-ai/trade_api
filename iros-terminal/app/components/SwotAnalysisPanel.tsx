@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import type { AITickerNewsReport, TerminalIntelligence } from "@/lib/market-api";
 import { buildFactSwot, type DrawerStockFacts, type IntradayMetrics } from "@/lib/drawer-research";
 import type { TrendlyneCardSummary } from "@/lib/intelligence-summary";
@@ -145,7 +145,7 @@ function ScoreRing({ value, label, color }: { value: number | null; label: strin
 /* ── Empty state ── */
 function EmptyState() {
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <div className="relative overflow-hidden rounded-3xl border border-slate-700 bg-slate-950 shadow-sm">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.08),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(239,68,68,0.06),transparent_36%)]" />
       <div className="relative flex min-h-[240px] sm:min-h-[320px] md:min-h-[400px] flex-col items-center justify-center p-8 text-center">
         <div className="mb-6 relative">
@@ -180,6 +180,7 @@ export default function SwotAnalysisPanel({
   const [activeView, setActiveView] = useState<'widget' | 'analysis'>('analysis');
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
+  const widgetHostRef = useRef<HTMLDivElement>(null);
 
   const swotData = useMemo(() => {
     if (!normalizedTicker) return null;
@@ -197,6 +198,36 @@ export default function SwotAnalysisPanel({
     if (!normalizedTicker) return "";
     return `https://trendlyne.com/web-widget/swot-widget/Poppins/${encodeURIComponent(normalizedTicker)}`;
   }, [normalizedTicker]);
+
+  useEffect(() => {
+    if (activeView !== 'widget' || !normalizedTicker) return;
+    const host = widgetHostRef.current;
+    if (!host) return;
+
+    setLoaded(false);
+    setErrored(false);
+    host.replaceChildren();
+
+    const quote = document.createElement("blockquote");
+    quote.className = "trendlyne-widgets";
+    quote.dataset.getUrl = widgetUrl;
+    quote.dataset.theme = "dark";
+    quote.dataset.posCol = "00A25B";
+    quote.dataset.primaryCol = "4DA3FF";
+    quote.dataset.negCol = "FF5A4F";
+    quote.dataset.neuCol = "F6B94A";
+    host.appendChild(quote);
+
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = "https://cdn-static.trendlyne.com/static/js/webwidgets/tl-widgets.js";
+    script.charset = "utf-8";
+    script.onload = () => setLoaded(true);
+    script.onerror = () => setErrored(true);
+    host.appendChild(script);
+
+    return () => host.replaceChildren();
+  }, [activeView, normalizedTicker, widgetUrl]);
 
   if (!normalizedTicker) return <EmptyState />;
 
@@ -258,9 +289,9 @@ export default function SwotAnalysisPanel({
               </a>
             </div>
 
-            <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner">
+            <div className="relative overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-inner">
               {!loaded && !errored && (
-                <div className="flex flex-col items-center justify-center gap-4 bg-white min-h-[240px] sm:min-h-[320px] md:min-h-[400px]">
+                <div className="flex flex-col items-center justify-center gap-4 bg-slate-950 min-h-[240px] sm:min-h-[320px] md:min-h-[400px]">
                   <div className="relative h-14 w-14 rounded-2xl border border-amber-200 bg-amber-50/80 shadow-lg flex items-center justify-center">
                     <svg className="h-7 w-7 text-amber-500 animate-pulse" viewBox="0 0 24 24" fill="none">
                       <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -286,15 +317,10 @@ export default function SwotAnalysisPanel({
                   </a>
                 </div>
               )}
-              <iframe
-                key={widgetUrl}
-                src={widgetUrl}
-                title={`SIGQ SWOT analysis for ${normalizedTicker}`}
-                loading="lazy"
-                referrerPolicy="strict-origin-when-cross-origin"
-                onLoad={() => setLoaded(true)}
-                onError={() => setErrored(true)}
-                className="min-h-[240px] sm:min-h-[320px] md:min-h-[400px] h-[min(70dvh,500px)] md:h-[500px] w-full bg-white"
+              <div
+                ref={widgetHostRef}
+                className="min-h-[240px] sm:min-h-[320px] md:min-h-[400px] bg-slate-950"
+                aria-label={`SIGQ SWOT analysis for ${normalizedTicker}`}
               />
             </div>
           </div>
