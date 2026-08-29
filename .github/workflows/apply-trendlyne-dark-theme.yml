@@ -1,0 +1,51 @@
+name: Apply Trendlyne dark theme
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-trendlyne-dark-theme.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Apply Trendlyne dark-theme patch
+        run: python scripts/fix_trendlyne_dark_theme.py
+
+      - name: Verify widget contracts
+        run: |
+          grep -q 'quote.dataset.theme = "dark"' iros-terminal/app/components/SigqQvtPanel.tsx
+          grep -q 'quote.dataset.theme = "dark"' iros-terminal/app/components/SwotAnalysisPanel.tsx
+          grep -q 'widgetHostRef' iros-terminal/app/components/SwotAnalysisPanel.tsx
+          if grep -q 'src={widgetUrl}' iros-terminal/app/components/SwotAnalysisPanel.tsx; then
+            echo 'Raw SWOT iframe still present'
+            exit 1
+          fi
+
+      - name: Install frontend dependencies
+        working-directory: iros-terminal
+        run: npm ci
+
+      - name: Production build
+        working-directory: iros-terminal
+        run: npm run build
+
+      - name: Commit validated source changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add iros-terminal/app/components/SigqQvtPanel.tsx iros-terminal/app/components/SwotAnalysisPanel.tsx
+          if git diff --cached --quiet; then
+            echo 'No source changes to commit'
+            exit 0
+          fi
+          git commit -m 'Force Trendlyne widgets to dark theme'
+          git push origin HEAD:main
