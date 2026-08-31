@@ -932,6 +932,7 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
         selected = min(delta_ok, key=lambda item: abs(abs(_float(item.get("delta")) or 0) - 0.55)) if delta_ok else None
         future = row.get("future") if isinstance(row.get("future"), dict) else {}
         breadth = _weighted_breadth(market_snapshot, key, direction)
+        neutral_breadth = _weighted_breadth(market_snapshot, key, None)
         futures_oi = _futures_oi_state(future)
         oi_state = futures_oi["state"]
         strong_oi = (direction == "CALL" and oi_state == "LONG_BUILDUP") or (direction == "PUT" and oi_state == "SHORT_BUILDUP")
@@ -968,6 +969,24 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
         contract_gate = True if selected else False if direction and any(_float(item.get("delta")) is not None for item in chain) else None
         greeks_source = selected.get("greeksSource") if selected else None
         directional_breadth = _float(breadth.get("directionalScore"))
+        # The premium-selling sleeve is deliberately built from a separate
+        # gate stack. A range is positive evidence for an iron condor; a
+        # directional breakout can instead produce a hedged credit spread.
+        # Import locally to avoid a module cycle with the shared parsing helpers.
+        from .index_options_seller import build_defined_risk_seller_setup
+        seller_setup = build_defined_risk_seller_setup(
+            chain=chain,
+            spot=spot,
+            expiry_value=row.get("expiry"),
+            structure=structure,
+            breadth_neutral=neutral_breadth,
+            breadth_directional=breadth,
+            futures_oi=futures_oi,
+            directional_oi_aligned=oi_aligned,
+            vix=vix,
+            vix_regime=regime,
+            provider_live=row.get("status") == "LIVE",
+        )
         converted[key] = {
             "spot": spot, "direction": direction, "source": row.get("source") or "ANGEL_ONE", "providerStatus": row.get("status"),
             "expiry": row.get("expiry"), "rawChain": chain, "componentFreshness": row.get("componentFreshness") or {},
@@ -986,6 +1005,7 @@ def option_data_to_strategy_inputs(option_data: dict[str, Any], snapshot: dict[s
                           "lotSize": selected.get("lotSize"), "token": selected.get("token"),
                           "exchange": selected.get("exchange")} if selected else None),
             "breadth": breadth, "structure": structure, "vixRegime": regime, "indiaVix": vix, "expectedR": expected_r,
+            "seller": seller_setup,
             "oiResearch": {"pcr": row.get("pcr"), "source": "SIGQ_RESEARCH" if row.get("pcr") is not None or any(
                 isinstance(item, dict) and item.get("oiEnrichmentSource") == "SIGQ_RESEARCH" for item in chain
             ) else None},

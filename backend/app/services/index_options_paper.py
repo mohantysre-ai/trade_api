@@ -19,11 +19,31 @@ from .index_options_engine import (
     IndexOptionReEntryGovernor,
     can_reenter_index_option,
 )
+from .index_options_seller import SELLER_ENTRY_CUTOFF
 from .json_atomic import atomic_write_json, load_json_with_fallback
 from .market_snapshot_store import market_snapshot_path
 
 _PAPER_LOCK = threading.Lock()
 PAPER_SQUARE_OFF_TIME = dt_time(15, 29)
+SELLER_SQUARE_OFF_TIME = dt_time(15, 20)
+DEFAULT_SELLER_MAX_SINGLE_RISK_INR = 5_000.0
+DEFAULT_SELLER_MAX_PORTFOLIO_RISK_INR = 10_000.0
+
+
+def _positive_env_float(name: str, default: float) -> float:
+    try:
+        value = float(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
+def _seller_single_risk_cap() -> float:
+    return _positive_env_float("INDEX_OPTIONS_SELLER_MAX_SINGLE_RISK", DEFAULT_SELLER_MAX_SINGLE_RISK_INR)
+
+
+def _seller_portfolio_risk_cap() -> float:
+    return _positive_env_float("INDEX_OPTIONS_SELLER_MAX_PORTFOLIO_RISK", DEFAULT_SELLER_MAX_PORTFOLIO_RISK_INR)
 
 
 def paper_book_path() -> Path:
@@ -76,7 +96,13 @@ def _hydrate_locked_instruments(positions: list[dict[str, Any]], candidates: lis
         for contract in row.get("chain") or []:
             if isinstance(contract, dict) and contract.get("symbol"):
                 by_symbol[str(contract["symbol"])] = contract
-    unresolved = [row for row in positions if not row.get("token") or not row.get("exchange")]
+    locked_instruments = [
+        instrument
+        for row in positions
+        for instrument in ((row.get("legs") or []) if row.get("strategyMode") == "SELL_PREMIUM" else [row])
+        if isinstance(instrument, dict)
+    ]
+    unresolved = [row for row in locked_instruments if not row.get("token") or not row.get("exchange")]
     if unresolved:
         try:
             for raw in load_angel_scrip_master():
@@ -86,21 +112,29 @@ def _hydrate_locked_instruments(positions: list[dict[str, Any]], candidates: lis
         except Exception:
             pass
     for position in positions:
-        contract = by_symbol.get(str(position.get("symbol") or "")) or {}
-        if not position.get("token") and contract.get("token"):
-            position["token"] = str(contract["token"])
-        if not position.get("exchange") and (contract.get("exchange") or contract.get("exch_seg")):
-            position["exchange"] = str(contract.get("exchange") or contract.get("exch_seg"))
+        instruments = [position, *(leg for leg in (position.get("legs") or []) if isinstance(leg, dict))]
+        for instrument in instruments:
+            contract = by_symbol.get(str(instrument.get("symbol") or "")) or {}
+            if not instrument.get("token") and contract.get("token"):
+                instrument["token"] = str(contract["token"])
+            if not instrument.get("exchange") and (contract.get("exchange") or contract.get("exch_seg")):
+                instrument["exchange"] = str(contract.get("exchange") or contract.get("exch_seg"))
 
 
 def _direct_locked_marks(client: Any, positions: list[dict[str, Any]]) -> tuple[dict[str, float], str | None]:
     if client is None:
         return {}, None
     instruments: list[Instrument] = []
+    seen: set[str] = set()
     for position in positions:
-        symbol, token, exchange = str(position.get("symbol") or ""), str(position.get("token") or ""), str(position.get("exchange") or "")
-        if symbol and token and exchange:
-            instruments.append(Instrument(f"PAPER:{symbol}", exchange, symbol, token, symbol))
+        locked = (position.get("legs") or []) if position.get("strategyMode") == "SELL_PREMIUM" else [position]
+        for leg in locked:
+            if not isinstance(leg, dict):
+                continue
+            symbol, token, exchange = str(leg.get("symbol") or ""), str(leg.get("token") or ""), str(leg.get("exchange") or "")
+            if symbol and token and exchange and symbol not in seen:
+                instruments.append(Instrument(f"PAPER:{symbol}", exchange, symbol, token, symbol))
+                seen.add(symbol)
     if not instruments:
         return {}, "LOCKED_CONTRACT_TOKEN_UNAVAILABLE" if positions else None
     try:
@@ -145,7 +179,137 @@ def _update_open(position: dict[str, Any], mark: float, now: datetime) -> tuple[
     return updated, None
 
 
+def _candidate_contract(symbol: str, candidates: list[dict[str, Any]]) -> dict[str, Any]:
+    for row in candidates:
+        for contract in row.get("chain") or []:
+            if isinstance(contract, dict) and str(contract.get("symbol") or "") == symbol:
+                return contract
+        for leg in row.get("legs") or []:
+            if isinstance(leg, dict) and str(leg.get("symbol") or "") == symbol:
+                return leg
+    return {}
+
+
+def _credit_close_debit(
+    position: dict[str, Any], candidates: list[dict[str, Any]], direct_marks: dict[str, float],
+) -> tuple[float | None, list[dict[str, Any]], str]:
+    """Price seller exits conservatively: buy shorts at ask, sell hedges at bid."""
+    marked: list[dict[str, Any]] = []
+    direct_used = False
+    for leg in position.get("legs") or []:
+        if not isinstance(leg, dict):
+            return None, [], "UNAVAILABLE"
+        symbol = str(leg.get("symbol") or "")
+        quote = _candidate_contract(symbol, candidates)
+        action = str(leg.get("action") or "").upper()
+        executable = _float(quote.get("bestAsk" if action == "SELL" else "bestBid"))
+        source = "RADAR_EXECUTABLE_DEPTH"
+        if executable is None:
+            executable = direct_marks.get(symbol)
+            source = "ANGEL_DIRECT_LTP_FALLBACK"
+            direct_used = direct_used or executable is not None
+        if executable is None:
+            return None, [], "UNAVAILABLE"
+        marked.append({**leg, "currentPrice": round(executable, 2), "markSource": source})
+    debit = sum(float(leg["currentPrice"]) for leg in marked if leg.get("action") == "SELL") \
+        - sum(float(leg["currentPrice"]) for leg in marked if leg.get("action") == "BUY")
+    return round(max(0.0, debit), 2), marked, "ANGEL_DIRECT_LTP_FALLBACK" if direct_used else "RADAR_EXECUTABLE_DEPTH"
+
+
+def _spot_for(position: dict[str, Any], candidates: list[dict[str, Any]]) -> float | None:
+    key = str(position.get("index") or "")
+    for row in candidates:
+        if str(row.get("key") or "") == key:
+            spot = _float(row.get("spot"))
+            if spot is not None:
+                return spot
+    return None
+
+
+def _close_credit(position: dict[str, Any], debit: float, reason: str, now: datetime) -> dict[str, Any]:
+    credit, qty = float(position["entryCredit"]), int(position["quantity"])
+    costs = float(position.get("estimatedRoundTripCosts") or 0)
+    pnl = round((credit - debit) * qty - costs, 2)
+    max_loss = max(float(position.get("maxLossPerLot") or 0), 0.01)
+    return {
+        **position,
+        "status": "CLOSED",
+        "exitDebit": round(debit, 2),
+        "currentDebit": round(debit, 2),
+        "exitReason": reason,
+        "exitedAt": now.isoformat(),
+        "pnl": pnl,
+        "pnlPct": round(pnl / max_loss * 100.0, 2),
+        "unrealizedPnl": 0.0,
+    }
+
+
+def _update_credit_open(
+    position: dict[str, Any], debit: float, marked_legs: list[dict[str, Any]], spot: float | None, now: datetime,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    credit, qty = float(position["entryCredit"]), int(position["quantity"])
+    costs = float(position.get("estimatedRoundTripCosts") or 0)
+    max_loss_unit = float(position["maxLossPerUnit"])
+    profit_debit = credit * 0.50
+    loss_budget = min(credit * 1.50, max_loss_unit * 0.35)
+    stop_debit = credit + loss_budget
+    pnl = round((credit - debit) * qty - costs, 2)
+    updated = {
+        **position,
+        "legs": marked_legs,
+        "currentDebit": round(debit, 2),
+        "profitTargetDebit": round(profit_debit, 2),
+        "stopDebit": round(stop_debit, 2),
+        "currentUnderlying": round(spot, 2) if spot is not None else None,
+        "unrealizedPnl": pnl,
+        "updatedAt": now.isoformat(),
+    }
+    lower = _float(position.get("shortPutStrike"))
+    upper = _float(position.get("shortCallStrike"))
+    breached = bool(spot is not None and ((lower is not None and spot <= lower) or (upper is not None and spot >= upper)))
+    if breached:
+        return None, _close_credit(updated, debit, "UNDERLYING_SHORT_STRIKE_BREACH", now)
+    if debit <= profit_debit:
+        return None, _close_credit(updated, debit, "PROFIT_TARGET_50PCT_CREDIT", now)
+    if debit >= stop_debit:
+        return None, _close_credit(updated, debit, "DEFINED_RISK_STOP", now)
+    if now.astimezone(IST_ZONE).time().replace(tzinfo=None) >= SELLER_SQUARE_OFF_TIME:
+        return None, _close_credit(updated, debit, "EOD_GAMMA_SQUAREOFF", now)
+    return updated, None
+
+
 def _new_position(row: dict[str, Any], now: datetime, sequence: int) -> dict[str, Any] | None:
+    if row.get("strategyMode") == "SELL_PREMIUM":
+        if now.astimezone(IST_ZONE).time().replace(tzinfo=None) > SELLER_ENTRY_CUTOFF:
+            return None
+        legs = [dict(leg) for leg in (row.get("legs") or []) if isinstance(leg, dict)]
+        risk = row.get("risk") if isinstance(row.get("risk"), dict) else {}
+        credit = _float(risk.get("entryCredit"))
+        max_loss_unit = _float(risk.get("maxLossPerUnit"))
+        max_loss_lot = _float(risk.get("maxLossPerLot"))
+        estimated_costs = _float(risk.get("estimatedRoundTripCosts")) or 0.0
+        lots = {int(_float(leg.get("lotSize")) or 0) for leg in legs}
+        if (not legs or len(lots) != 1 or next(iter(lots), 0) < 1 or not credit or not max_loss_unit
+                or not max_loss_lot or max_loss_lot > _seller_single_risk_cap()):
+            return None
+        lot = next(iter(lots))
+        primary = next((leg for leg in legs if leg.get("action") == "SELL"), legs[0])
+        return {
+            "id": f"{now.astimezone(IST_ZONE).date().isoformat()}-{sequence:02d}-{row['key']}-SELL",
+            "index": row["key"], "bucket": row["bucket"], "direction": row.get("direction"),
+            "strategyMode": "SELL_PREMIUM", "strategyType": row.get("strategyType"),
+            "symbol": primary.get("symbol"), "expiry": row.get("expiry"), "legs": legs,
+            "quantity": lot, "lotSize": lot, "entryCredit": round(credit, 2),
+            "currentDebit": round(credit, 2), "maxProfitPerLot": risk.get("maxProfitPerLot"),
+            "estimatedRoundTripCosts": round(estimated_costs, 2),
+            "maxLossPerUnit": round(max_loss_unit, 2), "maxLossPerLot": round(max_loss_lot, 2),
+            "creditToRisk": risk.get("creditToRisk"), "lowerBreakEven": risk.get("lowerBreakEven"),
+            "upperBreakEven": risk.get("upperBreakEven"), "shortPutStrike": risk.get("shortPutStrike"),
+            "shortCallStrike": risk.get("shortCallStrike"), "score": row.get("score"),
+            "status": "OPEN", "enteredAt": now.isoformat(), "updatedAt": now.isoformat(),
+            "unrealizedPnl": 0.0, "source": row.get("dataSource"), "execution": "DEFINED_RISK_PAPER_ONLY",
+            "entryBasis": "SELL_BID_BUY_ASK", "nakedRisk": False,
+        }
     contract = row.get("contract") if isinstance(row.get("contract"), dict) else {}
     rr = ((row.get("gateEvidence") or {}).get("riskReward") or {})
     premium, lot = _float(contract.get("ltp")), _float(contract.get("lotSize"))
@@ -178,11 +342,17 @@ def _governor(book: dict[str, Any]) -> IndexOptionReEntryGovernor:
         key = str(row.get("index") or "")
         reason = str(row.get("exitReason") or "")
         pnl = float(row.get("pnl") or 0)
-        mapped = "TARGET" if reason == "TARGET" else "TRAILING_SL_PROFIT" if reason == "TRAIL_STOP" and pnl >= 0 else "STOP_LOSS"
+        if reason in {"TARGET", "PROFIT_TARGET_50PCT_CREDIT"}:
+            mapped = "TARGET"
+        elif pnl >= 0:
+            mapped = "TRAILING_SL_PROFIT"
+        else:
+            mapped = "STOP_LOSS"
         if mapped == "STOP_LOSS":
             governor.sl_counts[key] = governor.sl_counts.get(key, 0) + 1
         governor.last_exits[key] = {"time": row.get("exitedAt"), "reason": mapped,
-                                    "direction": row.get("direction"), "price": row.get("exitPremium")}
+                                    "direction": row.get("direction"),
+                                    "price": row.get("exitPremium") if row.get("exitPremium") is not None else row.get("exitDebit")}
     return governor
 
 
@@ -193,12 +363,31 @@ def reconcile_paper_book(
     session = clock.date().isoformat()
     with _PAPER_LOCK:
         book = _load_book(session)
-        candidates = radar.get("candidates") if isinstance(radar.get("candidates"), list) else []
+        buy_candidates = radar.get("candidates") if isinstance(radar.get("candidates"), list) else []
+        seller_candidates = radar.get("sellerCandidates") if isinstance(radar.get("sellerCandidates"), list) else []
+        candidates = [*buy_candidates, *seller_candidates]
         _hydrate_locked_instruments(book["open"], candidates)
         direct_marks, direct_error = _direct_locked_marks(client, book["open"])
         next_open: list[dict[str, Any]] = []
         closed_now: list[dict[str, Any]] = []
         for position in book["open"]:
+            if position.get("strategyMode") == "SELL_PREMIUM":
+                debit, marked_legs, mark_source = _credit_close_debit(position, candidates, direct_marks)
+                if debit is None:
+                    position["markStatus"] = "UNAVAILABLE"
+                    position["markError"] = direct_error or "SPREAD_LEG_MARK_UNAVAILABLE"
+                    next_open.append(position)
+                    continue
+                position["markSource"] = mark_source
+                position["markedAt"] = clock.isoformat()
+                position["markStatus"] = "LIVE"
+                position["markError"] = direct_error if mark_source != "RADAR_EXECUTABLE_DEPTH" else None
+                active, closed = _update_credit_open(position, debit, marked_legs, _spot_for(position, candidates), clock)
+                if active:
+                    next_open.append(active)
+                if closed:
+                    closed_now.append(closed)
+                continue
             mark = direct_marks.get(str(position.get("symbol") or ""))
             mark_source = "ANGEL_DIRECT_LOCKED_CONTRACT"
             if mark is None:
@@ -240,6 +429,13 @@ def reconcile_paper_book(
                 position = _new_position(row, clock, book["entryCount"] + 1)
                 if position is None:
                     continue
+                if position.get("strategyMode") == "SELL_PREMIUM":
+                    open_seller_risk = sum(
+                        float(item.get("maxLossPerLot") or 0)
+                        for item in book["open"] if item.get("strategyMode") == "SELL_PREMIUM"
+                    )
+                    if open_seller_risk + float(position.get("maxLossPerLot") or 0) > _seller_portfolio_risk_cap():
+                        continue
                 book["open"].append(position)
                 book["entryCount"] += 1
                 open_indexes.add(str(row.get("key")))
@@ -249,7 +445,9 @@ def reconcile_paper_book(
         realized = round(sum(float(row.get("pnl") or 0) for row in book["closed"]), 2)
         book.update({"updatedAt": clock.isoformat(), "openPnl": open_pnl, "realizedPnl": realized,
                      "totalPnl": round(open_pnl + realized, 2), "dailyEntryCap": MAX_DAILY_ENTRIES,
-                     "marketOpen": _market_open(clock)})
+                     "marketOpen": _market_open(clock),
+                     "sellerRiskCaps": {"singleTrade": _seller_single_risk_cap(),
+                                        "portfolio": _seller_portfolio_risk_cap()}})
         if persist:
             atomic_write_json(paper_book_path(), book)
         return book

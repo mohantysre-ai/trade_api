@@ -100,6 +100,34 @@ def _refresh_live_breadth_confirmation(row: dict[str, Any], expected_r: float) -
     row.setdefault("gates", {})["breadth"] = refreshed.get("aligned")
 
 
+def _refresh_seller_tail_buffer(row: dict[str, Any], spot: float) -> None:
+    """Invalidate a seller setup when current spot consumes its hedge cushion."""
+    seller = row.get("seller") if isinstance(row.get("seller"), dict) else None
+    if not seller:
+        return
+    risk = seller.get("risk") if isinstance(seller.get("risk"), dict) else {}
+    structure = row.get("structure") if isinstance(row.get("structure"), dict) else {}
+    atr = _float(structure.get("atr5m"))
+    if not atr or atr <= 0:
+        return
+    lower, upper = _float(risk.get("shortPutStrike")), _float(risk.get("shortCallStrike"))
+    buffers = [value for value in (
+        (spot - lower) if lower is not None else None,
+        (upper - spot) if upper is not None else None,
+    ) if value is not None]
+    if not buffers:
+        return
+    minimum = min(buffers) / atr
+    required = 1.0 if seller.get("strategyType") == "IRON_CONDOR" else 0.75
+    aligned = minimum >= required
+    seller.setdefault("gates", {})["tailBuffer"] = aligned
+    seller.setdefault("gateEvidence", {})["tailBuffer"] = {
+        "aligned": aligned, "minimumBufferAtr": round(minimum, 3),
+        "minimum": required, "basis": "LIVE_STREAMED_SPOT",
+    }
+    risk["minimumBufferAtr"] = round(minimum, 3)
+
+
 def _apply_live_spot_risk_guard(strategy_inputs: dict[str, Any]) -> dict[str, Any]:
     """Re-value option risk from live spot and block intrabar stop violations.
 
@@ -120,6 +148,8 @@ def _apply_live_spot_risk_guard(strategy_inputs: dict[str, Any]) -> dict[str, An
             continue
         direction = str(row.get("direction") or "").upper()
         spot = _float(row.get("spot"))
+        if spot:
+            _refresh_seller_tail_buffer(row, spot)
         contract = row.get("contract") if isinstance(row.get("contract"), dict) else None
         structure = row.get("structure") if isinstance(row.get("structure"), dict) else {}
         if direction not in {"CALL", "PUT"} or not spot or not contract:

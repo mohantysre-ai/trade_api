@@ -21,7 +21,10 @@ type Candidate = {
   exchange: string;
   bucket: string;
   spot: number | null;
-  direction: 'CALL' | 'PUT' | null;
+  direction: 'CALL' | 'PUT' | 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
+  bias?: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
+  strategyMode?: 'BUY_PREMIUM' | 'SELL_PREMIUM';
+  strategyType?: string | null;
   state: 'ELIGIBLE' | 'WATCH' | 'NO_TRADE';
   reason: string;
   score: number | null;
@@ -43,7 +46,16 @@ type Candidate = {
     };
     contractEconomics?: { aligned?: boolean | null; greeksSource?: string | null; spreadPct?: number | null };
     riskReward?: { aligned?: boolean | null; expectedR?: number | null; basis?: string; stop?: number | null; target?: number | null; minimumR?: number | null };
+    structure?: { aligned?: boolean | null; status?: string; barCount?: number | null };
+    futuresRegime?: { aligned?: boolean | null; state?: string; priceChangePct?: number | null };
+    volatilityEdge?: { aligned?: boolean | null; shortIv?: number | null; indiaVix?: number | null; ivEdgePoints?: number | null; ivToVix?: number | null };
+    definedRisk?: { aligned?: boolean | null; creditToRisk?: number | null; minimum?: number | null; maxLossPerLot?: number | null };
+    thetaCarry?: { aligned?: boolean | null; netTheta?: number | null; netGamma?: number | null; gammaCap?: number | null };
+    tailBuffer?: { aligned?: boolean | null; minimumBufferAtr?: number | null; minimum?: number | null };
+    timeWindow?: { aligned?: boolean | null; reason?: string; daysToExpiry?: number | null; entryCutoffIst?: string };
   };
+  legs?: Array<{ action: 'BUY' | 'SELL'; role?: string; symbol?: string; strike?: number; optionType?: string; entryPrice?: number; ltp?: number; delta?: number; theta?: number; iv?: number; spreadPct?: number; lotSize?: number }>;
+  risk?: { entryCredit?: number | null; maxProfitPerLot?: number | null; maxLossPerLot?: number | null; creditToRisk?: number | null; lowerBreakEven?: number | null; upperBreakEven?: number | null; minimumBufferAtr?: number | null };
   chain?: Array<{ symbol?: string; strike?: number; optionType?: string; ltp?: number; oi?: number; oiChange?: number; delta?: number; gamma?: number; theta?: number; vega?: number; iv?: number }>;
   structure?: Structure | null;
   oiResearch?: { pcr?: number | null; source?: string | null };
@@ -62,6 +74,7 @@ type Radar = {
   streamStatus?: { connected?: boolean; subscribed?: number; lastTickAt?: string | null };
   disclaimer?: string;
   candidates: Candidate[];
+  sellerCandidates?: Candidate[];
   selected: Candidate[];
   paperBook?: {
     mode?: string; entryCount?: number; dailyEntryCap?: number; openPnl?: number; realizedPnl?: number; totalPnl?: number;
@@ -80,7 +93,9 @@ type Radar = {
 
 type PaperPosition = {
   id: string; index: string; symbol: string; direction: string; quantity: number; status: string;
-  entryPremium: number; currentPremium: number; effectiveStopPremium: number; targetPremium: number;
+  strategyMode?: 'BUY_PREMIUM' | 'SELL_PREMIUM'; strategyType?: string;
+  entryPremium?: number; currentPremium?: number; effectiveStopPremium?: number; targetPremium?: number;
+  entryCredit?: number; currentDebit?: number; profitTargetDebit?: number; stopDebit?: number; maxLossPerLot?: number;
   unrealizedPnl?: number; pnl?: number; pnlPct?: number; exitReason?: string; enteredAt?: string;
   markSource?: string; markedAt?: string; markStatus?: string; markError?: string | null;
 };
@@ -96,6 +111,12 @@ const GATE_LABEL: Record<string, string> = {
   structure: 'Structure',
   trend: 'Trend',
   fresh: 'Live quotes',
+  futuresRegime: 'Futures regime',
+  volatilityEdge: 'IV edge',
+  definedRisk: 'Defined risk',
+  thetaCarry: 'Theta',
+  tailBuffer: 'Tail buffer',
+  timeWindow: 'Time window',
 };
 
 function fmtSpot(value: number | null | undefined) {
@@ -144,8 +165,13 @@ function chainSourceLabel(source: string | null | undefined) {
 
 function candidateHeadline(row: Candidate) {
   const bars = row.structure?.barCount ?? 0;
-  if (row.state === 'ELIGIBLE') return 'All gates passed';
-  if (row.state === 'WATCH') return 'Score below 80';
+  if (row.state === 'ELIGIBLE') return row.strategyMode === 'SELL_PREMIUM' ? 'Defined-risk seller gates passed' : 'All gates passed';
+  if (row.state === 'WATCH') return row.strategyMode === 'SELL_PREMIUM' ? 'Seller score below 82' : 'Score below 80';
+  if (row.reason === 'SELLER_STRUCTURE_UNAVAILABLE') return 'No executable hedged seller structure';
+  if (row.reason.startsWith('SELLER_GATE_FAILED:')) {
+    return `Blocked: ${row.failedGates.map((key) => GATE_LABEL[key] ?? key).join(' · ')}`;
+  }
+  if (row.reason.startsWith('SELLER_DATA_INCOMPLETE:')) return 'Waiting for seller evidence';
   if (row.reason.startsWith('HARD_GATE_FAILED:') && row.failedGates.includes('fresh')) {
     return bars === 0 ? 'Quotes not live' : 'Stale quotes';
   }
@@ -165,6 +191,21 @@ function candidateHeadline(row: Candidate) {
   }
   if (row.reason === 'DIRECTION_NOT_PROVEN') return 'No ORB breakout';
   return 'No trade';
+}
+
+function compactSellerEvidence(row: Candidate) {
+  const evidence = row.gateEvidence;
+  if (!evidence) return [];
+  const vol = evidence.volatilityEdge;
+  const risk = evidence.definedRisk;
+  const theta = evidence.thetaCarry;
+  const buffer = evidence.tailBuffer;
+  return [
+    { label: 'IV edge', value: vol?.ivEdgePoints == null ? 'Missing' : `${fmtNum(vol.ivEdgePoints)} pts · IV/VIX ${fmtNum(vol.ivToVix)}×`, aligned: vol?.aligned },
+    { label: 'Credit/risk', value: risk?.creditToRisk == null ? 'Missing' : `${fmtNum(risk.creditToRisk)} · max loss ₹${fmtNum(risk.maxLossPerLot, 0)}`, aligned: risk?.aligned },
+    { label: 'Theta', value: theta?.netTheta == null ? 'Missing' : `+${fmtNum(theta.netTheta)} · Γ ${fmtNum(theta.netGamma, 5)}`, aligned: theta?.aligned },
+    { label: 'Buffer', value: buffer?.minimumBufferAtr == null ? 'Missing' : `${fmtNum(buffer.minimumBufferAtr)} ATR`, aligned: buffer?.aligned },
+  ];
 }
 
 function compactEvidence(row: Candidate) {
@@ -222,7 +263,6 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
     let inFlight = false;
     let timer: number | undefined;
     const refresh = () => {
@@ -259,7 +299,7 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
               <span className="signal-live-orb" aria-hidden />
               <h2 className="desk-panel-title text-[var(--fg-strong)]">INDEX OPTIONS RADAR</h2>
             </div>
-            <p className="mt-1 text-[11px] text-[var(--fg-muted)]">Direction first · futures OI · option chain · weighted constituents · contract economics</p>
+            <p className="mt-1 text-[11px] text-[var(--fg-muted)]">Long premium breakouts · defined-risk credit spreads · range iron condors · portfolio tail controls</p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="desk-pill desk-pill--ok">Auto paper only</span>
@@ -280,6 +320,10 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
         <div className="desk-card border border-red-500/40 p-3 text-[12px] text-red-600">{radar.error}</div>
       )}
 
+      <div className="flex items-center justify-between px-1">
+        <div className="desk-panel-title">LONG PREMIUM · CONVEX BREAKOUT</div>
+        <span className="desk-pill desk-pill--muted">Debit risk capped at premium</span>
+      </div>
       <div className="desk-metric-grid grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {(radar?.candidates ?? []).map((row) => {
           const pill = statePill(row.state);
@@ -365,6 +409,69 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
         })}
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+        <div>
+          <div className="desk-panel-title">DEFINED-RISK PREMIUM SELLING</div>
+          <div className="mt-0.5 text-[10px] text-[var(--fg-muted)]">Credit spreads and iron condors only · hedge wing mandatory · no naked shorts</div>
+        </div>
+        <span className="desk-pill desk-pill--ok">Institutional seller sleeve</span>
+      </div>
+      <div className="desk-metric-grid grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {(radar?.sellerCandidates ?? []).map((row) => {
+          const pill = statePill(row.state);
+          const chips = gateChips(row);
+          const evidence = compactSellerEvidence(row);
+          return (
+            <article
+              key={`seller-${row.key}`}
+              className={`desk-metric-tile signal-card signal-card--${row.state.toLowerCase()} flex-col items-stretch justify-start`}
+              style={{ ['--tile-accent' as string]: tileAccent(row.state) }}
+            >
+              <div className="flex w-full items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="desk-metric-label">{row.label}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--fg-subtle)]">{row.strategyType?.replaceAll('_', ' ') ?? 'SELLER SCAN'}</div>
+                </div>
+                <span className={pill.className}>{pill.label}</span>
+              </div>
+              <div className="desk-metric-value desk-num mt-2 w-full">{fmtSpot(row.spot)}</div>
+              <div className="mt-2 grid w-full grid-cols-3 gap-2 text-[10px]">
+                <div><div className="uppercase tracking-wider text-[var(--fg-subtle)]">Bias</div><div className="mt-0.5 font-bold text-[var(--fg-strong)]">{row.bias ?? '—'}</div></div>
+                <div><div className="uppercase tracking-wider text-[var(--fg-subtle)]">Seller score</div><div className="mt-0.5 font-bold tabular-nums text-[var(--fg-strong)]">{row.score == null ? 'Pending' : row.score.toFixed(1)}</div></div>
+                <div><div className="uppercase tracking-wider text-[var(--fg-subtle)]">Credit</div><div className="mt-0.5 font-bold tabular-nums text-[var(--fg-strong)]">₹{fmtNum(row.risk?.entryCredit)}</div></div>
+              </div>
+              <div className="mt-2 text-[11px] leading-snug text-[var(--fg-muted)]">{candidateHeadline(row)}</div>
+              {chips.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{chips.map((chip) => <span key={chip} className="desk-pill desk-pill--muted">{chip}</span>)}</div>}
+              {evidence.length > 0 && (
+                <div className="mt-2 grid w-full grid-cols-2 gap-1 border-t border-[var(--terminal-line)] pt-2 text-[9px]">
+                  {evidence.map((item) => (
+                    <div key={item.label} className="min-w-0">
+                      <span className="uppercase tracking-wider text-[var(--fg-subtle)]">{item.label} </span>
+                      <span className={item.aligned === true ? 'text-emerald-600' : item.aligned === false ? 'text-red-500' : 'text-[var(--fg-muted)]'}>{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(row.legs?.length ?? 0) > 0 && (
+                <div className="mt-2 border-t border-[var(--terminal-line)] pt-2 text-[9px]">
+                  <div className="flex flex-wrap gap-1">
+                    {row.legs?.map((leg) => (
+                      <span key={`${leg.action}-${leg.symbol}`} className={leg.action === 'SELL' ? 'desk-pill desk-pill--warn' : 'desk-pill desk-pill--ok'}>
+                        {leg.action} {fmtNum(leg.strike, 0)} {leg.optionType === 'CALL' ? 'CE' : 'PE'} @ ₹{fmtNum(leg.entryPrice)}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="mt-1 tabular-nums text-[var(--fg-muted)]">
+                    Max profit ₹{fmtNum(row.risk?.maxProfitPerLot, 0)} · Max loss ₹{fmtNum(row.risk?.maxLossPerLot, 0)} · C/R {fmtNum(row.risk?.creditToRisk)}
+                  </div>
+                  <div className="mt-0.5 tabular-nums text-[var(--fg-subtle)]">B/E {fmtNum(row.risk?.lowerBreakEven)} — {fmtNum(row.risk?.upperBreakEven)}</div>
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+
       {radar?.paperBook && (
         <div className="desk-card signal-widget signal-widget--book p-3 sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -385,16 +492,19 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
           <div className="mt-3 overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-[10px]">
               <thead className="uppercase tracking-wider text-[var(--fg-subtle)]">
-                <tr><th className="pb-2">Contract</th><th>Index</th><th>Qty</th><th>Entry</th><th>Mark</th><th>Trail SL</th><th>Target</th><th>P&amp;L</th><th>Status</th></tr>
+                <tr><th className="pb-2">Contract / structure</th><th>Index</th><th>Qty</th><th>Entry</th><th>Mark</th><th>Risk exit</th><th>Profit exit</th><th>P&amp;L</th><th>Status</th></tr>
               </thead>
               <tbody>
                 {[...(radar.paperBook.open ?? []), ...(radar.paperBook.closed ?? []).slice(-5).reverse()].map((position) => {
                   const pnl = position.status === 'OPEN' ? position.unrealizedPnl : position.pnl;
+                  const seller = position.strategyMode === 'SELL_PREMIUM';
                   return (
                     <tr key={position.id} className="border-t border-[var(--terminal-line)] tabular-nums">
-                      <td className="py-2 font-bold text-[var(--fg-strong)]">{position.symbol}</td><td>{position.index}</td><td>{position.quantity}</td>
-                      <td>₹{fmtNum(position.entryPremium)}</td><td>₹{fmtNum(position.currentPremium)}</td>
-                      <td>₹{fmtNum(position.effectiveStopPremium)}</td><td>₹{fmtNum(position.targetPremium)}</td>
+                      <td className="py-2 font-bold text-[var(--fg-strong)]">{seller ? position.strategyType?.replaceAll('_', ' ') : position.symbol}</td><td>{position.index}</td><td>{position.quantity}</td>
+                      <td>{seller ? `₹${fmtNum(position.entryCredit)} credit` : `₹${fmtNum(position.entryPremium)}`}</td>
+                      <td>{seller ? `₹${fmtNum(position.currentDebit)} debit` : `₹${fmtNum(position.currentPremium)}`}</td>
+                      <td>₹{fmtNum(seller ? position.stopDebit : position.effectiveStopPremium)}</td>
+                      <td>₹{fmtNum(seller ? position.profitTargetDebit : position.targetPremium)}</td>
                       <td className={(pnl ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}>₹{fmtNum(pnl)}</td>
                       <td>
                         <div>{position.status === 'CLOSED' ? position.exitReason ?? 'CLOSED' : 'OPEN'}</div>
@@ -417,6 +527,7 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
       <div className="desk-card flex flex-wrap items-baseline gap-x-4 gap-y-1 p-3 text-[11px]">
         <span className="font-bold uppercase tracking-wider text-[var(--fg-muted)]">Policy</span>
         <span className="text-[var(--fg-muted)]">1 BROAD + 1 FINANCIAL</span>
+        <span className="text-[var(--fg-muted)]">Seller: hedge wing mandatory · 50% credit target · 35% max-loss budget · 15:20 exit</span>
         <span className="tabular-nums text-[var(--fg-muted)]">
           Re-entry {radar?.reentryPolicy?.maxAttemptsPerIndex ?? 2}× · {radar?.reentryPolicy?.targetCooldownMin ?? 20}m / {radar?.reentryPolicy?.profitTrailCooldownMin ?? 30}m / {radar?.reentryPolicy?.sameDirectionStopCooldownMin ?? 45}m · {(radar?.reentryPolicy?.riskScale ?? 0.5) * 100}% risk
         </span>
