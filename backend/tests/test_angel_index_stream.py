@@ -1,6 +1,42 @@
 from app.services.angel_index_stream import AngelIndexStream
 
 
+class _FakeSdkSocket:
+    def __init__(self):
+        self.calls = []
+
+    def subscribe(self, correlation_id, mode, token_list):
+        self.calls.append((correlation_id, mode, token_list))
+
+
+def test_open_subscribes_through_sdk_wrapper_not_websocket_app():
+    stream = AngelIndexStream()
+    stream._wanted[(1, "99926000")] = {
+        "exchange": "NSE", "token": "99926000", "indexKey": "NIFTY", "kind": "INDEX",
+    }
+    sdk = _FakeSdkSocket()
+    stream._socket = sdk
+
+    stream._on_open(sdk)
+
+    assert sdk.calls == [
+        ("sigqixopt", 3, [{"exchangeType": 1, "tokens": ["99926000"]}])
+    ]
+
+
+def test_subscription_is_deferred_until_current_socket_is_open():
+    stream = AngelIndexStream()
+    stream._wanted[(1, "99926000")] = {
+        "exchange": "NSE", "token": "99926000", "indexKey": "NIFTY", "kind": "INDEX",
+    }
+    sdk = _FakeSdkSocket()
+    stream._socket = sdk
+
+    stream._subscribe_missing(sdk)
+
+    assert sdk.calls == []
+
+
 def test_stream_tick_updates_quote_and_local_five_minute_bar():
     stream = AngelIndexStream()
     stream._wanted[(1, "99926000")] = {

@@ -83,7 +83,9 @@ DOMESTIC_INDEX_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("niftybank", "^NSEBANK", "NIFTY BANK", "index", _fmt_index),
     YahooInstrument("niftyit", "^CNXIT", "NIFTY IT", "index", _fmt_index),
     YahooInstrument("niftypharma", "^CNXPHARMA", "NIFTY PHARMA", "index", _fmt_index),
-    YahooInstrument("niftymidcap", "^CRSMID", "NIFTY MIDCAP", "index", _fmt_index),
+    # Yahoo's legacy ^CRSMID chart intermittently returns an empty/delisted
+    # response. Its NSE instrument ticker carries the same Midcap 100 index.
+    YahooInstrument("niftymidcap", "NIFTY_MIDCAP_100.NS", "NIFTY MIDCAP", "index", _fmt_index),
     YahooInstrument("niftysmallcap", "^CNXSC", "NIFTY SMALLCAP", "index", _fmt_index),
 ]
 
