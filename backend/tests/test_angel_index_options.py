@@ -221,6 +221,34 @@ def test_opposing_breadth_never_uses_adaptive_confirmation():
     assert result["reason"] == "BREADTH_OPPOSES_DIRECTION"
 
 
+def test_early_directional_breadth_requires_exceptional_independent_evidence():
+    early = {
+        "status": "LIVE", "aligned": False, "strictAligned": False,
+        "directionalScore": 0.14, "adaptiveFloor": 0.50, "classification": "NEUTRAL",
+    }
+    allowed = _effective_breadth_gate(
+        early, strong_oi=True, chain_aligned=True, expected_r=3.76,
+        spread_pct=0.4, vix_regime="NORMAL",
+    )
+    assert allowed["aligned"] is True
+    assert allowed["strictAligned"] is False
+    assert allowed["confirmationMode"] == "EARLY_EXCEPTIONAL_EVIDENCE"
+    assert allowed["earlyFloor"] == 0.10
+
+    weak_rr = _effective_breadth_gate(
+        early, strong_oi=True, chain_aligned=True, expected_r=2.99,
+        spread_pct=0.4, vix_regime="NORMAL",
+    )
+    assert weak_rr["aligned"] is False
+
+    flat = _effective_breadth_gate(
+        {**early, "directionalScore": 0.0}, strong_oi=True, chain_aligned=True,
+        expected_r=10.0, spread_pct=0.1, vix_regime="NORMAL",
+    )
+    assert flat["aligned"] is False
+    assert flat["reason"] == "BREADTH_TOO_NEUTRAL"
+
+
 def test_local_black_scholes_fills_missing_sensex_put_greeks():
     result = _local_greeks(
         {"strike": 77300, "ltp": 420, "optionType": "PUT"},

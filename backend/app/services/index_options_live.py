@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 from .angel_index_options import (
     _apply_oi_baselines,
+    _effective_breadth_gate,
     active_index_expiries,
     cached_angel_index_option_snapshot,
     option_data_to_strategy_inputs,
@@ -62,6 +63,41 @@ def _live_structural_levels(row: dict[str, Any]) -> tuple[float | None, float | 
         targets = [orb_low - opening_range, spot - atr]
         target = max((level for level in targets if level < spot), default=None)
     return stop, target, opening_range
+
+
+def _refresh_live_breadth_confirmation(row: dict[str, Any], expected_r: float) -> None:
+    """Re-evaluate adaptive breadth after live spot changes contract R:R.
+
+    Initial breadth confirmation is computed from the last completed candle.
+    The live risk guard then re-prices entry economics from streamed spot.  The
+    old implementation updated only the R:R gate, leaving breadth blocked by
+    stale pre-live economics.  Always restart from ``strictAligned`` so an old
+    adaptive result cannot carry forward without current independent evidence.
+    """
+    direction = str(row.get("direction") or "").upper()
+    evidence = row.get("gateEvidence") if isinstance(row.get("gateEvidence"), dict) else {}
+    breadth = evidence.get("breadth") if isinstance(evidence.get("breadth"), dict) else row.get("breadth")
+    futures = evidence.get("futuresOi") if isinstance(evidence.get("futuresOi"), dict) else {}
+    chain = evidence.get("optionChain") if isinstance(evidence.get("optionChain"), dict) else {}
+    economics = evidence.get("contractEconomics") if isinstance(evidence.get("contractEconomics"), dict) else {}
+    if not isinstance(breadth, dict) or direction not in {"CALL", "PUT"}:
+        return
+    oi_state = str(futures.get("state") or "").upper()
+    strong_oi = (direction == "CALL" and oi_state == "LONG_BUILDUP") or (
+        direction == "PUT" and oi_state == "SHORT_BUILDUP"
+    )
+    base_breadth = {**breadth, "aligned": breadth.get("strictAligned")}
+    refreshed = _effective_breadth_gate(
+        base_breadth,
+        strong_oi=strong_oi,
+        chain_aligned=chain.get("aligned"),
+        expected_r=expected_r,
+        spread_pct=_float(economics.get("spreadPct")),
+        vix_regime=str(row.get("vixRegime") or "").upper() or None,
+    )
+    row["breadth"] = refreshed
+    evidence["breadth"] = refreshed
+    row.setdefault("gates", {})["breadth"] = refreshed.get("aligned")
 
 
 def _apply_live_spot_risk_guard(strategy_inputs: dict[str, Any]) -> dict[str, Any]:
@@ -164,6 +200,7 @@ def _apply_live_spot_risk_guard(strategy_inputs: dict[str, Any]) -> dict[str, An
             "openingRangePoints": round(opening_range, 4),
             "liveInvalidated": False,
         }
+        _refresh_live_breadth_confirmation(row, expected_r)
     return strategy_inputs
 
 

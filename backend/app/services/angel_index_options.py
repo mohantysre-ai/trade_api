@@ -698,7 +698,9 @@ def _effective_breadth_gate(
 
     Strict breadth remains preferred. Partial *directional* participation may
     pass only when the independent futures, chain, R:R, spread, and VIX checks
-    are unusually strong. Neutral or opposing breadth never passes this path.
+    are unusually strong. A narrow early-confirmation tier accepts a mild but
+    real directional bias only with exceptional (>=3R) independent evidence.
+    Flat or opposing breadth never passes either path.
     """
     if breadth.get("aligned") is True:
         return {**breadth, "confirmationMode": "STRICT", "reason": "STRICT_BREADTH_CONFIRMED"}
@@ -708,8 +710,7 @@ def _effective_breadth_gate(
     if directional < 0:
         return {**breadth, "aligned": False, "confirmationMode": "BLOCKED", "reason": "BREADTH_OPPOSES_DIRECTION"}
     floor = _float(breadth.get("adaptiveFloor")) or 0.35
-    if directional < floor:
-        return {**breadth, "aligned": False, "confirmationMode": "BLOCKED", "reason": "BREADTH_TOO_NEUTRAL"}
+    early_floor = 0.10
     supporting = {
         "strongFuturesOi": strong_oi,
         "chainAligned": chain_aligned is True,
@@ -717,10 +718,23 @@ def _effective_breadth_gate(
         "tightSpread": spread_pct is not None and spread_pct <= 1.0,
         "vixAcceptable": vix_regime in {"CALM", "NORMAL", "ELEVATED"},
     }
-    if all(supporting.values()):
+    if directional >= floor and all(supporting.values()):
         return {**breadth, "aligned": True, "classification": "PARTIAL_CONFIRMED",
                 "confirmationMode": "ADAPTIVE_STRONG_EVIDENCE", "reason": "PARTIAL_BREADTH_WITH_STRONG_INDEPENDENT_CONFIRMATION",
                 "adaptiveChecks": supporting}
+    early_supporting = {
+        **supporting,
+        "minimumExpectedR": expected_r is not None and expected_r >= 3.0,
+    }
+    if directional >= early_floor and all(early_supporting.values()):
+        return {**breadth, "aligned": True, "classification": "EARLY_CONFIRMED",
+                "confirmationMode": "EARLY_EXCEPTIONAL_EVIDENCE",
+                "reason": "EARLY_BREADTH_WITH_EXCEPTIONAL_INDEPENDENT_CONFIRMATION",
+                "earlyFloor": early_floor, "adaptiveChecks": early_supporting}
+    if directional < early_floor:
+        return {**breadth, "aligned": False, "confirmationMode": "BLOCKED",
+                "reason": "BREADTH_TOO_NEUTRAL", "earlyFloor": early_floor,
+                "adaptiveChecks": early_supporting}
     return {**breadth, "aligned": False, "confirmationMode": "BLOCKED",
             "reason": "PARTIAL_BREADTH_MISSING_STRONG_CONFIRMATION", "adaptiveChecks": supporting}
 

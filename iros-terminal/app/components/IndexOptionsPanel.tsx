@@ -38,7 +38,7 @@ type Candidate = {
     breadth?: {
       score?: number | null; directionalScore?: number | null; coveragePct?: number | null;
       aligned?: boolean | null; strictAligned?: boolean | null; source?: string; classification?: string;
-      confirmationMode?: string; reason?: string; alignmentFloor?: number | null; adaptiveFloor?: number | null;
+      confirmationMode?: string; reason?: string; alignmentFloor?: number | null; adaptiveFloor?: number | null; earlyFloor?: number | null;
       bullishPct?: number | null; bearishPct?: number | null; neutralPct?: number | null; quoteProxyPct?: number | null;
     };
     contractEconomics?: { aligned?: boolean | null; greeksSource?: string | null; spreadPct?: number | null };
@@ -174,12 +174,27 @@ function compactEvidence(row: Candidate) {
   const futures = evidence.futuresOi;
   const chain = evidence.optionChain;
   const rr = evidence.riskReward;
-  const breadthFloor = breadth?.alignmentFloor == null ? null : breadth.alignmentFloor * 100;
+  const breadthFloor = breadth?.confirmationMode === 'EARLY_EXCEPTIONAL_EVIDENCE'
+    ? breadth.earlyFloor == null ? null : breadth.earlyFloor * 100
+    : breadth?.confirmationMode === 'ADAPTIVE_STRONG_EVIDENCE'
+      ? breadth.adaptiveFloor == null ? null : breadth.adaptiveFloor * 100
+      : breadth?.alignmentFloor == null ? null : breadth.alignmentFloor * 100;
+  const breadthThresholdKind = breadth?.confirmationMode === 'EARLY_EXCEPTIONAL_EVIDENCE'
+    ? 'early need'
+    : breadth?.confirmationMode === 'ADAPTIVE_STRONG_EVIDENCE'
+      ? 'adaptive need'
+      : 'need';
   const breadthNeed = breadthFloor == null || !row.direction
     ? ''
-    : row.direction === 'CALL' ? `need ≥+${breadthFloor.toFixed(0)}%` : `need ≤−${breadthFloor.toFixed(0)}%`;
+    : row.direction === 'CALL'
+      ? `${breadthThresholdKind} ≥+${breadthFloor.toFixed(0)}%`
+      : `${breadthThresholdKind} ≤−${breadthFloor.toFixed(0)}%`;
   const breadthClass = breadth?.classification?.replaceAll('_', ' ') ?? '';
-  const breadthMode = breadth?.confirmationMode === 'ADAPTIVE_STRONG_EVIDENCE' ? ' · adaptive pass' : '';
+  const breadthMode = breadth?.confirmationMode === 'ADAPTIVE_STRONG_EVIDENCE'
+    ? ' · adaptive pass'
+    : breadth?.confirmationMode === 'EARLY_EXCEPTIONAL_EVIDENCE'
+      ? ' · early 3R pass'
+      : '';
   return [
     { label: 'Fut OI', value: futures?.state?.replaceAll('_', ' ') ?? 'Missing', aligned: futures?.aligned },
     { label: 'Breadth', value: breadth?.score == null ? 'Missing' : `${breadthClass ? `${breadthClass} ` : ''}${(breadth.score * 100).toFixed(0)}% · ${breadthNeed} · ${fmtNum(breadth.coveragePct, 0)}% cov${breadthMode}`, aligned: breadth?.aligned },

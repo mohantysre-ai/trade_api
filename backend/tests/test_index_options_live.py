@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from app.services.index_options_live import (
@@ -7,6 +7,9 @@ from app.services.index_options_live import (
     finalize_closed_index_options_radar,
     replay_session_payload,
 )
+from app.services.index_options_engine import build_index_options_radar
+from app.services.index_options_paper import reconcile_paper_book
+from app.services.angel_index_options import IST_ZONE
 from app.services.lemonn_options import apply_lemonn_fallback
 from tests.test_index_options_replay import _ReplayClient, _master_for_replay
 
@@ -109,6 +112,66 @@ def test_live_put_stop_invalidation_is_direction_aware():
     guarded = _apply_live_spot_risk_guard(inputs)["indices"]["BANKNIFTY"]
     assert guarded["gates"]["structure"] is False
     assert guarded["gateEvidence"]["riskReward"]["liveInvalidated"] is True
+
+
+def test_banknifty_early_breadth_rechecks_live_rr_and_auto_locks(tmp_path, monkeypatch):
+    monkeypatch.setenv("INDEX_OPTIONS_PAPER_BOOK_FILE", str(tmp_path / "paper.json"))
+    inputs = {
+        "indices": {
+            "BANKNIFTY": {
+                "spot": 249.0,
+                "direction": "PUT",
+                "providerStatus": "LIVE",
+                "source": "ANGEL_ONE",
+                "contract": {
+                    "symbol": "BANKNIFTYTESTPE", "strike": 250, "expiry": "2026-09-01",
+                    "ltp": 120, "delta": -0.52, "gamma": 0.001, "lotSize": 30,
+                    "token": "12345", "exchange": "NFO",
+                },
+                "scores": {name: 100.0 for name in (
+                    "trend", "breakout", "futuresOi", "optionChain", "contract", "regime"
+                )} | {"breadth": 57.0},
+                "structure": {"last": 247, "ema9": 251, "orbHigh": 260, "orbLow": 250, "atr5m": 10},
+                "gates": {name: True for name in (
+                    "fresh", "structure", "breakout", "futuresOi", "optionChain", "contractEconomics"
+                )} | {"breadth": False, "riskReward": False},
+                "gateEvidence": {
+                    "futuresOi": {"state": "SHORT_BUILDUP", "aligned": True},
+                    "optionChain": {"aligned": True, "reason": "DIRECTIONAL_PREMIUM_OI_BUILDUP"},
+                    "breadth": {
+                        "status": "LIVE", "aligned": False, "strictAligned": False,
+                        "score": -0.14, "directionalScore": 0.14, "coveragePct": 100.0,
+                        "adaptiveFloor": 0.50, "classification": "NEUTRAL",
+                    },
+                    "contractEconomics": {"aligned": True, "spreadPct": 0.2},
+                },
+                "breadth": {
+                    "status": "LIVE", "aligned": False, "strictAligned": False,
+                    "score": -0.14, "directionalScore": 0.14, "coveragePct": 100.0,
+                    "adaptiveFloor": 0.50, "classification": "NEUTRAL",
+                },
+                "vixRegime": "NORMAL",
+                "rawChain": [],
+                "dataLimitations": [],
+            }
+        }
+    }
+    guarded = _apply_live_spot_risk_guard(inputs)
+    bank = guarded["indices"]["BANKNIFTY"]
+    assert bank["expectedR"] >= 3.0
+    assert bank["gates"]["breadth"] is True
+    assert bank["breadth"]["confirmationMode"] == "EARLY_EXCEPTIONAL_EVIDENCE"
+
+    radar = build_index_options_radar({"indexOptions": guarded})
+    assert radar["selected"][0]["key"] == "BANKNIFTY"
+    assert radar["selected"][0]["state"] == "ELIGIBLE"
+
+    book = reconcile_paper_book(
+        radar, now=datetime(2026, 8, 31, 11, 0, tzinfo=IST_ZONE), persist=True,
+    )
+    assert book["entryCount"] == 1
+    assert book["open"][0]["index"] == "BANKNIFTY"
+    assert book["open"][0]["symbol"] == "BANKNIFTYTESTPE"
 
 
 def test_compose_applies_lemonn_after_scanx(monkeypatch):
