@@ -3888,4 +3888,1952 @@ def _build_payload_from_live_data(
         # first. Only missing Angel symbols use the existing provider failover.
         angel_rows = client.fetch_batch_quotes(stock_universe)
         stock_quotes_raw = {
-     
+            str(symbol).upper(): {**dict(row), "quoteProvider": "angel"}
+            for symbol, row in angel_rows.items()
+            if isinstance(row, dict)
+        }
+        missing_instruments = [inst for inst in stock_universe if inst.key not in stock_quotes_raw]
+        fallback_rows: dict[str, dict[str, Any]] = {}
+        fallback_meta: dict[str, Any] = {}
+        if missing_instruments:
+            fallback_rows, fallback_meta = _fetch_stock_quotes_with_coverage(client, missing_instruments)
+            for symbol, row in fallback_rows.items():
+                stock_quotes_raw.setdefault(symbol, row)
+        expected = len(stock_universe)
+        received = len(stock_quotes_raw)
+        coverage_pct = round((received / expected * 100.0) if expected else 0.0, 2)
+        providers = {"angel": len(angel_rows), "nse": 0, "dhan": 0}
+        for provider, count in (fallback_meta.get("providers") or {}).items():
+            providers[provider] = providers.get(provider, 0) + int(count or 0)
+        quote_coverage = {
+            "expected": expected,
+            "received": received,
+            "coveragePct": coverage_pct,
+            "selectionAllowed": bool(expected and coverage_pct >= 99.0),
+            "providers": providers,
+            "missingSymbols": [inst.key for inst in stock_universe if inst.key not in stock_quotes_raw],
+            "pricePriority": "ANGEL_FIRST_SWING_HUNT",
+        }
+    else:
+        stock_quotes_raw, quote_coverage = _fetch_stock_quotes_with_coverage(client, stock_universe)
+    if not quote_coverage["selectionAllowed"]:
+        raise RuntimeError(
+            "Market quote coverage below required threshold: "
+            f"{quote_coverage['received']}/{quote_coverage['expected']} "
+            f"({quote_coverage['coveragePct']}%). Missing: "
+            f"{', '.join(quote_coverage['missingSymbols'][:25])}"
+        )
+    macro_raw = client.fetch_batch_quotes(list(MACRO_INSTRUMENTS))
+
+    all_stocks: list[dict[str, Any]] = []
+    stock_quotes: dict[str, dict[str, Any]] = {}
+    stock_universe_by_key = {inst.key: inst for inst in stock_universe}
+    for inst in stock_universe:
+        quote = stock_quotes_raw.get(inst.key)
+        if not quote:
+            continue
+        row = _build_stock_row(inst, quote, active_pool_label)
+        all_stocks.append(row)
+        stock_quotes[inst.key] = row
+
+    candle_limit = int(os.getenv("INTRADAY_CANDIDATE_LIMIT", str(VOLUME_PRESELECT_LIMIT)))
+    volume_limit = int(os.getenv("VOLUME_PRESELECT_LIMIT", str(VOLUME_PRESELECT_LIMIT)))
+    swing_limit = int(os.getenv("SWING_CANDIDATE_LIMIT", str(SWING_CANDIDATE_LIMIT)))
+    candle_limit = max(candle_limit, volume_limit, swing_limit)
+    top_by_volume = _select_top_volume_stocks(all_stocks, candle_limit)
+    candidate_rows = top_by_volume[:candle_limit]
+    candidate_keys = {row["ticker"] for row in candidate_rows}
+    row_by_ticker = {row["ticker"]: row for row in all_stocks}
+
+    for row in all_stocks:
+        if row["ticker"] not in candidate_keys:
+            row["intraday"] = {
+                "atr_pct": 0.0,
+                "volume_multiplier": 0.0,
+                "today_volume": 0.0,
+                "avg_daily_volume_20": 0.0,
+                "vwap": 0.0,
+                "ema9": 0.0,
+                "ema_angle_deg": 0.0,
+                "orb_high": 0.0,
+                "orb_low": 0.0,
+                "orb_velocity_pct": 0.0,
+                "wick_noise_ratio": 1.0,
+                "turnover_cr": 0.0,
+                "price_above_vwap": False,
+                "price_above_ema9": False,
+                "trigger_point": "VWAP Bounce",
+                "passes_hard_filters": False,
+                "hard_filter_reasons": ["not in intraday candidate set"],
+            }
+
+    rows_to_fetch: list[dict[str, Any]] = []
+    for row in candidate_rows:
+        cached_intraday = intraday_cache.get(row["ticker"])
+        if _intraday_metrics_usable(cached_intraday):
+            row["intraday"] = cached_intraday
+            stock_quotes[row["ticker"]] = row
+        else:
+            rows_to_fetch.append(row)
+
+    if rows_to_fetch:
+        progress(f"Fetching intraday metrics for {len(rows_to_fetch)} symbols...")
+        fetched_metrics = _fetch_all_intraday_chunked(
+            client,
+            rows_to_fetch,
+            stock_universe_by_key,
+            now,
+            on_progress=on_progress,
+        )
+        for ticker, metrics in fetched_metrics.items():
+            original = row_by_ticker.get(ticker)
+            if original is not None:
+                original["intraday"] = metrics
+                stock_quotes[ticker] = original
+
+    candle_ready = sum(
+        1 for row in candidate_rows if _intraday_metrics_usable(row.get("intraday"))
+    )
+    candle_expected = len(candidate_rows)
+    candle_coverage_pct = round(
+        (candle_ready / candle_expected * 100.0) if candle_expected else 0.0, 2
+    )
+    quote_coverage["candles"] = {
+        "expected": candle_expected,
+        "received": candle_ready,
+        "coveragePct": candle_coverage_pct,
+        "selectionAllowed": bool(
+            candle_expected
+            and candle_coverage_pct >= MARKET_DATA_MIN_CANDLE_COVERAGE_PCT
+        ),
+    }
+    if not quote_coverage["candles"]["selectionAllowed"]:
+        raise RuntimeError(
+            "Candle coverage below required threshold: "
+            f"{candle_ready}/{candle_expected} ({candle_coverage_pct}%)"
+        )
+
+    bulk_deal_map = load_bulk_deals()
+    promoter_map = ensure_promoter_holdings([row["ticker"] for row in candidate_rows])
+    for row in all_stocks:
+        if row["ticker"] in candidate_keys:
+            enrich_stock_quality(row, promoter_map, bulk_deal_map)
+            stock_quotes[row["ticker"]] = row
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # STAGE 1: Deterministic Quant Engine
+    # Applies hard filters and computes Alpha Scores with no LLM involvement.
+    # Returns top TOP_SELECTION_COUNT by Alpha Score; pads with volume leaders if needed.
+    # ─────────────────────────────────────────────────────────────────────────
+    progress("Running quant pipeline...")
+    top_ranked = _compute_deterministic_pipeline(all_stocks)
+
+    macro_morning, macro_evening = _build_macro_strips(macro_raw)
+    global_macro = fetch_global_macro()
+    news_items = fetch_live_news()
+
+    existing_ti = snapshot.get("terminalIntelligence") if snapshot else None
+    existing_summary = snapshot.get("newsSummary") if snapshot else None
+    existing_ticker_news = snapshot.get("tickerNewsByTicker") if snapshot else {}
+
+    top_llm_tickers = [row["ticker"] for row in top_ranked[:LLM_DISPLAY_COUNT]]
+    can_reuse_ai = not force_llm_refresh and _ai_cache_fresh(snapshot, top_llm_tickers)
+
+    reused_llm = False
+    if can_reuse_ai:
+        cached_stock_by_ticker = {
+            str(row.get("ticker") or row.get("symbol") or "").upper(): row
+            for row in ((snapshot or {}).get("stocks") or [])
+            if isinstance(row, dict) and (row.get("ticker") or row.get("symbol"))
+        }
+        verdict_by_ticker = {
+            str(row.get("ticker")).upper(): row
+            for row in ((existing_ti or {}).get("ledger_stocks") or [])
+            if row.get("ticker")
+        }
+        final_audited: list[dict[str, Any]] = []
+        for row in top_ranked:
+            enriched = dict(row)
+            ledger = verdict_by_ticker.get(str(row["ticker"]).upper())
+            cached_stock = cached_stock_by_ticker.get(str(row["ticker"]).upper())
+            audit_source = cached_stock or ledger or {}
+            cached_verdict = str(
+                audit_source.get("riskAuditVerdict")
+                or audit_source.get("verdict")
+                or ""
+            ).upper().strip()
+            if row["ticker"] not in top_llm_tickers:
+                cached_verdict = "HOLD_FOR_DATA"
+            elif cached_verdict not in ("APPROVE", "REJECT", "HOLD_FOR_DATA"):
+                cached_verdict = "HOLD_FOR_DATA"
+            enriched["riskAuditVerdict"] = cached_verdict
+            enriched["verdict"] = cached_verdict
+            enriched["risk_flags"] = list(audit_source.get("risk_flags") or [
+                "Reused cached risk audit" if cached_verdict != "HOLD_FOR_DATA"
+                else "No reusable risk audit; fail-closed hold"
+            ])
+            if isinstance(audit_source.get("deskIcSummary"), dict):
+                enriched["deskIcSummary"] = dict(audit_source["deskIcSummary"])
+            elif cached_verdict == "HOLD_FOR_DATA":
+                enriched["deskIcSummary"] = {
+                    "deskDecision": "HOLD_FOR_DATA",
+                    "conviction": None,
+                    "oneLiner": "No reusable risk audit; fail-closed hold.",
+                    "source": "risk_audit",
+                }
+            final_audited.append(enriched)
+        top_rows = final_audited[:_TI_TOP_SELECTION_COUNT]
+        terminal_intel = existing_ti
+        news_summary = existing_summary
+        reused_llm = True
+        desk_ic_map = (
+            snapshot.get("deskIcByTicker")
+            if isinstance(snapshot.get("deskIcByTicker"), dict)
+            else {}
+        )
+        _log = logging.getLogger(__name__)
+        _log.info(
+            "Reusing snapshot terminalIntelligence/newsSummary (day-lock=%s top-%d)",
+            _llm_locked_for_today(snapshot),
+            LLM_DISPLAY_COUNT,
+        )
+    else:
+        progress(f"Running LLM risk audit on top {LLM_DISPLAY_COUNT}...")
+        final_audited = _execute_llm_risk_audit(top_ranked, news_items)
+        try:
+            from .desk_ic_criteria import batch_desk_ic_for_stocks
+
+            progress(f"Running Desk IC criteria on top {LLM_DISPLAY_COUNT}...")
+            desk_ic_map = batch_desk_ic_for_stocks(
+                final_audited[:LLM_DISPLAY_COUNT],
+                news_by_ticker=existing_ticker_news or {},
+                # Refresh path: deterministic FactPack (incl. risk verdict). Drawer /api/desk-ic uses LLM.
+                use_llm=False,
+                limit=LLM_DISPLAY_COUNT,
+            )
+        except Exception as desk_exc:
+            logging.getLogger(__name__).warning("Desk IC batch failed: %s", desk_exc)
+            desk_ic_map = {}
+        progress("Building terminal intelligence...")
+        ledger_rows = build_audit_ledger([s for s in final_audited if s.get("ticker") in top_llm_tickers])
+        _log = logging.getLogger(__name__)
+        _log.info("\n" + "=" * 40 + " INSTITUTIONAL RISK AUDIT LEDGER " + "=" * 40)
+        for ledger_row in ledger_rows:
+            _log.info(ledger_row)
+        _log.info("=" * 113)
+        top_rows, terminal_intel, news_summary = _build_terminal_payload(
+            all_stocks=final_audited,
+            news_items=news_items,
+            macro_morning=macro_morning,
+            macro_evening=macro_evening,
+            pool_name=resolved_pool_name,
+            custom_prompt=custom_prompt,
+        )
+
+    payload = {
+        "success": True,
+        "source": f"angel_one+news+llm_dynamic_top{_TI_TOP_SELECTION_COUNT}",
+        "rawSources": _news_feed_sources(),
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "mockTickers": sorted(MOCK_TICKERS),
+        "availablePools": [NIFTY_100_LABEL, "Nifty 500", LIVE_UNIVERSE_LABEL],
+        "activePool": resolved_pool_name,
+        "poolDescription": (
+            "Nifty 500 universe: live quotes on full index, swing candles on top "
+            f"{candle_limit} by volume, Asset Matrix volume screen {volume_limit}."
+            if resolved_pool_name == NIFTY_500_LABEL
+            else (
+                "Matrix pool "
+                f"{resolved_pool_name}; swing hunt still quotes the full Nifty 500."
+            )
+        ),
+        "universeSize": len(all_stocks),
+        "volumeScreenedCount": len(candidate_rows),
+        "marketDataCoverage": quote_coverage,
+        "stocks": top_rows,
+        "stockQuotes": stock_quotes,
+        "macroDataStrip": {"morning": macro_morning, "evening": macro_evening},
+        "globalMacro": global_macro,
+        "news": news_items,
+        "llmProvider": llm_config[0] if llm_config else None,
+        "llmConfigured": llm_config is not None,
+        "newsSummary": news_summary,
+        "llmError": None,
+        "terminalIntelligence": terminal_intel,
+        "tickerIntelligenceByTicker": {},
+        "tickerNewsByTicker": existing_ticker_news or {},
+        "deskIcByTicker": desk_ic_map if isinstance(desk_ic_map, dict) else {},
+        "isSnapshotFallback": False,
+    }
+    # Day-lock: carry prior lock on reuse; stamp lock after a successful fresh LLM pass.
+    if reused_llm and snapshot and snapshot.get("llmLockedForDate"):
+        payload["llmLockedForDate"] = snapshot.get("llmLockedForDate")
+    elif not reused_llm and terminal_intel and not terminal_intel.get("llmError") and news_summary:
+        _stamp_llm_lock(payload, locked=True)
+
+    progress("Fetching Dhan swing picks...")
+    payload = _hydrate_dhan_swing_picks(payload, force=True)
+    payload = _hydrate_ticker_intelligence_map(payload)
+    _apply_selection_meta(
+        payload,
+        mode="live",
+        reason="Live refresh completed during the scheduled IST window.",
+        data_date=_ist_now().date().isoformat(),
+    )
+
+    return payload
+
+
+def build_market_payload(
+    client: AngelOneClient,
+    pool_name: str | None = None,
+    force_refresh: bool = False,
+    custom_prompt: str | None = None,
+    allow_fallback: bool = True, # If live fetch fails, allow falling back to snapshot
+    prefer_cache: bool = False, # If true, try cache first, then live if cache is empty/stale
+    force_llm_refresh: bool = False,  # When false, reuse day-locked / TTL-fresh snapshot AI
+    on_progress: Callable[[str], None] | None = None,
+    angel_first_quotes: bool = False,
+) -> dict[str, Any]:
+    snapshot = _load_last_snapshot()
+
+    if prefer_cache and snapshot:
+        # First-paint path: serve persisted quotes as-is (real updatedAt / dataDate).
+        snapshot = dict(snapshot)
+        snapshot["isSnapshotFallback"] = True
+        age_sec = _snapshot_quote_age_seconds(snapshot)
+        if age_sec is not None:
+            snapshot["snapshotAgeSeconds"] = age_sec
+        data_date = _payload_data_date(snapshot)
+        snapshot["snapshotDataDate"] = data_date
+        needs_refresh = _snapshot_needs_live_refresh(snapshot)
+        snapshot["liveRefreshPending"] = needs_refresh
+        snapshot.setdefault("tickerNewsByTicker", {})
+        if pool_name:
+            snapshot["activePool"] = pool_name
+        if needs_refresh:
+            kick_background_live_refresh(reason="prefer_cache_stale")
+        _apply_selection_meta(
+            snapshot,
+            mode="snapshot",
+            reason=(
+                "Cache preferred. Quote age exposed; background live refresh queued."
+                if needs_refresh
+                else "Cache preferred. Serving the latest saved snapshot."
+            ),
+            data_date=data_date,
+        )
+        return _hydrate_ticker_intelligence_map(
+            _hydrate_dhan_swing_picks(snapshot, prefer_persisted=True)
+        )
+
+    # Attempt live data fetch
+    try:
+        payload = _build_payload_from_live_data(
+            client,
+            pool_name=pool_name,
+            custom_prompt=custom_prompt,
+            force_llm_refresh=force_llm_refresh,
+            prior_snapshot=snapshot,
+            on_progress=on_progress,
+            angel_first_quotes=angel_first_quotes,
+        )
+        _save_last_snapshot(payload)
+        return payload
+    except Exception as exc:
+        if force_refresh and not allow_fallback:
+            raise
+        if allow_fallback and snapshot is not None:
+            snapshot = dict(snapshot)
+            snapshot["isSnapshotFallback"] = True
+            snapshot["llmError"] = snapshot.get("llmError")
+            age_sec = _snapshot_quote_age_seconds(snapshot)
+            if age_sec is not None:
+                snapshot["snapshotAgeSeconds"] = age_sec
+            snapshot["snapshotDataDate"] = _payload_data_date(snapshot)
+            snapshot.setdefault("tickerNewsByTicker", {})
+            if pool_name:
+                snapshot["activePool"] = pool_name
+            # Refresh RSS news even when outside refresh window
+            try: # Still try to fetch fresh news even if falling back to old stock data
+                fresh_news = fetch_live_news()
+                if fresh_news:
+                    snapshot["news"] = fresh_news
+            except Exception:
+                pass
+            _apply_selection_meta(
+                snapshot,
+                mode="snapshot",
+                reason=f"Live refresh failed ({exc}). Serving the latest saved snapshot with fresh news.",
+                data_date=_payload_data_date(snapshot),
+            )
+            return _hydrate_ticker_intelligence_map(
+                _hydrate_dhan_swing_picks(snapshot, prefer_persisted=True)
+            )
+        if not allow_fallback:
+            return {
+                "success": False,
+                "error": "Live refresh was requested but the scheduled refresh window is not active and fallback is disabled.",
+                "rawSources": _news_feed_sources(),
+                "availablePools": [NIFTY_100_LABEL, "Nifty 500", LIVE_UNIVERSE_LABEL],
+                "activePool": pool_name or NIFTY_500_LABEL,
+                "poolDescription": "Nifty 500 Angel One live universe; swing hunt uses the full index.",
+                "stocks": [],
+                "stockQuotes": {},
+                "macroDataStrip": {"morning": [], "evening": []},
+                "globalMacro": {"indices": [], "commodities": []},
+                "news": [],
+                "newsSummary": None,
+                "llmError": None,
+                "terminalIntelligence": None,
+                "tickerIntelligenceByTicker": {},
+                "tickerNewsByTicker": {},
+                "isSnapshotFallback": False,
+                "selectionMeta": {
+                    "mode": "live",
+                    "reason": f"Live refresh failed ({exc}) and fallback is disabled.",
+                    "dataDate": _ist_now().date().isoformat(),
+                },
+            }
+        return {
+            "success": False,
+            "error": "No cached snapshot available. Live refresh runs only during the morning or evening IST windows.",
+            "rawSources": _news_feed_sources(),
+            "availablePools": [NIFTY_100_LABEL, "Nifty 500", LIVE_UNIVERSE_LABEL],
+            "activePool": pool_name or NIFTY_500_LABEL,
+            "poolDescription": "Nifty 500 Angel One live universe; swing hunt uses the full index.",
+            "stocks": [],
+            "stockQuotes": {},
+            "macroDataStrip": {"morning": [], "evening": []},
+            "globalMacro": {"indices": [], "commodities": []},
+            "news": [],
+            "newsSummary": None,
+            "llmError": None,
+            "terminalIntelligence": None,
+            "tickerIntelligenceByTicker": {},
+            "tickerNewsByTicker": {},
+            "isSnapshotFallback": True,
+            "selectionMeta": {
+                "mode": "snapshot",
+                    "reason": f"Live refresh failed ({exc}) and no cached snapshot is available.",
+                "dataDate": _ist_now().date().isoformat(),
+            },
+        }
+
+
+def refresh_snapshot_macros(client: AngelOneClient | None = None) -> dict[str, Any]:
+    """Light live refresh of SNAPSHOT indices / commodities only (no LLM / stock rebuild).
+
+    The refresh is detached from the HTTP request. Every caller receives the
+    last durable snapshot immediately; concurrent callers coalesce onto the
+    one running worker instead of holding a Cloudflare stream open.
+    """
+    if not _MACRO_REFRESH_LOCK.acquire(blocking=False):
+        snapshot = _load_last_snapshot()
+        snapshot = dict(snapshot) if isinstance(snapshot, dict) else {}
+        return {
+            "success": True,
+            "busy": True,
+            "updatedAt": snapshot.get("updatedAt"),
+            "macrosRefreshedAt": snapshot.get("macrosRefreshedAt"),
+            "macroCount": len((snapshot.get("macroDataStrip") or {}).get("morning") or []),
+            "globalIndexCount": len((snapshot.get("globalMacro") or {}).get("indices") or []),
+            "commodityCount": len((snapshot.get("globalMacro") or {}).get("commodities") or []),
+            "payload": snapshot,
+        }
+
+    def run_refresh() -> None:
+        try:
+            _refresh_snapshot_macros_body(client)
+        except BaseException as exc:  # keep the lock releasable even on unusual provider failures
+            logging.getLogger(__name__).warning(
+                "refresh_snapshot_macros background refresh failed: %s", exc
+            )
+        finally:
+            _MACRO_REFRESH_LOCK.release()
+
+    try:
+        threading.Thread(
+            target=run_refresh,
+            name="macro-snapshot-refresh",
+            daemon=True,
+        ).start()
+    except Exception:
+        _MACRO_REFRESH_LOCK.release()
+        raise
+
+    snapshot = _load_last_snapshot()
+    snapshot = dict(snapshot) if isinstance(snapshot, dict) else {}
+    return {
+        "success": True,
+        "accepted": True,
+        "busy": False,
+        "refreshScheduled": True,
+        "updatedAt": snapshot.get("updatedAt"),
+        "macrosRefreshedAt": snapshot.get("macrosRefreshedAt"),
+        "macroCount": len((snapshot.get("macroDataStrip") or {}).get("morning") or []),
+        "globalIndexCount": len((snapshot.get("globalMacro") or {}).get("indices") or []),
+        "commodityCount": len((snapshot.get("globalMacro") or {}).get("commodities") or []),
+        "payload": snapshot,
+    }
+
+
+def _refresh_snapshot_macros_body(client: AngelOneClient | None = None) -> dict[str, Any]:
+    """Inner macro refresh body (runs under lock + timeout)."""
+    snapshot = _load_last_snapshot()
+    if not isinstance(snapshot, dict):
+        snapshot = {
+            "success": True,
+            "stocks": [],
+            "stockQuotes": {},
+            "macroDataStrip": {"morning": [], "evening": []},
+            "globalMacro": {"indices": [], "commodities": []},
+            "news": [],
+        }
+    else:
+        snapshot = dict(snapshot)
+
+    used = client or AngelOneClient()
+    try:
+        macro_raw = used.fetch_batch_quotes(list(MACRO_INSTRUMENTS))
+    except Exception as exc:
+        logging.getLogger(__name__).warning("macro Angel quotes failed: %s", exc)
+        macro_raw = {}
+
+    morning, evening = _build_macro_strips(macro_raw if isinstance(macro_raw, dict) else {})
+    try:
+        gm = fetch_global_macro()
+    except Exception as exc:
+        logging.getLogger(__name__).warning("global macro failed: %s", exc)
+        gm = snapshot.get("globalMacro") if isinstance(snapshot.get("globalMacro"), dict) else {}
+        gm = dict(gm or {})
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    snapshot["macroDataStrip"] = {"morning": morning, "evening": evening}
+    snapshot["globalMacro"] = {
+        "indices": list(gm.get("indices") or []),
+        "commodities": list(gm.get("commodities") or []),
+    }
+    snapshot["updatedAt"] = now_iso
+    snapshot["macrosRefreshedAt"] = now_iso
+    snapshot["isSnapshotFallback"] = False
+    snapshot["success"] = True
+    _save_last_snapshot(snapshot)
+    return {
+        "success": True,
+        "updatedAt": now_iso,
+        "macrosRefreshedAt": now_iso,
+        "macroCount": len(morning),
+        "globalIndexCount": len(snapshot["globalMacro"]["indices"]),
+        "commodityCount": len(snapshot["globalMacro"]["commodities"]),
+        "payload": snapshot,
+    }
+
+
+def _compile_market_analysis_stream(payload: dict[str, Any], custom_prompt: str | None = None) -> str:
+    lines = [
+        f"TOP_N: {_TI_TOP_SELECTION_COUNT}",
+        f"FILTER_PROMPT: {_filter_prompt(custom_prompt)}",
+        "Use the live Angel One universe and return only valid JSON.",
+        "",
+        "--- NEWS ---",
+    ]
+
+    for item in payload.get("news", [])[:10]:
+        lines.append(
+            f"Source: {item['source']}\nTitle: {item['title']}\nSummary: {item['summary']}\nLink: {item['link']}\n"
+        )
+
+    lines.append("--- TOP STOCKS ---")
+    for stock in payload.get("stocks", [])[:_TI_TOP_SELECTION_COUNT]:
+        lines.append(
+            f"{stock['ticker']} ({stock['name']}): LTP {stock['ltp']}, delta {stock['delta']}, "
+            f"state {stock['state']}, close {stock.get('close')}, volume {stock.get('volume')}"
+        )
+
+    lines.append("--- MACRO MORNING ---")
+    for row in payload.get("macroDataStrip", {}).get("morning", [])[:10]:
+        lines.append(f"{row['label']}: {row['val']} {row['delta']} {row['state']}")
+
+    return "\n".join(lines)
+
+
+def create_app() -> FastAPI:
+    _load_refresh_tasks_from_disk()
+    app = FastAPI(title="IROS Angel One Market Feed", version="2.0.0")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @app.get("/api/market-data")
+    def market_data(pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
+        try:
+            # Prefer-cache path does not need Angel login — avoid constructing client.
+            return build_market_payload(
+                None,  # type: ignore[arg-type]
+                pool_name=pool,
+                custom_prompt=prompt,
+                prefer_cache=True,
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.post("/api/refresh-macros")
+    def refresh_macros() -> dict[str, Any]:
+        """Refresh SNAPSHOT India/global indices + commodities only (fast path)."""
+        try:
+            return refresh_snapshot_macros()
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.get("/api/nse-symbols")
+    def nse_symbols(universe: str = "nifty500") -> dict[str, Any]:
+        """Searchable NSE equity tickers for the desk header search bar.
+
+        universe=nifty500 (default): cached Nifty 500 instruments (~500).
+        universe=all: Angel NSE -EQ scrip master keys (~2.4k) when available.
+        """
+        try:
+            mode = str(universe or "nifty500").strip().lower()
+            items: list[dict[str, str]] = []
+            source = "nifty500_instruments"
+
+            if mode in ("all", "full", "nse"):
+                try:
+                    token_map = _load_nse_eq_token_map(force_refresh=False)
+                    for key in sorted(token_map.keys()):
+                        items.append({"ticker": key, "name": key})
+                    source = "angel_scrip_master_nse_eq"
+                except Exception as exc:
+                    logging.getLogger(__name__).warning("nse-symbols all-universe failed: %s", exc)
+
+            if not items:
+                inst_path = Path(__file__).resolve().parent / "nifty500_instruments.json"
+                sym_path = Path(__file__).resolve().parent.parent / "data" / "nifty500_symbols.json"
+                if inst_path.is_file():
+                    raw = json.loads(inst_path.read_text(encoding="utf-8"))
+                    for row in raw.get("instruments") or []:
+                        if not isinstance(row, dict):
+                            continue
+                        key = str(row.get("key") or "").upper().strip()
+                        if not key:
+                            continue
+                        label = str(row.get("label") or key).strip() or key
+                        items.append({"ticker": key, "name": label})
+                    source = "nifty500_instruments"
+                elif sym_path.is_file():
+                    raw = json.loads(sym_path.read_text(encoding="utf-8"))
+                    for sym in raw.get("symbols") or []:
+                        key = str(sym or "").upper().strip()
+                        if key:
+                            items.append({"ticker": key, "name": key})
+                    source = "nifty500_symbols"
+
+            # Merge any snapshot quote names for richer display
+            snap = _load_last_snapshot() or {}
+            quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
+            by_ticker = {r["ticker"]: r for r in items}
+            for t, q in quotes.items():
+                key = str(t or "").upper().strip()
+                if not key:
+                    continue
+                name = key
+                if isinstance(q, dict):
+                    name = str(q.get("name") or q.get("ticker") or key).strip() or key
+                if key in by_ticker:
+                    if name and name != key:
+                        by_ticker[key]["name"] = name
+                else:
+                    by_ticker[key] = {"ticker": key, "name": name}
+            items = sorted(by_ticker.values(), key=lambda r: r["ticker"])
+            return {
+                "success": True,
+                "source": source,
+                "universe": mode if items else "nifty500",
+                "count": len(items),
+                "symbols": items,
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/audit-verdicts")
+    def audit_verdicts() -> dict[str, Any]:
+        """Return all ticker risk audit results (Approved or Rejected) in clean JSON."""
+        snapshot = _load_last_snapshot()
+        if not snapshot:
+            return {
+                "success": False,
+                "error": "No cached market snapshot available. Run a live refresh first."
+            }
+        
+        verdicts = []
+        for stock in snapshot.get("stocks", []):
+            verdicts.append({
+                "ticker": stock.get("ticker"),
+                "name": stock.get("name"),
+                "alpha_score": stock.get("alpha_score", 0.0),
+                "verdict": stock.get("verdict", "APPROVE"),
+                "risk_flags": stock.get("risk_flags", ["None"]),
+                "deskIcSummary": stock.get("deskIcSummary"),
+            })
+            
+        return {
+            "success": True,
+            "updatedAt": snapshot.get("updatedAt"),
+            "count": len(verdicts),
+            "verdicts": verdicts
+        }
+
+    @app.get("/api/desk-ic")
+    def desk_ic(ticker: str = "", force: bool = False, fast: bool = False) -> dict[str, Any]:
+        """Fact-grounded Desk IC criteria (senior IB checklist) for one ticker."""
+        sym = (ticker or "").strip().upper()
+        if not sym:
+            raise HTTPException(status_code=400, detail="Missing required parameter: ticker")
+        snapshot = _load_last_snapshot() or {}
+        try:
+            snapshot = ensure_snapshot_ticker_facts(snapshot, sym)
+            from .desk_ic_criteria import evaluate_and_cache_ticker, get_cached_desk_ic
+
+            cached = None if force else get_cached_desk_ic(
+                snapshot, sym, require_llm=not fast
+            )
+            fact = None
+            try:
+                from .desk_ic_criteria import build_fact_pack, resolve_stock_from_snapshot
+
+                fact = build_fact_pack(sym, resolve_stock_from_snapshot(snapshot, sym))
+            except Exception:
+                fact = None
+            if cached and isinstance(cached.get("factPack"), dict) and isinstance(fact, dict):
+                if cached["factPack"].get("ltp") is None and fact.get("ltp") is not None:
+                    cached = None
+                elif cached["factPack"].get("turnover_cr") is None and fact.get("turnover_cr") is not None:
+                    cached = None
+            if cached:
+                return {"success": True, "ticker": sym, "deskIc": cached, "cached": True}
+            result = evaluate_and_cache_ticker(
+                snapshot,
+                sym,
+                use_llm=not fast,
+                force=force,
+            )
+            if snapshot and not fast:
+                try:
+                    _save_last_snapshot(snapshot)
+                except Exception:
+                    pass
+            return {"success": True, "ticker": sym, "deskIc": result, "cached": False, "fast": fast}
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.get("/api/intraday-matrix")
+    def intraday_matrix() -> dict[str, Any]:
+        """Return lemonn.co.in intraday stock recommendations (upper panel)."""
+        try:
+            from .lemonn_recommender import (
+                fetch_intraday_recommendations,
+                recommendations_to_dict,
+            )
+            recs = fetch_intraday_recommendations(top_n=10)
+            return {
+                "success": True,
+                "recommendations": recommendations_to_dict(recs),
+                "count": len(recs),
+                "source": "lemonn.co.in",
+            }
+
+        except Exception:
+            # Fallback: When lemonn.co.in is unreachable, return mock data
+            # so the frontend never shows a 404 error page.
+            _mock = [
+                {"symbol": "RELIANCE", "name": "Reliance Industries", "direction": "BUY",
+                 "buyPrice": 2950.00, "sellPrice": 3070.00, "stopLoss": 2910.00,
+                 "riskPerShare": 40.00, "confidence": 82.0, "reasons": ["Strong breakout above 15m high", "RSI momentum bullish"]},
+                {"symbol": "TCS", "name": "Tata Consultancy", "direction": "BUY",
+                 "buyPrice": 4120.00, "sellPrice": 4280.00, "stopLoss": 4060.00,
+                 "riskPerShare": 60.00, "confidence": 78.0, "reasons": ["Above 5m and 15m EMA50", "Delivery volume strong"]},
+                {"symbol": "HDFCBANK", "name": "HDFC Bank", "direction": "BUY",
+                 "buyPrice": 1680.00, "sellPrice": 1740.00, "stopLoss": 1655.00,
+                 "riskPerShare": 25.00, "confidence": 85.0, "reasons": ["Daily SMA50 support held", "Bank Nifty momentum"]},
+                {"symbol": "INFY", "name": "Infosys Ltd", "direction": "BUY",
+                 "buyPrice": 1520.00, "sellPrice": 1580.00, "stopLoss": 1495.00,
+                 "riskPerShare": 25.00, "confidence": 76.0, "reasons": ["IT sector rotation", "Above VWAP"]},
+                {"symbol": "BHARTIARTL", "name": "Bharti Airtel", "direction": "BUY",
+                 "buyPrice": 1425.00, "sellPrice": 1480.00, "stopLoss": 1400.00,
+                 "riskPerShare": 25.00, "confidence": 80.0, "reasons": ["Telecom sector strength", "ARPU upgrade cycle"]},
+                {"symbol": "LT", "name": "Larsen & Toubro", "direction": "BUY",
+                 "buyPrice": 3650.00, "sellPrice": 3790.00, "stopLoss": 3590.00,
+                 "riskPerShare": 60.00, "confidence": 73.0, "reasons": ["Capex cycle play", "Order book momentum"]},
+                {"symbol": "SUNPHARMA", "name": "Sun Pharma", "direction": "SELL",
+                 "buyPrice": 1580.00, "sellPrice": 1520.00, "stopLoss": 1610.00,
+                 "riskPerShare": 30.00, "confidence": 65.0, "reasons": ["RSI overbought", "Pharma sector profit booking"]},
+                {"symbol": "TITAN", "name": "Titan Company", "direction": "BUY",
+                 "buyPrice": 3760.00, "sellPrice": 3910.00, "stopLoss": 3700.00,
+                 "riskPerShare": 60.00, "confidence": 79.0, "reasons": ["Consumer demand recovery", "Gold price tailwind"]},
+                {"symbol": "MARUTI", "name": "Maruti Suzuki", "direction": "BUY",
+                 "buyPrice": 12450.00, "sellPrice": 12880.00, "stopLoss": 12280.00,
+                 "riskPerShare": 170.00, "confidence": 81.0, "reasons": ["Auto sales momentum", "New launch pipeline"]},
+                {"symbol": "SBIN", "name": "State Bank of India", "direction": "BUY",
+                 "buyPrice": 820.00, "sellPrice": 850.00, "stopLoss": 808.00,
+                 "riskPerShare": 12.00, "confidence": 84.0, "reasons": ["PSU banking rally", "Valuation comfort"]},
+            ]
+            return {
+                "success": True,
+                "recommendations": _mock,
+                "count": len(_mock),
+                "source": "lemonn.co.in (mock fallback)",
+                "isMock": True,
+            }
+
+    @app.get("/api/index-options")
+    def index_options(
+        background_tasks: BackgroundTasks,
+        live: bool = True,
+        sessionDate: str | None = None,
+    ) -> dict[str, Any]:
+        """Return the deterministic index-options radar; never mock missing chain data."""
+        from .angel_index_options import _RADAR_REFRESH_LOCK, load_persisted_radar
+        from .index_options_live import (
+            compose_live_index_options_radar,
+            finalize_closed_index_options_radar,
+            replay_session_payload,
+        )
+        from .index_options_paper import index_options_market_open
+
+        if sessionDate:
+            try:
+                return replay_session_payload(
+                    AngelOneClient(),
+                    sessionDate,
+                    today=datetime.now(tz=IST_ZONE).date(),
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"Invalid sessionDate: {exc}") from exc
+
+        def _compose() -> dict[str, Any]:
+            return compose_live_index_options_radar(
+                ensure_fresh_market_snapshot(reason="index_options_compose"),
+                live=live,
+                client=AngelOneClient(),
+            )
+
+        def _refresh_bg() -> None:
+            if not _RADAR_REFRESH_LOCK.acquire(blocking=False):
+                return
+            try:
+                _compose()
+            finally:
+                _RADAR_REFRESH_LOCK.release()
+
+        cached = load_persisted_radar()
+        if not index_options_market_open(datetime.now(tz=IST_ZONE)):
+            if cached:
+                return finalize_closed_index_options_radar(cached, client=AngelOneClient())
+            closed = _compose()
+            closed["sessionStatus"] = "CLOSED"
+            closed["huntActive"] = False
+            closed["limits"]["huntMode"] = "SESSION_CLOSED"
+            return closed
+        if _snapshot_needs_live_refresh(_load_last_snapshot()):
+            return _compose()
+        if cached:
+            age_ok = load_persisted_radar(max_age_seconds=15.0) is not None
+            recent = load_persisted_radar(max_age_seconds=90.0) is not None
+            if not age_ok and not recent:
+                return _compose()
+            if not age_ok:
+                background_tasks.add_task(_refresh_bg)
+                cached = {**cached, "cacheStatus": "REFRESHING" if recent else "STALE"}
+            else:
+                cached = {**cached, "cacheStatus": "HIT"}
+            return cached
+        return _compose()
+
+    @app.get("/api/dhan-scanner-matrix")
+    def dhan_scanner_matrix() -> dict[str, Any]:
+        """Dhan ScanX → feed_scanner pipeline with Trade Plan + ₹5L capital allocation."""
+        try:
+            from .dhan_scanner_service import fetch_dhan_scan_results
+            return fetch_dhan_scan_results(min_volume=1_000_000, top_n=10)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.get("/api/trade-outcomes")
+    def trade_outcomes() -> dict[str, Any]:
+        """Return persisted scanner picks with live target/SL hit status."""
+        try:
+            from .trade_outcome import get_trade_outcomes
+            return get_trade_outcomes()
+        except Exception as exc:
+            return {"long": [], "short": [], "updatedAt": None, "error": str(exc)}
+
+    @app.get("/api/fixed-trade-plan")
+    def fixed_trade_plan() -> dict[str, Any]:
+        """Return the fixed/static trade plan persisted as JSON."""
+        try:
+            from .trade_outcome import load_fixed_trade_plan
+            return load_fixed_trade_plan() or {"long": [], "short": [], "updatedAt": None}
+        except Exception as exc:
+            return {"long": [], "short": [], "updatedAt": None, "error": str(exc)}
+
+    @app.post("/api/fixed-trade-plan")
+    def save_fixed_trade_plan(payload: dict[str, Any]) -> dict[str, Any]:
+        """Overwrite the fixed trade plan JSON with the provided payload."""
+        try:
+            from .trade_outcome import save_fixed_trade_plan, _utc_now
+            save_fixed_trade_plan(payload)
+            return {"success": True, "updatedAt": _utc_now()}
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/live-prices")
+    def live_prices() -> dict[str, Any]:
+        """Prices + outcomes for fixed-plan symbols (monitor poll).
+
+        On trading days (session + post-close), every plan ticker is refreshed via
+        Angel One ltpData and/or Yahoo last print; snapshot fills the rest.
+        See response.ltpSourceMix / priceSourcesNote. Never claims tick-live.
+        """
+        try:
+            from .trade_outcome import get_live_prices_for_plan
+            return get_live_prices_for_plan()
+        except Exception as exc:
+            return {
+                "long": [],
+                "short": [],
+                "updatedAt": None,
+                "snapshotUpdatedAt": None,
+                "error": str(exc),
+                "dataStale": True,
+                "marketOpen": False,
+                "sessionClosed": True,
+                "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0},
+                "priceSourcesNote": "Error path — external Yahoo may have been attempted before failure",
+            }
+
+    @app.get("/api/intraday-session/candidates")
+    def intraday_session_candidates() -> dict[str, Any]:
+        """Score universe and propose a 5 LONG + 5 SHORT basket (not locked)."""
+        try:
+            from .intraday_session_engine import generate_candidates
+            return generate_candidates()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/sector-heatmap")
+    def sector_heatmap() -> dict[str, Any]:
+        """Cached NSE Sectoral Indices heat map used by UI and intraday ranking."""
+        from .sector_rotation import get_sector_heatmap
+
+        return get_sector_heatmap()
+
+    @app.post("/api/intraday-session/commit")
+    def intraday_session_commit(force: bool = False) -> dict[str, Any]:
+        """Lock intradAy basket (default 10L+10S) + auto-lock swing portfolio for EOD.
+
+        Manual-broker only — no broker orders. Desk automation may auto-commit after pre-work.
+        Symbols immutable until force unlock.
+        """
+        try:
+            from .intraday_session_engine import commit_session
+            result = commit_session(force=force)
+            if not result.get("success") and result.get("error"):
+                raise HTTPException(status_code=409, detail=result.get("error"))
+            return result
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/swing-screener")
+    def swing_screener_get() -> dict[str, Any]:
+        """Cached swing pre-filter (Chartink unofficial or Yahoo). Lock gates unchanged."""
+        try:
+            from .swing_prefilter import load_prefilter_snapshot, refresh_swing_prefilter
+
+            snap = load_prefilter_snapshot()
+            if snap.get("symbols"):
+                return snap
+            return refresh_swing_prefilter(force=False)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.post("/api/swing-screener/refresh")
+    def swing_screener_refresh(force: bool = True) -> dict[str, Any]:
+        """Refresh Chartink/Yahoo swing pre-filter snapshot."""
+        try:
+            from .swing_prefilter import refresh_swing_prefilter
+
+            return refresh_swing_prefilter(force=force)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/swing-session")
+    def swing_session_get(live: bool = False) -> dict[str, Any]:
+        """Return locked swing portfolio; live=1 enriches LTP/Δ only (symbols fixed)."""
+        try:
+            from .swing_session import get_swing_session
+            return get_swing_session(live=live)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.post("/api/swing-session/lock")
+    def swing_session_lock(force: bool = False) -> dict[str, Any]:
+        """Lock Asset Matrix BUY set into swing_session.json for EOD."""
+        try:
+            from .swing_session import lock_swing_session
+            result = lock_swing_session(force=force)
+            if not result.get("success") and result.get("error"):
+                raise HTTPException(status_code=409, detail=result.get("error"))
+            return result
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/intraday-session")
+    def intraday_session(live: bool = True) -> dict[str, Any]:
+        """Return locked session state + mark-to-market (JSON snapshots only)."""
+        try:
+            from .intraday_session_engine import get_session
+            return get_session(include_live=live)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/intraday-session/replacements")
+    def intraday_session_replacements() -> dict[str, Any]:
+        """GET replacement candidates + applied fills + free capital slots."""
+        try:
+            from .intraday_session_engine import get_session
+
+            sess = get_session(include_live=True)
+            return {
+                "success": bool(sess.get("success")),
+                "sessionDate": sess.get("sessionDate"),
+                "locked": sess.get("locked"),
+                "freeSlots": sess.get("freeSlots"),
+                "replacementCandidates": sess.get("replacementCandidates") or [],
+                "replacementsApplied": sess.get("replacementsApplied") or [],
+                "lastReplacementAppliedAt": sess.get("lastReplacementAppliedAt"),
+                "replacementBlockedReason": sess.get("replacementBlockedReason"),
+                "replacementCutoffIst": sess.get("replacementCutoffIst"),
+                "rotationWindow": sess.get("rotationWindow"),
+                "rotationWindowCode": sess.get("rotationWindowCode"),
+                "rotationWindowOpen": sess.get("rotationWindowOpen"),
+                "updatedAt": sess.get("updatedAt"),
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/alert-history")
+    def alert_history(since: str | None = None) -> dict[str, Any]:
+        """Return fired alert history for today, optionally filtered."""
+        try:
+            from .trade_outcome import get_alert_history
+            return get_alert_history(since=since)
+        except Exception as exc:
+            return {"alerts": [], "total": 0, "error": str(exc)}
+
+    @app.get("/api/reports/eod-intraday")
+    def eod_intraday_report(
+        date: str | None = None,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        """Post-close reconciliation of the day's intraday scanner picks.
+
+        Serves ``data/eod/{date}/book_intraday.json`` when present unless force=true.
+        """
+        try:
+            from datetime import date as _date
+            from .eod_intraday_report import generate_intraday_eod_report
+            from datetime import datetime as _dt
+            for_date = (
+                _date.fromisoformat(date)
+                if date
+                else _dt.now(tz=IST_ZONE).date()
+            )
+            return generate_intraday_eod_report(for_date, force=force)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/reports/eod-swing")
+    def eod_swing_report(
+        date: str | None = None,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        """Day-bucketed swing P&L. Cached under book_swing.json unless force=true."""
+        try:
+            from datetime import date as _date
+            from .eod_swing_report import generate_swing_eod_report
+            for_date = _date.fromisoformat(date) if date else None
+            return generate_swing_eod_report(for_date, force=force)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/news")
+    def news_feed() -> dict[str, Any]:
+        try:
+            return {"success": True, "news": fetch_live_news()}
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.get("/api/test-ticker")
+    def test_ticker(ticker: str = "RELIANCE") -> dict[str, Any]:
+        try:
+            client = AngelOneClient()
+            ticker_upper = ticker.upper()
+            inst = next(
+                (i for i in WATCHLIST if i.key.upper() == ticker_upper),
+                Instrument(ticker_upper, "NSE", f"{ticker_upper}-EQ", "2885")
+            )
+            quote = client.fetch_quote(inst.exchange, inst.tradingsymbol, inst.token)
+            return {
+                "success": True,
+                "ticker": ticker_upper,
+                "quote": quote,
+                "llmConfigured": _llm_config_canonical()[0] is not None,
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.post("/api/refresh-instrument-cache")
+    def refresh_instrument_cache(pool: str = "Nifty 500") -> dict[str, Any]:
+        """Refresh the Nifty 500 / Nifty 100 instrument cache from Angel One.
+
+        On-demand cache population for the asset matrix pools.
+        """
+        try:
+            if pool == NIFTY_100_LABEL:
+                result = refresh_nifty100_cache()
+            else:
+                result = refresh_nifty500_cache()
+            return {"success": result.get("success"), "pool": pool, "result": result}
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.get("/api/market-data/coverage")
+    def market_data_coverage() -> dict[str, Any]:
+        """Expose universe and quote coverage; missing symbols never disappear silently."""
+        raw = _read_nifty500_cache_raw()
+        snapshot = _load_last_snapshot() or {}
+        return {
+            "success": True,
+            "cache": _nifty500_cache_health(raw),
+            "cacheRefreshedAt": raw.get("refreshedAt") or raw.get("exportedAtUtc"),
+            "cacheMissingSymbols": raw.get("unresolved") or [],
+            "quotes": snapshot.get("marketDataCoverage") or {
+                "selectionAllowed": False,
+                "reason": "No coverage metadata in current snapshot",
+            },
+            "snapshotUpdatedAt": snapshot.get("updatedAt"),
+        }
+
+    @app.get("/api/market-intelligence")
+    def market_intelligence(pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
+        try:
+            client = AngelOneClient()
+            payload = build_market_payload(client, pool_name=pool, custom_prompt=prompt)
+            return {
+                "success": True,
+                "analysis": payload.get("terminalIntelligence"),
+                "tickerIntelligenceByTicker": payload.get("tickerIntelligenceByTicker", {}),
+                "newsSummary": payload.get("newsSummary"),
+                "isSnapshotFallback": payload.get("isSnapshotFallback", False),
+                "selectionMeta": payload.get("selectionMeta"),
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.get("/api/terminal-intelligence")
+    def terminal_intelligence(ticker: str | None = None, pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
+        """Read-only ticker intelligence from the persisted snapshot (no live Angel refresh)."""
+        try:
+            snapshot = _load_last_snapshot()
+            if not snapshot:
+                raise HTTPException(status_code=503, detail="Market snapshot unavailable.")
+            snapshot = dict(snapshot)
+            if ticker:
+                resolved = str(ticker).strip().upper()
+                snapshot = ensure_snapshot_ticker_facts(snapshot, resolved)
+                try:
+                    from .ticker_financial_evidence import ensure_ticker_financial_evidence
+
+                    snapshot = ensure_ticker_financial_evidence(snapshot, resolved)
+                except Exception as exc:
+                    logging.getLogger(__name__).warning("ticker financial evidence unavailable for %s: %s", resolved, exc)
+            payload = _hydrate_ticker_intelligence_map(snapshot)
+            if pool:
+                payload["activePool"] = pool
+            sym = str(ticker or "").strip().upper()
+            if sym:
+                report = (payload.get("tickerIntelligenceByTicker") or {}).get(sym)
+                report = dict(report) if isinstance(report, dict) else build_ticker_intelligence_report(payload, sym)
+            else:
+                report = dict(payload.get("terminalIntelligence") or {})
+            return {
+                "success": True,
+                "terminalIntelligence": report,
+                "focusTicker": sym or ticker,
+                "tickerIntelligenceByTicker": payload.get("tickerIntelligenceByTicker", {}),
+                "newsSummary": payload.get("newsSummary"),
+                "selectionMeta": payload.get("selectionMeta"),
+                "isSnapshotFallback": bool(payload.get("isSnapshotFallback", False)),
+            }
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.post("/api/orchestrated-refresh")
+    async def trigger_orchestrated_refresh(background_tasks: BackgroundTasks, pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
+        task_id = f"orchestrated:{int(time.time())}"
+        with _REFRESH_TASK_LOCK:
+            _REFRESH_TASKS[task_id] = {"status": "running", "progress": "Initializing sequence...", "created_at": time.time()}
+        
+        background_tasks.add_task(_run_orchestrated_sequence, task_id, pool, prompt)
+        return {"success": True, "taskId": task_id, "message": "Sequential orchestrated refresh started."}
+
+    @app.post("/api/refresh-intelligence")
+    def refresh_intelligence(pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
+        task_id = _refresh_task_key(pool, prompt)
+        with _REFRESH_TASK_LOCK:
+            task = _REFRESH_TASKS.get(task_id)
+            start_new = False
+            if task is None:
+                start_new = True
+            elif time.time() - task.get("created_at", 0) > REFRESH_TASK_TTL_SECONDS:
+                start_new = True
+
+            if start_new:
+                task_id = _refresh_task_key(pool, prompt)
+                _REFRESH_TASKS[task_id] = {
+                    "status": "running",
+                    "progress": "queued",
+                    "error": None,
+                    "result": None,
+                    "created_at": time.time(),
+                    "pool": pool,
+                    "prompt": prompt,
+                }
+                thread = threading.Thread(
+                    target=_run_refresh_task,
+                    args=(task_id, pool, prompt),
+                    daemon=True,
+                )
+                thread.start()
+
+        return {
+            "success": True,
+            "accepted": True,
+            "taskId": task_id,
+            "status": "running",
+            "statusUrl": f"/api/refresh-intelligence/status?taskId={task_id}",
+            "pool": pool or LIVE_UNIVERSE_LABEL,
+        }
+
+    @app.get("/api/refresh-intelligence/status")
+    def refresh_intelligence_status(taskId: str) -> dict[str, Any]:
+        status = _refresh_task_status(taskId)
+        if status is None:
+            return {
+                "success": False,
+                "taskId": taskId,
+                "status": "expired",
+                "error": "Task not found or expired.",
+            }
+        response: dict[str, Any] = {
+            "success": True,
+            "taskId": taskId,
+            "status": status["status"],
+            "progress": status.get("progress"),
+            "error": status.get("error"),
+            "created_at": status.get("created_at"),
+        }
+        if status["status"] == "done" and status.get("result"):
+            response["result"] = status["result"]
+        return response
+
+    @app.get("/api/morning-prework/status")
+    def morning_prework_status() -> dict[str, Any]:
+        """IST morning pre-work stamp + whether LLM is day-locked."""
+        stamp = _load_morning_prework_stamp()
+        snapshot = _load_last_snapshot()
+        today = _ist_today()
+        scheduler_started = False
+        desk = {}
+        try:
+            from .eod_engine import scheduler as _desk_sched
+
+            scheduler_started = bool(_desk_sched._STARTED)
+            desk = _desk_sched.desk_automation_status()
+        except Exception:
+            scheduler_started = False
+        return {
+            "success": True,
+            "date": today,
+            "enabled": os.getenv("MARKET_PREWORK_ENABLED", "1").strip().lower()
+            not in ("0", "false", "no", "off"),
+            "preworkHour": int(os.getenv("MARKET_PREWORK_HOUR", "9")),
+            "preworkMinute": int(os.getenv("MARKET_PREWORK_MINUTE", "45")),
+            "doneToday": morning_prework_done_today(),
+            "llmLockedForDate": (snapshot or {}).get("llmLockedForDate"),
+            "llmLockedToday": _llm_locked_for_today(snapshot),
+            "schedulerStarted": scheduler_started,
+            "stamp": stamp,
+            "deskAutomation": desk,
+        }
+
+    @app.get("/api/desk-automation/status")
+    def desk_automation_status_route() -> dict[str, Any]:
+        """Full weekday automation pipeline status."""
+        try:
+            from .eod_engine.scheduler import desk_automation_status
+
+            return desk_automation_status()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.post("/api/morning-prework/run")
+    def morning_prework_run(force: bool = False) -> dict[str, Any]:
+        """Manual morning pre-work (same path as the 09:45 IST scheduler)."""
+        try:
+            return run_scheduled_morning_prework(force=force)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.post("/api/refresh-data-on-demand")
+    async def refresh_data_on_demand(request: Request, pool: str | None = None, prompt: str | None = None):
+        try:
+            body: dict[str, Any] = {}
+            try:
+                parsed_body = await request.json()
+                if isinstance(parsed_body, dict):
+                    body = parsed_body
+            except Exception:
+                body = {}
+
+            resolved_pool = pool or body.get("pool")
+            resolved_prompt = prompt or body.get("prompt")
+            refresh_ticker_news = bool(
+                body.get("refreshTickerNews", body.get("refresh_ticker_news", False))
+            )
+            force_llm_refresh = bool(
+                body.get("forceLlmRefresh", body.get("force_llm_refresh", False))
+            )
+
+            dedup_key = _ondemand_refresh_task_key(resolved_pool, resolved_prompt)
+            now = time.time()
+            with _REFRESH_TASK_LOCK:
+                active_task_id = _ONDEMAND_ACTIVE_BY_KEY.get(dedup_key)
+                task = _REFRESH_TASKS.get(active_task_id) if active_task_id else None
+                start_new = True
+                if task is not None:
+                    status = str(task.get("status") or "running")
+                    updated_at = float(task.get("updated_at") or task.get("created_at") or 0)
+                    if status == "running" and (now - updated_at) <= REFRESH_TASK_RUNNING_MAX_IDLE_SECONDS:
+                        start_new = False
+                        task_id = active_task_id
+                    elif status in ("done", "error") and (now - float(task.get("created_at") or 0)) <= REFRESH_TASK_TTL_SECONDS:
+                        start_new = False
+                        task_id = active_task_id
+
+                if start_new:
+                    task_id = f"ondemand-{uuid.uuid4().hex}"
+                    _REFRESH_TASKS[task_id] = {
+                        "status": "running",
+                        "progress": "queued",
+                        "error": None,
+                        "result": None,
+                        "created_at": now,
+                        "updated_at": now,
+                        "pool": resolved_pool,
+                        "prompt": resolved_prompt,
+                        "force_llm_refresh": force_llm_refresh,
+                        "dedup_key": dedup_key,
+                    }
+                    _ONDEMAND_ACTIVE_BY_KEY[dedup_key] = task_id
+                    thread = threading.Thread(
+                        target=_run_ondemand_refresh_task,
+                        args=(task_id, resolved_pool, resolved_prompt, refresh_ticker_news, force_llm_refresh),
+                        daemon=True,
+                    )
+                    thread.start()
+
+            _persist_refresh_tasks()
+
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "success": True,
+                    "accepted": True,
+                    "taskId": task_id,
+                    "status": "running",
+                    "statusUrl": _ondemand_status_url(task_id),
+                    "pool": resolved_pool or LIVE_UNIVERSE_LABEL,
+                },
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.get("/api/refresh-data-on-demand/status")
+    def refresh_data_on_demand_status(taskId: str) -> dict[str, Any]:
+        status = _refresh_task_status(taskId)
+        if status is None:
+            return {
+                "success": False,
+                "taskId": taskId,
+                "status": "expired",
+                "error": "Task not found or expired.",
+            }
+        response: dict[str, Any] = {
+            "success": True,
+            "taskId": taskId,
+            "status": status["status"],
+            "progress": status.get("progress"),
+            "error": status.get("error"),
+            "created_at": status.get("created_at"),
+        }
+        if status["status"] == "done" and status.get("result"):
+            response["result"] = status["result"]
+        return response
+
+    @app.post("/api/refresh-ticker-reason")
+    async def refresh_ticker_reason(request: Request, ticker: str | None = None, pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
+        try:
+            body: dict[str, Any] = {}
+            try:
+                parsed_body = await request.json()
+                if isinstance(parsed_body, dict):
+                    body = parsed_body
+            except Exception:
+                body = {}
+
+            resolved_ticker = str(ticker or body.get("ticker") or "").strip().upper()
+            if not resolved_ticker:
+                raise HTTPException(status_code=400, detail="Missing required ticker parameter.")
+
+            resolved_pool = pool or body.get("pool")
+            resolved_prompt = prompt or body.get("prompt")
+            client = AngelOneClient()
+            payload = build_market_payload(client, pool_name=resolved_pool, custom_prompt=resolved_prompt)
+
+            stock_row = None
+            for stock in payload.get("stocks") or []:
+                if str(stock.get("ticker", "")).upper() == resolved_ticker:
+                    stock_row = stock
+                    break
+            if stock_row is None:
+                quote = (payload.get("stockQuotes") or {}).get(resolved_ticker)
+                if isinstance(quote, dict) and quote:
+                    stock_row = quote
+
+            if stock_row is None:
+                raise HTTPException(status_code=404, detail=f"Ticker {resolved_ticker} not found in current payload.")
+
+            ledger_score = None
+            for row in ((payload.get("terminalIntelligence") or {}).get("ledger_stocks") or []):
+                if str(row.get("ticker", "")).upper() == resolved_ticker:
+                    ledger_score = row.get("score")
+                    break
+            try:
+                score = float(ledger_score if ledger_score is not None else stock_row.get("score") or 0.0)
+            except Exception:
+                score = 0.0
+
+            reason = _on_demand_ticker_selection_reason(resolved_ticker, stock_row, score)
+
+            ticker_map = payload.get("tickerIntelligenceByTicker") or {}
+            ticker_report = ticker_map.get(resolved_ticker)
+            if not ticker_report:
+                ticker_report = build_ticker_intelligence_report(payload, resolved_ticker)
+
+            ticker_report = dict(ticker_report)
+            factor_hub = dict(ticker_report.get("active_factor_hub") or {})
+            factor_hub["selection_reason"] = reason
+            ticker_report["active_factor_hub"] = factor_hub
+            ticker_report["focusTicker"] = resolved_ticker
+            ticker_report["ticker"] = resolved_ticker
+
+            ticker_map[resolved_ticker] = ticker_report
+            payload["tickerIntelligenceByTicker"] = ticker_map
+
+            terminal = payload.get("terminalIntelligence") or {}
+            ledger = terminal.get("ledger_stocks") or []
+            for row in ledger:
+                if str(row.get("ticker", "")).upper() == resolved_ticker:
+                    row["selection_reason"] = reason
+                    break
+            terminal["ledger_stocks"] = ledger
+            payload["terminalIntelligence"] = terminal
+
+            _save_last_snapshot(payload)
+
+            return {
+                "success": True,
+                "ticker": resolved_ticker,
+                "selectionReason": reason,
+                "tickerReport": ticker_report,
+                "isSnapshotFallback": payload.get("isSnapshotFallback", False),
+                "selectionMeta": payload.get("selectionMeta"),
+            }
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.get("/api/ticker-news")
+    async def get_ticker_news(
+        ticker: str,
+        company: str | None = None,
+        max_articles: int = 8,
+        include_raw: bool = False,
+        force_refresh: bool = False,
+    ) -> dict[str, Any]:
+        try:
+            from .ai_ticker_news import (
+                ticker_news_report_has_deterministic_evidence,
+                ticker_news_report_is_llm_complete,
+            )
+
+            resolved_ticker = ticker.strip().upper()
+            if not resolved_ticker:
+                raise HTTPException(status_code=400, detail="Missing required parameter: ticker")
+            capped_articles = max(1, min(int(max_articles or 8), 15))
+
+            snapshot = _load_last_snapshot()
+            ticker_news_map = (snapshot.get("tickerNewsByTicker") or {}) if snapshot else {}
+            cached_report = ticker_news_map.get(resolved_ticker)
+
+            if (
+                not force_refresh
+                and (
+                    ticker_news_report_is_llm_complete(cached_report)
+                    or ticker_news_report_has_deterministic_evidence(cached_report)
+                )
+            ):
+                cached_report = dict(cached_report)
+                cached_report["cached"] = True
+                return cached_report
+
+            async with httpx.AsyncClient() as http_client:
+                response = await http_client.get(
+                    f"{AI_NEWS_API_URL}/api/ticker-news",
+                    params={
+                        "ticker": resolved_ticker,
+                        "company": company or "",
+                        "max_articles": capped_articles,
+                        "include_raw": include_raw,
+                        "force_refresh": force_refresh,
+                    },
+                    timeout=90,
+                )
+                response.raise_for_status()
+                report_data = response.json()
+
+            report_data["cached"] = False
+
+            if snapshot and (
+                ticker_news_report_is_llm_complete(report_data)
+                or ticker_news_report_has_deterministic_evidence(report_data)
+            ):
+                updated_map = dict(snapshot.get("tickerNewsByTicker") or {})
+                updated_map[resolved_ticker] = report_data
+                snapshot = dict(snapshot)
+                snapshot["tickerNewsByTicker"] = updated_map
+                _save_last_snapshot(snapshot)
+
+            return report_data
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger = logging.getLogger("angel_one_feed")
+            logger.error("ticker-news fetch failed for %s: %s", ticker, exc)
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    wire_eod_into_app(app)
+
+    def _persist_books_on_boot() -> None:
+        try:
+            if _snapshot_needs_live_refresh(_load_last_snapshot()):
+                run_scheduled_live_refresh(reason="desk_boot_cold_start")
+        except Exception:
+            logging.getLogger(__name__).exception("boot live snapshot refresh failed")
+        try:
+            from .intraday_session_engine import (
+                _invalidate_session_response_cache,
+                refresh_session_state,
+            )
+            from .cross_book_resolution import reconcile_cross_book
+
+            reconcile_cross_book(_ist_now().date().isoformat(), persist=True)
+            _invalidate_session_response_cache()
+            refresh_session_state()
+        except Exception:
+            logging.getLogger(__name__).exception("boot persist session JSON failed")
+        try:
+            from .swing_session import (
+                _invalidate_swing_response_cache,
+                refresh_swing_session_state,
+            )
+
+            _invalidate_swing_response_cache()
+            refresh_swing_session_state()
+        except Exception:
+            logging.getLogger(__name__).exception("boot persist swing session failed")
+
+    threading.Thread(target=_persist_books_on_boot, name="desk-boot-persist", daemon=True).start()
+
+    return app
+
+
+async def _refresh_ticker_news_for_payload(payload: dict[str, Any]) -> None:
+    """Keep cached news only. LLM summaries run on-demand when the drawer opens a ticker."""
+    existing = payload.get("tickerNewsByTicker")
+    payload["tickerNewsByTicker"] = existing if isinstance(existing, dict) else {}
+    logging.getLogger("angel_one_feed").info(
+        "Skipping background ticker-news LLM (%d cached); summarize on drawer GET /api/ticker-news.",
+        len(payload["tickerNewsByTicker"]),
+    )
+
+
+def _run_ondemand_refresh_task(
+    task_id: str,
+    pool_name: str | None,
+    custom_prompt: str | None,
+    refresh_ticker_news: bool,
+    force_llm_refresh: bool = False,
+) -> None:
+    def update_progress(msg: str) -> None:
+        _refresh_task_touch(task_id, msg)
+
+    try:
+        update_progress("Starting live market refresh...")
+        client = AngelOneClient()
+        payload = build_market_payload(
+            client,
+            pool_name=pool_name,
+            force_refresh=True,
+            prefer_cache=False,
+            custom_prompt=custom_prompt,
+            allow_fallback=True,
+            force_llm_refresh=force_llm_refresh,
+            on_progress=update_progress,
+        )
+        if not payload.get("success", False):
+            _refresh_task_set_error(task_id, payload.get("error") or "Live refresh produced no payload.")
+            return
+
+        payload.setdefault("isSnapshotFallback", False)
+        if payload.get("selectionMeta", {}).get("mode") != "live":
+            payload["selectionMeta"] = {
+                "mode": "live",
+                "reason": payload.get("selectionMeta", {}).get("reason")
+                or "Live refresh explicitly requested by frontend.",
+                "dataDate": payload.get("selectionMeta", {}).get("dataDate") or _payload_data_date(payload),
+            }
+
+        if refresh_ticker_news:
+            update_progress("Refreshing ticker news...")
+            asyncio.run(_refresh_ticker_news_for_payload(payload))
+
+        update_progress("Saving snapshot...")
+        _save_last_snapshot(payload)
+        _refresh_task_set_done(
+            task_id,
+            {
+                "success": True,
+                "payload": payload,
+                "selectionMeta": payload.get("selectionMeta"),
+                "isSnapshotFallback": False,
+            },
+        )
+    except Exception as exc:
+        _refresh_task_set_error(task_id, str(exc))
+
+
+def _run_refresh_task(task_id: str, pool_name: str | None, custom_prompt: str | None) -> None:
+    try:
+        payload = build_market_payload(
+            AngelOneClient(),
+            pool_name=pool_name,
+            force_refresh=True,
+            custom_prompt=custom_prompt,
+        )
+        if not payload.get("success", False):
+            _refresh_task_set_error(task_id, payload.get("error", "Market data unavailable."))
+            return
+        result = {
+            "success": True,
+            "poolStocks": len(payload.get("stocks", [])),
+            "tiLedgerStocks": len((payload.get("terminalIntelligence") or {}).get("ledger_stocks", [])),
+            "tiPopulated": bool(payload.get("terminalIntelligence")),
+            "newsSummaryPopulated": bool(payload.get("newsSummary")),
+            "selectionMeta": payload.get("selectionMeta"),
+        }
+        _refresh_task_set_done(task_id, result)
+    except Exception as exc:
+        _refresh_task_set_error(task_id, str(exc))
+
+
+def _run_orchestrated_sequence(task_id: str, pool_name: str | None, custom_prompt: str | None) -> None:
+    """Orchestrates the sequential dashboard update with 30s delays between sections as specified."""
+    try:
+        client = AngelOneClient()
+        
+        def update_progress(msg: str, payload: dict[str, Any]):
+            with _REFRESH_TASK_LOCK:
+                if task_id in _REFRESH_TASKS:
+                    _REFRESH_TASKS[task_id]["progress"] = msg
+            # Progressive save so frontend can reflect sections being filled
+            _save_last_snapshot(payload)
+            print(f"[ORCHESTRATION] {msg}")
+
+        # 1. Immediately delete existing dashboard snapshot to start fresh
+        snap_path = _snapshot_path()
+        if snap_path.exists():
+            snap_path.unlink()
+        
+        payload: dict[str, Any] = {
+            "success": True,
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+            "stocks": [],
+            "stockQuotes": {},
+            "macroDataStrip": {"morning": [], "evening": []},
+            "globalMacro": {"indices": [], "commodities": []},
+            "news": [],
+            "terminalIntelligence": None,
+            "isSnapshotFallback": False
+        }
+
+        # Step 1: Update GLOBAL INDICES section
+        update_progress("Updating GLOBAL INDICES section...", payload)
+        gm = fetch_global_macro()
+        payload["globalMacro"]["indices"] = gm.get("indices", [])
+        update_progress("GLOBAL INDICES updated. Waiting 30 seconds...", payload)
+        time.sleep(ORCHESTRATION_DELAY)
+
+        # Step 2: Update COMMODITIES & FX section
+        update_progress("Updating COMMODITIES & FX section...", payload)
+        payload["globalMacro"]["commodities"] = gm.get("commodities", [])
+        payload["macroDataStrip"]["morning"].extend(fetch_domestic_yahoo_macro())
+        update_progress("COMMODITIES & FX updated. Waiting 30 seconds...", payload)
+        time.sleep(ORCHESTRATION_DELAY)
+
+        # Step 3: Update NIFTY TOP 5 GAINERS & LOSERS
+        update_progress("Updating NIFTY TOP 5 GAINERS & LOSERS...", payload)
+        resolved_pool = pool_name or NIFTY_500_LABEL
+        stock_universe, pool_label = _quote_universe(resolved_pool)
+        stock_quotes_raw = client.fetch_batch_quotes(stock_universe)
+        
+        all_stocks = []
+        for inst in stock_universe:
+            if q := stock_quotes_raw.get(inst.key):
+                all_stocks.append(_build_stock_row(inst, q, pool_label))
+        
+        # Perform intraday fetch for ranking
+        candidate_rows = _coarse_pre_rank(all_stocks)[:30]
+        all_metrics = _fetch_all_intraday_chunked(client, candidate_rows, {i.key: i for i in stock_universe}, _ist_now())
+        
+        for row in all_stocks:
+            if m := all_metrics.get(row["ticker"]):
+                row["intraday"] = m
+        
+        # ─────────────────────────────────────────────────────────────────────────
+        # STAGE 1: Deterministic Quant Engine
+        # Applies hard filters and computes Alpha Scores with no LLM involvement.
+        # Returns top TOP_SELECTION_COUNT by Alpha Score; pads with volume leaders if needed.
+        # ─────────────────────────────────────────────────────────────────────────
+        update_progress("Running deterministic quant pipeline (hard filters + alpha scores)...", payload)
+        top_20_quant = _compute_deterministic_pipeline(all_stocks)
+
+        # ─────────────────────────────────────────────────────────────────────────
+        # STAGE 2: LLM Safety Auditor
+        # Audits ONLY non-technical risk domains using news context.
+        # Attaches risk_flags + verdict to each stock; never re-ranks technically.
+        # ─────────────────────────────────────────────────────────────────────────
+        update_progress(f"Running LLM risk audit on top {_TI_TOP_SELECTION_COUNT} stocks...", payload)
+        final_audited = _execute_llm_risk_audit(top_20_quant, payload.get("news", []))
+
+        # Print institutional audit ledger to server log
+        ledger_rows = build_audit_ledger(final_audited)
+        for ledger_row in ledger_rows:
+            print(f"[AUDIT] {ledger_row}")
+
+        payload["stocks"] = final_audited
+        payload["stockQuotes"] = {s["ticker"]: s for s in all_stocks}
+        update_progress("NIFTY TOP 5 MOVERS updated. Waiting 30 seconds...", payload)
+        time.sleep(ORCHESTRATION_DELAY)
+
+        # Step 4: Update NIFTY 100 HEAT MAP (gradient data is now in stockQuotes)
+        update_progress("Updating NIFTY 100 HEAT MAP data...", payload)
+        update_progress("NIFTY 100 HEAT MAP updated. Waiting 30 seconds...", payload)
+        time.sleep(ORCHESTRATION_DELAY)
+
+        # Step 5: Update LIVE NEWS FEED
+        update_progress("Updating LIVE NEWS FEED section...", payload)
+        payload["news"] = fetch_live_news()
+        update_progress("LIVE NEWS FEED updated. Waiting 30 seconds...", payload)
+        time.sleep(ORCHESTRATION_DELAY)
+
+        # Step 6: Update INDIA MARKETS section (TOP MOVERS, ASSET METRICS)
+        update_progress("Updating INDIA MARKETS section...", payload)
+        macro_raw = client.fetch_batch_quotes(list(MACRO_INSTRUMENTS))
+        m, e = _build_macro_strips(macro_raw)
+        payload["macroDataStrip"]["morning"].extend(m)
+        payload["macroDataStrip"]["evening"].extend(e)
+        payload["macroDataStrip"]["morning"].extend(fetch_domestic_index_macro())
+        update_progress("INDIA MARKETS section updated. Waiting 30 seconds...", payload)
+        time.sleep(ORCHESTRATION_DELAY)
+
+        # Step 7: Update AI NEWS TERMINAL & SUMMARY
+        # Check if we already have this in a valid state from a previous snapshot
+        snapshot = _load_last_snapshot()
+        if snapshot and snapshot.get("terminalIntelligence") and not snapshot.get("terminalIntelligence", {}).get("llmError"):
+            update_progress("AI NEWS TERMINAL & SUMMARY found in cache. Reusing...", payload)
+            top_rows = snapshot.get("stocks", [])
+            ti_intel = snapshot.get("terminalIntelligence")
+            news_summary = snapshot.get("newsSummary")
+        else:
+            update_progress("AI NEWS TERMINAL & SUMMARY missing or invalid. Calling LLM...", payload)
+            top_rows, ti_intel, news_summary = _build_terminal_payload(
+                all_stocks=final_audited,
+                news_items=payload["news"],
+                macro_morning=payload["macroDataStrip"]["morning"],
+                macro_evening=payload["macroDataStrip"]["evening"],
+                pool_name=resolved_pool,
+                custom_prompt=custom_prompt
+            )
+            
+            if not ti_intel or ti_intel.get("llmError"):
+                 update_progress("AI ANALYSIS failed. Panel will remain empty for on-demand retry.", payload)
+            else:
+                 update_progress("AI ANALYSIS completed successfully.", payload)
+
+        payload["terminalIntelligence"] = ti_intel
+        payload["newsSummary"] = news_summary
+        update_progress("AI SUMMARY updated. Waiting 30 seconds...", payload)
+        time.sleep(ORCHESTRATION_DELAY)
+
+        # Step 8: Update TERMINAL ANALYSIS section
+        update_progress("Updating final TERMINAL ANALYSIS section...", payload)
+        payload = _hydrate_dhan_swing_picks(payload, force=True)
+        payload = _hydrate_ticker_intelligence_map(payload)
+        _apply_selection_meta(
+            payload, 
+            mode="live", 
+            reason="Sequential orchestrated refresh complete. Rendering final dashboard."
+        )
+        
+        update_progress("Orchestrated refresh sequence complete. Dashboard fully generated.", payload)
+        _refresh_task_set_done(task_id, {"success": True, "message": "Sequence finished successfully."})
+
+        # NOTE: At this point, the backend has generated the complete dataset.
+        # The 'light-themed image' rendering is handled by the frontend dashboard component
+        # when it detects the 'Sequential orchestrated refresh complete' meta state.
+
+    except Exception as exc:
+        print(f"[ORCHESTRATION ERROR] {exc}")
+        _refresh_task_set_error(task_id, str(exc))
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Angel One market feed for IROS")
+    parser.add_argument("--serve", action="store_true", help="Start FastAPI server")
+    parser.add_argument("--once", action="store_true", help="Fetch once and print/save JSON")
+    parser.add_argument("--output", help="Write JSON snapshot to this file")
+    parser.add_argument("--pool", default=None, help="Pool label. Defaults to Nifty 500; Nifty 100 and Live Universe are also supported.")
+    parser.add_argument("--prompt", default=None, help="Custom filter prompt override")
+    parser.add_argument("--refresh-on-demand", action="store_true", help="Force a non-fallback live refresh and write snapshot")
+    parser.add_argument("--orchestrate", action="store_true", help="Run the sequential orchestrated refresh sequence")
+    parser.add_argument("--audit-verdicts", action="store_true", help="Print all ticker audit verdicts (Approved/Rejected) from the latest snapshot")
+    args = parser.parse_args()
+
+    try:
+        resolved = _llm_config_canonical()
+        print(
+            f"[LLM-DEBUG] env_path={BASE_DIR / '.env'} "
+            f"LLM_PROVIDER={os.getenv('LLM_PROVIDER','')} "
+            f"LLM_MODEL={os.getenv('LLM_MODEL','')} "
+            f"ANGEL_PASSWORD={'set' if os.getenv('ANGEL_PASSWORD','').strip() else 'missing'} "
+            f"resolved={resolved}"
+        )
+    except Exception as exc:
+        print(f"[LLM-DEBUG] config inspect failed: {exc}")
+
+    if args.serve:
+        import uvicorn
+
+        host = os.getenv("MARKET_API_HOST", "0.0.0.0")
+        port = int(os.getenv("MARKET_API_PORT", "8000"))
+        uvicorn.run(create_app(), host=host, port=port)
+        return 0
+
+    if args.orchestrate:
+        print("[INFO] Starting orchestrated sequential refresh...")
+        _run_orchestrated_sequence("cli_task", args.pool, args.prompt)
+        return 0
+
+    if args.audit_verdicts:
+        snapshot = _load_last_snapshot()
+        if not snapshot:
+            print(json.dumps({"success": False, "error": "No cached snapshot available."}, indent=2))
+            return 1
+        verdicts = []
+        for s in snapshot.get("stocks", []):
+            verdicts.append({
+                "ticker": s.get("ticker"),
+                "name": s.get("name"),
+                "alpha_score": s.get("alpha_score", 0.0),
+                "verdict": s.get("verdict", "APPROVE"),
+                "risk_flags": s.get("risk_flags", ["None"])
+            })
+        print(json.dumps({"success": True, "verdicts": verdicts}, indent=2))
+        return 0
+
+    if args.refresh_on_demand:
+        client = AngelOneClient()
+        payload = build_market_payload(
+            client,
+            pool_name=args.pool,
+            force_refresh=True,
+            prefer_cache=False, # Explicitly do not prefer cache for on-demand refresh
+            custom_prompt=args.prompt,
+            allow_fallback=False,
+        )
+        if not payload.get("success", False):
+            raise RuntimeError(payload.get("error") or "Live refresh produced no payload.")
+        payload.setdefault("isSnapshotFallback", False)
+        if payload.get("selectionMeta", {}).get("mode") != "live":
+            payload["selectionMeta"] = {
+                "mode": "live",
+                "reason": payload.get("selectionMeta", {}).get("reason") or "Live refresh explicitly requested by CLI.",
+                "dataDate": payload.get("selectionMeta", {}).get("dataDate") or _payload_data_date(payload),
+            }
+        _save_last_snapshot(payload)
+        text = json.dumps(payload, indent=2)
+        print(text)
+        if args.output:
+            Path(args.output).write_text(text, encoding="utf-8")
+        return 0
+
+    client = AngelOneClient()
+    payload = build_market_payload(client, pool_name=args.pool, custom_prompt=args.prompt)
+    text = json.dumps(payload, indent=2)
+    print(text)
+    if args.output:
+        Path(args.output).write_text(text, encoding="utf-8")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
