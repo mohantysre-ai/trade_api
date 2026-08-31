@@ -28,3 +28,5 @@ logs/
 *.tmp
 *.old
 *.orig
+# Strix penetration-test output can contain sensitive evidence.
+strix_runs/

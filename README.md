@@ -162,6 +162,7 @@ This is a representative sample, not the full list — see [`backend/README.md`]
 | [`docs/index-options.md`](docs/index-options.md) | Index Options data contract and hard-gate rules |
 | [`docs/LLM_PROVIDER_ROUTING.md`](docs/LLM_PROVIDER_ROUTING.md) | Multi-provider LLM failover configuration |
 | [`docs/PRIVACY_DATA_MAP.md`](docs/PRIVACY_DATA_MAP.md) | Data handling map |
+| [`docs/STRIX_PENETRATION_TESTING.md`](docs/STRIX_PENETRATION_TESTING.md) | Authorized Strix repository, web, and authenticated security scans |
 
 ---
 
@@ -194,4 +195,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-

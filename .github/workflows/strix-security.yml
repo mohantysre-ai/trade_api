@@ -1,0 +1,148 @@
+name: Strix authorized penetration testing
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '30 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Authorized target set
+        type: choice
+        required: true
+        default: repository
+        options:
+          - repository
+          - web
+          - multi
+      web_target:
+        description: HTTPS target; host must be allowlisted
+        type: string
+        required: false
+        default: https://sigq.in
+      scan_mode:
+        description: Scan depth
+        type: choice
+        required: true
+        default: quick
+        options:
+          - quick
+          - standard
+          - deep
+      authenticated:
+        description: Use the dedicated test-account secrets
+        type: boolean
+        required: true
+        default: false
+      max_budget:
+        description: Maximum LLM spend in USD
+        type: string
+        required: true
+        default: '10'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: strix-security-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  authorized-pentest:
+    # GitHub does not provide repository secrets to fork pull requests.
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      STRIX_LLM: ${{ vars.STRIX_LLM || 'openai/gpt-5.4' }}
+      LLM_API_KEY: ${{ secrets.STRIX_LLM_API_KEY }}
+      STRIX_SCAN_SCOPE: ${{ github.event_name == 'workflow_dispatch' && inputs.scope || 'repository' }}
+      STRIX_WEB_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.web_target || vars.STRIX_WEB_TARGET || 'https://sigq.in' }}
+      STRIX_SCAN_MODE: ${{ github.event_name == 'pull_request' && 'quick' || github.event_name == 'schedule' && 'standard' || inputs.scan_mode || 'quick' }}
+      STRIX_AUTHENTICATED: ${{ github.event_name == 'workflow_dispatch' && inputs.authenticated || false }}
+      STRIX_MAX_BUDGET: ${{ github.event_name == 'pull_request' && '8' || github.event_name == 'schedule' && '15' || inputs.max_budget || '10' }}
+      STRIX_MAX_TURNS: '300'
+      STRIX_ALLOWED_HOSTS: ${{ vars.STRIX_ALLOWED_HOSTS || 'sigq.in,www.sigq.in' }}
+      STRIX_SCOPE_MODE: ${{ github.event_name == 'pull_request' && 'diff' || 'full' }}
+      STRIX_DIFF_BASE: origin/${{ github.base_ref || 'main' }}
+      STRIX_TEST_USERNAME: ${{ secrets.STRIX_TEST_USERNAME }}
+      STRIX_TEST_PASSWORD: ${{ secrets.STRIX_TEST_PASSWORD }}
+      STRIX_LOGIN_URL: ${{ vars.STRIX_LOGIN_URL }}
+
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Verify required secret
+        shell: bash
+        run: |
+          if [[ -z "$LLM_API_KEY" ]]; then
+            echo '::error::Add STRIX_LLM_API_KEY in repository Actions secrets.'
+            exit 1
+          fi
+
+      - name: Install pinned Strix CLI
+        run: python -m pip install --disable-pip-version-check 'strix-agent==1.5.3'
+
+      - name: Verify Strix and Docker
+        run: |
+          strix --version
+          docker version
+
+      - name: Run authorized penetration test
+        id: strix
+        shell: bash
+        run: bash scripts/run-strix.sh
+
+      - name: Redact test credentials from reports
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          secrets = [
+              value for value in (
+                  os.environ.get('STRIX_TEST_USERNAME'),
+                  os.environ.get('STRIX_TEST_PASSWORD'),
+                  os.environ.get('LLM_API_KEY'),
+              ) if value
+          ]
+          root = Path('strix_runs')
+          if not root.exists():
+              raise SystemExit(0)
+          for path in root.rglob('*'):
+              if not path.is_file() or path.stat().st_size > 20_000_000:
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except (UnicodeDecodeError, OSError):
+                  continue
+              redacted = text
+              for secret in secrets:
+                  redacted = redacted.replace(secret, '[REDACTED]')
+              if redacted != text:
+                  path.write_text(redacted, encoding='utf-8')
+          PY
+
+      - name: Upload Strix reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: strix-${{ github.event_name }}-${{ github.run_id }}
+          path: strix_runs/**
+          if-no-files-found: warn
+          retention-days: 14
