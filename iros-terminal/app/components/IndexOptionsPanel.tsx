@@ -25,6 +25,7 @@ type Candidate = {
   bias?: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
   strategyMode?: 'BUY_PREMIUM' | 'SELL_PREMIUM';
   strategyType?: string | null;
+  constructionStatus?: string | null;
   state: 'ELIGIBLE' | 'WATCH' | 'NO_TRADE';
   reason: string;
   score: number | null;
@@ -53,6 +54,7 @@ type Candidate = {
     thetaCarry?: { aligned?: boolean | null; netTheta?: number | null; netGamma?: number | null; gammaCap?: number | null };
     tailBuffer?: { aligned?: boolean | null; minimumBufferAtr?: number | null; minimum?: number | null };
     timeWindow?: { aligned?: boolean | null; reason?: string; daysToExpiry?: number | null; entryCutoffIst?: string };
+    construction?: { reason?: string; chainContracts?: number; uniqueStrikes?: number; usableContracts?: number; lowestStrike?: number | null; highestStrike?: number | null; structureStatus?: string; missingLegs?: string[] };
   };
   legs?: Array<{ action: 'BUY' | 'SELL'; role?: string; symbol?: string; strike?: number; optionType?: string; entryPrice?: number; ltp?: number; delta?: number; theta?: number; iv?: number; spreadPct?: number; lotSize?: number }>;
   risk?: { entryCredit?: number | null; maxProfitPerLot?: number | null; maxLossPerLot?: number | null; creditToRisk?: number | null; lowerBreakEven?: number | null; upperBreakEven?: number | null; minimumBufferAtr?: number | null };
@@ -168,6 +170,12 @@ function candidateHeadline(row: Candidate) {
   if (row.state === 'ELIGIBLE') return row.strategyMode === 'SELL_PREMIUM' ? 'Defined-risk seller gates passed' : 'All gates passed';
   if (row.state === 'WATCH') return row.strategyMode === 'SELL_PREMIUM' ? 'Seller score below 82' : 'Score below 80';
   if (row.reason === 'SELLER_STRUCTURE_UNAVAILABLE') return 'No executable hedged seller structure';
+  if (row.reason.startsWith('SELLER_CONSTRUCTION_FAILED:')) {
+    const construction = row.gateEvidence?.construction;
+    const reason = construction?.reason?.replaceAll('_', ' ').toLowerCase() ?? 'structure unavailable';
+    const missing = construction?.missingLegs?.map((leg) => leg.replaceAll('_', ' ').toLowerCase()).join(' + ');
+    return `Cannot construct: ${missing || reason}`;
+  }
   if (row.reason.startsWith('SELLER_GATE_FAILED:')) {
     return `Blocked: ${row.failedGates.map((key) => GATE_LABEL[key] ?? key).join(' · ')}`;
   }
@@ -196,6 +204,15 @@ function candidateHeadline(row: Candidate) {
 function compactSellerEvidence(row: Candidate) {
   const evidence = row.gateEvidence;
   if (!evidence) return [];
+  const construction = evidence.construction;
+  if (construction) {
+    return [
+      { label: 'Chain', value: `${construction.chainContracts ?? 0} contracts · ${construction.uniqueStrikes ?? 0} strikes`, aligned: false },
+      { label: 'Usable', value: `${construction.usableContracts ?? 0} with depth + Greeks`, aligned: (construction.usableContracts ?? 0) > 0 },
+      { label: 'Range', value: construction.lowestStrike == null ? 'Unavailable' : `${fmtNum(construction.lowestStrike, 0)}—${fmtNum(construction.highestStrike, 0)}`, aligned: construction.lowestStrike != null },
+      { label: 'Structure', value: construction.structureStatus?.replaceAll('_', ' ') ?? 'Unavailable', aligned: construction.structureStatus === 'NO_BREAKOUT' || construction.structureStatus === 'CONFIRMED' },
+    ];
+  }
   const vol = evidence.volatilityEdge;
   const risk = evidence.definedRisk;
   const theta = evidence.thetaCarry;

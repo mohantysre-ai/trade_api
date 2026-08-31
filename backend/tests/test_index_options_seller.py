@@ -73,7 +73,9 @@ def test_directional_breakout_builds_bull_put_credit_spread_not_naked_short():
 
 def test_seller_rejects_missing_hedge_and_unpriced_volatility_edge():
     no_wings = [row for row in _chain() if row["strike"] in {95, 100, 105}]
-    assert _seller(chain=no_wings) is None
+    unavailable = _seller(chain=no_wings)
+    assert unavailable["constructionStatus"] == "IRON_CONDOR_LEGS_UNAVAILABLE"
+    assert set(unavailable["gateEvidence"]["construction"]["missingLegs"]) == {"CALL_HEDGE_WING", "PUT_HEDGE_WING"}
     cheap_iv = _seller(chain=_chain(iv=12.1), vix=12.0)
     assert cheap_iv is not None
     assert cheap_iv["gates"]["volatilityEdge"] is False

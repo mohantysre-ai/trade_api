@@ -222,9 +222,13 @@ def _seller_candidate(index: dict[str, str], snapshot: dict[str, Any]) -> dict[s
     unavailable = [name for name in required_gates if gates.get(name) is not True and name not in failed]
     strategy_type = str(seller.get("strategyType") or "")
     bias = str(seller.get("bias") or "").upper()
+    construction_status = str(seller.get("constructionStatus") or "")
     eligible = bool(strategy_type and bias in {"BULLISH", "BEARISH", "NEUTRAL"} and not failed and not unavailable
                     and score is not None and score >= SELLER_MIN_SCORE)
-    if not seller:
+    if construction_status:
+        state, reason = "NO_TRADE", f"SELLER_CONSTRUCTION_FAILED:{construction_status}"
+        failed, unavailable, missing = [], [], []
+    elif not seller:
         state, reason = "NO_TRADE", "SELLER_STRUCTURE_UNAVAILABLE"
     elif failed:
         state, reason = "NO_TRADE", f"SELLER_GATE_FAILED:{','.join(failed)}"
@@ -248,6 +252,7 @@ def _seller_candidate(index: dict[str, str], snapshot: dict[str, Any]) -> dict[s
         "missingInputs": sorted(set(unavailable + missing)),
         "strategyMode": "SELL_PREMIUM",
         "strategyType": strategy_type or None,
+        "constructionStatus": construction_status or None,
         "legs": seller.get("legs") or [],
         "risk": seller.get("risk") or {},
         "contract": primary,

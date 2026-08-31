@@ -34,6 +34,18 @@ def test_contract_resolution_normalizes_angel_paise_strike():
     assert future["symbol"].endswith("FUT")
 
 
+def test_contract_resolution_keeps_enough_strikes_for_hedged_selling():
+    rows = []
+    for strike in range(24_500, 25_501, 50):
+        for suffix in ("CE", "PE"):
+            rows.append({"token": f"{strike}-{suffix}", "symbol": f"NIFTY01JAN99{strike}{suffix}",
+                         "name": "NIFTY", "expiry": "01JAN2099", "strike": str(strike * 100),
+                         "lotsize": "75", "instrumenttype": "OPTIDX", "exch_seg": "NFO"})
+    _, options, _ = _contracts(rows, INDEXES[0], 25_000)
+    assert len({row["_strike"] for row in options}) == 15
+    assert len(options) == 30
+
+
 def test_sensex_resolution_does_not_select_sensex50_future():
     rows = _master("SENSEX", "BFO") + [
         {"token": "bad", "symbol": "SENSEX5026AUGFUT", "name": "SENSEX50",

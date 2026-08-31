@@ -28,6 +28,38 @@ MAX_SHORT_DELTA = 0.40
 ESTIMATED_COST_PER_ORDER_INR = 20.0
 
 
+def _construction_failure(
+    reason: str, *, chain: list[dict[str, Any]], structure: dict[str, Any], details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    usable = [row for row in chain if _usable(row)]
+    strikes = sorted({_float(row.get("strike")) for row in chain if _float(row.get("strike")) is not None})
+    return {
+        "strategyMode": "SELL_PREMIUM",
+        "strategyType": None,
+        "bias": None,
+        "direction": None,
+        "legs": [],
+        "scores": {},
+        "gates": {},
+        "risk": {},
+        "constructionStatus": reason,
+        "gateEvidence": {
+            "construction": {
+                "reason": reason,
+                "chainContracts": len(chain),
+                "uniqueStrikes": len(strikes),
+                "usableContracts": len(usable),
+                "lowestStrike": strikes[0] if strikes else None,
+                "highestStrike": strikes[-1] if strikes else None,
+                "structureStatus": structure.get("status"),
+                "structureDirection": structure.get("direction"),
+                **(details or {}),
+            }
+        },
+        "dataLimitations": [reason],
+    }
+
+
 def _leg_spread(row: dict[str, Any]) -> float | None:
     bid, ask = _float(row.get("bestBid")), _float(row.get("bestAsk"))
     if bid is None or ask is None or bid <= 0 or ask < bid:
@@ -307,10 +339,12 @@ def build_defined_risk_seller_setup(
     vix_regime: str | None,
     provider_live: bool,
     now: datetime | None = None,
-) -> dict[str, Any] | None:
+) -> dict[str, Any]:
     """Choose one auditable seller structure, preferring confirmed direction."""
-    if spot is None or spot <= 0 or not chain:
-        return None
+    if spot is None or spot <= 0:
+        return _construction_failure("SPOT_UNAVAILABLE", chain=chain, structure=structure)
+    if not chain:
+        return _construction_failure("OPTION_CHAIN_UNAVAILABLE", chain=chain, structure=structure)
     clock = (now or datetime.now(IST_ZONE)).astimezone(IST_ZONE)
     direction = structure.get("direction")
     if direction == "CALL":
@@ -325,6 +359,11 @@ def build_defined_risk_seller_setup(
                 vix=vix, vix_regime=vix_regime, expiry_value=expiry_value,
                 provider_live=provider_live, now=clock,
             )
+        return _construction_failure(
+            "PUT_SHORT_UNAVAILABLE" if not short else "PUT_HEDGE_WING_UNAVAILABLE",
+            chain=chain, structure=structure,
+            details={"requiredShortDelta": "0.15-0.40", "requiredHedge": "LOWER_STRIKE_PUT"},
+        )
     elif direction == "PUT":
         short = _pick_short(chain, spot, "CALL")
         wing = _pick_wing(chain, short, "CALL") if short else None
@@ -337,15 +376,35 @@ def build_defined_risk_seller_setup(
                 vix=vix, vix_regime=vix_regime, expiry_value=expiry_value,
                 provider_live=provider_live, now=clock,
             )
+        return _construction_failure(
+            "CALL_SHORT_UNAVAILABLE" if not short else "CALL_HEDGE_WING_UNAVAILABLE",
+            chain=chain, structure=structure,
+            details={"requiredShortDelta": "0.15-0.40", "requiredHedge": "HIGHER_STRIKE_CALL"},
+        )
 
     if str(structure.get("status") or "") != "NO_BREAKOUT":
-        return None
+        return _construction_failure(
+            "WAITING_FOR_CONFIRMED_OR_RANGE_STRUCTURE", chain=chain, structure=structure,
+            details={"barCount": structure.get("barCount")},
+        )
     short_call = _pick_short(chain, spot, "CALL")
     short_put = _pick_short(chain, spot, "PUT")
     long_call = _pick_wing(chain, short_call, "CALL") if short_call else None
     long_put = _pick_wing(chain, short_put, "PUT") if short_put else None
     if not all((short_call, short_put, long_call, long_put)):
-        return None
+        missing = []
+        if not short_call:
+            missing.append("CALL_SHORT")
+        if not short_put:
+            missing.append("PUT_SHORT")
+        if short_call and not long_call:
+            missing.append("CALL_HEDGE_WING")
+        if short_put and not long_put:
+            missing.append("PUT_HEDGE_WING")
+        return _construction_failure(
+            "IRON_CONDOR_LEGS_UNAVAILABLE", chain=chain, structure=structure,
+            details={"missingLegs": missing, "requiredShortDelta": "0.15-0.40"},
+        )
     return _setup_from_legs(
         strategy_type="IRON_CONDOR", bias="NEUTRAL",
         legs=[
