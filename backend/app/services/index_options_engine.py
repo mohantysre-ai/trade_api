@@ -1,9 +1,10 @@
 """Deterministic index-options radar and re-entry governor.
 
-This module is advisory only.  It never places broker orders and never fills
-missing market evidence with inferred values.  A candidate becomes eligible
-only when every directional, liquidity, breadth, OI, and option-economics gate
-is explicitly present and passes.
+This module is advisory only. It never places broker orders and never fills
+missing market evidence with inferred values. Long-premium candidates lock for
+paper execution at the configured score floor once core quote/contract safety
+is valid; directional confirmation gates remain auditable warnings. Defined-
+risk premium selling keeps its stricter structural risk gates.
 """
 from __future__ import annotations
 
@@ -25,7 +26,9 @@ MIN_DAILY_ENTRIES = 0
 MAX_DAILY_ENTRIES = 20
 MAX_ATTEMPTS_PER_INDEX = 20
 MAX_CONCURRENT_TRADES = 2
-MIN_ELIGIBLE_SCORE = 80.0
+MIN_ELIGIBLE_SCORE = 70.0
+
+_LONG_PREMIUM_SAFETY_GATES = ("fresh", "contractEconomics")
 
 
 def _num(value: Any) -> float | None:
@@ -166,18 +169,38 @@ def _candidate(index: dict[str, str], snapshot: dict[str, Any]) -> dict[str, Any
     required_gates = ("fresh", "structure", "breakout", "futuresOi", "optionChain", "breadth", "contractEconomics", "riskReward")
     failed = [name for name in required_gates if gates.get(name) is False]
     unavailable = [name for name in required_gates if gates.get(name) is not True and name not in failed]
+    safety_failed = [name for name in _LONG_PREMIUM_SAFETY_GATES if gates.get(name) is False]
+    safety_unavailable = [name for name in _LONG_PREMIUM_SAFETY_GATES if gates.get(name) is not True and name not in safety_failed]
+
     direction = str(supplied.get("direction") or "").upper()
-    eligible = direction in {"CALL", "PUT"} and not failed and not unavailable and score is not None and score >= MIN_ELIGIBLE_SCORE
-    if failed:
-        state, reason = "NO_TRADE", f"HARD_GATE_FAILED:{','.join(failed)}"
-    elif unavailable or missing:
-        state, reason = "NO_TRADE", f"DATA_INCOMPLETE:{','.join(sorted(set(unavailable + missing)))}"
-    elif score is not None and score < MIN_ELIGIBLE_SCORE:
-        state, reason = "WATCH", "SCORE_BELOW_80"
+    contract = supplied.get("contract") if isinstance(supplied.get("contract"), dict) else {}
+    premium = _num(contract.get("ltp"))
+    contract_executable = bool(str(contract.get("symbol") or "").strip() and premium is not None and premium > 0)
+
+    eligible = bool(
+        direction in {"CALL", "PUT"}
+        and score is not None
+        and score >= MIN_ELIGIBLE_SCORE
+        and not safety_failed
+        and not safety_unavailable
+        and contract_executable
+    )
+
+    if safety_failed:
+        state, reason = "NO_TRADE", f"SAFETY_GATE_FAILED:{','.join(safety_failed)}"
+    elif safety_unavailable:
+        state, reason = "NO_TRADE", f"SAFETY_DATA_INCOMPLETE:{','.join(safety_unavailable)}"
+    elif not contract_executable:
+        state, reason = "NO_TRADE", "CONTRACT_NOT_EXECUTABLE"
+    elif missing:
+        state, reason = "NO_TRADE", f"DATA_INCOMPLETE:{','.join(sorted(set(missing)))}"
     elif direction not in {"CALL", "PUT"}:
         state, reason = "NO_TRADE", "DIRECTION_NOT_PROVEN"
+    elif score is not None and score < MIN_ELIGIBLE_SCORE:
+        state, reason = "WATCH", "SCORE_BELOW_70"
     else:
-        state, reason = "ELIGIBLE", "ALL_GATES_PASSED"
+        state, reason = "ELIGIBLE", "SCORE_LOCK_70"
+
     return {
         **index,
         "spot": spot,
