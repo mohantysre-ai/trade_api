@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 import os
 import threading
-import time
 from datetime import datetime, time as dt_time, timedelta
 from pathlib import Path
 from typing import Any, Callable
@@ -67,10 +66,20 @@ def _session_active(now: datetime) -> bool:
 
 def _next_minute_boundary(now: datetime) -> datetime:
     clock = now.astimezone(IST_ZONE)
-    return (clock.replace(second=0, microsecond=0) + timedelta(minutes=1))
+    return clock.replace(second=0, microsecond=0) + timedelta(minutes=1)
+
+
+def _set_local_status(**changes: Any) -> None:
+    with _STATUS_LOCK:
+        _STATUS.update(changes)
 
 
 def _status_update(**changes: Any) -> None:
+    """Update owner-local state and durable heartbeat.
+
+    Only the cross-process lease owner calls this function. Non-owner workers
+    keep their process-local status but never overwrite the shared heartbeat.
+    """
     with _STATUS_LOCK:
         _STATUS.update(changes)
         payload = dict(_STATUS)
@@ -81,15 +90,20 @@ def _status_update(**changes: Any) -> None:
 
 
 def paper_supervisor_status() -> dict[str, Any]:
-    """Return process status, falling back to the last durable heartbeat."""
+    """Return the durable owner heartbeat plus this worker's ownership state."""
     with _STATUS_LOCK:
         current = dict(_STATUS)
     try:
         persisted = load_json_with_fallback(_status_path())
     except (FileNotFoundError, ValueError, TypeError):
         persisted = {}
-    if isinstance(persisted, dict) and persisted.get("lastSuccessAt") and not current.get("lastSuccessAt"):
-        return {**persisted, **current}
+    if isinstance(persisted, dict) and persisted:
+        return {
+            **persisted,
+            "localWorkerPid": os.getpid(),
+            "localWorkerOwner": bool(current.get("owner")),
+            "localWorkerRunning": bool(current.get("running")),
+        }
     return current
 
 
@@ -149,11 +163,12 @@ class _ProcessLease:
 def _supervisor_loop(client_factory: Callable[[], Any]) -> None:
     lease = _ProcessLease(_lock_path())
     owner = lease.acquire()
-    _status_update(enabled=True, running=owner, owner=owner, pid=os.getpid())
     if not owner:
+        _set_local_status(enabled=True, running=False, owner=False, pid=os.getpid())
         logger.info("index-options paper supervisor already owned by another worker")
         return
 
+    _status_update(enabled=True, running=True, owner=True, pid=os.getpid())
     client: Any = None
     try:
         while not _STOP_EVENT.is_set():
@@ -221,7 +236,7 @@ def start_paper_supervisor(client_factory: Callable[[], Any]) -> bool:
     """Start the one-minute autonomous marker once for this application process."""
     global _THREAD
     if not _enabled():
-        _status_update(enabled=False, running=False, owner=False)
+        _set_local_status(enabled=False, running=False, owner=False)
         return False
 
     with _THREAD_LOCK:
