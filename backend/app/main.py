@@ -20,9 +20,15 @@ if _env_path.exists():
 
 # Import the create_app function from the market feed service
 # which registers all API routes (market-data, news, intelligence, refresh, etc.)
-from app.services.angel_one_feed import create_app
+from app.services.angel_one_feed import AngelOneClient, create_app
+from app.services.index_options_paper_supervisor import start_paper_supervisor
 
 app = create_app()
+
+# Infrastructure only: this worker never scans or creates trades. It autonomously
+# marks already-locked index-option paper positions once per minute and persists
+# the existing paper-book exit logic even when no dashboard/browser is open.
+start_paper_supervisor(AngelOneClient)
 
 
 if __name__ == "__main__":
