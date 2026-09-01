@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { LiveTickNumber } from '@/lib/desk-motion';
 import { subscribeLiveDesk, type LiveDeskSnapshot } from '@/lib/live-desk';
+import { isExplicitNonFill, isLiveSessionFill, canOverlayIntradayBook } from '@/lib/eod-execution';
 
 /* -------------------------------------------------------------------------- */
 /*  Types for EOD report responses from the backend                          */
@@ -522,6 +523,7 @@ function istCalendarToday(): string {
 }
 
 type LivePriceRow = {
+  skipped?: boolean | null;
   symbol?: string;
   direction?: string;
   entryDate?: string | null;
@@ -562,6 +564,7 @@ type SessionDesk = {
 };
 
 type LiveMark = {
+  skipped?: boolean | null;
   ltp: number;
   hitLevel: string | null;
   remainingQty?: number | null;
@@ -593,21 +596,6 @@ function isLiveHardClose(mark: LiveMark | null | undefined): boolean {
     return true;
   }
   return Boolean(mark.closed) && !(Number(mark.remainingQty) > 0);
-}
-
-function isLiveSessionFill(mark: LiveMark | null | undefined): boolean {
-  if (!mark) return false;
-  if (mark.triggered === true) return true;
-  const exec = String(mark.executionStatus || '').toUpperCase();
-  if (exec === 'TRIGGERED' || exec === 'EXECUTED' || exec === 'FILLED') return true;
-  if (Number(mark.remainingQty) > 0) return true;
-  if (mark.closed === false) return true;
-  if (mark.realizedPnl != null && Number.isFinite(Number(mark.realizedPnl))) return true;
-  const status = String(mark.status || '').toUpperCase();
-  if (status.includes('RUNNING') || status.includes('STOP') || status.includes('TARGET') || status.includes('TRAIL')) {
-    return true;
-  }
-  return false;
 }
 
 function exitReasonFromHit(hit: string | null | undefined, fallback: string): string {
@@ -1157,6 +1145,7 @@ export default function EodAnalysisPanel({
               closed: row.closed ?? row.exitState?.closed ?? null,
               status: row.status ?? row.outcome?.label ?? null,
               triggered: row.triggered ?? null,
+              skipped: row.skipped ?? null,
               executionStatus: row.executionStatus ?? null,
             };
             bySymbol[sym] = ltp;
@@ -1183,16 +1172,18 @@ export default function EodAnalysisPanel({
             const dir = String(row.direction || fallbackDir).toUpperCase();
             const key = markKey(sym, dir);
             const prev = byKey[key];
+            const nonFill = isExplicitNonFill(row);
             byKey[key] = {
               ltp: Number(row.currentPrice ?? row.ltp) > 0 ? Number(row.currentPrice ?? row.ltp) : (prev?.ltp ?? ltp),
-              hitLevel: prev?.hitLevel ?? (row.outcome?.hitLevel != null ? String(row.outcome.hitLevel) : null),
+              hitLevel: nonFill ? null : (row.outcome?.hitLevel != null ? String(row.outcome.hitLevel) : prev?.hitLevel ?? null),
               remainingQty: row.remainingQty ?? row.exitState?.remainingQty ?? prev?.remainingQty ?? null,
               realizedPnl: row.realizedPnl ?? row.exitState?.realizedPnl ?? prev?.realizedPnl ?? null,
               unrealizedPnl: row.unrealizedPnl ?? row.exitState?.unrealizedPnl ?? prev?.unrealizedPnl ?? null,
               closed: row.closed ?? row.exitState?.closed ?? prev?.closed ?? null,
               status: row.status ?? prev?.status ?? null,
-              triggered: row.triggered ?? prev?.triggered ?? null,
-              executionStatus: row.executionStatus ?? prev?.executionStatus ?? null,
+              skipped: nonFill,
+              triggered: nonFill ? false : row.triggered ?? null,
+              executionStatus: nonFill ? 'NOT_TRIGGERED' : row.executionStatus ?? null,
             };
           }
         };
@@ -1233,7 +1224,7 @@ export default function EodAnalysisPanel({
 
   const displayIntraday = useMemo(() => {
     if (!intraday) return null;
-    if (!liveActive || !liveMarks) {
+    if (!liveActive || !liveMarks || !canOverlayIntradayBook(intraday.marketPhase, liveMarks.marketOpen)) {
       return deriveIntradayHeadlines(intraday, intraday.trades || []);
     }
 
