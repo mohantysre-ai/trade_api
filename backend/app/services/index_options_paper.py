@@ -2,6 +2,8 @@
 
 This module never calls a broker order API. It locks one exchange lot at the
 observed option premium and marks/exits it only from later market-data quotes.
+Long-premium paper positions use an immutable 20-point stop, 40-point target,
+and one-minute mark cadence (1:2 option-premium risk/reward).
 """
 from __future__ import annotations
 
@@ -28,6 +30,11 @@ PAPER_SQUARE_OFF_TIME = dt_time(15, 29)
 SELLER_SQUARE_OFF_TIME = dt_time(15, 20)
 DEFAULT_SELLER_MAX_SINGLE_RISK_INR = 5_000.0
 DEFAULT_SELLER_MAX_PORTFOLIO_RISK_INR = 10_000.0
+LONG_PREMIUM_MARK_INTERVAL_SECONDS = 60
+LONG_PREMIUM_STOP_POINTS = 20.0
+LONG_PREMIUM_TARGET_POINTS = 40.0
+LONG_PREMIUM_RISK_REWARD = 2.0
+LONG_PREMIUM_MARK_HISTORY_LIMIT = 400
 
 
 def _positive_env_float(name: str, default: float) -> float:
@@ -149,29 +156,71 @@ def _direct_locked_marks(client: Any, positions: list[dict[str, Any]]) -> tuple[
     return marks, None
 
 
+def _parse_iso(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=IST_ZONE)
+
+
+def _long_mark_due(position: dict[str, Any], now: datetime) -> bool:
+    if now.astimezone(IST_ZONE).time().replace(tzinfo=None) >= PAPER_SQUARE_OFF_TIME:
+        return True
+    last = _parse_iso(position.get("markedAt") or position.get("enteredAt"))
+    if last is None:
+        return True
+    return (now - last.astimezone(now.tzinfo)).total_seconds() >= LONG_PREMIUM_MARK_INTERVAL_SECONDS
+
+
+def _record_long_mark(position: dict[str, Any], mark: float, now: datetime, source: str) -> dict[str, Any]:
+    entry, qty = float(position["entryPremium"]), int(position["quantity"])
+    pnl = round((mark - entry) * qty, 2)
+    history = list(position.get("minuteMarks") or [])
+    history.append({"at": now.isoformat(), "premium": round(mark, 2), "pnl": pnl, "source": source})
+    if len(history) > LONG_PREMIUM_MARK_HISTORY_LIMIT:
+        history = history[-LONG_PREMIUM_MARK_HISTORY_LIMIT:]
+    return {
+        **position,
+        "currentPremium": round(mark, 2),
+        "peakPremium": round(max(float(position.get("peakPremium") or entry), mark), 2),
+        "effectiveStopPremium": round(float(position["initialStopPremium"]), 2),
+        "unrealizedPnl": pnl,
+        "updatedAt": now.isoformat(),
+        "markedAt": now.isoformat(),
+        "markSource": source,
+        "markStatus": "LIVE",
+        "minuteMarks": history,
+        "nextMarkDueAt": datetime.fromtimestamp(now.timestamp() + LONG_PREMIUM_MARK_INTERVAL_SECONDS, tz=now.tzinfo).isoformat(),
+    }
+
+
 def _close(position: dict[str, Any], mark: float, reason: str, now: datetime) -> dict[str, Any]:
     entry, qty = float(position["entryPremium"]), int(position["quantity"])
-    return {**position, "status": "CLOSED", "exitPremium": round(mark, 2), "exitReason": reason,
-            "exitedAt": now.isoformat(), "pnl": round((mark - entry) * qty, 2),
-            "pnlPct": round((mark - entry) / entry * 100.0, 2), "currentPremium": round(mark, 2)}
+    return {
+        **position,
+        "status": "CLOSED",
+        "exitPremium": round(mark, 2),
+        "exitReason": reason,
+        "exitedAt": now.isoformat(),
+        "pnl": round((mark - entry) * qty, 2),
+        "pnlPct": round((mark - entry) / entry * 100.0, 2),
+        "currentPremium": round(mark, 2),
+        "unrealizedPnl": 0.0,
+        "nextMarkDueAt": None,
+    }
 
 
-def _update_open(position: dict[str, Any], mark: float, now: datetime) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-    entry, initial_stop = float(position["entryPremium"]), float(position["initialStopPremium"])
-    risk = max(entry - initial_stop, 0.05)
-    peak = max(float(position.get("peakPremium") or entry), mark)
-    stop = float(position.get("effectiveStopPremium") or initial_stop)
-    favourable_r = (peak - entry) / risk
-    if favourable_r >= 1.0:
-        stop = max(stop, entry)
-    if favourable_r >= 2.0:
-        stop = max(stop, peak - risk)
+def _update_open(
+    position: dict[str, Any], mark: float, now: datetime, *, mark_source: str,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    stop = float(position["initialStopPremium"])
     target = float(position["targetPremium"])
-    updated = {**position, "currentPremium": round(mark, 2), "peakPremium": round(peak, 2),
-               "effectiveStopPremium": round(stop, 2), "unrealizedPnl": round((mark - entry) * int(position["quantity"]), 2),
-               "updatedAt": now.isoformat()}
+    updated = _record_long_mark(position, mark, now, mark_source)
     if mark <= stop:
-        return None, _close(updated, mark, "TRAIL_STOP" if stop >= entry else "INITIAL_STOP", now)
+        return None, _close(updated, mark, "INITIAL_STOP", now)
     if mark >= target:
         return None, _close(updated, mark, "TARGET", now)
     if now.astimezone(IST_ZONE).time().replace(tzinfo=None) >= PAPER_SQUARE_OFF_TIME:
@@ -310,14 +359,13 @@ def _new_position(row: dict[str, Any], now: datetime, sequence: int) -> dict[str
             "unrealizedPnl": 0.0, "source": row.get("dataSource"), "execution": "DEFINED_RISK_PAPER_ONLY",
             "entryBasis": "SELL_BID_BUY_ASK", "nakedRisk": False,
         }
+
     contract = row.get("contract") if isinstance(row.get("contract"), dict) else {}
-    rr = ((row.get("gateEvidence") or {}).get("riskReward") or {})
     premium, lot = _float(contract.get("ltp")), _float(contract.get("lotSize"))
-    projected_loss, projected_gain = _float(rr.get("projectedOptionLoss")), _float(rr.get("projectedOptionGain"))
-    if not premium or not lot or lot < 1 or not projected_loss or not projected_gain:
+    if not premium or premium <= LONG_PREMIUM_STOP_POINTS or not lot or lot < 1:
         return None
-    stop = max(0.05, premium - projected_loss)
-    target = premium + projected_gain
+    stop = premium - LONG_PREMIUM_STOP_POINTS
+    target = premium + LONG_PREMIUM_TARGET_POINTS
     return {
         "id": f"{now.astimezone(IST_ZONE).date().isoformat()}-{sequence:02d}-{row['key']}",
         "index": row["key"], "bucket": row["bucket"], "direction": row["direction"],
@@ -326,9 +374,14 @@ def _new_position(row: dict[str, Any], now: datetime, sequence: int) -> dict[str
         "quantity": int(lot), "lotSize": int(lot), "entryPremium": round(premium, 2),
         "currentPremium": round(premium, 2), "peakPremium": round(premium, 2),
         "initialStopPremium": round(stop, 2), "effectiveStopPremium": round(stop, 2),
-        "targetPremium": round(target, 2), "expectedR": rr.get("expectedR"), "score": row.get("score"),
-        "status": "OPEN", "enteredAt": now.isoformat(), "updatedAt": now.isoformat(), "unrealizedPnl": 0.0,
-        "source": row.get("dataSource"), "execution": "PAPER_ONLY",
+        "targetPremium": round(target, 2), "expectedR": LONG_PREMIUM_RISK_REWARD, "score": row.get("score"),
+        "status": "OPEN", "enteredAt": now.isoformat(), "updatedAt": now.isoformat(), "markedAt": now.isoformat(),
+        "nextMarkDueAt": datetime.fromtimestamp(now.timestamp() + LONG_PREMIUM_MARK_INTERVAL_SECONDS, tz=now.tzinfo).isoformat(),
+        "unrealizedPnl": 0.0, "source": row.get("dataSource"), "execution": "PAPER_ONLY",
+        "riskModel": "FIXED_OPTION_PREMIUM_POINTS_1_TO_2", "markIntervalSeconds": LONG_PREMIUM_MARK_INTERVAL_SECONDS,
+        "stopDistancePoints": LONG_PREMIUM_STOP_POINTS, "targetDistancePoints": LONG_PREMIUM_TARGET_POINTS,
+        "riskRewardRatio": LONG_PREMIUM_RISK_REWARD,
+        "minuteMarks": [{"at": now.isoformat(), "premium": round(premium, 2), "pnl": 0.0, "source": "ENTRY_LOCK"}],
     }
 
 
@@ -367,7 +420,12 @@ def reconcile_paper_book(
         seller_candidates = radar.get("sellerCandidates") if isinstance(radar.get("sellerCandidates"), list) else []
         candidates = [*buy_candidates, *seller_candidates]
         _hydrate_locked_instruments(book["open"], candidates)
-        direct_marks, direct_error = _direct_locked_marks(client, book["open"])
+
+        due_positions = [
+            position for position in book["open"]
+            if position.get("strategyMode") == "SELL_PREMIUM" or _long_mark_due(position, clock)
+        ]
+        direct_marks, direct_error = _direct_locked_marks(client, due_positions)
         next_open: list[dict[str, Any]] = []
         closed_now: list[dict[str, Any]] = []
         for position in book["open"]:
@@ -388,6 +446,11 @@ def reconcile_paper_book(
                 if closed:
                     closed_now.append(closed)
                 continue
+
+            if not _long_mark_due(position, clock):
+                next_open.append(position)
+                continue
+
             mark = direct_marks.get(str(position.get("symbol") or ""))
             mark_source = "ANGEL_DIRECT_LOCKED_CONTRACT"
             if mark is None:
@@ -396,17 +459,16 @@ def reconcile_paper_book(
             if mark is None:
                 position["markStatus"] = "UNAVAILABLE"
                 position["markError"] = direct_error
+                position["lastMarkAttemptAt"] = clock.isoformat()
                 next_open.append(position)
                 continue
-            position["markSource"] = mark_source
-            position["markedAt"] = clock.isoformat()
-            position["markStatus"] = "LIVE"
             position["markError"] = direct_error if mark_source != "ANGEL_DIRECT_LOCKED_CONTRACT" else None
-            active, closed = _update_open(position, mark, clock)
+            active, closed = _update_open(position, mark, clock, mark_source=mark_source)
             if active:
                 next_open.append(active)
             if closed:
                 closed_now.append(closed)
+
         book["open"] = next_open
         book["closed"].extend(closed_now)
         book["entryCount"] = len(book["open"]) + len(book["closed"])
@@ -443,11 +505,21 @@ def reconcile_paper_book(
 
         open_pnl = round(sum(float(row.get("unrealizedPnl") or 0) for row in book["open"]), 2)
         realized = round(sum(float(row.get("pnl") or 0) for row in book["closed"]), 2)
-        book.update({"updatedAt": clock.isoformat(), "openPnl": open_pnl, "realizedPnl": realized,
-                     "totalPnl": round(open_pnl + realized, 2), "dailyEntryCap": MAX_DAILY_ENTRIES,
-                     "marketOpen": _market_open(clock),
-                     "sellerRiskCaps": {"singleTrade": _seller_single_risk_cap(),
-                                        "portfolio": _seller_portfolio_risk_cap()}})
+        book.update({
+            "updatedAt": clock.isoformat(),
+            "openPnl": open_pnl,
+            "realizedPnl": realized,
+            "totalPnl": round(open_pnl + realized, 2),
+            "dailyEntryCap": MAX_DAILY_ENTRIES,
+            "marketOpen": _market_open(clock),
+            "longPremiumRiskPolicy": {
+                "markIntervalSeconds": LONG_PREMIUM_MARK_INTERVAL_SECONDS,
+                "stopPoints": LONG_PREMIUM_STOP_POINTS,
+                "targetPoints": LONG_PREMIUM_TARGET_POINTS,
+                "riskReward": LONG_PREMIUM_RISK_REWARD,
+            },
+            "sellerRiskCaps": {"singleTrade": _seller_single_risk_cap(), "portfolio": _seller_portfolio_risk_cap()},
+        })
         if persist:
             atomic_write_json(paper_book_path(), book)
         return book
