@@ -97,7 +97,12 @@ def test_month_book_pnl_sums_archived_days(tmp_path, monkeypatch):
     )
 
     def _load(for_date, kind):
-        name = "book_intraday.json" if kind == "intraday" else "book_swing.json"
+        names = {
+            "intraday": "book_intraday.json",
+            "swing": "book_swing.json",
+            "index_options": "book_index_options.json",
+        }
+        name = names[kind]
         path = root / for_date.isoformat() / name
         if not path.is_file():
             return None

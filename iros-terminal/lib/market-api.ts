@@ -866,9 +866,11 @@ export type EodMonthDayPnl = {
   date: string;
   intradayPnl: number | null;
   swingPnl: number | null;
+  indexOptionsPnl: number | null;
   combinedPnl: number | null;
   hasIntraday: boolean;
   hasSwing: boolean;
+  hasIndexOptions: boolean;
 };
 
 export type EodMonthPnl = {
@@ -878,6 +880,7 @@ export type EodMonthPnl = {
   sessionCount: number;
   intradayPnl: number | null;
   swingPnl: number | null;
+  indexOptionsPnl: number | null;
   combinedPnl: number | null;
   winDays: number;
   lossDays: number;

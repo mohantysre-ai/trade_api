@@ -497,6 +497,7 @@ def load_persisted_candles(for_date: date, ticker: str) -> dict[str, Any]:
 _EOD_DATE_MARKERS = (
     "master_eod_payload.json",
     "book_intraday.json",
+    "book_index_options.json",
     "book_swing.json",
     "scorecards.json",
 )

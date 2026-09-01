@@ -19,7 +19,7 @@ import { fetchLiveDesk } from '@/lib/live-desk';
 type EodMode = 'book' | 'forensic' | 'full';
 
 const MODES: { key: EodMode; label: string; hint: string }[] = [
-  { key: 'book', label: 'Book P&L', hint: 'Intraday + swing day marks' },
+  { key: 'book', label: 'Book P&L', hint: 'Intraday + swing + index options' },
   { key: 'forensic', label: 'Forensic', hint: 'Scorecards · replay · proposals' },
   { key: 'full', label: 'Full Desk', hint: 'Single pane — both layers' },
 ];
@@ -579,6 +579,9 @@ export default function EodDeskPanel({
             </span>
             <span className={`tabular-nums ${monthPnlTone(monthPnl.swingPnl)}`}>
               Swing {fmtMonthPnl(monthPnl.swingPnl)}
+            </span>
+            <span className={`tabular-nums ${monthPnlTone(monthPnl.indexOptionsPnl)}`}>
+              Index Options {fmtMonthPnl(monthPnl.indexOptionsPnl)}
             </span>
             <span className="text-slate-500">
               {monthPnl.sessionCount} archived session{monthPnl.sessionCount === 1 ? '' : 's'}

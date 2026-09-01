@@ -140,6 +140,17 @@ type IntradayReport = {
   trades: IntradayTrade[];
 };
 
+type IndexOptionsReport = {
+  date: string;
+  archiveStatus?: string;
+  entryCount?: number;
+  realizedPnl: number | null;
+  openPnl: number | null;
+  totalPnl: number | null;
+  positions?: Array<{ symbol?: string; index?: string; pnl?: number; pnlKind?: string }>;
+  fromCache?: boolean;
+};
+
 type SwingPick = {
   symbol: string;
   direction: string;
@@ -1021,6 +1032,7 @@ export default function EodAnalysisPanel({
 }: EodAnalysisPanelProps = {}) {
   const [intraday, setIntraday] = useState<IntradayReport | null>(null);
   const [swing, setSwing] = useState<SwingReport | null>(null);
+  const [indexOptions, setIndexOptions] = useState<IndexOptionsReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [localDate, setLocalDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -1081,15 +1093,18 @@ export default function EodAnalysisPanel({
     };
 
     try {
-      const [intraData, swingData] = await Promise.all([
+      const [intraData, swingData, optionsData] = await Promise.all([
         loadOne<IntradayReport>(`/api/reports/eod-intraday${buildQs(dateStr)}`, 'Intraday'),
         loadOne<SwingReport>(`/api/reports/eod-swing${buildQs(swingDate)}`, 'Swing'),
+        loadOne<IndexOptionsReport>(`/api/reports/eod-index-options${buildQs(dateStr)}`, 'Index Options'),
       ]);
       if (intraData) setIntraday(intraData);
       else setIntraday(null);
       if (swingData) setSwing(swingData);
       else setSwing(null);
-      if (!intraData && !swingData) {
+      if (optionsData) setIndexOptions(optionsData);
+      else setIndexOptions(null);
+      if (!intraData && !swingData && !optionsData) {
         setError((prev) => prev || 'Book P&L failed to load');
       }
     } finally {
@@ -1551,7 +1566,7 @@ export default function EodAnalysisPanel({
 
   const noIntraday = displayIntraday && (!displayIntraday.trades || displayIntraday.trades.length === 0);
   const noSwing = displaySwing && (!displaySwing.picks || displaySwing.picks.length === 0);
-  const fromCache = Boolean(intraday?.fromCache || swing?.fromCache);
+  const fromCache = Boolean(intraday?.fromCache || swing?.fromCache || indexOptions?.fromCache);
   const showBody = Boolean(displayIntraday || displaySwing || error);
   const intradayModeledBooked = (displayIntraday?.trades || []).reduce(
     (sum, trade) => sum + (Number(trade.realizedPnl) || 0), 0,
@@ -1666,6 +1681,23 @@ export default function EodAnalysisPanel({
 
       {(displayIntraday || displaySwing) && (
         <>
+          {indexOptions && indexOptions.archiveStatus !== 'NO_BOOK' && (
+            <section className="rounded-xl border border-slate-300 bg-white p-3 shadow-sm">
+              <div className="flex flex-wrap items-center gap-3 text-[11px]">
+                <span className="desk-panel-title text-slate-900">INDEX OPTIONS · EOD</span>
+                <span className="desk-pill desk-pill--info">{indexOptions.entryCount ?? 0} trades</span>
+                <span className={`tabular-nums font-black ${pnlTone(indexOptions.totalPnl)}`}>
+                  Total {fmtInr(indexOptions.totalPnl, 2)}
+                </span>
+                <span className={`tabular-nums ${pnlTone(indexOptions.realizedPnl)}`}>
+                  Realised {fmtInr(indexOptions.realizedPnl, 2)}
+                </span>
+                <span className={`tabular-nums ${pnlTone(indexOptions.openPnl)}`}>
+                  Open {fmtInr(indexOptions.openPnl, 2)}
+                </span>
+              </div>
+            </section>
+          )}
           {(() => {
             const i = displayIntraday?.deskCounts;
             const s = displaySwing?.deskCounts;

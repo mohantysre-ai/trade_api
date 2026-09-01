@@ -4980,6 +4980,17 @@ def create_app() -> FastAPI:
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    @app.get("/api/reports/eod-index-options")
+    def eod_index_options_report(date: str | None = None) -> dict[str, Any]:
+        """Date-locked Index Options paper P&L archived with the EOD books."""
+        try:
+            from datetime import date as _date, datetime as _dt
+            from .eod_index_options_report import generate_index_options_eod_report
+            for_date = _date.fromisoformat(date) if date else _dt.now(tz=IST_ZONE).date()
+            return generate_index_options_eod_report(for_date)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
     @app.get("/api/news")
     def news_feed() -> dict[str, Any]:
         try:

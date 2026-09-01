@@ -23,7 +23,14 @@ def _day_dir(for_date) -> str:
 
 
 def book_cache_path(for_date, kind: str) -> str:
-    name = "book_intraday.json" if kind == "intraday" else "book_swing.json"
+    names = {
+        "intraday": "book_intraday.json",
+        "swing": "book_swing.json",
+        "index_options": "book_index_options.json",
+    }
+    if kind not in names:
+        raise ValueError(f"Unknown book kind: {kind}")
+    name = names[kind]
     return os.path.join(_day_dir(for_date), name)
 
 
@@ -75,6 +82,7 @@ def _reconcile_master_from_books(for_date) -> None:
 
     intra = _read_json(os.path.join(day_dir, "book_intraday.json"))
     swing = _read_json(os.path.join(day_dir, "book_swing.json"))
+    options = _read_json(os.path.join(day_dir, "book_index_options.json"))
     if intra is None or swing is None:
         return
 
@@ -82,9 +90,13 @@ def _reconcile_master_from_books(for_date) -> None:
     swing_rows = [r for r in (swing.get("picks") or []) if isinstance(r, dict)]
     active_swing = [r for r in swing_rows if _is_triggered_swing(r)]
     active_intra = [r for r in intra_rows if str(r.get("executionStatus") or "").upper() != "NOT_TRIGGERED"]
-    active_rows = active_intra + active_swing
+    option_rows = [
+        r for r in ((options or {}).get("positions") or [])
+        if isinstance(r, dict)
+    ]
+    active_rows = active_intra + active_swing + option_rows
 
-    locked = len(intra_rows) + len(swing_rows)
+    locked = len(intra_rows) + len(swing_rows) + len(option_rows)
     triggered = len(active_rows)
     skipped = max(0, locked - triggered)
 
@@ -102,7 +114,9 @@ def _reconcile_master_from_books(for_date) -> None:
             pass
 
     deployed_from_reports = 0.0
-    for report in (intra, swing):
+    for report in (intra, swing, options):
+        if not report:
+            continue
         try:
             deployed_from_reports += float(report.get("totalDeployed") or 0.0)
         except (TypeError, ValueError):
@@ -163,6 +177,7 @@ def _reconcile_master_from_books(for_date) -> None:
         "net_return_pct": net_return,
         "intraday_pnl": round(float(intra.get("totalPnl") or 0.0), 2),
         "swing_pnl": round(float(swing.get("totalPnl") or 0.0), 2),
+        "index_options_pnl": round(float((options or {}).get("totalPnl") or 0.0), 2),
         "reconciled_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -177,6 +192,7 @@ def _reconcile_master_from_books(for_date) -> None:
         "attribution_narrative": (
             f"Intraday P&L {float(intra.get('totalPnl') or 0.0):+.2f}; "
             f"Swing P&L {float(swing.get('totalPnl') or 0.0):+.2f}. "
+            f"Index Options P&L {float((options or {}).get('totalPnl') or 0.0):+.2f}. "
             "Trade-level attribution is sourced from Book rows; forensic scorecards remain diagnostic."
         ),
         "execution_and_slippage_review": "Book reconciliation uses realized P&L, close marks, scale/trail state, and deployed-capital rows shown in the EOD Book.",
@@ -232,6 +248,8 @@ def warm_book_caches(for_date) -> dict[str, Any]:
     from .eod_swing_report import generate_swing_eod_report
     intra = generate_intraday_eod_report(for_date, force=True)
     swing = generate_swing_eod_report(for_date, force=True)
+    from .eod_index_options_report import generate_index_options_eod_report
+    options = generate_index_options_eod_report(for_date)
     try:
         _reconcile_master_from_books(for_date)
     except Exception as exc:
@@ -239,6 +257,7 @@ def warm_book_caches(for_date) -> dict[str, Any]:
     return {
         "intraday": bool(intra),
         "swing": bool(swing),
+        "indexOptions": bool(options),
         "date": for_date.isoformat() if hasattr(for_date, "isoformat") else str(for_date),
     }
 
@@ -252,9 +271,11 @@ def freeze_dated_books_from_live(for_date: date | str) -> dict[str, Any]:
     day = date.fromisoformat(str(for_date)[:10]) if not isinstance(for_date, date) else for_date
     intra = load_book_cache(day, "intraday")
     swing = load_book_cache(day, "swing")
+    options = load_book_cache(day, "index_options")
     have_intra = bool(intra and intra.get("trades"))
     have_swing = bool(swing and (swing.get("picks") or swing.get("totalPicks")))
-    if have_intra and have_swing:
+    have_options = bool(options and (options.get("positions") or options.get("totalPnl") is not None))
+    if have_intra and have_swing and have_options:
         return {"skipped": True, "reason": "already_archived", "date": day.isoformat()}
     from .eod_intraday_report import generate_intraday_eod_report
     from .eod_swing_report import generate_swing_eod_report
@@ -263,6 +284,8 @@ def freeze_dated_books_from_live(for_date: date | str) -> dict[str, Any]:
         generate_intraday_eod_report(day, force=True)
     if not have_swing:
         generate_swing_eod_report(day, force=True)
+    from .eod_index_options_report import generate_index_options_eod_report
+    generate_index_options_eod_report(day)
     return {"skipped": False, "date": day.isoformat()}
 
 
@@ -306,8 +329,10 @@ def month_book_pnl(month: str | None = None) -> dict[str, Any]:
     days_out: list[dict[str, Any]] = []
     intra_sum = 0.0
     swing_sum = 0.0
+    options_sum = 0.0
     intra_n = 0
     swing_n = 0
+    options_n = 0
     win_days = 0
     loss_days = 0
     flat_days = 0
@@ -321,19 +346,25 @@ def month_book_pnl(month: str | None = None) -> dict[str, Any]:
             continue
         intra = load_book_cache(day, "intraday")
         swing = load_book_cache(day, "swing")
+        options = load_book_cache(day, "index_options")
         ip = _book_total_pnl(intra)
         sp = _book_total_pnl(swing)
+        op = _book_total_pnl(options)
         has_intra = bool(intra and (intra.get("trades") or ip is not None) and str(intra.get("archiveStatus") or "") != "NO_BOOK")
         has_swing = bool(swing and (swing.get("picks") or sp is not None) and str(swing.get("archiveStatus") or "") != "NO_BOOK")
-        if not has_intra and not has_swing:
+        has_options = bool(options and (options.get("positions") or op is not None) and str(options.get("archiveStatus") or "") != "NO_BOOK")
+        if not has_intra and not has_swing and not has_options:
             continue
-        combined = round((ip or 0.0) + (sp or 0.0), 2) if (ip is not None or sp is not None) else None
+        combined = round((ip or 0.0) + (sp or 0.0) + (op or 0.0), 2) if (ip is not None or sp is not None or op is not None) else None
         if ip is not None:
             intra_sum += ip
             intra_n += 1
         if sp is not None:
             swing_sum += sp
             swing_n += 1
+        if op is not None:
+            options_sum += op
+            options_n += 1
         if combined is not None:
             if combined > 0.005:
                 win_days += 1
@@ -345,9 +376,11 @@ def month_book_pnl(month: str | None = None) -> dict[str, Any]:
             "date": day_key,
             "intradayPnl": ip,
             "swingPnl": sp,
+            "indexOptionsPnl": op,
             "combinedPnl": combined,
             "hasIntraday": has_intra,
             "hasSwing": has_swing,
+            "hasIndexOptions": has_options,
         })
 
     return {
@@ -357,7 +390,8 @@ def month_book_pnl(month: str | None = None) -> dict[str, Any]:
         "sessionCount": len(days_out),
         "intradayPnl": round(intra_sum, 2) if intra_n else None,
         "swingPnl": round(swing_sum, 2) if swing_n else None,
-        "combinedPnl": round(intra_sum + swing_sum, 2) if (intra_n or swing_n) else None,
+        "indexOptionsPnl": round(options_sum, 2) if options_n else None,
+        "combinedPnl": round(intra_sum + swing_sum + options_sum, 2) if (intra_n or swing_n or options_n) else None,
         "winDays": win_days,
         "lossDays": loss_days,
         "flatDays": flat_days,
