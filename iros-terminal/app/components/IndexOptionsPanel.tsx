@@ -512,7 +512,7 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
                 <tr><th className="pb-2">Contract / structure</th><th>Index</th><th>Qty</th><th>Entry</th><th>Mark</th><th>Risk exit</th><th>Profit exit</th><th>P&amp;L</th><th>Status</th></tr>
               </thead>
               <tbody>
-                {[...(radar.paperBook.open ?? []), ...(radar.paperBook.closed ?? []).slice(-5).reverse()].map((position) => {
+                {[...(radar.paperBook.open ?? []), ...(radar.paperBook.closed ?? []).slice().reverse()].map((position) => {
                   const pnl = position.status === 'OPEN' ? position.unrealizedPnl : position.pnl;
                   const seller = position.strategyMode === 'SELL_PREMIUM';
                   return (

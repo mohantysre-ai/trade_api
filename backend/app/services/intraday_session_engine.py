@@ -4261,6 +4261,14 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
         elif isinstance(out.get("outcome"), dict) and out["outcome"].get("pnl") is not None:
             realized = float(out["outcome"]["pnl"])
         out["status"] = out.get("status") if str(out.get("status") or "").upper() not in ("", "RUNNING") else "CLOSED"
+        state = out.get("exitState") or {}
+        fills = state.get("legsFilled") or []
+        if fills and isinstance(fills[-1], dict):
+            # SCALE_TRAIL names the engine, not the kind of stop that fired.
+            if fills[-1].get("r") == "INITIAL_SL":
+                out["status"] = "STOP LOSS HIT"
+            elif fills[-1].get("r") == "TRAIL_SL":
+                out["status"] = "TRAIL STOP HIT"
         out["closed"] = True
         out["realizedPnl"] = round(realized, 2) if realized is not None else None
         out["unrealizedPnl"] = 0.0 if realized is not None else None
@@ -4335,7 +4343,12 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
         hit = live_row["outcome"].get("hitLevel")
         label = str(live_row["outcome"].get("label") or "")
         if hit == "sl" or "STOP" in label.upper() or "TRAIL" in label.upper():
-            status = "TRAIL STOP HIT" if live_row["outcome"].get("scaleTrail") else "STOP LOSS HIT"
+            state = out.get("exitState") or {}
+            fills = state.get("legsFilled") or []
+            last_kind = fills[-1].get("r") if fills and isinstance(fills[-1], dict) else None
+            status = "TRAIL STOP HIT" if last_kind == "TRAIL_SL" or (
+                last_kind != "INITIAL_SL" and "TRAIL" in label.upper()
+            ) else "STOP LOSS HIT"
             out["closed"] = True
         elif hit == "partial":
             status = label or "PARTIAL"
@@ -4380,7 +4393,7 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
         status = "SESSION CLOSED"
 
     if out.get("closed"):
-        status = "CLOSED" if status not in ("STOP LOSS HIT", "TARGET 1 HIT", "TARGET 2 HIT") else status
+        status = "CLOSED" if status not in ("STOP LOSS HIT", "TRAIL STOP HIT", "TARGET 1 HIT", "TARGET 2 HIT") else status
     out["status"] = status
     return out
 

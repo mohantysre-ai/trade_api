@@ -114,8 +114,22 @@ def apply_session_leg_economics(
             pass
     st = sess_row.get("exitState")
     if isinstance(st, dict):
+        fills = st.get("legsFilled") or []
+        if fills and isinstance(fills[-1], dict):
+            if fills[-1].get("r") == "INITIAL_SL":
+                reason = "STOP LOSS HIT"
+            elif fills[-1].get("r") == "TRAIL_SL":
+                reason = "TRAIL STOP HIT"
         merged = dict(scale_meta or {})
         merged["exitState"] = st
+        # Do not mix replayed top-level economics with the locked session's
+        # fill state (e.g. PRESTIGE +101.27 total but -490.77 realised).
+        for key in ("realizedPnl", "unrealizedPnl", "remainingQty", "effectiveStop", "closed", "rMultiple"):
+            value = sess_row.get(key)
+            if value is None:
+                value = st.get(key)
+            if value is not None:
+                merged[key] = value
         scale_meta = merged
     return reason, float(exit_price or 0), pnl, scale_meta
 
@@ -152,6 +166,18 @@ def intraday_book_cache_stale(
         "intraday_session_stale",
     ):
         return "ghost"
+    for row in cached.get("trades") or []:
+        state = row.get("exitState")
+        if not isinstance(state, dict):
+            continue
+        fills = state.get("legsFilled") or []
+        if fills and isinstance(fills[-1], dict) and fills[-1].get("r") == "INITIAL_SL":
+            if "TRAIL" in str(row.get("exitReason") or "").upper():
+                return "row_economics_mismatch"
+        for key in ("realizedPnl", "unrealizedPnl"):
+            if row.get(key) is not None and state.get(key) is not None:
+                if abs(float(row[key]) - float(state[key])) > 0.05:
+                    return "row_economics_mismatch"
     sess_date = str((session or {}).get("sessionDate") or "")[:10]
     if session and sess_date == for_date.isoformat() and bool(session.get("locked")):
         sess_pnl = session_realized_pnl(session)
@@ -1118,7 +1144,7 @@ def generate_intraday_eod_report(
             if not after_close:
                 # RTH GET must not candle-walk. Rebuild only for missing/ghost books or a
                 # changed symbol set; P&L ticks are overlaid live in the UI.
-                if stale_reason in ("ghost", "mock") or (
+                if stale_reason in ("ghost", "mock", "row_economics_mismatch") or (
                     stale_reason == "symbol_set" and picks
                 ):
                     pass

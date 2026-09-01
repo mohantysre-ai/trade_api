@@ -77,6 +77,7 @@ type PositionRow = {
   distToT2Pct?: number | null;
   status?: string;
   closed?: boolean;
+  skipped?: boolean;
   ltpSource?: string;
   dataStale?: boolean;
   /** Capital-slot / rotation fields from session engine — only when present */
@@ -1178,13 +1179,19 @@ export default function AssetMetricsPanel({
     session?.portfolio?.cashHeld === true ||
     replacementBlocked === 'prefer_cash_no_qualified';
   const realizedPnl = session?.portfolio?.realizedPnl ?? null;
-  const unrealizedPnl = session?.portfolio?.unrealizedPnl ?? null;
-  const sessionPnl =
-    realizedPnl == null && unrealizedPnl == null ? null : (realizedPnl ?? 0) + (unrealizedPnl ?? 0);
-  const closedNameCount = [...(session?.long || []), ...(session?.short || [])].filter(
-    (r) => r.closed || String(r.status || '').toUpperCase().includes('CLOSED'),
+  const rawUnrealizedPnl = session?.portfolio?.unrealizedPnl ?? null;
+  const closedRows = [...(session?.long || []), ...(session?.short || [])];
+  const notTriggeredCount = closedRows.filter(
+    (r) => r.skipped || String(r.status || '').toUpperCase().includes('NOT_TRIGGERED'),
+  ).length;
+  const closedNameCount = closedRows.filter(
+    (r) => !r.skipped && !String(r.status || '').toUpperCase().includes('NOT_TRIGGERED') &&
+      (r.closed || String(r.status || '').toUpperCase().includes('CLOSED')),
   ).length;
   const openNameCount = (freeSlots?.openLong ?? 0) + (freeSlots?.openShort ?? 0);
+  const unrealizedPnl = rawUnrealizedPnl == null && showLockedBasket && freeSlots != null && openNameCount === 0 ? 0 : rawUnrealizedPnl;
+  const sessionPnl =
+    realizedPnl == null && unrealizedPnl == null ? null : (realizedPnl ?? 0) + (unrealizedPnl ?? 0);
 
   const emptyHint = showLockedBasket
     ? lockedToday
@@ -1234,6 +1241,9 @@ export default function AssetMetricsPanel({
                 <StatusPill tone="desk-pill--muted">
                   {openNameCount} OPEN · {closedNameCount} CLOSED
                 </StatusPill>
+              )}
+              {showLockedBasket && notTriggeredCount > 0 && (
+                <StatusPill tone="desk-pill--muted">{notTriggeredCount} NOT TRIGGERED</StatusPill>
               )}
               {session?.rotationPending && (
                 <StatusPill tone="desk-pill--warn" title={session.rotationError || ''}>

@@ -1567,7 +1567,7 @@ export default function EodAnalysisPanel({
   const noIntraday = displayIntraday && (!displayIntraday.trades || displayIntraday.trades.length === 0);
   const noSwing = displaySwing && (!displaySwing.picks || displaySwing.picks.length === 0);
   const fromCache = Boolean(intraday?.fromCache || swing?.fromCache || indexOptions?.fromCache);
-  const showBody = Boolean(displayIntraday || displaySwing || error);
+  const showBody = Boolean(displayIntraday || displaySwing || indexOptions || error);
   const intradayModeledBooked = (displayIntraday?.trades || []).reduce(
     (sum, trade) => sum + (Number(trade.realizedPnl) || 0), 0,
   );
@@ -1679,13 +1679,15 @@ export default function EodAnalysisPanel({
         </div>
       )}
 
-      {(displayIntraday || displaySwing) && (
+      {(displayIntraday || displaySwing || indexOptions) && (
         <>
-          {indexOptions && indexOptions.archiveStatus !== 'NO_BOOK' && (
+          {indexOptions && (
             <section className="rounded-xl border border-slate-300 bg-white p-3 shadow-sm">
               <div className="flex flex-wrap items-center gap-3 text-[11px]">
                 <span className="desk-panel-title text-slate-900">INDEX OPTIONS · EOD</span>
-                <span className="desk-pill desk-pill--info">{indexOptions.entryCount ?? 0} trades</span>
+                <span className={`desk-pill ${indexOptions.archiveStatus === 'NO_BOOK' ? 'desk-pill--warn' : 'desk-pill--info'}`}>
+                  {indexOptions.archiveStatus === 'NO_BOOK' ? 'BOOK UNAVAILABLE' : `${indexOptions.entryCount ?? 0} trades`}
+                </span>
                 <span className={`tabular-nums font-black ${pnlTone(indexOptions.totalPnl)}`}>
                   Total {fmtInr(indexOptions.totalPnl, 2)}
                 </span>
@@ -1696,6 +1698,19 @@ export default function EodAnalysisPanel({
                   Open {fmtInr(indexOptions.openPnl, 2)}
                 </span>
               </div>
+              {(indexOptions.positions || []).length > 0 && (
+                <div className="mt-2 overflow-x-auto">
+                  <table className="w-full min-w-[560px] text-[10px]">
+                    <thead><tr className="border-b border-slate-200 text-left uppercase text-slate-500"><th>Contract</th><th>Index</th><th>Kind</th><th className="text-right">P&amp;L</th></tr></thead>
+                    <tbody>{(indexOptions.positions || []).map((p, i) => (
+                      <tr key={`${p.symbol || p.index || 'option'}-${i}`} className="border-b border-slate-100">
+                        <td className="py-1 font-bold">{p.symbol || 'Defined-risk structure'}</td><td>{p.index || '—'}</td><td>{p.pnlKind || '—'}</td>
+                        <td className={`text-right font-bold ${pnlTone(p.pnl)}`}>{fmtInr(p.pnl, 2)}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              )}
             </section>
           )}
           {(() => {
