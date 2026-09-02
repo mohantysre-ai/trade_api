@@ -415,6 +415,7 @@ def _evaluate_swing_pick(
         work = refresh_exit_policy(
             {
                 **pick,
+                "exitPolicyScope": "SWING",
                 "entryPrice": base_entry,
                 "approxQty": qty,
                 "direction": direction,
@@ -429,6 +430,7 @@ def _evaluate_swing_pick(
         if base_entry > 0 and qty > 0 and (risk > 0 or sl > 0):
             work = attach_exit_plan({
                 **pick,
+                "exitPolicyScope": "SWING",
                 "entryPrice": base_entry,
                 "approxQty": qty,
                 "direction": direction,

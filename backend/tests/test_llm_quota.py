@@ -17,6 +17,7 @@ from app.services.llm_client import parse_openrouter_reset_unix, quota_not_befor
 def _reset_llm_state():
     llm_client._llm_not_before = 0.0
     llm_client._model_not_before.clear()
+    llm_client._retired_models.clear()
     llm_client._last_good_model = None
     llm_client._provider_not_before.clear()
     llm_client._last_good_provider = None

@@ -38,7 +38,7 @@ def test_refresh_exit_policy_rewrites_notes_keeps_booked_state():
     pick["closed"] = True
     pick["status"] = "CLOSED"
     out = refresh_exit_policy(pick, keep_exit_state=True)
-    assert "be_after_1r_scale" in (out["exitPlan"]["notes"] or [])
+    assert "trail_after_2r_blended_1r" in (out["exitPlan"]["notes"] or [])
     assert "max_stop_0p5pct" in (out["exitPlan"]["notes"] or [])
     assert out["exitPlan"]["policyVersion"] == EXIT_POLICY_VERSION
     assert out["exitState"]["effectiveStop"] == 100.0
@@ -65,7 +65,7 @@ def test_overwrite_booked_path_with_1r_policy():
     }
     out = overwrite_row_with_current_policy(row, after_close=False, force=True)
     assert out["exitPlan"]["policyVersion"] == EXIT_POLICY_VERSION
-    assert "be_after_1r_scale" in (out["exitPlan"]["notes"] or [])
+    assert "trail_after_2r_blended_1r" in (out["exitPlan"]["notes"] or [])
     assert out["exitState"]["policyVersion"] == EXIT_POLICY_VERSION
     assert out["totalPnl"] != 1151.92
     assert out["pnl"] == out["totalPnl"]
@@ -88,7 +88,7 @@ def test_refresh_exit_policy_keeps_open_book_stop():
     out = refresh_exit_policy(pick, keep_exit_state=True)
     assert out["stopLoss"] == 1471.95
     assert out["exitPlan"]["initialStop"] == 1471.95
-    assert "be_after_1r_scale" in (out["exitPlan"]["notes"] or [])
+    assert "trail_after_2r_blended_1r" in (out["exitPlan"]["notes"] or [])
     assert "max_stop_0p5pct" in (out["exitPlan"]["notes"] or [])
 
 
@@ -108,8 +108,8 @@ def test_r_ratchet_is_monotonic_and_break_even_then_profit():
     assert locked_r_for_mfe(0.49) == -1.0
     assert locked_r_for_mfe(0.50) == -1.0
     assert locked_r_for_mfe(0.99) == -1.0
-    assert locked_r_for_mfe(1.00) == 0.0
-    assert locked_r_for_mfe(1.50) == 0.0
+    assert locked_r_for_mfe(1.00) == -1.0
+    assert locked_r_for_mfe(1.50) == -1.0
     assert locked_r_for_mfe(2.00) == 0.50
     assert locked_r_for_mfe(3.00) == 1.50
     assert locked_r_for_mfe(4.00) == 2.50
@@ -122,8 +122,8 @@ def test_scale_legs_sum_with_40pct_runner():
     assert RUNNER_FRACTION == 0.40
     assert SCALE_LEGS == tuple(EXIT_SCALE_LEGS)
     assert RUNNER_FRACTION == RUNNER_FRAC
-    assert abs(PROFIT_GUARD_LOCK_R - 0.0) < 1e-9
-    assert abs(PROFIT_GUARD_TRIGGER_R - 1.0) < 1e-9
+    assert abs(PROFIT_GUARD_LOCK_R - 0.5) < 1e-9
+    assert abs(PROFIT_GUARD_TRIGGER_R - 2.0) < 1e-9
     assert tuple(R_RATCHET) == tuple(TRAIL_RATCHET.items())
 
 
@@ -291,7 +291,7 @@ def test_economic_r_matches_book_pnl_after_scale():
     assert result["exitState"]["rMultiple"] == 1.0
 
 
-def test_cold_path_full_stop_then_be_after_1r_scale():
+def test_cold_path_full_stop_then_trail_only_after_2r():
     pick = attach_exit_plan(
         {
             "symbol": "TEST",
@@ -325,13 +325,17 @@ def test_cold_path_full_stop_then_be_after_1r_scale():
 
     greened = evaluate_scale_trail(pick, ltp=102.0, after_close=False)
     assert greened["exitState"]["mfeR"] >= 1.0
-    assert greened["exitState"]["profitGuardActive"] is True
-    assert greened["exitState"]["effectiveStop"] == 100.0
+    assert greened["exitState"]["profitGuardActive"] is False
+    assert greened["exitState"]["effectiveStop"] == 98.0
     assert greened["exitState"]["legsFilled"][0]["r"] == 1.0
 
     pulled = dict(pick)
     pulled["exitState"] = greened["exitState"]
     hit = evaluate_scale_trail(pulled, ltp=100.0, after_close=False)
+    assert not hit["closed"]
+    armed = evaluate_scale_trail(pulled, ltp=104.0, after_close=False)
+    pulled["exitState"] = armed["exitState"]
+    hit = evaluate_scale_trail(pulled, ltp=armed["effectiveStop"], after_close=False)
     assert hit.get("hitLevel") == "sl"
     assert hit.get("stopKind") == "TRAIL"
     assert hit["exitState"]["legsFilled"][-1]["r"] == "TRAIL_SL"

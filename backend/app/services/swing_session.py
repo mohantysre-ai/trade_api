@@ -161,6 +161,7 @@ def _size_swing_row(
     force: bool = False,
 ) -> dict[str, Any]:
     """Risk + notional size for one swing name (same idea as intradAy desk)."""
+    row = {**row, "exitPolicyScope": "SWING"}
     entry = _f(row.get("entryPrice")) or 0.0
     risk = _f(row.get("riskPerShare"))
     if risk is None or risk <= 0:
@@ -2102,6 +2103,7 @@ def _enrich_swing_row_prices(
 ) -> dict[str, Any]:
     """Price-only MTM — never mutate symbol / levels / lock fields."""
     out = dict(row)
+    out["exitPolicyScope"] = "SWING"
     replay = str((out.get("exitState") or {}).get("pathReplay") or "")
     if replay:
         return out

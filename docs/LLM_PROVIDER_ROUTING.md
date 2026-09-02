@@ -15,7 +15,7 @@ LLM_FREE_FAILOVER_MAX=4
 
 NVIDIA_API_KEY=nvapi-placeholder
 NVIDIA_NEWS_MODEL=nvidia/nemotron-3-nano-30b-a3b
-NVIDIA_REASONING_MODEL=nvidia/llama-3.3-nemotron-super-49b-v1
+NVIDIA_REASONING_MODEL=nvidia/nemotron-3-super-120b-a12b
 
 GROQ_API_KEY=placeholder
 GROQ_NEWS_MODEL=llama-3.1-8b-instant
@@ -54,6 +54,13 @@ configured endpoint.
 
 API keys must remain server-side and must never use a `NEXT_PUBLIC_` variable.
 Free hosted endpoints are rate-limited and are not production SLAs.
+
+NVIDIA retired the hosted 49B v1/v1.5 endpoints on 2026-08-25. Old NVIDIA
+model environment overrides are migrated to `nvidia/nemotron-3-super-120b-a12b`
+on the standard hosted URL only; custom/self-hosted URLs remain untouched.
+HTTP 410 disables that exact endpoint/model for the worker lifetime and falls
+through to another configured provider, rather than retrying every 60 seconds.
+Changing the configured model or endpoint makes the new pair eligible immediately.
 
 OmniRoute does not grant a guaranteed token allocation. It aggregates whatever
 free tiers, OAuth sessions, API keys, subscriptions, and no-auth providers the

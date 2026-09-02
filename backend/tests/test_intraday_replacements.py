@@ -745,5 +745,5 @@ def test_get_applies_current_exit_policy_without_writing(monkeypatch):
     assert saves == []
     assert path_calls == []
     notes = ((out.get("long") or [{}])[0].get("exitPlan") or {}).get("notes") or []
-    assert "be_after_1r_scale" in notes
+    assert "trail_after_2r_blended_1r" in notes
     assert "max_stop_0p5pct" in notes

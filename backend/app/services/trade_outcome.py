@@ -491,6 +491,10 @@ def compute_outcome(pick: dict[str, Any]) -> dict[str, Any] | None:
         if not plan or plan.get("mode") != "SCALE_TRAIL" or not exit_plan_is_current(plan):
             enriched = refresh_exit_policy(pick, keep_exit_state=True)
             pick["exitPlan"] = enriched.get("exitPlan")
+            if isinstance(enriched.get("exitState"), dict):
+                pick["exitState"] = enriched["exitState"]
+            if enriched.get("effectiveStop") is not None:
+                pick["effectiveStop"] = enriched["effectiveStop"]
             if enriched.get("target1") is not None:
                 pick["target1"] = enriched["target1"]
             if enriched.get("target2") is not None:

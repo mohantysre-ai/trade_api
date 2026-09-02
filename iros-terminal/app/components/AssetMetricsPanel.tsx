@@ -1829,7 +1829,9 @@ export default function AssetMetricsPanel({
                         <Kpi
                           label="Policy"
                           value={
-                            selectedRow.exitPlan?.notes?.includes('be_after_1r_scale')
+                            selectedRow.exitPlan?.notes?.includes('trail_after_2r_blended_1r')
+                              ? '1R scale · 2R trail · ≥1R blended gross · SL≤0.5%'
+                              : selectedRow.exitPlan?.notes?.includes('be_after_1r_scale')
                               ? selectedRow.exitPlan.notes.includes('max_stop_0p5pct')
                                 ? 'BE after +1R scale · SL≤0.5%'
                                 : 'BE after +1R scale'

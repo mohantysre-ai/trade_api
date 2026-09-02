@@ -17,29 +17,30 @@ SCALE_LEGS: list[tuple[float, float]] = [
 RUNNER_FRAC = 0.40
 
 # NSE hybrid trail, expressed in R (desk 1R = initial risk).
-# 0–1R: fixed initial SL. The first +1R scale fill must happen before BE.
-# 1R–1.5R: breakeven after 20% has been booked, so the whole trade cannot
-# close flat merely because it first reached +0.5R.
+# 0–2R: fixed initial SL, with partial fills at 1R and 1.5R.
+# Do not move to BE after partial fills: 20% at 1R + 80% at BE is
+# only 0.2R for the whole trade. Arm the profit trail at 2R instead.
 # 2R: ATR×1.5 analogue → lock mfe−1.5 = 0.5R.
 # 3R+: structure analogue → tighter lock, still room to run.
 # Initial SL and trail gap are also capped at MAX_STOP_PCT (0.5%) of price.
 # Stop is monotonic and never loosens.
 TRAIL_RATCHET: dict[float, float] = {
-    1.00: 0.00,
-    1.50: 0.00,
+    1.00: -1.00,
+    1.50: -1.00,
     2.00: 0.50,
     3.00: 1.50,
     4.00: 2.50,
     5.00: 3.50,
 }
 
-PROFIT_GUARD_TRIGGER_R = 1.0
-PROFIT_GUARD_LOCK_R = 0.0
+PROFIT_GUARD_TRIGGER_R = 2.0
+PROFIT_GUARD_LOCK_R = 0.5
 PCT_TRAIL_TRIGGER_R = 2.0
 MAX_STOP_PCT = 0.005
 REF_T1_R = 1.5
 REF_T2_R = 3.0
-EXIT_POLICY_VERSION = "1r_be_2r_trail_max_0p5pct"
+EXIT_POLICY_VERSION = "1r_scale_2r_trail_blended_1r_max_0p5pct"
+SWING_TRAIL_RATCHET = {**TRAIL_RATCHET, 1.0: 0.0, 1.5: 0.0}
 # 40R at 0.5% risk = 20% (upper circuit class). 80–100R trails are not market.
 MAX_STATE_MFE_R = 40.0
 MAX_INTRADAY_PRICE_RATIO = 1.50
@@ -201,7 +202,7 @@ def build_exit_plan(
         "notes": [
             "40pct_runner",
             "monotonic_r_ratchet",
-            "be_after_1r_scale",
+            "trail_after_2r_blended_1r",
             "max_stop_0p5pct",
             "nse_hybrid_trail",
             "no_stop_loosen",
@@ -234,6 +235,14 @@ def attach_exit_plan(row: dict[str, Any]) -> dict[str, Any]:
         int(out.get("approxQty") or 0),
         initial_stop=supplied_stop,
     )
+    if out.get("exitPolicyScope") == "SWING":
+        plan["scope"] = "SWING"
+        plan["policyVersion"] = "1r_be_2r_trail_max_0p5pct"
+        plan["trailRatchet"] = {str(k): v for k, v in SWING_TRAIL_RATCHET.items()}
+        plan["notes"] = ["be_after_1r_scale" if n == "trail_after_2r_blended_1r" else n
+                         for n in plan.get("notes", [])]
+        for leg in plan.get("legs", []):
+            leg["trailStopAfter"] = SWING_TRAIL_RATCHET[leg["r"]]
     out["exitPlan"] = plan
     if plan.get("target1") is not None:
         out["target1"] = plan["target1"]
@@ -251,7 +260,9 @@ def exit_plan_is_current(plan: dict[str, Any] | None) -> bool:
     if not isinstance(plan, dict) or plan.get("mode") != "SCALE_TRAIL":
         return False
     notes = plan.get("notes") or []
-    return "be_after_1r_scale" in notes and "max_stop_0p5pct" in notes
+    if plan.get("scope") == "SWING":
+        return "be_after_1r_scale" in notes and "max_stop_0p5pct" in notes
+    return "trail_after_2r_blended_1r" in notes and "max_stop_0p5pct" in notes
 
 
 def refresh_exit_policy(row: dict[str, Any], *, keep_exit_state: bool = True) -> dict[str, Any]:
@@ -260,6 +271,9 @@ def refresh_exit_policy(row: dict[str, Any], *, keep_exit_state: bool = True) ->
     Keeps locked initialStop and booked exitState. Does not invent PnL.
     """
     out = dict(row)
+    state = row.get("exitState") or {}
+    if keep_exit_state and (row.get("closed") or state.get("closed")) and state.get("legsFilled") and _exit_state_is_sane(row, state):
+        return out
     booked = out.get("exitPlan") if isinstance(out.get("exitPlan"), dict) else None
     if keep_exit_state and isinstance(booked, dict) and not exit_plan_is_current(booked):
         out["bookedExitPlan"] = {
@@ -270,7 +284,8 @@ def refresh_exit_policy(row: dict[str, Any], *, keep_exit_state: bool = True) ->
     plan = attached.get("exitPlan")
     if isinstance(plan, dict):
         plan = dict(plan)
-        plan["policyVersion"] = EXIT_POLICY_VERSION
+        if plan.get("scope") != "SWING":
+            plan["policyVersion"] = EXIT_POLICY_VERSION
         out["exitPlan"] = plan
         if plan.get("target1") is not None:
             out["target1"] = plan["target1"]
@@ -285,17 +300,20 @@ def refresh_exit_policy(row: dict[str, Any], *, keep_exit_state: bool = True) ->
     if keep_exit_state and isinstance(row.get("exitState"), dict):
         state = dict(row["exitState"])
         closed = bool(row.get("closed") or str(row.get("status") or "").upper() == "CLOSED")
-        legacy_half_r = isinstance(booked, dict) and "be_at_0p5r" in (booked.get("notes") or [])
+        legacy_early_be = isinstance(booked, dict) and bool(
+            {"be_at_0p5r", "be_after_1r_scale"}.intersection(booked.get("notes") or [])
+        )
         numeric_fills = [
             float(x.get("r")) for x in (state.get("legsFilled") or [])
             if isinstance(x, dict) and isinstance(x.get("r"), (int, float))
         ]
         peak_r = float(state.get("mfeR") or 0)
-        if legacy_half_r and not closed and peak_r < 1.0 and not any(r >= 1.0 for r in numeric_fills):
-            # Explicit policy migration: a legacy +0.5R BE must not survive
-            # into the +1R policy before any profit has actually been booked.
+        if legacy_early_be and out.get("exitPolicyScope") != "SWING" and not closed and peak_r < 2.0 and not any(r >= 2.0 for r in numeric_fills):
+            # Explicit open-paper policy migration. Keep every partial fill,
+            # but remove the old early BE stop before the new 2R trigger.
             state["profitGuardActive"] = False
             state["effectiveStop"] = plan.get("initialStop") if isinstance(plan, dict) else out.get("stopLoss")
+            out["effectiveStop"] = state["effectiveStop"]
         out["exitState"] = state
         if closed:
             if state.get("effectiveStop") is not None:
@@ -430,6 +448,10 @@ def overwrite_row_with_current_policy(
     ohlc_bars: list[tuple[float, float, float]] | None = None,
 ) -> dict[str, Any]:
     """Replay SCALE_TRAIL with the 0.5% initial-stop cap and current trail math."""
+    state = row.get("exitState") or {}
+    if (row.get("closed") or state.get("closed")) and state.get("legsFilled") and _exit_state_is_sane(row, state):
+        # Real executed fills are not a counterfactual replay under a new policy.
+        return row
     qty = int(row.get("approxQty") or row.get("qty") or 0)
     if not row.get("entryPrice") or qty <= 0:
         return row
@@ -582,7 +604,8 @@ def _ratchet_stop(
     trigger_r = PROFIT_GUARD_TRIGGER_R if profit_guard_trigger is None else float(profit_guard_trigger)
     ratchet = trail_ratchet if trail_ratchet is not None else TRAIL_RATCHET
     if r_now + 1e-9 >= trigger_r:
-        stop = _tighter_stop(direction, stop, _stop_at_r(entry, risk, PROFIT_GUARD_LOCK_R, direction))
+        lock_r = PROFIT_GUARD_LOCK_R if profit_guard_trigger is None else 0.0
+        stop = _tighter_stop(direction, stop, _stop_at_r(entry, risk, lock_r, direction))
         if use_pct_trail and r_now + 1e-9 >= PCT_TRAIL_TRIGGER_R:
             stop = _tighter_stop(direction, stop, _pct_trail_from_mfe(entry, risk, direction, r_now))
     for trigger, lock_r in ratchet.items():
@@ -609,6 +632,9 @@ def evaluate_scale_trail(
     plan = pick.get("exitPlan") if isinstance(pick.get("exitPlan"), dict) else None
     if not plan or plan.get("mode") != "SCALE_TRAIL":
         return {}
+    if plan.get("scope") == "SWING" and trail_ratchet is None and profit_guard_trigger is None:
+        trail_ratchet = SWING_TRAIL_RATCHET
+        profit_guard_trigger = 1.0
     entry = float(pick.get("entryPrice") or plan.get("entry") or 0)
     risk = float(pick.get("riskPerShare") or plan.get("riskPerShare") or 0)
     direction = str(pick.get("direction") or plan.get("direction") or "LONG").upper()
@@ -683,6 +709,16 @@ def evaluate_scale_trail(
 
     guard_trigger = PROFIT_GUARD_TRIGGER_R if profit_guard_trigger is None else float(profit_guard_trigger)
     guard_active = bool(prior.get("profitGuardActive")) or peak_r + 1e-9 >= guard_trigger
+
+    if peak_r + 1e-9 >= guard_trigger and remaining > 0 and trail_ratchet is None and profit_guard_trigger is None:
+        # Quantity rounding (especially tiny positions) can leave less booked
+        # profit than the nominal percentages imply. Protect 1R on the original
+        # full quantity, not merely 1R on a small tranche. Gross, before costs.
+        floor_px = entry + _sign(direction) * (risk * total_qty - realized) / remaining
+        # Round toward profit so paise rounding cannot undercut the floor.
+        floor_px = (math.floor(floor_px * 100 + 1e-8) if direction == "SHORT"
+                    else math.ceil(floor_px * 100 - 1e-8)) / 100
+        effective_stop = _tighter_stop(direction, effective_stop, floor_px)
 
     if remaining > 0 and _stop_hit(effective_stop, ltp, direction):
         px = effective_stop

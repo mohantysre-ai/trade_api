@@ -380,6 +380,12 @@ def _exit_reason_from_scale_eval(eval_result: dict[str, Any]) -> str:
     label = str(eval_result.get("label") or "").upper()
     state = eval_result.get("exitState") if isinstance(eval_result.get("exitState"), dict) else {}
     legs = state.get("legsFilled") if isinstance(state.get("legsFilled"), list) else []
+    if legs and isinstance(legs[-1], dict):
+        last_kind = legs[-1].get("r")
+        if last_kind == "INITIAL_SL":
+            return "SL_HIT"
+        if last_kind == "EOD_SQUAREOFF":
+            return "EOD_SQUAREOFF"
     has_trail_stop = any(
         isinstance(leg, dict) and str(leg.get("r") or "").upper() == "TRAIL_SL"
         for leg in legs
@@ -515,6 +521,23 @@ def _leg_pnl(
         or (outcome.get("ltp") if isinstance(outcome, dict) else None)
         or entry
     )
+
+    # Completed fills are immutable even when a new exit policy is deployed.
+    # Replaying their path would fabricate a different historical result.
+    from .exit_plan import _exit_state_is_sane
+    booked_state = pick.get("exitState") or {}
+    fills = booked_state.get("legsFilled") or []
+    if (pick.get("closed") or booked_state.get("closed")) and fills and _exit_state_is_sane(pick, booked_state) and sum(int(x.get("qty") or 0) for x in fills) == qty:
+        realized = round(sum(float(x.get("pnl") or 0) for x in fills), 2)
+        average = round(sum(float(x["price"]) * int(x["qty"]) for x in fills) / qty, 2)
+        reason = _exit_reason_from_scale_eval({"exitState": booked_state, "closed": True})
+        return reason, average, realized, {
+            "exitPlan": pick.get("exitPlan"), "exitState": booked_state,
+            "remainingQty": 0, "realizedPnl": realized, "unrealizedPnl": 0.0,
+            "effectiveStop": booked_state.get("effectiveStop"),
+            "rMultiple": booked_state.get("economicR", booked_state.get("rMultiple")),
+            "scaleTrail": True,
+        }
 
     work = _scale_trail_work_pick(pick)
     if work is not None:

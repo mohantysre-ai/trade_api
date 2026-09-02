@@ -14,6 +14,7 @@ _log = logging.getLogger(__name__)
 
 _llm_not_before: float = 0.0
 _model_not_before: dict[str, float] = {}
+_retired_models: set[tuple[str, str]] = set()
 _last_good_model: str | None = None
 _provider_not_before: dict[str, float] = {}
 _last_good_provider: str | None = None
@@ -196,7 +197,7 @@ _OPENAI_COMPATIBLE_PROVIDERS = {
         "NVIDIA_API_URL",
         "https://integrate.api.nvidia.com/v1/chat/completions",
         "NVIDIA_MODEL",
-        "nvidia/llama-3.3-nemotron-super-49b-v1",
+        "nvidia/nemotron-3-super-120b-a12b",
     ),
     "groq": (
         "GROQ_API_KEY",
@@ -260,11 +261,20 @@ def configured_llm_providers(purpose: str = "reasoning") -> list[LLMProviderConf
         key = os.getenv(key_env, "").strip()
         if key:
             default_model = os.getenv(model_env, model_default).strip() or model_default
+            api_url = os.getenv(url_env, url_default).strip() or url_default
+            selected_model = _purpose_model(name, default_model, purpose)
+            # Migrate only NVIDIA's retired hosted endpoints, including old
+            # purpose-specific env overrides. Do not change self-hosted NIMs.
+            if name == "nvidia" and api_url.rstrip("/") == url_default and selected_model in {
+                "nvidia/llama-3.3-nemotron-super-49b-v1",
+                "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+            }:
+                selected_model = model_default
             configs[name] = LLMProviderConfig(
                 name=name,
                 api_key=key,
-                api_url=os.getenv(url_env, url_default).strip() or url_default,
-                model=_purpose_model(name, default_model, purpose),
+                api_url=api_url,
+                model=selected_model,
             )
 
     # OmniRoute is a self-hosted OpenAI-compatible gateway, not a source of
@@ -356,7 +366,9 @@ def call_llm_with_fallback(
         cap = max(1, min(int(os.getenv("LLM_PROVIDER_ATTEMPTS", "3")), 7))
     except ValueError:
         cap = 3
-    candidates = [item for item in providers if _provider_available(item.name)][:cap]
+    candidates = [item for item in providers if _provider_available(item.name)
+                  and (_is_openrouter_url(item.api_url)
+                       or (item.api_url.rstrip("/"), item.model) not in _retired_models)][:cap]
     if not candidates:
         raise RuntimeError("All configured LLM providers are cooling down")
     errors: list[str] = []
@@ -496,6 +508,7 @@ def _openrouter_error_retryable(message: str) -> bool:
             "not found",
             "unavailable",
             "404",
+            "410",
             "502",
             "503",
             "524",
@@ -565,6 +578,10 @@ def _openai_chat_once(
         "temperature": 0.1,
         "max_tokens": max_tokens or int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "2000")),
     }
+    if api_url.rstrip("/") == "https://integrate.api.nvidia.com/v1/chat/completions" and model == "nvidia/nemotron-3-super-120b-a12b":
+        # The terminal needs bounded JSON output, not a reasoning-only response
+        # that consumes the entire output budget before emitting content.
+        payload["chat_template_kwargs"] = {"enable_thinking": False}
     response = requests.post(api_url, json=payload, headers=headers, timeout=timeout)
     if response.status_code >= 300:
         raise RuntimeError(f"OpenAI request failed ({response.status_code}): {response.text}")
@@ -582,6 +599,8 @@ def _openai_chat_once(
         raise RuntimeError("OpenAI response missing expected content")
     finish = choices[0].get("finish_reason", "")
     content = choices[0]["message"].get("content") or ""
+    if not content.strip():
+        raise RuntimeError("OpenAI response missing expected content")
     if finish == "length" and content:
         content = _close_truncated_json(content)
     return content.strip()
@@ -601,6 +620,10 @@ def _call_openai(
     models = [model]
     if _is_openrouter_url(api_url):
         models = openrouter_free_failover_models(model)
+    models = [candidate for candidate in models
+              if (api_url.rstrip("/"), candidate) not in _retired_models]
+    if not models:
+        raise RuntimeError("LLM endpoint model retired (410); configure a supported model")
     available = [candidate for candidate in models if _model_available(candidate)]
     if available:
         models = available
@@ -614,7 +637,12 @@ def _call_openai(
             return text
         except Exception as exc:
             last_error = str(exc)
-            _record_model_skip(candidate, last_error)
+            if re.search(r"\(410\)|\"status\"\s*:\s*410", last_error):
+                _retired_models.add((api_url.rstrip("/"), candidate))
+                _log.warning("LLM model %s retired (410); disabled for this endpoint until configuration changes or restart",
+                             candidate)
+            elif _is_openrouter_url(api_url):
+                _record_model_skip(candidate, last_error)
             if _is_account_wide_quota(last_error):
                 _record_quota_error(last_error)
                 break
