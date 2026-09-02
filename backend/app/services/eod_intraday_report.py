@@ -1832,15 +1832,20 @@ def recalculate_live_intraday_from_candles(
         # any inferred close economics with candle-evidenced stop-only truth.
         generate_intraday_eod_report(for_date, force=True)
     from .eod_engine.ingestion import fetch_and_persist_candles
-    fetch_and_persist_candles(
-        for_date,
-        [
-            str(row.get("symbol") or "")
-            for key in ("long", "short")
-            for row in (session.get(key) or [])
-            if isinstance(row, dict)
-        ],
-    )
+    try:
+        fetch_and_persist_candles(
+            for_date,
+            [
+                str(row.get("symbol") or "")
+                for key in ("long", "short")
+                for row in (session.get(key) or [])
+                if isinstance(row, dict)
+            ],
+        )
+    except Exception:
+        # Recalculate from already persisted evidence if the provider is
+        # temporarily unavailable; never restore stale inferred exits.
+        log.exception("candle refresh failed before strict intraday replay")
     out = dict(session)
     names = 0
     realized = 0.0
