@@ -142,6 +142,33 @@ def post_entry_ohlc_bars(
     return bars
 
 
+def post_entry_ohlc_events(
+    candles: list[Any],
+    *,
+    entry_at: str | datetime | None,
+    session_date: date | None = None,
+) -> list[dict[str, Any]]:
+    """Timestamped one-minute evidence from the actual fill onward."""
+    start = _dt(entry_at)
+    close_dt = datetime.combine(session_date, CASH_CLOSE, tzinfo=IST) if session_date else None
+    events: list[dict[str, Any]] = []
+    for candle in candles or []:
+        parsed = _bar_ohlc(candle)
+        if parsed is None:
+            continue
+        ts, high, low, close = parsed
+        ts_dt = _dt(ts)
+        if start is not None and ts_dt is not None and ts_dt < start:
+            continue
+        if close_dt is not None and ts_dt is not None and ts_dt > close_dt:
+            continue
+        events.append({
+            "at": ts_dt.isoformat() if ts_dt is not None else str(ts or ""),
+            "high": high, "low": low, "close": close,
+        })
+    return events
+
+
 _SESSION_FILL_STATUSES = frozenset({"TRIGGERED", "EXECUTED", "FILLED"})
 
 

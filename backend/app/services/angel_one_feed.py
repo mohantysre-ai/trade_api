@@ -4955,13 +4955,17 @@ def create_app() -> FastAPI:
         """
         try:
             from datetime import date as _date
-            from .eod_intraday_report import generate_intraday_eod_report
+            from .eod_intraday_report import generate_intraday_eod_report, recalculate_live_intraday_from_candles
             from datetime import datetime as _dt
             for_date = (
                 _date.fromisoformat(date)
                 if date
                 else _dt.now(tz=IST_ZONE).date()
             )
+            if force and for_date == _dt.now(tz=IST_ZONE).date():
+                recalculated = recalculate_live_intraday_from_candles(for_date, after_close=False)
+                if recalculated.get("ok") and isinstance(recalculated.get("book"), dict):
+                    return recalculated["book"]
             return generate_intraday_eod_report(for_date, force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc

@@ -1,5 +1,19 @@
 # Intraday profit floor — 2026-09-02
 
+## Same-day EOD correction
+
+For the already-triggered 2026-09-02 book, policy
+`post_entry_stop_only_0p5_v1` supersedes the scale/trail replay:
+
+- evaluate one-minute candles only from each row's recorded fill time;
+- close only when the direction-aware 0.50% hard stop is reached;
+- store the exact stop-hit minute;
+- otherwise retain the row as `RUNNING` with unrealized P&L;
+- do not infer a target, tranche, breakeven, trailing, or EOD close.
+
+This correction is invoked by the EOD runner and by a forced request to
+`/api/reports/eod-intraday` for the current IST date.
+
 The former 1R breakeven rule could close a trade for only 0.2R blended:
 20% booked at 1R, with 80% stopped at entry. At 0.50% initial risk that is
 only +0.10% on the original position. Two tranches at 1R and 1.5R followed

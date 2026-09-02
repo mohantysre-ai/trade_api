@@ -244,7 +244,7 @@ def _ensure_book_reports_cached(for_date: date, *, force: bool = False) -> None:
     """
     try:
         from ..eod_book_cache import warm_book_caches
-        from ..eod_intraday_report import generate_intraday_eod_report
+        from ..eod_intraday_report import generate_intraday_eod_report, recalculate_live_intraday_from_candles
         from ..eod_swing_report import generate_swing_eod_report
         from ..swing_session import load_swing_session
         from .ingestion import load_intraday_session
@@ -259,6 +259,8 @@ def _ensure_book_reports_cached(for_date: date, *, force: bool = False) -> None:
             force = False
         if force:
             warm_book_caches(for_date)
+            if str(sess.get("sessionDate") or "")[:10] == for_date.isoformat():
+                recalculate_live_intraday_from_candles(for_date, after_close=False)
         else:
             generate_intraday_eod_report(for_date, force=False)
             generate_swing_eod_report(for_date, force=False)
