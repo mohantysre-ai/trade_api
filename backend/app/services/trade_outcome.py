@@ -408,6 +408,12 @@ def _quote_day_range(symbol: str) -> tuple[float | None, float | None]:
     return hi, lo
 
 
+# Session extrema used by the exit engine must start when the modeled trade is
+# filled.  A market snapshot's dayHigh/dayLow includes prints before entry and
+# therefore cannot prove that this position touched a stop or target.
+_POST_ENTRY_PATH_VERSION = "post_entry_live_marks_v1"
+
+
 def _plausible_live_mark(
     *,
     entry: float,
@@ -440,7 +446,7 @@ def _plausible_live_mark(
 
 
 def _evaluate_live_scale_trail(pick: dict[str, Any], ltp: float, *, after_close: bool = False) -> dict[str, Any]:
-    """Favourable excursion first (session high/low + quote range), then stop."""
+    """Evaluate only price marks observed after this position was triggered."""
     direction = str(pick.get("direction") or "LONG").upper()
     entry = float(pick.get("entryPrice") or 0)
     risk = float(pick.get("riskPerShare") or 0)
@@ -453,16 +459,26 @@ def _evaluate_live_scale_trail(pick: dict[str, Any], ltp: float, *, after_close:
         except (TypeError, ValueError):
             continue
     mark = float(ltp)
-    quote_hi, quote_lo = _quote_day_range(str(pick.get("symbol") or ""))
     if not _plausible_live_mark(
         entry=entry, risk=risk, last_mark=last_mark, new_mark=mark, direction=direction
     ):
         mark = float(last_mark or entry or mark)
-        # Keep quote day range — those prints are not a one-poll spike.
-    highs = [v for v in (pick.get("sessionHigh"), quote_hi, mark, last_mark) if isinstance(v, (int, float)) and v > 0]
-    lows = [v for v in (pick.get("sessionLow"), quote_lo, mark, last_mark) if isinstance(v, (int, float)) and v > 0]
+
+    # Legacy sessionHigh/sessionLow values may have been seeded from the full
+    # trading-day range.  Trust extrema only when their post-entry provenance
+    # is explicit; otherwise begin at the modeled fill and the current mark.
+    path_is_post_entry = pick.get("pathEvidenceVersion") == _POST_ENTRY_PATH_VERSION
+    prior_high = pick.get("sessionHigh") if path_is_post_entry else None
+    prior_low = pick.get("sessionLow") if path_is_post_entry else None
+    highs = [v for v in (prior_high, entry, mark) if isinstance(v, (int, float)) and v > 0]
+    lows = [v for v in (prior_low, entry, mark) if isinstance(v, (int, float)) and v > 0]
     session_high = max(highs) if highs else None
     session_low = min(lows) if lows else None
+    pick["pathEvidenceVersion"] = _POST_ENTRY_PATH_VERSION
+    pick["pathEvidenceStartedAt"] = (
+        pick.get("pathEvidenceStartedAt") if path_is_post_entry
+        else pick.get("triggeredAt") or pick.get("replacedAt") or _utc_now()
+    )
     if session_high is not None:
         pick["sessionHigh"] = round(float(session_high), 2)
     if session_low is not None:
@@ -533,6 +549,8 @@ def compute_outcome(pick: dict[str, Any]) -> dict[str, Any] | None:
                 "scaleTrail": True,
                 "sessionHigh": pick.get("sessionHigh"),
                 "sessionLow": pick.get("sessionLow"),
+                "pathEvidenceVersion": pick.get("pathEvidenceVersion"),
+                "pathEvidenceStartedAt": pick.get("pathEvidenceStartedAt"),
             }
 
     if not entry or not sl or not t1 or not t2:
@@ -640,6 +658,8 @@ def evaluate_outcome(pick: dict[str, Any], finalize_if_closed: bool = False) -> 
                 "final": result.get("final"),
                 "sessionHigh": pick.get("sessionHigh"),
                 "sessionLow": pick.get("sessionLow"),
+                "pathEvidenceVersion": pick.get("pathEvidenceVersion"),
+                "pathEvidenceStartedAt": pick.get("pathEvidenceStartedAt"),
             }
 
     if not after_close:
@@ -1307,9 +1327,11 @@ def _compute_live_prices_for_plan(
                 plan_changed.append(True)
                 if outcome.get("closed") or hit_level == "sl":
                     p["closed"] = True
+                    fills = ((outcome.get("exitState") or {}).get("legsFilled") or [])
+                    last_fill_kind = fills[-1].get("r") if fills and isinstance(fills[-1], dict) else None
                     p["status"] = (
                         "TRAIL STOP HIT"
-                        if hit_level == "sl" and outcome.get("scaleTrail")
+                        if hit_level == "sl" and last_fill_kind == "TRAIL_SL"
                         else "STOP LOSS HIT"
                         if hit_level == "sl"
                         else "CLOSED"
@@ -1344,6 +1366,10 @@ def _compute_live_prices_for_plan(
                 entry["sessionHigh"] = p["sessionHigh"] = outcome["sessionHigh"]
             if outcome.get("sessionLow") is not None:
                 entry["sessionLow"] = p["sessionLow"] = outcome["sessionLow"]
+            if outcome.get("pathEvidenceVersion") is not None:
+                entry["pathEvidenceVersion"] = p["pathEvidenceVersion"] = outcome["pathEvidenceVersion"]
+            if outcome.get("pathEvidenceStartedAt") is not None:
+                entry["pathEvidenceStartedAt"] = p["pathEvidenceStartedAt"] = outcome["pathEvidenceStartedAt"]
         else:
             entry["outcome"] = None
 

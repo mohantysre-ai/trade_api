@@ -2861,6 +2861,10 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
                 "triggered": True,
                 "executionStatus": "TRIGGERED",
                 "triggeredAt": committed_at,
+                "sessionHigh": out.get("entryPrice") or out.get("lockObservedPrice"),
+                "sessionLow": out.get("entryPrice") or out.get("lockObservedPrice"),
+                "pathEvidenceVersion": "post_entry_live_marks_v1",
+                "pathEvidenceStartedAt": committed_at,
             })
         return out
     long_rows = [_stamp_execution(r) for r in long_rows]
@@ -4058,6 +4062,10 @@ def apply_replacements(
                 "triggered": True,
                 "executionStatus": "TRIGGERED",
                 "triggeredAt": at,
+                "sessionHigh": entry,
+                "sessionLow": entry,
+                "pathEvidenceVersion": "post_entry_live_marks_v1",
+                "pathEvidenceStartedAt": at,
             }
         )
         if direction == "LONG":

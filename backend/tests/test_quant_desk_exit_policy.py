@@ -416,6 +416,54 @@ def test_live_scale_rejects_one_poll_crash_tick():
     assert live.get("exitState", {}).get("legsFilled") == []
 
 
+def test_live_scale_ignores_unproven_full_day_extrema_before_entry():
+    from app.services.trade_outcome import _evaluate_live_scale_trail
+
+    pick = attach_exit_plan({
+        "symbol": "INDUSINDBK",
+        "direction": "LONG",
+        "entryPrice": 1010.40,
+        "stopLoss": 1005.35,
+        "riskPerShare": 5.05,
+        "approxQty": 98,
+        "ltp": 1010.40,
+        # Legacy values came from the entire day and have no post-entry proof.
+        "sessionHigh": 1025.0,
+        "sessionLow": 1000.0,
+        "triggeredAt": "2026-09-07T10:30:00+05:30",
+    })
+    live = _evaluate_live_scale_trail(pick, 1007.37, after_close=False)
+    assert live.get("closed") is not True
+    assert live.get("hitLevel") is None
+    assert pick["sessionLow"] == 1007.37
+    assert pick["sessionHigh"] == 1010.40
+    assert pick["pathEvidenceVersion"] == "post_entry_live_marks_v1"
+
+
+def test_live_scale_does_not_arm_profit_trail_from_pre_entry_day_high():
+    from app.services.trade_outcome import _evaluate_live_scale_trail
+
+    pick = attach_exit_plan({
+        "symbol": "ANGELONE",
+        "direction": "LONG",
+        "entryPrice": 303.35,
+        "stopLoss": 301.83,
+        "riskPerShare": 1.52,
+        "approxQty": 329,
+        "ltp": 303.35,
+        "sessionHigh": 310.0,
+        "sessionLow": 302.0,
+        "triggeredAt": "2026-09-07T11:00:00+05:30",
+    })
+    live = _evaluate_live_scale_trail(pick, 305.47, after_close=False)
+    assert live.get("closed") is not True
+    # +0.70% may legitimately book the first 1R tranche, but it must not
+    # falsely arm/close the profit trail from a high printed before entry.
+    assert live.get("hitLevel") == "partial"
+    assert live["exitState"]["profitGuardActive"] is False
+    assert live["exitState"]["mfeR"] < 2.0
+
+
 def test_half_pct_stop_gap_print_is_a_real_hit():
     from app.services.exit_plan import apply_max_stop_cap, overwrite_row_with_current_policy
     from app.services.trade_outcome import _evaluate_live_scale_trail, _plausible_live_mark

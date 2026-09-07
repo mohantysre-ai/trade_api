@@ -1735,7 +1735,7 @@ def _replay_triggered_row(
         out["exitPrice"] = None
         out["stopHitAt"] = None
     out["pnlKind"] = "realised" if overwritten.get("closed") else "unrealised"
-    out["recalculationPolicy"] = "post_entry_stop_only_0p5_v1"
+    out["recalculationPolicy"] = "post_entry_stop_only_0p5_v2"
     out["entryEvaluatedFrom"] = str(entry_at or "")
     return out
 
@@ -1800,7 +1800,7 @@ def recalculate_cached_intraday_book(for_date: date, *, after_close: bool | None
         "locked": len(rows), "triggered": len(rows) - skipped,
         "skipped": skipped, "wins": 0, "losses": stopped, "running": running,
     }
-    cached["recalculationPolicy"] = "post_entry_stop_only_0p5_v1"
+    cached["recalculationPolicy"] = "post_entry_stop_only_0p5_v2"
     cached["updatedAt"] = datetime.now(tz=timezone.utc).isoformat()
     return save_book_cache(for_date, "intraday", cached)
 
@@ -1868,7 +1868,7 @@ def recalculate_live_intraday_from_candles(
     out["updatedAt"] = datetime.now(tz=timezone.utc).isoformat()
     out["pnlRecalc"] = {
         "source": "post_entry_one_minute_candles",
-        "policyVersion": "post_entry_stop_only_0p5_v1",
+        "policyVersion": "post_entry_stop_only_0p5_v2",
         "at": out["updatedAt"],
         "afterClose": after_close,
     }

@@ -4966,7 +4966,7 @@ def create_app() -> FastAPI:
                 from .intraday_session_engine import load_session as _load_intraday_session
                 active_session = _load_intraday_session()
                 active_policy = str((active_session.get("pnlRecalc") or {}).get("policyVersion") or "")
-                if force or active_policy != "post_entry_stop_only_0p5_v1":
+                if force or active_policy != "post_entry_stop_only_0p5_v2":
                     recalculated = recalculate_live_intraday_from_candles(for_date, after_close=False)
                     if recalculated.get("ok") and isinstance(recalculated.get("book"), dict):
                         return recalculated["book"]
