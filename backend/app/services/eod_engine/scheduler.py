@@ -430,6 +430,17 @@ def _maybe_auto_swing_lock(now: datetime) -> None:
     found, then lock it (and fill remaining slots). Do not cash-finalize at 10:15.
     After 14:45: seal an empty hunt as cash-held.
     """
+    try:
+        from ..swing_v2.authoritative import is_v2_authoritative
+
+        if is_v2_authoritative():
+            # refresh_swing_session_state() already ran this V2 cycle at the
+            # top of the scheduler tick. Never invoke the legacy hunt as well.
+            return
+    except Exception as exc:
+        log.warning("V2 authoritative swing cycle failed closed: %s", exc)
+        return
+
     if not _AUTO_COMMIT:
         return
     hunt_ok, hunt_code = swing_entry_hunt_allowed(now)

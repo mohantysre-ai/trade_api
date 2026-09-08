@@ -761,6 +761,10 @@ def generate_swing_eod_report(
     force: bool = False,
 ) -> dict[str, Any]:
     """Build swing Book P&L from locked swing portfolio (not intradAy mirror)."""
+    from .swing_v2.authoritative import authoritative_eod_report, is_v2_authoritative
+    if is_v2_authoritative():
+        return authoritative_eod_report(for_date or date.fromisoformat(_today_ist()))
+
     from .eod_book_cache import load_book_cache, save_book_cache
 
     as_of = for_date or date.fromisoformat(_today_ist())

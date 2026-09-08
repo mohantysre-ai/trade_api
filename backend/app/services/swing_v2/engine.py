@@ -32,6 +32,7 @@ def execute_paper_order(
         return ledger.append(
             idempotency_key=f"{decision_id}:ORDER_EXPIRED",
             decision_id=decision_id,
+            position_id=decision_id,
             symbol=symbol,
             session_date=session_date,
             event_type=EventType.ORDER_EXPIRED,

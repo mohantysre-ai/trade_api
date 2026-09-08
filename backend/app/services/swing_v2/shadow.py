@@ -52,6 +52,7 @@ def build_shadow_v2(
     regime: str = "REGIME_UNRATED",
     final_lock: bool = False,
     occupied_symbols: set[str] | None = None,
+    existing_positions: list[dict[str, Any]] | None = None,
     correlations: dict[tuple[str, str], float] | None = None,
     persist_events: bool = False,
     now: datetime | None = None,
@@ -60,8 +61,8 @@ def build_shadow_v2(
     cfg, now = config or load_config(), now or datetime.now(timezone.utc)
     base = {
         "strategyId": cfg.strategy_id, "policyVersion": cfg.policy_version,
-        "featureVersion": cfg.feature_version, "mode": "SHADOW",
-        "enabled": cfg.enabled, "authoritative": False,
+        "featureVersion": cfg.feature_version, "mode": cfg.mode,
+        "enabled": cfg.enabled, "authoritative": cfg.paper_authoritative,
         "validationState": str(ValidationState.RESEARCH_HYPOTHESIS),
         "liveCapitalApproved": False,
         "executionMode": "PAPER",
@@ -79,6 +80,7 @@ def build_shadow_v2(
 
     snapshot_id = _snapshot_hash(rows)
     session_date = now.astimezone(ZoneInfo("Asia/Kolkata")).date().isoformat()
+    decision_timestamp = now.isoformat()
     funnel = {"universe": len(rows), "freshData": 0, "tradable": 0, "safetyPass": 0, "setupPass": 0, "expectancyPass": 0, "portfolioPass": 0, "locked": 0, "filled": 0}
     qualified, rejected = [], []
     for raw in rows:
@@ -113,17 +115,28 @@ def build_shadow_v2(
 
     qualified = assign_segment_percentiles(qualified)
     scaled_cfg = SwingV2Config(**{**cfg.__dict__, "max_positions": min(cfg.max_positions, regime_cap), "core_risk_bps": max(1, int(cfg.core_risk_bps * risk_scale)), "microcap_risk_bps": max(1, int(cfg.microcap_risk_bps * risk_scale))})
-    portfolio = construct_portfolio(qualified, scaled_cfg, correlations=correlations, occupied_symbols=occupied_symbols)
+    portfolio = construct_portfolio(qualified, scaled_cfg, correlations=correlations, occupied_symbols=occupied_symbols, existing_positions=existing_positions)
     selected = portfolio["selected"]
+    for row in selected:
+        row["sessionDate"] = session_date
+        row["decisionTimestamp"] = decision_timestamp
+        row["decision"] = "LOCKED" if final_lock else "SELECTED"
+        row["limitPrice"] = round(
+            float(row.get("bestAsk") or row.get("decisionPrice") or row.get("entryPrice") or 0)
+            * (1.0 + min(0.001, float(row.get("modeledRoundTripCostPct") or 0.2) / 400.0)),
+            4,
+        )
     funnel["portfolioPass"] = len(selected)
     if final_lock:
         funnel["locked"] = len(selected)
     if persist_events:
         ledger = SwingLedger(cfg.ledger_path)
         selected_ids = {row["decisionId"] for row in selected}
+        selected_by_id = {row["decisionId"]: row for row in selected}
         for row in qualified:
             event_type = EventType.POSITION_LOCKED if row["decisionId"] in selected_ids else EventType.CANDIDATE_QUALIFIED
-            ledger.append(idempotency_key=f"{row['decisionId']}:{event_type}", decision_id=row["decisionId"], position_id=row["decisionId"] if event_type == EventType.POSITION_LOCKED else None, symbol=row["symbol"], session_date=session_date, event_type=event_type, event_timestamp=now.isoformat(), payload=row)
+            event_payload = selected_by_id.get(row["decisionId"], row)
+            ledger.append(idempotency_key=f"{row['decisionId']}:{event_type}", decision_id=row["decisionId"], position_id=row["decisionId"] if event_type == EventType.POSITION_LOCKED else None, symbol=row["symbol"], session_date=session_date, event_type=event_type, event_timestamp=now.isoformat(), payload=event_payload)
         for index, row in enumerate(rejected):
             symbol = row.get("symbol") or f"UNKNOWN_{index}"
             decision_id = _decision_id(snapshot_id, session_date, symbol)

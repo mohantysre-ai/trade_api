@@ -19,6 +19,7 @@ OFFICIAL_SEGMENT_URLS = {
     "NIFTY_MICROCAP250": "https://www.niftyindices.com/IndexConstituent/ind_niftymicrocap250_list.csv",
 }
 EXPECTED_SEGMENT_COUNTS = {"NIFTY100": 100, "NIFTY_MIDCAP150": 150, "NIFTY_SMALLCAP250": 250, "NIFTY_MICROCAP250": 250}
+MAX_OFFICIAL_TRANSITION_VARIANCE = 5
 
 
 def point_in_time_members(rows: list[dict[str, Any]], on_date: date) -> list[dict[str, Any]]:
@@ -71,19 +72,21 @@ def refresh_official_membership(
                     "source": "NIFTY_INDICES_OFFICIAL",
                 })
         expected = EXPECTED_SEGMENT_COUNTS[segment]
-        if len(segment_rows) != expected:
-            raise ValueError(f"{segment} expected {expected} constituents, received {len(segment_rows)}")
+        if not expected - MAX_OFFICIAL_TRANSITION_VARIANCE <= len(segment_rows) <= expected + MAX_OFFICIAL_TRANSITION_VARIANCE:
+            raise ValueError(f"{segment} baseline {expected} constituents, received implausible official count {len(segment_rows)}")
         rows.extend(segment_rows)
         sources.append({"segment": segment, "url": url, "count": len(segment_rows)})
     symbols = {row["symbol"] for row in rows}
-    if len(symbols) != 750:
-        raise ValueError(f"NIFTY_TOTAL_MARKET_750 union expected 750 unique symbols, received {len(symbols)}")
+    if not 750 - MAX_OFFICIAL_TRANSITION_VARIANCE <= len(symbols) <= 750 + MAX_OFFICIAL_TRANSITION_VARIANCE:
+        raise ValueError(f"NIFTY_TOTAL_MARKET_750 baseline 750 unique symbols, received implausible official count {len(symbols)}")
     payload = {
         "schemaVersion": "swing_universe_v2",
         "universe": "NIFTY_TOTAL_MARKET_750",
+        "baselineConstituentCount": 750,
         "effectiveDate": effective_date.isoformat(),
         "retrievedAt": datetime.now(timezone.utc).isoformat(),
         "constituentCount": len(symbols),
+        "officialTransitionVariance": len(symbols) - 750,
         "sources": sources,
         "constituents": sorted(rows, key=lambda row: (row["universeSegment"], row["symbol"])),
     }

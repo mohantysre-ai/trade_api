@@ -252,6 +252,13 @@ type SwingReport = {
   dayLessons?: string[];
   rotation?: string;
   source?: string;
+  strategyId?: string;
+  policyVersion?: string;
+  validationState?: string;
+  authoritative?: boolean;
+  executionMode?: string;
+  eventCount?: number;
+  reconciled?: boolean;
   shadowV2?: {
     strategyId?: string;
     policyVersion?: string;
@@ -2004,7 +2011,7 @@ export default function EodAnalysisPanel({
                 {displaySwing?.date ?? dateStr}
                 {displaySwing?.symbolSource ? ` · ${displaySwing.symbolSource}` : ''}
                 {displaySwing?.isMock ? ' · MOCK' : ''}
-                {' · Asset Matrix swing lock (not intraday)'}
+                {displaySwing?.authoritative ? ' · V2 ledger authority' : ' · Asset Matrix swing lock (not intraday)'}
                 {liveActive && liveMarks?.marketOpen ? ' · LIVE MTM' : ''}
               </p>
               {displaySwing?.executionBasis === 'MODELED_PAPER' && (
@@ -2013,6 +2020,20 @@ export default function EodAnalysisPanel({
                 </p>
               )}
             </div>
+
+            {displaySwing?.authoritative && (
+              <div className="border-b border-emerald-200 bg-emerald-50/80 px-3 py-2 text-[9px] text-slate-600">
+                <span className="font-black uppercase tracking-wider text-emerald-800">
+                  {displaySwing.strategyId} · v{displaySwing.policyVersion}
+                </span>
+                {' · '}V2 paper authority · V1 disabled · {displaySwing.validationState}
+                {' · '}events {displaySwing.eventCount ?? 0}
+                {' · '}
+                <span className={displaySwing.reconciled ? 'font-bold text-emerald-700' : 'font-bold text-red-700'}>
+                  {displaySwing.reconciled ? 'ledger reconciled' : 'ledger mismatch'}
+                </span>
+              </div>
+            )}
 
             {displaySwing?.shadowV2 && (
               <div className="border-b border-cyan-200 bg-cyan-50/70 px-3 py-2 text-[9px] text-slate-600">

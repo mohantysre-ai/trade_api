@@ -16,6 +16,7 @@ import logging
 import math
 import os
 import re
+import statistics
 import sys
 import threading
 import time
@@ -428,6 +429,10 @@ def _intraday_metrics_usable(intraday: Any) -> bool:
     """True when cached metrics come from 5m or daily candles, not a dummy stub."""
     if not isinstance(intraday, dict):
         return False
+    if os.getenv("SWING_STRATEGY_AUTHORITY", "V1").strip().upper() == "V2":
+        raw = intraday.get("swingV2Raw")
+        if not isinstance(raw, dict) or int(raw.get("dailyObservationCount") or 0) < 252:
+            return False
 
     def _num(key: str) -> float:
         try:
@@ -799,7 +804,7 @@ def run_scheduled_morning_prework(*, force: bool = False) -> dict[str, Any]:
 def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dict[str, Any]:
     """Live quote/candle refresh with LLM day-lock reuse (no force LLM)."""
     log = logging.getLogger(__name__)
-    swing_hunt = reason == "swing_entry_hunt"
+    swing_hunt = reason == "swing_entry_hunt" or reason.startswith("swing_v2")
     pool = NIFTY_500_LABEL if swing_hunt else ((os.getenv("MARKET_PREWORK_POOL") or NIFTY_500_LABEL).strip() or NIFTY_500_LABEL)
     try:
         prior = _load_last_snapshot()
@@ -2639,6 +2644,11 @@ def _build_stock_row(
     ltp = float(quote.get("ltp", 0) or 0)
     close = float(quote.get("close", 0) or 0)
     delta, state = _pct_change(ltp, close if close else None)
+    depth = quote.get("depth") if isinstance(quote.get("depth"), dict) else {}
+    buy_rows = depth.get("buy") if isinstance(depth.get("buy"), list) else []
+    sell_rows = depth.get("sell") if isinstance(depth.get("sell"), list) else []
+    best_buy = buy_rows[0] if buy_rows and isinstance(buy_rows[0], dict) else {}
+    best_sell = sell_rows[0] if sell_rows and isinstance(sell_rows[0], dict) else {}
     return {
         "ticker": inst.key,
         "name": (inst.label or inst.tradingsymbol).replace("-EQ", "").replace("-BE", "").replace("-", " ").strip(),
@@ -2654,6 +2664,14 @@ def _build_stock_row(
         "close": quote.get("close"),
         "oi": float(quote.get("opnInterest", 0) or quote.get("oi", 0) or 0),
         "prev_oi": float(quote.get("previousOI", 0) or quote.get("prev_oi", 0) or 0),
+        "bestBid": quote.get("bestBidPrice") or best_buy.get("price"),
+        "bestAsk": quote.get("bestAskPrice") or best_sell.get("price"),
+        "availableBidDepth": best_buy.get("quantity") or best_buy.get("qty"),
+        "availableAskDepth": best_sell.get("quantity") or best_sell.get("qty"),
+        "lowerCircuit": quote.get("lowerCircuit") or quote.get("lowerCircuitLimit"),
+        "upperCircuit": quote.get("upperCircuit") or quote.get("upperCircuitLimit"),
+        "quoteProvider": quote.get("quoteProvider") or "angel",
+        "quoteReceivedAt": datetime.now(timezone.utc).isoformat(),
         "intraday": intraday or {},
     }
 
@@ -2705,6 +2723,59 @@ def _atr_percent(candles: list[dict[str, Any]], period: int = 14) -> float:
     atr = sum(trs[-period:]) / period
     close = candles[-1]["close"] or 1.0
     return (atr / close) * 100
+
+
+def _swing_v2_raw_metrics(
+    daily_candles: list[dict[str, Any]],
+    intraday_candles: list[dict[str, Any]],
+    ltp: float,
+    now: datetime,
+) -> dict[str, Any]:
+    """Point-in-time raw facts used later for V2 cross-sectional ranking."""
+    previous = []
+    for candle in daily_candles:
+        raw_ts = str(candle.get("ts") or "")[:10]
+        if raw_ts and raw_ts < now.date().isoformat():
+            previous.append(candle)
+    closes = [float(row["close"]) for row in previous if float(row.get("close") or 0) > 0]
+    returns = [closes[index] / closes[index - 1] - 1 for index in range(1, len(closes)) if closes[index - 1] > 0]
+
+    def annualized_vol(window: int) -> float:
+        values = returns[-window:]
+        if len(values) < max(20, window // 2):
+            return 0.0
+        return statistics.pstdev(values) * math.sqrt(252)
+
+    def momentum(lookback: int, vol_window: int) -> float | None:
+        if len(closes) < lookback + 5:
+            return None
+        denominator = annualized_vol(vol_window)
+        return None if denominator <= 0 else (closes[-5] / closes[-lookback - 5] - 1) / denominator
+
+    ema20_values = _ema(closes, period=20)
+    atr_pct = _atr_percent(previous)
+    atr = (atr_pct / 100.0) * (closes[-1] if closes else ltp)
+    prior20 = previous[-20:]
+    prior_high = max((float(row.get("high") or 0) for row in prior20), default=0.0)
+    mdtv_values = [float(row.get("close") or 0) * float(row.get("volume") or 0) for row in previous[-20:]]
+    intraday_closes = [float(row.get("close") or 0) for row in intraday_candles]
+    intraday_lows = [float(row.get("low") or 0) for row in intraday_candles]
+    last_ts = intraday_candles[-1].get("ts") if intraday_candles else None
+    return {
+        "dailyObservationCount": len(previous),
+        "dailyBarsThroughPreviousClose": bool(previous),
+        "mom6mRaw": momentum(126, 126),
+        "mom12mRaw": momentum(252, 252),
+        "return5dRaw": (closes[-1] / closes[-6] - 1) if len(closes) >= 6 and closes[-6] > 0 else None,
+        "ema20Daily": ema20_values[-1] if ema20_values else None,
+        "atr14": atr if atr > 0 else None,
+        "prior20dHigh": prior_high or None,
+        "mdtv20": statistics.median(mdtv_values) if mdtv_values else None,
+        "last3Closes": intraday_closes[-3:],
+        "intradayLow": min(intraday_lows) if intraday_lows else None,
+        "last5mTimestamp": last_ts,
+        "previous52wHigh": max((float(row.get("high") or 0) for row in previous[-252:]), default=0.0) or None,
+    }
 
 
 def _vwap(candles: list[dict[str, Any]]) -> float:
@@ -3019,6 +3090,7 @@ def _intraday_metrics_from_daily(
         "hard_filter_reasons": ["5m bars unavailable; ATR/RSI/turnover from daily candles + quote volume"],
         "day_change_pct": None if day_move_pct is None else round(day_move_pct, 2),
         "volume_pace_adjusted": False,
+        "swingV2Raw": _swing_v2_raw_metrics(daily_candles, [], ltp, now),
     }
 
 
@@ -3033,7 +3105,8 @@ def _intraday_metrics(
 ) -> dict[str, Any]:
     try:
         market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
-        daily_from = (now - timedelta(days=45)).replace(hour=9, minute=15, second=0, microsecond=0)
+        # V2 needs at least 252 observations and a 12-month momentum prior.
+        daily_from = (now - timedelta(days=430)).replace(hour=9, minute=15, second=0, microsecond=0)
         daily_to = now
 
         dhan_id = load_dhan_security_ids().get(inst.key) if dhan_configured() else None
@@ -3190,6 +3263,7 @@ def _intraday_metrics(
         "volume_pace_adjusted": True,
         "passes_hard_filters": passes_hard_filters,
         "hard_filter_reasons": hard_filter_reasons,
+        "swingV2Raw": _swing_v2_raw_metrics(daily_candles, intraday_candles, ltp, now),
     }
     return attach_pivot_metrics(metrics, ltp, daily_candles)
 
@@ -4165,6 +4239,17 @@ def _build_payload_from_live_data(
         "deskIcByTicker": desk_ic_map if isinstance(desk_ic_map, dict) else {},
         "isSnapshotFallback": False,
     }
+    try:
+        from .swing_v2.ingestion import enrich_v2_market_snapshot
+
+        payload = enrich_v2_market_snapshot(payload, all_stocks, now=now)
+    except Exception as exc:
+        logging.getLogger(__name__).exception("Swing V2 governed enrichment failed closed: %s", exc)
+        payload.update({
+            "swingV2UniverseCoverage": 0.0,
+            "swingV2Regime": "REGIME_UNRATED",
+            "swingV2DataStatus": {"errors": [str(exc)], "featureRows": 0},
+        })
     # Day-lock: carry prior lock on reuse; stamp lock after a successful fresh LLM pass.
     if reused_llm and snapshot and snapshot.get("llmLockedForDate"):
         payload["llmLockedForDate"] = snapshot.get("llmLockedForDate")
@@ -4898,12 +4983,13 @@ def create_app() -> FastAPI:
             if isinstance(result.get("session"), dict):
                 from .market_snapshot_store import readable_market_snapshot_path
                 from .swing_v2.facade import attach_shadow_v2
-                result["session"] = attach_shadow_v2(
-                    result["session"],
-                    str(readable_market_snapshot_path()),
-                    final_lock=True,
-                    persist_events=True,
-                )
+                if not result["session"].get("authoritative"):
+                    result["session"] = attach_shadow_v2(
+                        result["session"],
+                        str(readable_market_snapshot_path()),
+                        final_lock=True,
+                        persist_events=True,
+                    )
             return result
         except HTTPException:
             raise
@@ -4994,10 +5080,11 @@ def create_app() -> FastAPI:
             from .eod_swing_report import generate_swing_eod_report
             for_date = _date.fromisoformat(date) if date else None
             report = generate_swing_eod_report(for_date, force=force)
-            from .swing_v2.facade import eod_shadow_v2
-            shadow_v2 = eod_shadow_v2(_date.fromisoformat(str(report.get("date") or for_date)))
-            if shadow_v2.get("enabled"):
-                report["shadowV2"] = shadow_v2
+            if not report.get("authoritative"):
+                from .swing_v2.facade import eod_shadow_v2
+                shadow_v2 = eod_shadow_v2(_date.fromisoformat(str(report.get("date") or for_date)))
+                if shadow_v2.get("enabled"):
+                    report["shadowV2"] = shadow_v2
             return report
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc

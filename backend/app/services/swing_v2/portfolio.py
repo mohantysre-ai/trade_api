@@ -13,26 +13,33 @@ def _average_correlation(symbol: str, selected: list[dict[str, Any]], correlatio
     return sum(values) / len(values)
 
 
-def construct_portfolio(rows: list[dict[str, Any]], cfg: SwingV2Config, *, correlations: dict[tuple[str, str], float] | None = None, occupied_symbols: set[str] | None = None) -> dict[str, Any]:
+def construct_portfolio(rows: list[dict[str, Any]], cfg: SwingV2Config, *, correlations: dict[tuple[str, str], float] | None = None, occupied_symbols: set[str] | None = None, existing_positions: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     selected: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
+    existing = [row for row in (existing_positions or []) if not row.get("terminal") and not row.get("closed")]
     correlations, occupied = correlations or {}, {value.upper() for value in (occupied_symbols or set())}
-    remaining_risk = cfg.nav * cfg.max_portfolio_risk_bps / 10_000
+    occupied.update(str(row.get("symbol") or "").upper() for row in existing if row.get("symbol"))
+    existing_risk = sum(float(row.get("initialRiskRupees") or 0) for row in existing)
+    remaining_risk = max(0.0, cfg.nav * cfg.max_portfolio_risk_bps / 10_000 - existing_risk)
     sector_notional: dict[str, float] = {}
     sector_risk: dict[str, float] = {}
-    stress = 0.0
-    microcaps = 0
+    for position in existing:
+        sector = str(position.get("sector") or "UNKNOWN")
+        sector_notional[sector] = sector_notional.get(sector, 0) + float(position.get("deployedCapital") or 0)
+        sector_risk[sector] = sector_risk.get(sector, 0) + float(position.get("initialRiskRupees") or 0)
+    stress = sum(gap_stress_loss(row) for row in existing)
+    microcaps = sum("MICRO" in str(row.get("universeSegment") or "").upper() for row in existing)
     ordered = sorted(rows, key=lambda row: (float(row.get("expectedUtilityR") if row.get("expectedUtilityR") is not None else row.get("expectedNetR") or -999), float(row.get("score") or 0)), reverse=True)
     for row in ordered:
         symbol, sector = str(row.get("symbol") or "").upper(), str(row.get("sector") or "UNKNOWN")
         reason = None
-        if len(selected) >= cfg.max_positions:
+        if len(existing) + len(selected) >= cfg.max_positions:
             reason = "MAX_POSITIONS"
         elif symbol in occupied:
             reason = "CROSS_BOOK_CONFLICT"
-        elif sum(1 for item in selected if str(item.get("sector") or "UNKNOWN") == sector) >= 2:
+        elif sum(1 for item in [*existing, *selected] if str(item.get("sector") or "UNKNOWN") == sector) >= 2:
             reason = "MAX_TWO_NAMES_PER_SECTOR"
-        elif _average_correlation(symbol, selected, correlations) > cfg.max_average_correlation:
+        elif _average_correlation(symbol, [*existing, *selected], correlations) > cfg.max_average_correlation:
             reason = "EXCESS_PORTFOLIO_CORRELATION"
         elif "MICRO" in str(row.get("universeSegment") or "").upper() and microcaps >= 1:
             reason = "MAX_ONE_MICROCAP_SATELLITE"
@@ -55,4 +62,4 @@ def construct_portfolio(rows: list[dict[str, Any]], cfg: SwingV2Config, *, corre
         sector_notional[sector] = sector_notional.get(sector, 0) + notional
         sector_risk[sector] = sector_risk.get(sector, 0) + risk
         remaining_risk -= risk; stress = next_stress
-    return {"selected": selected, "rejected": rejected, "portfolioInitialRisk": round(cfg.nav * cfg.max_portfolio_risk_bps / 10_000 - remaining_risk, 2), "gapStressLoss": round(stress, 2), "cash": round(cfg.nav - sum(float(row["deployedCapital"]) for row in selected), 2)}
+    return {"selected": selected, "rejected": rejected, "portfolioInitialRisk": round(cfg.nav * cfg.max_portfolio_risk_bps / 10_000 - remaining_risk, 2), "gapStressLoss": round(stress, 2), "cash": round(cfg.nav - sum(float(row.get("deployedCapital") or 0) for row in [*existing, *selected]), 2)}

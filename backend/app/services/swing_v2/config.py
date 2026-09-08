@@ -23,6 +23,7 @@ def _clock(value: str, name: str) -> time:
 class SwingV2Config:
     enabled: bool = False
     mode: str = "SHADOW"
+    authority: str = "V1"
     strategy_id: str = "SWING_2S_MOMENTUM_V2"
     policy_version: str = "2.0.0"
     feature_version: str = "swing_features_v2"
@@ -61,11 +62,19 @@ class SwingV2Config:
     ledger_path: str = ""
     live_promotion: bool = False
 
+    @property
+    def paper_authoritative(self) -> bool:
+        return self.enabled and self.mode == "PAPER" and self.authority == "V2"
+
     def validate(self) -> None:
         if self.strategy_id != "SWING_2S_MOMENTUM_V2":
             raise ValueError("SWING_STRATEGY_ID must remain SWING_2S_MOMENTUM_V2")
         if self.mode not in {"SHADOW", "PAPER"}:
             raise ValueError("SWING_V2_MODE must be SHADOW or PAPER before live promotion")
+        if self.authority not in {"V1", "V2"}:
+            raise ValueError("SWING_STRATEGY_AUTHORITY must be V1 or V2")
+        if self.authority == "V2" and (not self.enabled or self.mode != "PAPER"):
+            raise ValueError("V2 authority requires SWING_V2_ENABLED=true and SWING_V2_MODE=PAPER")
         if self.microcap_mode not in {"DISABLED", "SHADOW"}:
             raise ValueError("SWING_MICROCAP_MODE must be DISABLED or SHADOW")
         if not 1 <= self.max_positions <= 5:
@@ -105,6 +114,7 @@ def load_config() -> SwingV2Config:
     c = SwingV2Config(
         enabled=_bool("SWING_V2_ENABLED", False),
         mode=os.getenv("SWING_V2_MODE", "SHADOW").upper(),
+        authority=os.getenv("SWING_STRATEGY_AUTHORITY", "V1").upper(),
         strategy_id=os.getenv("SWING_STRATEGY_ID", "SWING_2S_MOMENTUM_V2"),
         universe=os.getenv("SWING_UNIVERSE", "NIFTY_TOTAL_MARKET_750"),
         active_segments=tuple(p.strip().upper() for p in os.getenv("SWING_ACTIVE_SEGMENTS", "NIFTY100,NIFTY_MIDCAP150,NIFTY_SMALLCAP250").split(",") if p.strip()),

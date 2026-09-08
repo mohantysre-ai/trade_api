@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from .ledger import SwingLedger, materialize_position
 
@@ -18,9 +20,23 @@ def reconcile_positions(positions: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def ledger_eod_report(ledger: SwingLedger, session_date: str) -> dict[str, Any]:
-    events = ledger.events(session_date=session_date)
+    all_events = ledger.events()
+    ist = ZoneInfo("Asia/Kolkata")
+    def event_day(event: dict[str, Any]) -> str | None:
+        try:
+            return datetime.fromisoformat(str(event.get("eventTimestamp") or "").replace("Z", "+00:00")).astimezone(ist).date().isoformat()
+        except (TypeError, ValueError):
+            return None
+
+    events = [
+        event for event in all_events
+        if event.get("sessionDate") == session_date or event_day(event) == session_date
+    ]
+    relevant_position_ids = {str(event["positionId"]) for event in events if event.get("positionId")}
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for event in events:
-        grouped[event.get("positionId") or event["decisionId"]].append(event)
+    for event in all_events:
+        if event.get("positionId") and str(event["positionId"]) in relevant_position_ids:
+            grouped[str(event["positionId"])].append(event)
     positions = [materialize_position(group) for group in grouped.values()]
-    return {"strategyId": "SWING_2S_MOMENTUM_V2", "policyVersion": "2.0.0", "validationState": "RESEARCH_HYPOTHESIS", "sessionDate": session_date, "eventCount": len(events), "positions": positions, **reconcile_positions(positions)}
+    event_counts = Counter(str(event.get("eventType") or "UNKNOWN") for event in events)
+    return {"strategyId": "SWING_2S_MOMENTUM_V2", "policyVersion": "2.0.0", "validationState": "RESEARCH_HYPOTHESIS", "date": session_date, "sessionDate": session_date, "eventCount": len(events), "eventCounts": dict(event_counts), "positions": positions, **reconcile_positions(positions)}

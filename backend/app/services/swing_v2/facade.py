@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from .config import load_config
@@ -21,7 +21,9 @@ def _read_snapshot(path: str) -> dict[str, Any]:
 
 def _rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
     result = []
-    for raw in snapshot.get("stocks") or []:
+    quote_rows = snapshot.get("stockQuotes") if isinstance(snapshot.get("stockQuotes"), dict) else {}
+    source_rows = list(quote_rows.values()) if quote_rows else (snapshot.get("stocks") or [])
+    for raw in source_rows:
         if not isinstance(raw, dict):
             continue
         row = {**raw, **(raw.get("intraday") or {})}
@@ -35,11 +37,11 @@ def _rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
-def build_from_market_snapshot(snapshot: dict[str, Any], *, final_lock: bool = False, persist_events: bool = False, occupied_symbols: set[str] | None = None) -> dict[str, Any]:
+def build_from_market_snapshot(snapshot: dict[str, Any], *, final_lock: bool = False, persist_events: bool = False, occupied_symbols: set[str] | None = None, existing_positions: list[dict[str, Any]] | None = None, now: datetime | None = None) -> dict[str, Any]:
     universe_size = int(snapshot.get("swingV2UniverseSize") or snapshot.get("universeSize") or 0)
     coverage = float(snapshot.get("swingV2UniverseCoverage") or min(1.0, universe_size / 750.0))
     regime = str(snapshot.get("swingV2Regime") or (snapshot.get("selectionMeta") or {}).get("swingV2Regime") or "REGIME_UNRATED")
-    return build_shadow_v2(_rows(snapshot), universe_coverage=coverage, regime=regime, final_lock=final_lock, persist_events=persist_events, occupied_symbols=occupied_symbols)
+    return build_shadow_v2(_rows(snapshot), universe_coverage=coverage, regime=regime, final_lock=final_lock, persist_events=persist_events, occupied_symbols=occupied_symbols, existing_positions=existing_positions, now=now)
 
 
 def attach_shadow_v2(session: dict[str, Any], snapshot_path: str, *, final_lock: bool = False, persist_events: bool = False) -> dict[str, Any]:

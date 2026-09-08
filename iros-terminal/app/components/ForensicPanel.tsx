@@ -722,6 +722,14 @@ export default function ForensicPanel({
       outcome?: { label?: string | null } | null;
     }>;
     portfolio?: { realizedPnl?: number; unrealizedPnl?: number; totalPnl?: number; lockedCount?: number };
+    strategyId?: string;
+    policyVersion?: string;
+    validationState?: string;
+    authority?: string;
+    authoritative?: boolean;
+    executionMode?: string;
+    v1Enabled?: boolean;
+    v2?: SwingV2Shadow;
     shadowV2?: SwingV2Shadow;
   } | null>(null);
   const [locking, setLocking] = useState(false);
@@ -1448,7 +1456,32 @@ export default function ForensicPanel({
           )}
         </div>
       </div>
-      {swingSession?.shadowV2 && (
+      {swingSession?.authority === 'V2' && swingSession.v2 && (
+        <div className="mb-3 rounded-xl border border-emerald-300 bg-emerald-50/80 p-3 text-[10px] text-slate-700">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-black uppercase tracking-wider text-emerald-800">
+              {swingSession.strategyId} · v{swingSession.policyVersion}
+            </span>
+            <span className="rounded border border-emerald-300 bg-white px-1.5 py-0.5 font-black uppercase text-emerald-800">
+              V2 paper authority
+            </span>
+            <span className="font-semibold text-slate-500">V1 disabled · broker execution disabled · {swingSession.validationState}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 tabular-nums">
+            <span>Coverage {swingSession.v2.coverage != null ? (swingSession.v2.coverage * 100).toFixed(1) + '%' : '—'}</span>
+            <span>Regime {swingSession.v2.regime || 'UNRATED'}</span>
+            <span>Qualified {swingSession.v2.qualifiedCount ?? 0}</span>
+            <span>Selected {swingSession.v2.selectedCount ?? 0}/5</span>
+            {swingSession.v2.blockReason && <span className="font-bold text-amber-700">Cash held: {swingSession.v2.blockReason}</span>}
+          </div>
+          {swingSession.v2.funnel && (
+            <div className="mt-2 text-slate-500">
+              V2 funnel {swingSession.v2.funnel.universe ?? 0} → fresh {swingSession.v2.funnel.freshData ?? 0} → tradable {swingSession.v2.funnel.tradable ?? 0} → safety {swingSession.v2.funnel.safetyPass ?? 0} → setup {swingSession.v2.funnel.setupPass ?? 0} → portfolio {swingSession.v2.funnel.portfolioPass ?? 0}
+            </div>
+          )}
+        </div>
+      )}
+      {swingSession?.shadowV2 && swingSession?.authority !== 'V2' && (
         <div className="mb-3 rounded-xl border border-cyan-200 bg-cyan-50/70 p-3 text-[10px] text-slate-700">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-black uppercase tracking-wider text-cyan-800">
