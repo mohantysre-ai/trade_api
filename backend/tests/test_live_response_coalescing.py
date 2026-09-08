@@ -86,11 +86,54 @@ def test_stale_intraday_rotation_is_background_and_coalesced(monkeypatch):
 
 
 def test_current_day_cash_lock_is_a_valid_intraday_session(monkeypatch):
-    current = {"locked": True, "sessionDate": "2026-08-26", "long": [], "short": [], "cashHeld": True}
+    current = {
+        "locked": True,
+        "sessionDate": "2026-08-26",
+        "committedAt": "2026-08-26T10:00:00+05:30",
+        "long": [], "short": [], "cashHeld": True,
+    }
     monkeypatch.setattr(intraday, "load_session", lambda: current)
     monkeypatch.setattr(intraday, "_ist_now", lambda: datetime(2026, 8, 26, 10, 0))
     monkeypatch.setattr(intraday, "commit_session", lambda **kwargs: (_ for _ in ()).throw(AssertionError("must not recommit")))
     assert intraday.ensure_intraday_session_locked() == current
+
+
+def test_current_day_lock_without_commit_timestamp_is_rebuilt(monkeypatch):
+    malformed = {
+        "locked": True, "sessionDate": "2026-08-26", "committedAt": None,
+        "long": [{"symbol": "GHOST"}], "short": [],
+    }
+    rebuilt = {
+        "locked": True, "sessionDate": "2026-08-26",
+        "committedAt": "2026-08-26T10:01:00+05:30", "long": [], "short": [],
+    }
+    calls = []
+    monkeypatch.setattr(intraday, "load_session", lambda: malformed)
+    monkeypatch.setattr(intraday, "_ist_now", lambda: datetime(2026, 8, 26, 10, 1))
+    monkeypatch.setattr(
+        intraday, "commit_session",
+        lambda **kwargs: calls.append(kwargs) or rebuilt,
+    )
+    assert intraday.ensure_intraday_session_locked() == rebuilt
+    assert calls == [{"force": True}]
+
+
+def test_stale_snapshot_cannot_create_intraday_lock(monkeypatch):
+    monkeypatch.setattr(intraday, "reconcile_cross_book", lambda *args, **kwargs: None)
+    monkeypatch.setattr(intraday, "load_session", lambda: {})
+    monkeypatch.setattr(intraday, "basket_lock_allowed", lambda **kwargs: (True, "primary_window"))
+    monkeypatch.setattr(intraday, "_maybe_refresh_live_snapshot", lambda **kwargs: {"updatedAt": "old"})
+    monkeypatch.setattr(
+        intraday, "generate_candidates",
+        lambda snapshot: {
+            "dataStale": True,
+            "snapshotUpdatedAt": "old",
+            "snapshotAgeSec": 9999,
+        },
+    )
+    result = intraday.commit_session()
+    assert result["success"] is False
+    assert result["error"].startswith("STALE_SNAPSHOT")
 
 
 def test_swing_live_response_refresh_does_not_block_concurrent_callers(monkeypatch):

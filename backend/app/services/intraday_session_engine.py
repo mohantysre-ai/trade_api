@@ -5,7 +5,7 @@ placed by this module (executionPolicy remains advisory / manual-broker).
 
 Funnel: Nifty 500 → regime → multi-factor score → entry_quality_gate →
   10 LONG + 10 SHORT candidate pool (20) →
-  adopt highest-probability QUALIFIED 5 BUY + 5 SELL (10) → immutable JSON lock.
+  adopt highest-probability QUALIFIED 5 total → immutable JSON lock.
 
 No broker order placement. Missing inputs → UNRATED / STALE_DATA / NO_EDGE, never invented.
 """
@@ -117,7 +117,7 @@ MEANREV_SLOTS = int(os.environ.get("INTRADAY_MEANREV_SLOTS", "4"))
 _BASKET_ENV = os.environ.get("INTRADAY_BASKET_SIZE")
 # Candidate pool size per side (default 10 = 6 MOM + 4 MR)
 BASKET_SIZE = int(_BASKET_ENV) if _BASKET_ENV else max(1, MOMENTUM_SLOTS + MEANREV_SLOTS)
-# Locked desk: high-probability adoption from the 20 → 5 BUY + 5 SELL
+# Locked desk: high-probability adoption from the 20 → 5 total.
 LOCK_SIZE = int(os.environ.get("MAX_INTRADAY_POSITIONS", os.environ.get("INTRADAY_LOCK_SIZE", "5")))
 MAX_LONG_POSITIONS = int(os.environ.get("MAX_LONG_POSITIONS", "3"))
 MAX_SHORT_POSITIONS = int(os.environ.get("MAX_SHORT_POSITIONS", "3"))
@@ -152,6 +152,7 @@ REGIME_BLOCK_NIFTY_PCT = float(os.environ.get("INTRADAY_REGIME_BLOCK_NIFTY_PCT",
 REGIME_HARD_NIFTY_PCT = float(os.environ.get("INTRADAY_REGIME_HARD_NIFTY_PCT", "1.5"))
 REGIME_HEADWIND_HAIRCUT = float(os.environ.get("INTRADAY_REGIME_HAIRCUT", "0.70"))
 ENTRY_MIN_EXPECTED_R = float(os.environ.get("INTRADAY_ENTRY_MIN_EXPECTED_R", "1.20"))
+ENTRY_MIN_SCORE = float(os.environ.get("INTRADAY_ENTRY_MIN_SCORE", "70"))
 PRIORITY_EXPECTED_R = float(os.environ.get("INTRADAY_PRIORITY_EXPECTED_R", "1.50"))
 HIGH_CONVICTION_R = float(os.environ.get("INTRADAY_HIGH_CONVICTION_R", "2.00"))
 ENTRY_EXCEPTIONAL_SCORE = float(os.environ.get("INTRADAY_ENTRY_EXCEPTIONAL_SCORE", "72"))
@@ -180,7 +181,9 @@ _ENTRY_HARD_REJECT = frozenset(
 
 # Replacement planner — propose only until cutoff; prefer cash over weak names
 REPLACEMENT_CUTOFF_HHMM = os.environ.get("INTRADAY_REPLACEMENT_CUTOFF", "1445")
-REPLACEMENT_MIN_SCORE = float(os.environ.get("INTRADAY_REPLACEMENT_MIN_SCORE", "55"))
+REPLACEMENT_MIN_SCORE = float(
+    os.environ.get("INTRADAY_REPLACEMENT_MIN_SCORE", str(ENTRY_MIN_SCORE))
+)
 REPLACEMENT_MAX_PER_SIDE = int(os.environ.get("INTRADAY_REPLACEMENT_MAX_PER_SIDE", str(LOCK_SIZE)))
 # A locked book may rotate, but it must never turn a five-name desk into a
 # high-turnover scanner. This is a session-wide cap on *new* entries after
@@ -989,6 +992,24 @@ def entry_quality_gate(
             ltp_source=ltp_source,
             day_move=day_move,
         )
+    if score is None:
+        return _gate_payload(
+            ENTRY_NO_EDGE,
+            exclude_reason="score missing — cannot enforce entry floor",
+            quality_r=None,
+            flags=["SCORE_MISSING"],
+            ltp_source=ltp_source or None,
+            day_move=day_move,
+        )
+    if score < ENTRY_MIN_SCORE:
+        return _gate_payload(
+            ENTRY_NO_EDGE,
+            exclude_reason=f"score {score:.1f} < {ENTRY_MIN_SCORE:.1f}",
+            quality_r=None,
+            flags=["LOW_SCORE"],
+            ltp_source=ltp_source or None,
+            day_move=day_move,
+        )
 
     nifty_chg = _safe_float(regime_use.get("niftyChangePct"))
     regime_label = str(regime_use.get("label") or regime_use.get("regime") or "UNRATED")
@@ -1256,9 +1277,6 @@ def entry_quality_gate(
         flags.append("EXHAUSTION_DISCOUNT")
     if regime_label == "UNRATED":
         adj *= 0.90
-    if score is not None and score < REPLACEMENT_MIN_SCORE:
-        adj *= 0.70
-        flags.append("LOW_SCORE_HAIRCUT")
     # Soft OI preference: boost aligned / haircut misaligned (never invent OI)
     if oi_aligned is True:
         adj *= OI_ALIGN_BONUS
@@ -1283,19 +1301,6 @@ def entry_quality_gate(
             oi_setup=oi_setup,
             oi_aligned=oi_aligned,
         )
-    # Replacement path only: enforce minimum score (morning scan uses expected-R hurdle).
-    if (quotes or live) and score is not None and score < REPLACEMENT_MIN_SCORE:
-        return _gate_payload(
-            ENTRY_NO_EDGE,
-            exclude_reason=f"score {score:.1f} < {REPLACEMENT_MIN_SCORE}",
-            quality_r=adj,
-            flags=["LOW_SCORE", *flags],
-            ltp_source=ltp_source or None,
-            day_move=day_move,
-            oi_setup=oi_setup,
-            oi_aligned=oi_aligned,
-        )
-
     if in_play:
         flags.append("IN_PLAY")
     return _gate_payload(
@@ -2503,6 +2508,7 @@ def generate_candidates(
             "regimeHardNiftyPct": REGIME_HARD_NIFTY_PCT,
             "regimeHeadwindHaircut": REGIME_HEADWIND_HAIRCUT,
             "minExpectedR": ENTRY_MIN_EXPECTED_R,
+            "minScore": ENTRY_MIN_SCORE,
             "oiRequireFno": OI_REQUIRE_FNO,
             "oiPreferFirst": True,
             "oiMisalignHaircut": OI_MISALIGN_HAIRCUT,
@@ -2829,7 +2835,17 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
             "session": existing,
         }
 
-    candidates = generate_candidates()
+    candidates = generate_candidates(
+        _maybe_refresh_live_snapshot(reason="intraday_commit")
+    )
+    if candidates.get("dataStale"):
+        return {
+            "success": False,
+            "error": "STALE_SNAPSHOT — basket not committed; waiting for a fresh market snapshot.",
+            "session": existing,
+            "snapshotUpdatedAt": candidates.get("snapshotUpdatedAt"),
+            "snapshotAgeSec": candidates.get("snapshotAgeSec"),
+        }
     pool_long = candidates.get("proposedLong") or []
     pool_short = candidates.get("proposedShort") or []
     long_rows = candidates.get("adoptLong") or []
@@ -2839,33 +2855,22 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
     # generate_candidates already applies the single total selector and capital guard.
     long_rows = long_rows[:LOCK_SIZE]
     short_rows = short_rows[: max(0, LOCK_SIZE - len(long_rows))]
-    # A stale feed can lock a plan, but cannot prove an execution. Fresh locks
-    # use the observed candidate LTP as timestamped modeled-fill evidence.
+    # Fresh locks use the observed candidate LTP as timestamped modeled-fill evidence.
     committed_at = _utc_now_iso()
-    feed_stale_at_lock = bool(candidates.get("dataStale"))
     def _stamp_execution(row: dict[str, Any]) -> dict[str, Any]:
         out = dict(row)
         planned = float(out.get("deployedCapital") or 0)
         out["plannedCapital"] = planned
         out["lockObservedPrice"] = _safe_float(out.get("ltp") or out.get("currentPrice"))
-        if feed_stale_at_lock:
-            out.update({
-                "triggered": False,
-                "executionStatus": "PENDING_ENTRY",
-                "triggeredAt": None,
-                "deployedCapital": 0.0,
-                "status": "PENDING ENTRY",
-            })
-        else:
-            out.update({
-                "triggered": True,
-                "executionStatus": "TRIGGERED",
-                "triggeredAt": committed_at,
-                "sessionHigh": out.get("entryPrice") or out.get("lockObservedPrice"),
-                "sessionLow": out.get("entryPrice") or out.get("lockObservedPrice"),
-                "pathEvidenceVersion": "post_entry_live_marks_v1",
-                "pathEvidenceStartedAt": committed_at,
-            })
+        out.update({
+            "triggered": True,
+            "executionStatus": "TRIGGERED",
+            "triggeredAt": committed_at,
+            "sessionHigh": out.get("entryPrice") or out.get("lockObservedPrice"),
+            "sessionLow": out.get("entryPrice") or out.get("lockObservedPrice"),
+            "pathEvidenceVersion": "post_entry_live_marks_v1",
+            "pathEvidenceStartedAt": committed_at,
+        })
         return out
     long_rows = [_stamp_execution(r) for r in long_rows]
     short_rows = [_stamp_execution(r) for r in short_rows]
@@ -2979,9 +2984,14 @@ def ensure_intraday_session_locked() -> dict[str, Any]:
     # A current-day cash-held lock with zero names is valid. Replacement
     # hunting may fill it later; do not make it impossible to re-enter because
     # commit_session correctly refuses to overwrite today's immutable lock.
-    if existing.get("locked") and existing_date == today:
+    if existing.get("locked") and existing_date == today and existing.get("committedAt"):
         return existing
-    result = commit_session(force=bool(existing.get("locked") and existing_date != today))
+    malformed_current = bool(
+        existing.get("locked") and existing_date == today and not existing.get("committedAt")
+    )
+    result = commit_session(
+        force=bool(existing.get("locked") and (existing_date != today or malformed_current))
+    )
     if isinstance(result, dict) and result.get("locked") and result.get("sessionDate"):
         return result
     nested = result.get("session") if isinstance(result, dict) else None
@@ -4407,7 +4417,7 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
 
 
 def _schedule_stale_session_rotation(existing: dict[str, Any] | None = None) -> bool:
-    """Recover a missed scheduler tick without blocking an HTTP request.
+    """Recover a stale or malformed lock without blocking an HTTP request.
 
     GET remains non-blocking: it only coalesces one background call through the
     same deterministic ensure/commit path used by the desk scheduler.
@@ -4417,8 +4427,11 @@ def _schedule_stale_session_rotation(existing: dict[str, Any] | None = None) -> 
     today = _ist_now().strftime("%Y-%m-%d")
     session_date = str(session.get("sessionDate") or "").strip()[:10]
     stale = bool(session.get("locked") and session_date and session_date != today)
+    malformed_current = bool(
+        session.get("locked") and session_date == today and not session.get("committedAt")
+    )
     allowed, _reason = basket_lock_allowed()
-    if not stale or not allowed:
+    if not (stale or malformed_current) or not allowed:
         return False
     now = time.monotonic()
     if now - _SESSION_ROTATION_ATTEMPT_AT < _SESSION_ROTATION_RETRY_SEC:
@@ -4432,7 +4445,7 @@ def _schedule_stale_session_rotation(existing: dict[str, Any] | None = None) -> 
             result = ensure_intraday_session_locked()
             if str(result.get("sessionDate") or "")[:10] == today and result.get("locked"):
                 refresh_session_state()
-                log.info("Recovered stale intraday session %s -> %s from read-path trigger", session_date, today)
+                log.info("Recovered intraday session %s -> %s from read-path trigger", session_date, today)
             else:
                 log.warning("Read-path intraday rotation remains pending: %s", result.get("commitError"))
         except Exception:
