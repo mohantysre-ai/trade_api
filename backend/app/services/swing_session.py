@@ -2311,7 +2311,8 @@ def _compute_swing_session(*, live: bool = False) -> dict[str, Any]:
     if len(unique_long) != len(long_rows) or len(unique_short) != len(short_rows):
         _recompute_active_swing_totals(sess)
     if not live:
-        return sess
+        from .swing_v2.facade import attach_shadow_v2
+        return attach_shadow_v2(sess, _matrix_snapshot_path())
     snap = _read_json(_matrix_snapshot_path())
     quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
     stocks_by: dict[str, Any] = {}
@@ -2430,4 +2431,5 @@ def _compute_swing_session(*, live: bool = False) -> dict[str, Any]:
         )
     except Exception:
         out["newAlerts"] = []
-    return out
+    from .swing_v2.facade import attach_shadow_v2
+    return attach_shadow_v2(out, _matrix_snapshot_path())

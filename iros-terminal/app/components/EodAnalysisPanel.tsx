@@ -252,6 +252,28 @@ type SwingReport = {
   dayLessons?: string[];
   rotation?: string;
   source?: string;
+  shadowV2?: {
+    strategyId?: string;
+    policyVersion?: string;
+    validationState?: string;
+    enabled?: boolean;
+    authoritative?: boolean;
+    eventCount?: number;
+    realizedPnl?: number;
+    unrealizedPnl?: number;
+    totalPnl?: number;
+    reconciled?: boolean;
+    positions?: Array<{
+      symbol?: string;
+      setupIds?: string[];
+      holdingSessionAge?: number;
+      lastEventType?: string;
+      pathQuality?: string;
+      realizedPnl?: number;
+      unrealizedPnl?: number;
+      totalPnl?: number;
+    }>;
+  };
 };
 
 /* -------------------------------------------------------------------------- */
@@ -1991,6 +2013,22 @@ export default function EodAnalysisPanel({
                 </p>
               )}
             </div>
+
+            {displaySwing?.shadowV2 && (
+              <div className="border-b border-cyan-200 bg-cyan-50/70 px-3 py-2 text-[9px] text-slate-600">
+                <span className="font-black uppercase tracking-wider text-cyan-800">
+                  {displaySwing.shadowV2.strategyId} · v{displaySwing.shadowV2.policyVersion}
+                </span>
+                {' · '}shadow ledger · {displaySwing.shadowV2.validationState}
+                {' · '}events {displaySwing.shadowV2.eventCount ?? 0}
+                {' · '}P&amp;L {fmtInr(displaySwing.shadowV2.totalPnl ?? 0, 2)}
+                {' · '}
+                <span className={displaySwing.shadowV2.reconciled ? 'font-bold text-emerald-700' : 'font-bold text-red-700'}>
+                  {displaySwing.shadowV2.reconciled ? 'ledger reconciled' : 'ledger mismatch'}
+                </span>
+                {' · '}non-authoritative
+              </div>
+            )}
 
             {noSwing ? (
               <div className="p-4 text-[11px] text-slate-400 text-center">

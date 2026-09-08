@@ -8,6 +8,9 @@ backend/app/services/last_market_snapshot.json
 *.log
 logs/
 *.log.*
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
 !.env.example
 !backend/.env.example
 config/cloudflare/credentials.json

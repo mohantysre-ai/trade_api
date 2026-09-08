@@ -17,7 +17,7 @@ def build_exit_and_size(row: dict[str, Any], cfg: SwingV2Config, *, remaining_ri
     structure_distance = entry - structure_stop
     risk_distance = max(structure_distance, cfg.stop_atr_mult * atr)
     risk_pct = 100.0 * risk_distance / entry
-    max_stop = cfg.max_stop_small_pct if "SMALL" in segment else cfg.max_stop_core_pct
+    max_stop = cfg.max_stop_micro_pct if "MICRO" in segment else (cfg.max_stop_small_pct if "SMALL" in segment else cfg.max_stop_core_pct)
     if risk_pct < cfg.min_stop_pct or risk_pct > max_stop:
         return {**row, "riskEligible": False, "riskRejectReason": "STOP_OUTSIDE_SWING_BAND", "riskPct": round(risk_pct, 4)}
 
@@ -37,8 +37,8 @@ def build_exit_and_size(row: dict[str, Any], cfg: SwingV2Config, *, remaining_ri
         math.floor(max_notional / entry),
         math.floor(liquidity_notional / entry),
     )
-    if qty < 1:
-        return {**row, "riskEligible": False, "riskRejectReason": "SIZE_BELOW_ONE_SHARE"}
+    if qty < 2:
+        return {**row, "riskEligible": False, "riskRejectReason": "SIZE_BELOW_TWO_SHARES"}
 
     stop = entry - risk_distance
     t1 = entry + cfg.t1_r * risk_distance
@@ -56,8 +56,14 @@ def build_exit_and_size(row: dict[str, Any], cfg: SwingV2Config, *, remaining_ri
         "deployedCapital": round(qty * entry, 2),
         "t1": round(t1, 4),
         "t2": round(t2, 4),
-        "t1Qty": max(1, qty // 2),
+        # Never round the risk-bearing T1 tranche upward.
+        "t1Qty": max(1, math.floor(qty * cfg.t1_qty_pct / 100.0)),
+        "remainingQty": qty,
+        "filledQty": qty,
         "plannedMaxBlendedR": 1.50,
+        "upsideCapacityR": row.get("upsideCapacityR"),
+        "expectedNetR": row.get("expectedNetR"),
+        "expectedNetRStatus": row.get("expectedNetRStatus") or ("CALIBRATED" if row.get("expectedNetR") is not None else "UNRATED"),
         "exitPolicyScope": "SWING_V2",
     }
 

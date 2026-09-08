@@ -4895,6 +4895,15 @@ def create_app() -> FastAPI:
             result = lock_swing_session(force=force)
             if not result.get("success") and result.get("error"):
                 raise HTTPException(status_code=409, detail=result.get("error"))
+            if isinstance(result.get("session"), dict):
+                from .market_snapshot_store import readable_market_snapshot_path
+                from .swing_v2.facade import attach_shadow_v2
+                result["session"] = attach_shadow_v2(
+                    result["session"],
+                    str(readable_market_snapshot_path()),
+                    final_lock=True,
+                    persist_events=True,
+                )
             return result
         except HTTPException:
             raise
@@ -4984,7 +4993,12 @@ def create_app() -> FastAPI:
             from datetime import date as _date
             from .eod_swing_report import generate_swing_eod_report
             for_date = _date.fromisoformat(date) if date else None
-            return generate_swing_eod_report(for_date, force=force)
+            report = generate_swing_eod_report(for_date, force=force)
+            from .swing_v2.facade import eod_shadow_v2
+            shadow_v2 = eod_shadow_v2(_date.fromisoformat(str(report.get("date") or for_date)))
+            if shadow_v2.get("enabled"):
+                report["shadowV2"] = shadow_v2
+            return report
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 

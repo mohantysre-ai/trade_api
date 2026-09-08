@@ -591,6 +591,32 @@ type SwingLongPosition = {
   outcome?: { label?: string | null } | null;
 };
 
+type SwingV2Shadow = {
+  strategyId?: string;
+  policyVersion?: string;
+  validationState?: string;
+  authoritative?: boolean;
+  liveCapitalApproved?: boolean;
+  blocked?: boolean;
+  blockReason?: string;
+  coverage?: number;
+  regime?: string;
+  riskScale?: number;
+  qualifiedCount?: number;
+  selectedCount?: number;
+  funnel?: {
+    universe?: number;
+    freshData?: number;
+    tradable?: number;
+    safetyPass?: number;
+    setupPass?: number;
+    expectancyPass?: number;
+    portfolioPass?: number;
+    locked?: number;
+    filled?: number;
+  };
+};
+
 function uniqueSwingLongPositions<T extends SwingLongPosition>(rows: T[] | undefined): T[] {
   if (!rows?.length) return [];
   const groups = new Map<string, T[]>();
@@ -696,6 +722,7 @@ export default function ForensicPanel({
       outcome?: { label?: string | null } | null;
     }>;
     portfolio?: { realizedPnl?: number; unrealizedPnl?: number; totalPnl?: number; lockedCount?: number };
+    shadowV2?: SwingV2Shadow;
   } | null>(null);
   const [locking, setLocking] = useState(false);
   const [lockError, setLockError] = useState<string | null>(null);
@@ -1421,6 +1448,31 @@ export default function ForensicPanel({
           )}
         </div>
       </div>
+      {swingSession?.shadowV2 && (
+        <div className="mb-3 rounded-xl border border-cyan-200 bg-cyan-50/70 p-3 text-[10px] text-slate-700">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-black uppercase tracking-wider text-cyan-800">
+              {swingSession.shadowV2.strategyId} · v{swingSession.shadowV2.policyVersion}
+            </span>
+            <span className="rounded border border-cyan-300 bg-white px-1.5 py-0.5 font-black uppercase text-cyan-800">
+              Shadow · {swingSession.shadowV2.validationState}
+            </span>
+            <span className="font-semibold text-slate-500">Non-authoritative · live capital disabled</span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 tabular-nums">
+            <span>Coverage {swingSession.shadowV2.coverage != null ? (swingSession.shadowV2.coverage * 100).toFixed(1) + '%' : '—'}</span>
+            <span>Regime {swingSession.shadowV2.regime || 'UNRATED'}</span>
+            <span>Qualified {swingSession.shadowV2.qualifiedCount ?? 0}</span>
+            <span>Selected {swingSession.shadowV2.selectedCount ?? 0}/5</span>
+            {swingSession.shadowV2.blockReason && <span className="font-bold text-amber-700">Blocked: {swingSession.shadowV2.blockReason}</span>}
+          </div>
+          {swingSession.shadowV2.funnel && (
+            <div className="mt-2 text-slate-500">
+              Funnel {swingSession.shadowV2.funnel.universe ?? 0} → fresh {swingSession.shadowV2.funnel.freshData ?? 0} → tradable {swingSession.shadowV2.funnel.tradable ?? 0} → safety {swingSession.shadowV2.funnel.safetyPass ?? 0} → setup {swingSession.shadowV2.funnel.setupPass ?? 0} → expectancy {swingSession.shadowV2.funnel.expectancyPass ?? 0} → portfolio {swingSession.shadowV2.funnel.portfolioPass ?? 0}
+            </div>
+          )}
+        </div>
+      )}
       {lockError && (
         <p className="mb-2 text-[10px] text-red-600">{lockError}</p>
       )}

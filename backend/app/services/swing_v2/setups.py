@@ -29,7 +29,7 @@ def breakout_close_v1(row: dict[str, Any]) -> tuple[bool, list[str]]:
 def pullback_reclaim_v1(row: dict[str, Any]) -> tuple[bool, list[str]]:
     required = {
         "trendPriorPctile": lambda v: v >= 70,
-        "distanceToPrior20dHighAtr": lambda v: v <= 1.50,
+        "distanceToPrior20dHighAtr": lambda v: abs(float(v)) <= 1.50,
         "intradayLowToVwapAtr": lambda v: v <= 0.10,
         "last3ClosesAboveVwap": bool,
         "lastCloseAboveEma9": bool,
@@ -51,6 +51,29 @@ def pullback_reclaim_v1(row: dict[str, Any]) -> tuple[bool, list[str]]:
     return not failed, failed
 
 
+def catalyst_gap_hold_v1(row: dict[str, Any]) -> tuple[bool, list[str]]:
+    segment = str(row.get("universeSegment") or "").upper()
+    maximum_gap = 5.0 if "SMALL" in segment else 4.0
+    required = {
+        "structuredAnnouncementId": bool,
+        "announcementKnownBeforeDecision": bool,
+        "gapPct": lambda v: 1.0 <= float(v) <= maximum_gap,
+        "gapFillPct": lambda v: float(v) <= 50,
+        "decisionAboveVwap": bool,
+        "clv": lambda v: float(v) >= .75,
+        "rvolPaced": lambda v: float(v) >= 2.0,
+    }
+    failed = []
+    for key, test in required.items():
+        value = row.get(key)
+        try:
+            if value is None or not test(value):
+                failed.append(key)
+        except (TypeError, ValueError):
+            failed.append(key)
+    return not failed, failed
+
+
 def evaluate_setups(row: dict[str, Any]) -> dict[str, Any]:
     passed: list[str] = []
     reasons: dict[str, list[str]] = {}
@@ -64,4 +87,10 @@ def evaluate_setups(row: dict[str, Any]) -> dict[str, Any]:
         passed.append("PULLBACK_RECLAIM_V1")
     else:
         reasons["PULLBACK_RECLAIM_V1"] = why
-    return {"passedSetupIds": passed, "rejections": reasons, "eligible": bool(passed)}
+    shadow_passed: list[str] = []
+    ok, why = catalyst_gap_hold_v1(row)
+    if ok:
+        shadow_passed.append("CATALYST_GAP_HOLD_V1")
+    else:
+        reasons["CATALYST_GAP_HOLD_V1"] = why
+    return {"passedSetupIds": passed, "shadowSetupIds": shadow_passed, "rejections": reasons, "eligible": bool(passed)}
