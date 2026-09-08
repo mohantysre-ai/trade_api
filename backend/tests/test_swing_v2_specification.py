@@ -27,6 +27,7 @@ from app.services.swing_v2.schemas import EventType
 from app.services.swing_v2.setups import evaluate_setups
 from app.services.swing_v2.shadow import build_shadow_v2
 from app.services.swing_v2.tradability import evaluate_tradability
+from app.services.swing_v2.universe import angel_resolution_coverage, refresh_official_membership
 from app.services.swing_v2.validation import research_to_shadow_gates, shadow_to_paper_gates, walk_forward_windows
 
 
@@ -330,3 +331,28 @@ def test_compatibility_facade_is_invisible_when_disabled_and_versioned_when_enab
     attached = attach_shadow_v2(session, str(snapshot))
     assert attached["shadowV2"]["strategyId"] == "SWING_2S_MOMENTUM_V2"
     assert attached["shadowV2"]["blockReason"] == "UNIVERSE_COVERAGE_BELOW_99PCT"
+
+
+def test_official_750_universe_is_exact_date_stamped_and_angel_coverage_is_explicit(tmp_path):
+    counts = {"nifty100": ("L", 100), "midcap150": ("M", 150), "smallcap250": ("S", 250), "microcap250": ("X", 250)}
+
+    class Response:
+        def __init__(self, text):
+            self.text = text
+
+        def raise_for_status(self):
+            return None
+
+    def fetcher(url, timeout):
+        prefix, count = next(value for key, value in counts.items() if key in url.replace("_", "").lower())
+        body = "Company Name,Industry,Symbol\n" + "\n".join(f"{prefix}{i},TEST,{prefix}{i}" for i in range(count))
+        return Response(body)
+
+    payload = refresh_official_membership(str(tmp_path), effective_date=date(2026, 9, 8), fetcher=fetcher)
+    assert payload["constituentCount"] == 750
+    assert (tmp_path / "2026-09-08.json").exists()
+    master = [{"symbol": f"L{i}-EQ", "token": str(i)} for i in range(99)]
+    resolved = angel_resolution_coverage(payload["constituents"], master)
+    assert resolved["expected"] == 750
+    assert resolved["resolved"] == 99
+    assert resolved["coverage"] == 99 / 750

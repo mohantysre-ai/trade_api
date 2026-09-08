@@ -55,6 +55,11 @@ The current snapshot is Nifty-500 oriented, so turning on the feature before
 the Nifty Total Market 750 ingestion is populated will correctly show
 UNIVERSE_COVERAGE_BELOW_99PCT.
 
+universe.py includes the official Nifty Indices segment CSV loader, immutable
+date-stamped snapshots, exact 100/150/250/250 and 750-unique-symbol checks, and
+Angel One instrument-resolution coverage. Historical research must retain each
+dated snapshot; today's constituents are never projected backwards.
+
 ## Validation
 
     cd backend
