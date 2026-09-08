@@ -146,23 +146,6 @@ def _reentry_cand(sym: str, *, ltp: float = 107.0, score: float = 70.0) -> dict:
     }
 
 
-def test_intraday_initial_and_replacement_score_floor_is_70():
-    assert eng.ENTRY_MIN_SCORE == 70.0
-    assert eng.REPLACEMENT_MIN_SCORE == 70.0
-    gate = eng.entry_quality_gate(
-        {
-            **_pool_cand("KALYANKJIL", score=57.8),
-            "ltpSource": "snapshot",
-            "turnoverCr": 100.0,
-            "intraday": {"atr_pct": 2.0, "turnover_cr": 100.0},
-        },
-        "LONG",
-        {"label": "NEUTRAL", "niftyChangePct": -0.34},
-    )
-    assert gate["entryState"] == eng.ENTRY_NO_EDGE
-    assert "57.8 < 70.0" in gate["excludeReason"]
-
-
 def test_apply_replacement_restores_open_count():
     session = {
         "locked": True,

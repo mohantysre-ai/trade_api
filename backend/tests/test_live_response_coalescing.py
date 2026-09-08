@@ -90,6 +90,7 @@ def test_current_day_cash_lock_is_a_valid_intraday_session(monkeypatch):
         "locked": True,
         "sessionDate": "2026-08-26",
         "committedAt": "2026-08-26T10:00:00+05:30",
+        "entryPolicyVersion": intraday.ENTRY_POLICY_VERSION,
         "long": [], "short": [], "cashHeld": True,
     }
     monkeypatch.setattr(intraday, "load_session", lambda: current)
@@ -106,6 +107,7 @@ def test_current_day_lock_without_commit_timestamp_is_rebuilt(monkeypatch):
     rebuilt = {
         "locked": True, "sessionDate": "2026-08-26",
         "committedAt": "2026-08-26T10:01:00+05:30", "long": [], "short": [],
+        "entryPolicyVersion": intraday.ENTRY_POLICY_VERSION,
     }
     calls = []
     monkeypatch.setattr(intraday, "load_session", lambda: malformed)

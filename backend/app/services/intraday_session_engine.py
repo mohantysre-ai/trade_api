@@ -152,7 +152,6 @@ REGIME_BLOCK_NIFTY_PCT = float(os.environ.get("INTRADAY_REGIME_BLOCK_NIFTY_PCT",
 REGIME_HARD_NIFTY_PCT = float(os.environ.get("INTRADAY_REGIME_HARD_NIFTY_PCT", "1.5"))
 REGIME_HEADWIND_HAIRCUT = float(os.environ.get("INTRADAY_REGIME_HAIRCUT", "0.70"))
 ENTRY_MIN_EXPECTED_R = float(os.environ.get("INTRADAY_ENTRY_MIN_EXPECTED_R", "1.20"))
-ENTRY_MIN_SCORE = float(os.environ.get("INTRADAY_ENTRY_MIN_SCORE", "70"))
 PRIORITY_EXPECTED_R = float(os.environ.get("INTRADAY_PRIORITY_EXPECTED_R", "1.50"))
 HIGH_CONVICTION_R = float(os.environ.get("INTRADAY_HIGH_CONVICTION_R", "2.00"))
 ENTRY_EXCEPTIONAL_SCORE = float(os.environ.get("INTRADAY_ENTRY_EXCEPTIONAL_SCORE", "72"))
@@ -181,9 +180,7 @@ _ENTRY_HARD_REJECT = frozenset(
 
 # Replacement planner — propose only until cutoff; prefer cash over weak names
 REPLACEMENT_CUTOFF_HHMM = os.environ.get("INTRADAY_REPLACEMENT_CUTOFF", "1445")
-REPLACEMENT_MIN_SCORE = float(
-    os.environ.get("INTRADAY_REPLACEMENT_MIN_SCORE", str(ENTRY_MIN_SCORE))
-)
+REPLACEMENT_MIN_SCORE = float(os.environ.get("INTRADAY_REPLACEMENT_MIN_SCORE", "55"))
 REPLACEMENT_MAX_PER_SIDE = int(os.environ.get("INTRADAY_REPLACEMENT_MAX_PER_SIDE", str(LOCK_SIZE)))
 # A locked book may rotate, but it must never turn a five-name desk into a
 # high-turnover scanner. This is a session-wide cap on *new* entries after
@@ -200,6 +197,7 @@ MAX_DAILY_REPLACEMENTS = int(
 # morning lock, ordinary replacements and same-symbol re-entries. It is not a
 # concurrent-position limit; LOCK_SIZE remains the live-book risk limit.
 MAX_DAILY_POSITIONS = int(os.environ.get("INTRADAY_MAX_DAILY_POSITIONS", "20"))
+ENTRY_POLICY_VERSION = "intraday_expected_r_gate_v2"
 
 # Re-entry policy.  A completed target or a genuinely profitable trailing exit
 # may receive one smaller, independently-qualified continuation attempt.  An
@@ -992,25 +990,6 @@ def entry_quality_gate(
             ltp_source=ltp_source,
             day_move=day_move,
         )
-    if score is None:
-        return _gate_payload(
-            ENTRY_NO_EDGE,
-            exclude_reason="score missing — cannot enforce entry floor",
-            quality_r=None,
-            flags=["SCORE_MISSING"],
-            ltp_source=ltp_source or None,
-            day_move=day_move,
-        )
-    if score < ENTRY_MIN_SCORE:
-        return _gate_payload(
-            ENTRY_NO_EDGE,
-            exclude_reason=f"score {score:.1f} < {ENTRY_MIN_SCORE:.1f}",
-            quality_r=None,
-            flags=["LOW_SCORE"],
-            ltp_source=ltp_source or None,
-            day_move=day_move,
-        )
-
     nifty_chg = _safe_float(regime_use.get("niftyChangePct"))
     regime_label = str(regime_use.get("label") or regime_use.get("regime") or "UNRATED")
     regime_haircut = 1.0
@@ -1277,6 +1256,9 @@ def entry_quality_gate(
         flags.append("EXHAUSTION_DISCOUNT")
     if regime_label == "UNRATED":
         adj *= 0.90
+    if score is not None and score < REPLACEMENT_MIN_SCORE:
+        adj *= 0.70
+        flags.append("LOW_SCORE_HAIRCUT")
     # Soft OI preference: boost aligned / haircut misaligned (never invent OI)
     if oi_aligned is True:
         adj *= OI_ALIGN_BONUS
@@ -1296,6 +1278,20 @@ def entry_quality_gate(
             exclude_reason=f"qualityAdjustedExpectedR {adj:.3f} < {ENTRY_MIN_EXPECTED_R}",
             quality_r=adj,
             flags=flags,
+            ltp_source=ltp_source or None,
+            day_move=day_move,
+            oi_setup=oi_setup,
+            oi_aligned=oi_aligned,
+        )
+    # Replacement path only: the morning basket is selected by expected-R and
+    # cross-sectional rank. Do not confuse the Index Options 70-point lock rule
+    # with this independent Intraday score model.
+    if (quotes or live) and score is not None and score < REPLACEMENT_MIN_SCORE:
+        return _gate_payload(
+            ENTRY_NO_EDGE,
+            exclude_reason=f"score {score:.1f} < {REPLACEMENT_MIN_SCORE}",
+            quality_r=adj,
+            flags=["LOW_SCORE", *flags],
             ltp_source=ltp_source or None,
             day_move=day_move,
             oi_setup=oi_setup,
@@ -2508,7 +2504,6 @@ def generate_candidates(
             "regimeHardNiftyPct": REGIME_HARD_NIFTY_PCT,
             "regimeHeadwindHaircut": REGIME_HEADWIND_HAIRCUT,
             "minExpectedR": ENTRY_MIN_EXPECTED_R,
-            "minScore": ENTRY_MIN_SCORE,
             "oiRequireFno": OI_REQUIRE_FNO,
             "oiPreferFirst": True,
             "oiMisalignHaircut": OI_MISALIGN_HAIRCUT,
@@ -2604,6 +2599,7 @@ def generate_candidates(
             "note": "starting params — not proven optimal",
         },
         "executionPolicy": "MANUAL_ONLY",
+        "entryPolicyVersion": ENTRY_POLICY_VERSION,
         "locked": False,
     }
     if include_full_hunt:
@@ -2945,6 +2941,7 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
         "meanRevGate": candidates.get("meanRevGate"),
         "capital": capital,
         "executionPolicy": "MANUAL_ONLY",
+        "entryPolicyVersion": ENTRY_POLICY_VERSION,
         "long": long_rows,
         "short": short_rows,
         "candidatePoolLong": pool_long,
@@ -2984,10 +2981,15 @@ def ensure_intraday_session_locked() -> dict[str, Any]:
     # A current-day cash-held lock with zero names is valid. Replacement
     # hunting may fill it later; do not make it impossible to re-enter because
     # commit_session correctly refuses to overwrite today's immutable lock.
-    if existing.get("locked") and existing_date == today and existing.get("committedAt"):
+    current_policy = existing.get("entryPolicyVersion") == ENTRY_POLICY_VERSION
+    if (
+        existing.get("locked") and existing_date == today
+        and existing.get("committedAt") and current_policy
+    ):
         return existing
     malformed_current = bool(
-        existing.get("locked") and existing_date == today and not existing.get("committedAt")
+        existing.get("locked") and existing_date == today
+        and (not existing.get("committedAt") or not current_policy)
     )
     result = commit_session(
         force=bool(existing.get("locked") and (existing_date != today or malformed_current))
@@ -4428,7 +4430,11 @@ def _schedule_stale_session_rotation(existing: dict[str, Any] | None = None) -> 
     session_date = str(session.get("sessionDate") or "").strip()[:10]
     stale = bool(session.get("locked") and session_date and session_date != today)
     malformed_current = bool(
-        session.get("locked") and session_date == today and not session.get("committedAt")
+        session.get("locked") and session_date == today
+        and (
+            not session.get("committedAt")
+            or session.get("entryPolicyVersion") != ENTRY_POLICY_VERSION
+        )
     )
     allowed, _reason = basket_lock_allowed()
     if not (stale or malformed_current) or not allowed:
