@@ -19,6 +19,7 @@ from app.services.swing_v2.ledger import (
     TerminalStateConflict,
     materialize_position,
 )
+from app.services.swing_v2.reporting import ledger_eod_report
 from app.services.swing_v2.lifecycle import evaluate_position, thesis_break, update_stop
 from app.services.swing_v2.portfolio import construct_portfolio
 from app.services.swing_v2.ranking import rank_score
@@ -287,6 +288,40 @@ def test_integrated_paper_order_and_chronological_ledger_lifecycle(tmp_path):
     time_exit = process_position_bar(ledger, "paper-1", {"timestamp": (NOW + timedelta(days=2)).isoformat(), "open": 106, "low": 105.3, "high": 106, "close": 105.5}, is_d2_exit=True)
     assert time_exit["lastEventType"] == "TIME_EXIT_FILLED"
     assert time_exit["terminal"] is True
+
+
+def test_marks_are_durable_and_historical_eod_has_a_strict_cutoff(tmp_path):
+    ledger = SwingLedger(str(tmp_path / "marks.sqlite3"))
+    entry_at = datetime(2026, 9, 8, 4, 0, tzinfo=timezone.utc)
+    ledger.append(
+        idempotency_key="m1:fill", decision_id="m1", position_id="m1",
+        symbol="ABC", session_date="2026-09-08", event_type=EventType.FILL_COMPLETE,
+        event_timestamp=entry_at.isoformat(), payload={
+            "entryPrice": 100, "entryTimestamp": entry_at.isoformat(),
+            "initialStop": 98, "effectiveStop": 98, "riskPerShare": 2,
+            "t1": 102, "t2": 104, "qty": 10, "remainingQty": 10,
+            "realizedPnl": 0, "unrealizedPnl": 0, "totalPnl": 0,
+        },
+    )
+    marked = process_position_bar(ledger, "m1", {
+        "timestamp": datetime(2026, 9, 8, 10, 0, tzinfo=timezone.utc).isoformat(),
+        "open": 100, "low": 99.5, "high": 101, "close": 101,
+    })
+    assert marked["lastEventType"] == "MARK_OBSERVED"
+    assert marked["unrealizedPnl"] == 10
+
+    process_position_bar(
+        ledger, "m1", {
+            "timestamp": datetime(2026, 9, 10, 10, 0, tzinfo=timezone.utc).isoformat(),
+            "open": 101, "low": 100, "high": 101.5, "close": 101.5,
+        }, is_d2_exit=True,
+    )
+    d0 = ledger_eod_report(ledger, "2026-09-08")
+    d2 = ledger_eod_report(ledger, "2026-09-10")
+    assert d0["positions"][0]["terminal"] is False
+    assert d0["positions"][0]["totalPnl"] == 10
+    assert d2["positions"][0]["terminal"] is True
+    assert d2["positions"][0]["exitReason"] == "TIME_EXIT_FILLED"
 
 
 def test_calibration_requires_100_bucket_fills():

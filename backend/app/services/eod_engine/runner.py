@@ -260,7 +260,7 @@ def _ensure_book_reports_cached(for_date: date, *, force: bool = False) -> None:
         if force:
             warm_book_caches(for_date)
             if str(sess.get("sessionDate") or "")[:10] == for_date.isoformat():
-                recalculate_live_intraday_from_candles(for_date, after_close=False)
+                recalculate_live_intraday_from_candles(for_date, after_close=None)
         else:
             generate_intraday_eod_report(for_date, force=False)
             generate_swing_eod_report(for_date, force=False)

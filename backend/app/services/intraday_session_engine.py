@@ -48,6 +48,7 @@ log = logging.getLogger(__name__)
 _IST = timezone(timedelta(hours=5, minutes=30))
 _BASE = Path(__file__).resolve().parent
 _CLOSE_FREEZE_LOCK = threading.Lock()
+_SESSION_STATE_REFRESH_LOCK = threading.RLock()
 _SESSION_RESPONSE_LOCK = threading.Lock()
 _SESSION_RESPONSE_CACHE: dict[str, Any] | None = None
 _SESSION_RESPONSE_CACHE_AT = 0.0
@@ -4556,13 +4557,14 @@ def _refresh_session_response_cache(started_gen: int) -> None:
 def refresh_session_state() -> dict[str, Any]:
     """Single-writer scheduler path for durable close/replacement transitions."""
     global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT, _SESSION_RESPONSE_GEN
-    reconcile_cross_book(_ist_now().strftime("%Y-%m-%d"), persist=True)
-    result = _compute_session(include_live=True, persist=True)
-    with _SESSION_RESPONSE_LOCK:
-        _SESSION_RESPONSE_GEN += 1
-        _SESSION_RESPONSE_CACHE = copy.deepcopy(result)
-        _SESSION_RESPONSE_CACHE_AT = time.monotonic()
-    return result
+    with _SESSION_STATE_REFRESH_LOCK:
+        reconcile_cross_book(_ist_now().strftime("%Y-%m-%d"), persist=True)
+        result = _compute_session(include_live=True, persist=True)
+        with _SESSION_RESPONSE_LOCK:
+            _SESSION_RESPONSE_GEN += 1
+            _SESSION_RESPONSE_CACHE = copy.deepcopy(result)
+            _SESSION_RESPONSE_CACHE_AT = time.monotonic()
+        return result
 
 
 def _compute_session(include_live: bool = True, *, persist: bool = False) -> dict[str, Any]:

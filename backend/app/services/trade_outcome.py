@@ -181,7 +181,9 @@ def _should_refresh_plan_ltps(market_open: bool, after_close: bool) -> bool:
 def _is_trading_day(now: datetime | None = None) -> bool:
     """True if now (IST) falls on a weekday (Mon–Fri)."""
     now = now or _ist_now()
-    return now.weekday() < 5
+    from .nse_trading_calendar import is_nse_trading_day
+
+    return is_nse_trading_day(now.date())
 
 
 def _is_market_open(now: datetime | None = None) -> bool:

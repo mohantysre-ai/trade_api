@@ -5128,10 +5128,17 @@ def create_app() -> FastAPI:
             )
             if for_date == _dt.now(tz=IST_ZONE).date():
                 from .intraday_session_engine import load_session as _load_intraday_session
+                from .desk_clock import cash_session_phase as _cash_session_phase
+                from .eod_book_cache import load_book_cache as _load_book_cache
                 active_session = _load_intraday_session()
                 active_policy = str((active_session.get("pnlRecalc") or {}).get("policyVersion") or "")
-                if force or active_policy != "post_entry_stop_only_0p5_v2":
-                    recalculated = recalculate_live_intraday_from_candles(for_date, after_close=False)
+                cached_book = _load_book_cache(for_date, "intraday") or {}
+                closed_book_missing = (
+                    _cash_session_phase(for_date) == "CLOSED"
+                    and cached_book.get("afterClose") is not True
+                )
+                if force or active_policy != "post_entry_stop_only_0p5_v2" or closed_book_missing:
+                    recalculated = recalculate_live_intraday_from_candles(for_date, after_close=None)
                     if recalculated.get("ok") and isinstance(recalculated.get("book"), dict):
                         return recalculated["book"]
             return generate_intraday_eod_report(for_date, force=force)

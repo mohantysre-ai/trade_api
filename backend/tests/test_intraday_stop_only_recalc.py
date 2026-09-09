@@ -23,24 +23,36 @@ def row(direction="LONG", qty=100):
         "exitPrice": 100.1, "exitReason": "TRAIL_SL_HIT",
     }
 
-def replay(raw, payload):
+def replay(raw, payload, *, after_close=True):
     with patch("app.services.eod_engine.ingestion.load_persisted_candles", return_value=payload):
-        return _replay_triggered_row(raw, for_date=DAY, after_close=True)
+        return _replay_triggered_row(raw, for_date=DAY, after_close=after_close)
 
-def test_pre_entry_stop_is_ignored_and_small_profit_remains_running():
+def test_pre_entry_stop_is_ignored_and_small_profit_squareoffs_at_close():
     out = replay(row(), candles(
         ("2026-09-02T09:59:00+05:30", 100.1, 99.0, 99.2),
         ("2026-09-02T10:00:00+05:30", 100.4, 99.7, 100.1),
         ("2026-09-02T15:30:00+05:30", 100.3, 100.0, 100.1),
     ))
+    assert out["status"] == "CLOSED"
+    assert out["closed"] is True
+    assert out["exitReason"] == "EOD_SQUAREOFF"
+    assert out["realizedPnl"] == 10
+    assert out["unrealizedPnl"] == 0
+    assert out["pnlKind"] == "realised"
+    assert out["exitState"]["legsFilled"][-1]["r"] == "EOD_SQUAREOFF"
+    assert out["exitPlan"] is None
+    assert out["entryEvaluatedFrom"] == "2026-09-02T10:00:00+05:30"
+
+
+def test_same_position_remains_running_before_close():
+    out = replay(row(), candles(
+        ("2026-09-02T10:00:00+05:30", 100.4, 99.7, 100.1),
+        ("2026-09-02T15:30:00+05:30", 100.3, 100.0, 100.1),
+    ), after_close=False)
     assert out["status"] == "RUNNING"
     assert out["closed"] is False
     assert out["exitReason"] == "OPEN"
-    assert out["realizedPnl"] == 0
     assert out["unrealizedPnl"] == 10
-    assert out["pnlKind"] == "unrealised"
-    assert out["exitPlan"] is None
-    assert out["entryEvaluatedFrom"] == "2026-09-02T10:00:00+05:30"
 
 @pytest.mark.parametrize("direction,hit_high,hit_low", [
     ("LONG", 100.0, 99.49),

@@ -10,6 +10,8 @@ import os
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
+from .nse_trading_calendar import is_nse_trading_day
+
 _IST = timezone(timedelta(hours=5, minutes=30))
 
 
@@ -42,7 +44,7 @@ def cash_session_phase(for_date=None, now: datetime | None = None) -> str:
     """Return PRE_OPEN, OPEN, or CLOSED for an IST trading date."""
     n = ist_now(now)
     target = for_date or n.date()
-    if target < n.date() or target.weekday() >= 5:
+    if target < n.date() or not is_nse_trading_day(target):
         return "CLOSED"
     if target > n.date():
         return "PRE_OPEN"
@@ -86,8 +88,8 @@ def basket_lock_allowed(
         return True, "manual_override"
 
     n = ist_now(now)
-    if n.weekday() >= 5:
-        return False, "weekend"
+    if not is_nse_trading_day(n.date()):
+        return False, "market_holiday" if n.weekday() < 5 else "weekend"
 
     mins = _mins(n.hour, n.minute)
     start = _mins(_LOCK_START_H, _LOCK_START_M)
@@ -109,6 +111,8 @@ def basket_lock_allowed(
 
 def basket_lock_block_message(reason: str) -> str:
     cfg = lock_window_config()
+    if reason == "market_holiday":
+        return "Basket lock disabled on an NSE cash-market holiday."
     if reason == "weekend":
         return "Basket lock disabled on weekends (NSE cash closed)."
     if reason == "pre_lock_window":
@@ -161,8 +165,8 @@ def rotation_window_allowed(now: datetime | None = None) -> tuple[bool, str]:
       afternoon | after_rotation
     """
     n = ist_now(now)
-    if n.weekday() >= 5:
-        return False, "weekend"
+    if not is_nse_trading_day(n.date()):
+        return False, "market_holiday" if n.weekday() < 5 else "weekend"
 
     mins = _mins(n.hour, n.minute)
     primary_start = _mins(_LOCK_START_H, _LOCK_START_M)
@@ -242,8 +246,8 @@ def swing_entry_hunt_allowed(
         return True, "manual_override"
 
     n = ist_now(now)
-    if n.weekday() >= 5:
-        return False, "weekend"
+    if not is_nse_trading_day(n.date()):
+        return False, "market_holiday" if n.weekday() < 5 else "weekend"
 
     mins = _mins(n.hour, n.minute)
     start = _mins(_LOCK_START_H, _LOCK_START_M)
@@ -259,6 +263,8 @@ def swing_entry_hunt_allowed(
 
 def swing_entry_hunt_block_message(reason: str) -> str:
     cfg = swing_entry_hunt_config()
+    if reason == "market_holiday":
+        return "Swing entry hunt disabled on an NSE cash-market holiday."
     if reason == "weekend":
         return "Swing entry hunt disabled on weekends (NSE cash closed)."
     if reason == "pre_lock":

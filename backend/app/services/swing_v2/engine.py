@@ -110,7 +110,9 @@ def process_position_bar(
     if reason_event:
         event_types.append(reason_event)
     if not event_types:
-        return after
+        # A durable minute mark preserves MTM/MFE and advances the recovery
+        # cursor without making any additional market-data request.
+        event_types.append(EventType.MARK_OBSERVED)
     last_event = None
     for index, event_type in enumerate(event_types):
         last_event = ledger.append(

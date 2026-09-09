@@ -7,7 +7,11 @@ IST = ZoneInfo("Asia/Kolkata")
 
 
 def is_session(day: date, holidays: set[date] | None = None) -> bool:
-    return day.weekday() < 5 and day not in (holidays or set())
+    if holidays is None:
+        from ..nse_trading_calendar import is_nse_trading_day
+
+        return is_nse_trading_day(day)
+    return day.weekday() < 5 and day not in holidays
 
 
 def next_session(day: date, holidays: set[date] | None = None) -> date:

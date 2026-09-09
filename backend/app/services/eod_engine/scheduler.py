@@ -27,6 +27,7 @@ from zoneinfo import ZoneInfo
 from .ingestion import eod_day_dir
 from .runner import ensure_pm_llm_once, run_eod_analysis
 from ..desk_clock import basket_lock_allowed, lock_window_config, swing_entry_hunt_allowed
+from ..nse_trading_calendar import is_nse_trading_day
 
 log = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
@@ -164,13 +165,18 @@ def _scheduler_loop() -> None:
     while not _STOP.is_set():
         try:
             now = datetime.now(tz=IST)
-            if now.weekday() < 5 and _DESK_AUTO:
+            if is_nse_trading_day(now.date(), refresh=True) and _DESK_AUTO:
                 # The scheduler is the sole durable state writer for both books.
                 # Public GET handlers only enrich/calculate in memory.
                 try:
                     from ..intraday_session_engine import refresh_session_state
 
-                    refresh_session_state()
+                    # Preserve the close-before-EOD ordering. During RTH, keep
+                    # a slow rate-limited universe refresh off the clock thread.
+                    if now.hour == 15 and 30 <= now.minute < 40:
+                        refresh_session_state()
+                    elif not _spawn_once("intraday-session-state", refresh_session_state):
+                        log.debug("Intraday state refresh already running")
                 except Exception as exc:
                     log.debug("Live session state refresh skipped: %s", exc)
                 try:
@@ -179,7 +185,11 @@ def _scheduler_loop() -> None:
                     # Swing V2 can perform broker/history I/O at its decision
                     # boundary.  Never let it block Intraday, Index Options,
                     # market refreshes or EOD work on this shared scheduler.
-                    if not _spawn_once("swing-session-state", refresh_swing_session_state):
+                    # At the close boundary it must finish before EOD so the
+                    # final durable minute mark is included in the report.
+                    if now.hour == 15 and 30 <= now.minute < 40:
+                        refresh_swing_session_state()
+                    elif not _spawn_once("swing-session-state", refresh_swing_session_state):
                         log.debug("Swing state refresh already running")
                 except Exception as exc:
                     log.debug("Swing session state refresh skipped: %s", exc)

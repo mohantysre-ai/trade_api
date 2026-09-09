@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, time
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -22,21 +22,32 @@ def reconcile_positions(positions: list[dict[str, Any]]) -> dict[str, Any]:
 def ledger_eod_report(ledger: SwingLedger, session_date: str) -> dict[str, Any]:
     all_events = ledger.events()
     ist = ZoneInfo("Asia/Kolkata")
+    report_day = datetime.fromisoformat(session_date).date()
+    cutoff = datetime.combine(report_day, time.max, tzinfo=ist)
     def event_day(event: dict[str, Any]) -> str | None:
         try:
             return datetime.fromisoformat(str(event.get("eventTimestamp") or "").replace("Z", "+00:00")).astimezone(ist).date().isoformat()
         except (TypeError, ValueError):
             return None
 
-    events = [
-        event for event in all_events
-        if event.get("sessionDate") == session_date or event_day(event) == session_date
-    ]
-    relevant_position_ids = {str(event["positionId"]) for event in events if event.get("positionId")}
+    events = [event for event in all_events if event_day(event) == session_date]
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for event in all_events:
-        if event.get("positionId") and str(event["positionId"]) in relevant_position_ids:
+        if not event.get("positionId"):
+            continue
+        try:
+            stamp = datetime.fromisoformat(str(event.get("eventTimestamp") or "").replace("Z", "+00:00")).astimezone(ist)
+        except (TypeError, ValueError):
+            continue
+        if stamp <= cutoff:
             grouped[str(event["positionId"])].append(event)
-    positions = [materialize_position(group) for group in grouped.values()]
+    positions = []
+    for group in grouped.values():
+        state = materialize_position(group)
+        last_day = event_day(group[-1])
+        # New positions, carried-open positions, and positions closed today are
+        # in this EOD. Positions terminal before today are not.
+        if str(state.get("sessionDate") or "") == session_date or not state.get("terminal") or last_day == session_date:
+            positions.append(state)
     event_counts = Counter(str(event.get("eventType") or "UNKNOWN") for event in events)
     return {"strategyId": "SWING_2S_MOMENTUM_V2", "policyVersion": "2.0.0", "validationState": "RESEARCH_HYPOTHESIS", "date": session_date, "sessionDate": session_date, "eventCount": len(events), "eventCounts": dict(event_counts), "positions": positions, **reconcile_positions(positions)}

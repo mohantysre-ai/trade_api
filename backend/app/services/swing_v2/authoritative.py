@@ -177,7 +177,7 @@ def _session(scan: dict[str, Any] | None = None, *, now: datetime | None = None)
         "v1Enabled": False,
         "sessionDate": day,
         "locked": bool(active) or locked_today or cash_held,
-        "hunting": not finalized and not freeze_reached,
+        "hunting": not finalized and not freeze_reached and not blocked,
         "selectionFinalized": finalized,
         "cashHeld": cash_held,
         "cashReason": (effective_scan or {}).get("blockReason") if cash_held or blocked else None,
@@ -316,14 +316,32 @@ def _manage_open_positions(ledger: SwingLedger, now: datetime, cfg: SwingV2Confi
         instruments, _ = _pool_watchlist(NIFTY_500_LABEL, client)
         wanted = {str(state.get("symbol") or "").upper() for _, state in open_positions}
         by_symbol = {item.key.upper(): item for item in instruments if item.key.upper() in wanted}
-        start = now - timedelta(minutes=12)
         for symbol, instrument in by_symbol.items():
-            raw = client.fetch_candles(instrument.exchange, instrument.token, "ONE_MINUTE", start, now)
-            bars = []
-            for candle in _parse_candle_rows(raw):
-                timestamp = candle.pop("ts", None)
-                bars.append({**candle, "timestamp": str(timestamp), "source": "ANGEL_ONE_1M"})
-            minute_bars[symbol] = bars
+            symbol_states = [
+                state for _, state in open_positions
+                if str(state.get("symbol") or "").upper() == symbol
+            ]
+            cursors: list[datetime] = []
+            for state in symbol_states:
+                raw_cursor = state.get("lastEventAt") or state.get("entryTimestamp")
+                try:
+                    cursors.append(datetime.fromisoformat(str(raw_cursor).replace("Z", "+00:00")))
+                except (TypeError, ValueError):
+                    continue
+            # Keep one rate-limited candle request per open symbol, but recover
+            # every bar since the last durable event instead of only 12 minutes.
+            start = min(cursors) if cursors else now - timedelta(minutes=12)
+            try:
+                raw = client.fetch_candles(instrument.exchange, instrument.token, "ONE_MINUTE", start, now)
+                bars = []
+                for candle in _parse_candle_rows(raw):
+                    timestamp = candle.pop("ts", None)
+                    bars.append({**candle, "timestamp": str(timestamp), "source": "ANGEL_ONE_1M"})
+                minute_bars[symbol] = bars
+            except Exception:
+                # One throttled/failed symbol must not discard good paths for
+                # the remaining positions; its batched FULL quote is fallback.
+                continue
     except Exception:
         minute_bars = {}
     for position_id, state in open_positions:
@@ -361,6 +379,19 @@ def run_authoritative_cycle(*, now: datetime | None = None, force: bool = False)
     now = (now or datetime.now(timezone.utc)).astimezone(IST)
     with _LOCK:
         ledger = SwingLedger(cfg.ledger_path)
+        from ..nse_trading_calendar import is_nse_trading_day
+
+        if not is_nse_trading_day(now.date()):
+            # Direct lock calls obey the same calendar gate as the scheduler.
+            return _session({
+                "enabled": True,
+                "authoritative": True,
+                "mode": "PAPER",
+                "blocked": True,
+                "blockReason": "NSE_MARKET_HOLIDAY",
+                "candidates": [],
+                "funnel": {"universe": 0},
+            }, now=now)
         _manage_open_positions(ledger, now, cfg)
         current = _read_json(_state_path())
         day = now.date().isoformat()

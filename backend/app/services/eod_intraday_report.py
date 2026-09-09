@@ -1675,6 +1675,25 @@ def _replay_triggered_row(
                         "closed": True, "stopHitAt": hit["at"]},
             "outcomeBucket": "LOSS",
         }
+    elif after_close:
+        realized = round(sign * (mark - entry) * qty, 2)
+        state = {
+            "mode": "HARD_STOP_ONLY", "closed": True, "remainingQty": 0,
+            "initialStop": stop, "effectiveStop": stop, "realizedPnl": realized,
+            "unrealizedPnl": 0.0,
+            "legsFilled": [{"r": "EOD_SQUAREOFF", "qty": qty, "price": mark,
+                            "pnl": realized, "at": events[-1]["at"] if events else None}],
+        }
+        overwritten = {
+            "stopLoss": stop, "riskPerShare": risk, "closed": True,
+            "status": "CLOSED", "remainingQty": 0, "effectiveStop": stop,
+            "realizedPnl": realized, "unrealizedPnl": 0.0, "pnl": realized,
+            "totalPnl": realized, "exitState": state, "exitPlan": None,
+            "ltp": mark, "currentPrice": mark, "exitPrice": mark,
+            "outcome": {"label": "EOD SQUARE-OFF", "hitLevel": None,
+                        "closed": True, "final": True},
+            "outcomeBucket": "WIN" if realized > 0 else "LOSS" if realized < 0 else "FLAT",
+        }
     else:
         unrealized = round(sign * (mark - entry) * qty, 2)
         state = {
@@ -1801,6 +1820,7 @@ def recalculate_cached_intraday_book(for_date: date, *, after_close: bool | None
         "skipped": skipped, "wins": 0, "losses": stopped, "running": running,
     }
     cached["recalculationPolicy"] = "post_entry_stop_only_0p5_v2"
+    cached["afterClose"] = bool(after_close)
     cached["updatedAt"] = datetime.now(tz=timezone.utc).isoformat()
     return save_book_cache(for_date, "intraday", cached)
 
@@ -1877,7 +1897,7 @@ def recalculate_live_intraday_from_candles(
         sync_fixed_plan_from_session(out)
     except Exception:
         log.exception("sync_fixed_plan_from_session after candle recalc failed")
-    book = recalculate_cached_intraday_book(for_date, after_close=False)
+    book = recalculate_cached_intraday_book(for_date, after_close=after_close)
     return {
         "ok": True,
         "sessionDate": session_date,
