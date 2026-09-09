@@ -9,6 +9,8 @@ from app.services.swing_v2.config import load_config
 from app.services.swing_v2 import ingestion
 from app.services.swing_v2.portfolio import construct_portfolio
 from app.services.angel_one_feed import _intraday_metrics_usable
+from app.services import angel_one_feed as market_feed
+from app.utils.symbols import Instrument
 
 
 def _candidate(now: datetime) -> dict:
@@ -156,3 +158,21 @@ def test_v2_authority_does_not_invalidate_shared_intraday_cache(monkeypatch):
         "hard_filter_reasons": [],
     }
     assert _intraday_metrics_usable(cached) is True
+
+
+def test_long_history_is_explicitly_swing_only(monkeypatch):
+    observed = []
+
+    def fake_metrics(*args, daily_lookback_days=45, **kwargs):
+        observed.append(daily_lookback_days)
+        return {"data_source": "candles", "vwap": 100}
+
+    monkeypatch.setattr(market_feed, "_intraday_metrics", fake_metrics)
+    instrument = Instrument("ABC", "NSE", "ABC-EQ", "1")
+    row = {"ticker": "ABC", "ltpRaw": 100}
+    now = datetime.now(timezone.utc)
+    market_feed._fetch_intraday_chunk(None, [row], {"ABC": instrument}, now)
+    market_feed._fetch_intraday_chunk(
+        None, [row], {"ABC": instrument}, now, daily_lookback_days=430
+    )
+    assert observed == [45, 430]

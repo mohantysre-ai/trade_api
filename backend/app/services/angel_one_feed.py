@@ -818,6 +818,7 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
             allow_fallback=True,
             force_llm_refresh=False,
             angel_first_quotes=swing_hunt,
+            swing_v2_history=reason.startswith("swing_v2"),
         )
         if not payload.get("success", False):
             return {
@@ -3103,11 +3104,13 @@ def _intraday_metrics(
     quote_fallback: dict[str, Any] | None = None,
     *,
     force_angel_fallback: bool = False,
+    daily_lookback_days: int = 45,
 ) -> dict[str, Any]:
     try:
         market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
-        # V2 needs at least 252 observations and a 12-month momentum prior.
-        daily_from = (now - timedelta(days=430)).replace(hour=9, minute=15, second=0, microsecond=0)
+        daily_from = (now - timedelta(days=max(45, daily_lookback_days))).replace(
+            hour=9, minute=15, second=0, microsecond=0
+        )
         daily_to = now
 
         dhan_id = load_dhan_security_ids().get(inst.key) if dhan_configured() else None
@@ -3276,6 +3279,7 @@ def _fetch_intraday_chunk(
     now: datetime,
     *,
     force_angel_fallback: bool = False,
+    daily_lookback_days: int = 45,
 ) -> dict[str, dict[str, Any]]:
     results: dict[str, dict[str, Any]] = {}
     for row in rows:
@@ -3298,7 +3302,10 @@ def _fetch_intraday_chunk(
         }
         try:
             metrics = _intraday_metrics(
-                client, inst, ltp, now, quote_fallback=quote_fallback, force_angel_fallback=force_angel_fallback,
+                client, inst, ltp, now,
+                quote_fallback=quote_fallback,
+                force_angel_fallback=force_angel_fallback,
+                daily_lookback_days=daily_lookback_days,
             )
         except Exception:
             import traceback as _traceback
@@ -3316,6 +3323,8 @@ def _fetch_all_intraday_chunked(
     stock_universe_by_key: dict[str, Instrument],
     now: datetime,
     on_progress: Callable[[str], None] | None = None,
+    *,
+    daily_lookback_days: int = 45,
 ) -> dict[str, dict[str, Any]]:
     chunks = [
         candidate_rows[i : i + INTRADAY_CHUNK_SIZE]
@@ -3332,7 +3341,13 @@ def _fetch_all_intraday_chunked(
     def fetch_chunk(chunk: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         # Thread-local Angel clients avoid sharing SmartConnect state across workers.
         chunk_client = _get_thread_angel_client() if workers > 1 else client
-        return _fetch_intraday_chunk(chunk_client, chunk, stock_universe_by_key, now)
+        return _fetch_intraday_chunk(
+            chunk_client,
+            chunk,
+            stock_universe_by_key,
+            now,
+            daily_lookback_days=daily_lookback_days,
+        )
 
     def report_chunk_progress() -> None:
         nonlocal completed_chunks
@@ -3944,6 +3959,7 @@ def _build_payload_from_live_data(
     prior_snapshot: dict[str, Any] | None = None,
     on_progress: Callable[[str], None] | None = None,
     angel_first_quotes: bool = False,
+    swing_v2_history: bool = False,
 ) -> dict[str, Any]:
     def progress(msg: str) -> None:
         if on_progress:
@@ -4045,7 +4061,12 @@ def _build_payload_from_live_data(
     rows_to_fetch: list[dict[str, Any]] = []
     for row in candidate_rows:
         cached_intraday = intraday_cache.get(row["ticker"])
-        if _intraday_metrics_usable(cached_intraday):
+        cached_v2_raw = cached_intraday.get("swingV2Raw") if isinstance(cached_intraday, dict) else None
+        v2_history_ready = bool(
+            isinstance(cached_v2_raw, dict)
+            and int(cached_v2_raw.get("dailyObservationCount") or 0) >= 252
+        )
+        if _intraday_metrics_usable(cached_intraday) and (not swing_v2_history or v2_history_ready):
             row["intraday"] = cached_intraday
             stock_quotes[row["ticker"]] = row
         else:
@@ -4059,6 +4080,7 @@ def _build_payload_from_live_data(
             stock_universe_by_key,
             now,
             on_progress=on_progress,
+            daily_lookback_days=430 if swing_v2_history else 45,
         )
         for ticker, metrics in fetched_metrics.items():
             original = row_by_ticker.get(ticker)
@@ -4280,6 +4302,7 @@ def build_market_payload(
     force_llm_refresh: bool = False,  # When false, reuse day-locked / TTL-fresh snapshot AI
     on_progress: Callable[[str], None] | None = None,
     angel_first_quotes: bool = False,
+    swing_v2_history: bool = False,
 ) -> dict[str, Any]:
     snapshot = _load_last_snapshot()
 
@@ -4323,6 +4346,7 @@ def build_market_payload(
             prior_snapshot=snapshot,
             on_progress=on_progress,
             angel_first_quotes=angel_first_quotes,
+            swing_v2_history=swing_v2_history,
         )
         _save_last_snapshot(payload)
         return payload
