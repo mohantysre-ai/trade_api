@@ -373,11 +373,10 @@ def run_authoritative_cycle(*, now: datetime | None = None, force: bool = False)
         start, freeze, expiry = (_clock(cfg.decision_start_ist), _clock(cfg.decision_freeze_ist), _clock(cfg.order_expire_ist))
         scan: dict[str, Any] | None = current.get("scan") if isinstance(current.get("scan"), dict) else None
         if start <= local_time < freeze and not current.get("selectionFinalized"):
-            # Scan the most recent shared snapshot.  A full-universe refresh on
-            # every 30-second scheduler tick would exhaust the common Angel
-            # quota and starve the other books.  The final decision performs
-            # one governed synchronous refresh in this isolated worker.
-            scan = build_from_market_snapshot(_snapshot(), final_lock=False, persist_events=False, occupied_symbols=occupied, existing_positions=existing_open, now=now)
+            # Hunt and lock qualified Swing names throughout the session. The
+            # ledger is idempotent, so each cycle fills only remaining slots.
+            # Shared snapshots avoid a full Angel refresh on every scheduler tick.
+            scan = build_from_market_snapshot(_snapshot(), final_lock=True, persist_events=True, occupied_symbols=occupied, existing_positions=existing_open, now=now)
             current.update({"scan": scan, "lastScanAt": now.astimezone(timezone.utc).isoformat()})
         elif freeze <= local_time and not current.get("selectionFinalized"):
             snapshot = _refresh_snapshot("swing_v2_final_lock")

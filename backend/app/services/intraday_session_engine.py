@@ -117,7 +117,8 @@ MEANREV_SLOTS = int(os.environ.get("INTRADAY_MEANREV_SLOTS", "4"))
 _BASKET_ENV = os.environ.get("INTRADAY_BASKET_SIZE")
 # Candidate pool size per side (default 10 = 6 MOM + 4 MR)
 BASKET_SIZE = int(_BASKET_ENV) if _BASKET_ENV else max(1, MOMENTUM_SLOTS + MEANREV_SLOTS)
-# Locked desk: high-probability adoption from the 20 → 5 total.
+# Live intraday book: five concurrent positions. The daily ledger may still
+# record up to 20 qualified entries as positions rotate during the session.
 LOCK_SIZE = int(os.environ.get("MAX_INTRADAY_POSITIONS", os.environ.get("INTRADAY_LOCK_SIZE", "5")))
 MAX_LONG_POSITIONS = int(os.environ.get("MAX_LONG_POSITIONS", "3"))
 MAX_SHORT_POSITIONS = int(os.environ.get("MAX_SHORT_POSITIONS", "3"))
@@ -179,14 +180,11 @@ _ENTRY_HARD_REJECT = frozenset(
 )
 
 # Replacement planner — propose only until cutoff; prefer cash over weak names
-REPLACEMENT_CUTOFF_HHMM = os.environ.get("INTRADAY_REPLACEMENT_CUTOFF", "1445")
+REPLACEMENT_CUTOFF_HHMM = os.environ.get("INTRADAY_REPLACEMENT_CUTOFF", "1530")
 REPLACEMENT_MIN_SCORE = float(os.environ.get("INTRADAY_REPLACEMENT_MIN_SCORE", "55"))
 REPLACEMENT_MAX_PER_SIDE = int(os.environ.get("INTRADAY_REPLACEMENT_MAX_PER_SIDE", str(LOCK_SIZE)))
-# A locked book may rotate, but it must never turn a five-name desk into a
-# high-turnover scanner. This is a session-wide cap on *new* entries after
-# the morning lock (normal replacements plus permitted re-entries). Its default
-# is derived from the advertised total-entry ceiling so 5 initial + 15 later
-# entries can reach, but never exceed, the 20-entry session policy.
+# A locked five-slot book may rotate, but it must never exceed the session-wide
+# 20-entry ceiling. Direction remains opportunity-driven, not 10/10 balanced.
 MAX_DAILY_REPLACEMENTS = int(
     os.environ.get(
         "INTRADAY_MAX_DAILY_REPLACEMENTS",
@@ -194,8 +192,7 @@ MAX_DAILY_REPLACEMENTS = int(
     )
 )
 # Hard session ledger ceiling. This counts every executed entry, including the
-# morning lock, ordinary replacements and same-symbol re-entries. It is not a
-# concurrent-position limit; LOCK_SIZE remains the live-book risk limit.
+# initial lock, ordinary replacements, and same-symbol re-entries.
 MAX_DAILY_POSITIONS = int(os.environ.get("INTRADAY_MAX_DAILY_POSITIONS", "20"))
 ENTRY_POLICY_VERSION = "intraday_expected_r_gate_v2"
 
