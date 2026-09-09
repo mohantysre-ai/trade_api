@@ -6,8 +6,6 @@ flag false so the decision engine fails closed.
 """
 from __future__ import annotations
 
-import csv
-import io
 import json
 import math
 import os
@@ -23,10 +21,10 @@ from .config import load_config
 from .regime import classify_regime
 from .universe import point_in_time_members, refresh_official_membership
 
-ASM_URLS = (
-    "https://archives.nseindia.com/content/equities/ASM.csv",
-    "https://archives.nseindia.com/content/equities/GSM.csv",
-    "https://archives.nseindia.com/content/equities/ESM.csv",
+NSE_SURVEILLANCE_URLS = (
+    "https://www.nseindia.com/api/reportASM",
+    "https://www.nseindia.com/api/reportGSM",
+    "https://www.nseindia.com/api/reportESM",
 )
 NSE_BOARD_MEETINGS_URL = "https://www.nseindia.com/api/corporate-board-meetings"
 _HEADERS = {
@@ -83,17 +81,34 @@ def _membership(day: date) -> tuple[list[dict[str, Any]], bool, str | None]:
     return [], False, str(failure)
 
 
-def _surveillance() -> tuple[set[str], bool, str | None]:
+def _surveillance_symbols(payload: Any) -> set[str]:
+    """Extract symbols from NSE's list and nested ASM response shapes."""
+    symbols: set[str] = set()
+    if isinstance(payload, dict):
+        symbol = payload.get("symbol") or payload.get("Symbol") or payload.get("SYMBOL")
+        if symbol:
+            symbols.add(str(symbol).removesuffix("-EQ").strip().upper())
+        for value in payload.values():
+            if isinstance(value, (dict, list)):
+                symbols.update(_surveillance_symbols(value))
+    elif isinstance(payload, list):
+        for value in payload:
+            symbols.update(_surveillance_symbols(value))
+    return {symbol for symbol in symbols if symbol}
+
+
+def _surveillance(*, session_factory: Any = requests.Session) -> tuple[set[str], bool, str | None]:
     restricted: set[str] = set()
     try:
-        for url in ASM_URLS:
-            response = requests.get(url, headers=_HEADERS, timeout=(5, 20))
+        session = session_factory()
+        session.headers.update(_HEADERS)
+        for url in NSE_SURVEILLANCE_URLS:
+            response = session.get(url, timeout=(5, 30))
             response.raise_for_status()
-            for row in csv.DictReader(io.StringIO(response.text.lstrip("\ufeff"))):
-                upper = {str(key).upper(): value for key, value in row.items()}
-                symbol = upper.get("SYMBOL") or upper.get("SYMBOL NAME") or upper.get("SCRIP")
-                if symbol:
-                    restricted.add(str(symbol).replace("-EQ", "").strip().upper())
+            payload = response.json()
+            if not isinstance(payload, (dict, list)):
+                raise ValueError(f"invalid NSE surveillance response from {url}")
+            restricted.update(_surveillance_symbols(payload))
         return restricted, True, None
     except Exception as exc:
         return set(), False, str(exc)

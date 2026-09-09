@@ -201,6 +201,42 @@ def test_membership_outage_reuses_latest_valid_official_snapshot(monkeypatch, tm
     assert rows[499]["universeSegment"] == "NIFTY_SMALLCAP250"
 
 
+def test_surveillance_uses_current_nse_json_reports():
+    class Response:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._payload
+
+    class Session:
+        def __init__(self):
+            self.headers = {}
+
+        def get(self, url, timeout):
+            if url.endswith("/"):
+                return Response({})
+            if url.endswith("reportASM"):
+                return Response({
+                    "longterm": {"data": [{"symbol": "ABC"}]},
+                    "shortterm": {"data": [{"symbol": "XYZ-EQ"}]},
+                })
+            if url.endswith("reportGSM"):
+                return Response([{"symbol": "GSMCO"}])
+            if url.endswith("reportESM"):
+                return Response([{"symbol": "ESMCO"}])
+            raise AssertionError(url)
+
+    symbols, current, error = ingestion._surveillance(session_factory=Session)
+
+    assert symbols == {"ABC", "XYZ", "GSMCO", "ESMCO"}
+    assert current is True
+    assert error is None
+
+
 def test_existing_v2_positions_consume_portfolio_slots(monkeypatch):
     monkeypatch.setenv("SWING_MAX_POSITIONS", "1")
     config = load_config()
