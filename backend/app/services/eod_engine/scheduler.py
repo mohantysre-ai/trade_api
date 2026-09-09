@@ -176,7 +176,11 @@ def _scheduler_loop() -> None:
                 try:
                     from ..swing_session import refresh_swing_session_state
 
-                    refresh_swing_session_state()
+                    # Swing V2 can perform broker/history I/O at its decision
+                    # boundary.  Never let it block Intraday, Index Options,
+                    # market refreshes or EOD work on this shared scheduler.
+                    if not _spawn_once("swing-session-state", refresh_swing_session_state):
+                        log.debug("Swing state refresh already running")
                 except Exception as exc:
                     log.debug("Swing session state refresh skipped: %s", exc)
                 _maybe_run_morning_prework(now)

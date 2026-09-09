@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import os
 import threading
-import time as monotonic_time
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
@@ -26,7 +25,6 @@ from .reporting import ledger_eod_report
 IST = ZoneInfo("Asia/Kolkata")
 _LOCK = threading.RLock()
 _DATA_REFRESH_LOCK = threading.Lock()
-_LAST_SCAN_REFRESH_KICK = 0.0
 
 
 def is_v2_authoritative(config: SwingV2Config | None = None) -> bool:
@@ -214,19 +212,6 @@ def _refresh_snapshot(reason: str) -> dict[str, Any]:
     return _snapshot()
 
 
-def _kick_candidate_refresh() -> None:
-    global _LAST_SCAN_REFRESH_KICK
-    current = monotonic_time.monotonic()
-    if current - _LAST_SCAN_REFRESH_KICK < 300 or _DATA_REFRESH_LOCK.locked():
-        return
-    _LAST_SCAN_REFRESH_KICK = current
-
-    def job() -> None:
-        _refresh_snapshot("swing_v2_candidate_scan")
-
-    threading.Thread(target=job, name="swing-v2-candidate-refresh", daemon=True).start()
-
-
 def _quote_observations(symbols: list[str], now: datetime) -> dict[str, dict[str, Any]]:
     """Fetch a small Angel FULL quote batch for post-decision paper evidence."""
     if not symbols:
@@ -388,7 +373,10 @@ def run_authoritative_cycle(*, now: datetime | None = None, force: bool = False)
         start, freeze, expiry = (_clock(cfg.decision_start_ist), _clock(cfg.decision_freeze_ist), _clock(cfg.order_expire_ist))
         scan: dict[str, Any] | None = current.get("scan") if isinstance(current.get("scan"), dict) else None
         if start <= local_time < freeze and not current.get("selectionFinalized"):
-            _kick_candidate_refresh()
+            # Scan the most recent shared snapshot.  A full-universe refresh on
+            # every 30-second scheduler tick would exhaust the common Angel
+            # quota and starve the other books.  The final decision performs
+            # one governed synchronous refresh in this isolated worker.
             scan = build_from_market_snapshot(_snapshot(), final_lock=False, persist_events=False, occupied_symbols=occupied, existing_positions=existing_open, now=now)
             current.update({"scan": scan, "lastScanAt": now.astimezone(timezone.utc).isoformat()})
         elif freeze <= local_time and not current.get("selectionFinalized"):

@@ -8,6 +8,7 @@ from app.services.swing_v2 import authoritative
 from app.services.swing_v2.config import load_config
 from app.services.swing_v2 import ingestion
 from app.services.swing_v2.portfolio import construct_portfolio
+from app.services.angel_one_feed import _intraday_metrics_usable
 
 
 def _candidate(now: datetime) -> dict:
@@ -140,3 +141,18 @@ def test_existing_v2_positions_consume_portfolio_slots(monkeypatch):
     result = construct_portfolio([candidate], config, existing_positions=existing)
     assert result["selected"] == []
     assert result["rejected"][0]["portfolioRejectReason"] == "MAX_POSITIONS"
+
+
+def test_v2_authority_does_not_invalidate_shared_intraday_cache(monkeypatch):
+    monkeypatch.setenv("SWING_STRATEGY_AUTHORITY", "V2")
+    # This is a valid shared-book candle block even though it predates V2 and
+    # therefore has no swingV2Raw section.  V2 must fail its own row closed
+    # without forcing Intraday and Index Options to refetch their universe.
+    cached = {
+        "data_source": "candles",
+        "vwap": 101.25,
+        "atr_pct": 3.2,
+        "turnover_cr": 80.0,
+        "hard_filter_reasons": [],
+    }
+    assert _intraday_metrics_usable(cached) is True

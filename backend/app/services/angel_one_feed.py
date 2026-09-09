@@ -429,10 +429,11 @@ def _intraday_metrics_usable(intraday: Any) -> bool:
     """True when cached metrics come from 5m or daily candles, not a dummy stub."""
     if not isinstance(intraday, dict):
         return False
-    if os.getenv("SWING_STRATEGY_AUTHORITY", "V1").strip().upper() == "V2":
-        raw = intraday.get("swingV2Raw")
-        if not isinstance(raw, dict) or int(raw.get("dailyObservationCount") or 0) < 252:
-            return False
+
+    # This predicate is shared by Intraday, Index Options and Swing.  V2's
+    # longer-history requirement must be enforced by the V2 ingestion gates,
+    # not here: rejecting an otherwise valid shared cache causes every book to
+    # refetch hundreds of historical series and can fail the entire snapshot.
 
     def _num(key: str) -> float:
         try:
