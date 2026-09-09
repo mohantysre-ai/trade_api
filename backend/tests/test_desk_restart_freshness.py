@@ -3,9 +3,11 @@ from datetime import datetime, timezone
 import app.services.intraday_session_engine as eng
 from app.services.angel_index_options import option_data_to_strategy_inputs
 from app.services.angel_one_feed import (
+    _snapshot_selection_issue,
     _snapshot_needs_live_refresh,
     build_market_payload,
     kick_background_live_refresh,
+    run_scheduled_live_refresh,
 )
 
 
@@ -45,6 +47,66 @@ def test_snapshot_needs_live_refresh_when_data_date_stale(monkeypatch):
         "selectionMeta": {"dataDate": "2026-08-27"},
     }
     assert _snapshot_needs_live_refresh(snap) is True
+
+
+def test_newly_timestamped_empty_snapshot_still_needs_refresh(monkeypatch):
+    monkeypatch.setattr("app.services.trade_outcome._is_market_open", lambda: True)
+    snap = {
+        "success": True,
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "selectionMeta": {"dataDate": datetime.now(timezone.utc).date().isoformat()},
+        "stockQuotes": {},
+        "stocks": [],
+    }
+    assert _snapshot_selection_issue(snap) == "missing_stock_universe"
+    assert _snapshot_needs_live_refresh(snap) is True
+
+
+def test_failed_market_coverage_is_not_selection_ready():
+    snap = {
+        "success": True,
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "stockQuotes": {"AAA": {"ltp": 100}},
+        "marketDataCoverage": {
+            "selectionAllowed": True,
+            "candles": {"selectionAllowed": False},
+        },
+    }
+    assert _snapshot_selection_issue(snap) == "candle_coverage_incomplete"
+
+
+def test_scheduled_refresh_does_not_promote_fallback_to_live(monkeypatch):
+    fallback = {
+        "success": True,
+        "isSnapshotFallback": True,
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "stockQuotes": {"AAA": {"ltp": 100}},
+    }
+    monkeypatch.setattr("app.services.angel_one_feed._load_last_snapshot", lambda: fallback)
+    monkeypatch.setattr("app.services.angel_one_feed.AngelOneClient", lambda: object())
+    monkeypatch.setattr("app.services.angel_one_feed.build_market_payload", lambda *_a, **_k: fallback)
+    monkeypatch.setattr(
+        "app.services.angel_one_feed._save_last_snapshot",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("fallback must not be saved as live")),
+    )
+    out = run_scheduled_live_refresh(reason="intraday_replacement_hunt")
+    assert out["success"] is False
+    assert out["usedFallback"] is True
+
+
+def test_intraday_candidates_reject_fresh_but_empty_snapshot():
+    out = eng.generate_candidates(
+        {
+            "success": True,
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+            "stockQuotes": {},
+            "stocks": [],
+        }
+    )
+    assert out["dataStale"] is True
+    assert out["dataStaleReason"] == "missing_stock_universe"
+    assert out["adoptLong"] == []
+    assert out["adoptShort"] == []
 
 
 def test_structure_gate_warming_is_incomplete_not_hard_fail():

@@ -826,6 +826,16 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
                 "error": payload.get("error") or "Live refresh produced no payload.",
                 "reason": reason,
             }
+        selection_issue = _snapshot_selection_issue(payload)
+        if payload.get("isSnapshotFallback") is True or selection_issue is not None:
+            # A cached availability fallback is useful for display, but it is
+            # not a completed live refresh and must not be restamped as one.
+            return {
+                "success": False,
+                "error": f"Live refresh did not produce selection-ready data ({selection_issue or 'snapshot_fallback'}).",
+                "reason": reason,
+                "usedFallback": bool(payload.get("isSnapshotFallback")),
+            }
         if prior and prior.get("llmLockedForDate") and not payload.get("llmLockedForDate"):
             payload["llmLockedForDate"] = prior.get("llmLockedForDate")
         payload.setdefault("selectionMeta", {})
@@ -1592,8 +1602,40 @@ def _snapshot_quote_age_seconds(payload: dict[str, Any] | None) -> int | None:
         return None
 
 
+def _snapshot_selection_issue(payload: dict[str, Any] | None) -> str | None:
+    """Return why a snapshot cannot safely drive a trading-book selection.
+
+    A timestamp alone is not proof that the quote/candle pipeline completed.  In
+    particular, an error/fallback payload can be written recently while carrying
+    no selectable universe.  Treat those payloads as refresh-required so a
+    newly timestamped empty response can never look healthy to Intraday.
+    """
+    if not isinstance(payload, dict) or not payload:
+        return "missing_snapshot"
+    if payload.get("success") is False:
+        return "snapshot_failed"
+    if payload.get("isSnapshotFallback") is True:
+        return "snapshot_fallback"
+
+    quotes = payload.get("stockQuotes")
+    stocks = payload.get("stocks")
+    if not (isinstance(quotes, dict) and quotes) and not (
+        isinstance(stocks, list) and stocks
+    ):
+        return "missing_stock_universe"
+
+    coverage = payload.get("marketDataCoverage")
+    if isinstance(coverage, dict):
+        if coverage.get("selectionAllowed") is False:
+            return "quote_coverage_incomplete"
+        candles = coverage.get("candles")
+        if isinstance(candles, dict) and candles.get("selectionAllowed") is False:
+            return "candle_coverage_incomplete"
+    return None
+
+
 def _snapshot_needs_live_refresh(payload: dict[str, Any] | None, *, stale_sec: int = 900) -> bool:
-    """True when RTH quotes are from a prior IST date or older than ``stale_sec``."""
+    """True when RTH data is unusable, prior-day, or older than ``stale_sec``."""
     if not isinstance(payload, dict) or not payload:
         return True
     try:
@@ -1603,6 +1645,8 @@ def _snapshot_needs_live_refresh(payload: dict[str, Any] | None, *, stale_sec: i
             return False
     except Exception:
         return False
+    if _snapshot_selection_issue(payload) is not None:
+        return True
     today = _ist_now().date().isoformat()
     data_date = _payload_data_date(payload)
     if data_date and data_date != today:

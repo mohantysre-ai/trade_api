@@ -2282,7 +2282,13 @@ def generate_candidates(
     age_sec = None
     if snap_dt is not None:
         age_sec = max(0, int((datetime.now(tz=timezone.utc) - snap_dt.astimezone(timezone.utc)).total_seconds()))
-    stale = age_sec is None or age_sec > SNAPSHOT_STALE_SEC
+    # Fresh timestamps are insufficient: a failed/fallback refresh can still
+    # contain no selectable universe or explicitly failed quote/candle coverage.
+    # Fail closed before an empty response becomes an immutable cash lock.
+    from .angel_one_feed import _snapshot_selection_issue
+
+    selection_issue = _snapshot_selection_issue(snap)
+    stale = age_sec is None or age_sec > SNAPSHOT_STALE_SEC or selection_issue is not None
 
     regime = detect_regime(snap)
     mr_gate_open, mr_gate_reason = _meanrev_gate_open(regime)
@@ -2457,6 +2463,7 @@ def generate_candidates(
         "snapshotUpdatedAt": updated_at,
         "snapshotAgeSec": age_sec,
         "dataStale": stale,
+        "dataStaleReason": selection_issue or ("snapshot_too_old" if stale else None),
         "regime": regime,
         "meanRevGate": {
             "open": mr_gate_open,
@@ -2841,6 +2848,7 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
             "session": existing,
             "snapshotUpdatedAt": candidates.get("snapshotUpdatedAt"),
             "snapshotAgeSec": candidates.get("snapshotAgeSec"),
+            "dataStaleReason": candidates.get("dataStaleReason"),
         }
     pool_long = candidates.get("proposedLong") or []
     pool_short = candidates.get("proposedShort") or []
