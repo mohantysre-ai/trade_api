@@ -53,6 +53,13 @@ try:
 except ImportError:
     from app.utils.symbols import WATCHLIST
 
+try:
+    from ..config import runtime_config_issues
+    from ..middleware import add_api_hardening, configured_cors_origins
+except ImportError:
+    from app.config import runtime_config_issues
+    from app.middleware import add_api_hardening, configured_cors_origins
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -113,18 +120,27 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+config_issues = runtime_config_issues()
+if config_issues:
+    logger.warning("Runtime configuration issues: %s", "; ".join(config_issues))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=configured_cors_origins(),
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+add_api_hardening(app)
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "ai-ticker-news"}
+    return {
+        "status": "degraded" if config_issues else "ok",
+        "service": "ai-ticker-news",
+        "configuration": {"valid": not config_issues, "issues": config_issues},
+    }
 
 
 def _check_ticker_news_fresh(ticker: str) -> dict:

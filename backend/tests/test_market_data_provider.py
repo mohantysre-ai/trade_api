@@ -206,3 +206,51 @@ def test_nse_intraday_drops_bars_outside_requested_window(monkeypatch):
     assert len(rows) == 1
     assert rows[0][0] == "2026-08-17 09:20:00"
     assert rows[0][1:] == [10.0, 11.0, 9.0, 10.5, 100.0]
+
+
+def test_nse_circuit_opens_only_after_failure_threshold(monkeypatch):
+    class Response:
+        status_code = 503
+        headers = {}
+
+    class Session:
+        def get(self, *_args, **_kwargs):
+            return Response()
+
+    provider._reset_nse_candle_circuit()
+    monkeypatch.setattr(provider, "NSE_CANDLE_FAILURE_THRESHOLD", 3)
+    monkeypatch.setattr(provider, "_nse_history_slot", lambda: None)
+    monkeypatch.setattr(provider, "_nse_chart_session", lambda: Session())
+
+    assert provider._nse_chart_get({}) is None
+    assert provider._NSE_CANDLE_CIRCUIT_UNTIL == 0.0
+    assert provider._nse_chart_get({}) is None
+    assert provider._NSE_CANDLE_CIRCUIT_UNTIL == 0.0
+    assert provider._nse_chart_get({}) is None
+    assert provider._NSE_CANDLE_CIRCUIT_UNTIL > 0.0
+    assert not provider._nse_candle_calls_allowed()
+
+
+def test_nse_circuit_allows_one_half_open_probe_and_resets_on_success(monkeypatch):
+    class Response:
+        status_code = 200
+        headers = {}
+
+        def json(self):
+            return {"data": []}
+
+    class Session:
+        def get(self, *_args, **_kwargs):
+            return Response()
+
+    provider._reset_nse_candle_circuit()
+    provider._NSE_CANDLE_CIRCUIT_UNTIL = provider.time.monotonic() - 1
+    monkeypatch.setattr(provider, "_nse_history_slot", lambda: None)
+    monkeypatch.setattr(provider, "_nse_chart_session", lambda: Session())
+
+    assert provider._nse_candle_calls_allowed()
+    assert not provider._nse_candle_calls_allowed()
+    provider._NSE_CANDLE_PROBE_IN_FLIGHT = False
+    assert provider._nse_chart_get({}) == {"data": []}
+    assert provider._NSE_CANDLE_CIRCUIT_UNTIL == 0.0
+    assert provider._NSE_CANDLE_FAILURES == 0

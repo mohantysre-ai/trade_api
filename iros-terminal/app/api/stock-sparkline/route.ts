@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import * as fs from "fs";
 import * as path from "path";
+import { normalizeSparklineFlag, normalizeTicker } from "@/lib/api-input";
 
 export const runtime = "nodejs";
 
@@ -81,7 +82,10 @@ async function getNseCookies(): Promise<string> {
     },
     redirect: "follow",
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
+
+  if (!res.ok) throw new Error(`NSE session HTTP ${res.status}`);
 
   const setCookies = res.headers.getSetCookie?.() ?? [];
   nseCookies = setCookies.map((c) => c.split(";")[0]).join("; ");
@@ -92,11 +96,20 @@ async function getNseCookies(): Promise<string> {
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const ticker = url.searchParams.get("ticker");
-    const flag = url.searchParams.get("flag") || "1M";
+    const ticker = normalizeTicker(url.searchParams.get("ticker"));
+    const flag = normalizeSparklineFlag(url.searchParams.get("flag"));
 
     if (!ticker) {
-      return NextResponse.json({ error: "ticker param required", sparkline: [] }, { status: 400 });
+      return NextResponse.json(
+        { error: "ticker must be 1-30 valid NSE symbol characters", sparkline: [] },
+        { status: 400 }
+      );
+    }
+    if (!flag) {
+      return NextResponse.json(
+        { error: "flag must be one of 1D, 1M, or 1Y", sparkline: [] },
+        { status: 400 }
+      );
     }
 
     // ── Check cache first ──────────────────────────────────────────────
@@ -128,10 +141,14 @@ export async function GET(request: Request) {
         Cookie: cookies,
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!res.ok) {
-      return NextResponse.json({ error: `NSE HTTP ${res.status}`, sparkline: [] }, { status: 200 });
+      return NextResponse.json(
+        { error: `NSE HTTP ${res.status}`, sparkline: [] },
+        { status: res.status === 429 ? 503 : 502 }
+      );
     }
 
     const raw = await res.json();
@@ -170,6 +187,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ sparkline, ticker: identifier.replace('EQN', ''), flag, graphData, cached: false });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message, sparkline: [] }, { status: 200 });
+    const timedOut = /timeout|aborted|AbortError/i.test(message);
+    return NextResponse.json(
+      { error: timedOut ? "NSE request timed out" : "NSE request failed", sparkline: [] },
+      { status: timedOut ? 504 : 502 }
+    );
   }
 }

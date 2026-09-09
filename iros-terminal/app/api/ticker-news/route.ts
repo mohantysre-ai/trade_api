@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { normalizeBooleanParam, normalizeTicker } from "@/lib/api-input";
 
 export const runtime = "nodejs";
 
@@ -19,12 +20,18 @@ function clampMaxArticles(raw: string | null): string {
 export async function GET(request: Request) {
   try {
     const requestUrl = new URL(request.url);
-    const ticker = requestUrl.searchParams.get("ticker");
-    const company = requestUrl.searchParams.get("company");
+    const ticker = normalizeTicker(requestUrl.searchParams.get("ticker"));
+    const company = requestUrl.searchParams.get("company")?.trim();
 
     if (!ticker) {
       return NextResponse.json(
-        { success: false, error: "Missing required parameter: ticker" },
+        { success: false, error: "ticker must be 1-30 valid symbol characters" },
+        { status: 400 }
+      );
+    }
+    if (company && company.length > 120) {
+      return NextResponse.json(
+        { success: false, error: "company must be 120 characters or fewer" },
         { status: 400 }
       );
     }
@@ -33,11 +40,16 @@ export async function GET(request: Request) {
     params.set("ticker", ticker);
     if (company) params.set("company", company);
     params.set("max_articles", clampMaxArticles(requestUrl.searchParams.get("max_articles")));
-    if (requestUrl.searchParams.get("include_raw")) {
-      params.set("include_raw", requestUrl.searchParams.get("include_raw")!);
-    }
-    if (requestUrl.searchParams.get("force_refresh")) {
-      params.set("force_refresh", requestUrl.searchParams.get("force_refresh")!);
+    for (const name of ["include_raw", "force_refresh"]) {
+      const raw = requestUrl.searchParams.get(name);
+      const value = normalizeBooleanParam(raw);
+      if (raw !== null && value === null) {
+        return NextResponse.json(
+          { success: false, error: `${name} must be a boolean` },
+          { status: 400 }
+        );
+      }
+      if (value !== null) params.set(name, value);
     }
 
     const backendUrl = new URL("/api/ticker-news", MAIN_API_URL);

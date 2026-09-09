@@ -47,6 +47,12 @@ NSE_CHARTING_HISTORY_URL = os.getenv(
 )
 NSE_CANDLE_MIN_INTERVAL_SECONDS = float(os.getenv("NSE_CANDLE_MIN_INTERVAL_SECONDS", "0.15"))
 NSE_CANDLE_CIRCUIT_SECONDS = float(os.getenv("NSE_CANDLE_CIRCUIT_SECONDS", "60"))
+try:
+    NSE_CANDLE_FAILURE_THRESHOLD = max(
+        1, int(os.getenv("NSE_CANDLE_FAILURE_THRESHOLD", "3"))
+    )
+except ValueError as exc:
+    raise RuntimeError("NSE_CANDLE_FAILURE_THRESHOLD must be an integer") from exc
 MARKET_DATA_MIN_COVERAGE_PCT = float(os.getenv("MARKET_DATA_MIN_COVERAGE_PCT", "99"))
 _IST_ZONE = ZoneInfo("Asia/Kolkata")
 
@@ -59,6 +65,9 @@ _NSE_CHART_LOCK = threading.Lock()
 _NSE_CHART_SESSION: requests.Session | None = None
 _NSE_CHART_LAST_CALL = 0.0
 _NSE_CANDLE_CIRCUIT_UNTIL = 0.0
+_NSE_CANDLE_FAILURES = 0
+_NSE_CANDLE_PROBE_IN_FLIGHT = False
+_NSE_CIRCUIT_LOCK = threading.Lock()
 _NSE_CHART_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Referer": f"{NSE_CHARTING_BASE_URL.rstrip('/')}/",
@@ -211,15 +220,53 @@ def _as_ist(value: datetime) -> datetime:
 
 
 def _nse_candle_calls_allowed() -> bool:
-    return time.monotonic() >= _NSE_CANDLE_CIRCUIT_UNTIL
+    global _NSE_CANDLE_PROBE_IN_FLIGHT
+    with _NSE_CIRCUIT_LOCK:
+        if _NSE_CANDLE_CIRCUIT_UNTIL <= 0:
+            return True
+        if time.monotonic() < _NSE_CANDLE_CIRCUIT_UNTIL:
+            return False
+        # Half-open: after the hold period, allow one probe request only.
+        if _NSE_CANDLE_PROBE_IN_FLIGHT:
+            return False
+        _NSE_CANDLE_PROBE_IN_FLIGHT = True
+        return True
 
 
 def _trip_nse_candle_circuit(seconds: float | None = None) -> None:
-    global _NSE_CANDLE_CIRCUIT_UNTIL, _NSE_CHART_SESSION
+    global _NSE_CANDLE_CIRCUIT_UNTIL, _NSE_CANDLE_PROBE_IN_FLIGHT
+    global _NSE_CHART_SESSION
     hold = NSE_CANDLE_CIRCUIT_SECONDS if seconds is None else float(seconds)
-    _NSE_CANDLE_CIRCUIT_UNTIL = max(_NSE_CANDLE_CIRCUIT_UNTIL, time.monotonic() + max(1.0, hold))
-    _NSE_CHART_SESSION = None
+    with _NSE_CIRCUIT_LOCK:
+        _NSE_CANDLE_CIRCUIT_UNTIL = max(
+            _NSE_CANDLE_CIRCUIT_UNTIL, time.monotonic() + max(1.0, hold)
+        )
+        _NSE_CANDLE_PROBE_IN_FLIGHT = False
+    with _NSE_CHART_LOCK:
+        _NSE_CHART_SESSION = None
     log.warning("NSE charting circuit open for %.0fs", hold)
+
+
+def _record_nse_candle_failure(
+    *, seconds: float | None = None, force_open: bool = False
+) -> None:
+    global _NSE_CANDLE_FAILURES, _NSE_CANDLE_PROBE_IN_FLIGHT
+    with _NSE_CIRCUIT_LOCK:
+        _NSE_CANDLE_FAILURES += 1
+        failures = _NSE_CANDLE_FAILURES
+        was_probe = _NSE_CANDLE_PROBE_IN_FLIGHT
+        _NSE_CANDLE_PROBE_IN_FLIGHT = False
+    if force_open or was_probe or failures >= NSE_CANDLE_FAILURE_THRESHOLD:
+        _trip_nse_candle_circuit(seconds)
+
+
+def _reset_nse_candle_circuit() -> None:
+    global _NSE_CANDLE_CIRCUIT_UNTIL, _NSE_CANDLE_FAILURES
+    global _NSE_CANDLE_PROBE_IN_FLIGHT
+    with _NSE_CIRCUIT_LOCK:
+        _NSE_CANDLE_CIRCUIT_UNTIL = 0.0
+        _NSE_CANDLE_FAILURES = 0
+        _NSE_CANDLE_PROBE_IN_FLIGHT = False
 
 
 def _nse_history_slot() -> None:
@@ -258,18 +305,33 @@ def _nse_chart_get(params: dict[str, Any]) -> dict[str, Any] | None:
         )
     except Exception as exc:
         log.warning("NSE charting request failed: %s", exc)
+        _record_nse_candle_failure()
         return None
     if response.status_code in {401, 403, 429, 503}:
-        _trip_nse_candle_circuit()
+        retry_after = response.headers.get("Retry-After")
+        try:
+            hold = min(900.0, max(1.0, float(retry_after))) if retry_after else None
+        except ValueError:
+            hold = None
+        _record_nse_candle_failure(
+            seconds=hold,
+            force_open=response.status_code == 429,
+        )
         log.warning("NSE charting HTTP %s", response.status_code)
         return None
     if response.status_code != 200:
+        _record_nse_candle_failure()
         return None
     try:
         payload = response.json()
     except Exception:
+        _record_nse_candle_failure()
         return None
-    return payload if isinstance(payload, dict) else None
+    if not isinstance(payload, dict):
+        _record_nse_candle_failure()
+        return None
+    _reset_nse_candle_circuit()
+    return payload
 
 
 def fetch_nse_candles(

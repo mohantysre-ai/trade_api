@@ -39,6 +39,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from SmartApi import SmartConnect
 
+from ..config import runtime_config_issues
+from ..middleware import add_api_hardening, configured_cors_origins
 from ..utils.log_redaction import install_secret_redaction
 
 # SmartAPI logs complete request headers on failures. Install this before the
@@ -4616,17 +4618,25 @@ def create_app() -> FastAPI:
     _load_refresh_tasks_from_disk()
     app = FastAPI(title="IROS Angel One Market Feed", version="2.0.0")
 
+    config_issues = runtime_config_issues()
+    if config_issues:
+        logging.getLogger(__name__).warning("Runtime configuration issues: %s", "; ".join(config_issues))
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=configured_cors_origins(),
         allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    add_api_hardening(app)
 
     @app.get("/health")
-    def health() -> dict[str, str]:
-        return {"status": "ok"}
+    def health() -> dict[str, Any]:
+        return {
+            "status": "degraded" if config_issues else "ok",
+            "configuration": {"valid": not config_issues, "issues": config_issues},
+        }
 
     @app.get("/api/market-data")
     def market_data(pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
@@ -4962,18 +4972,8 @@ def create_app() -> FastAPI:
             from .trade_outcome import get_live_prices_for_plan
             return get_live_prices_for_plan()
         except Exception as exc:
-            return {
-                "long": [],
-                "short": [],
-                "updatedAt": None,
-                "snapshotUpdatedAt": None,
-                "error": str(exc),
-                "dataStale": True,
-                "marketOpen": False,
-                "sessionClosed": True,
-                "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0},
-                "priceSourcesNote": "Error path — external Yahoo may have been attempted before failure",
-            }
+            logging.getLogger(__name__).exception("Live price refresh failed")
+            raise HTTPException(status_code=503, detail="Live prices are temporarily unavailable") from exc
 
     @app.get("/api/intraday-session/candidates")
     def intraday_session_candidates() -> dict[str, Any]:
