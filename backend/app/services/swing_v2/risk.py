@@ -11,13 +11,14 @@ def build_exit_and_size(row: dict[str, Any], cfg: SwingV2Config, *, remaining_ri
     atr = float(row.get("atr14") or 0)
     structure_stop = float(row.get("structureStop") or 0)
     segment = str(row.get("universeSegment") or "").upper()
+    small_or_fallback = "SMALL" in segment or segment == "NIFTY500_FALLBACK"
     if entry <= 0 or atr <= 0 or structure_stop <= 0 or structure_stop >= entry:
         return {**row, "riskEligible": False, "riskRejectReason": "INVALID_ENTRY_ATR_OR_STRUCTURE_STOP"}
 
     structure_distance = entry - structure_stop
     risk_distance = max(structure_distance, cfg.stop_atr_mult * atr)
     risk_pct = 100.0 * risk_distance / entry
-    max_stop = cfg.max_stop_micro_pct if "MICRO" in segment else (cfg.max_stop_small_pct if "SMALL" in segment else cfg.max_stop_core_pct)
+    max_stop = cfg.max_stop_micro_pct if "MICRO" in segment else (cfg.max_stop_small_pct if small_or_fallback else cfg.max_stop_core_pct)
     if risk_pct < cfg.min_stop_pct or risk_pct > max_stop:
         return {**row, "riskEligible": False, "riskRejectReason": "STOP_OUTSIDE_SWING_BAND", "riskPct": round(risk_pct, 4)}
 
@@ -27,7 +28,7 @@ def build_exit_and_size(row: dict[str, Any], cfg: SwingV2Config, *, remaining_ri
         risk_rupees = min(risk_rupees, max(0.0, remaining_risk_rupees))
     max_notional = cfg.nav * (10.0 if "MICRO" in segment else cfg.max_name_notional_pct) / 100.0
     mdtv = float(row.get("mdtv20") or 0)
-    participation = 0.001 if "MICRO" in segment else (0.0015 if "SMALL" in segment else 0.0025)
+    participation = 0.001 if "MICRO" in segment else (0.0015 if small_or_fallback else 0.0025)
     liquidity_notional = mdtv * participation if mdtv > 0 else 0
     if liquidity_notional <= 0:
         return {**row, "riskEligible": False, "riskRejectReason": "MISSING_MDTV20"}
@@ -70,5 +71,6 @@ def build_exit_and_size(row: dict[str, Any], cfg: SwingV2Config, *, remaining_ri
 
 def gap_stress_loss(row: dict[str, Any]) -> float:
     segment = str(row.get("universeSegment") or "").upper()
-    gap = 0.12 if "MICRO" in segment else (0.08 if "SMALL" in segment else 0.05)
+    small_or_fallback = "SMALL" in segment or segment == "NIFTY500_FALLBACK"
+    gap = 0.12 if "MICRO" in segment else (0.08 if small_or_fallback else 0.05)
     return float(row.get("deployedCapital") or 0) * gap

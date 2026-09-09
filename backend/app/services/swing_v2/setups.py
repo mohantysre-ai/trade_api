@@ -53,7 +53,7 @@ def pullback_reclaim_v1(row: dict[str, Any]) -> tuple[bool, list[str]]:
 
 def catalyst_gap_hold_v1(row: dict[str, Any]) -> tuple[bool, list[str]]:
     segment = str(row.get("universeSegment") or "").upper()
-    maximum_gap = 5.0 if "SMALL" in segment else 4.0
+    maximum_gap = 5.0 if "SMALL" in segment or segment == "NIFTY500_FALLBACK" else 4.0
     required = {
         "structuredAnnouncementId": bool,
         "announcementKnownBeforeDecision": bool,

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import math
 import os
 import statistics
@@ -34,6 +35,8 @@ _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
 }
 
+FALLBACK_SEGMENT = "NIFTY500_FALLBACK"
+
 
 def _universe_dir() -> Path:
     return Path(os.getenv("SWING_V2_UNIVERSE_DIR", str(Path(__file__).resolve().parents[2] / "data" / "swing_v2_universe")))
@@ -41,18 +44,43 @@ def _universe_dir() -> Path:
 
 def _membership(day: date) -> tuple[list[dict[str, Any]], bool, str | None]:
     target = _universe_dir() / f"{day.isoformat()}.json"
+    failure: Exception | None = None
     try:
         if target.is_file():
-            import json
-
             payload = json.loads(target.read_text(encoding="utf-8-sig"))
         else:
             payload = refresh_official_membership(str(_universe_dir()), effective_date=day)
         rows = point_in_time_members(payload.get("constituents") or [], day)
         count = len({str(row.get("symbol") or "") for row in rows})
-        return rows, 745 <= count <= 755, None
+        if not 745 <= count <= 755:
+            raise ValueError(f"official membership snapshot has implausible constituent count {count}")
+        return rows, True, None
     except Exception as exc:
-        return [], False, str(exc)
+        failure = exc
+
+    # A current official download is preferable, but a recent immutable snapshot
+    # still contains the real large/mid/small-cap classifications.  Keep those
+    # classifications during a source outage rather than throwing them away.
+    try:
+        candidates = sorted(
+            (
+                path for path in _universe_dir().glob("????-??-??.json")
+                if path != target and path.stem <= day.isoformat()
+            ),
+            reverse=True,
+        )
+        for candidate in candidates:
+            try:
+                payload = json.loads(candidate.read_text(encoding="utf-8-sig"))
+                rows = point_in_time_members(payload.get("constituents") or [], day)
+                count = len({str(row.get("symbol") or "") for row in rows})
+                if 745 <= count <= 755:
+                    return rows, False, f"{failure}; using cached official membership {candidate.name}"
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return [], False, str(failure)
 
 
 def _surveillance() -> tuple[set[str], bool, str | None]:
@@ -160,6 +188,8 @@ def enrich_v2_market_snapshot(payload: dict[str, Any], all_stocks: list[dict[str
         return payload
     members, universe_current, universe_error = _membership(now.date())
     member_by = {str(row.get("symbol") or "").upper(): row for row in members}
+    membership_fallback = not bool(member_by)
+    membership_mode = "OFFICIAL_CURRENT" if universe_current else ("OFFICIAL_STALE" if member_by else "RESOLVED_LIVE_FALLBACK")
     active_members = {symbol for symbol, row in member_by.items() if str(row.get("universeSegment") or "").upper() in set(cfg.active_segments)}
     if not active_members:
         active_members = {str(row.get("ticker") or "").upper() for row in all_stocks}
@@ -174,8 +204,12 @@ def enrich_v2_market_snapshot(payload: dict[str, Any], all_stocks: list[dict[str
         if not isinstance(raw, dict):
             continue
         membership = member_by.get(symbol) or {}
-        segment = str(membership.get("universeSegment") or "").upper()
-        if segment not in set(cfg.active_segments) and segment != "NIFTY_MICROCAP250":
+        segment = str(
+            membership.get("universeSegment")
+            or raw.get("universeSegment")
+            or (FALLBACK_SEGMENT if membership_fallback else "")
+        ).upper()
+        if segment not in set(cfg.active_segments) and segment not in {"NIFTY_MICROCAP250", FALLBACK_SEGMENT}:
             continue
         price = _number(row.get("ltpRaw")) or 0.0
         high, low = _number(row.get("high")), _number(row.get("low"))
@@ -199,6 +233,11 @@ def enrich_v2_market_snapshot(payload: dict[str, Any], all_stocks: list[dict[str
         bars_stamp = _iso_timestamp(raw.get("last5mTimestamp"), quote_stamp)
         record = {
             **raw, "symbol": symbol, "universeSegment": segment,
+            "membershipSource": (
+                "OFFICIAL_NIFTY_INDICES" if membership
+                else "UPSTREAM_ROW" if raw.get("universeSegment")
+                else "RESOLVED_LIVE_NIFTY500"
+            ),
             "sector": membership.get("industry") or "UNKNOWN", "decisionPrice": price,
             "bestAsk": ask, "availableAskDepth": row.get("availableAskDepth"), "spreadPct": spread,
             "modeledRoundTripCostPct": (spread * 2 + 0.12) if spread is not None else None,
@@ -254,7 +293,7 @@ def enrich_v2_market_snapshot(payload: dict[str, Any], all_stocks: list[dict[str
         "swingV2SchemaVersion": "swing_market_facts_v2", "swingV2UniverseSize": len(active_members),
         "swingV2UniverseCoverage": coverage, "swingV2DiscoveryUniverseSize": len(member_by),
         "swingV2Regime": regime.get("state"), "swingV2RegimeDetail": regime,
-        "swingV2DataStatus": {"universeCurrent": universe_current, "surveillanceCurrent": surveillance_current, "corporateEventsCurrent": corporate_current, "featureRows": len(prepared), "errors": [value for value in (universe_error, surveillance_error, corporate_error) if value]},
+        "swingV2DataStatus": {"universeCurrent": universe_current, "membershipMode": membership_mode, "surveillanceCurrent": surveillance_current, "corporateEventsCurrent": corporate_current, "featureRows": len(prepared), "errors": [value for value in (universe_error, surveillance_error, corporate_error) if value]},
     })
     return payload
 

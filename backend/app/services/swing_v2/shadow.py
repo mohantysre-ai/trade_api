@@ -88,7 +88,7 @@ def build_shadow_v2(
         symbol = str(row.get("symbol") or row.get("ticker") or "").upper()
         segment = str(row.get("universeSegment") or "").replace("_", "").upper()
         active_segments = {value.replace("_", "").upper() for value in cfg.active_segments}
-        segment_active = segment in active_segments or (segment == "NIFTYMICROCAP250" and cfg.microcap_mode == "SHADOW")
+        segment_active = segment in active_segments or segment == "NIFTY500FALLBACK" or (segment == "NIFTYMICROCAP250" and cfg.microcap_mode == "SHADOW")
         fresh_ok, fresh_reasons = evaluate_freshness(row, final_lock=final_lock, now=now)
         trade_ok, trade_reasons = evaluate_tradability(row)
         gate_ok, gate_reasons = _quality_and_safety(row, final_lock=final_lock, now=now)

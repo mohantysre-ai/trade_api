@@ -9,6 +9,10 @@ LIMITS = {
     "NIFTY_MIDCAP_150": (2_500_000_000.0, 0.30, 0.0025),
     "NIFTY_SMALLCAP250": (1_500_000_000.0, 0.50, 0.0015),
     "NIFTY_SMALLCAP_250": (1_500_000_000.0, 0.50, 0.0015),
+    # Segment membership is not part of Angel's instrument/quote response.
+    # When only the live Nifty 500 universe is available, use the conservative
+    # small-cap thresholds until official membership recovers.
+    "NIFTY500_FALLBACK": (1_500_000_000.0, 0.50, 0.0015),
     "NIFTY_MICROCAP250": (1_000_000_000.0, 0.70, 0.0010),
     "NIFTY_MICROCAP_250": (1_000_000_000.0, 0.70, 0.0010),
 }

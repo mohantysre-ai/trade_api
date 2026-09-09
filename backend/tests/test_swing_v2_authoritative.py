@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -132,6 +133,72 @@ def test_ingestion_publishes_active_coverage_and_enrichment(monkeypatch):
     assert out["swingV2Regime"] == "NORMAL"
     assert rows[0]["swingV2"]["corporateEventsCurrent"] is True
     assert rows[0]["swingV2"]["trendPriorPctile"] is not None
+
+
+def test_ingestion_uses_live_universe_when_membership_download_fails(monkeypatch):
+    monkeypatch.setenv("SWING_V2_ENABLED", "true")
+    monkeypatch.setenv("SWING_V2_MODE", "SHADOW")
+    monkeypatch.setenv("SWING_STRATEGY_AUTHORITY", "V1")
+    monkeypatch.setattr(ingestion, "_membership", lambda day: ([], False, "timeout"))
+    monkeypatch.setattr(ingestion, "_surveillance", lambda: (set(), True, None))
+    monkeypatch.setattr(ingestion, "_result_events", lambda day: (set(), True, None))
+    monkeypatch.setattr(ingestion, "_regime_from_market", lambda rows: {"state": "NORMAL", "riskScale": 1.0})
+    now = datetime(2026, 9, 9, 9, 0, tzinfo=timezone.utc)
+    raw = {
+        "dailyObservationCount": 300, "dailyBarsThroughPreviousClose": True,
+        "mom6mRaw": .2, "mom12mRaw": .3, "return5dRaw": .04,
+        "ema20Daily": 100, "atr14": 2, "prior20dHigh": 104,
+        "mdtv20": 4_000_000_000, "last3Closes": [105, 105.1, 105.2],
+        "intradayLow": 103, "last5mTimestamp": now.isoformat(), "previous52wHigh": 108,
+    }
+    rows = [{
+        "ticker": "ABC", "ltpRaw": 105, "high": 106, "low": 103,
+        "bestBid": 104.95, "bestAsk": 105, "availableAskDepth": 1000,
+        "quoteReceivedAt": now.isoformat(),
+        "intraday": {"swingV2Raw": raw, "vwap": 104, "ema9": 104.5, "volume_multiplier": 1.8},
+    }]
+    payload = {"stockQuotes": {"ABC": rows[0]}}
+    out = ingestion.enrich_v2_market_snapshot(payload, rows, now=now)
+    assert out["swingV2UniverseCoverage"] == 1.0
+    assert out["swingV2DataStatus"]["featureRows"] == 1
+    assert out["swingV2DataStatus"]["membershipMode"] == "RESOLVED_LIVE_FALLBACK"
+    assert out["swingV2Regime"] == "NORMAL"
+    assert rows[0]["swingV2"]["universeSegment"] == "NIFTY500_FALLBACK"
+    assert rows[0]["swingV2"]["membershipSource"] == "RESOLVED_LIVE_NIFTY500"
+
+
+def test_membership_outage_reuses_latest_valid_official_snapshot(monkeypatch, tmp_path):
+    snapshot_day = "2026-09-08"
+    constituents = [
+        {
+            "symbol": f"SYM{index:03d}",
+            "universeSegment": (
+                "NIFTY100" if index < 100
+                else "NIFTY_MIDCAP150" if index < 250
+                else "NIFTY_SMALLCAP250" if index < 500
+                else "NIFTY_MICROCAP250"
+            ),
+            "effectiveFrom": snapshot_day,
+            "effectiveTo": None,
+        }
+        for index in range(750)
+    ]
+    (tmp_path / f"{snapshot_day}.json").write_text(
+        json.dumps({"constituents": constituents}), encoding="utf-8"
+    )
+    monkeypatch.setenv("SWING_V2_UNIVERSE_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        ingestion,
+        "refresh_official_membership",
+        lambda *args, **kwargs: (_ for _ in ()).throw(TimeoutError("membership source timeout")),
+    )
+
+    rows, current, error = ingestion._membership(datetime(2026, 9, 9).date())
+
+    assert len(rows) == 750
+    assert current is False
+    assert "using cached official membership 2026-09-08.json" in str(error)
+    assert rows[499]["universeSegment"] == "NIFTY_SMALLCAP250"
 
 
 def test_existing_v2_positions_consume_portfolio_slots(monkeypatch):
