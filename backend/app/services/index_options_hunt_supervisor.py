@@ -88,13 +88,11 @@ def index_options_hunt_status() -> dict[str, Any]:
 
 def run_index_options_hunt_cycle(client: Any, *, now: datetime | None = None) -> dict[str, Any]:
     """Run the existing live index-options pipeline once, unchanged."""
-    from .index_options_context import refresh_index_options_context
+    from .angel_one_feed import ensure_fresh_market_snapshot
     from .index_options_live import compose_live_index_options_radar
 
     clock = (now or datetime.now(IST_ZONE)).astimezone(IST_ZONE)
-    # Read-only market context: this worker owns Index Options only and cannot
-    # trigger the Intraday/Swing full-universe refresh pipeline.
-    snapshot = refresh_index_options_context(client, now=clock)
+    snapshot = ensure_fresh_market_snapshot(reason="autonomous_index_options_hunt")
     return compose_live_index_options_radar(
         snapshot,
         live=True,

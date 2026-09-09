@@ -170,8 +170,7 @@ def _scheduler_loop() -> None:
                 try:
                     from ..intraday_session_engine import refresh_session_state
 
-                    if not _spawn_once("intraday-session-state", refresh_session_state):
-                        log.debug("Intraday state refresh already running")
+                    refresh_session_state()
                 except Exception as exc:
                     log.debug("Live session state refresh skipped: %s", exc)
                 try:

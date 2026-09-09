@@ -4795,7 +4795,6 @@ def create_app() -> FastAPI:
             replay_session_payload,
         )
         from .index_options_paper import index_options_market_open
-        from .index_options_context import load_index_options_context
 
         if sessionDate:
             try:
@@ -4809,9 +4808,7 @@ def create_app() -> FastAPI:
 
         def _compose() -> dict[str, Any]:
             return compose_live_index_options_radar(
-                # Index Options owns its chain/OI refresh but only reads the
-                # common stock snapshot for breadth context.
-                load_index_options_context(),
+                ensure_fresh_market_snapshot(reason="index_options_compose"),
                 live=live,
                 client=AngelOneClient(),
             )
@@ -5597,6 +5594,9 @@ def create_app() -> FastAPI:
                 _invalidate_session_response_cache,
                 refresh_session_state,
             )
+            from .cross_book_resolution import reconcile_cross_book
+
+            reconcile_cross_book(_ist_now().date().isoformat(), persist=True)
             _invalidate_session_response_cache()
             refresh_session_state()
         except Exception:
