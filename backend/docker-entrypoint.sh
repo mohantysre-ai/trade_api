@@ -7,4 +7,6 @@ mkdir -p /app/state /app/backend/app/data/eod /app/backend/app/services/eod_arch
 [ -f /app/state/last_market_snapshot.json ] || printf '%s\n' '{}' > /app/state/last_market_snapshot.json
 [ -f /app/state/intraday_session.json ] || printf '%s\n' '{}' > /app/state/intraday_session.json
 [ -f /app/state/swing_session.json ] || printf '%s\n' '{}' > /app/state/swing_session.json
+[ -f /app/state/swing_v2_market_context.json ] || printf '%s\n' '{}' > /app/state/swing_v2_market_context.json
+[ -f /app/state/index_options_market_context.json ] || printf '%s\n' '{}' > /app/state/index_options_market_context.json
 exec "$@"

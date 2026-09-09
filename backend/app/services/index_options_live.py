@@ -19,6 +19,7 @@ from .angel_index_stream import ANGEL_INDEX_STREAM
 from .dhan_scanx_options import apply_scanx_fallback
 from .index_options_engine import build_index_options_radar
 from .index_options_paper import index_options_market_open, reconcile_paper_book
+from .book_isolation import independent_books_enabled
 from .index_options_replay import parse_session_date, replay_index_options_session
 from .lemonn_options import LEMONN_SLUGS, apply_lemonn_fallback, discover_lemonn_expiries
 from .trendlyne_oi import apply_oi_enrichment
@@ -249,7 +250,15 @@ def compose_live_index_options_radar(
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Build the live radar. Lemonn fills indexes still unusable after ScanX."""
-    book = ensure_fresh_market_snapshot(snapshot, reason="index_options_breadth")
+    # In isolated mode Index Options may consume the last published breadth
+    # snapshot, but it must never launch or overwrite the stock-book refresh.
+    # Its option chain, futures OI, Greeks and locked-contract marks remain
+    # independently refreshed below. Stale breadth fails the option gate closed.
+    book = (
+        dict(snapshot)
+        if independent_books_enabled()
+        else ensure_fresh_market_snapshot(snapshot, reason="index_options_breadth")
+    )
     option_data: dict[str, Any] | None = None
     if live:
         try:
@@ -298,6 +307,7 @@ def compose_live_index_options_radar(
     result["limits"]["huntMode"] = "CONTINUOUS_MARKET_SESSION" if market_open else "SESSION_CLOSED"
     result["provider"] = "ANGEL_ONE_WITH_SCANX_AND_LEMONN_FALLBACK"
     result["providerEvidence"] = book.get("indexOptionProvider")
+    result["marketContext"] = book.get("indexOptionsContext")
     result["streamStatus"] = ANGEL_INDEX_STREAM.status()
     if persist:
         persist_radar(result)

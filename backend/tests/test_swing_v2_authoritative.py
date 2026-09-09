@@ -156,3 +156,27 @@ def test_v2_authority_does_not_invalidate_shared_intraday_cache(monkeypatch):
         "hard_filter_reasons": [],
     }
     assert _intraday_metrics_usable(cached) is True
+
+
+def test_v2_does_not_read_intraday_locks_when_books_are_isolated(monkeypatch, tmp_path):
+    _configure(monkeypatch, tmp_path)
+    monkeypatch.setenv("BOOK_EXECUTION_ISOLATION", "true")
+    now = datetime(2026, 9, 9, 8, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(authoritative, "_manage_open_positions", lambda *args: None)
+    monkeypatch.setattr(authoritative, "_snapshot", lambda: {})
+    monkeypatch.setattr(
+        "app.services.desk_book_symbols.intraday_locked_symbols",
+        lambda day: (_ for _ in ()).throw(AssertionError("cross-book read")),
+    )
+    session = authoritative.run_authoritative_cycle(now=now)
+    assert session["authority"] == "V2"
+
+
+def test_v2_snapshot_is_book_owned(monkeypatch, tmp_path):
+    own = tmp_path / "swing-v2-context.json"
+    shared = tmp_path / "intraday-context.json"
+    own.write_text('{"book":"SWING_V2"}', encoding="utf-8")
+    shared.write_text('{"book":"INTRADAY"}', encoding="utf-8")
+    monkeypatch.setenv("SWING_V2_MARKET_CONTEXT_FILE", str(own))
+    monkeypatch.setenv("MARKET_SNAPSHOT_FILE", str(shared))
+    assert authoritative._snapshot() == {"book": "SWING_V2"}

@@ -60,6 +60,8 @@ services:
       DESK_AUTO_MIDDAY_REFRESH: "1"
       DESK_MIDDAY_REFRESH_TIMES: "12:00,14:00"
       DESK_AUTO_PM_LLM: "1"
+      # Each book owns its decisions/state. No cross-book exclusion, refresh or reconciliation.
+      BOOK_EXECUTION_ISOLATION: "true"
       DESK_PM_LLM_HOUR: "16"
       DESK_PM_LLM_MINUTE: "0"
       SWING_CAPITAL: "1000000"
@@ -71,6 +73,7 @@ services:
       SWING_LIVE_PROMOTION: "false"
       SWING_SESSION_FILE: /app/state/swing_session.json
       SWING_V2_SESSION_FILE: /app/state/swing_v2_session.json
+      SWING_V2_MARKET_CONTEXT_FILE: /app/state/swing_v2_market_context.json
       SWING_V2_LEDGER_PATH: /app/backend/app/data/swing_v2_ledger.sqlite3
       SNAPSHOT_FILE: /app/state/trade_api_snapshot.json
       MARKET_SNAPSHOT_FILE: /app/state/last_market_snapshot.json
@@ -80,6 +83,7 @@ services:
       INDEX_OPTIONS_RADAR_FILE: /app/state/index_options_radar.json
       INDEX_OPTIONS_OI_BASELINE_FILE: /app/state/index_options_oi_baseline.json
       INDEX_OPTIONS_CANDLE_CACHE_FILE: /app/state/index_options_candles.json
+      INDEX_OPTIONS_MARKET_CONTEXT_FILE: /app/state/index_options_market_context.json
       INDEX_OPTIONS_PAPER_BOOK_FILE: /app/state/index_options_paper_book.json
       INDEX_OPTIONS_STREAM_ENABLED: "1"
     ports:

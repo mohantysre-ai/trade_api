@@ -21,6 +21,7 @@ from .engine import execute_paper_order, process_position_bar
 from .facade import build_from_market_snapshot
 from .ledger import SwingLedger, materialize_position
 from .reporting import ledger_eod_report
+from ..book_isolation import independent_books_enabled
 
 IST = ZoneInfo("Asia/Kolkata")
 _LOCK = threading.RLock()
@@ -36,6 +37,13 @@ def _state_path() -> Path:
     if configured:
         return Path(configured)
     return Path(__file__).resolve().parents[2] / "data" / "swing_v2_session.json"
+
+
+def _market_context_path() -> Path:
+    configured = os.getenv("SWING_V2_MARKET_CONTEXT_FILE", "").strip()
+    if configured:
+        return Path(configured)
+    return Path(__file__).resolve().parents[2] / "data" / "swing_v2_market_context.json"
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -55,9 +63,7 @@ def _write_state(payload: dict[str, Any]) -> None:
 
 
 def _snapshot() -> dict[str, Any]:
-    from ..market_snapshot_store import readable_market_snapshot_path
-
-    return _read_json(readable_market_snapshot_path())
+    return _read_json(_market_context_path())
 
 
 def _clock(value: str) -> time:
@@ -203,13 +209,28 @@ def _session(scan: dict[str, Any] | None = None, *, now: datetime | None = None)
 
 def _refresh_snapshot(reason: str) -> dict[str, Any]:
     try:
-        from ..angel_one_feed import run_scheduled_live_refresh
+        from ..angel_one_feed import (
+            AngelOneClient,
+            NIFTY_500_LABEL,
+            _build_payload_from_live_data,
+        )
 
         with _DATA_REFRESH_LOCK:
-            run_scheduled_live_refresh(reason=reason)
+            payload = _build_payload_from_live_data(
+                AngelOneClient(),
+                pool_name=NIFTY_500_LABEL,
+                force_llm_refresh=False,
+                prior_snapshot=_snapshot(),
+                angel_first_quotes=True,
+            )
+            target = _market_context_path()
+            target.parent.mkdir(parents=True, exist_ok=True)
+            temporary = target.with_suffix(target.suffix + ".tmp")
+            temporary.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+            os.replace(temporary, target)
+            return payload
     except Exception:
-        pass
-    return _snapshot()
+        return {}
 
 
 def _quote_observations(symbols: list[str], now: datetime) -> dict[str, dict[str, Any]]:
@@ -367,8 +388,11 @@ def run_authoritative_cycle(*, now: datetime | None = None, force: bool = False)
         if str(current.get("sessionDate") or "") != day:
             current = {"sessionDate": day, "selectionFinalized": False}
         local_time = now.time().replace(tzinfo=None)
-        from ..desk_book_symbols import intraday_locked_symbols
-        occupied = intraday_locked_symbols(day)
+        if independent_books_enabled():
+            occupied: set[str] = set()
+        else:
+            from ..desk_book_symbols import intraday_locked_symbols
+            occupied = intraday_locked_symbols(day)
         existing_open = [row for row in _positions(ledger) if not row.get("terminal")]
         start, freeze, expiry = (_clock(cfg.decision_start_ist), _clock(cfg.decision_freeze_ist), _clock(cfg.order_expire_ist))
         scan: dict[str, Any] | None = current.get("scan") if isinstance(current.get("scan"), dict) else None
