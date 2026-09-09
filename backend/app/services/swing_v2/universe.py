@@ -20,6 +20,11 @@ OFFICIAL_SEGMENT_URLS = {
 }
 EXPECTED_SEGMENT_COUNTS = {"NIFTY100": 100, "NIFTY_MIDCAP150": 150, "NIFTY_SMALLCAP250": 250, "NIFTY_MICROCAP250": 250}
 MAX_OFFICIAL_TRANSITION_VARIANCE = 5
+OFFICIAL_DOWNLOAD_HEADERS = {
+    "Accept": "text/csv,application/octet-stream;q=0.9,*/*;q=0.8",
+    "Referer": "https://www.niftyindices.com/",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+}
 
 
 def point_in_time_members(rows: list[dict[str, Any]], on_date: date) -> list[dict[str, Any]]:
@@ -48,14 +53,22 @@ def refresh_official_membership(
     output_directory: str,
     *,
     effective_date: date,
-    fetcher: Any = requests.get,
+    fetcher: Any | None = None,
 ) -> dict[str, Any]:
     """Persist an immutable official constituent snapshot; never rewrite history."""
     rows, sources = [], []
     for segment, default_url in OFFICIAL_SEGMENT_URLS.items():
         env_name = f"SWING_{segment}_CONSTITUENTS_URL"
         url = os.getenv(env_name, default_url)
-        response = fetcher(url, timeout=30)
+        if fetcher is None:
+            response = requests.get(
+                url,
+                headers=OFFICIAL_DOWNLOAD_HEADERS,
+                timeout=(10, 90),
+            )
+        else:
+            # Keep the injectable fetcher contract small for deterministic tests.
+            response = fetcher(url, timeout=30)
         response.raise_for_status()
         reader = csv.DictReader(io.StringIO(response.text.lstrip("\ufeff")))
         segment_rows = []
