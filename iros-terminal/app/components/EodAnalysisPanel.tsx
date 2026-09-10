@@ -1084,7 +1084,7 @@ export default function EodAnalysisPanel({
       return s ? `?${s}` : '';
     };
     const swingDate = swingDateStr || dateStr;
-    const timeoutMs = force ? 60_000 : 45_000;
+    const timeoutMs = force ? 180_000 : 120_000;
 
     const loadOne = async <T,>(url: string, label: string): Promise<T | null> => {
       const ctrl = new AbortController();
@@ -1100,7 +1100,7 @@ export default function EodAnalysisPanel({
         const msg =
           err instanceof Error
             ? err.name === 'AbortError'
-              ? `${label} timed out (${force ? '60s' : '45s'})`
+              ? `${label} timed out (${force ? '180s' : '120s'})`
               : err.message
             : `${label} failed`;
         setError((prev) => (prev ? `${prev} · ${msg}` : msg));
