@@ -34,12 +34,28 @@ def book_cache_path(for_date, kind: str) -> str:
     return os.path.join(_day_dir(for_date), name)
 
 
+def has_book_cache(for_date, kind: str) -> bool:
+    """Check cache presence without reconciling the optional master artifact."""
+    return os.path.isfile(book_cache_path(for_date, kind))
+
+
+def load_book_cache_fast(for_date, kind: str) -> dict[str, Any] | None:
+    """Read a valid Book cache without touching forensic master artifacts."""
+    data = _read_json(book_cache_path(for_date, kind))
+    if data is None or int(data.get("bookCacheSchemaVersion") or 0) != BOOK_CACHE_SCHEMA_VERSION:
+        return None
+    out = dict(data)
+    out["fromCache"] = True
+    return out
+
+
 def _read_json(path: str) -> dict[str, Any] | None:
     if not os.path.isfile(path):
         return None
     try:
-        with open(path, "r", encoding="utf-8-sig") as fh:
-            data = json.load(fh)
+        from .json_atomic import load_json_with_fallback
+
+        data = load_json_with_fallback(path)
         return data if isinstance(data, dict) else None
     except Exception as exc:
         log.warning("EOD cache read failed %s: %s", path, exc)
@@ -73,12 +89,35 @@ def _is_triggered_swing(row: dict[str, Any]) -> bool:
 
 
 def _reconcile_master_from_books(for_date) -> None:
-    """Make the headline EOD artifact agree with canonical Book caches."""
+    """Make the headline EOD artifact agree with canonical Book caches.
+
+    If the master payload is missing but one or more book caches exist, create
+    a minimal master from the books so the EOD summary never returns NO_ARTIFACT
+    when book data is already available.
+    """
     day_dir = _day_dir(for_date)
     master_path = os.path.join(day_dir, "master_eod_payload.json")
     master = _read_json(master_path)
+
+    # If master doesn't exist but books do, bootstrap a minimal master from books
     if master is None:
-        return
+        intra = _read_json(os.path.join(day_dir, "book_intraday.json"))
+        swing = _read_json(os.path.join(day_dir, "book_swing.json"))
+        options = _read_json(os.path.join(day_dir, "book_index_options.json"))
+        if intra is None and swing is None and options is None:
+            return
+        master = {
+            "analysis_date": for_date.isoformat() if hasattr(for_date, "isoformat") else str(for_date),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "status": "BOOK_ONLY",
+            "notes": ["book_reconciled_no_forensic_engine"],
+            "executive_summary": {},
+            "scorecards": [],
+            "learning_proposals": [],
+            "pm_commentary": {},
+            "schema_version": "1.0.0",
+        }
+        _write_json(master_path, master)
 
     intra = _read_json(os.path.join(day_dir, "book_intraday.json"))
     swing = _read_json(os.path.join(day_dir, "book_swing.json"))

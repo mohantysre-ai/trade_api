@@ -127,6 +127,7 @@ def run_eod_analysis(
             {"date": for_date.isoformat(), "proposals": []},
             payload.pm_commentary,
         )
+        _ensure_book_reports_cached(for_date, force=True)
         return {
             "success": True,
             "skipped": False,

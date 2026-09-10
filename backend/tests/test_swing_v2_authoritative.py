@@ -65,7 +65,7 @@ def test_authoritative_cycle_locks_fills_and_feeds_eod(monkeypatch, tmp_path):
         "stockQuotes": {"ABC": _candidate(decision)},
     }
     monkeypatch.setattr(authoritative, "_snapshot", lambda: snapshot)
-    monkeypatch.setattr(authoritative, "_refresh_snapshot", lambda reason: snapshot)
+    monkeypatch.setattr(authoritative, "_refresh_snapshot", lambda reason, **kwargs: snapshot)
     monkeypatch.setattr(authoritative, "_refresh_final_candidate_facts", lambda value, scan, now: value)
     monkeypatch.setattr(authoritative, "_quote_observations", lambda symbols, now: {
         "ABC": {"timestamp": now.astimezone(timezone.utc).isoformat(), "ask": 105.0, "askDepth": 10_000, "open": 105.0, "high": 105.0, "low": 105.0, "close": 105.0, "source": "TEST"}
@@ -92,13 +92,79 @@ def test_authoritative_cycle_keeps_cash_when_v2_data_is_blocked(monkeypatch, tmp
     decision = datetime(2026, 9, 9, 9, 40, tzinfo=timezone.utc)
     snapshot = {"swingV2UniverseSize": 500, "swingV2UniverseCoverage": .98, "swingV2Regime": "NORMAL", "stockQuotes": {}}
     monkeypatch.setattr(authoritative, "_snapshot", lambda: snapshot)
-    monkeypatch.setattr(authoritative, "_refresh_snapshot", lambda reason: snapshot)
+    monkeypatch.setattr(authoritative, "_refresh_snapshot", lambda reason, **kwargs: snapshot)
     monkeypatch.setattr(authoritative, "_quote_observations", lambda symbols, now: {})
     monkeypatch.setattr("app.services.desk_book_symbols.intraday_locked_symbols", lambda day: set())
     session = authoritative.run_authoritative_cycle(now=decision)
     assert session["cashHeld"] is True
     assert session["cashReason"] == "UNIVERSE_COVERAGE_BELOW_99PCT"
     assert session["long"] == []
+
+
+def test_authoritative_cycle_final_refresh_never_poisons_cash_after_window(monkeypatch, tmp_path):
+    _configure(monkeypatch, tmp_path)
+    # 09:55 UTC == 15:25 IST: the scheduler tick reaches the final branch only
+    # after the order window has already closed.
+    decision = datetime(2026, 9, 9, 9, 55, tzinfo=timezone.utc)
+    snapshot = {
+        "swingV2UniverseSize": 500,
+        "swingV2UniverseCoverage": 1.0,
+        "swingV2Regime": "NORMAL",
+        "stockQuotes": {"ABC": _candidate(decision)},
+    }
+    monkeypatch.setattr(authoritative, "_snapshot", lambda: snapshot)
+    monkeypatch.setattr(authoritative, "_refresh_snapshot", lambda reason, **kwargs: snapshot)
+    monkeypatch.setattr(authoritative, "_refresh_final_candidate_facts", lambda value, scan, now: value)
+    monkeypatch.setattr(authoritative, "_quote_observations", lambda symbols, now: {})
+    monkeypatch.setattr("app.services.desk_book_symbols.intraday_locked_symbols", lambda day: set())
+
+    session = authoritative.run_authoritative_cycle(now=decision)
+
+    assert session["selectionFinalized"] is True
+    assert session.get("cashReason") != "FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW"
+    state = authoritative._read_json(authoritative._state_path())
+    assert state["scan"].get("blockReason") != "FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW"
+    # Past the order window: the decision is surfaced but no locks are persisted,
+    # and no poison block is recorded (cashReason stays None / honest or absent).
+    assert state["scan"].get("blocked") is None or state["scan"].get("blockReason") is None
+
+
+def test_authoritative_cycle_recovers_poisoned_missed_window_final(monkeypatch, tmp_path):
+    _configure(monkeypatch, tmp_path)
+    decision = datetime(2026, 9, 9, 9, 40, tzinfo=timezone.utc)  # 15:10 IST
+    poisoned = {
+        "sessionDate": "2026-09-09",
+        "selectionFinalized": True,
+        "scan": {
+            "strategyId": "SWING_2S_MOMENTUM_V2", "policyVersion": "2.0.0",
+            "enabled": True, "authoritative": True, "mode": "PAPER",
+            "blocked": True, "blockReason": "FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW",
+            "candidates": [], "funnel": {"universe": 0},
+        },
+    }
+    authoritative._write_state(poisoned)
+    snapshot = {
+        "swingV2UniverseSize": 500,
+        "swingV2UniverseCoverage": 1.0,
+        "swingV2Regime": "NORMAL",
+        "stockQuotes": {"ABC": _candidate(decision)},
+    }
+    monkeypatch.setattr(authoritative, "_snapshot", lambda: snapshot)
+    monkeypatch.setattr(authoritative, "_refresh_snapshot", lambda reason, **kwargs: snapshot)
+    monkeypatch.setattr(authoritative, "_refresh_final_candidate_facts", lambda value, scan, now: value)
+    monkeypatch.setattr(authoritative, "_quote_observations", lambda symbols, now: {
+        "ABC": {"timestamp": now.astimezone(timezone.utc).isoformat(), "ask": 105.0, "askDepth": 10_000, "open": 105.0, "high": 105.0, "low": 105.0, "close": 105.0, "source": "TEST"}
+    })
+    monkeypatch.setattr("app.services.desk_book_symbols.intraday_locked_symbols", lambda day: set())
+
+    session = authoritative.run_authoritative_cycle(now=decision)
+
+    assert session["selectionFinalized"] is True
+    assert session.get("cashReason") != "FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW"
+    state = authoritative._read_json(authoritative._state_path())
+    assert state["scan"].get("blockReason") != "FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW"
+    # The recovery is recorded on the scan so operators can see the self-heal.
+    assert state["scan"].get("recoveredFrom") == "FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW"
 
 
 def test_ingestion_publishes_active_coverage_and_enrichment(monkeypatch):
@@ -279,3 +345,33 @@ def test_long_history_is_explicitly_swing_only(monkeypatch):
         None, [row], {"ABC": instrument}, now, daily_lookback_days=430
     )
     assert observed == [45, 430]
+
+
+def test_v2_daily_lookback_defaults_to_shallow_30_days(monkeypatch):
+    monkeypatch.delenv("SWING_V2_DAILY_LOOKBACK_DAYS", raising=False)
+    monkeypatch.delenv("DAILY_LOOKBACK_DEFAULT_DAYS", raising=False)
+    # Regression: the V2 "full universe + swing history" refresh previously pulled
+    # ~430 calendar days of ONE_DAY candles per candidate, flooding Angel's
+    # getCandleData endpoint. Short-horizon V2 entries only need the near-term
+    # window, so the default is now 30 calendar days.
+    assert market_feed._daily_lookback_days(swing_v2_history=True) == 30
+    assert market_feed._daily_lookback_days(swing_v2_history=False) == 45
+
+def test_v2_env_override_restores_deep_lookback_and_legacy_readiness(monkeypatch):
+    monkeypatch.setenv("SWING_V2_DAILY_LOOKBACK_DAYS", "430")
+    assert market_feed._daily_lookback_days(swing_v2_history=True) == 430
+    # The readiness gate clamps at 252 observations for a deep config so legacy
+    # 12-month rows remain the only reusable ones; shallow rows stay non-ready..
+    assert market_feed._v2_history_ready({"dailyObservationCount": 252}) is True
+    assert market_feed._v2_history_ready({"dailyObservationCount": 251}) is False
+    assert market_feed._v2_history_ready(None) is False
+
+def test_v2_cache_readiness_scales_with_shallow_lookback(monkeypatch):
+    monkeypatch.setenv("SWING_V2_DAILY_LOOKBACK_DAYS", "30")
+    threshold = min(
+        market_feed._SWING_V2_LONG_HORIZON_OBSERVATIONS, max(15, int(30 * 0.7))
+    )
+    assert threshold == 21
+    assert market_feed._v2_history_ready({"dailyObservationCount": 21}) is True
+    assert market_feed._v2_history_ready({"dailyObservationCount": 20}) is False
+    assert market_feed._v2_history_ready({"dailyObservationCount": 300}) is True

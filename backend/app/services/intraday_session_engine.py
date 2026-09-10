@@ -2987,7 +2987,10 @@ def ensure_intraday_session_locked() -> dict[str, Any]:
     # A current-day cash-held lock with zero names is valid. Replacement
     # hunting may fill it later; do not make it impossible to re-enter because
     # commit_session correctly refuses to overwrite today's immutable lock.
-    current_policy = existing.get("entryPolicyVersion") == ENTRY_POLICY_VERSION
+    # Legacy locks predate entryPolicyVersion. Their symbols are already
+    # immutable, so missing metadata must not trigger a read-path recommit.
+    stored_policy = existing.get("entryPolicyVersion")
+    current_policy = stored_policy in (None, ENTRY_POLICY_VERSION)
     if (
         existing.get("locked") and existing_date == today
         and existing.get("committedAt") and current_policy
@@ -2998,7 +3001,8 @@ def ensure_intraday_session_locked() -> dict[str, Any]:
         and (not existing.get("committedAt") or not current_policy)
     )
     result = commit_session(
-        force=bool(existing.get("locked") and (existing_date != today or malformed_current))
+        force=bool(existing.get("locked") and (existing_date != today or malformed_current)),
+        bypass_lock_window=bool(existing.get("locked") and existing_date != today),
     )
     if isinstance(result, dict) and result.get("locked") and result.get("sessionDate"):
         return result
@@ -4439,7 +4443,10 @@ def _schedule_stale_session_rotation(existing: dict[str, Any] | None = None) -> 
         session.get("locked") and session_date == today
         and (
             not session.get("committedAt")
-            or session.get("entryPolicyVersion") != ENTRY_POLICY_VERSION
+            or (
+                session.get("entryPolicyVersion") is not None
+                and session.get("entryPolicyVersion") != ENTRY_POLICY_VERSION
+            )
         )
     )
     allowed, _reason = basket_lock_allowed()

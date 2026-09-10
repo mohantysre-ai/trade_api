@@ -41,8 +41,9 @@ def _read_json_file(path: str) -> Any:
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail=f"Artifact not found: {os.path.basename(path)}")
     try:
-        with open(path, "r", encoding="utf-8-sig") as fh:
-            return json.load(fh)
+        from ..json_atomic import load_json_with_fallback
+
+        return load_json_with_fallback(path)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to read artifact: {exc}") from exc
 
@@ -65,7 +66,22 @@ def eod_month_pnl(month: Optional[str] = Query(None)) -> dict[str, Any]:
 
 @router.get("/api/eod/summary/{analysis_date}")
 def eod_summary(analysis_date: str) -> dict[str, Any]:
-    return _read_json_file(_day_path(analysis_date, "master_eod_payload.json"))
+    path = _day_path(analysis_date, "master_eod_payload.json")
+    if not os.path.isfile(path):
+        try:
+            result = run_eod_analysis(analysis_date, force=False)
+            if result.get("success") and result.get("payload"):
+                return result["payload"]
+        except Exception:
+            pass
+        return {
+            "analysis_date": analysis_date,
+            "status": "NO_ARTIFACT",
+            "scorecards": [],
+            "learning_proposals": [],
+            "pm_commentary": None,
+        }
+    return _read_json_file(path)
 
 
 @router.get("/api/eod/scorecards/{analysis_date}")

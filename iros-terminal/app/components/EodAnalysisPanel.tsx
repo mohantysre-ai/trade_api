@@ -1137,6 +1137,39 @@ export default function EodAnalysisPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot force paired with refreshToken
   }, [fetchReports, refreshToken]);
 
+  // Keep the Index Options EOD card in sync with the live options refresh stream
+  useEffect(() => {
+    if (!dateStr) return;
+    let cancelled = false;
+    let timer: number | null = null;
+
+    const loadOptions = async () => {
+      if (cancelled) return;
+      try {
+        const ctrl = new AbortController();
+        const timeout = window.setTimeout(() => ctrl.abort(), 30000);
+        const res = await fetch(`/api/reports/eod-index-options?date=${encodeURIComponent(dateStr)}`, {
+          cache: 'no-store',
+          signal: ctrl.signal,
+        });
+        window.clearTimeout(timeout);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setIndexOptions(data);
+      } catch {
+        // ignore — next tick retries
+      }
+    };
+
+    loadOptions();
+    timer = window.setInterval(loadOptions, 15000);
+
+    return () => {
+      cancelled = true;
+      if (timer) window.clearInterval(timer);
+    };
+  }, [dateStr, refreshToken]);
+
   // Market-hours live marks — overlay LTP / MTM without rewriting book cache
   useEffect(() => {
     if (!isTodayBook) {
@@ -1254,7 +1287,7 @@ export default function EodAnalysisPanel({
 
   const displayIntraday = useMemo(() => {
     if (!intraday) return null;
-    if (!liveActive || !liveMarks || !canOverlayIntradayBook(intraday.marketPhase, liveMarks.marketOpen)) {
+    if (!liveActive || !liveMarks || (!canOverlayIntradayBook(intraday.marketPhase, liveMarks.marketOpen) && intraday.marketPhase !== 'CLOSED')) {
       return deriveIntradayHeadlines(intraday, intraday.trades || []);
     }
 

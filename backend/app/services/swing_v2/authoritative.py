@@ -25,6 +25,9 @@ from .reporting import ledger_eod_report
 IST = ZoneInfo("Asia/Kolkata")
 _LOCK = threading.RLock()
 _DATA_REFRESH_LOCK = threading.Lock()
+# Safety margin (seconds) the final decision pipeline needs to finish after a
+# (possibly slow) broker refresh before the 15:20 IST order window expires.
+_FINAL_REFRESH_MARGIN_SECONDS = int(os.getenv("SWING_FINAL_REFRESH_MARGIN_SECONDS", "90"))
 
 
 def is_v2_authoritative(config: SwingV2Config | None = None) -> bool:
@@ -201,12 +204,43 @@ def _session(scan: dict[str, Any] | None = None, *, now: datetime | None = None)
     }
 
 
-def _refresh_snapshot(reason: str) -> dict[str, Any]:
+def _time_until_expiry(now: datetime, expiry: time) -> timedelta:
+    """Wall-clock room still available before ``expiry`` in the final window."""
+    expiry_local = datetime.combine(now.astimezone(IST).date(), expiry, tzinfo=IST)
+    return expiry_local - now.astimezone(IST)
+
+
+def _refresh_snapshot(reason: str, *, deadline: datetime | None = None) -> dict[str, Any]:
+    """Deadline-bounded Angel refresh for the final decision window.
+
+    The broker refresh is heavy (full universe + daily history) and this path
+    runs inside the single-writer cycle on the scheduler thread.  It must never
+    consume the whole 15:10–15:20 IST order window: when ``deadline`` has
+    already arrived, or the shared refresh lock is held by another refresh,
+    fall back to the last persisted snapshot so the final scan can still be
+    produced instead of poisoning the book with a MISSED_ORDER_WINDOW cash-hold.
+    """
     try:
         from ..angel_one_feed import run_scheduled_live_refresh
 
-        with _DATA_REFRESH_LOCK:
+        def _seconds_left() -> float:
+            if deadline is None:
+                return float("inf")
+            return max(0.0, (deadline.astimezone(timezone.utc) - datetime.now(timezone.utc)).total_seconds())
+
+        if _seconds_left() <= 1.0:
+            return _snapshot()
+        acquired = _DATA_REFRESH_LOCK.acquire(timeout=_seconds_left())
+        if not acquired:
+            # Another refresh holds the shared lock; never block the order
+            # window waiting for it.
+            return _snapshot()
+        try:
             run_scheduled_live_refresh(reason=reason)
+        except Exception:
+            pass
+        finally:
+            _DATA_REFRESH_LOCK.release()
     except Exception:
         pass
     return _snapshot()
@@ -409,32 +443,48 @@ def run_authoritative_cycle(*, now: datetime | None = None, force: bool = False)
             # Shared snapshots avoid a full Angel refresh on every scheduler tick.
             scan = build_from_market_snapshot(_snapshot(), final_lock=True, persist_events=True, occupied_symbols=occupied, existing_positions=existing_open, now=now)
             current.update({"scan": scan, "lastScanAt": now.astimezone(timezone.utc).isoformat()})
-        elif freeze <= local_time and not current.get("selectionFinalized"):
-            snapshot = _refresh_snapshot("swing_v2_final_lock")
-            if not supplied_now:
-                now = datetime.now(timezone.utc).astimezone(IST)
-                local_time = now.time().replace(tzinfo=None)
-            if local_time > expiry:
-                scan = {
-                    "strategyId": cfg.strategy_id, "policyVersion": cfg.policy_version,
-                    "enabled": True, "authoritative": True, "mode": "PAPER",
-                    "blocked": True, "blockReason": "FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW",
-                    "candidates": [], "funnel": {"universe": 0},
-                }
-                current.update({"scan": scan, "selectionFinalized": True, "finalizedAt": now.astimezone(timezone.utc).isoformat()})
-                _write_state(current)
-                return _session(scan, now=now)
-            quote_rows = snapshot.get("stockQuotes") if isinstance(snapshot.get("stockQuotes"), dict) else {}
-            seed = {"candidates": [
-                {"symbol": str(row.get("ticker") or symbol).upper()}
-                for symbol, row in quote_rows.items()
-                if isinstance(row, dict) and isinstance(row.get("swingV2"), dict)
-            ]}
-            snapshot = _refresh_final_candidate_facts(snapshot, seed, now)
-            prelock = build_from_market_snapshot(snapshot, final_lock=False, persist_events=False, occupied_symbols=occupied, existing_positions=existing_open, now=now)
-            snapshot = _refresh_final_candidate_facts(snapshot, prelock, now)
-            scan = build_from_market_snapshot(snapshot, final_lock=True, persist_events=True, occupied_symbols=occupied, existing_positions=existing_open, now=now)
-            current.update({"scan": scan, "selectionFinalized": True, "finalizedAt": now.astimezone(timezone.utc).isoformat()})
+        elif freeze <= local_time:
+            # Final decision path — runs once per trading day, plus a same-day
+            # retry when a previous pass aborted on a missed order window, so a
+            # slow broker refresh can never permanently poison the book into a
+            # cash-hold with zero qualified signals.
+            poisoned_final = bool(
+                current.get("selectionFinalized")
+                and str((current.get("scan") or {}).get("blockReason"))
+                == "FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW"
+            )
+            if not current.get("selectionFinalized") or poisoned_final:
+                expiry_local = datetime.combine(now.astimezone(IST).date(), expiry, tzinfo=IST)
+                refresh_deadline = expiry_local - timedelta(seconds=_FINAL_REFRESH_MARGIN_SECONDS)
+                snapshot = _refresh_snapshot("swing_v2_final_lock", deadline=refresh_deadline)
+                if not supplied_now:
+                    now = datetime.now(timezone.utc).astimezone(IST)
+                    local_time = now.time().replace(tzinfo=None)
+                remaining = _time_until_expiry(now, expiry)
+                inside_window = remaining.total_seconds() >= 0
+                # Candidate-fact quote batches are extra broker I/O; spend them
+                # only while there is real room left before the order window
+                # expires, otherwise finalize from the snapshot already on disk.
+                if remaining.total_seconds() >= _FINAL_REFRESH_MARGIN_SECONDS:
+                    quote_rows = snapshot.get("stockQuotes") if isinstance(snapshot.get("stockQuotes"), dict) else {}
+                    seed = {"candidates": [
+                        {"symbol": str(row.get("ticker") or symbol).upper()}
+                        for symbol, row in quote_rows.items()
+                        if isinstance(row, dict) and isinstance(row.get("swingV2"), dict)
+                    ]}
+                    snapshot = _refresh_final_candidate_facts(snapshot, seed, now)
+                prelock = build_from_market_snapshot(snapshot, final_lock=False, persist_events=False, occupied_symbols=occupied, existing_positions=existing_open, now=now)
+                if remaining.total_seconds() >= _FINAL_REFRESH_MARGIN_SECONDS:
+                    snapshot = _refresh_final_candidate_facts(snapshot, prelock, now)
+                scan = build_from_market_snapshot(snapshot, final_lock=True, persist_events=inside_window, occupied_symbols=occupied, existing_positions=existing_open, now=now)
+                if poisoned_final:
+                    scan = {**scan, "recoveredFrom": "FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW"}
+                current.update({
+                    "scan": scan,
+                    "selectionFinalized": True,
+                    "finalizedAt": now.astimezone(timezone.utc).isoformat(),
+                    **({"recoveredFrom": "FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW"} if poisoned_final else {}),
+                })
         if freeze <= local_time <= expiry:
             _fill_locked_orders(ledger, now, cfg)
         elif local_time > expiry:

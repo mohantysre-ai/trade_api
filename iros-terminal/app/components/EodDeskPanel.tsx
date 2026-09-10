@@ -91,8 +91,6 @@ function monthPnlTone(v: number | null | undefined): string {
   return Number(v) > 0 ? 'text-emerald-600' : 'text-red-500';
 }
 
-const POST_CLOSE_POLL_MS = 45_000;
-
 function PmMemoStrip({
   commentary,
   source,
@@ -311,40 +309,14 @@ export default function EodDeskPanel({
     }
   }, [refreshToken]);
 
-  // After 15:30 IST on weekdays: one force rebuild, then poll book/forensic every ~45s (no PM LLM).
+  // After 15:30 IST on weekdays: load the locked book once. Live prices are
+  // supplied by the shared desk stream; do not rerun EOD report generation.
   useEffect(() => {
-    let pollId: number | undefined;
-
-    const stopPoll = () => {
-      if (pollId != null) {
-        window.clearInterval(pollId);
-        pollId = undefined;
-      }
-    };
-
-    const startPoll = () => {
-      if (pollId != null) return;
-      pollId = window.setInterval(() => {
-        const { today, marketClosed } = getIstMarketState();
-        if (!(marketClosed && dateStr === today)) {
-          setPostCloseAuto(false);
-          stopPoll();
-          return;
-        }
-        // Cache polls only — never force, never PM LLM
-        setForceBookRebuild(false);
-        setRefreshKey((k) => k + 1);
-      }, POST_CLOSE_POLL_MS);
-    };
-
     const evaluate = () => {
       const { today, marketClosed } = getIstMarketState();
       const active = marketClosed && dateStr === today;
       setPostCloseAuto(active);
-      if (!active) {
-        stopPoll();
-        return;
-      }
+      if (!active) return;
       // Serve cached book immediately. Symbol-mismatch rebuild happens server-side
       // on force=false. Avoid auto force=true (Yahoo marks) — it hung the UI at 20s.
       if (forcedForDateRef.current !== today) {
@@ -352,7 +324,6 @@ export default function EodDeskPanel({
         setForceBookRebuild(false);
         setRefreshKey((k) => k + 1);
       }
-      startPoll();
     };
 
     evaluate();
@@ -360,7 +331,6 @@ export default function EodDeskPanel({
     const watchId = window.setInterval(evaluate, 60_000);
 
     return () => {
-      stopPoll();
       window.clearInterval(watchId);
     };
   }, [dateStr]);

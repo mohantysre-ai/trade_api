@@ -207,6 +207,9 @@ def _scheduler_loop() -> None:
                         _maybe_run_today()
                         _STOP.wait(300)
                         continue
+                # Post-close catch-up: if artifacts are missing, run EOD
+                if now.hour >= 15 and now.minute >= 40:
+                    _maybe_run_today()
                 _maybe_pm_llm(now)
             _STOP.wait(30)
         except Exception as exc:

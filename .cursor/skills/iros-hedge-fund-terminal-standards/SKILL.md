@@ -99,6 +99,8 @@ Display funnel (rule baseline): **500 → 200 → 50 → ≥10 BUY**. LLM (verdi
 | `VOLUME_PRESELECT_LIMIT` | `200` | `angel_one_feed.py` | Top-N by volume from ~500 quotes |
 | `TOP_SELECTION_COUNT` | `50` | `intelligence_engine.py` | Ranked pool after volume screen |
 | `LLM_DISPLAY_COUNT` | `10` | `intelligence_engine.py` | BUY display set receiving LLM verdict + news |
+| `DAILY_LOOKBACK_DEFAULT_DAYS` | `45` | `angel_one_feed.py` | ONE_DAY candle window per symbol on standard (non-V2) pipeline refresh |
+| `SWING_V2_DAILY_LOOKBACK_DAYS` | `30` | `angel_one_feed.py` | ONE_DAY candle window per symbol on V2 hunts (was 430 — shortens the full-universe getCandleData load; only 6m/12m momentum and 52w-high raw fields degrade to null) |
 
 Do not expand LLM scope or change funnel semantics without explicit user approval. UI must show screened counts from live payload — never fabricate BUY badges or conviction.
 

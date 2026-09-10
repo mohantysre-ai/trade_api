@@ -173,6 +173,56 @@ _ANGEL_CANDLE_CIRCUIT_UNTIL = 0.0
 
 AI_NEWS_API_URL = os.getenv("AI_NEWS_API_URL", "http://127.0.0.1:8001")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Candle history lookback per symbol (calendar days)
+# The V2 hunt used to fetch ~430 days of ONE_DAY candles for the whole candidate
+# universe in one refresh ("full universe + swing history"), which hammers the
+# Angel getCandleData endpoint (AB1021). Short-horizon V2 entries only need the
+# near-term window (EMA20, ATR14, 5d return, 20d high, MDTV, intraday shape),
+# so the V2 default is now 30 days; the 6m/12m momentum and 52w-high raw fields
+# simply return null over that window. Override the env vars to restore a deeper
+# pull when a long-horizon decision run is required.
+# ─────────────────────────────────────────────────────────────────────────────
+DAILY_LOOKBACK_DEFAULT_DAYS = int(os.getenv("DAILY_LOOKBACK_DEFAULT_DAYS", "45"))
+SWING_V2_DAILY_LOOKBACK_DAYS_DEFAULT = 30
+# Long-horizon raw signals are computed over 252 trading days (~12 months).
+# The readiness gate scales with the configured lookback and clamps here so a
+# legacy 430-day configuration still requires the full year of observations.
+_SWING_V2_LONG_HORIZON_OBSERVATIONS = 252
+
+
+def _daily_lookback_days(*, swing_v2_history: bool) -> int:
+    """Calendar days of ONE_DAY candles to pull per symbol on a refresh.
+
+    V2 hunts default to a shallow 30-day window (previously 430) so the
+    full-universe refresh stops flooding Angel; set
+    ``SWING_V2_DAILY_LOOKBACK_DAYS`` to restore a deep historical fetch when a
+    long-horizon decision is actually required.
+    """
+    if swing_v2_history:
+        return int(
+            os.getenv(
+                "SWING_V2_DAILY_LOOKBACK_DAYS",
+                str(SWING_V2_DAILY_LOOKBACK_DAYS_DEFAULT),
+            )
+        )
+    return int(os.getenv("DAILY_LOOKBACK_DEFAULT_DAYS", str(DAILY_LOOKBACK_DEFAULT_DAYS)))
+
+
+def _v2_history_ready(cached_v2_raw: Any) -> bool:
+    """True when a cached ``swingV2Raw`` block has enough daily observations.
+
+    Scales with the configured lookback: a 30-day pull yields ~21 observations,
+    so reusing the old >=252 gate would invalidate every shallow row and force a
+    full-universe refetch on each V2 cycle (the very load this cap removes).
+    For the legacy 430-day config the formula still resolves to 252.
+    """
+    if not isinstance(cached_v2_raw, dict):
+        return False
+    days = _daily_lookback_days(swing_v2_history=True)
+    threshold = min(_SWING_V2_LONG_HORIZON_OBSERVATIONS, max(15, int(days * 0.7)))
+    return int(cached_v2_raw.get("dailyObservationCount") or 0) >= threshold
+
 
 # =============================================================================
 # STRICT SAFETY AUDITOR SYSTEM PROMPT
@@ -2821,7 +2871,11 @@ def _swing_v2_raw_metrics(
         "last3Closes": intraday_closes[-3:],
         "intradayLow": min(intraday_lows) if intraday_lows else None,
         "last5mTimestamp": last_ts,
-        "previous52wHigh": max((float(row.get("high") or 0) for row in previous[-252:]), default=0.0) or None,
+        "previous52wHigh": (
+            max((float(row.get("high") or 0) for row in previous[-252:]), default=0.0) or None
+            if len(previous) >= _SWING_V2_LONG_HORIZON_OBSERVATIONS
+            else None
+        ),
     }
 
 
@@ -3149,11 +3203,11 @@ def _intraday_metrics(
     quote_fallback: dict[str, Any] | None = None,
     *,
     force_angel_fallback: bool = False,
-    daily_lookback_days: int = 45,
+    daily_lookback_days: int = DAILY_LOOKBACK_DEFAULT_DAYS,
 ) -> dict[str, Any]:
     try:
         market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
-        daily_from = (now - timedelta(days=max(45, daily_lookback_days))).replace(
+        daily_from = (now - timedelta(days=max(DAILY_LOOKBACK_DEFAULT_DAYS, daily_lookback_days))).replace(
             hour=9, minute=15, second=0, microsecond=0
         )
         daily_to = now
@@ -3324,7 +3378,7 @@ def _fetch_intraday_chunk(
     now: datetime,
     *,
     force_angel_fallback: bool = False,
-    daily_lookback_days: int = 45,
+    daily_lookback_days: int = DAILY_LOOKBACK_DEFAULT_DAYS,
 ) -> dict[str, dict[str, Any]]:
     results: dict[str, dict[str, Any]] = {}
     for row in rows:
@@ -3369,7 +3423,7 @@ def _fetch_all_intraday_chunked(
     now: datetime,
     on_progress: Callable[[str], None] | None = None,
     *,
-    daily_lookback_days: int = 45,
+    daily_lookback_days: int = DAILY_LOOKBACK_DEFAULT_DAYS,
 ) -> dict[str, dict[str, Any]]:
     chunks = [
         candidate_rows[i : i + INTRADAY_CHUNK_SIZE]
@@ -4106,10 +4160,8 @@ def _build_payload_from_live_data(
     rows_to_fetch: list[dict[str, Any]] = []
     for row in candidate_rows:
         cached_intraday = intraday_cache.get(row["ticker"])
-        cached_v2_raw = cached_intraday.get("swingV2Raw") if isinstance(cached_intraday, dict) else None
-        v2_history_ready = bool(
-            isinstance(cached_v2_raw, dict)
-            and int(cached_v2_raw.get("dailyObservationCount") or 0) >= 252
+        v2_history_ready = _v2_history_ready(
+            cached_intraday.get("swingV2Raw") if isinstance(cached_intraday, dict) else None
         )
         if _intraday_metrics_usable(cached_intraday) and (not swing_v2_history or v2_history_ready):
             row["intraday"] = cached_intraday
@@ -4125,7 +4177,7 @@ def _build_payload_from_live_data(
             stock_universe_by_key,
             now,
             on_progress=on_progress,
-            daily_lookback_days=430 if swing_v2_history else 45,
+            daily_lookback_days=_daily_lookback_days(swing_v2_history=swing_v2_history),
         )
         for ticker, metrics in fetched_metrics.items():
             original = row_by_ticker.get(ticker)
@@ -5001,7 +5053,7 @@ def create_app() -> FastAPI:
         """
         try:
             from .intraday_session_engine import commit_session
-            result = commit_session(force=force)
+            result = commit_session(force=force, bypass_lock_window=force)
             if not result.get("success") and result.get("error"):
                 raise HTTPException(status_code=409, detail=result.get("error"))
             return result
@@ -5127,21 +5179,32 @@ def create_app() -> FastAPI:
                 if date
                 else _dt.now(tz=IST_ZONE).date()
             )
-            if for_date == _dt.now(tz=IST_ZONE).date():
-                from .intraday_session_engine import load_session as _load_intraday_session
+            if not force:
                 from .desk_clock import cash_session_phase as _cash_session_phase
-                from .eod_book_cache import load_book_cache as _load_book_cache
-                active_session = _load_intraday_session()
-                active_policy = str((active_session.get("pnlRecalc") or {}).get("policyVersion") or "")
-                cached_book = _load_book_cache(for_date, "intraday") or {}
-                closed_book_missing = (
-                    _cash_session_phase(for_date) == "CLOSED"
-                    and cached_book.get("afterClose") is not True
-                )
-                if force or active_policy != "post_entry_stop_only_0p5_v2" or closed_book_missing:
-                    recalculated = recalculate_live_intraday_from_candles(for_date, after_close=None)
-                    if recalculated.get("ok") and isinstance(recalculated.get("book"), dict):
-                        return recalculated["book"]
+                from .eod_book_cache import load_book_cache_fast as _load_book_cache_fast
+                if _cash_session_phase(for_date) == "CLOSED":
+                    cached_book = _load_book_cache_fast(for_date, "intraday")
+                    if cached_book is not None:
+                        return cached_book
+                    return {
+                        "date": for_date.isoformat(),
+                        "capital": 0.0,
+                        "totalDeployed": 0.0,
+                        "bookTurnover": 0.0,
+                        "totalPnl": None,
+                        "remainingCapital": 0.0,
+                        "archiveStatus": "NO_BOOK",
+                        "executionPolicy": "MANUAL_ONLY",
+                        "executionBasis": "MODELED_PAPER",
+                        "marketPhase": "CLOSED",
+                        "trades": [],
+                    }
+            if for_date == _dt.now(tz=IST_ZONE).date() and force:
+                # Candle replay is an explicit Rebuild action only. Normal EOD
+                # reads must serve the locked book cache, especially after close.
+                recalculated = recalculate_live_intraday_from_candles(for_date, after_close=None)
+                if recalculated.get("ok") and isinstance(recalculated.get("book"), dict):
+                    return recalculated["book"]
             return generate_intraday_eod_report(for_date, force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -5156,6 +5219,34 @@ def create_app() -> FastAPI:
             from datetime import date as _date
             from .eod_swing_report import generate_swing_eod_report
             for_date = _date.fromisoformat(date) if date else None
+            if not force and for_date is not None:
+                from .desk_clock import cash_session_phase as _cash_session_phase
+                from .eod_book_cache import load_book_cache_fast as _load_book_cache_fast
+                if _cash_session_phase(for_date) == "CLOSED":
+                    cached_book = _load_book_cache_fast(for_date, "swing")
+                    if cached_book is not None:
+                        return cached_book
+                    return {
+                        "date": for_date.isoformat(),
+                        "picks": [],
+                        "summary": {"note": "No cached swing book for this IST date"},
+                        "totalPicks": 0,
+                        "activePicks": 0,
+                        "skippedNotTriggered": 0,
+                        "totalDeployed": 0.0,
+                        "totalPnl": None,
+                        "totalPnlPct": None,
+                        "winCount": 0,
+                        "lossCount": 0,
+                        "bestPerformer": None,
+                        "worstPerformer": None,
+                        "pnlByDayBucket": {},
+                        "isMock": False,
+                        "symbolSource": "cache_missing",
+                        "archiveStatus": "NO_BOOK",
+                        "deskCounts": {},
+                        "attribution": {"locked": 0, "triggered": 0, "skipped": 0, "wins": 0, "losses": 0, "deployed": 0},
+                    }
             report = generate_swing_eod_report(for_date, force=force)
             if not report.get("authoritative"):
                 from .swing_v2.facade import eod_shadow_v2
