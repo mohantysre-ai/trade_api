@@ -26,7 +26,10 @@ _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 if _env_path.exists():
     try:
         from dotenv import load_dotenv
-        load_dotenv(_env_path)
+        try:
+            load_dotenv(_env_path, encoding="utf-8")
+        except UnicodeDecodeError:
+            load_dotenv(_env_path, encoding="cp1252")
         logger = logging.getLogger("ai_news_server")
         logger.info("Loaded environment from %s", _env_path)
     except ImportError:

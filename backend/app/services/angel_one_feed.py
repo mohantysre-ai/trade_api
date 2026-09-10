@@ -1955,6 +1955,7 @@ def refresh_fixed_plan_close_marks(*, force: bool = True) -> dict[str, Any]:
     Used post-close (and on demand) so INTRADAY/EOD polls see closing prints
     instead of a frozen pre-15:30 snapshot. Does not invent prices.
     """
+    log = logging.getLogger(__name__)
     global _FIXED_PLAN_QUOTE_CACHE
     if force:
         _FIXED_PLAN_QUOTE_CACHE = {}

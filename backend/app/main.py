@@ -16,7 +16,10 @@ from dotenv import load_dotenv
 # Load environment variables from backend/.env
 _env_path = Path(__file__).resolve().parent.parent / ".env"
 if _env_path.exists():
-    load_dotenv(_env_path)
+    try:
+        load_dotenv(_env_path, encoding="utf-8")
+    except UnicodeDecodeError:
+        load_dotenv(_env_path, encoding="cp1252")
 
 # Import the create_app function from the market feed service
 # which registers all API routes (market-data, news, intelligence, refresh, etc.)
