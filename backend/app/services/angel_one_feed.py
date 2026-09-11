@@ -113,6 +113,20 @@ except UnicodeDecodeError:
 NIFTY_500_CACHE_PATH = BASE_DIR / "nifty500_instruments.json"
 NIFTY_500_SYMBOLS_PATH = BASE_DIR.parent / "data" / "nifty500_symbols.json"
 NIFTY_500_LABEL = "Nifty 500"
+INTRADAY_750_CACHE_PATH = BASE_DIR / "intraday750_instruments.json"
+INTRADAY_750_LABEL = "Intraday 750"
+INTRADAY_750_INDEXES = (
+    "NIFTY 100",
+    "NIFTY MIDCAP 150",
+    "NIFTY SMALLCAP 250",
+    "NIFTY MICROCAP 250",
+)
+INTRADAY_750_CONSTITUENT_URLS = (
+    "https://www.niftyindices.com/IndexConstituent/ind_nifty100list.csv",
+    "https://www.niftyindices.com/IndexConstituent/ind_niftymidcap150list.csv",
+    "https://www.niftyindices.com/IndexConstituent/ind_niftysmallcap250list.csv",
+    "https://www.niftyindices.com/IndexConstituent/ind_niftymicrocap250_list.csv",
+)
 SCRIP_MASTER_URL = "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json"
 # Funnel: full Nifty 500 quotes → top N by volume for Asset Matrix (env: VOLUME_PRESELECT_LIMIT).
 # Swing hunt candles default to the full 500 (env: SWING_CANDIDATE_LIMIT).
@@ -800,7 +814,14 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
     """Live quote/candle refresh with LLM day-lock reuse (no force LLM)."""
     log = logging.getLogger(__name__)
     swing_hunt = reason == "swing_entry_hunt"
-    pool = NIFTY_500_LABEL if swing_hunt else ((os.getenv("MARKET_PREWORK_POOL") or NIFTY_500_LABEL).strip() or NIFTY_500_LABEL)
+    intraday_hunt = reason.startswith("intraday_")
+    pool = (
+        NIFTY_500_LABEL
+        if swing_hunt
+        else INTRADAY_750_LABEL
+        if intraday_hunt
+        else ((os.getenv("MARKET_PREWORK_POOL") or NIFTY_500_LABEL).strip() or NIFTY_500_LABEL)
+    )
     try:
         prior = _load_last_snapshot()
         client = AngelOneClient()
@@ -1070,6 +1091,8 @@ def _within_refresh_window(now: datetime | None = None) -> bool:
 def _normalize_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
     payload["rawSources"] = _news_feed_sources()
     available_pools = [pool for pool in payload.get("availablePools", []) if pool != "Nifty 50"]
+    if INTRADAY_750_LABEL not in available_pools:
+        available_pools.insert(0, INTRADAY_750_LABEL)
     if NIFTY_500_LABEL not in available_pools:
         available_pools.insert(0, NIFTY_500_LABEL)
     if NIFTY_100_LABEL not in available_pools:
@@ -1140,6 +1163,41 @@ def _load_nifty500_symbol_list() -> list[str]:
     except Exception as exc:
         logging.getLogger(__name__).warning("Failed to load Nifty 500 symbol seed: %s", exc)
         return []
+
+
+def _load_intraday750_symbol_list() -> list[str]:
+    """Load the de-duplicated Nifty 100/Midcap/Smallcap/Microcap universe."""
+    symbols: set[str] = set()
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://www.niftyindices.com/",
+        "Accept": "text/csv, text/plain, */*",
+    }
+    for url, index in zip(INTRADAY_750_CONSTITUENT_URLS, INTRADAY_750_INDEXES):
+        try:
+            response = requests.get(url, headers=headers, timeout=30)
+            response.raise_for_status()
+            reader = csv.DictReader(io.StringIO(response.text.lstrip("\ufeff")))
+            rows = {
+                str(row.get("Symbol") or row.get("SYMBOL") or "").strip().upper()
+                for row in reader
+            }
+            symbols.update(symbol for symbol in rows if symbol)
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "Official %s constituent fetch failed: %s; trying NSE API",
+                index,
+                exc,
+            )
+            symbols.update(_fetch_nse_index_symbols(index))
+    if len(symbols) >= 700:
+        return sorted(symbols)
+    logging.getLogger(__name__).warning(
+        "Intraday 750 constituent fetch returned only %d symbols; "
+        "falling back to the Nifty 500 universe.",
+        len(symbols),
+    )
+    return _load_nifty500_symbol_list()
 
 
 def _persist_nifty500_symbol_seed(symbols: list[str]) -> None:
@@ -1339,6 +1397,68 @@ def _pool_watchlist(pool_name: str | None, client: AngelOneClient | None = None)
 
     if resolved == "Nifty 50":
         resolved = NIFTY_100_LABEL
+
+    if resolved == INTRADAY_750_LABEL:
+        cached = _load_watchlist_from_cache(INTRADAY_750_CACHE_PATH)
+        if cached:
+            try:
+                cache_raw = json.loads(
+                    INTRADAY_750_CACHE_PATH.read_text(encoding="utf-8-sig")
+                )
+                refreshed = datetime.fromisoformat(
+                    str(cache_raw.get("refreshedAt")).replace("Z", "+00:00")
+                )
+                cache_age = (datetime.now(timezone.utc) - refreshed).total_seconds()
+            except (OSError, TypeError, ValueError):
+                cache_age = float("inf")
+            if len(cached) >= 700 and cache_age < 86400:
+                return cached, INTRADAY_750_LABEL
+        symbols = _load_intraday750_symbol_list()
+        token_map = _load_nse_eq_token_map(force_refresh=True)
+        instruments = _symbols_to_instruments(symbols, token_map, client=client)
+        resolved_keys = {item.key for item in instruments}
+        for symbol, security_id in load_dhan_security_ids(force=True).items():
+            if symbol in symbols and symbol not in resolved_keys:
+                instruments.append(
+                    Instrument(
+                        symbol,
+                        "NSE",
+                        f"{symbol}-EQ",
+                        f"DHAN:{security_id}",
+                        symbol,
+                    )
+                )
+                resolved_keys.add(symbol)
+        if instruments:
+            payload = {
+                "label": INTRADAY_750_LABEL,
+                "refreshedAt": datetime.now(timezone.utc).isoformat(),
+                "count": len(instruments),
+                "sourceSymbols": len(symbols),
+                "instruments": [
+                    {
+                        "key": item.key,
+                        "exchange": item.exchange,
+                        "tradingsymbol": item.tradingsymbol,
+                        "token": item.token,
+                        "label": item.label or item.key,
+                    }
+                    for item in instruments
+                ],
+            }
+            try:
+                temporary = INTRADAY_750_CACHE_PATH.with_suffix(".json.tmp")
+                temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+                os.replace(temporary, INTRADAY_750_CACHE_PATH)
+            except OSError:
+                logging.getLogger(__name__).exception(
+                    "Failed to persist %s instrument cache", INTRADAY_750_LABEL
+                )
+            return instruments, INTRADAY_750_LABEL
+        logging.getLogger(__name__).warning(
+            "%s cache could not be built; falling back to Nifty 500", INTRADAY_750_LABEL
+        )
+        resolved = NIFTY_500_LABEL
 
     if resolved == NIFTY_500_LABEL:
         nifty500 = _ensure_nifty500_cache(client)

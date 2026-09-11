@@ -3,7 +3,8 @@
 Desk automation may auto-commit after morning pre-work. Broker orders are never
 placed by this module (executionPolicy remains advisory / manual-broker).
 
-Funnel: Nifty 500 → regime → multi-factor score → entry_quality_gate →
+Funnel: Intraday 750 (Nifty 100 + Midcap 150 + Smallcap 250 + Microcap 250)
+→ regime → multi-factor score → entry_quality_gate →
   10 LONG + 10 SHORT candidate pool (20) →
   adopt highest-probability QUALIFIED 5 total → immutable JSON lock.
 
@@ -58,7 +59,8 @@ _SESSION_ROTATION_ATTEMPT_AT = 0.0
 _SESSION_ROTATION_RETRY_SEC = float(os.environ.get("INTRADAY_ROTATION_RETRY_SEC", "30"))
 _SESSION_RESPONSE_OPEN_TTL = float(os.environ.get("INTRADAY_RESPONSE_OPEN_TTL", "4"))
 _SESSION_RESPONSE_CLOSED_TTL = float(os.environ.get("INTRADAY_RESPONSE_CLOSED_TTL", "20"))
-# Live replacement hunt: rescore Nifty 500 QUALIFIED names; do not reuse 10:18 lock pools.
+# Live replacement hunt: rescore the expanded Intraday 750 QUALIFIED universe;
+# do not reuse 10:18 lock pools.
 _HUNT_TTL_SEC = float(os.environ.get("INTRADAY_HUNT_TTL", "30"))
 _SNAP_REFRESH_MIN_GAP_SEC = float(os.environ.get("INTRADAY_HUNT_REFRESH_GAP_SEC", "120"))
 _HUNT_POOL_CACHE: dict[str, Any] = {"key": "", "at": 0.0, "long": [], "short": []}
@@ -2669,7 +2671,11 @@ def _replacement_source_pools(
     session: dict[str, Any],
     snap: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
-    """Market hours: QUALIFIED names from a live Nifty 500 hunt. After hours: morning lock pools."""
+    """Market hours: QUALIFIED names from the live Intraday 750 hunt.
+
+    After hours, use the morning lock pools because no live replacement scan is
+    needed outside the trading session.
+    """
     from .trade_outcome import _is_market_open
 
     lock_long = list(session.get("candidatePoolLong") or [])
@@ -3552,7 +3558,7 @@ def propose_replacements(
 ) -> list[dict[str, Any]]:
     """Propose replacements for freed capital slots.
 
-    During RTH, hunt_pools is the live Nifty 500 QUALIFIED set. After hours
+    During RTH, hunt_pools is the live Intraday 750 QUALIFIED set. After hours
     (or when hunt_pools is omitted) uses the morning lock pools.
     Prefer cash over weak / exhausted / stale candidates. Proposal-only — does not mutate.
     Uses entry_quality_gate (EXHAUSTED / STALE / NO_EDGE / WAIT_RETEST skipped).
