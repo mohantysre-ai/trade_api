@@ -21,6 +21,8 @@ import sys
 import threading
 import time
 import uuid
+import random
+from collections import deque
 from urllib.parse import quote
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
@@ -75,6 +77,7 @@ from .market_data_provider import (
     fetch_quotes_with_failover,
     load_dhan_security_ids,
 )
+from .angel_index_stream import ANGEL_INDEX_STREAM
 from ..utils.symbols import MACRO_INSTRUMENTS, MOCK_TICKERS, NIFTY_50_KEYS, WATCHLIST, Instrument
 from .llm_client import (
     _call_openai as _llm_openai_chat,
@@ -155,11 +158,18 @@ ANGEL_API_TIMEOUT_SECONDS = int(os.getenv("ANGEL_API_TIMEOUT_SECONDS", "24"))
 LLM_CALL_TIMEOUT_SECONDS = min(max(1, int(os.getenv("LLM_CALL_TIMEOUT_SECONDS", "180"))), 300)
 QUOTE_CHUNK_SIZE = int(os.getenv("QUOTE_CHUNK_SIZE", "10"))
 INTRADAY_CHUNK_SIZE = int(os.getenv("INTRADAY_CHUNK_SIZE", "5"))
-# Global candle throttle across all threads (Angel AB1021 / ~3–5 req/s soft limit).
-CANDLE_MIN_INTERVAL_SECONDS = float(os.getenv("CANDLE_MIN_INTERVAL_SECONDS", "1.1"))
-# Extra POSTs after AB1021 make the flood worse; default is trip the circuit.
-CANDLE_RATE_LIMIT_RETRIES = int(os.getenv("CANDLE_RATE_LIMIT_RETRIES", "0"))
+# One process-wide historical gate. These defaults deliberately stay below
+# Angel's published limits because AB1021 is also observed below those limits.
+ANGEL_HIST_MAX_RPS = float(os.getenv("ANGEL_HIST_MAX_RPS", "2"))
+ANGEL_HIST_MAX_RPM = int(os.getenv("ANGEL_HIST_MAX_RPM", "100"))
+CANDLE_MIN_INTERVAL_SECONDS = float(
+    os.getenv("CANDLE_MIN_INTERVAL_SECONDS", str(1.0 / max(ANGEL_HIST_MAX_RPS, 0.1)))
+)
+CANDLE_RATE_LIMIT_RETRIES = int(os.getenv("CANDLE_RATE_LIMIT_RETRIES", "4"))
 ANGEL_CANDLE_CIRCUIT_SECONDS = float(os.getenv("ANGEL_CANDLE_CIRCUIT_SECONDS", "120"))
+ANGEL_CANDLE_CACHE_PATH = Path(
+    os.getenv("ANGEL_CANDLE_CACHE_PATH", str(BASE_DIR.parent / "data" / "angel_candle_cache.json"))
+)
 NIFTY_CACHE_EXPECTED_MIN = int(os.getenv("NIFTY_CACHE_EXPECTED_MIN", "475"))
 NIFTY_CACHE_MIN_COVERAGE_PCT = float(os.getenv("NIFTY_CACHE_MIN_COVERAGE_PCT", "99"))
 NIFTY_CACHE_MAX_AGE_SECONDS = int(os.getenv("NIFTY_CACHE_MAX_AGE_SECONDS", "86400"))
@@ -170,6 +180,12 @@ _CANDLE_THROTTLE_LOCK = threading.Lock()
 _CANDLE_LAST_CALL_MONO = 0.0
 _CANDLE_COOLDOWN_UNTIL_MONO = 0.0
 _ANGEL_CANDLE_CIRCUIT_UNTIL = 0.0
+_ANGEL_CANDLE_AB1021_COUNT = 0
+_CANDLE_CALL_TIMES: deque[float] = deque()
+_CANDLE_CACHE_LOCK = threading.RLock()
+_CANDLE_CACHE: dict[str, list[list[Any]]] | None = None
+_CANDLE_INFLIGHT: dict[str, threading.Event] = {}
+_CANDLE_INFLIGHT_RESULTS: dict[str, list[list[Any]]] = {}
 
 AI_NEWS_API_URL = os.getenv("AI_NEWS_API_URL", "http://127.0.0.1:8001")
 
@@ -923,14 +939,23 @@ def _candle_api_slot():
     def _slot():
         global _CANDLE_LAST_CALL_MONO, _CANDLE_COOLDOWN_UNTIL_MONO
         with _CANDLE_THROTTLE_LOCK:
-            now = time.monotonic()
-            wait = max(
-                0.0,
-                _CANDLE_COOLDOWN_UNTIL_MONO - now,
-                CANDLE_MIN_INTERVAL_SECONDS - (now - _CANDLE_LAST_CALL_MONO),
-            )
-            if wait > 0:
+            while True:
+                now = time.monotonic()
+                while _CANDLE_CALL_TIMES and now - _CANDLE_CALL_TIMES[0] >= 60.0:
+                    _CANDLE_CALL_TIMES.popleft()
+                waits = [
+                    _CANDLE_COOLDOWN_UNTIL_MONO - now,
+                    CANDLE_MIN_INTERVAL_SECONDS - (now - _CANDLE_LAST_CALL_MONO),
+                ]
+                if ANGEL_HIST_MAX_RPS > 0 and len(_CANDLE_CALL_TIMES) >= math.ceil(ANGEL_HIST_MAX_RPS):
+                    waits.append((_CANDLE_CALL_TIMES[-math.ceil(ANGEL_HIST_MAX_RPS)] + 1.0) - now)
+                if len(_CANDLE_CALL_TIMES) >= ANGEL_HIST_MAX_RPM:
+                    waits.append((_CANDLE_CALL_TIMES[0] + 60.0) - now)
+                wait = max(0.0, *waits)
+                if wait <= 0:
+                    break
                 time.sleep(wait)
+            _CANDLE_CALL_TIMES.append(time.monotonic())
             try:
                 yield
             finally:
@@ -975,6 +1000,65 @@ def _trip_angel_candle_circuit(seconds: float | None = None) -> None:
         )
     _ANGEL_CANDLE_CIRCUIT_UNTIL = max(_ANGEL_CANDLE_CIRCUIT_UNTIL, until)
     _trip_candle_rate_limit_cooldown(hold)
+
+
+def _record_ab1021() -> None:
+    """Open only after repeated AB1021 responses, never on the first one."""
+    global _ANGEL_CANDLE_AB1021_COUNT
+    _ANGEL_CANDLE_AB1021_COUNT += 1
+    if _ANGEL_CANDLE_AB1021_COUNT >= 2:
+        _trip_angel_candle_circuit()
+
+
+def _reset_ab1021_state() -> None:
+    global _ANGEL_CANDLE_AB1021_COUNT
+    _ANGEL_CANDLE_AB1021_COUNT = 0
+
+
+def _candle_cache_key(exchange: str, token: str, interval: str, fromdate: datetime, todate: datetime) -> str:
+    return "|".join((exchange.upper(), token, interval.upper(), fromdate.isoformat(), todate.isoformat()))
+
+
+def _candle_range_is_complete(interval: str, todate: datetime) -> bool:
+    now = datetime.now(IST_ZONE)
+    end = todate.astimezone(IST_ZONE)
+    if interval.upper() == "FIVE_MINUTE":
+        completed_boundary = now.replace(
+            minute=(now.minute // 5) * 5, second=0, microsecond=0
+        )
+        return end < completed_boundary
+    if interval.upper() == "ONE_DAY":
+        return end.date() < now.date()
+    return end < now
+
+
+def _load_candle_cache() -> dict[str, list[list[Any]]]:
+    global _CANDLE_CACHE
+    with _CANDLE_CACHE_LOCK:
+        if _CANDLE_CACHE is not None:
+            return _CANDLE_CACHE
+        try:
+            raw = json.loads(ANGEL_CANDLE_CACHE_PATH.read_text(encoding="utf-8"))
+            _CANDLE_CACHE = raw if isinstance(raw, dict) else {}
+        except (FileNotFoundError, OSError, ValueError):
+            _CANDLE_CACHE = {}
+        return _CANDLE_CACHE
+
+
+def _cached_candles(key: str) -> list[list[Any]] | None:
+    with _CANDLE_CACHE_LOCK:
+        rows = _load_candle_cache().get(key)
+        return [list(row) for row in rows] if isinstance(rows, list) else None
+
+
+def _store_cached_candles(key: str, rows: list[list[Any]]) -> None:
+    with _CANDLE_CACHE_LOCK:
+        cache = _load_candle_cache()
+        cache[key] = rows
+        ANGEL_CANDLE_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temporary = ANGEL_CANDLE_CACHE_PATH.with_suffix(ANGEL_CANDLE_CACHE_PATH.suffix + ".tmp")
+        temporary.write_text(json.dumps(cache, separators=(",", ":")), encoding="utf-8")
+        os.replace(temporary, ANGEL_CANDLE_CACHE_PATH)
 
 
 def _is_candle_rate_limited(response_or_exc: Any) -> bool:
@@ -2533,6 +2617,46 @@ class AngelOneClient:
         fromdate: datetime,
         todate: datetime,
     ) -> list[list[Any]]:
+        if symboltoken.startswith("DHAN:"):
+            return self._fetch_candles_remote(exchange, symboltoken, interval, fromdate, todate)
+        key = _candle_cache_key(exchange, symboltoken, interval, fromdate, todate)
+        cacheable = _candle_range_is_complete(interval, todate)
+        if cacheable:
+            cached = _cached_candles(key)
+            if cached is not None:
+                return cached
+        with _CANDLE_CACHE_LOCK:
+            event = _CANDLE_INFLIGHT.get(key)
+            if event is None:
+                event = threading.Event()
+                _CANDLE_INFLIGHT[key] = event
+                leader = True
+            else:
+                leader = False
+        if not leader:
+            event.wait()
+            with _CANDLE_CACHE_LOCK:
+                return [list(row) for row in _CANDLE_INFLIGHT_RESULTS.get(key, [])]
+        try:
+            rows = self._fetch_candles_remote(exchange, symboltoken, interval, fromdate, todate)
+            with _CANDLE_CACHE_LOCK:
+                _CANDLE_INFLIGHT_RESULTS[key] = rows
+            if cacheable and rows:
+                _store_cached_candles(key, rows)
+            return rows
+        finally:
+            with _CANDLE_CACHE_LOCK:
+                _CANDLE_INFLIGHT.pop(key, None)
+                event.set()
+
+    def _fetch_candles_remote(
+        self,
+        exchange: str,
+        symboltoken: str,
+        interval: str,
+        fromdate: datetime,
+        todate: datetime,
+    ) -> list[list[Any]]:
         log = logging.getLogger(__name__)
         if symboltoken.startswith("DHAN:"):
             try:
@@ -2559,23 +2683,21 @@ class AngelOneClient:
                         smart = self.connect()
                         response = smart.getCandleData(params)
                     except Exception as exc:
-                        # Trip while the global request mutex is still held.
-                        # Otherwise a queued caller can escape in the tiny gap
-                        # between the HTTP return and the outer exception path.
                         if _is_candle_rate_limited(exc):
-                            _trip_angel_candle_circuit()
+                            _record_ab1021()
                         raise
                     if _is_candle_rate_limited(response):
                         # Same protection for SmartAPI's HTTP-200 error body.
-                        _trip_angel_candle_circuit()
+                        _record_ab1021()
             except Exception as exc:
                 if self._is_auth_error(exc) and not auth_retried:
                     auth_retried = True
                     self._reset_connection()
                     continue
                 if _is_candle_rate_limited(exc) and attempt < CANDLE_RATE_LIMIT_RETRIES:
-                    delay = min(8.0, (2 ** attempt) + (0.1 * attempt))
-                    _trip_angel_candle_circuit(max(delay, ANGEL_CANDLE_CIRCUIT_SECONDS))
+                    if not _angel_candle_calls_allowed():
+                        return []
+                    delay = min(20.0, 2 ** (attempt + 1)) + random.uniform(0.1, 0.8)
                     log.warning(
                         "Angel candle rate-limited (token=%s interval=%s); retry in %.1fs (%d/%d)",
                         symboltoken, interval, delay, attempt + 1, CANDLE_RATE_LIMIT_RETRIES,
@@ -2589,11 +2711,13 @@ class AngelOneClient:
             if not isinstance(response, dict):
                 return []
             if response.get("status"):
+                _reset_ab1021_state()
                 data = response.get("data") or []
                 return data if isinstance(data, list) else []
             if _is_candle_rate_limited(response) and attempt < CANDLE_RATE_LIMIT_RETRIES:
-                delay = min(8.0, (2 ** attempt) + (0.1 * attempt))
-                _trip_angel_candle_circuit(max(delay, ANGEL_CANDLE_CIRCUIT_SECONDS))
+                if not _angel_candle_calls_allowed():
+                    return []
+                delay = min(20.0, 2 ** (attempt + 1)) + random.uniform(0.1, 0.8)
                 log.warning(
                     "Angel candle AB1021 (token=%s interval=%s); backoff %.1fs (%d/%d)",
                     symboltoken, interval, delay, attempt + 1, CANDLE_RATE_LIMIT_RETRIES,
@@ -3212,6 +3336,12 @@ def _intraday_metrics(
         )
         daily_to = now
 
+        ANGEL_INDEX_STREAM.ensure(
+            client,
+            [{"exchange": inst.exchange, "token": inst.token, "candleKey": inst.key, "kind": "EQUITY"}],
+        )
+        stream_raw = ANGEL_INDEX_STREAM.candles(inst.key)
+
         dhan_id = load_dhan_security_ids().get(inst.key) if dhan_configured() else None
         tried_dhan = bool(dhan_id)
         if dhan_id:
@@ -3230,6 +3360,8 @@ def _intraday_metrics(
             intraday_raw = fetch_nse_candles(
                 inst.key, inst.token, "FIVE_MINUTE", market_open, now
             )
+        if stream_raw:
+            intraday_raw = stream_raw
         # Batch hunt skips Angel when a Dhan id exists (AB1021). Drawer single-name
         # fetches may force Angel so ATR/turnover are not left blank.
         allow_angel = force_angel_fallback or not tried_dhan

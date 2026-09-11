@@ -1,12 +1,19 @@
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
+import time
 
 from app.services import angel_one_feed as feed
 
 
 def _reset_circuit() -> None:
     feed._ANGEL_CANDLE_CIRCUIT_UNTIL = 0.0
+    feed._ANGEL_CANDLE_AB1021_COUNT = 0
     feed._CANDLE_COOLDOWN_UNTIL_MONO = 0.0
     feed._CANDLE_LAST_CALL_MONO = 0.0
+    feed._CANDLE_CALL_TIMES.clear()
+    feed._CANDLE_CACHE = {}
+    feed._CANDLE_INFLIGHT.clear()
+    feed._CANDLE_INFLIGHT_RESULTS.clear()
 
 
 def test_ab1021_opens_circuit_and_skips_further_angel_posts(monkeypatch):
@@ -30,11 +37,11 @@ def test_ab1021_opens_circuit_and_skips_further_angel_posts(monkeypatch):
     now = datetime(2026, 8, 17, 11, 9, tzinfo=feed.IST_ZONE)
 
     assert client.fetch_candles("NSE", "317", "ONE_DAY", now, now) == []
-    assert len(calls) == 1
+    assert len(calls) == 2
     assert feed._angel_candle_calls_allowed() is False
 
     assert client.fetch_candles("NSE", "318", "ONE_DAY", now, now) == []
-    assert len(calls) == 1
+    assert len(calls) == 2
 
 
 def test_dhan_mapped_symbol_does_not_fall_back_to_angel(monkeypatch):
@@ -95,3 +102,48 @@ def test_nse_daily_skips_angel_one_day(monkeypatch):
     )
     assert nse_intervals == ["ONE_DAY", "FIVE_MINUTE"]
     assert angel_intervals == ["FIVE_MINUTE"]
+
+
+def test_completed_range_is_cached(monkeypatch, tmp_path):
+    _reset_circuit()
+    monkeypatch.setattr(feed, "ANGEL_CANDLE_CACHE_PATH", tmp_path / "candles.json")
+    calls = []
+
+    class DummySmart:
+        def getCandleData(self, params):
+            calls.append(params)
+            return {"status": True, "data": [["2026-08-17 09:15", 1, 2, 1, 2, 10]]}
+
+    client = object.__new__(feed.AngelOneClient)
+    monkeypatch.setattr(client, "connect", lambda: DummySmart())
+    start = datetime(2026, 8, 17, 9, 15, tzinfo=feed.IST_ZONE)
+    end = datetime(2026, 8, 17, 9, 29, tzinfo=feed.IST_ZONE)
+
+    assert client.fetch_candles("NSE", "317", "FIVE_MINUTE", start, end)
+    assert client.fetch_candles("NSE", "317", "FIVE_MINUTE", start, end)
+    assert len(calls) == 1
+
+
+def test_concurrent_same_range_is_single_flight(monkeypatch, tmp_path):
+    _reset_circuit()
+    monkeypatch.setattr(feed, "ANGEL_CANDLE_CACHE_PATH", tmp_path / "candles.json")
+    calls = []
+
+    class DummySmart:
+        def getCandleData(self, params):
+            calls.append(params)
+            time.sleep(0.05)
+            return {"status": True, "data": [["2026-08-17 09:15", 1, 2, 1, 2, 10]]}
+
+    client = object.__new__(feed.AngelOneClient)
+    monkeypatch.setattr(client, "connect", lambda: DummySmart())
+    start = datetime(2026, 8, 17, 9, 15, tzinfo=feed.IST_ZONE)
+    end = datetime(2026, 8, 17, 9, 29, tzinfo=feed.IST_ZONE)
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        results = list(executor.map(
+            lambda _: client.fetch_candles("NSE", "317", "FIVE_MINUTE", start, end),
+            range(5),
+        ))
+
+    assert len(calls) == 1
+    assert all(result == results[0] for result in results)

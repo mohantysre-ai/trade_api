@@ -194,14 +194,18 @@ class AngelIndexStream:
             wanted = self._wanted.get((int(message.get("exchange_type") or 0), token))
             if not wanted:
                 wanted = next((value for (_, wanted_token), value in self._wanted.items() if wanted_token == token), None)
-            index_key = str((wanted or {}).get("indexKey") or "")
-            if not index_key or str((wanted or {}).get("kind")) != "INDEX":
+            candle_key = str(
+                (wanted or {}).get("candleKey")
+                or ((wanted or {}).get("indexKey") if str((wanted or {}).get("kind")) == "INDEX" else "")
+                or ""
+            )
+            if not candle_key:
                 return
             stamp = now.astimezone(IST_ZONE)
             minute = stamp.minute - stamp.minute % 5
             bucket = stamp.replace(minute=minute, second=0, microsecond=0)
             bucket_key = bucket.isoformat()
-            bars = self._bars.setdefault(index_key, {})
+            bars = self._bars.setdefault(candle_key, {})
             current = bars.get(bucket_key)
             if current is None:
                 bars[bucket_key] = [bucket_key, ltp, ltp, ltp, ltp, 0]
