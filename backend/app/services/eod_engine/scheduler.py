@@ -403,7 +403,11 @@ def _maybe_auto_commit(now: datetime) -> None:
                 _mark_stage(now, "session_commit", status="pending", error=str(err))
                 # Pool often empty when macros/regime mis-parsed or snapshot thin —
                 # kick a live refresh so the next tick can adopt.
-                if "Insufficient candidate" in str(err) or "Could not adopt" in str(err):
+                if (
+                    "Insufficient candidate" in str(err)
+                    or "Could not adopt" in str(err)
+                    or "EMPTY_UNIVERSE" in str(err)
+                ):
                     try:
                         from ..angel_one_feed import run_scheduled_live_refresh
 

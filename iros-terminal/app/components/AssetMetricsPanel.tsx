@@ -1146,9 +1146,9 @@ export default function AssetMetricsPanel({
   const staleLocked = Boolean(session?.locked && sessionDate && sessionDate !== istToday);
   // After close / overnight: keep showing the locked basket (SESSION CLOSED + last LTP).
   // Never fall back to candidates while a lock exists — candidates hardcode RUNNING.
-  const showLockedBasket = Boolean(
-    session?.locked && ((session?.long?.length ?? 0) > 0 || (session?.short?.length ?? 0) > 0),
-  );
+  // A lock with 0 adopted names (cash held) is still a locked session and must
+  // show an honest empty book, not the raw unlocked research candidate rows.
+  const showLockedBasket = Boolean(session?.locked);
   const locked = lockedToday;
   const displayLong = showLockedBasket ? (session?.long || []) : (candidates?.proposedLong || []);
   const displayShort = showLockedBasket ? (session?.short || []) : (candidates?.proposedShort || []);
@@ -1195,7 +1195,9 @@ export default function AssetMetricsPanel({
 
   const emptyHint = showLockedBasket
     ? lockedToday
-      ? 'No locked positions —'
+      ? session?.shortCashReason || session?.cashHeld
+        ? `Locked ${sessionDate} · cash held — ${session?.shortCashReason || 'no qualified names'}`
+        : 'No locked positions —'
       : `Locked ${sessionDate} · close marks (rotate next session for a new basket)`
     : candidates?.error
       ? `Candidates unavailable — ${candidates.error}`

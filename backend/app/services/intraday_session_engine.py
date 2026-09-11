@@ -100,6 +100,11 @@ MAX_PRICE = float(os.environ.get("INTRADAY_MAX_PRICE", "10000"))
 MIN_ATR_PCT = float(os.environ.get("INTRADAY_MIN_ATR_PCT", "0.8"))
 MAX_ATR_PCT = float(os.environ.get("INTRADAY_MAX_ATR_PCT", "12"))
 SNAPSHOT_STALE_SEC = int(os.environ.get("INTRADAY_SNAPSHOT_STALE_SEC", "900"))
+# A healthy universe scores well over a hundred names per side even on quiet
+# days (filters/gates reject the rest) — an empty candidate pool on both sides
+# means the feed/universe was broken at commit time, not that there is
+# genuinely no edge. Guard against permanently locking that as a 0/0 basket.
+INTRADAY_MIN_COMMIT_UNIVERSE = int(os.environ.get("INTRADAY_MIN_COMMIT_UNIVERSE", "50"))
 
 # Codex §6 weights (env-overridable starting params — not proven optimal)
 W_REGIME = float(os.environ.get("INTRADAY_W_REGIME", "15"))
@@ -414,10 +419,10 @@ def save_session(payload: dict[str, Any]) -> None:
     payload_date = _session_date(payload)
     existing_date = _session_date(existing)
 
-    if payload.get("locked") and payload_date != today:
+    if payload.get("locked") and payload_date and payload_date != today:
         raise RuntimeError(
             "Refusing to persist a locked stale Intraday session: "
-            f"{payload_date or '<missing>'} != {today}"
+            f"{payload_date} != {today}"
         )
 
     if (
@@ -2925,6 +2930,28 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
         }
     pool_long = candidates.get("proposedLong") or []
     pool_short = candidates.get("proposedShort") or []
+    universe_size = int((candidates.get("funnel") or {}).get("universe") or 0)
+    if not pool_long and not pool_short and universe_size < INTRADAY_MIN_COMMIT_UNIVERSE:
+        # Every stock in the universe scored/filtered to nothing on both sides —
+        # this is a broken/empty feed snapshot, not a legitimate no-edge verdict.
+        # Refuse to permanently lock a 0/0 basket for the whole day; let the
+        # caller retry once a healthy snapshot is available.
+        log.warning(
+            "Intraday commit refused: empty candidate pool with universe=%d "
+            "(< min %d) — suspected feed/universe failure, not a no-edge day",
+            universe_size,
+            INTRADAY_MIN_COMMIT_UNIVERSE,
+        )
+        return {
+            "success": False,
+            "error": (
+                "EMPTY_UNIVERSE — basket not committed; candidate universe "
+                f"({universe_size} names) is too small to trust a cash-only lock."
+            ),
+            "session": existing,
+            "snapshotUpdatedAt": candidates.get("snapshotUpdatedAt"),
+            "funnel": candidates.get("funnel"),
+        }
     long_rows = candidates.get("adoptLong") or []
     short_rows = candidates.get("adoptShort") or []
     regime = candidates.get("regime") or {}
