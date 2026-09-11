@@ -118,7 +118,7 @@ def start_eod_scheduler() -> None:
     msg = (
         f"Desk automation started "
         f"(pre-work {_PREWORK_HOUR:02d}:{_PREWORK_MINUTE:02d} · "
-        f"lock {lw['lockStart']}–{lw['lockEnd']} catch-up≤{lw['catchupUntil']} · "
+        f"lock {lw['lockStart']}-{lw['lockEnd']} catch-up<={lw['catchupUntil']} · "
         f"midday {_MIDDAY_TIMES} · "
         f"close 15:31 · EOD 15:35 · PM-LLM {_PM_LLM_HOUR:02d}:{_PM_LLM_MINUTE:02d} IST)"
     )

@@ -5612,12 +5612,14 @@ def create_app() -> FastAPI:
         try:
             from .intraday_session_engine import (
                 _invalidate_session_response_cache,
+                ensure_intraday_session_locked,
                 refresh_session_state,
             )
             from .cross_book_resolution import reconcile_cross_book
 
             reconcile_cross_book(_ist_now().date().isoformat(), persist=True)
             _invalidate_session_response_cache()
+            ensure_intraday_session_locked()
             refresh_session_state()
         except Exception:
             logging.getLogger(__name__).exception("boot persist session JSON failed")

@@ -410,7 +410,7 @@ def _invalidate_session_response_cache() -> None:
         _SESSION_RESPONSE_CACHE_AT = 0.0
 
 
-def save_session(payload: dict[str, Any]) -> None:
+def save_session(payload: dict[str, Any], force: bool = False) -> None:
     if not isinstance(payload, dict):
         raise TypeError("Intraday session payload must be a JSON object")
 
@@ -419,7 +419,7 @@ def save_session(payload: dict[str, Any]) -> None:
     payload_date = _session_date(payload)
     existing_date = _session_date(existing)
 
-    if payload.get("locked") and payload_date and payload_date != today:
+    if not force and payload.get("locked") and payload_date and payload_date != today:
         raise RuntimeError(
             "Refusing to persist a locked stale Intraday session: "
             f"{payload_date} != {today}"
@@ -479,13 +479,16 @@ def _persist_if_close_transition(session: dict[str, Any], long_rows: list[dict[s
     """
     if not session.get("locked"):
         return
+    payload_date = _session_date(session)
+    today = _ist_now().strftime("%Y-%m-%d")
+    force_persist = bool(session.get("locked") and payload_date and payload_date != today)
     for side_key, rows in (("long", long_rows), ("short", short_rows)):
         orig_rows = session.get(side_key) or []
         for idx, row in enumerate(rows):
             if idx >= len(orig_rows):
                 if row.get("closed") or str(row.get("status") or "").upper() not in ("", "RUNNING"):
                     session["updatedAt"] = _utc_now_iso()
-                    save_session(session)
+                    save_session(session, force=force_persist)
                     return
             else:
                 prev = orig_rows[idx]
@@ -496,7 +499,7 @@ def _persist_if_close_transition(session: dict[str, Any], long_rows: list[dict[s
                     or prev.get("slotStatus") != row.get("slotStatus")
                 ):
                     session["updatedAt"] = _utc_now_iso()
-                    save_session(session)
+                    save_session(session, force=force_persist)
                     return
 
 

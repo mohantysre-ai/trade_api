@@ -13,10 +13,20 @@ import uvicorn
 from pathlib import Path
 from dotenv import load_dotenv
 
+def _load_env(path: Path) -> None:
+    for enc in ("utf-8", "cp1252"):
+        try:
+            load_dotenv(path, encoding=enc)
+            return
+        except UnicodeDecodeError:
+            continue
+        except Exception:
+            raise
+
 # Load environment variables from backend/.env
 _env_path = Path(__file__).resolve().parent.parent / ".env"
 if _env_path.exists():
-    load_dotenv(_env_path)
+    _load_env(_env_path)
 
 # Import the create_app function from the market feed service
 # which registers all API routes (market-data, news, intelligence, refresh, etc.)
