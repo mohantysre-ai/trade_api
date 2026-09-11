@@ -329,11 +329,38 @@ def load_session() -> dict[str, Any]:
         return {}
 
 
+def _session_date(session: dict[str, Any] | None) -> str:
+    if not isinstance(session, dict):
+        return ""
+    return str(session.get("sessionDate") or "").strip()[:10]
+
+
+def _session_has_book_rows(session: dict[str, Any] | None) -> bool:
+    if not isinstance(session, dict):
+        return False
+    return any(
+        isinstance(session.get(key), list) and bool(session.get(key))
+        for key in ("long", "short")
+    )
+
+
+def _session_persistence_allowed(session: dict[str, Any]) -> bool:
+    """Only durable-write today's locked Intraday book.
+
+    Market snapshots may be refreshed independently. A stale or empty session
+    must never become the authoritative Intraday book through reconciliation.
+    """
+    if not session.get("locked"):
+        return True
+    return _session_date(session) == _ist_now().strftime("%Y-%m-%d")
+
+
 def _ensure_current_exit_policy(session: dict[str, Any], *, persist: bool = False) -> dict[str, Any]:
     """Apply current SCALE_TRAIL notes/ratchet in memory. Path replay + disk write only on persist."""
     work = dict(session)
     changed = False
     quotes: dict[str, Any] = {}
+    persist = persist and _session_persistence_allowed(work)
     if persist:
         snap = load_market_snapshot()
         quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
@@ -379,6 +406,54 @@ def _invalidate_session_response_cache() -> None:
 
 
 def save_session(payload: dict[str, Any]) -> None:
+    if not isinstance(payload, dict):
+        raise TypeError("Intraday session payload must be a JSON object")
+
+    existing = load_session()
+    today = _ist_now().strftime("%Y-%m-%d")
+    payload_date = _session_date(payload)
+    existing_date = _session_date(existing)
+
+    if payload.get("locked") and payload_date != today:
+        raise RuntimeError(
+            "Refusing to persist a locked stale Intraday session: "
+            f"{payload_date or '<missing>'} != {today}"
+        )
+
+    if (
+        existing.get("locked")
+        and existing_date == today
+        and _session_has_book_rows(existing)
+        and not _session_has_book_rows(payload)
+    ):
+        raise RuntimeError(
+            "Refusing to replace today's non-empty Intraday book with an empty book"
+        )
+
+    existing_symbols = {
+        str(row.get("symbol") or "").upper()
+        for key in ("long", "short")
+        for row in (existing.get(key) or [])
+        if isinstance(row, dict) and row.get("symbol")
+    }
+    payload_symbols = {
+        str(row.get("symbol") or "").upper()
+        for key in ("long", "short")
+        for row in (payload.get(key) or [])
+        if isinstance(row, dict) and row.get("symbol")
+    }
+    if (
+        existing.get("locked")
+        and existing_date == today
+        and existing_symbols
+        and payload.get("locked")
+        and payload_symbols
+        and not payload_symbols.intersection(existing_symbols)
+    ):
+        raise RuntimeError(
+            "Refusing to replace today's Intraday book with a disjoint symbol set"
+        )
+
     _atomic_write(_SESSION_FILE, payload)
     # Explicit mutations invalidate the response snapshot. The computing caller
     # will republish a fresh value after its state transition finishes.
