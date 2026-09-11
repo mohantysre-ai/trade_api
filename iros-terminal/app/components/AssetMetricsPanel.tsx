@@ -1071,6 +1071,7 @@ export default function AssetMetricsPanel({
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch synchronizes this panel with the live session on mount
     void loadSession();
     void loadCandidates();
     const clockId = window.setInterval(() => setClock(formatIstNow()), 15_000);
@@ -1079,6 +1080,7 @@ export default function AssetMetricsPanel({
 
   useEffect(() => {
     if (!refreshToken) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch synchronizes this panel when the parent-driven refreshToken changes
     void loadSession();
     void loadCandidates();
     void loadResearch();
@@ -1134,6 +1136,7 @@ export default function AssetMetricsPanel({
         month: '2-digit',
         day: '2-digit',
       }).format(new Date()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clock is a tick trigger so istToday rolls over at midnight IST, not itself read in the body
     [clock],
   );
   const sessionDate = String(session?.sessionDate || '').slice(0, 10);
