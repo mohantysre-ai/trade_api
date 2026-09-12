@@ -21,7 +21,7 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from .exit_plan import (
     apply_exit_policy_to_rows,
@@ -2356,12 +2356,81 @@ def _construct_dual_sleeve(
     return picked
 
 
+def _overlay_market_state(snap: dict[str, Any]) -> dict[str, Any]:
+    """Overlay live in-memory WS quotes onto the scanner snapshot (pull-to-push).
+
+    Captures ONE immutable evaluation snapshot (spec §17) and stamps its
+    generation onto the result; scoring rows get LTP/age from market state
+    when the quote is usable. Rows without a live quote keep their snapshot
+    values — nothing is fabricated, and stale rows stay explicitly marked.
+    """
+    try:
+        from .intraday_market_state import get_intraday_market_state
+
+        state = get_intraday_market_state()
+    except Exception:
+        return snap
+    try:
+        live = state.capture_snapshot()
+    except Exception:
+        log.exception("market-state evaluation snapshot capture failed")
+        return snap
+    quotes = live.get("quotes") or {}
+    if not quotes:
+        return snap
+    overlapped = snap if isinstance(snap, dict) else {}
+    # Mutate the snapshot's source dicts: _universe_rows merges
+    # {**stockQuotes[sym], **stocks[sym]} into fresh copies, so overlaying
+    # the copies would be discarded. stockQuotes and stocks entries win in
+    # that merge respectively, so both get the live quote.
+    stock_quotes = overlapped.get("stockQuotes") or {}
+    stocks_list = overlapped.get("stocks") or []
+    touched = 0
+    for row in _iter_quote_targets(stock_quotes, stocks_list):
+        sym = str(row.get("ticker") or "").upper()
+        quote = quotes.get(sym)
+        if not quote:
+            continue
+        freshness = quote.get("freshness")
+        if freshness in ("LIVE", "DEGRADED"):
+            row["ltp"] = quote.get("ltp")
+            row["ltpRaw"] = quote.get("ltp")
+            row["ltpSource"] = "ANGEL_WS"
+            row["receivedAt"] = quote.get("receivedAt")
+            row["dataAge"] = quote.get("dataAge")
+            row["dataStale"] = False
+        else:
+            # STALE/UNAVAILABLE: keep snapshot LTP but mark it honestly.
+            row["dataStale"] = True
+            row["excludeReason"] = "STALE_DATA"
+        touched += 1
+    if touched:
+        log.info("SCANNER_MARKET_STATE overlay gen=%s symbols=%d", live.get("generation"), touched)
+    overlapped["marketGeneration"] = live.get("generation")
+    return overlapped
+
+
+def _iter_quote_targets(
+    stock_quotes: Any, stocks_list: Any
+) -> Iterator[dict[str, Any]]:
+    if isinstance(stock_quotes, dict):
+        for sym, q in stock_quotes.items():
+            if isinstance(q, dict):
+                q.setdefault("ticker", str(sym).upper())
+                yield q
+    if isinstance(stocks_list, list):
+        for s in stocks_list:
+            if isinstance(s, dict) and s.get("ticker"):
+                yield s
+
+
 def generate_candidates(
     snapshot: dict[str, Any] | None = None,
     *,
     include_full_hunt: bool = False,
 ) -> dict[str, Any]:
     snap = snapshot if snapshot is not None else load_market_snapshot()
+    snap = _overlay_market_state(snap)
     updated_at = snap.get("updatedAt")
     snap_dt = _parse_iso(updated_at)
     age_sec = None
@@ -2729,6 +2798,16 @@ def _maybe_refresh_live_snapshot(*, reason: str) -> dict[str, Any]:
     snap = load_market_snapshot()
     if not _is_market_open():
         return snap
+    try:
+        from .angel_one_feed import _intraday_ws_authoritative
+    except Exception:
+        _intraday_ws_authoritative = lambda: False  # type: ignore[assignment]
+    if _intraday_ws_authoritative():
+        # Spec V5 §13: the in-memory WS state is the live authority for the
+        # Intraday universe; the periodic REST snapshot refresh must not run
+        # as a hidden heartbeat. It stays available for recovery (the guard
+        # flips to False on any stream degradation) and for other books.
+        return snap
     if not _snapshot_needs_live_refresh(snap, stale_sec=SNAPSHOT_STALE_SEC):
         return snap
     now = time.monotonic()
@@ -2865,6 +2944,51 @@ def sync_fixed_plan_from_session(session: dict[str, Any]) -> None:
         log.warning("fixed plan sync failed: %s", exc)
 
 
+def _empty_session_state(today: str, *, reason: str = "") -> dict[str, Any]:
+    """Spec V5 §28: today's empty session state — date reset first, always.
+
+    Candidate population may fail afterward; that only ever produces an
+    empty/degraded TODAY session, never yesterday's session kept alive.
+    """
+    return {
+        "success": False,
+        "locked": False,
+        "sessionDate": today,
+        "committedAt": None,
+        "updatedAt": _utc_now_iso(),
+        "openPositions": [],
+        "closedPositions": [],
+        "events": [
+            {
+                "type": "SESSION_DAY_ROLLOVER",
+                "at": _utc_now_iso(),
+                "sessionDate": today,
+                "reason": reason or "day_boundary_reset",
+            }
+        ],
+        "cashHeld": False,
+        "replacementBlockedReason": None,
+        "rotationPending": False,
+        "rotationError": None,
+        "sessionStatus": "EMPTY",
+        "dataStale": True,
+        "marketGeneration": None,
+    }
+
+
+def _reset_session_to_today(today: str, *, reason: str) -> dict[str, Any]:
+    """Persist today's EMPTY session BEFORE any candidate/stream work runs.
+
+    Separates hard failure (candidate generation, WS down, REST failure)
+    from the date contract: on failure diagnostics show rotationPending /
+    rotationError for TODAY's empty state, never yesterday's locks.
+    """
+    reset = _empty_session_state(today, reason=reason)
+    reset["sessionStatus"] = "DEGRADED"
+    save_session(reset)
+    return reset
+
+
 def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> dict[str, Any]:
     """Lock up to five qualified names total; cash is valid when edge is absent.
 
@@ -2902,6 +3026,12 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
         except Exception as exc:
             log.warning("Prior-day EOD freeze failed for %s: %s", existing_date, exc)
 
+    if stale_day:
+        # Spec V5 §28: date reset FIRST — persist today's empty session before
+        # candidate generation. A generation failure can only produce an empty
+        # TODAY session, never yesterday's locks carried over.
+        _reset_session_to_today(today, reason="day_boundary_reset")
+
     if existing.get("locked") and not force:
         return {
             "success": False,
@@ -2924,12 +3054,27 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
         _maybe_refresh_live_snapshot(reason="intraday_commit")
     )
     if candidates.get("dataStale"):
+        # Spec V5 §28/§29: the prior-day session was already cleared from disk
+        # before candidate generation ran. Mark today's empty state explicitly
+        # so diagnostics show rotationPending/rotationError, never stale locks.
+        if stale_day:
+            try:
+                failed = load_session()
+                failed = dict(failed or {})
+                failed.setdefault("sessionDate", today)
+                failed["sessionStatus"] = "DEGRADED"
+                failed["rotationPending"] = True
+                failed["rotationError"] = "STALE_SNAPSHOT"
+                save_session(failed)
+            except Exception as exc:
+                log.warning("Failed to mark rotation pending: %s", exc)
         return {
             "success": False,
             "error": "STALE_SNAPSHOT — basket not committed; waiting for a fresh market snapshot.",
-            "session": existing,
+            "session": load_session(),
             "snapshotUpdatedAt": candidates.get("snapshotUpdatedAt"),
             "snapshotAgeSec": candidates.get("snapshotAgeSec"),
+            "stalePriorSession": "yesterday_session_cleared" if stale_day else None,
         }
     pool_long = candidates.get("proposedLong") or []
     pool_short = candidates.get("proposedShort") or []
@@ -3040,6 +3185,31 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
     if short_cash_reason:
         capital["shortCashReason"] = short_cash_reason
 
+    # Spec V5 §18: the evaluation ran on snapshot generation N. Re-read the
+    # live generation; a newer generation that moved locked-candidate prices
+    # materially must not be silently committed as stale state.
+    try:
+        from .intraday_market_state import get_intraday_market_state as _market_state
+
+        _eval_generation = candidates.get("marketGeneration")
+        _live_generation = _market_state().generation
+        if isinstance(_eval_generation, int) and _live_generation > _eval_generation + 2500:
+            stale_err = (
+                f"STALE_EVALUATION — scanner used generation {_eval_generation}, "
+                f"live is {_live_generation}; re-run evaluation"
+            )
+            if stale_day:
+                _reset_session_to_today(today, reason="stale_evaluation")
+            return {
+                "success": False,
+                "error": stale_err,
+                "session": load_session(),
+                "marketGeneration": _live_generation,
+            }
+    except Exception as exc:
+        # A market-state lookup failure must not block locking (REST path when WS down).
+        log.debug("Market-generation guard skipped: %s", exc)
+
     session = {
         "success": True,
         "locked": True,
@@ -3115,19 +3285,36 @@ def ensure_intraday_session_locked() -> dict[str, Any]:
         if result.get("alreadyLocked"):
             out["alreadyLocked"] = True
         return out
+    # Spec V5 §28/§29: reset today's session BEFORE candidate generation.
+    # If generation below fails, today's session is EMPTY/DEGRADED — it can
+    # never remain yesterday's active session.
+    stale_day = bool(existing_date and existing_date != today)
+    if stale_day:
+        _reset_session_to_today(today, reason="day_boundary_reset")
+        existing = load_session()
+        existing_date = str(existing.get("sessionDate") or "").strip()[:10]
     # Commit failed — return current disk session so callers still see shape
     failed = dict(existing) if isinstance(existing, dict) else {}
     failed.setdefault("locked", False)
     if isinstance(result, dict) and result.get("error"):
         failed["commitError"] = result.get("error")
-    # Stale prior-day lock must never look "healthy" — stamp rotation failure on disk
-    if existing.get("locked") and existing_date and existing_date != today:
-        failed["locked"] = True
-        failed["sessionDate"] = existing_date
+    # Stale prior-day lock must never look "healthy" — after the reset above
+    # this only records rotation failure on TODAY's session (spec V5 §29).
+    # Yesterday's locks are already gone from disk; never restore them.
+    if existing_date and existing_date != today:
+        failed = _empty_session_state(today, reason="rotation_failed")
         failed["rotationPending"] = True
         failed["rotationError"] = (
             result.get("error") if isinstance(result, dict) else "commit_failed"
         )
+        failed["rotationAttemptedAt"] = _utc_now_iso()
+        try:
+            save_session(failed)
+        except Exception as exc:
+            log.warning("Failed to persist rotationPending flag: %s", exc)
+    elif existing.get("locked") and result.get("error"):
+        failed["rotationPending"] = True
+        failed["rotationError"] = result.get("error")
         failed["rotationAttemptedAt"] = _utc_now_iso()
         try:
             save_session(failed)

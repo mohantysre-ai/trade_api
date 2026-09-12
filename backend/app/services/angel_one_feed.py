@@ -1731,6 +1731,27 @@ _LIVE_REFRESH_KICKED_AT = 0.0
 _LIVE_REFRESH_KICK_GAP_SEC = float(os.environ.get("DESK_LIVE_REFRESH_KICK_GAP_SEC", "30"))
 
 
+def _intraday_ws_authoritative() -> bool:
+    """True when the Intraday WS stream is connected and covering its universe.
+
+    Spec V5 §13: with the in-memory live state healthy, periodic REST
+    snapshot refreshes must NOT fire as a hidden live-price heartbeat.  Any
+    failure to even evaluate stream health returns False so the legacy REST
+    heartbeat still operates (safe fallback, not a silent stall).
+    """
+    try:
+        from .intraday_market_state import get_intraday_market_state
+
+        status = get_intraday_market_state().stream_status()
+    except Exception:
+        return False
+    if not status.get("wsConnected"):
+        return False
+    expected = int(status.get("symbolsExpected") or 0)
+    fresh = int(status.get("symbolsLive") or 0)
+    return expected > 0 and fresh >= int(expected * 0.90)
+
+
 def kick_background_live_refresh(*, reason: str) -> None:
     """Coalesce async snapshot refresh for prefer-cache / read paths."""
     global _LIVE_REFRESH_KICKED_AT
@@ -5057,6 +5078,20 @@ def create_app() -> FastAPI:
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    @app.get("/api/intraday/market-state")
+    def intraday_market_state() -> dict[str, Any]:
+        """Compact operational diagnostic for the intraday live market state."""
+        try:
+            from .intraday_market_state import get_intraday_market_state
+            from .intraday_session_engine import get_session
+            state = get_intraday_market_state()
+            session = get_session(include_live=True)
+            if not isinstance(session, dict):
+                session = {}
+            return {"block": state.diagnostic_block(session)}
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
     @app.get("/api/alert-history")
     def alert_history(since: str | None = None) -> dict[str, Any]:
         """Return fired alert history for today, optionally filtered."""
@@ -5077,7 +5112,7 @@ def create_app() -> FastAPI:
         """
         try:
             from datetime import date as _date
-            from .eod_intraday_report import generate_intraday_eod_report, recalculate_live_intraday_from_candles
+            from .eod_intraday_report import generate_intraday_eod_report
             from datetime import datetime as _dt
             for_date = (
                 _date.fromisoformat(date)
@@ -5085,13 +5120,10 @@ def create_app() -> FastAPI:
                 else _dt.now(tz=IST_ZONE).date()
             )
             if for_date == _dt.now(tz=IST_ZONE).date():
-                from .intraday_session_engine import load_session as _load_intraday_session
-                active_session = _load_intraday_session()
-                active_policy = str((active_session.get("pnlRecalc") or {}).get("policyVersion") or "")
-                if force or active_policy != "post_entry_stop_only_0p5_v2":
-                    recalculated = recalculate_live_intraday_from_candles(for_date, after_close=False)
-                    if recalculated.get("ok") and isinstance(recalculated.get("book"), dict):
-                        return recalculated["book"]
+                # Session-economics projection (never a candle-rewrite of the
+                # locked session): generate reads the authoritative Intraday
+                # session directly for today's date.
+                return generate_intraday_eod_report(for_date, force=force)
             return generate_intraday_eod_report(for_date, force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc

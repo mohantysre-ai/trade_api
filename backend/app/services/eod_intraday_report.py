@@ -1095,6 +1095,282 @@ def _apply_scorecard_to_leg(
     return reason, float(exit_price or 0), float(pnl or 0), {}
 
 
+def project_session_live(
+    session: dict[str, Any],
+    for_date: date,
+    capital: float,
+) -> dict[str, Any]:
+    """Read-only EOD report projection from the locked intraday session state.
+
+    Does not modify the session.  Used when the market is closed or on
+    ``force=True`` so the authoritative Intraday session economics become
+    the single source of truth for the day's EOD book.
+    """
+    from .desk_clock import cash_session_phase
+
+    market_phase = cash_session_phase(for_date)
+    sess_idx = _session_leg_index(session)
+    rows: list[dict[str, Any]] = []
+    total_pnl = 0.0
+    total_deployed = 0.0
+    hits: dict[str, int] = {
+        "T1_HIT": 0,
+        "T2_HIT": 0,
+        "SL_HIT": 0,
+        "EOD_SQUAREOFF": 0,
+        "TRAIL_SL_HIT": 0,
+        "PARTIAL_SCALE": 0,
+    }
+    wins = 0
+    losses = 0
+    skipped_count = 0
+    triggered_count = 0
+
+    for (_sym, direction), sess_row in sess_idx.items():
+        if not _session_leg_is_triggered(sess_row):
+            skipped_count += 1
+            planned = float(
+                sess_row.get("plannedCapital") or sess_row.get("deployedCapital") or 0
+            )
+            rows.append({
+                "symbol": _sym,
+                "direction": direction,
+                "entryPrice": sess_row.get("entryPrice"),
+                "exitPrice": None,
+                "stopLoss": sess_row.get("stopLoss"),
+                "target1": sess_row.get("target1"),
+                "target2": sess_row.get("target2"),
+                "exitReason": "NOT_TRIGGERED",
+                "deskExitLabel": "SKIPPED",
+                "executionStatus": "NOT_TRIGGERED",
+                "outcomeBucket": "SKIPPED",
+                "qty": sess_row.get("approxQty") or sess_row.get("qty") or 0,
+                "deployedCapital": 0.0,
+                "positionValue": 0.0,
+                "pnl": 0.0,
+                "pnlPct": 0.0,
+                "realizedPnl": 0.0,
+                "unrealizedPnl": 0.0,
+                "remainingQty": 0,
+                "exitState": None,
+                "closed": True,
+                "triggered": False,
+                "skipped": True,
+                "skipReason": sess_row.get("skipReason") or "NOT_TRIGGERED",
+                "entryEvidence": session_lock_fill_evidence(sess_row) or {
+                    "triggered": False,
+                    "reason": "NOT_TRIGGERED",
+                },
+                "executionBasis": "MODELED_PAPER",
+                "executionEvidence": "SESSION_LOCK",
+                "pnlKind": "skipped",
+                "pickSource": sess_row.get("source") or "intraday_session",
+                "missDiagnostic": {
+                    "isMiss": False,
+                    "isHit": False,
+                    "isSkip": True,
+                    "exitReason": "NOT_TRIGGERED",
+                    "rootCause": "ENTRY_NEVER_CROSSED",
+                    "factors": ["NOT_TRIGGERED", "SKIP_PNL"],
+                    "rMultiple": None,
+                    "economicR": None,
+                    "pathR": None,
+                    "movePct": None,
+                    "gapToT1Pct": None,
+                    "gapToT2Pct": None,
+                    "stopUtilization": None,
+                    "plannedRr": None,
+                    "riskPerShare": None,
+                    "maePct": None,
+                    "mfePct": None,
+                    "mfeR": None,
+                    "maeR": None,
+                    "stopEff": None,
+                    "falsePositive": False,
+                    "holdingMins": None,
+                    "source": "SESSION",
+                },
+            })
+            continue
+
+        triggered_count += 1
+        entry_px = _f(sess_row.get("entryPrice"))
+        exit_px = _f(sess_row.get("exitPrice")) or _f(
+            sess_row.get("currentPrice")
+        ) or _f(sess_row.get("ltp"))
+        pnl = _f(sess_row.get("realizedPnl"))
+        if pnl is None:
+            pnl = _f(sess_row.get("pnl")) or 0.0
+        exit_reason = str(
+            sess_row.get("exitReason") or sess_row.get("status") or "EOD_SQUAREOFF"
+        )
+        qty = int(sess_row.get("approxQty") or sess_row.get("qty") or 0)
+        deployed = float(sess_row.get("deployedCapital") or 0)
+        if deployed <= 0 and entry_px and qty:
+            deployed = round(entry_px * qty, 2)
+        risk_ps = _f(sess_row.get("riskPerShare"))
+        if risk_ps is None and entry_px and sess_row.get("stopLoss") is not None:
+            risk_ps = abs(entry_px - float(sess_row.get("stopLoss")))
+
+        exit_state = sess_row.get("exitState")
+        if not isinstance(exit_state, dict):
+            exit_state = None
+
+        desk = build_trade_outcome(
+            triggered=True,
+            realized_pnl=pnl,
+            exit_reason=exit_reason,
+            exit_state=exit_state,
+            entry=entry_px,
+            exit_price=exit_px,
+            risk_per_share=risk_ps,
+            qty=qty,
+            direction=direction,
+            effective_stop=_f(sess_row.get("effectiveStop")),
+            lineage={
+                "source": sess_row.get("source") or "intraday_session",
+                "filterStage": None,
+                "score": _f(sess_row.get("score")),
+                "scoreComponents": None,
+                "lockRank": None,
+                "selectionReason": (
+                    sess_row.get("selectionReason") or sess_row.get("selection_reason")
+                ),
+                "verdict": sess_row.get("verdict"),
+                "sector": sess_row.get("sector"),
+                "levelsSource": sess_row.get("levelsSource"),
+                "triggeredAt": sess_row.get("triggeredAt"),
+                "executedFills": (
+                    exit_state.get("legsFilled") if isinstance(exit_state, dict) else None
+                ),
+                "exitPathTag": None,
+            },
+        )
+
+        pnl = float(desk["pnl"])
+        reason_desk = str(desk.get("deskExitLabel") or exit_reason)
+        total_pnl += pnl
+        total_deployed += deployed
+        hits[exit_reason] = hits.get(exit_reason, 0) + 1
+        if desk.get("outcomeBucket") == "WIN":
+            wins += 1
+        elif desk.get("outcomeBucket") == "LOSS":
+            losses += 1
+
+        pnl_pct = None
+        if deployed:
+            pnl_pct = round((pnl / deployed * 100), 2)
+        else:
+            if entry_px and entry_px > 0:
+                sign = 1 if direction == "LONG" else -1
+                pnl_pct = (
+                    round(sign * (exit_px - entry_px) / entry_px * 100, 2)
+                    if exit_px is not None
+                    else None
+                )
+
+        row: dict[str, Any] = {
+            "symbol": _sym,
+            "direction": direction,
+            "entryPrice": entry_px,
+            "exitPrice": round(exit_px, 2) if exit_px is not None else None,
+            "stopLoss": sess_row.get("stopLoss"),
+            "target1": sess_row.get("target1"),
+            "target2": sess_row.get("target2"),
+            "exitReason": exit_reason,
+            "deskExitLabel": reason_desk,
+            "executionStatus": desk.get("executionStatus"),
+            "outcomeBucket": desk.get("outcomeBucket"),
+            "deskProgress": desk.get("deskProgress"),
+            "mfeR": desk.get("mfeR"),
+            "maeR": desk.get("maeR"),
+            "economicR": desk.get("economicR"),
+            "pathR": desk.get("pathR"),
+            "effectiveStopR": desk.get("effectiveStopR"),
+            "qty": qty,
+            "deployedCapital": deployed,
+            "pnl": round(pnl, 2),
+            "pnlPct": pnl_pct,
+            "missAnalysis": None,
+            "missDiagnostic": None,
+            "pickSource": sess_row.get("source") or "intraday_session",
+            "lineage": desk.get("lineage"),
+            "policyChain": desk.get("policyChain") or desk.get("chain"),
+            "outcomeSchemaVersion": desk.get("outcomeSchemaVersion"),
+            "executionBasis": "MODELED_PAPER",
+            "pnlKind": "realised",
+            "executionEvidence": "SESSION_LOCK",
+            "entryEvidence": session_lock_fill_evidence(sess_row)
+            or {"triggered": True, "triggerSource": "session_lock"},
+        }
+        if desk.get("rMultiple") is not None:
+            row["rMultiple"] = desk.get("rMultiple")
+        for _k in (
+            "rMultiple",
+            "economicR",
+            "pathR",
+            "mfeR",
+            "maeR",
+            "effectiveStopR",
+            "deskProgress",
+            "deskExitLabel",
+            "executionStatus",
+            "outcomeBucket",
+            "pnl",
+            "policyChain",
+            "lineage",
+        ):
+            if desk.get(_k) is not None:
+                row[_k] = desk[_k]
+        rows.append(row)
+
+    long_count = len(session.get("long") or [])
+    short_count = len(session.get("short") or [])
+    desk_counts = {
+        "swing": 0,
+        "intradayLong": long_count,
+        "intradayShort": short_count,
+        "total": long_count + short_count,
+    }
+
+    book_turnover = round(total_deployed, 2)
+    working_deployed = round(min(total_deployed, capital), 2)
+    remaining_capital = capital + total_pnl
+
+    report = {
+        "date": for_date.isoformat(),
+        "capital": capital,
+        "totalDeployed": working_deployed,
+        "bookTurnover": book_turnover,
+        "totalPnl": round(total_pnl, 2),
+        "remainingCapital": round(remaining_capital, 2),
+        "hitBreakdown": hits,
+        "hitRatePct": round(wins / triggered_count * 100, 1) if triggered_count else 0.0,
+        "missCount": losses,
+        "hitCount": wins,
+        "missScorecardCoverage": 0,
+        "isMock": False,
+        "symbolSource": "intraday_session",
+        "executionPolicy": "MANUAL_ONLY",
+        "executionBasis": "MODELED_PAPER",
+        "marketPhase": market_phase,
+        "deskCounts": desk_counts,
+        "attribution": {
+            "locked": len(rows),
+            "triggered": triggered_count,
+            "skipped": skipped_count,
+            "wins": wins,
+            "losses": losses,
+            "deployed": working_deployed,
+            "turnover": book_turnover,
+        },
+        "rotationAttribution": _build_rotation_attribution(session, rows),
+        "dayLessons": [],
+        "trades": rows,
+    }
+    return report
+
+
 def generate_intraday_eod_report(
     for_date: date,
     capital: float = DEFAULT_INTRADAY_CAPITAL,
@@ -1112,12 +1388,21 @@ def generate_intraday_eod_report(
     after_close = market_phase == "CLOSED"
     session_live = load_intraday_session(for_date)
     sess_idx: dict[tuple[str, str], dict[str, Any]] = {}
-    live_for_date = str(session_live.get("sessionDate") or "")[:10] == for_date.isoformat()
-    if live_for_date:
+    live_session_date = str(session_live.get("sessionDate") or "")[:10] == for_date.isoformat()
+    if live_session_date:
         sess_idx = _session_leg_index(session_live)
+        # Spec V5 §36/§39/§62: once the session is closed (or a forced EOD
+        # rebuild runs), today's cached/reconstructed book must not persist —
+        # the authoritative Intraday state is the single source of truth for
+        # today's EOD projection.  Projection is read-only; post-market
+        # analytics run separately and never re-derive live session economics.
+        # During OPEN hours the existing cache flow below is preserved — P&L
+        # ticks are overlaid live in the UI.
+        if after_close or force:
+            return project_session_live(session_live, for_date=for_date, capital=capital)
 
     cached_hist = load_book_cache(for_date, "intraday")
-    if not live_for_date:
+    if not live_session_date:
         if cached_hist is not None:
             return cached_hist
         if not picks:
@@ -1810,7 +2095,14 @@ def recalculate_live_intraday_from_candles(
     *,
     after_close: bool | None = None,
 ) -> dict[str, Any]:
-    """Rebuild today's locked session P&L from post-entry 1-minute candles. Does not unlock."""
+    """Post-market candle-evidenced *analytics* replay (spec V5 §36/§37/§63).
+
+    Read-only w.r.t. the live session: it may recompute an analytics view,
+    but it must NEVER overwrite the authoritative Intraday session's locked
+    trade economics (entry/stop/target/pnl fields or the stored session).
+    Historical reporting consumers use the returned replay; today's live
+    EOD projection stays a direct projection of the Intraday session.
+    """
     from .intraday_session_engine import load_session, save_session, sync_fixed_plan_from_session
 
     session = load_session()
@@ -1871,13 +2163,14 @@ def recalculate_live_intraday_from_candles(
         "policyVersion": "post_entry_stop_only_0p5_v2",
         "at": out["updatedAt"],
         "afterClose": after_close,
+        "readOnly": True,
     }
-    save_session(out)
-    try:
-        sync_fixed_plan_from_session(out)
-    except Exception:
-        log.exception("sync_fixed_plan_from_session after candle recalc failed")
-    book = recalculate_cached_intraday_book(for_date, after_close=False)
+    # Authoritative-session guard (§63): the candle replay is analytics only.
+    # The live Intraday session on disk is left untouched so today's EOD
+    # projection and Intraday MTM cannot diverge into two truths.
+    book = dict(out)
+    book["totalPnl"] = round(realized, 2)
+    book["names"] = names
     return {
         "ok": True,
         "sessionDate": session_date,

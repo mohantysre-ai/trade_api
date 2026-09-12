@@ -52,6 +52,45 @@ start_paper_supervisor(AngelOneClient)
 start_index_options_hunt_supervisor(AngelOneClient)
 
 
+def _start_intraday_stream() -> bool:
+    """Start the process-wide Intraday WS live state (all 750 -> WebSocket).
+
+    Async startup: REST bootstrap/recovery continues in the background and the
+    API never blocks on 750-symbol hydration (spec V5 §30). Disabled cleanly
+    when the env opt-out is set or the client/credentials are unavailable.
+    """
+    if os.getenv("INTRADAY_WS_ENABLED", "1").strip().lower() in {"0", "false", "no"}:
+        return False
+    try:
+        from app.services.intraday_market_state import get_intraday_stream
+
+        return bool(get_intraday_stream().ensure(AngelOneClient))
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "intraday live stream failed to start; REST recovery path remains active"
+        )
+        return False
+
+
+INTRADAY_STREAM_STARTED = _start_intraday_stream()
+
+# REST becomes an exceptional/recovery path: targeted recovery for symbols the
+# WS stream left stale (bounded batches, existing limiter), never a heartbeat.
+INTRADAY_RECOVERY_STARTED = False
+try:
+    if os.getenv("INTRADAY_WS_ENABLED", "1").strip().lower() not in {"0", "false", "no"}:
+        from app.services.intraday_market_state import start_intraday_recovery_worker
+
+        start_intraday_recovery_worker(AngelOneClient)
+        INTRADAY_RECOVERY_STARTED = True
+except Exception:
+    import logging as _logging
+
+    _logging.getLogger(__name__).exception("intraday recovery worker failed to start")
+
+
 @app.get("/api/index-options/paper-supervisor")
 def index_options_paper_supervisor_status() -> dict:
     """Read-only operational health for the autonomous paper-position marker."""
