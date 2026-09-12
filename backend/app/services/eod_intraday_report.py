@@ -1198,13 +1198,26 @@ def project_session_live(
         exit_px = _f(sess_row.get("exitPrice")) or _f(
             sess_row.get("currentPrice")
         ) or _f(sess_row.get("ltp"))
+        qty = int(sess_row.get("approxQty") or sess_row.get("qty") or 0)
         pnl = _f(sess_row.get("realizedPnl"))
         if pnl is None:
-            pnl = _f(sess_row.get("pnl")) or 0.0
+            pnl = _f(sess_row.get("pnl"))
+        if pnl is None:
+            is_open = not bool(sess_row.get("closed")) and str(
+                sess_row.get("status") or ""
+            ).upper() not in ("CLOSED", "STOP LOSS HIT", "TRAIL STOP HIT", "SCALE COMPLETE")
+            if is_open and entry_px is not None and exit_px is not None and qty:
+                # Open-at-close position (F5.1): the raw persisted session row
+                # never carries a booked `realizedPnl`/`pnl` for a still-open
+                # leg. Mark it to the EOD close price instead of silently
+                # reporting zero P&L.
+                sign = 1.0 if str(direction or "LONG").upper() != "SHORT" else -1.0
+                pnl = round(sign * (exit_px - entry_px) * qty, 2)
+            else:
+                pnl = 0.0
         exit_reason = str(
             sess_row.get("exitReason") or sess_row.get("status") or "EOD_SQUAREOFF"
         )
-        qty = int(sess_row.get("approxQty") or sess_row.get("qty") or 0)
         deployed = float(sess_row.get("deployedCapital") or 0)
         if deployed <= 0 and entry_px and qty:
             deployed = round(entry_px * qty, 2)

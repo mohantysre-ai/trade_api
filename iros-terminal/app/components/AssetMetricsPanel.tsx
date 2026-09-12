@@ -240,6 +240,12 @@ type SessionResponse = {
   error?: string;
 };
 
+type MarketStateResponse = {
+  success?: boolean;
+  block?: string;
+  error?: string;
+};
+
 type CandidatesResponse = {
   success?: boolean;
   error?: string;
@@ -587,6 +593,27 @@ async function fetchSession(): Promise<SessionResponse> {
   } catch (err) {
     return { ...empty, error: err instanceof Error ? err.message : 'Session fetch failed' };
   }
+}
+
+async function fetchMarketState(): Promise<MarketStateResponse> {
+  try {
+    const res = await fetch('/api/intraday/market-state', { cache: 'no-store' });
+    const data = await readJsonSafe<MarketStateResponse>(res, { success: false });
+    return res.ok ? data : { ...data, success: false };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Market state fetch failed',
+    };
+  }
+}
+
+function marketStateLine(block: string | undefined, label: string): string | null {
+  const line = block?.split('\n').find((item) => {
+    const trimmed = item.trimStart();
+    return trimmed.startsWith(label) && trimmed.slice(label.length).trimStart().startsWith(':');
+  });
+  return line ? line.split(':').slice(1).join(':').trim() : null;
 }
 
 async function fetchCandidates(): Promise<CandidatesResponse> {
@@ -1007,6 +1034,7 @@ export default function AssetMetricsPanel({
   refreshToken?: number;
 }) {
   const [session, setSession] = useState<SessionResponse | null>(null);
+  const [marketState, setMarketState] = useState<MarketStateResponse | null>(null);
   const [candidates, setCandidates] = useState<CandidatesResponse | null>(null);
   const [livePrices, setLivePrices] = useState<LivePricesResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1048,6 +1076,10 @@ export default function AssetMetricsPanel({
     }
   }, [applySession]);
 
+  const loadMarketState = useCallback(async () => {
+    setMarketState(await fetchMarketState());
+  }, []);
+
   const loadCandidates = useCallback(async () => {
     try {
       const data = await fetchCandidates();
@@ -1073,18 +1105,20 @@ export default function AssetMetricsPanel({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch synchronizes this panel with the live session on mount
     void loadSession();
+    void loadMarketState();
     void loadCandidates();
     const clockId = window.setInterval(() => setClock(formatIstNow()), 15_000);
     return () => window.clearInterval(clockId);
-  }, [loadSession, loadCandidates]);
+  }, [loadSession, loadMarketState, loadCandidates]);
 
   useEffect(() => {
     if (!refreshToken) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch synchronizes this panel when the parent-driven refreshToken changes
     void loadSession();
+    void loadMarketState();
     void loadCandidates();
     void loadResearch();
-  }, [refreshToken, loadSession, loadCandidates, loadResearch]);
+  }, [refreshToken, loadSession, loadMarketState, loadCandidates, loadResearch]);
 
   useEffect(() => subscribeLiveDesk((snapshot) => {
     applySession(snapshot['intraday-session'] as unknown as SessionResponse);
@@ -1127,6 +1161,9 @@ export default function AssetMetricsPanel({
   const regimeLabel = session?.regime?.label || candidates?.regime?.label || 'UNRATED';
   const marketOpen = livePrices?.marketOpen ?? session?.marketOpen;
   const dataStale = Boolean(livePrices?.dataStale || session?.dataStale);
+  const marketStateBlock = marketState?.block;
+  const wsConnected = marketStateLine(marketStateBlock, 'WS Connected');
+  const marketStateHealth = marketStateLine(marketStateBlock, 'Data Health');
 
   const istToday = useMemo(
     () =>
@@ -1263,8 +1300,11 @@ export default function AssetMetricsPanel({
               <StatusPill tone={marketOpen === true ? 'desk-pill--ok' : 'desk-pill--muted'}>
                 {marketOpen === true ? 'MARKET OPEN' : marketOpen === false ? 'MARKET CLOSED' : 'MARKET —'}
               </StatusPill>
-              <StatusPill tone={statusTone(dataStale ? 'DATA STALE' : session?.feedStatus)}>
-                FEED {session?.feedStatus || '—'}
+              <StatusPill
+                tone={statusTone(dataStale ? 'DATA STALE' : marketStateHealth || session?.feedStatus)}
+                title={marketStateBlock || marketState?.error || undefined}
+              >
+                WS {wsConnected || '—'} · FEED {marketStateHealth || session?.feedStatus || '—'}
               </StatusPill>
             </div>
             <p className="text-[9px] text-slate-500 mt-1">

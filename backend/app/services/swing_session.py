@@ -148,9 +148,12 @@ def _f(v: Any) -> float | None:
     if v is None or v == "":
         return None
     try:
-        return float(v)
+        n = float(v)
     except (TypeError, ValueError):
         return None
+    if n != n or n in (float("inf"), float("-inf")):
+        return None
+    return n
 
 
 def _size_swing_row(

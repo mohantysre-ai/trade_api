@@ -64,7 +64,9 @@ def _start_intraday_stream() -> bool:
     try:
         from app.services.intraday_market_state import get_intraday_stream
 
-        return bool(get_intraday_stream().ensure(AngelOneClient))
+        global INTRADAY_CLIENT
+        INTRADAY_CLIENT = AngelOneClient()
+        return bool(get_intraday_stream().ensure(INTRADAY_CLIENT))
     except Exception:
         import logging
 
@@ -74,6 +76,7 @@ def _start_intraday_stream() -> bool:
         return False
 
 
+INTRADAY_CLIENT: AngelOneClient | None = None
 INTRADAY_STREAM_STARTED = _start_intraday_stream()
 
 # REST becomes an exceptional/recovery path: targeted recovery for symbols the
@@ -83,7 +86,8 @@ try:
     if os.getenv("INTRADAY_WS_ENABLED", "1").strip().lower() not in {"0", "false", "no"}:
         from app.services.intraday_market_state import start_intraday_recovery_worker
 
-        start_intraday_recovery_worker(AngelOneClient)
+        if INTRADAY_CLIENT is not None:
+            start_intraday_recovery_worker(INTRADAY_CLIENT)
         INTRADAY_RECOVERY_STARTED = True
 except Exception:
     import logging as _logging

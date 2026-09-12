@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "currentSessionNumber": 3,
+  "currentSessionStartedAt": "2026-09-12T17:23:12.181Z",
+  "lifetimeTokensSaved": 953796,
+  "lifetimeCostSavedUsd": 2.8613879999999994,
+  "pastSessions": [
+    {
+      "sessionNumber": 2,
+      "startedAt": "2026-09-12T17:22:21.338Z",
+      "endedAt": "2026-09-12T17:23:12.181Z",
+      "totalTokensSaved": 0,
+      "totalCostSavedUsd": 0,
+      "eventsCount": 0,
+      "modelName": "Claude Sonnet 5",
+      "events": []
+    },
+    {
+      "sessionNumber": 1,
+      "startedAt": "2026-09-12T17:16:14.501Z",
+      "endedAt": "2026-09-12T17:22:21.338Z",
+      "totalTokensSaved": 0,
+      "totalCostSavedUsd": 0,
+      "eventsCount": 0,
+      "modelName": "Claude Sonnet 5",
+      "events": []
+    }
+  ]
+}

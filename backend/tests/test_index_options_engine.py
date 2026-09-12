@@ -24,7 +24,7 @@ def _complete(direction: str, score: float = 90.0) -> dict:
         "direction": direction,
         "scores": {name: score for name in ("trend", "breakout", "futuresOi", "optionChain", "breadth", "contract", "regime")},
         "gates": {name: True for name in ("fresh", "structure", "breakout", "futuresOi", "optionChain", "breadth", "contractEconomics", "riskReward")},
-        "contract": {"strike": 25000, "expiry": "2026-08-25", "delta": 0.55},
+        "contract": {"symbol": f"{direction}-TEST", "strike": 25000, "expiry": "2026-08-25", "delta": 0.55, "ltp": 100},
     }
 
 

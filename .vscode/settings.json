@@ -1,0 +1,53 @@
+{
+  "github.copilot.chat.codeGeneration.instructions": [
+    {
+      "file": ".vscode/copilot-instructions.md"
+    }
+  ],
+  "mcp": {
+    "servers": {
+      "headroom": {
+        "command": "headroom",
+        "args": [
+          "mcp",
+          "serve"
+        ],
+        "type": "stdio",
+        "env": {
+          "HEADROOM_BEACON": "off",
+          "HEADROOM_TELEMETRY": "off",
+          "HEADROOM_OFFLINE": "1",
+          "DO_NOT_TRACK": "1"
+        }
+      },
+      "token-cache": {
+        "command": "node",
+        "args": [
+          "c:\\Users\\Joker\\.vscode\\extensions\\sarfudheen.tokenshield-1.0.18\\dist\\cache-server.js",
+          "d:\\trade_api"
+        ],
+        "type": "stdio"
+      }
+    }
+  },
+  "github.copilot.chat.codesearch.exclude": {
+    "*.lock": true,
+    "*.min.js": true,
+    "*.min.css": true,
+    "*.map": true,
+    "*.d.ts": true,
+    "*.generated.*": true,
+    "dist/**": true,
+    "build/**": true,
+    "coverage/**": true,
+    ".git/**": true,
+    "node_modules/**": true,
+    ".next/**": true,
+    ".nuxt/**": true,
+    "__pycache__/**": true,
+    "*.pyc": true,
+    "*.pyo": true,
+    "target/**": true,
+    "vendor/**": true
+  }
+}

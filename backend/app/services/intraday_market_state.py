@@ -33,7 +33,11 @@ SOURCE_REST_RECOVERY = "ANGEL_REST_RECOVERY"
 FRESH_SECONDS = float(os.getenv("INTRADAY_WS_FRESH_SECONDS", "8"))
 STALE_SECONDS = float(os.getenv("INTRADAY_WS_STALE_SECONDS", "30"))
 RECOVERY_SECONDS = float(os.getenv("INTRADAY_WS_RECOVERY_SECONDS", "60"))
-MAX_SUBSCRIBE_CHUNK = int(os.getenv("INTRADAY_WS_SUBSCRIBE_CHUNK", "250"))
+# Angel's SmartWebSocketV2 silently drops tokens beyond its per-request limit
+# instead of erroring — a 250-token chunk (F4.1/F4.2) left up to 250 of the
+# 750-symbol universe unsubscribed with no observable failure. 50 matches the
+# documented safe per-subscribe-call ceiling.
+MAX_SUBSCRIBE_CHUNK = int(os.getenv("INTRADAY_WS_SUBSCRIBE_CHUNK", "50"))
 WS_ENABLED = os.getenv("INTRADAY_WS_ENABLED", "1") == "1"
 UNIVERSE_LABEL = "INTRADAY_750"
 WS_CORRELATION_ID = "intraday750"
@@ -42,6 +46,7 @@ LIVE = "LIVE"
 DEGRADED = "DEGRADED"
 STALE = "STALE"
 UNAVAILABLE = "UNAVAILABLE"
+LOCKED_PRICE_UNAVAILABLE = "LOCKED_PRICE_UNAVAILABLE"
 
 _METRICS_LOCK = threading.Lock()
 _METRICS: dict[str, float] = {
@@ -49,6 +54,7 @@ _METRICS: dict[str, float] = {
     "ws_tick_dropped_older": 0.0,
     "ws_tick_duplicate": 0.0,
     "ws_tick_invalid": 0.0,
+    "ws_tick_stale_date": 0.0,
     "ws_reconnect_count": 0.0,
     "rest_recovery_count": 0.0,
     "rest_recovery_failures": 0.0,
@@ -262,6 +268,10 @@ class IntradayMarketState:
         if not isinstance(message, dict) or not token:
             _metric("ws_tick_invalid")
             return "invalid"
+        with self._lock:
+            if self._universe is not None and token not in self._universe_rows:
+                _metric("ws_tick_invalid")
+                return "invalid"
         ltp = _number(message.get("last_traded_price"), scale=100.0)
         if ltp is None:
             ltp = _number(message.get("ltp"))
@@ -272,6 +282,18 @@ class IntradayMarketState:
         sequence = int(sequence) if isinstance(sequence, (int, float)) else None
         now = _now_utc()
         mono = time.monotonic()
+        exchange_ts = _parse_exchange_ts(message)
+        if exchange_ts is not None:
+            # F8.1: a reconnect can hand the socket a burst of buffered/replayed
+            # packets from a prior session. Sequence numbers alone do not catch
+            # this across a fresh connection (sequence counters restart), so a
+            # tick whose exchange date is not today's IST date is rejected
+            # outright rather than silently becoming "live" state.
+            tick_date = exchange_ts.astimezone(IST_ZONE).date()
+            today_date = _now_utc().astimezone(IST_ZONE).date()
+            if tick_date != today_date:
+                _metric("ws_tick_stale_date")
+                return "invalid"
         with self._lock:
             row = self._state.get(token)
             if row is None:
@@ -313,7 +335,7 @@ class IntradayMarketState:
             row.update(
                 {
                     "ltp": ltp,
-                    "exchangeTimestamp": _iso(_parse_exchange_ts(message)),
+                    "exchangeTimestamp": _iso(exchange_ts),
                     "receivedAt": _iso(now),
                     "receivedMonotonic": mono,
                     "sequence": sequence,
@@ -365,7 +387,7 @@ class IntradayMarketState:
     @staticmethod
     def _freshness_from_age(age: float | None) -> str:
         if age is None:
-            return UNAVAILABLE
+            return LOCKED_PRICE_UNAVAILABLE
         if age <= FRESH_SECONDS:
             return LIVE
         if age <= STALE_SECONDS:
@@ -583,14 +605,39 @@ class IntradayMarketState:
         }
         status = self.stream_status()
         session = session or {}
+
+        def _as_list(value: Any) -> list[Any]:
+            if isinstance(value, list):
+                return value
+            if isinstance(value, tuple):
+                return list(value)
+            if isinstance(value, dict):
+                return [
+                    item
+                    for payload in value.values()
+                    if isinstance(payload, list)
+                    for item in payload
+                ]
+            return []
+
+        def _sum_slots(value: Any) -> int:
+            if isinstance(value, (int, float)):
+                return int(value)
+            if isinstance(value, dict):
+                total = 0
+                for payload in value.values():
+                    total += _sum_slots(payload)
+                return total
+            return 0
+
         last_tick = (status.get("lastTickAt") or "—")
         if last_tick != "—":
             try:
                 last_tick = datetime.fromisoformat(last_tick).astimezone(IST_ZONE).strftime("%H:%M:%S")
             except ValueError:
                 pass
-        locked = len(session.get("openPositions") or [])
-        free = int(session.get("freeSlots") or 0)
+        locked = len(_as_list(session.get("openPositions")))
+        free = _sum_slots(session.get("freeSlots"))
         data_health = "OK" if status["feedStatus"] == "OK" else status["feedStatus"]
         reason = ""
         if status["symbolsStale"]:
@@ -670,8 +717,8 @@ class AngelIntradayStream:
 
     def _credentials(self) -> tuple[str, str, str, str]:
         smart = self._client.connect()
-        auth = getattr(smart, "authToken", "") or ""
-        feed = getattr(smart, "feedToken", "") or ""
+        auth = getattr(smart, "access_token", "") or ""
+        feed = getattr(smart, "feed_token", "") or ""
         return auth, str(self._client.api_key), str(self._client.client_id), feed
 
     def _run(self) -> None:
@@ -712,8 +759,21 @@ class AngelIntradayStream:
             self._opened = True
             self._subscribed.clear()
         self._subscribe_desired(socket)
-        self._market_state.set_connected(True)
-        LOGGER.info("WS_CONNECTED correlationId=%s", WS_CORRELATION_ID)
+        with self._lock:
+            wanted = {
+                (EXCHANGE_TYPES.get(row["exchange"], 1), token)
+                for token, row in self._market_state._universe_rows.items()
+            }
+            ready = bool(wanted) and wanted.issubset(self._subscribed)
+        self._market_state.set_connected(ready)
+        if ready:
+            LOGGER.info("WS_CONNECTED correlationId=%s", WS_CORRELATION_ID)
+        else:
+            LOGGER.warning("WS_NOT_READY correlationId=%s; forcing bounded reconnect", WS_CORRELATION_ID)
+            try:
+                socket.close_connection()
+            except Exception:
+                LOGGER.debug("failed to close unready websocket", exc_info=True)
 
     def _subscribe_desired(self, socket: Any) -> None:
         with self._lock:
@@ -727,20 +787,63 @@ class AngelIntradayStream:
         grouped: dict[int, list[str]] = {}
         for exchange_type, token in missing:
             grouped.setdefault(exchange_type, []).append(token)
+        # F4.1/F4.2: only mark a chunk's tokens as subscribed once the SDK call
+        # for that specific chunk actually succeeds. A prior implementation
+        # marked the entire `missing` set subscribed unconditionally after the
+        # loop, so a raised/failed chunk left those tokens silently believed
+        # to be live while the socket never asked Angel for them.
+        acked: list[tuple[int, str]] = []
+        failed_chunks = 0
         for exchange_type, tokens in grouped.items():
             for start in range(0, len(tokens), MAX_SUBSCRIBE_CHUNK):
                 chunk = tokens[start : start + MAX_SUBSCRIBE_CHUNK]
-                socket.subscribe(
-                    WS_CORRELATION_ID,
-                    3,
-                    [{"exchangeType": exchange_type, "tokens": chunk}],
-                )
-        if missing:
+                try:
+                    response = socket.subscribe(
+                        WS_CORRELATION_ID,
+                        3,
+                        [{"exchangeType": exchange_type, "tokens": chunk}],
+                    )
+                except Exception as exc:
+                    failed_chunks += 1
+                    LOGGER.warning(
+                        "WS_SUBSCRIBE_FAILED correlationId=%s exchangeType=%s tokens=%d error=%s",
+                        WS_CORRELATION_ID,
+                        exchange_type,
+                        len(chunk),
+                        exc,
+                    )
+                    continue
+                # SmartWebSocketV2.subscribe() has no synchronous ack; an
+                # explicit falsy/error-shaped response is the only signal
+                # available here, so treat it the same as a raised exception.
+                if isinstance(response, dict) and str(response.get("status", "")).lower() in (
+                    "error",
+                    "fail",
+                    "failed",
+                ):
+                    failed_chunks += 1
+                    LOGGER.warning(
+                        "WS_SUBSCRIBE_REJECTED correlationId=%s exchangeType=%s tokens=%d response=%s",
+                        WS_CORRELATION_ID,
+                        exchange_type,
+                        len(chunk),
+                        response,
+                    )
+                    continue
+                acked.extend((exchange_type, tok) for tok in chunk)
+        if acked:
             with self._lock:
-                self._subscribed.update(missing)
+                self._subscribed.update(acked)
+        if missing:
             LOGGER.info(
-                "WS_SUBSCRIBE correlationId=%s tokens=%d", WS_CORRELATION_ID, len(missing)
+                "WS_SUBSCRIBE correlationId=%s requested=%d acked=%d failedChunks=%d",
+                WS_CORRELATION_ID,
+                len(missing),
+                len(acked),
+                failed_chunks,
             )
+        if failed_chunks:
+            _metric("ws_subscribe_chunk_failures", float(failed_chunks))
 
     def _on_close(self) -> None:
         with self._lock:
@@ -815,6 +918,11 @@ def start_intraday_recovery_worker(client: Any) -> threading.Thread | None:
       bounded batches through the existing Angel client (limiter preserved).
     - Daemon thread; never touches the tick path.
     """
+    global _RECOVERY_THREAD
+    with _RECOVERY_THREAD_LOCK:
+        if _RECOVERY_THREAD is not None and _RECOVERY_THREAD.is_alive():
+            return _RECOVERY_THREAD
+
     interval = float(os.getenv("INTRADAY_RECOVERY_INTERVAL_SEC", "60"))
     batch_size = int(os.getenv("INTRADAY_RECOVERY_BATCH", "25"))
     circuit = _RecoveryCircuit()
@@ -869,8 +977,12 @@ def start_intraday_recovery_worker(client: Any) -> threading.Thread | None:
     thread = threading.Thread(
         target=_run, name="intraday-recovery-worker", daemon=True
     )
-    thread.start()
-    return thread
+    with _RECOVERY_THREAD_LOCK:
+        if _RECOVERY_THREAD is not None and _RECOVERY_THREAD.is_alive():
+            return _RECOVERY_THREAD
+        _RECOVERY_THREAD = thread
+        thread.start()
+        return thread
 
 
 def _ws_tick_log_due() -> bool:
@@ -882,6 +994,8 @@ def _ws_tick_log_due() -> bool:
 INTRADAY_MARKET_STATE: IntradayMarketState | None = None
 INTRADAY_STREAM: AngelIntradayStream | None = None
 _SINGLETON_LOCK = threading.Lock()
+_RECOVERY_THREAD: threading.Thread | None = None
+_RECOVERY_THREAD_LOCK = threading.Lock()
 
 
 def get_intraday_market_state() -> IntradayMarketState:

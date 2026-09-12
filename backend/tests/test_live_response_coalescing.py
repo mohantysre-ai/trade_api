@@ -56,6 +56,26 @@ def test_intraday_live_response_refresh_does_not_block_concurrent_callers(monkey
     assert live["long"][0]["symbol"] == "LIVE"
 
 
+def test_unavailable_ws_quote_does_not_mask_external_price_fallback(monkeypatch):
+    class State:
+        def capture_snapshot(self, symbols):
+            return {
+                "quotes": {
+                    "RELIANCE": {
+                        "ltp": None,
+                        "freshness": "LOCKED_PRICE_UNAVAILABLE",
+                    }
+                }
+            }
+
+    monkeypatch.setattr(
+        "app.services.intraday_market_state.get_intraday_market_state",
+        lambda: State(),
+    )
+
+    assert trade_outcome._intraday_ws_live_quotes(["RELIANCE"]) == {}
+
+
 def test_stale_intraday_rotation_is_background_and_coalesced(monkeypatch):
     started = Event()
     release = Event()

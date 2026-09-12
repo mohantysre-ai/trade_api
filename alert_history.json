@@ -2155,5 +2155,31 @@
     "firedAt": "2026-08-18T04:56:24.883247+00:00",
     "book": "INTRADAY",
     "action": "BUY"
+  },
+  {
+    "key": "NEW:LONG:lock:INTRADAY:2026-09-12",
+    "symbol": "NEW",
+    "direction": "LONG",
+    "hitLevel": "buy",
+    "label": "INTRADAY PICK \u00b7 BUY",
+    "ltp": 200.0,
+    "entryPrice": 200.0,
+    "planDate": "2026-09-12",
+    "firedAt": "2026-09-12T13:27:52.678272+00:00",
+    "book": "INTRADAY",
+    "action": "BUY"
+  },
+  {
+    "key": "LOCKED:LONG:lock:INTRADAY:2026-09-12",
+    "symbol": "LOCKED",
+    "direction": "LONG",
+    "hitLevel": "buy",
+    "label": "INTRADAY PICK \u00b7 BUY",
+    "ltp": 100.0,
+    "entryPrice": 100.0,
+    "planDate": "2026-09-12",
+    "firedAt": "2026-09-12T13:34:53.782586+00:00",
+    "book": "INTRADAY",
+    "action": "BUY"
   }
 ]

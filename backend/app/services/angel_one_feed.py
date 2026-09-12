@@ -4351,6 +4351,10 @@ def build_market_payload(
         snapshot["snapshotDataDate"] = data_date
         needs_refresh = _snapshot_needs_live_refresh(snapshot)
         snapshot["liveRefreshPending"] = needs_refresh
+        # F9.1-F9.3: staleness must be an explicit, always-set flag — not just
+        # inferable from isSnapshotFallback — so consumers that key off
+        # `dataStale` are never fooled by a silent cache fallback.
+        snapshot["dataStale"] = bool(needs_refresh)
         snapshot.setdefault("tickerNewsByTicker", {})
         if pool_name:
             snapshot["activePool"] = pool_name
@@ -4389,6 +4393,7 @@ def build_market_payload(
         if allow_fallback and snapshot is not None:
             snapshot = dict(snapshot)
             snapshot["isSnapshotFallback"] = True
+            snapshot["dataStale"] = True
             snapshot["llmError"] = snapshot.get("llmError")
             age_sec = _snapshot_quote_age_seconds(snapshot)
             if age_sec is not None:
@@ -5273,7 +5278,12 @@ def create_app() -> FastAPI:
         with _REFRESH_TASK_LOCK:
             _REFRESH_TASKS[task_id] = {"status": "running", "progress": "Initializing sequence...", "created_at": time.time()}
         
-        background_tasks.add_task(_run_orchestrated_sequence, task_id, pool, prompt)
+        threading.Thread(
+            target=_run_orchestrated_sequence,
+            args=(task_id, pool, prompt),
+            daemon=True,
+            name=f"orchestrated-{task_id}",
+        ).start()
         return {"success": True, "taskId": task_id, "message": "Sequential orchestrated refresh started."}
 
     @app.post("/api/refresh-intelligence")
@@ -5481,11 +5491,11 @@ def create_app() -> FastAPI:
         return response
 
     @app.post("/api/refresh-ticker-reason")
-    async def refresh_ticker_reason(request: Request, ticker: str | None = None, pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
+    def refresh_ticker_reason(request: Request, ticker: str | None = None, pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
         try:
             body: dict[str, Any] = {}
             try:
-                parsed_body = await request.json()
+                parsed_body = json.loads(request.body().decode("utf-8"))
                 if isinstance(parsed_body, dict):
                     body = parsed_body
             except Exception:
@@ -5565,7 +5575,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     @app.get("/api/ticker-news")
-    async def get_ticker_news(
+    def get_ticker_news(
         ticker: str,
         company: str | None = None,
         max_articles: int = 8,
@@ -5598,8 +5608,8 @@ def create_app() -> FastAPI:
                 cached_report["cached"] = True
                 return cached_report
 
-            async with httpx.AsyncClient() as http_client:
-                response = await http_client.get(
+            with httpx.Client() as http_client:
+                response = http_client.get(
                     f"{AI_NEWS_API_URL}/api/ticker-news",
                     params={
                         "ticker": resolved_ticker,
@@ -5935,13 +5945,14 @@ def main() -> int:
 
     try:
         resolved = _llm_config_canonical()
-        print(
-            f"[LLM-DEBUG] env_path={BASE_DIR / '.env'} "
-            f"LLM_PROVIDER={os.getenv('LLM_PROVIDER','')} "
-            f"LLM_MODEL={os.getenv('LLM_MODEL','')} "
-            f"ANGEL_PASSWORD={'set' if os.getenv('ANGEL_PASSWORD','').strip() else 'missing'} "
-            f"resolved={resolved}"
-        )
+        if os.getenv("ANGEL_DEBUG", "0").strip().lower() in ("1", "true", "yes"):
+            print(
+                f"[LLM-DEBUG] env_path={BASE_DIR / '.env'} "
+                f"LLM_PROVIDER={os.getenv('LLM_PROVIDER','')} "
+                f"LLM_MODEL={os.getenv('LLM_MODEL','')} "
+                f"ANGEL_PASSWORD={'set' if os.getenv('ANGEL_PASSWORD','').strip() else 'missing'} "
+                f"resolved={resolved}"
+            )
     except Exception as exc:
         print(f"[LLM-DEBUG] config inspect failed: {exc}")
 

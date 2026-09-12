@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
+import time
 from datetime import date, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -34,6 +36,7 @@ from .ingestion import (
 
 log = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
+EOD_HARD_TIMEOUT_SEC = int(os.getenv("EOD_HARD_TIMEOUT_SEC", "300"))
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
@@ -64,6 +67,93 @@ def run_eod_analysis(
     use_llm: bool = False,
     client: Any | None = None,
 ) -> dict[str, Any]:
+    """Orchestrate full EOD pipeline for a trading date (single-writer guarded).
+
+    A per-date atomic lock file (F3.1) prevents two concurrent runs (e.g. the
+    scheduler firing while an operator manually triggers a rebuild) from both
+    writing artifacts for the same day and corrupting them with an interleaved
+    write. Idempotent: if master payload exists and force=False, returns
+    existing without needing the lock.
+    """
+    if for_date is None:
+        resolved_date = datetime.now(tz=IST).date()
+    elif isinstance(for_date, str):
+        resolved_date = date.fromisoformat(for_date)
+    else:
+        resolved_date = for_date
+
+    day_dir = eod_day_dir(resolved_date)
+    master_path = os.path.join(day_dir, "master_eod_payload.json")
+    if not force and os.path.isfile(master_path):
+        # Fast, read-only idempotent path — no writer lock needed.
+        try:
+            with open(master_path, "r", encoding="utf-8-sig") as fh:
+                existing = json.load(fh)
+            _ensure_book_reports_cached(resolved_date)
+            return {
+                "success": True,
+                "skipped": True,
+                "reason": "artifacts_exist",
+                "date": resolved_date.isoformat(),
+                "payload": existing,
+                "llm_used": False,
+            }
+        except Exception:
+            pass
+
+    lock_path = os.path.join(day_dir, "eod_pipeline.lock")
+    lock_max_age = EOD_HARD_TIMEOUT_SEC * 3
+    fd = None
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        try:
+            age = time.time() - os.path.getmtime(lock_path)
+        except OSError:
+            age = None
+        if age is not None and age > lock_max_age:
+            # Prior run crashed/was killed without cleanup — steal the stale lock.
+            log.warning(
+                "EOD pipeline lock for %s is stale (%.0fs old); reclaiming",
+                resolved_date.isoformat(),
+                age,
+            )
+            try:
+                os.remove(lock_path)
+                fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            except OSError:
+                fd = None
+        if fd is None:
+            return {
+                "success": False,
+                "error": "EOD_PIPELINE_ALREADY_RUNNING",
+                "date": resolved_date.isoformat(),
+            }
+    try:
+        os.write(fd, str(os.getpid()).encode("utf-8"))
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+    try:
+        return _run_eod_analysis_locked(
+            resolved_date, force=force, use_llm=use_llm, client=client
+        )
+    finally:
+        try:
+            os.remove(lock_path)
+        except OSError:
+            pass
+
+
+def _run_eod_analysis_locked(
+    for_date: date,
+    *,
+    force: bool = False,
+    use_llm: bool = False,
+    client: Any | None = None,
+) -> dict[str, Any]:
     """Orchestrate full EOD pipeline for a trading date.
 
     Idempotent: if master payload exists and force=False, returns existing.
@@ -77,11 +167,6 @@ def run_eod_analysis(
       unless use_llm=True.
     """
     ensure_eod_schema_file()
-
-    if for_date is None:
-        for_date = datetime.now(tz=IST).date()
-    elif isinstance(for_date, str):
-        for_date = date.fromisoformat(for_date)
 
     day_dir = eod_day_dir(for_date)
     master_path = os.path.join(day_dir, "master_eod_payload.json")
@@ -242,6 +327,23 @@ def _ensure_book_reports_cached(for_date: date, *, force: bool = False) -> None:
 
     force=False still rebuilds when locked pick set ≠ cached trades (stale morning book).
     """
+    t = threading.Thread(
+        target=_ensure_book_reports_cached_impl,
+        args=(for_date, force),
+        daemon=True,
+    )
+    t.start()
+    t.join(timeout=EOD_HARD_TIMEOUT_SEC)
+    if t.is_alive():
+        log.warning(
+            "EOD_ANALYTICS_TIMEOUT after %.0fs for %s",
+            EOD_HARD_TIMEOUT_SEC,
+            for_date,
+        )
+
+
+def _ensure_book_reports_cached_impl(for_date: date, force: bool) -> None:
+    """Actual book-cache warmup; runs in a daemon thread under timeout."""
     try:
         from ..eod_book_cache import warm_book_caches
         from ..eod_intraday_report import generate_intraday_eod_report

@@ -97,7 +97,7 @@ def _fetch_yahoo_finance_price(symbol: str) -> float | None:
 
 
 def _fetch_angel_plan_prices(symbols: list[str]) -> dict[str, float]:
-    """Angel One ltpData for fixed-plan symbols (last traded print after close too)."""
+    """Fetch fixed-plan marks through bounded Angel batch quote requests."""
     out: dict[str, float] = {}
     if not symbols:
         return out
@@ -112,16 +112,15 @@ def _fetch_angel_plan_prices(symbols: list[str]) -> dict[str, float]:
         return out
     if client is None:
         return out
-    for sym in symbols:
-        try:
-            quote = client.fetch_symbol_quote(sym)
-            if not quote:
-                continue
-            ltp = float(quote.get("ltp", 0) or 0)
+    try:
+        token_map = aof._load_nse_eq_token_map()
+        instruments = aof._symbols_to_instruments(symbols, token_map, client=client)
+        for symbol, quote in client.fetch_batch_quotes(instruments).items():
+            ltp = float(quote.get("ltp", 0) or quote.get("lastPrice", 0) or 0)
             if ltp > 0:
-                out[sym.upper()] = ltp
-        except Exception:
-            continue
+                out[str(symbol).upper()] = ltp
+    except Exception:
+        return out
     return out
 
 
@@ -1130,13 +1129,17 @@ def _intraday_ws_live_quotes(symbols: list[str]) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     for symbol, quote in (snapshot.get("quotes") or {}).items():
         ltp = quote.get("ltp")
-        if ltp is None or quote.get("freshness") not in ("LIVE", "DEGRADED"):
+        freshness = quote.get("freshness")
+        if freshness not in ("LIVE", "DEGRADED"):
+            continue
+        if ltp is None:
             continue
         out[symbol] = {
-            "ltp": float(ltp),
+            "ltp": float(ltp) if ltp is not None else None,
             "source": quote.get("source"),
             "receivedAt": quote.get("receivedAt"),
             "dataAge": quote.get("dataAge"),
+            "freshness": freshness,
         }
     return out
 
@@ -1175,7 +1178,7 @@ def _compute_live_prices_for_plan(
             "marketOpen": _is_market_open(),
             "sessionClosed": not _is_market_open(),
             "dataStale": True,
-            "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0},
+            "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0, "LOCKED_PRICE_UNAVAILABLE": 0},
         }
 
     long_plan = fixed.get("long") or []
@@ -1191,7 +1194,7 @@ def _compute_live_prices_for_plan(
             "marketOpen": _is_market_open(),
             "sessionClosed": not _is_market_open(),
             "dataStale": True,
-            "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0},
+            "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0, "LOCKED_PRICE_UNAVAILABLE": 0},
         }
 
     open_symbols = list(
@@ -1276,7 +1279,10 @@ def _compute_live_prices_for_plan(
             ltp = live_quotes[symbol]
             ws_meta = ws_quote_meta.get(symbol)
             if ws_meta is not None:
-                ltp_source = "ANGEL_WS"
+                if ws_meta.get("freshness") == "LOCKED_PRICE_UNAVAILABLE":
+                    ltp_source = "LOCKED_PRICE_UNAVAILABLE"
+                else:
+                    ltp_source = "ANGEL_WS"
                 from_snapshot = False
             else:
                 ltp_source = "live"
@@ -1293,7 +1299,7 @@ def _compute_live_prices_for_plan(
                     except (TypeError, ValueError):
                         pass
 
-        data_stale = ltp_source in ("cached", "none") or (
+        data_stale = ltp_source in ("cached", "none", "LOCKED_PRICE_UNAVAILABLE") or (
             ltp_source == "snapshot"
             and snapshot_age_sec is not None
             and snapshot_age_sec > max(_PRICE_TTL, 300)

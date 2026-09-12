@@ -92,9 +92,14 @@ def desk_progress(mfe_r: float, current_r: float, effective_stop_r: float) -> st
 
 def _f(value: Any) -> float | None:
     try:
-        return None if value is None else float(value)
+        n = None if value is None else float(value)
     except (TypeError, ValueError):
         return None
+    if n is None:
+        return None
+    if n != n or n in (float("inf"), float("-inf")):
+        return None
+    return n
 
 
 def economic_r(*, pnl: float, risk_per_share: float | None, qty: int | None) -> float | None:

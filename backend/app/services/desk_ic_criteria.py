@@ -103,9 +103,12 @@ def _f(v: Any) -> float | None:
         if not v or v in {"—", "-", "N/A", "n/a", "NA", "None"}:
             return None
     try:
-        return float(v)
+        n = float(v)
     except (TypeError, ValueError):
         return None
+    if n != n or n in (float("inf"), float("-inf")):
+        return None
+    return n
 
 
 def _utc_now_iso() -> str:

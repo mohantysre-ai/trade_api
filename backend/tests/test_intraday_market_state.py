@@ -63,6 +63,13 @@ def test_invalid_ticks_are_rejected():
     assert state.symbol_state("2885") is None or state.symbol_state("2885")["ltp"] is None
 
 
+def test_unknown_universe_ticks_do_not_create_state_rows():
+    state = _state()
+
+    assert state.apply_tick("999999", 1, _tick(100.0)) == "invalid"
+    assert state.symbol_state("999999") is None
+
+
 def test_per_symbol_freshness_and_stale_isolation():
     state = _state()
     state.apply_tick("2885", 1, _tick(100.0))
@@ -79,6 +86,21 @@ def test_per_symbol_freshness_and_stale_isolation():
     # Only the stale symbol needs targeted recovery.
     stale = [row["symbol"] for row in state.stale_symbols()]
     assert stale == ["TCS"]
+
+
+def test_diagnostic_block_handles_mapping_session_shapes():
+    state = _state()
+    session = {
+        "sessionDate": "2026-09-13",
+        "sessionStatus": "DEGRADED",
+        "openPositions": {"LONG": [{"symbol": "RELIANCE"}], "SHORT": [{"symbol": "TCS"}]},
+        "freeSlots": {"LONG": 3, "SHORT": 2},
+    }
+
+    block = state.diagnostic_block(session)
+
+    assert "Locked        : 2" in block
+    assert "Free Slots    : 5" in block
 
 
 def test_capture_snapshot_is_immutable_vs_live_state():
@@ -120,6 +142,47 @@ class _FakeSdkSocket:
 
     def subscribe(self, correlation_id, mode, token_list):
         self.calls.append((correlation_id, mode, token_list))
+
+
+class _FailingSdkSocket(_FakeSdkSocket):
+    def __init__(self):
+        super().__init__()
+        self.closed = False
+
+    def subscribe(self, correlation_id, mode, token_list):
+        raise RuntimeError("subscribe failed")
+
+    def close_connection(self):
+        self.closed = True
+
+
+def test_failed_subscription_is_not_reported_as_connected():
+    stream = AngelIntradayStream(_state())
+    sdk = _FailingSdkSocket()
+    stream._socket = sdk
+
+    stream._on_open(sdk)
+
+    assert sdk.closed is True
+    assert stream.market_state.stream_status()["wsConnected"] is False
+
+
+def test_stream_credentials_use_smartapi_token_attributes():
+    class FakeSmart:
+        access_token = "access"
+        feed_token = "feed"
+
+    class FakeClient:
+        api_key = "api-key"
+        client_id = "client-id"
+
+        def connect(self):
+            return FakeSmart()
+
+    stream = AngelIntradayStream(_state())
+    stream._client = FakeClient()
+
+    assert stream._credentials() == ("access", "api-key", "client-id", "feed")
 
 
 def test_no_subscription_churn_from_repeated_ensure_or_lock_events():
