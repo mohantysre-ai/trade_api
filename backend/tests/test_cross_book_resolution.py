@@ -77,40 +77,33 @@ def test_intraday_keeps_when_swing_contract_fails(monkeypatch):
     )
 
 
-def test_reconcile_no_promotion_scrubs_swing_conflicts(tmp_path, monkeypatch):
+def test_reconcile_swing_untouched_intraday_blocks_on_conflict(tmp_path, monkeypatch):
     day = "2026-08-28"
     intra_path = tmp_path / "intraday_session.json"
     swing_path = tmp_path / "swing_session.json"
-    # Intraday owns GRASIM
-    intra_path.write_text(
-        '{"locked":true,"sessionDate":"2026-08-28","long":[{"symbol":"GRASIM","direction":"LONG","closed":false}],"short":[],"events":[]}',
+    # Swing owns RELIANCE (locked)
+    swing_path.write_text(
+        '{"locked":true,"sessionDate":"2026-08-28","long":[{"symbol":"RELIANCE","direction":"BUY","closed":false}],"short":[]}',
         encoding="utf-8",
     )
-    # Swing also has GRASIM - should be scrubbed
-    swing_path.write_text(
-        '{"locked":true,"sessionDate":"2026-08-28","long":[{"symbol":"GRASIM","direction":"BUY","closed":false}],"short":[]}',
+    # Intraday does not own it
+    intra_path.write_text(
+        '{"locked":true,"sessionDate":"2026-08-28","long":[],"short":[],"events":[]}',
         encoding="utf-8",
     )
     monkeypatch.setattr(xbook, "_INTRADAY_SESSION_PATH", str(intra_path))
     monkeypatch.setattr(xbook, "_SWING_SESSION_PATH", str(swing_path))
-    monkeypatch.setattr(
-        "app.services.swing_session._atomic_write",
-        lambda path, payload: swing_path.write_text(
-            __import__("json").dumps(payload),
-            encoding="utf-8",
-        ),
-    )
 
     result = xbook.reconcile_cross_book(day, persist=True)
     # No promotion from intraday to swing
     assert result["promotedFromIntraday"] == []
     assert result["swingPreferred"] == []
-    # Swing symbol GRASIM is scrubbed because intraday owns it
-    assert result["scrubbedFromSwing"] == ["GRASIM"]
-    # Intraday still has GRASIM
-    saved_intra = __import__("json").loads(intra_path.read_text(encoding="utf-8"))
-    assert any(r.get("symbol") == "GRASIM" for r in saved_intra.get("long", []))
-    # Swing no longer has GRASIM
+    # No scrubbing - Swing remains untouched
+    assert result["scrubbedFromSwing"] == []
+    # Swing reports its owned symbols
+    assert result["swingOwned"] == ["RELIANCE"]
+    # Intraday blocks empty (no intraday symbols)
+    assert result["intradayBlocksSwing"] == []
+    # Swing file unchanged
     saved_swing = __import__("json").loads(swing_path.read_text(encoding="utf-8"))
-    assert not any(r.get("symbol") == "GRASIM" for r in saved_swing.get("long", []))
-    assert saved_swing.get("crossBookExcluded") == ["GRASIM"]
+    assert any(r.get("symbol") == "RELIANCE" for r in saved_swing.get("long", []))
