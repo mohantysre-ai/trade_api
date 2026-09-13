@@ -1,10 +1,11 @@
 """Cross-book resolution between Swing and Intraday desks.
 
-Intraday always keeps its symbols. Swing must discard any symbol that Intraday owns.
+Swing owns its symbols. Intraday must reject new entries/re-entries when Swing owns the symbol.
 
 - Intraday LONG symbols are never promoted to Swing.
-- Swing scrubs any symbol that exists on the Intraday LONG book.
+- Swing positions remain untouched (no scrubbing).
 - Intraday SHORT rows are never relevant to Swing (Swing book is BUY-only).
+- Intraday rejects new entry/re-entry when Swing owns the symbol.
 """
 from __future__ import annotations
 
@@ -156,8 +157,25 @@ def intraday_blocks_swing_symbol(
     return not swing_prefers_over_intraday(symbol, row, snapshot=snapshot)
 
 
+def swing_locked_symbols_for_day(day: str) -> set[str]:
+    """Swing LONG symbols that are locked for the given day."""
+    session = _read_json(_SWING_SESSION_PATH)
+    if str(session.get("sessionDate") or "")[:10] != str(day or "")[:10]:
+        return set()
+    if not session.get("locked"):
+        return set()
+    out: set[str] = set()
+    for row in session.get("long") or []:
+        if not isinstance(row, dict) or row.get("closed"):
+            continue
+        sym = str(row.get("symbol") or row.get("ticker") or "").upper().strip()
+        if sym:
+            out.add(sym)
+    return out
+
+
 def intraday_locked_symbols_respecting_swing(day: str) -> set[str]:
-    """Intraday LONG symbols that still block swing after swing-first resolution."""
+    """Intraday LONG symbols that still block swing after cross-book resolution."""
     session = _read_json(_INTRADAY_SESSION_PATH)
     blocked = locked_symbols_for_date(session, day=day)
     if not blocked:
@@ -171,62 +189,24 @@ def intraday_locked_symbols_respecting_swing(day: str) -> set[str]:
 
 
 def reconcile_cross_book(day: str, *, persist: bool = True) -> dict[str, Any]:
-    """Apply cross-book rules: Intraday owns its symbols; Swing discards conflicts."""
+    """Report cross-book state: Swing owns symbols; Intraday must block on conflicts."""
     snap = _load_matrix_snapshot()
     intra_session = _read_json(_INTRADAY_SESSION_PATH)
     swing_session = _read_json(_SWING_SESSION_PATH)
-    promoted: list[str] = []
-    swing_scrubbed: list[str] = []
 
-    # Swing-first promotion DISABLED: Intraday always keeps its symbols.
-    # No symbols are promoted from Intraday to Swing.
+    # Swing-first promotion DISABLED: Intraday never promotes to Swing.
+    # Swing positions remain untouched (no scrubbing).
+    # Intraday should reject new entries/re-entries for symbols Swing owns.
 
-    # Scrub swing symbols that Intraday already owns (Intraday wins conflicts).
-    if (
-        str(swing_session.get("sessionDate") or "")[:10] == str(day or "")[:10]
-        and swing_session.get("locked")
-    ):
-        intra_rows = intraday_long_rows(intra_session)
-        open_long = [
-            r for r in (swing_session.get("long") or [])
-            if isinstance(r, dict) and not r.get("closed")
-        ]
-        closed_long = [
-            r for r in (swing_session.get("long") or [])
-            if isinstance(r, dict) and r.get("closed")
-        ]
-        drop_from_swing: set[str] = set()
-        for row in open_long:
-            sym = str(row.get("symbol") or "").upper().strip()
-            if not sym or sym not in intra_rows:
-                continue
-            # Intraday owns this symbol -> swing must discard it
-            drop_from_swing.add(sym)
-        if drop_from_swing:
-            kept, dropped = filter_rows_excluding(open_long, drop_from_swing)
-            swing_scrubbed = sorted(set(dropped))
-            sess = dict(swing_session)
-            sess["long"] = closed_long + kept
-            sess["crossBookExcluded"] = swing_scrubbed
-            sess["updatedAt"] = _utc_now_iso()
-            if persist:
-                from .swing_session import _atomic_write, _recompute_active_swing_totals
-
-                _recompute_active_swing_totals(sess)
-                _atomic_write(_SWING_SESSION_PATH, sess)
-            swing_session = sess
-            log.info(
-                "Scrubbed %d swing name(s) owned by Intraday desk: %s",
-                len(swing_scrubbed),
-                ",".join(swing_scrubbed),
-            )
+    swing_owned = swing_locked_symbols_for_day(day)
 
     return {
         "day": day,
         "swingPreferred": [],
-        "promotedFromIntraday": promoted,
-        "scrubbedFromSwing": swing_scrubbed,
+        "promotedFromIntraday": [],
+        "scrubbedFromSwing": [],
         "intradayBlocksSwing": sorted(intraday_locked_symbols_respecting_swing(day)),
+        "swingOwned": sorted(swing_owned),
     }
 
 
