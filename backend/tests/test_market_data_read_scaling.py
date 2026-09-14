@@ -38,5 +38,7 @@ def test_market_snapshot_loader_invalidates_on_file_change(tmp_path, monkeypatch
     feed._MARKET_SNAPSHOT_MEMORY_PATH = None
     feed._MARKET_SNAPSHOT_MEMORY_MTIME_NS = None
     assert feed._load_last_snapshot()["version"] == 1
+    import time
+    time.sleep(0.05)
     snap.write_text(json.dumps({"success": True, "version": 2, "padding": "changed"}), encoding="utf-8")
     assert feed._load_last_snapshot()["version"] == 2

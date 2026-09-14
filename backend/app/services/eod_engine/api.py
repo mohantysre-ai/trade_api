@@ -65,7 +65,17 @@ def eod_month_pnl(month: Optional[str] = Query(None)) -> dict[str, Any]:
 
 @router.get("/api/eod/summary/{analysis_date}")
 def eod_summary(analysis_date: str) -> dict[str, Any]:
-    return _read_json_file(_day_path(analysis_date, "master_eod_payload.json"))
+    payload = _read_json_file(_day_path(analysis_date, "master_eod_payload.json"))
+    try:
+        from app.services.shared_state.view_store import get_view_store
+        from app.services.shared_state.event_bus import get_event_bus, EventType
+        get_view_store().set("eod", payload)
+        get_event_bus().publish(
+            Event(type=EventType.EOD_READY, payload={"date": analysis_date})
+        )
+    except Exception:
+        pass
+    return payload
 
 
 @router.get("/api/eod/scorecards/{analysis_date}")

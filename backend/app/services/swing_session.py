@@ -2307,6 +2307,15 @@ def _refresh_swing_response_cache(started_gen: int) -> None:
                 return
             _SWING_RESPONSE_CACHE = copy.deepcopy(result)
             _SWING_RESPONSE_CACHE_AT = time.monotonic()
+        try:
+            from app.services.shared_state.view_store import get_view_store
+            from app.services.shared_state.event_bus import get_event_bus, EventType
+            get_view_store().set("swing", result)
+            get_event_bus().publish(
+                Event(type=EventType.SWING_STATE_CHANGED, payload={"version": result.get("version", 0)})
+            )
+        except Exception:
+            pass
     except Exception:
         log.exception("swing live refresh failed; serving persisted marks")
     finally:

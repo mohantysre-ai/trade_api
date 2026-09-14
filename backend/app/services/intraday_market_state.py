@@ -355,6 +355,22 @@ class IntradayMarketState:
             self._last_tick_at = now
             self._update_bar_locked(token, ltp, now.astimezone(IST_ZONE))
         _metric("ws_tick_count")
+        try:
+            from app.services.shared_state.market_state import get_market_state
+            from app.services.shared_state.schemas import FeedStatus, Quote
+            ms = get_market_state()
+            ms.update_quote(
+                Quote(
+                    symbol=str(row.get("symbol") or "").upper(),
+                    ltp=ltp,
+                    volume=row.get("tradeVolume"),
+                    oi=row.get("oi"),
+                    source="ANGEL_WS",
+                    feed_status=FeedStatus.LIVE,
+                )
+            )
+        except Exception:
+            pass
         return "new"
 
     def _update_bar_locked(self, token: str, ltp: float, stamp: datetime) -> None:
@@ -477,6 +493,20 @@ class IntradayMarketState:
             _metric("rest_recovery_count")
         else:
             _metric("rest_bootstrap_count")
+        try:
+            from app.services.shared_state.market_state import get_market_state
+            from app.services.shared_state.schemas import FeedStatus, Quote
+            ms = get_market_state()
+            ms.update_quote(
+                Quote(
+                    symbol=str(symbol).upper(),
+                    ltp=ltp,
+                    source=str(source),
+                    feed_status=FeedStatus.LIVE if source == SOURCE_WS else FeedStatus.DEGRADED,
+                )
+            )
+        except Exception:
+            pass
         return True
 
     # -------------------------------------------------- snapshot / status

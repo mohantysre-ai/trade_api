@@ -4857,6 +4857,7 @@ def create_app() -> FastAPI:
             replay_session_payload,
         )
         from .index_options_paper import index_options_market_open
+        from app.services.shared_state.view_store import get_view_store
 
         if sessionDate:
             try:
@@ -4882,6 +4883,19 @@ def create_app() -> FastAPI:
                 _compose()
             finally:
                 _RADAR_REFRESH_LOCK.release()
+
+        view = get_view_store().get("index_options")
+        if view:
+            payload = view.get("payload") or {}
+            if payload.get("success"):
+                age = time.time() - (view.get("updatedAt") or 0)
+                if age < 90.0:
+                    return {**payload, "cacheStatus": "HIT"}
+                if age < 300.0:
+                    background_tasks.add_task(_refresh_bg)
+                    return {**payload, "cacheStatus": "REFRESHING"}
+                background_tasks.add_task(_refresh_bg)
+                return {**payload, "cacheStatus": "STALE"}
 
         cached = load_persisted_radar()
         if not index_options_market_open(datetime.now(tz=IST_ZONE)):

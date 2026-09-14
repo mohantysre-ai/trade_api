@@ -90,7 +90,7 @@ def run_eod_analysis(
             with open(master_path, "r", encoding="utf-8-sig") as fh:
                 existing = json.load(fh)
             _ensure_book_reports_cached(resolved_date)
-            return {
+            result = {
                 "success": True,
                 "skipped": True,
                 "reason": "artifacts_exist",
@@ -98,6 +98,16 @@ def run_eod_analysis(
                 "payload": existing,
                 "llm_used": False,
             }
+            try:
+                from app.services.shared_state.view_store import get_view_store
+                from app.services.shared_state.event_bus import get_event_bus, EventType
+                get_view_store().set("eod", result)
+                get_event_bus().publish(
+                    Event(type=EventType.EOD_READY, payload={"date": resolved_date.isoformat()})
+                )
+            except Exception:
+                pass
+            return result
         except Exception:
             pass
 
@@ -177,7 +187,7 @@ def _run_eod_analysis_locked(
             with open(master_path, "r", encoding="utf-8-sig") as fh:
                 existing = json.load(fh)
             _ensure_book_reports_cached(for_date)
-            return {
+            result = {
                 "success": True,
                 "skipped": True,
                 "reason": "artifacts_exist",
@@ -185,6 +195,16 @@ def _run_eod_analysis_locked(
                 "payload": existing,
                 "llm_used": False,
             }
+            try:
+                from app.services.shared_state.view_store import get_view_store
+                from app.services.shared_state.event_bus import get_event_bus, EventType
+                get_view_store().set("eod", result)
+                get_event_bus().publish(
+                    Event(type=EventType.EOD_READY, payload={"date": for_date.isoformat()})
+                )
+            except Exception:
+                pass
+            return result
         except Exception:
             pass
 
@@ -212,7 +232,7 @@ def _run_eod_analysis_locked(
             {"date": for_date.isoformat(), "proposals": []},
             payload.pm_commentary,
         )
-        return {
+        result = {
             "success": True,
             "skipped": False,
             "date": for_date.isoformat(),
@@ -220,6 +240,16 @@ def _run_eod_analysis_locked(
             "payload": payload.model_dump(mode="json"),
             "llm_used": False,
         }
+        try:
+            from app.services.shared_state.view_store import get_view_store
+            from app.services.shared_state.event_bus import get_event_bus, EventType
+            get_view_store().set("eod", result)
+            get_event_bus().publish(
+                Event(type=EventType.EOD_READY, payload={"date": for_date.isoformat()})
+            )
+        except Exception:
+            pass
+        return result
 
     symbols = [p["symbol"] for p in picks]
     candles_by_sym = fetch_and_persist_candles(for_date, symbols, client=client)
@@ -311,7 +341,7 @@ def _run_eod_analysis_locked(
 
     _ensure_book_reports_cached(for_date, force=True)
 
-    return {
+    result = {
         "success": True,
         "skipped": False,
         "date": for_date.isoformat(),
@@ -320,6 +350,16 @@ def _run_eod_analysis_locked(
         "payload": payload.model_dump(mode="json"),
         "llm_used": bool(allow_llm and commentary.source == "LLM"),
     }
+    try:
+        from app.services.shared_state.view_store import get_view_store
+        from app.services.shared_state.event_bus import get_event_bus, EventType
+        get_view_store().set("eod", result)
+        get_event_bus().publish(
+            Event(type=EventType.EOD_READY, payload={"date": for_date.isoformat()})
+        )
+    except Exception:
+        pass
+    return result
 
 
 def _ensure_book_reports_cached(for_date: date, *, force: bool = False) -> None:

@@ -199,6 +199,15 @@ def _hunt_loop(client_factory: Callable[[], Any]) -> None:
                     dailyEntryCount=int(paper.get("entryCount") or 0),
                     huntActive=bool(radar.get("huntActive")),
                 )
+                try:
+                    from app.services.shared_state.view_store import get_view_store
+                    from app.services.shared_state.event_bus import get_event_bus, EventType
+                    get_view_store().set("index_options", radar)
+                    get_event_bus().publish(
+                        Event(type=EventType.INDEX_OPTIONS_STATE_CHANGED, payload={"version": radar.get("version", 0)})
+                    )
+                except Exception:
+                    pass
             except Exception as exc:
                 client = None
                 with _STATUS_LOCK:
