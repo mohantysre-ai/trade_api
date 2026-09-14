@@ -4874,6 +4874,7 @@ def create_app() -> FastAPI:
                 ensure_fresh_market_snapshot(reason="index_options_compose"),
                 live=live,
                 client=AngelOneClient(),
+                persist=live,
             )
 
         def _refresh_bg() -> None:

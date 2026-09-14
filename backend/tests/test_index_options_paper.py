@@ -98,6 +98,42 @@ def test_fixed_40_point_target_closes_and_cooldown_prevents_immediate_reentry(tm
     assert closed["entryCount"] == 1
 
 
+def test_reentry_after_cooldown_requires_current_candidate_confirmations(tmp_path, monkeypatch):
+    monkeypatch.setenv("INDEX_OPTIONS_PAPER_BOOK_FILE", str(tmp_path / "paper.json"))
+    now = datetime(2026, 8, 24, 11, 0, tzinfo=IST_ZONE)
+    reconcile_paper_book(_radar(), now=now)
+    reconcile_paper_book(_radar(140), now=now + timedelta(minutes=1))
+    blocked = reconcile_paper_book(_radar(100), now=now + timedelta(minutes=22))
+    assert blocked["open"] == []
+    row = _candidate(100)
+    row["gates"] = {
+        "fresh": True,
+        "structure": True,
+        "breakout": True,
+        "futuresOi": True,
+        "breadth": True,
+    }
+    allowed = reconcile_paper_book(
+        {"candidates": [row], "selected": [row]},
+        now=now + timedelta(minutes=23),
+    )
+    assert len(allowed["open"]) == 1
+    assert allowed["entryCount"] == 2
+
+
+def test_cross_book_owner_blocks_new_paper_entry(tmp_path, monkeypatch):
+    monkeypatch.setenv("INDEX_OPTIONS_PAPER_BOOK_FILE", str(tmp_path / "paper.json"))
+    monkeypatch.setattr(
+        "app.services.index_options_paper._cross_book_owner",
+        lambda row, session_date: "SWING",
+    )
+    radar = _radar()
+    book = reconcile_paper_book(radar, now=datetime(2026, 8, 24, 11, 0, tzinfo=IST_ZONE))
+    assert book["entryCount"] == 0
+    assert book["open"] == []
+    assert radar["selected"][0]["ownershipBlockedBy"] == "SWING"
+
+
 def test_premium_too_low_for_true_20_point_stop_is_not_locked(tmp_path, monkeypatch):
     monkeypatch.setenv("INDEX_OPTIONS_PAPER_BOOK_FILE", str(tmp_path / "paper.json"))
     row = _candidate(mark=20.0)

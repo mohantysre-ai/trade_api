@@ -28,7 +28,16 @@ MAX_ATTEMPTS_PER_INDEX = 20
 MAX_CONCURRENT_TRADES = 2
 MIN_ELIGIBLE_SCORE = 70.0
 
-_LONG_PREMIUM_SAFETY_GATES = ("fresh", "contractEconomics")
+_LONG_PREMIUM_SAFETY_GATES = (
+    "fresh",
+    "structure",
+    "breakout",
+    "futuresOi",
+    "optionChain",
+    "breadth",
+    "contractEconomics",
+    "riskReward",
+)
 
 
 def _num(value: Any) -> float | None:
@@ -210,6 +219,7 @@ def _candidate(index: dict[str, str], snapshot: dict[str, Any]) -> dict[str, Any
         "score": score,
         "scoreFloor": MIN_ELIGIBLE_SCORE,
         "failedGates": failed,
+        "gates": dict(gates),
         "missingInputs": sorted(set(unavailable + missing)),
         "contract": supplied.get("contract"),
         "providerStatus": supplied.get("providerStatus"),

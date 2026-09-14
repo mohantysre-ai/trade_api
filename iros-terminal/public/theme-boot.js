@@ -9,5 +9,5 @@
     document.documentElement.setAttribute("data-theme", t);
     document.documentElement.setAttribute("data-font", f);
     document.documentElement.style.colorScheme = t;
-  } catch (e) {}
+  } catch {}
 })();

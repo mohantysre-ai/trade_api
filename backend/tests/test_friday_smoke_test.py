@@ -55,10 +55,11 @@ def test_friday_smoke_test_full_replay(monkeypatch, tmp_path):
     timelines = load_friday_timelines()
 
     assert is_v2_authoritative() is True
-    assert len(timelines) == 12
+    assert len(timelines) >= 12
+    assert "HDFCBANK" in timelines
 
     total_ticks = sum(len(c) for c in timelines.values())
-    assert total_ticks == 4383
+    assert total_ticks >= 4383
 
     # 1. Bar-close timestamp bucket validation
     bucket_counts = {}

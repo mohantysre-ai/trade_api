@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
@@ -385,7 +385,8 @@ function useAdaptiveTooltip() {
 
 function MiniSparkline({ positive }: { positive: boolean }) {
   const color = positive ? '#10b981' : '#ef4444';
-  const id = `mini-${positive ? 'g' : 'r'}-${Math.random().toString(36).slice(2, 6)}`;
+  const stableId = useId().replace(/:/g, '');
+  const id = `mini-${positive ? 'g' : 'r'}-${stableId}`;
   const fillUrl = 'url(#' + id + ')';
 
   let pathD: string;

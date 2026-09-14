@@ -1,0 +1,11 @@
+{
+  "name": "alphix-performance-tests",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
+  },
+  "scripts": {
+    "ui": "node ui_performance.mjs"
+  }
+}

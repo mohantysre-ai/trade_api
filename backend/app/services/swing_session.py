@@ -117,17 +117,9 @@ def _invalidate_swing_response_cache() -> None:
 
 
 def _atomic_write(path: str, payload: dict[str, Any]) -> None:
-    parent = os.path.dirname(path)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(payload, fh, indent=2, default=str)
-    try:
-        os.replace(tmp, path)
-    except OSError:
-        with open(path, "w", encoding="utf-8") as fh:
-            json.dump(payload, fh, indent=2, default=str)
+    from .json_atomic import atomic_write_json
+
+    atomic_write_json(path, payload)
     _invalidate_swing_response_cache()
 
 

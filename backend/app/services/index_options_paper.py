@@ -409,6 +409,35 @@ def _governor(book: dict[str, Any]) -> IndexOptionReEntryGovernor:
     return governor
 
 
+def _cross_book_owner(row: dict[str, Any], session_date: str) -> str | None:
+    symbol = str(row.get("ownershipSymbol") or row.get("key") or "").upper().strip()
+    if not symbol:
+        return "INVALID"
+    from .cross_book_resolution import (
+        intraday_blocks_swing_symbol,
+        swing_locked_symbols_for_day,
+    )
+
+    if symbol in swing_locked_symbols_for_day(session_date):
+        return "SWING"
+    if intraday_blocks_swing_symbol(symbol, session_date):
+        return "INTRADAY"
+    return None
+
+
+def _reentry_confirmations(row: dict[str, Any]) -> dict[str, bool]:
+    gates = row.get("gates") if isinstance(row.get("gates"), dict) else {}
+    breakout = all(gates.get(name) is True for name in ("fresh", "structure", "breakout"))
+    oi = gates.get("futuresOi") is True
+    breadth = gates.get("breadth") is True
+    return {
+        "fresh_breakout_confirmed": breakout,
+        "oi_aligned": oi,
+        "breadth_aligned": breadth,
+        "opposite_confirmation": breakout,
+    }
+
+
 def reconcile_paper_book(
     radar: dict[str, Any], *, client: Any = None, now: datetime | None = None, persist: bool = True,
 ) -> dict[str, Any]:
@@ -481,10 +510,14 @@ def reconcile_paper_book(
                     break
                 if row.get("state") != "ELIGIBLE" or row.get("key") in open_indexes or row.get("bucket") in open_buckets:
                     continue
+                owner = _cross_book_owner(row, session)
+                if owner:
+                    row["ownershipBlockedBy"] = owner
+                    continue
                 governor = _governor(book)
                 decision = can_reenter_index_option(
                     str(row.get("key") or ""), str(row.get("direction") or ""), clock, governor,
-                    fresh_breakout_confirmed=True, oi_aligned=True, breadth_aligned=True,
+                    **_reentry_confirmations(row),
                 )
                 if not decision.get("allowed"):
                     continue

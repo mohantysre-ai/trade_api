@@ -197,17 +197,10 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
   const [enrichingLlm, setEnrichingLlm] = useState(false);
   const [deskIc, setDeskIc] = useState<DeskIcPayload | null>(initialDeskIc ?? null);
   const [deskError, setDeskError] = useState<string | null>(null);
-  const initialDeskIcRef = useRef(initialDeskIc);
-  initialDeskIcRef.current = initialDeskIc;
-
   useEffect(() => {
-    setDeskIc(initialDeskIcRef.current ?? null);
+    setDeskIc(initialDeskIc ?? null);
     setDeskError(null);
-  }, [normalizedTicker]);
-
-  useEffect(() => {
-    if (initialDeskIc) setDeskIc(initialDeskIc);
-  }, [normalizedTicker, initialDeskIc?.generatedAt, initialDeskIc?.deskDecision]);
+  }, [normalizedTicker, initialDeskIc]);
 
   useEffect(() => {
     if (activeView !== "dashboard" || !normalizedTicker) return;
@@ -224,7 +217,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
     );
 
     const loadDeskIc = async () => {
-      const hasCached = Boolean(initialDeskIcRef.current);
+      const hasCached = Boolean(initialDeskIc);
       setDeskError(null);
       if (!hasCached) setLoadingDashboard(true);
 
@@ -283,7 +276,7 @@ export default function ConfidenceCheckerPanel({ ticker, companyName, initialDes
       window.clearTimeout(fastTimer);
       window.clearTimeout(llmTimer);
     };
-  }, [activeView, normalizedTicker]);
+  }, [activeView, normalizedTicker, initialDeskIc]);
 
   const widgetUrl = useMemo(() => {
     if (!normalizedTicker) return "";

@@ -219,10 +219,6 @@ def load_book_cache(for_date, kind: str) -> dict[str, Any] | None:
     if int(data.get("bookCacheSchemaVersion") or 0) != BOOK_CACHE_SCHEMA_VERSION:
         log.info("Ignoring stale %s Book cache for %s (schema=%s current=%s)", kind, for_date, data.get("bookCacheSchemaVersion"), BOOK_CACHE_SCHEMA_VERSION)
         return None
-    try:
-        _reconcile_master_from_books(for_date)
-    except Exception as exc:
-        log.warning("EOD Book reconciliation failed for %s: %s", for_date, exc)
     out = dict(data)
     out["fromCache"] = True
     return out

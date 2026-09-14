@@ -1103,15 +1103,15 @@ export default function EodAnalysisPanel({
 
   // forceBookRebuild is read only when refreshToken/date triggers — parent may clear it without a second fetch
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch synchronizes this client panel with the selected report date
+     
     void fetchReports({ force: forceBookRebuild });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot force paired with refreshToken
+     
   }, [fetchReports, refreshToken]);
 
   // Market-hours live marks — overlay LTP / MTM without rewriting book cache
   useEffect(() => {
     if (!isTodayBook) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear a now-inapplicable live overlay when browsing historical books
+       
       setLiveMarks(null);
       return;
     }

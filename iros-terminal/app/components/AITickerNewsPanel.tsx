@@ -138,7 +138,8 @@ export default function AITickerNewsPanel({
 
   const fetchNews = useCallback(async (forceRefresh = false) => {
     if (!ticker) return;
-    report ? setRefreshing(true) : setLoading(true);
+    if (report) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
       setReport(await fetchTickerNewsReport(ticker, { company: companyName, maxArticles: 8, includeRaw: true, forceRefresh }));
