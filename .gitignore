@@ -37,3 +37,9 @@ strix_runs/
 *.sqlite3
 *.sqlite3-wal
 *.sqlite3-shm
+# Python runtime
+__pycache__/
+*.pyc
+*.pyo
+# Kilo IDE cache
+.aicache/
