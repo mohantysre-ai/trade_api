@@ -302,43 +302,47 @@ def _seller_candidate(index: dict[str, str], snapshot: dict[str, Any]) -> dict[s
 
 
 def build_index_options_radar(snapshot: dict[str, Any] | None) -> dict[str, Any]:
-    payload = snapshot if isinstance(snapshot, dict) else {}
-    candidates = [_candidate(index, payload) for index in INDEX_CONFIG]
-    seller_candidates = [_seller_candidate(index, payload) for index in INDEX_CONFIG]
-    eligible = sorted((row for row in [*candidates, *seller_candidates] if row["eligible"]),
-                      key=lambda row: row["score"] or 0, reverse=True)
-    selected: list[dict[str, Any]] = []
-    used_buckets: set[str] = set()
-    used_indexes: set[str] = set()
-    for row in eligible:
-        if row["bucket"] in used_buckets or row["key"] in used_indexes or len(selected) >= MAX_CONCURRENT_TRADES:
-            continue
-        selected.append(row)
-        used_buckets.add(row["bucket"])
-        used_indexes.add(row["key"])
-    return {
-        "success": True,
-        "executionPolicy": "AUTO_PAPER_ONLY",
-        "strategy": "LONG_PREMIUM_OR_DEFINED_RISK_PREMIUM_SELLING",
-        "updatedAt": payload.get("updatedAt"),
-        "candidates": candidates,
-        "sellerCandidates": seller_candidates,
-        "selected": selected,
-        "limits": {
-            "minDailyEntries": MIN_DAILY_ENTRIES,
-            "maxDailyEntries": MAX_DAILY_ENTRIES,
-            "maxConcurrent": MAX_CONCURRENT_TRADES,
-            "maxPerCorrelationBucket": 1,
-            "scoreFloor": MIN_ELIGIBLE_SCORE,
-            "huntMode": "CONTINUOUS_MARKET_SESSION",
-        },
-        "reentryPolicy": {
-            "maxAttemptsPerIndex": MAX_ATTEMPTS_PER_INDEX,
-            "hardBanAfterStopLosses": 2,
-            "targetCooldownMin": 20,
-            "profitTrailCooldownMin": 30,
-            "sameDirectionStopCooldownMin": 45,
-            "confirmationRequired": ["freshBreakout", "futuresOi", "weightedBreadth"],
-            "riskScale": 0.5,
-        },
-    }
+    try:
+        from app.services.index_options.radar_builder import build_index_options_radar_v2
+        return build_index_options_radar_v2(snapshot)
+    except Exception:
+        payload = snapshot if isinstance(snapshot, dict) else {}
+        candidates = [_candidate(index, payload) for index in INDEX_CONFIG]
+        seller_candidates = [_seller_candidate(index, payload) for index in INDEX_CONFIG]
+        eligible = sorted((row for row in [*candidates, *seller_candidates] if row["eligible"]),
+                          key=lambda row: row["score"] or 0, reverse=True)
+        selected: list[dict[str, Any]] = []
+        used_buckets: set[str] = set()
+        used_indexes: set[str] = set()
+        for row in eligible:
+            if row["bucket"] in used_buckets or row["key"] in used_indexes or len(selected) >= MAX_CONCURRENT_TRADES:
+                continue
+            selected.append(row)
+            used_buckets.add(row["bucket"])
+            used_indexes.add(row["key"])
+        return {
+            "success": True,
+            "executionPolicy": "AUTO_PAPER_ONLY",
+            "strategy": "LONG_PREMIUM_OR_DEFINED_RISK_PREMIUM_SELLING",
+            "updatedAt": payload.get("updatedAt"),
+            "candidates": candidates,
+            "sellerCandidates": seller_candidates,
+            "selected": selected,
+            "limits": {
+                "minDailyEntries": MIN_DAILY_ENTRIES,
+                "maxDailyEntries": MAX_DAILY_ENTRIES,
+                "maxConcurrent": MAX_CONCURRENT_TRADES,
+                "maxPerCorrelationBucket": 1,
+                "scoreFloor": MIN_ELIGIBLE_SCORE,
+                "huntMode": "CONTINUOUS_MARKET_SESSION",
+            },
+            "reentryPolicy": {
+                "maxAttemptsPerIndex": MAX_ATTEMPTS_PER_INDEX,
+                "hardBanAfterStopLosses": 2,
+                "targetCooldownMin": 20,
+                "profitTrailCooldownMin": 30,
+                "sameDirectionStopCooldownMin": 45,
+                "confirmationRequired": ["freshBreakout", "futuresOi", "weightedBreadth"],
+                "riskScale": 0.5,
+            },
+        }

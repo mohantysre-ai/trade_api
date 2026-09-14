@@ -2,6 +2,22 @@
   "version": 1,
   "events": [
     {
+      "id": "evt-1789409295776-qgpm",
+      "timestamp": "2026-09-14T18:08:15.776Z",
+      "directive": "Diff-Only Output",
+      "source": ".vscode/settings.json",
+      "tokensSaved": 237,
+      "costSavedUsd": 0.0007109999999999999,
+      "details": "Applied 83 token diff hunk instead of rewriting full 320 token file (74% tokens saved)",
+      "sessionNumber": 3,
+      "beforeTokens": 320,
+      "afterTokens": 83,
+      "reductionPercent": 74,
+      "modelName": "Claude Sonnet 5",
+      "beforeContent": "{\n  \"github.copilot.chat.codeGeneration.instructions\": [\n    {\n      \"file\": \".vscode/copilot-instructions.md\"\n    }\n  ],\n  \"mcp\": {\n    \"servers\": {\n      \"headroom\": {\n        \"command\": \"headroom\",\n        \"args\": [\n          \"mcp\",\n          \"serve\"\n        ],\n        \"type\": \"stdio\",\n        \"env\": {\n          \"HEADROOM_BEACON\": \"off\",\n          \"HEADROOM_TELEMETRY\": \"off\",\n          \"HEADROOM_OFFLINE\": \"1\",\n          \"DO_NOT_TRACK\": \"1\"\n        }\n      },\n      \"token-cache\": {\n        \"command\": \"node\",\n        \"args\": [\n          \"c:\\\\Users\\\\Joker\\\\.vscode\\\\extensions\\\\sarfudheen.tokenshield-1.0.18\\\\dist\\\\cache-server.js\",\n          \"d:\\\\trade_api\"\n        ],\n        \"type\": \"stdio\"\n      }\n    }\n  },\n  \"github.copilot.chat.codesearch.exclude\": {\n    \"*.lock\": true,\n    \"*.min.js\": true,\n    \"*.min.css\": true,\n    \"*.map\": true,\n    \"*.d.ts\": true,\n    \"*.generated.*\": true,\n    \"dist/**\": true,\n    \"build/**\": true,\n    \"coverage/**\": true,\n    \".git/**\": true,\n    \"node_modules/**\": true,\n    \".next/**\": true,\n    \".nuxt/**\": true,\n    \"__pycache__/**\": true,\n    \"*.pyc\": true,\n    \"*.pyo\": true,\n    \"target/**\": true,\n    \"vendor/**\": true\n  },\n  \"CodeGPT.apiKey\": \"CodeGPT Plus Beta\"\n}",
+      "afterContent": "diff --git a/.vscode/settings.json b/.vscode/settings.json\nindex 3f24862..5bd69ad 100644\n--- a/.vscode/settings.json\n+++ b/.vscode/settings.json\n@@ -49,5 +49,6 @@\n     \"*.pyo\": true,\n     \"target/**\": true,\n     \"vendor/**\": true\n-  }\n+  },\n+  \"CodeGPT.apiKey\": \"CodeGPT Plus Beta\"\n }\n\\ No newline at end of file\n"
+    },
+    {
       "id": "evt-1789297031804-z6pk",
       "timestamp": "2026-09-13T10:57:11.804Z",
       "directive": "Diff-Only Output",
