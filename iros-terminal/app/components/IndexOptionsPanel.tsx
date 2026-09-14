@@ -25,8 +25,11 @@ type Candidate = {
   bias?: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
   strategyMode?: 'BUY_PREMIUM' | 'SELL_PREMIUM';
   strategyType?: string | null;
+  strategyId?: string | null;
+  family?: string | null;
   constructionStatus?: string | null;
   state: 'ELIGIBLE' | 'WATCH' | 'NO_TRADE';
+  eligible?: boolean;
   reason: string;
   score: number | null;
   missingInputs: string[];
@@ -56,12 +59,26 @@ type Candidate = {
     timeWindow?: { aligned?: boolean | null; reason?: string; daysToExpiry?: number | null; entryCutoffIst?: string };
     construction?: { reason?: string; chainContracts?: number; uniqueStrikes?: number; usableContracts?: number; lowestStrike?: number | null; highestStrike?: number | null; structureStatus?: string; missingLegs?: string[] };
   };
-  legs?: Array<{ action: 'BUY' | 'SELL'; role?: string; symbol?: string; strike?: number; optionType?: string; entryPrice?: number; ltp?: number; delta?: number; theta?: number; iv?: number; spreadPct?: number; lotSize?: number }>;
+  legs?: Array<{ action?: 'BUY' | 'SELL'; side?: 'BUY' | 'SELL'; role?: string; symbol?: string; strike?: number; optionType?: string; expiry?: string; entryPrice?: number; entryFill?: number; ltp?: number; delta?: number; theta?: number; iv?: number; spreadPct?: number; lotSize?: number }>;
   risk?: { entryCredit?: number | null; maxProfitPerLot?: number | null; maxLossPerLot?: number | null; creditToRisk?: number | null; lowerBreakEven?: number | null; upperBreakEven?: number | null; minimumBufferAtr?: number | null };
   chain?: Array<{ symbol?: string; strike?: number; optionType?: string; ltp?: number; oi?: number; oiChange?: number; delta?: number; gamma?: number; theta?: number; vega?: number; iv?: number }>;
   structure?: Structure | null;
   oiResearch?: { pcr?: number | null; source?: string | null };
   componentFreshness?: Record<string, { status?: string; source?: string; asOf?: string | null }>;
+  entryDebit?: number | null;
+  entryCredit?: number | null;
+  maxProfit?: number | null;
+  maxLoss?: number | null;
+  breakevens?: number[];
+  rewardRisk?: number | null;
+  delta?: number | null;
+  gamma?: number | null;
+  theta?: number | null;
+  vega?: number | null;
+  margin?: number | null;
+  paperEntryState?: string;
+  paperEntryReason?: string;
+  strategyPositionId?: string;
 };
 
 type Radar = {
@@ -78,6 +95,13 @@ type Radar = {
   candidates: Candidate[];
   sellerCandidates?: Candidate[];
   selected: Candidate[];
+  modularCandidates?: Candidate[];
+  modularSelected?: Candidate[];
+  strategyBook?: {
+    positions?: StrategyPosition[];
+    open?: StrategyPosition[];
+    closed?: StrategyPosition[];
+  };
   paperBook?: {
     mode?: string; entryCount?: number; dailyEntryCap?: number; openPnl?: number; realizedPnl?: number; totalPnl?: number;
     open?: PaperPosition[]; closed?: PaperPosition[];
@@ -101,6 +125,26 @@ type PaperPosition = {
   unrealizedPnl?: number; pnl?: number; pnlPct?: number; exitReason?: string; enteredAt?: string;
   markSource?: string; markedAt?: string; markStatus?: string; markError?: string | null;
 };
+
+type StrategyLeg = {
+  side?: 'BUY' | 'SELL'; action?: 'BUY' | 'SELL'; role?: string; symbol?: string;
+  strike?: number; optionType?: string; expiry?: string; qty?: number; lotSize?: number;
+  entryBid?: number; entryAsk?: number; entryFill?: number; currentBid?: number;
+  currentAsk?: number; currentPrice?: number; exitFill?: number;
+};
+
+type StrategyPosition = {
+  strategyPositionId: string; strategyId: string; family?: string; index?: string;
+  status: 'OPEN' | 'CLOSED'; lifecycleState?: string; legs?: StrategyLeg[];
+  entryDebit?: number; entryCredit?: number; entryValue?: number; maxLoss?: number;
+  maxProfit?: number; breakevens?: number[]; unrealizedPnl?: number; realizedPnl?: number;
+  combinedStructureValue?: number; netGreeks?: { delta?: number; gamma?: number; theta?: number; vega?: number };
+  markStatus?: string; exitReason?: string; enteredAt?: string; exitedAt?: string;
+};
+
+const LEGACY_STRATEGIES = new Set([
+  'LONG_CALL', 'LONG_PUT', 'BULL_PUT_CREDIT_SPREAD', 'BEAR_CALL_CREDIT_SPREAD', 'IRON_CONDOR',
+]);
 
 const GATE_LABEL: Record<string, string> = {
   breadth: 'Breadth',
@@ -277,6 +321,8 @@ function loadRadar(url: string, signal: AbortSignal) {
 export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?: number }) {
   const [radar, setRadar] = useState<Radar | null>(null);
   const [loading, setLoading] = useState(true);
+  const modularCandidates = (radar?.modularCandidates ?? []).filter((row) => !LEGACY_STRATEGIES.has(row.strategyId ?? row.strategyType ?? ''));
+  const modularSelected = new Set((radar?.modularSelected ?? []).map((row) => `${row.strategyId ?? row.strategyType}-${row.key}`));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -332,6 +378,48 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
           </div>
         </div>
       </div>
+
+      {modularCandidates.length > 0 && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            <div>
+              <div className="desk-panel-title">AUTOMATIC MULTI-LEG PAPER STRATEGIES</div>
+              <div className="mt-0.5 text-[10px] text-[var(--fg-muted)]">Debit spreads, long volatility and butterflies · conservative atomic fills · no broker orders</div>
+            </div>
+            <span className="desk-pill desk-pill--ok">{radar?.modularSelected?.length ?? 0} selected</span>
+          </div>
+          <div className="desk-metric-grid grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {modularCandidates.map((row) => {
+              const identity = `${row.strategyId ?? row.strategyType}-${row.key}`;
+              const isSelected = modularSelected.has(identity);
+              return (
+                <article key={identity} className={`desk-metric-tile signal-card signal-card--${row.state.toLowerCase()} flex-col items-stretch justify-start`} style={{ ['--tile-accent' as string]: tileAccent(row.state) }}>
+                  <div className="flex w-full items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="desk-metric-label">{(row.strategyId ?? row.strategyType ?? 'STRATEGY').replaceAll('_', ' ')}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-[var(--fg-subtle)]">{row.label} · {row.family?.replaceAll('_', ' ')}</div>
+                    </div>
+                    <span className={isSelected ? 'desk-pill desk-pill--ok' : row.eligible ? 'desk-pill desk-pill--muted' : 'desk-pill desk-pill--warn'}>{isSelected ? 'Selected' : row.state}</span>
+                  </div>
+                  <div className="mt-2 grid w-full grid-cols-3 gap-2 text-[10px]">
+                    <div><div className="uppercase tracking-wider text-[var(--fg-subtle)]">Debit</div><div className="font-bold tabular-nums">₹{fmtNum(row.entryDebit)}</div></div>
+                    <div><div className="uppercase tracking-wider text-[var(--fg-subtle)]">Credit</div><div className="font-bold tabular-nums">₹{fmtNum(row.entryCredit)}</div></div>
+                    <div><div className="uppercase tracking-wider text-[var(--fg-subtle)]">R:R</div><div className="font-bold tabular-nums">{fmtNum(row.rewardRisk)}</div></div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {(row.legs ?? []).map((leg, index) => {
+                      const side = leg.side ?? leg.action;
+                      return <span key={`${identity}-${leg.symbol ?? index}`} className={side === 'SELL' ? 'desk-pill desk-pill--warn' : 'desk-pill desk-pill--ok'}>{side} {fmtNum(leg.strike, 0)} {leg.optionType === 'CALL' ? 'CE' : 'PE'} @ ₹{fmtNum(leg.entryPrice)}</span>;
+                    })}
+                  </div>
+                  <div className="mt-2 border-t border-[var(--terminal-line)] pt-2 text-[9px] tabular-nums text-[var(--fg-muted)]">Max profit ₹{fmtNum(row.maxProfit, 0)} · Max loss ₹{fmtNum(row.maxLoss, 0)} · Δ {fmtNum(row.delta)} · Θ {fmtNum(row.theta)}</div>
+                  {row.paperEntryState && <div className="mt-1 text-[9px] uppercase tracking-wider text-[var(--fg-subtle)]">{row.paperEntryState.replaceAll('_', ' ')}{row.paperEntryReason ? ` · ${row.paperEntryReason.replaceAll('_', ' ')}` : ''}</div>}
+                </article>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {radar?.error && (
         <div className="desk-card border border-red-500/40 p-3 text-[12px] text-red-600">{radar.error}</div>
@@ -527,6 +615,34 @@ export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?:
                         <div>{position.status === 'CLOSED' ? position.exitReason ?? 'CLOSED' : 'OPEN'}</div>
                         {position.markSource && <div className="text-[8px] text-[var(--fg-subtle)]">{position.markSource.replaceAll('_', ' ')}</div>}
                       </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {radar?.strategyBook && (
+        <div className="desk-card signal-widget signal-widget--book p-3 sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div><div className="desk-panel-title">MULTI-LEG PAPER BOOK</div><div className="mt-1 text-[10px] text-[var(--fg-muted)]">Durable strategy positions · leg-level marks · lifecycle exits</div></div>
+            <div className="flex gap-1.5"><span className="desk-pill desk-pill--ok">{radar.strategyBook.open?.length ?? 0} open</span><span className="desk-pill desk-pill--muted">{radar.strategyBook.closed?.length ?? 0} closed</span></div>
+          </div>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[980px] text-left text-[10px]">
+              <thead className="uppercase tracking-wider text-[var(--fg-subtle)]"><tr><th className="pb-2">Strategy</th><th>Index</th><th>Legs</th><th>Entry</th><th>Structure mark</th><th>Max loss</th><th>Greeks Δ / Γ / Θ / V</th><th>P&amp;L</th><th>Status</th></tr></thead>
+              <tbody>
+                {[...(radar.strategyBook.open ?? []), ...(radar.strategyBook.closed ?? []).slice().reverse()].map((position) => {
+                  const pnl = position.status === 'OPEN' ? position.unrealizedPnl : position.realizedPnl;
+                  return (
+                    <tr key={position.strategyPositionId} className="border-t border-[var(--terminal-line)] align-top tabular-nums">
+                      <td className="py-2 font-bold text-[var(--fg-strong)]">{position.strategyId.replaceAll('_', ' ')}</td><td>{position.index}</td>
+                      <td><div className="flex max-w-[320px] flex-wrap gap-1">{(position.legs ?? []).map((leg, index) => <span key={`${position.strategyPositionId}-${leg.symbol ?? index}`} className={(leg.side ?? leg.action) === 'SELL' ? 'desk-pill desk-pill--warn' : 'desk-pill desk-pill--ok'}>{leg.side ?? leg.action} {fmtNum(leg.strike, 0)} {leg.optionType === 'CALL' ? 'CE' : 'PE'} @ ₹{fmtNum(leg.entryFill)} → ₹{fmtNum(leg.exitFill ?? leg.currentPrice)}</span>)}</div></td>
+                      <td>{position.entryDebit ? `₹${fmtNum(position.entryDebit)} debit` : `₹${fmtNum(position.entryCredit)} credit`}</td><td>₹{fmtNum(position.combinedStructureValue)}</td><td>₹{fmtNum(position.maxLoss, 0)}</td>
+                      <td>{fmtNum(position.netGreeks?.delta)} / {fmtNum(position.netGreeks?.gamma, 4)} / {fmtNum(position.netGreeks?.theta)} / {fmtNum(position.netGreeks?.vega)}</td>
+                      <td className={(pnl ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}>₹{fmtNum(pnl)}</td><td><div>{position.status === 'CLOSED' ? position.exitReason ?? 'CLOSED' : position.lifecycleState ?? 'OPEN'}</div><div className="text-[8px] text-[var(--fg-subtle)]">{position.markStatus}</div></td>
                     </tr>
                   );
                 })}
