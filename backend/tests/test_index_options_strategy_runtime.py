@@ -190,3 +190,20 @@ def test_structural_invalidation_exit_and_eod_moves(tmp_path, monkeypatch):
     report = strategy_eod("2026-09-15")["positions"][0]
     assert report["spotMove"] == -100
     assert report["ivMove"] == 2
+
+
+def test_expiry_cutoff_exit(tmp_path, monkeypatch):
+    monkeypatch.setenv("INDEX_OPTIONS_STRATEGY_DB", str(tmp_path / "expiry.db"))
+    candidate = _candidate()
+    candidate["expiryState"] = "EXPIRY_CUTOFF"
+    process_strategy_cycle(
+        {"modularCandidates": [candidate], "modularSelected": [candidate]},
+        _snapshot(),
+        datetime(2026, 9, 15, 10, 0, tzinfo=IST_ZONE),
+    )
+    closed = process_strategy_cycle(
+        {"modularCandidates": [], "modularSelected": []},
+        _snapshot(),
+        datetime(2026, 9, 15, 10, 1, tzinfo=IST_ZONE),
+    )["closed"]
+    assert closed[0]["exitReason"] == "EXPIRY_CUTOFF"
