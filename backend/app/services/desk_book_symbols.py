@@ -59,6 +59,19 @@ def intraday_locked_symbols(day: str) -> set[str]:
 
 
 def swing_locked_symbols(day: str) -> set[str]:
+    if os.getenv("SWING_STRATEGY_AUTHORITY", "V1").strip().upper() == "V2":
+        try:
+            from .swing_v2.authoritative import get_authoritative_session
+
+            session = get_authoritative_session(live=False)
+            return {
+                str(row.get("symbol") or row.get("ticker") or "").upper().strip()
+                for row in (session.get("long") or [])
+                if isinstance(row, dict) and (row.get("symbol") or row.get("ticker")) and not row.get("terminal")
+            }
+        except Exception as exc:
+            log.error("V2 cross-book symbol read failed closed: %s", exc)
+            return set()
     return locked_symbols_for_date(_read_json(_SWING_SESSION_PATH), day=day)
 
 

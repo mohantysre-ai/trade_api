@@ -59,6 +59,10 @@ _SESSION_RESPONSE_CACHE: dict[str, Any] | None = None
 _SESSION_RESPONSE_CACHE_AT = 0.0
 _SESSION_RESPONSE_REFRESHING = False
 _SESSION_RESPONSE_GEN = 0
+_SESSION_SNAPSHOT_CACHE: dict[str, Any] | None = None
+_SESSION_SNAPSHOT_CACHE_AT = 0.0
+_SESSION_SNAPSHOT_REFRESHING = False
+_SESSION_SNAPSHOT_TTL = float(os.environ.get("INTRADAY_RESPONSE_SNAPSHOT_TTL", "2"))
 _SESSION_ROTATION_LOCK = threading.Lock()
 _SESSION_ROTATION_ATTEMPT_AT = 0.0
 _SESSION_ROTATION_RETRY_SEC = float(os.environ.get("INTRADAY_ROTATION_RETRY_SEC", "30"))
@@ -467,10 +471,13 @@ def _ensure_current_exit_policy(session: dict[str, Any], *, persist: bool = Fals
 def _invalidate_session_response_cache() -> None:
     """Drop the coalesced GET snapshot and retire in-flight live refresh writes."""
     global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT, _SESSION_RESPONSE_GEN
+    global _SESSION_SNAPSHOT_CACHE, _SESSION_SNAPSHOT_CACHE_AT
     with _SESSION_RESPONSE_LOCK:
         _SESSION_RESPONSE_GEN += 1
         _SESSION_RESPONSE_CACHE = None
         _SESSION_RESPONSE_CACHE_AT = 0.0
+        _SESSION_SNAPSHOT_CACHE = None
+        _SESSION_SNAPSHOT_CACHE_AT = 0.0
 
 
 def save_session(payload: dict[str, Any], force: bool = False) -> None:
@@ -4890,8 +4897,24 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
     Live quote enrichment runs outside the FastAPI request worker pool.
     """
     global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT, _SESSION_RESPONSE_REFRESHING
+    global _SESSION_SNAPSHOT_CACHE, _SESSION_SNAPSHOT_CACHE_AT, _SESSION_SNAPSHOT_REFRESHING
     if not include_live:
-        return _compute_session(include_live=False)
+        now = time.monotonic()
+        if _SESSION_SNAPSHOT_CACHE is not None and now - _SESSION_SNAPSHOT_CACHE_AT < _SESSION_SNAPSHOT_TTL:
+            return copy.deepcopy(_SESSION_SNAPSHOT_CACHE)
+        with _SESSION_RESPONSE_LOCK:
+            now = time.monotonic()
+            if _SESSION_SNAPSHOT_CACHE is None:
+                _SESSION_SNAPSHOT_CACHE = copy.deepcopy(_compute_session(include_live=False))
+                _SESSION_SNAPSHOT_CACHE_AT = now
+            elif now - _SESSION_SNAPSHOT_CACHE_AT >= _SESSION_SNAPSHOT_TTL and not _SESSION_SNAPSHOT_REFRESHING:
+                _SESSION_SNAPSHOT_REFRESHING = True
+                threading.Thread(
+                    target=_refresh_session_snapshot_cache,
+                    name="intraday-session-snapshot-refresh",
+                    daemon=True,
+                ).start()
+            return copy.deepcopy(_SESSION_SNAPSHOT_CACHE)
     disk_session = load_session()
     rollover_pending = _schedule_stale_session_rotation(disk_session)
 
@@ -4942,6 +4965,20 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
                 _SESSION_RESPONSE_REFRESHING = False
             log.exception("failed to start intraday live refresh")
     return _with_rollover_state(result)
+
+
+def _refresh_session_snapshot_cache() -> None:
+    global _SESSION_SNAPSHOT_CACHE, _SESSION_SNAPSHOT_CACHE_AT, _SESSION_SNAPSHOT_REFRESHING
+    try:
+        result = _compute_session(include_live=False)
+        with _SESSION_RESPONSE_LOCK:
+            _SESSION_SNAPSHOT_CACHE = copy.deepcopy(result)
+            _SESSION_SNAPSHOT_CACHE_AT = time.monotonic()
+    except Exception:
+        log.exception("intraday session snapshot refresh failed")
+    finally:
+        with _SESSION_RESPONSE_LOCK:
+            _SESSION_SNAPSHOT_REFRESHING = False
 
 
 def _refresh_session_response_cache(started_gen: int) -> None:
