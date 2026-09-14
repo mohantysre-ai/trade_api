@@ -10,7 +10,7 @@ router = APIRouter()
 
 
 @router.get("/api/trade-outcomes")
-async def trade_outcomes(request: Request):
+def trade_outcomes(request: Request):
     """Return persisted scanner picks with live target/SL hit status."""
     # Inject market_data from app state if available
     from .market_feeds import get_market_data

@@ -141,6 +141,20 @@ def _read_json(path: str) -> dict[str, Any]:
 
 
 def load_swing_session() -> dict[str, Any]:
+    try:
+        from .swing_v2.authoritative import get_authoritative_session, is_v2_authoritative
+
+        if is_v2_authoritative():
+            return get_authoritative_session(live=False)
+    except ValueError:
+        raise
+    except Exception as exc:
+        log.error("V2 authoritative session read failed closed: %s", exc)
+        return {
+            "success": False, "locked": False, "hunting": False,
+            "cashHeld": True, "cashReason": "SWING_V2_SESSION_READ_FAILED",
+            "authority": "V2", "v1Enabled": False, "long": [], "short": [],
+        }
     return _read_json(_SWING_SESSION_PATH)
 
 
@@ -1677,6 +1691,10 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
     ``bypass_lock_window=True`` skips the clock. ``force`` rebuilds during hunt
     — it does not open early and does not wipe a live book after 14:45.
     """
+    from .swing_v2.authoritative import is_v2_authoritative, lock_authoritative_session
+    if is_v2_authoritative():
+        return lock_authoritative_session(force=force)
+
     today = _ist_today()
     reconcile_cross_book(today, persist=True)
     existing = load_swing_session()
@@ -1976,6 +1994,10 @@ def ensure_swing_session_locked(*, retry_empty: bool = False) -> dict[str, Any]:
     slots on a partial lock. Never fabricates fills; only locks fully qualified
     deterministic BUY rows.
     """
+    from .swing_v2.authoritative import is_v2_authoritative, run_authoritative_cycle
+    if is_v2_authoritative():
+        return run_authoritative_cycle()
+
     existing = load_swing_session()
     today = _ist_today()
     existing_date = str(existing.get("sessionDate") or "").strip()[:10]
@@ -2011,6 +2033,10 @@ def refresh_swing_session_state() -> dict[str, Any]:
     survive without a browser tab open. Paper Book only (MANUAL_ONLY) — no broker
     orders. Never mutates symbols, entry levels, or selection evidence.
     """
+    from .swing_v2.authoritative import is_v2_authoritative, run_authoritative_cycle
+    if is_v2_authoritative():
+        return run_authoritative_cycle()
+
     sess = load_swing_session()
     if not sess.get("locked"):
         return sess
@@ -2224,6 +2250,10 @@ def get_swing_session(*, live: bool = False) -> dict[str, Any]:
     persisted portfolio or each other's response payloads. A slow broker/Yahoo
     call must never hold the response lock or exhaust FastAPI's sync worker pool.
     """
+    from .swing_v2.authoritative import get_authoritative_session, is_v2_authoritative
+    if is_v2_authoritative():
+        return get_authoritative_session(live=live)
+
     global _SWING_RESPONSE_CACHE, _SWING_RESPONSE_CACHE_AT, _SWING_RESPONSE_REFRESHING
     if not live:
         return copy.deepcopy(_compute_swing_session(live=False))
@@ -2277,6 +2307,15 @@ def _refresh_swing_response_cache(started_gen: int) -> None:
                 return
             _SWING_RESPONSE_CACHE = copy.deepcopy(result)
             _SWING_RESPONSE_CACHE_AT = time.monotonic()
+        try:
+            from app.services.shared_state.view_store import get_view_store
+            from app.services.shared_state.event_bus import get_event_bus, EventType
+            get_view_store().set("swing", result)
+            get_event_bus().publish(
+                Event(type=EventType.SWING_STATE_CHANGED, payload={"version": result.get("version", 0)})
+            )
+        except Exception:
+            pass
     except Exception:
         log.exception("swing live refresh failed; serving persisted marks")
     finally:
@@ -2311,7 +2350,8 @@ def _compute_swing_session(*, live: bool = False) -> dict[str, Any]:
     if len(unique_long) != len(long_rows) or len(unique_short) != len(short_rows):
         _recompute_active_swing_totals(sess)
     if not live:
-        return sess
+        from .swing_v2.facade import attach_shadow_v2
+        return attach_shadow_v2(sess, _matrix_snapshot_path())
     snap = _read_json(_matrix_snapshot_path())
     quotes = snap.get("stockQuotes") if isinstance(snap.get("stockQuotes"), dict) else {}
     stocks_by: dict[str, Any] = {}
@@ -2430,4 +2470,5 @@ def _compute_swing_session(*, live: bool = False) -> dict[str, Any]:
         )
     except Exception:
         out["newAlerts"] = []
-    return out
+    from .swing_v2.facade import attach_shadow_v2
+    return attach_shadow_v2(out, _matrix_snapshot_path())

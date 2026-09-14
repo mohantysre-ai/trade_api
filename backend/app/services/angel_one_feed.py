@@ -1731,6 +1731,27 @@ _LIVE_REFRESH_KICKED_AT = 0.0
 _LIVE_REFRESH_KICK_GAP_SEC = float(os.environ.get("DESK_LIVE_REFRESH_KICK_GAP_SEC", "30"))
 
 
+def _intraday_ws_authoritative() -> bool:
+    """True when the Intraday WS stream is connected and covering its universe.
+
+    Spec V5 §13: with the in-memory live state healthy, periodic REST
+    snapshot refreshes must NOT fire as a hidden live-price heartbeat.  Any
+    failure to even evaluate stream health returns False so the legacy REST
+    heartbeat still operates (safe fallback, not a silent stall).
+    """
+    try:
+        from .intraday_market_state import get_intraday_market_state
+
+        status = get_intraday_market_state().stream_status()
+    except Exception:
+        return False
+    if not status.get("wsConnected"):
+        return False
+    expected = int(status.get("symbolsExpected") or 0)
+    fresh = int(status.get("symbolsLive") or 0)
+    return expected > 0 and fresh >= int(expected * 0.90)
+
+
 def kick_background_live_refresh(*, reason: str) -> None:
     """Coalesce async snapshot refresh for prefer-cache / read paths."""
     global _LIVE_REFRESH_KICKED_AT
@@ -4330,6 +4351,10 @@ def build_market_payload(
         snapshot["snapshotDataDate"] = data_date
         needs_refresh = _snapshot_needs_live_refresh(snapshot)
         snapshot["liveRefreshPending"] = needs_refresh
+        # F9.1-F9.3: staleness must be an explicit, always-set flag — not just
+        # inferable from isSnapshotFallback — so consumers that key off
+        # `dataStale` are never fooled by a silent cache fallback.
+        snapshot["dataStale"] = bool(needs_refresh)
         snapshot.setdefault("tickerNewsByTicker", {})
         if pool_name:
             snapshot["activePool"] = pool_name
@@ -4368,6 +4393,7 @@ def build_market_payload(
         if allow_fallback and snapshot is not None:
             snapshot = dict(snapshot)
             snapshot["isSnapshotFallback"] = True
+            snapshot["dataStale"] = True
             snapshot["llmError"] = snapshot.get("llmError")
             age_sec = _snapshot_quote_age_seconds(snapshot)
             if age_sec is not None:
@@ -4831,6 +4857,7 @@ def create_app() -> FastAPI:
             replay_session_payload,
         )
         from .index_options_paper import index_options_market_open
+        from app.services.shared_state.view_store import get_view_store
 
         if sessionDate:
             try:
@@ -4856,6 +4883,19 @@ def create_app() -> FastAPI:
                 _compose()
             finally:
                 _RADAR_REFRESH_LOCK.release()
+
+        view = get_view_store().get("index_options")
+        if view:
+            payload = view.get("payload") or {}
+            if payload.get("success"):
+                age = time.time() - (view.get("updatedAt") or 0)
+                if age < 90.0:
+                    return {**payload, "cacheStatus": "HIT"}
+                if age < 300.0:
+                    background_tasks.add_task(_refresh_bg)
+                    return {**payload, "cacheStatus": "REFRESHING"}
+                background_tasks.add_task(_refresh_bg)
+                return {**payload, "cacheStatus": "STALE"}
 
         cached = load_persisted_radar()
         if not index_options_market_open(datetime.now(tz=IST_ZONE)):
@@ -5057,6 +5097,20 @@ def create_app() -> FastAPI:
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    @app.get("/api/intraday/market-state")
+    def intraday_market_state() -> dict[str, Any]:
+        """Compact operational diagnostic for the intraday live market state."""
+        try:
+            from .intraday_market_state import get_intraday_market_state
+            from .intraday_session_engine import get_session
+            state = get_intraday_market_state()
+            session = get_session(include_live=True)
+            if not isinstance(session, dict):
+                session = {}
+            return {"block": state.diagnostic_block(session)}
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
     @app.get("/api/alert-history")
     def alert_history(since: str | None = None) -> dict[str, Any]:
         """Return fired alert history for today, optionally filtered."""
@@ -5077,7 +5131,7 @@ def create_app() -> FastAPI:
         """
         try:
             from datetime import date as _date
-            from .eod_intraday_report import generate_intraday_eod_report, recalculate_live_intraday_from_candles
+            from .eod_intraday_report import generate_intraday_eod_report
             from datetime import datetime as _dt
             for_date = (
                 _date.fromisoformat(date)
@@ -5085,13 +5139,10 @@ def create_app() -> FastAPI:
                 else _dt.now(tz=IST_ZONE).date()
             )
             if for_date == _dt.now(tz=IST_ZONE).date():
-                from .intraday_session_engine import load_session as _load_intraday_session
-                active_session = _load_intraday_session()
-                active_policy = str((active_session.get("pnlRecalc") or {}).get("policyVersion") or "")
-                if force or active_policy != "post_entry_stop_only_0p5_v2":
-                    recalculated = recalculate_live_intraday_from_candles(for_date, after_close=False)
-                    if recalculated.get("ok") and isinstance(recalculated.get("book"), dict):
-                        return recalculated["book"]
+                # Session-economics projection (never a candle-rewrite of the
+                # locked session): generate reads the authoritative Intraday
+                # session directly for today's date.
+                return generate_intraday_eod_report(for_date, force=force)
             return generate_intraday_eod_report(for_date, force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -5241,7 +5292,12 @@ def create_app() -> FastAPI:
         with _REFRESH_TASK_LOCK:
             _REFRESH_TASKS[task_id] = {"status": "running", "progress": "Initializing sequence...", "created_at": time.time()}
         
-        background_tasks.add_task(_run_orchestrated_sequence, task_id, pool, prompt)
+        threading.Thread(
+            target=_run_orchestrated_sequence,
+            args=(task_id, pool, prompt),
+            daemon=True,
+            name=f"orchestrated-{task_id}",
+        ).start()
         return {"success": True, "taskId": task_id, "message": "Sequential orchestrated refresh started."}
 
     @app.post("/api/refresh-intelligence")
@@ -5449,11 +5505,11 @@ def create_app() -> FastAPI:
         return response
 
     @app.post("/api/refresh-ticker-reason")
-    async def refresh_ticker_reason(request: Request, ticker: str | None = None, pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
+    def refresh_ticker_reason(request: Request, ticker: str | None = None, pool: str | None = None, prompt: str | None = None) -> dict[str, Any]:
         try:
             body: dict[str, Any] = {}
             try:
-                parsed_body = await request.json()
+                parsed_body = json.loads(request.body().decode("utf-8"))
                 if isinstance(parsed_body, dict):
                     body = parsed_body
             except Exception:
@@ -5533,7 +5589,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     @app.get("/api/ticker-news")
-    async def get_ticker_news(
+    def get_ticker_news(
         ticker: str,
         company: str | None = None,
         max_articles: int = 8,
@@ -5566,8 +5622,8 @@ def create_app() -> FastAPI:
                 cached_report["cached"] = True
                 return cached_report
 
-            async with httpx.AsyncClient() as http_client:
-                response = await http_client.get(
+            with httpx.Client() as http_client:
+                response = http_client.get(
                     f"{AI_NEWS_API_URL}/api/ticker-news",
                     params={
                         "ticker": resolved_ticker,
@@ -5903,13 +5959,14 @@ def main() -> int:
 
     try:
         resolved = _llm_config_canonical()
-        print(
-            f"[LLM-DEBUG] env_path={BASE_DIR / '.env'} "
-            f"LLM_PROVIDER={os.getenv('LLM_PROVIDER','')} "
-            f"LLM_MODEL={os.getenv('LLM_MODEL','')} "
-            f"ANGEL_PASSWORD={'set' if os.getenv('ANGEL_PASSWORD','').strip() else 'missing'} "
-            f"resolved={resolved}"
-        )
+        if os.getenv("ANGEL_DEBUG", "0").strip().lower() in ("1", "true", "yes"):
+            print(
+                f"[LLM-DEBUG] env_path={BASE_DIR / '.env'} "
+                f"LLM_PROVIDER={os.getenv('LLM_PROVIDER','')} "
+                f"LLM_MODEL={os.getenv('LLM_MODEL','')} "
+                f"ANGEL_PASSWORD={'set' if os.getenv('ANGEL_PASSWORD','').strip() else 'missing'} "
+                f"resolved={resolved}"
+            )
     except Exception as exc:
         print(f"[LLM-DEBUG] config inspect failed: {exc}")
 

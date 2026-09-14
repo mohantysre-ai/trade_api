@@ -30,3 +30,10 @@ logs/
 *.orig
 # Strix penetration-test output can contain sensitive evidence.
 strix_runs/
+# SQLite runtime files
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm

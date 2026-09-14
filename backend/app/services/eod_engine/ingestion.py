@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -78,9 +80,23 @@ def load_fixed_trade_plan(for_date: date | None = None) -> dict[str, Any]:
 
 
 def load_intraday_session(for_date: date | None = None) -> dict[str, Any]:
+    """Read intraday_session.json, rejecting a locked session for another day.
+
+    A locked basket from a different IST sessionDate must never leak into an
+    EOD report for ``for_date`` (F2.1) — the guard lives here so every caller
+    is protected even if it forgets to re-check ``sessionDate`` itself.
+    """
     session = _read_json(_INTRADAY_SESSION_PATH)
     if for_date is None:
         return session
+    session_date = str(session.get("sessionDate") or "").strip()[:10]
+    if session.get("locked") and session_date and session_date != for_date.isoformat():
+        log.info(
+            "load_intraday_session: rejecting stale locked session %s != requested %s",
+            session_date,
+            for_date.isoformat(),
+        )
+        return {}
     return session
 
 
@@ -144,9 +160,12 @@ def _f(v: Any) -> float | None:
     if v is None or v == "":
         return None
     try:
-        return float(v)
+        n = float(v)
     except (TypeError, ValueError):
         return None
+    if n != n or n in (float("inf"), float("-inf")):
+        return None
+    return n
 
 
 def _picks_from_archived_books(for_date: date) -> list[dict[str, Any]]:
@@ -447,7 +466,14 @@ def fetch_and_persist_candles(
             results[sym] = []
         return results
 
-    for sym in pending:
+    # F10.1: a strictly sequential REST loop over ~750 symbols times out the
+    # EOD pipeline. Fetch concurrently (bounded pool) and persist each result
+    # as it completes; ordering does not matter since each symbol writes its
+    # own file and its own `results[sym]` slot.
+    results_lock = threading.Lock()
+    max_workers = max(1, int(os.getenv("EOD_CANDLE_FETCH_WORKERS", "12")))
+
+    def _fetch_one(sym: str) -> tuple[str, list[dict[str, Any]]]:
         candles: list[dict[str, Any]] = []
         err: str | None = None
         try:
@@ -482,7 +508,19 @@ def fetch_and_persist_candles(
             "error": err,
         }
         atomic_write_json(os.path.join(ticks_dir, f"{sym}.json"), payload)
-        results[sym] = candles
+        return sym, candles
+
+    with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="eod-candle-fetch") as pool:
+        futures = {pool.submit(_fetch_one, sym): sym for sym in pending}
+        for future in as_completed(futures):
+            sym = futures[future]
+            try:
+                sym, candles = future.result()
+            except Exception as exc:
+                log.warning("Candle fetch worker failed for %s: %s", sym, exc)
+                candles = []
+            with results_lock:
+                results[sym] = candles
 
     return results
 

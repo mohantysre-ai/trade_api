@@ -113,11 +113,11 @@ fifteen new entries after the morning lock (`INTRADAY_MAX_DAILY_REPLACEMENTS=15`
 This is a shared ceiling across ordinary replacements and same-symbol re-entries,
 not a target number of trades.
 
-The separate hard session ledger cap is 20 executed entries
-(`INTRADAY_MAX_DAILY_POSITIONS=20`). It counts the initial lock, replacements,
+The separate hard session ledger cap is 10 executed entries
+(`INTRADAY_MAX_DAILY_POSITIONS=10`). It counts the initial lock, replacements,
 and every re-entry. Pending or never-triggered rows do not count. With the
-default five-position morning lock and fifteen post-lock replacements, the
-normal reachable maximum is 20; the 20-entry cap remains the fail-closed
+default five-position morning lock and five post-lock replacements, the
+normal reachable maximum is 10; the 10-entry cap remains the fail-closed
 session ceiling.
 
 A symbol that reaches a completed target, or exits through a profitable trail,
@@ -137,8 +137,8 @@ An initial stop-loss re-entry is disabled by default. Enable it only after
 event-level replay shows a positive out-of-sample contribution:
 
 ```env
-INTRADAY_MAX_DAILY_REPLACEMENTS=15
-INTRADAY_MAX_DAILY_POSITIONS=20
+INTRADAY_MAX_DAILY_REPLACEMENTS=5
+INTRADAY_MAX_DAILY_POSITIONS=10
 INTRADAY_MAX_REENTRIES_PER_SYMBOL=1
 INTRADAY_REENTRY_TARGET_COOLDOWN_MIN=20
 INTRADAY_REENTRY_TRAIL_COOLDOWN_MIN=30

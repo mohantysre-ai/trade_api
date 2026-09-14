@@ -67,7 +67,7 @@ def test_supervisor_marks_already_locked_trade_without_dashboard_request(tmp_pat
     assert marked["open"][0]["currentPremium"] == 115
     assert marked["open"][0]["unrealizedPnl"] == 450
     assert marked["open"][0]["markSource"] == "ANGEL_DIRECT_LOCKED_CONTRACT"
-    assert len(marked["open"][0]["minuteMarks"]) == 1
+    assert len(marked["open"][0]["minuteMarks"]) == 2
 
 
 def test_supervisor_applies_existing_target_exit(tmp_path, monkeypatch):

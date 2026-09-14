@@ -186,14 +186,14 @@ def _candidate(index: dict[str, str], snapshot: dict[str, Any]) -> dict[str, Any
         and contract_executable
     )
 
-    if safety_failed:
+    if missing:
+        state, reason = "NO_TRADE", f"DATA_INCOMPLETE:{','.join(sorted(set(missing)))}"
+    elif safety_failed:
         state, reason = "NO_TRADE", f"SAFETY_GATE_FAILED:{','.join(safety_failed)}"
     elif safety_unavailable:
         state, reason = "NO_TRADE", f"SAFETY_DATA_INCOMPLETE:{','.join(safety_unavailable)}"
     elif not contract_executable:
         state, reason = "NO_TRADE", "CONTRACT_NOT_EXECUTABLE"
-    elif missing:
-        state, reason = "NO_TRADE", f"DATA_INCOMPLETE:{','.join(sorted(set(missing)))}"
     elif direction not in {"CALL", "PUT"}:
         state, reason = "NO_TRADE", "DIRECTION_NOT_PROVEN"
     elif score is not None and score < MIN_ELIGIBLE_SCORE:

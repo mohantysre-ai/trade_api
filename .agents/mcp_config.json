@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "token-cache": {
+      "command": "node",
+      "args": [
+        "c:\\Users\\Joker\\.vscode\\extensions\\sarfudheen.tokenshield-1.0.18\\dist\\cache-server.js",
+        "d:\\trade_api"
+      ]
+    },
+    "headroom": {
+      "command": "headroom",
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "env": {
+        "HEADROOM_BEACON": "off",
+        "HEADROOM_TELEMETRY": "off",
+        "HEADROOM_OFFLINE": "1",
+        "DO_NOT_TRACK": "1"
+      }
+    }
+  }
+}

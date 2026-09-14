@@ -50,6 +50,10 @@ def _emit_atomic_json(path: Path, text: str) -> None:
             try:
                 os.replace(tmp, path)
                 try:
+                    path.chmod(0o600)
+                except OSError:
+                    pass
+                try:
                     new_path.unlink(missing_ok=True)
                 except OSError:
                     pass

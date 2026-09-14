@@ -97,7 +97,7 @@ def _fetch_yahoo_finance_price(symbol: str) -> float | None:
 
 
 def _fetch_angel_plan_prices(symbols: list[str]) -> dict[str, float]:
-    """Angel One ltpData for fixed-plan symbols (last traded print after close too)."""
+    """Fetch fixed-plan marks through bounded Angel batch quote requests."""
     out: dict[str, float] = {}
     if not symbols:
         return out
@@ -112,16 +112,15 @@ def _fetch_angel_plan_prices(symbols: list[str]) -> dict[str, float]:
         return out
     if client is None:
         return out
-    for sym in symbols:
-        try:
-            quote = client.fetch_symbol_quote(sym)
-            if not quote:
-                continue
-            ltp = float(quote.get("ltp", 0) or 0)
+    try:
+        token_map = aof._load_nse_eq_token_map()
+        instruments = aof._symbols_to_instruments(symbols, token_map, client=client)
+        for symbol, quote in client.fetch_batch_quotes(instruments).items():
+            ltp = float(quote.get("ltp", 0) or quote.get("lastPrice", 0) or 0)
             if ltp > 0:
-                out[sym.upper()] = ltp
-        except Exception:
-            continue
+                out[str(symbol).upper()] = ltp
+    except Exception:
+        return out
     return out
 
 
@@ -1108,6 +1107,43 @@ def _refresh_live_book_cache(started_gen: int) -> None:
             _LIVE_BOOK_CACHE_REFRESHING = False
 
 
+def _intraday_ws_live_quotes(symbols: list[str]) -> dict[str, dict[str, Any]]:
+    """Fresh LTPs from the authoritative in-memory Intraday market state.
+
+    Locked-position MTM reads live WebSocket state first (spec V5 §23/§59);
+    REST is only consulted for symbols the stream cannot serve fresh.  STALE
+    or UNAVAILABLE quotes are not returned as fresh — the normal REST/
+    cached fallback marks them honestly instead of fabricating prices.
+    """
+    if not symbols:
+        return {}
+    try:
+        from .intraday_market_state import get_intraday_market_state
+
+        snapshot = get_intraday_market_state().capture_snapshot(symbols)
+    except Exception:
+        logging.getLogger(__name__).debug(
+            "Intraday market state unavailable for plan quotes", exc_info=True
+        )
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for symbol, quote in (snapshot.get("quotes") or {}).items():
+        ltp = quote.get("ltp")
+        freshness = quote.get("freshness")
+        if freshness not in ("LIVE", "DEGRADED"):
+            continue
+        if ltp is None:
+            continue
+        out[symbol] = {
+            "ltp": float(ltp) if ltp is not None else None,
+            "source": quote.get("source"),
+            "receivedAt": quote.get("receivedAt"),
+            "dataAge": quote.get("dataAge"),
+            "freshness": freshness,
+        }
+    return out
+
+
 def _compute_live_prices_for_plan(
     *,
     allow_external: bool = True,
@@ -1142,7 +1178,7 @@ def _compute_live_prices_for_plan(
             "marketOpen": _is_market_open(),
             "sessionClosed": not _is_market_open(),
             "dataStale": True,
-            "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0},
+            "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0, "LOCKED_PRICE_UNAVAILABLE": 0},
         }
 
     long_plan = fixed.get("long") or []
@@ -1158,7 +1194,7 @@ def _compute_live_prices_for_plan(
             "marketOpen": _is_market_open(),
             "sessionClosed": not _is_market_open(),
             "dataStale": True,
-            "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0},
+            "ltpSourceMix": {"live": 0, "snapshot": 0, "cached": 0, "none": 0, "LOCKED_PRICE_UNAVAILABLE": 0},
         }
 
     open_symbols = list(
@@ -1195,11 +1231,19 @@ def _compute_live_prices_for_plan(
     # Live marks only for OPEN rows. Closed archive already has exit LTP — Yahoo/Angel
     # on 50+ closed names blocks GET /api/intraday-session past the UI timeout.
     live_quotes: dict[str, float] = {}
+    ws_quote_meta: dict[str, dict[str, Any]] = {}
     live_attempted = False
+    # Live-market-state first: in-memory WS quotes are the primary authority
+    # and need no REST. REST live marks run only for symbols the stream
+    # cannot serve fresh (targeted recovery, never a 750-symbol heartbeat).
+    for sym, meta in _intraday_ws_live_quotes(open_symbols).items():
+        live_quotes[sym] = meta["ltp"]
+        ws_quote_meta[sym] = meta
     if allow_external and _should_refresh_plan_ltps(market_open, after_close) and open_symbols:
         live_attempted = True
         if market_open:
-            angel_quotes = _fetch_angel_plan_prices(open_symbols)
+            rest_symbols = [sym for sym in open_symbols if sym not in live_quotes]
+            angel_quotes = _fetch_angel_plan_prices(rest_symbols)
             live_quotes.update(angel_quotes)
         now = time.time()
         for sym in open_symbols:
@@ -1233,8 +1277,16 @@ def _compute_live_prices_for_plan(
         # Prefer fresh Angel/Yahoo last print over stale snapshot (incl. after close)
         if symbol in live_quotes:
             ltp = live_quotes[symbol]
-            ltp_source = "live"
-            from_snapshot = False
+            ws_meta = ws_quote_meta.get(symbol)
+            if ws_meta is not None:
+                if ws_meta.get("freshness") == "LOCKED_PRICE_UNAVAILABLE":
+                    ltp_source = "LOCKED_PRICE_UNAVAILABLE"
+                else:
+                    ltp_source = "ANGEL_WS"
+                from_snapshot = False
+            else:
+                ltp_source = "live"
+                from_snapshot = False
 
         if ltp is None:
             for key in ("scanLtp", "currentPrice", "entryPrice"):
@@ -1247,7 +1299,7 @@ def _compute_live_prices_for_plan(
                     except (TypeError, ValueError):
                         pass
 
-        data_stale = ltp_source in ("cached", "none") or (
+        data_stale = ltp_source in ("cached", "none", "LOCKED_PRICE_UNAVAILABLE") or (
             ltp_source == "snapshot"
             and snapshot_age_sec is not None
             and snapshot_age_sec > max(_PRICE_TTL, 300)
@@ -1261,6 +1313,13 @@ def _compute_live_prices_for_plan(
             "dataStale": data_stale,
             "priceUpdatedAt": _utc_now(),
         }
+        ws_entry = ws_quote_meta.get(symbol)
+        if ltp_source == "ANGEL_WS" and ws_entry is not None:
+            entry["receivedAt"] = ws_entry.get("receivedAt")
+            entry["dataAge"] = ws_entry.get("dataAge")
+            # V5 freshness contract: the market-state mix source stays honest
+            # ("ANGEL_WS") and stale WS rows are excluded upstream, so the WS
+            # mark here is fresh.
 
         if ltp is None:
             entry["outcome"] = None

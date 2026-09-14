@@ -301,6 +301,15 @@ def compose_live_index_options_radar(
     result["streamStatus"] = ANGEL_INDEX_STREAM.status()
     if persist:
         persist_radar(result)
+    try:
+        from app.services.shared_state.view_store import get_view_store
+        from app.services.shared_state.event_bus import get_event_bus, EventType
+        get_view_store().set("index_options", result)
+        get_event_bus().publish(
+            Event(type=EventType.INDEX_OPTIONS_STATE_CHANGED, payload={"version": result.get("version", 0)})
+        )
+    except Exception:
+        pass
     return result
 
 

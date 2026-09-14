@@ -1,12 +1,11 @@
-"""Swing-first cross-book resolution between Swing and Intraday desks.
+"""Cross-book resolution between Swing and Intraday desks.
 
-When the same ticker appears on both books for the same IST session date,
-the desk with the higher deterministic buy probability wins for LONG names:
+Swing owns its symbols. Intraday must reject new entries/re-entries when Swing owns the symbol.
 
-- Swing wins when the Matrix BUY contract passes and swing probability beats
-  the intraday row (QUALIFIED momentum / expected-R score).
-- Intraday keeps the symbol when swing does not qualify or intraday scores higher.
-- Intraday SHORT rows are never promoted to swing (swing book is BUY-only).
+- Intraday LONG symbols are never promoted to Swing.
+- Swing positions remain untouched (no scrubbing).
+- Intraday SHORT rows are never relevant to Swing (Swing book is BUY-only).
+- Intraday rejects new entry/re-entry when Swing owns the symbol.
 """
 from __future__ import annotations
 
@@ -112,31 +111,11 @@ def swing_prefers_over_intraday(
     *,
     snapshot: dict[str, Any] | None = None,
 ) -> bool:
-    """True when swing BUY contract passes and beats the intraday row."""
-    from .swing_session import _evaluate_swing_buy_contract, _hydrate_swing_contract_row
-
-    direction = str((intraday_row or {}).get("direction") or "LONG").upper()
-    if direction == "SHORT":
-        return False
-
-    snap = snapshot if isinstance(snapshot, dict) else _load_matrix_snapshot()
-    matrix_row = _matrix_row_for_symbol(snap, symbol)
-    if not matrix_row:
-        return False
-    hydrated = _hydrate_swing_contract_row({**matrix_row, "symbol": symbol.upper(), "ticker": symbol.upper()})
-    ok, _, _ = _evaluate_swing_buy_contract(hydrated, intraday_symbols=set())
-    if not ok:
-        return False
-    if intraday_row is None:
-        return True
-    swing_edge = swing_probability_score(hydrated)
-    intra_edge = intraday_probability_score(intraday_row)
-    if swing_edge > intra_edge:
-        return True
-    if swing_edge < intra_edge:
-        return False
-    # Tie-break: explicit QUALIFIED intraday keeps the name unless swing contract is strict.
-    return str(intraday_row.get("entryState") or "").upper() != "QUALIFIED"
+    """True when swing BUY contract passes and beats the intraday row.
+    
+    DISABLED: Intraday always keeps its symbols. Swing cannot promote from Intraday.
+    """
+    return False
 
 
 def intraday_long_rows(session: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -155,16 +134,11 @@ def symbols_swing_prefers_over_intraday(
     *,
     snapshot: dict[str, Any] | None = None,
 ) -> set[str]:
-    """Symbols on today's intraday LONG book that should move to swing."""
-    session = _read_json(_INTRADAY_SESSION_PATH)
-    if str(session.get("sessionDate") or "")[:10] != str(day or "")[:10]:
-        return set()
-    snap = snapshot if isinstance(snapshot, dict) else _load_matrix_snapshot()
-    preferred: set[str] = set()
-    for sym, row in intraday_long_rows(session).items():
-        if swing_prefers_over_intraday(sym, row, snapshot=snap):
-            preferred.add(sym)
-    return preferred
+    """Symbols on today's intraday LONG book that should move to swing.
+    
+    DISABLED: Swing-first promotion is disabled. Intraday always keeps its symbols.
+    """
+    return set()
 
 
 def intraday_blocks_swing_symbol(
@@ -183,8 +157,25 @@ def intraday_blocks_swing_symbol(
     return not swing_prefers_over_intraday(symbol, row, snapshot=snapshot)
 
 
+def swing_locked_symbols_for_day(day: str) -> set[str]:
+    """Swing LONG symbols that are locked for the given day."""
+    session = _read_json(_SWING_SESSION_PATH)
+    if str(session.get("sessionDate") or "")[:10] != str(day or "")[:10]:
+        return set()
+    if not session.get("locked"):
+        return set()
+    out: set[str] = set()
+    for row in session.get("long") or []:
+        if not isinstance(row, dict) or row.get("closed"):
+            continue
+        sym = str(row.get("symbol") or row.get("ticker") or "").upper().strip()
+        if sym:
+            out.add(sym)
+    return out
+
+
 def intraday_locked_symbols_respecting_swing(day: str) -> set[str]:
-    """Intraday LONG symbols that still block swing after swing-first resolution."""
+    """Intraday LONG symbols that still block swing after cross-book resolution."""
     session = _read_json(_INTRADAY_SESSION_PATH)
     blocked = locked_symbols_for_date(session, day=day)
     if not blocked:
@@ -198,100 +189,24 @@ def intraday_locked_symbols_respecting_swing(day: str) -> set[str]:
 
 
 def reconcile_cross_book(day: str, *, persist: bool = True) -> dict[str, Any]:
-    """Apply swing-first cross-book rules to both persisted session files."""
+    """Report cross-book state: Swing owns symbols; Intraday must block on conflicts."""
     snap = _load_matrix_snapshot()
-    preferred = symbols_swing_prefers_over_intraday(day, snapshot=snap)
     intra_session = _read_json(_INTRADAY_SESSION_PATH)
     swing_session = _read_json(_SWING_SESSION_PATH)
-    promoted: list[str] = []
-    swing_scrubbed: list[str] = []
 
-    if (
-        preferred
-        and str(intra_session.get("sessionDate") or "")[:10] == str(day or "")[:10]
-        and intra_session.get("locked")
-    ):
-        open_long = [
-            r for r in (intra_session.get("long") or [])
-            if isinstance(r, dict) and not r.get("closed")
-        ]
-        closed_long = [
-            r for r in (intra_session.get("long") or [])
-            if isinstance(r, dict) and r.get("closed")
-        ]
-        kept, dropped = filter_rows_excluding(open_long, preferred)
-        if dropped:
-            promoted = sorted(set(dropped))
-            sess = dict(intra_session)
-            sess["long"] = closed_long + kept
-            events = list(sess.get("events") or [])
-            events.append(
-                {
-                    "type": "CROSS_BOOK_PROMOTED_TO_SWING",
-                    "at": _utc_now_iso(),
-                    "symbols": promoted,
-                    "reason": "SWING_HIGHER_PROBABILITY_BUY",
-                }
-            )
-            sess["events"] = events[-200:]
-            sess["crossBookPromotedToSwing"] = promoted
-            sess["updatedAt"] = _utc_now_iso()
-            if persist:
-                from .intraday_session_engine import save_session
+    # Swing-first promotion DISABLED: Intraday never promotes to Swing.
+    # Swing positions remain untouched (no scrubbing).
+    # Intraday should reject new entries/re-entries for symbols Swing owns.
 
-                save_session(sess)
-            intra_session = sess
-            log.info(
-                "Promoted %d intraday LONG name(s) to swing preference: %s",
-                len(promoted),
-                ",".join(promoted),
-            )
-
-    if (
-        str(swing_session.get("sessionDate") or "")[:10] == str(day or "")[:10]
-        and swing_session.get("locked")
-    ):
-        intra_rows = intraday_long_rows(intra_session)
-        open_long = [
-            r for r in (swing_session.get("long") or [])
-            if isinstance(r, dict) and not r.get("closed")
-        ]
-        closed_long = [
-            r for r in (swing_session.get("long") or [])
-            if isinstance(r, dict) and r.get("closed")
-        ]
-        drop_from_swing: set[str] = set()
-        for row in open_long:
-            sym = str(row.get("symbol") or "").upper().strip()
-            if not sym or sym not in intra_rows:
-                continue
-            if not swing_prefers_over_intraday(sym, intra_rows[sym], snapshot=snap):
-                drop_from_swing.add(sym)
-        if drop_from_swing:
-            kept, dropped = filter_rows_excluding(open_long, drop_from_swing)
-            swing_scrubbed = sorted(set(dropped))
-            sess = dict(swing_session)
-            sess["long"] = closed_long + kept
-            sess["crossBookExcluded"] = swing_scrubbed
-            sess["updatedAt"] = _utc_now_iso()
-            if persist:
-                from .swing_session import _atomic_write, _recompute_active_swing_totals
-
-                _recompute_active_swing_totals(sess)
-                _atomic_write(_SWING_SESSION_PATH, sess)
-            swing_session = sess
-            log.info(
-                "Scrubbed %d swing name(s) retained by higher-probability intraday: %s",
-                len(swing_scrubbed),
-                ",".join(swing_scrubbed),
-            )
+    swing_owned = swing_locked_symbols_for_day(day)
 
     return {
         "day": day,
-        "swingPreferred": sorted(preferred),
-        "promotedFromIntraday": promoted,
-        "scrubbedFromSwing": swing_scrubbed,
+        "swingPreferred": [],
+        "promotedFromIntraday": [],
+        "scrubbedFromSwing": [],
         "intradayBlocksSwing": sorted(intraday_locked_symbols_respecting_swing(day)),
+        "swingOwned": sorted(swing_owned),
     }
 
 

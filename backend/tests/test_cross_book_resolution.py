@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from app.services import cross_book_resolution as xbook
+from app.services import desk_book_symbols as desk
 from app.services import swing_session as swing
 
 
@@ -53,7 +54,8 @@ def test_swing_prefers_when_contract_passes_and_score_higher(monkeypatch):
         lambda row, **kwargs: (True, {}, []),
     )
     monkeypatch.setattr(swing, "_hydrate_swing_contract_row", lambda row: row)
-    assert xbook.swing_prefers_over_intraday(
+    # Swing-first promotion is DISABLED: always returns False
+    assert not xbook.swing_prefers_over_intraday(
         "APOLLOHOSP",
         _intraday_row("APOLLOHOSP", score=20.0, qer=0.5),
         snapshot=snap,
@@ -76,31 +78,46 @@ def test_intraday_keeps_when_swing_contract_fails(monkeypatch):
     )
 
 
-def test_reconcile_promotes_intraday_long_to_swing(tmp_path, monkeypatch):
+def test_reconcile_swing_untouched_intraday_blocks_on_conflict(tmp_path, monkeypatch):
     day = "2026-08-28"
     intra_path = tmp_path / "intraday_session.json"
     swing_path = tmp_path / "swing_session.json"
-    intra_path.write_text(
-        '{"locked":true,"sessionDate":"2026-08-28","long":[{"symbol":"GRASIM","direction":"LONG","closed":false}],"short":[],"events":[]}',
+    # Swing owns RELIANCE (locked)
+    swing_path.write_text(
+        '{"locked":true,"sessionDate":"2026-08-28","long":[{"symbol":"RELIANCE","direction":"BUY","closed":false}],"short":[]}',
         encoding="utf-8",
     )
-    swing_path.write_text(
-        '{"locked":true,"sessionDate":"2026-08-28","long":[],"short":[]}',
+    # Intraday does not own it
+    intra_path.write_text(
+        '{"locked":true,"sessionDate":"2026-08-28","long":[],"short":[],"events":[]}',
         encoding="utf-8",
     )
     monkeypatch.setattr(xbook, "_INTRADAY_SESSION_PATH", str(intra_path))
     monkeypatch.setattr(xbook, "_SWING_SESSION_PATH", str(swing_path))
-    monkeypatch.setattr(xbook, "symbols_swing_prefers_over_intraday", lambda *_a, **_k: {"GRASIM"})
-    monkeypatch.setattr(
-        "app.services.intraday_session_engine.save_session",
-        lambda payload: intra_path.write_text(
-            __import__("json").dumps(payload),
-            encoding="utf-8",
-        ),
-    )
 
     result = xbook.reconcile_cross_book(day, persist=True)
-    assert result["promotedFromIntraday"] == ["GRASIM"]
-    saved = __import__("json").loads(intra_path.read_text(encoding="utf-8"))
-    assert saved.get("long") == []
-    assert saved.get("crossBookPromotedToSwing") == ["GRASIM"]
+    # No promotion from intraday to swing
+    assert result["promotedFromIntraday"] == []
+    assert result["swingPreferred"] == []
+    # No scrubbing - Swing remains untouched
+    assert result["scrubbedFromSwing"] == []
+    # Swing reports its owned symbols
+    assert result["swingOwned"] == ["RELIANCE"]
+    # Intraday blocks empty (no intraday symbols)
+    assert result["intradayBlocksSwing"] == []
+    # Swing file unchanged
+    saved_swing = __import__("json").loads(swing_path.read_text(encoding="utf-8"))
+    assert any(r.get("symbol") == "RELIANCE" for r in saved_swing.get("long", []))
+
+
+def test_v2_swing_ownership_survives_same_day_exit(monkeypatch):
+    monkeypatch.setenv("SWING_STRATEGY_AUTHORITY", "V2")
+    monkeypatch.setattr(
+        "app.services.swing_v2.authoritative.get_authoritative_session",
+        lambda live=False: {
+            "sessionDate": "2026-08-28",
+            "long": [{"symbol": "TCS", "sessionDate": "2026-08-27", "terminal": False}],
+            "closedPositions": [{"symbol": "RELIANCE", "sessionDate": "2026-08-28", "terminal": True, "lastEventAt": "2026-08-28T12:00:00+05:30"}],
+        },
+    )
+    assert desk.swing_locked_symbols("2026-08-28") == {"RELIANCE", "TCS"}

@@ -11,7 +11,10 @@ from app.services.index_options_engine import build_index_options_radar
 from app.services.index_options_paper import reconcile_paper_book
 from app.services.angel_index_options import IST_ZONE
 from app.services.lemonn_options import apply_lemonn_fallback
-from tests.test_index_options_replay import _ReplayClient, _master_for_replay
+try:
+    from tests.test_index_options_replay import _ReplayClient, _master_for_replay
+except ModuleNotFoundError:
+    from test_index_options_replay import _ReplayClient, _master_for_replay
 
 
 def test_handler_reaches_session_date_before_live_return():

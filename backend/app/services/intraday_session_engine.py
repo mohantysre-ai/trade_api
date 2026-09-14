@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import copy
+from contextlib import contextmanager
 import logging
 import os
 import re
@@ -21,7 +22,7 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from .exit_plan import (
     apply_exit_policy_to_rows,
@@ -49,11 +50,19 @@ log = logging.getLogger(__name__)
 _IST = timezone(timedelta(hours=5, minutes=30))
 _BASE = Path(__file__).resolve().parent
 _CLOSE_FREEZE_LOCK = threading.Lock()
+# Serializes the load-check-write sequence in save_session so concurrent
+# writers (scheduler thread + request thread) cannot both read the same
+# stale disk state and race a lost-update onto intraday_session.json.
+_SESSION_PERSIST_LOCK = threading.RLock()
 _SESSION_RESPONSE_LOCK = threading.Lock()
 _SESSION_RESPONSE_CACHE: dict[str, Any] | None = None
 _SESSION_RESPONSE_CACHE_AT = 0.0
 _SESSION_RESPONSE_REFRESHING = False
 _SESSION_RESPONSE_GEN = 0
+_SESSION_SNAPSHOT_CACHE: dict[str, Any] | None = None
+_SESSION_SNAPSHOT_CACHE_AT = 0.0
+_SESSION_SNAPSHOT_REFRESHING = False
+_SESSION_SNAPSHOT_TTL = float(os.environ.get("INTRADAY_RESPONSE_SNAPSHOT_TTL", "2"))
 _SESSION_ROTATION_LOCK = threading.Lock()
 _SESSION_ROTATION_ATTEMPT_AT = 0.0
 _SESSION_ROTATION_RETRY_SEC = float(os.environ.get("INTRADAY_ROTATION_RETRY_SEC", "30"))
@@ -82,6 +91,41 @@ _FIXED_PLAN_FILE = Path(
         str(_BASE.parent.parent.parent / "fixed_trade_plan.json"),
     )
 )
+
+
+@contextmanager
+def _session_interprocess_lock():
+    """Serialize session read-check-write across API workers sharing the file."""
+    lock_path = Path(f"{_SESSION_FILE}.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = lock_path.open("a+b")
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            handle.seek(0)
+            handle.write(b"0")
+            handle.flush()
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            handle.close()
 
 # Capital sleeves (₹)
 LONG_CAPITAL = float(os.environ.get("INTRADAY_LONG_CAPITAL", "500000"))
@@ -297,10 +341,15 @@ def _safe_float(v: Any, default: float | None = None) -> float | None:
             cleaned = v.replace(",", "").replace("₹", "").replace("%", "").strip()
             if cleaned in ("", "-", "—", "N/A"):
                 return default
-            return float(cleaned)
-        return float(v)
+            result = float(cleaned)
+        else:
+            result = float(v)
     except (TypeError, ValueError):
         return default
+    # Guard NaN/Inf so a bad upstream field never poisons downstream sums.
+    if result != result or result in (float("inf"), float("-inf")):
+        return default
+    return result
 
 
 def _clamp(x: float, lo: float = 0.0, hi: float = 100.0) -> float:
@@ -347,6 +396,24 @@ def _session_has_book_rows(session: dict[str, Any] | None) -> bool:
         isinstance(session.get(key), list) and bool(session.get(key))
         for key in ("long", "short")
     )
+
+
+def _session_is_valid_current_lock(session: dict[str, Any] | None) -> bool:
+    """True only for a current-day, fully-committed Intraday lock.
+
+    A malformed or stale current lock is not authoritative and may be replaced by
+    a new valid payload. This prevents stale recovery writes from being rejected by
+    the disjoint-book guard when the on-disk session is itself invalid.
+    """
+    if not isinstance(session, dict) or not session.get("locked"):
+        return False
+    if _session_date(session) != _ist_now().strftime("%Y-%m-%d"):
+        return False
+    if not session.get("committedAt"):
+        return False
+    if session.get("entryPolicyVersion") != ENTRY_POLICY_VERSION:
+        return False
+    return True
 
 
 def _session_persistence_allowed(session: dict[str, Any]) -> bool:
@@ -404,62 +471,77 @@ def _ensure_current_exit_policy(session: dict[str, Any], *, persist: bool = Fals
 def _invalidate_session_response_cache() -> None:
     """Drop the coalesced GET snapshot and retire in-flight live refresh writes."""
     global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT, _SESSION_RESPONSE_GEN
+    global _SESSION_SNAPSHOT_CACHE, _SESSION_SNAPSHOT_CACHE_AT
     with _SESSION_RESPONSE_LOCK:
         _SESSION_RESPONSE_GEN += 1
         _SESSION_RESPONSE_CACHE = None
         _SESSION_RESPONSE_CACHE_AT = 0.0
+        _SESSION_SNAPSHOT_CACHE = None
+        _SESSION_SNAPSHOT_CACHE_AT = 0.0
 
 
 def save_session(payload: dict[str, Any], force: bool = False) -> None:
     if not isinstance(payload, dict):
         raise TypeError("Intraday session payload must be a JSON object")
 
-    existing = load_session()
-    today = _ist_now().strftime("%Y-%m-%d")
-    payload_date = _session_date(payload)
-    existing_date = _session_date(existing)
+    # The whole load -> validate -> write sequence must be atomic w.r.t. other
+    # writers: two concurrent callers each reading the same stale `existing`
+    # snapshot can both pass the guards below and the second write silently
+    # clobbers the first (lost update). One writer at a time closes that gap.
+    with _SESSION_PERSIST_LOCK, _session_interprocess_lock():
+        existing = load_session()
+        today = _ist_now().strftime("%Y-%m-%d")
+        payload_date = _session_date(payload)
+        existing_date = _session_date(existing)
 
-    if not force and payload.get("locked") and payload_date and payload_date != today:
-        raise RuntimeError(
-            "Refusing to persist a locked stale Intraday session: "
-            f"{payload_date} != {today}"
-        )
+        if not force and payload.get("locked") and payload_date and payload_date != today:
+            raise RuntimeError(
+                "Refusing to persist a locked stale Intraday session: "
+                f"{payload_date} != {today}"
+            )
 
-    if (
-        existing.get("locked")
-        and existing_date == today
-        and _session_has_book_rows(existing)
-        and not _session_has_book_rows(payload)
-    ):
-        raise RuntimeError(
-            "Refusing to replace today's non-empty Intraday book with an empty book"
-        )
+        authoritative_existing = _session_is_valid_current_lock(existing)
+        authoritative_payload = _session_is_valid_current_lock(payload)
 
-    existing_symbols = {
-        str(row.get("symbol") or "").upper()
-        for key in ("long", "short")
-        for row in (existing.get(key) or [])
-        if isinstance(row, dict) and row.get("symbol")
-    }
-    payload_symbols = {
-        str(row.get("symbol") or "").upper()
-        for key in ("long", "short")
-        for row in (payload.get(key) or [])
-        if isinstance(row, dict) and row.get("symbol")
-    }
-    if (
-        existing.get("locked")
-        and existing_date == today
-        and existing_symbols
-        and payload.get("locked")
-        and payload_symbols
-        and not payload_symbols.intersection(existing_symbols)
-    ):
-        raise RuntimeError(
-            "Refusing to replace today's Intraday book with a disjoint symbol set"
-        )
+        if (
+            authoritative_existing
+            and existing.get("locked")
+            and existing_date == today
+            and _session_has_book_rows(existing)
+            and not _session_has_book_rows(payload)
+            and authoritative_payload
+        ):
+            raise RuntimeError(
+                "Refusing to replace today's non-empty Intraday book with an empty book"
+            )
 
-    _atomic_write(_SESSION_FILE, payload)
+        existing_symbols = {
+            str(row.get("symbol") or "").upper()
+            for key in ("long", "short")
+            for row in (existing.get(key) or [])
+            if isinstance(row, dict) and row.get("symbol")
+        }
+        payload_symbols = {
+            str(row.get("symbol") or "").upper()
+            for key in ("long", "short")
+            for row in (payload.get(key) or [])
+            if isinstance(row, dict) and row.get("symbol")
+        }
+        if (
+            authoritative_existing
+            and authoritative_payload
+            and existing.get("locked")
+            and existing_date == today
+            and existing_symbols
+            and payload.get("locked")
+            and payload_symbols
+            and not payload_symbols.intersection(existing_symbols)
+        ):
+            raise RuntimeError(
+                "Refusing to replace today's Intraday book with a disjoint symbol set"
+            )
+
+        _atomic_write(_SESSION_FILE, payload)
     # Explicit mutations invalidate the response snapshot. The computing caller
     # will republish a fresh value after its state transition finishes.
     _invalidate_session_response_cache()
@@ -2356,12 +2438,90 @@ def _construct_dual_sleeve(
     return picked
 
 
+def _overlay_market_state(snap: dict[str, Any]) -> dict[str, Any]:
+    """Overlay live in-memory WS quotes onto the scanner snapshot (pull-to-push).
+
+    Captures ONE immutable evaluation snapshot (spec §17) and stamps its
+    generation onto the result; scoring rows get LTP/age from market state
+    when the quote is usable. Rows without a live quote keep their snapshot
+    values — nothing is fabricated, and stale rows stay explicitly marked.
+    """
+    try:
+        from .intraday_market_state import get_intraday_market_state
+
+        state = get_intraday_market_state()
+    except Exception:
+        return snap
+    try:
+        live = state.capture_snapshot()
+    except Exception:
+        log.exception("market-state evaluation snapshot capture failed")
+        return snap
+    quotes = live.get("quotes") or {}
+    if not quotes:
+        return snap
+    overlapped = snap if isinstance(snap, dict) else {}
+    # Mutate the snapshot's source dicts: _universe_rows merges
+    # {**stockQuotes[sym], **stocks[sym]} into fresh copies, so overlaying
+    # the copies would be discarded. stockQuotes and stocks entries win in
+    # that merge respectively, so both get the live quote.
+    stock_quotes = overlapped.get("stockQuotes") or {}
+    stocks_list = overlapped.get("stocks") or []
+    touched = 0
+    for row in _iter_quote_targets(stock_quotes, stocks_list):
+        sym = str(row.get("ticker") or "").upper()
+        quote = quotes.get(sym)
+        if not quote:
+            continue
+        freshness = quote.get("freshness")
+        if freshness in ("LIVE", "DEGRADED"):
+            row["ltp"] = quote.get("ltp")
+            row["ltpRaw"] = quote.get("ltp")
+            row["ltpSource"] = "ANGEL_WS"
+            row["receivedAt"] = quote.get("receivedAt")
+            row["dataAge"] = quote.get("dataAge")
+            row["dataStale"] = False
+        else:
+            # STALE/UNAVAILABLE: keep snapshot LTP but mark it honestly.
+            row["dataStale"] = True
+            row["excludeReason"] = "STALE_DATA"
+        touched += 1
+    if touched:
+        log.info("SCANNER_MARKET_STATE overlay gen=%s symbols=%d", live.get("generation"), touched)
+    overlapped["marketGeneration"] = live.get("generation")
+    return overlapped
+
+
+def _current_market_generation() -> int | None:
+    try:
+        from .intraday_market_state import get_intraday_market_state
+
+        return get_intraday_market_state().generation
+    except Exception:
+        return None
+
+
+def _iter_quote_targets(
+    stock_quotes: Any, stocks_list: Any
+) -> Iterator[dict[str, Any]]:
+    if isinstance(stock_quotes, dict):
+        for sym, q in stock_quotes.items():
+            if isinstance(q, dict):
+                q.setdefault("ticker", str(sym).upper())
+                yield q
+    if isinstance(stocks_list, list):
+        for s in stocks_list:
+            if isinstance(s, dict) and s.get("ticker"):
+                yield s
+
+
 def generate_candidates(
     snapshot: dict[str, Any] | None = None,
     *,
     include_full_hunt: bool = False,
 ) -> dict[str, Any]:
     snap = snapshot if snapshot is not None else load_market_snapshot()
+    snap = _overlay_market_state(snap)
     updated_at = snap.get("updatedAt")
     snap_dt = _parse_iso(updated_at)
     age_sec = None
@@ -2685,6 +2845,10 @@ def generate_candidates(
         },
         "executionPolicy": "MANUAL_ONLY",
         "entryPolicyVersion": ENTRY_POLICY_VERSION,
+        # Threaded through to commit_session's stale-evaluation guard so a
+        # scanner run against an old generation can never silently overwrite
+        # a newer locked basket (F6.1/F6.2).
+        "marketGeneration": snap.get("marketGeneration"),
         "locked": False,
     }
     if include_full_hunt:
@@ -2865,6 +3029,51 @@ def sync_fixed_plan_from_session(session: dict[str, Any]) -> None:
         log.warning("fixed plan sync failed: %s", exc)
 
 
+def _empty_session_state(today: str, *, reason: str = "") -> dict[str, Any]:
+    """Spec V5 §28: today's empty session state — date reset first, always.
+
+    Candidate population may fail afterward; that only ever produces an
+    empty/degraded TODAY session, never yesterday's session kept alive.
+    """
+    return {
+        "success": False,
+        "locked": False,
+        "sessionDate": today,
+        "committedAt": None,
+        "updatedAt": _utc_now_iso(),
+        "openPositions": [],
+        "closedPositions": [],
+        "events": [
+            {
+                "type": "SESSION_DAY_ROLLOVER",
+                "at": _utc_now_iso(),
+                "sessionDate": today,
+                "reason": reason or "day_boundary_reset",
+            }
+        ],
+        "cashHeld": False,
+        "replacementBlockedReason": None,
+        "rotationPending": False,
+        "rotationError": None,
+        "sessionStatus": "EMPTY",
+        "dataStale": True,
+        "marketGeneration": None,
+    }
+
+
+def _reset_session_to_today(today: str, *, reason: str) -> dict[str, Any]:
+    """Persist today's EMPTY session BEFORE any candidate/stream work runs.
+
+    Separates hard failure (candidate generation, WS down, REST failure)
+    from the date contract: on failure diagnostics show rotationPending /
+    rotationError for TODAY's empty state, never yesterday's locks.
+    """
+    reset = _empty_session_state(today, reason=reason)
+    reset["sessionStatus"] = "DEGRADED"
+    save_session(reset)
+    return reset
+
+
 def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> dict[str, Any]:
     """Lock up to five qualified names total; cash is valid when edge is absent.
 
@@ -2902,6 +3111,12 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
         except Exception as exc:
             log.warning("Prior-day EOD freeze failed for %s: %s", existing_date, exc)
 
+    if stale_day:
+        # Spec V5 §28: date reset FIRST — persist today's empty session before
+        # candidate generation. A generation failure can only produce an empty
+        # TODAY session, never yesterday's locks carried over.
+        _reset_session_to_today(today, reason="day_boundary_reset")
+
     if existing.get("locked") and not force:
         return {
             "success": False,
@@ -2924,12 +3139,27 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
         _maybe_refresh_live_snapshot(reason="intraday_commit")
     )
     if candidates.get("dataStale"):
+        # Spec V5 §28/§29: the prior-day session was already cleared from disk
+        # before candidate generation ran. Mark today's empty state explicitly
+        # so diagnostics show rotationPending/rotationError, never stale locks.
+        if stale_day:
+            try:
+                failed = load_session()
+                failed = dict(failed or {})
+                failed.setdefault("sessionDate", today)
+                failed["sessionStatus"] = "DEGRADED"
+                failed["rotationPending"] = True
+                failed["rotationError"] = "STALE_SNAPSHOT"
+                save_session(failed)
+            except Exception as exc:
+                log.warning("Failed to mark rotation pending: %s", exc)
         return {
             "success": False,
             "error": "STALE_SNAPSHOT — basket not committed; waiting for a fresh market snapshot.",
-            "session": existing,
+            "session": load_session(),
             "snapshotUpdatedAt": candidates.get("snapshotUpdatedAt"),
             "snapshotAgeSec": candidates.get("snapshotAgeSec"),
+            "stalePriorSession": "yesterday_session_cleared" if stale_day else None,
         }
     pool_long = candidates.get("proposedLong") or []
     pool_short = candidates.get("proposedShort") or []
@@ -3040,6 +3270,48 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
     if short_cash_reason:
         capital["shortCashReason"] = short_cash_reason
 
+    # Spec V5 §18: validate the symbols being committed, not unrelated tick
+    # traffic elsewhere in the 750-symbol universe. A global tick-count
+    # threshold rejects healthy commits during active markets and still does
+    # not prove that selected symbols are fresh.
+    try:
+        from .intraday_market_state import get_intraday_market_state as _market_state
+
+        _eval_generation = candidates.get("marketGeneration")
+        selected = [
+            row
+            for side in ("adoptLong", "adoptShort")
+            for row in (candidates.get(side) or [])
+            if isinstance(row, dict) and row.get("symbol")
+        ]
+        selected_symbols = [str(row["symbol"]).upper() for row in selected]
+        live = _market_state().capture_snapshot(selected_symbols)
+        stale_symbols: list[str] = []
+        for row in selected:
+            symbol = str(row["symbol"]).upper()
+            quote = (live.get("quotes") or {}).get(symbol) or {}
+            current = quote.get("ltp")
+            evaluated = row.get("ltpRaw") or row.get("ltp") or row.get("entryPrice")
+            if quote.get("freshness") in ("LIVE", "DEGRADED") and current and evaluated:
+                if abs(float(current) - float(evaluated)) / max(abs(float(evaluated)), 0.01) > 0.005:
+                    stale_symbols.append(symbol)
+        if stale_symbols:
+            stale_err = (
+                "STALE_EVALUATION — selected symbols moved after scan: "
+                + ", ".join(stale_symbols)
+            )
+            if stale_day:
+                _reset_session_to_today(today, reason="stale_evaluation")
+            return {
+                "success": False,
+                "error": stale_err,
+                "session": load_session(),
+                "marketGeneration": live.get("generation"),
+            }
+    except Exception as exc:
+        # A market-state lookup failure must not block locking (REST path when WS down).
+        log.debug("Market-generation guard skipped: %s", exc)
+
     session = {
         "success": True,
         "locked": True,
@@ -3053,6 +3325,7 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
         "capital": capital,
         "executionPolicy": "MANUAL_ONLY",
         "entryPolicyVersion": ENTRY_POLICY_VERSION,
+        "marketGeneration": candidates.get("marketGeneration"),
         "long": long_rows,
         "short": short_rows,
         "candidatePoolLong": pool_long,
@@ -3115,19 +3388,36 @@ def ensure_intraday_session_locked() -> dict[str, Any]:
         if result.get("alreadyLocked"):
             out["alreadyLocked"] = True
         return out
+    # Spec V5 §28/§29: reset today's session BEFORE candidate generation.
+    # If generation below fails, today's session is EMPTY/DEGRADED — it can
+    # never remain yesterday's active session.
+    stale_day = bool(existing_date and existing_date != today)
+    if stale_day:
+        _reset_session_to_today(today, reason="day_boundary_reset")
+        existing = load_session()
+        existing_date = str(existing.get("sessionDate") or "").strip()[:10]
     # Commit failed — return current disk session so callers still see shape
     failed = dict(existing) if isinstance(existing, dict) else {}
     failed.setdefault("locked", False)
     if isinstance(result, dict) and result.get("error"):
         failed["commitError"] = result.get("error")
-    # Stale prior-day lock must never look "healthy" — stamp rotation failure on disk
-    if existing.get("locked") and existing_date and existing_date != today:
-        failed["locked"] = True
-        failed["sessionDate"] = existing_date
+    # Stale prior-day lock must never look "healthy" — after the reset above
+    # this only records rotation failure on TODAY's session (spec V5 §29).
+    # Yesterday's locks are already gone from disk; never restore them.
+    if existing_date and existing_date != today:
+        failed = _empty_session_state(today, reason="rotation_failed")
         failed["rotationPending"] = True
         failed["rotationError"] = (
             result.get("error") if isinstance(result, dict) else "commit_failed"
         )
+        failed["rotationAttemptedAt"] = _utc_now_iso()
+        try:
+            save_session(failed)
+        except Exception as exc:
+            log.warning("Failed to persist rotationPending flag: %s", exc)
+    elif existing.get("locked") and result.get("error"):
+        failed["rotationPending"] = True
+        failed["rotationError"] = result.get("error")
         failed["rotationAttemptedAt"] = _utc_now_iso()
         try:
             save_session(failed)
@@ -4408,6 +4698,8 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
             out["pnlPct"] = round((realized / (entry * qty)) * 100, 2)
         if realized is not None:
             out["totalPnl"] = round(realized, 2)
+        # EOD/Book readers key off `pnl`, not `realizedPnl` (F5.1) — keep both in sync.
+        out["pnl"] = out["realizedPnl"] if out["realizedPnl"] is not None else 0.0
         try:
             refreshed = refresh_exit_policy(out, keep_exit_state=True)
             if refreshed.get("exitPlan"):
@@ -4435,10 +4727,16 @@ def _enrich_position(pos: dict[str, Any], quotes: dict[str, Any], live_row: dict
         out["positionValue"] = round(ltp * rem_qty, 2)
         if realized is not None:
             out["totalPnl"] = round(realized + unreal, 2)
+        # Still-open positions must carry a non-zero `pnl` for EOD Book readers
+        # that fall back to it when `realizedPnl` is None (F5.1); mark it as
+        # mark-to-market so callers do not mistake it for a booked exit.
+        out["pnl"] = round((realized or 0.0) + unreal, 2)
+        out["pnlKind"] = "unrealised"
     else:
         out["unrealizedPnl"] = None
         out["pnlPct"] = None
         out["positionValue"] = None
+        out["pnl"] = round(realized, 2) if realized is not None else None
 
     if live_row and live_row.get("effectiveStop") is not None:
         out["effectiveStop"] = live_row.get("effectiveStop")
@@ -4547,15 +4845,27 @@ def _schedule_stale_session_rotation(existing: dict[str, Any] | None = None) -> 
             or session.get("entryPolicyVersion") != ENTRY_POLICY_VERSION
         )
     )
-    allowed, _reason = basket_lock_allowed()
-    if not (stale or malformed_current) or not allowed:
+    if not (stale or malformed_current):
         return False
+    allowed, _reason = basket_lock_allowed()
     now = time.monotonic()
     if now - _SESSION_ROTATION_ATTEMPT_AT < _SESSION_ROTATION_RETRY_SEC:
         return True
     if not _SESSION_ROTATION_LOCK.acquire(blocking=False):
         return True
     _SESSION_ROTATION_ATTEMPT_AT = now
+
+    # Date invalidation is independent of the lock window. Never expose a
+    # prior-day basket while waiting for today's candidate lock window.
+    if stale and not allowed:
+        try:
+            _reset_session_to_today(today, reason="day_boundary_reset")
+        finally:
+            _SESSION_ROTATION_LOCK.release()
+        return True
+    if not allowed:
+        _SESSION_ROTATION_LOCK.release()
+        return True
 
     def _rotate() -> None:
         try:
@@ -4587,8 +4897,24 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
     Live quote enrichment runs outside the FastAPI request worker pool.
     """
     global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT, _SESSION_RESPONSE_REFRESHING
+    global _SESSION_SNAPSHOT_CACHE, _SESSION_SNAPSHOT_CACHE_AT, _SESSION_SNAPSHOT_REFRESHING
     if not include_live:
-        return _compute_session(include_live=False)
+        now = time.monotonic()
+        if _SESSION_SNAPSHOT_CACHE is not None and now - _SESSION_SNAPSHOT_CACHE_AT < _SESSION_SNAPSHOT_TTL:
+            return copy.deepcopy(_SESSION_SNAPSHOT_CACHE)
+        with _SESSION_RESPONSE_LOCK:
+            now = time.monotonic()
+            if _SESSION_SNAPSHOT_CACHE is None:
+                _SESSION_SNAPSHOT_CACHE = copy.deepcopy(_compute_session(include_live=False))
+                _SESSION_SNAPSHOT_CACHE_AT = now
+            elif now - _SESSION_SNAPSHOT_CACHE_AT >= _SESSION_SNAPSHOT_TTL and not _SESSION_SNAPSHOT_REFRESHING:
+                _SESSION_SNAPSHOT_REFRESHING = True
+                threading.Thread(
+                    target=_refresh_session_snapshot_cache,
+                    name="intraday-session-snapshot-refresh",
+                    daemon=True,
+                ).start()
+            return copy.deepcopy(_SESSION_SNAPSHOT_CACHE)
     disk_session = load_session()
     rollover_pending = _schedule_stale_session_rotation(disk_session)
 
@@ -4641,6 +4967,20 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
     return _with_rollover_state(result)
 
 
+def _refresh_session_snapshot_cache() -> None:
+    global _SESSION_SNAPSHOT_CACHE, _SESSION_SNAPSHOT_CACHE_AT, _SESSION_SNAPSHOT_REFRESHING
+    try:
+        result = _compute_session(include_live=False)
+        with _SESSION_RESPONSE_LOCK:
+            _SESSION_SNAPSHOT_CACHE = copy.deepcopy(result)
+            _SESSION_SNAPSHOT_CACHE_AT = time.monotonic()
+    except Exception:
+        log.exception("intraday session snapshot refresh failed")
+    finally:
+        with _SESSION_RESPONSE_LOCK:
+            _SESSION_SNAPSHOT_REFRESHING = False
+
+
 def _refresh_session_response_cache(started_gen: int) -> None:
     """Refresh the read-only response cache outside FastAPI's worker pool."""
     global _SESSION_RESPONSE_CACHE, _SESSION_RESPONSE_CACHE_AT, _SESSION_RESPONSE_REFRESHING
@@ -4652,6 +4992,15 @@ def _refresh_session_response_cache(started_gen: int) -> None:
                 return
             _SESSION_RESPONSE_CACHE = copy.deepcopy(result)
             _SESSION_RESPONSE_CACHE_AT = time.monotonic()
+        try:
+            from app.services.shared_state.view_store import get_view_store
+            from app.services.shared_state.event_bus import get_event_bus, EventType
+            get_view_store().set("intraday", result)
+            get_event_bus().publish(
+                Event(type=EventType.INTRADAY_STATE_CHANGED, payload={"version": result.get("version", 0)})
+            )
+        except Exception:
+            pass
     except Exception:
         log.exception("intraday live refresh failed; serving persisted session")
     finally:
