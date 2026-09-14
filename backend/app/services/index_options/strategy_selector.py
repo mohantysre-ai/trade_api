@@ -44,6 +44,13 @@ def select_strategies(context: IndexOptionContext) -> list[dict[str, Any]]:
     """Evaluate enabled strategies and return normalized candidate list."""
     regime = _classify_regime(context)
     allowed_families = _regime_family_map(regime)
+    if context.term_structure is not None and context.far_chain and context.far_expiry:
+        allowed_families.add("TERM_STRUCTURE")
+    if context.atm_iv is not None and context.realized_vol is not None:
+        if context.atm_iv < context.realized_vol:
+            allowed_families.add("VOLATILITY_EXPANSION")
+        elif context.atm_iv > context.realized_vol:
+            allowed_families.add("VOLATILITY_COMPRESSION")
     candidates = []
 
     for strategy_id, strategy in get_registered_strategies().items():

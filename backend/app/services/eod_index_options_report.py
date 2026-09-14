@@ -55,4 +55,10 @@ def generate_index_options_eod_report(for_date: date) -> dict[str, Any]:
         "positions": positions,
         "updatedAt": live.get("updatedAt"),
     }
+    try:
+        from .index_options.runtime import strategy_eod
+
+        report["strategyAttribution"] = strategy_eod(day)
+    except Exception:
+        report["strategyAttribution"] = {"sessionDate": day, "positions": [], "realizedPnl": 0.0, "unrealizedPnl": 0.0}
     return save_book_cache(for_date, "index_options", report)

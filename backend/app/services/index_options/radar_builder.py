@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .context import IndexOptionContext
+from .config import LEGACY_ALWAYS_ENABLED
 from .strategy_registry import get_registered_strategies, is_strategy_enabled
 from .strategy_selector import select_strategies
 
@@ -53,13 +54,13 @@ def _build_context(index: dict[str, str], snapshot: dict[str, Any]) -> IndexOpti
         breadth_directional_score=_num(breadth.get("directionalScore")),
         futures_oi_state=str(futures_oi.get("state") or "").upper() or None,
         futures_oi_aligned=futures_oi.get("aligned"),
-        realized_vol=None,
-        atm_iv=None,
-        iv_rank=None,
-        iv_percentile=None,
-        skew=None,
-        term_structure=None,
-        expected_move=None,
+        realized_vol=_num(supplied.get("realizedVol")),
+        atm_iv=_num(supplied.get("atmIv")),
+        iv_rank=_num(supplied.get("ivRank")),
+        iv_percentile=_num(supplied.get("ivPercentile")),
+        skew=_num(supplied.get("skew")),
+        term_structure=_num(supplied.get("termStructure")),
+        expected_move=_num(supplied.get("expectedMove")),
         chain=chain,
         expiry=str(expiry) if expiry else None,
         session_time=now,
@@ -71,8 +72,17 @@ def _build_context(index: dict[str, str], snapshot: dict[str, Any]) -> IndexOpti
         provider_status=provider_status,
         data_source=data_source,
         component_freshness=component_freshness,
-            raw_snapshot=supplied,
-            full_snapshot=snapshot,
+        raw_snapshot=supplied,
+        full_snapshot=snapshot,
+        snapshot_id=str(snapshot.get("snapshotId") or snapshot.get("updatedAt") or ""),
+        decision_timestamp=str(snapshot.get("updatedAt") or now.isoformat()),
+        market_generation=str(snapshot.get("marketGeneration") or ""),
+        put_skew=_num(supplied.get("putSkew")),
+        call_skew=_num(supplied.get("callSkew")),
+        dte=int(supplied["dte"]) if supplied.get("dte") is not None else None,
+        far_expiry=str(supplied.get("farExpiry")) if supplied.get("farExpiry") else None,
+        far_chain=supplied.get("farChain") if isinstance(supplied.get("farChain"), list) else [],
+        expiry_state=str(supplied.get("expiryState") or "NORMAL_EXPIRY_SESSION"),
     )
 
 
@@ -92,6 +102,8 @@ def _legacy_from_strategy_result(result: Any, index_config: dict[str, str]) -> d
         "missingInputs": [],
         "strategyMode": "SELL_PREMIUM" if is_seller else "BUY_PREMIUM",
         "strategyType": result.strategy_id,
+        "strategyId": result.strategy_id,
+        "family": result.family,
         "bias": result.bias,
         "eligible": result.eligible,
         "providerStatus": None,
@@ -103,6 +115,25 @@ def _legacy_from_strategy_result(result: Any, index_config: dict[str, str]) -> d
         "structure": {},
         "oiResearch": {},
         "componentFreshness": {},
+        "entryDebit": result.entry_debit,
+        "entryCredit": result.entry_credit,
+        "maxProfit": result.max_profit,
+        "maxLoss": result.max_loss,
+        "breakevens": result.breakevens,
+        "rewardRisk": result.reward_risk,
+        "delta": result.delta,
+        "gamma": result.gamma,
+        "theta": result.theta,
+        "vega": result.vega,
+        "margin": result.margin,
+        "liquidityScore": result.liquidity_score,
+        "executionScore": result.execution_score,
+        "snapshotId": result.extra.get("snapshotId"),
+        "decisionTimestamp": result.extra.get("decisionTimestamp"),
+        "marketGeneration": result.extra.get("marketGeneration"),
+        "farExpiry": result.extra.get("farExpiry"),
+        "expiryState": result.extra.get("expiryState"),
+        "atmIv": result.extra.get("atmIv"),
     }
     if not is_seller:
         base.update({
@@ -144,8 +175,11 @@ def build_index_options_radar_v2(snapshot: dict[str, Any] | None) -> dict[str, A
         context = _build_context(index, payload)
         if context is None:
             continue
+        selected_by_regime = {row["strategyId"] for row in select_strategies(context)}
         for strategy_id, strategy in get_registered_strategies().items():
             if not is_strategy_enabled(strategy_id):
+                continue
+            if strategy_id not in LEGACY_ALWAYS_ENABLED and strategy_id not in selected_by_regime:
                 continue
             if not strategy.eligible(context):
                 continue
