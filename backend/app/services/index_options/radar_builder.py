@@ -194,7 +194,7 @@ def build_index_options_radar_v2(snapshot: dict[str, Any] | None) -> dict[str, A
                 candidates.append(legacy)
 
     eligible = sorted(
-        [row for row in [*candidates, *seller_candidates] if row.get("eligible")],
+        [row for row in [*candidates, *seller_candidates] if row.get("eligible") and row.get("strategyId") not in LEGACY_ALWAYS_ENABLED],
         key=lambda row: row.get("score") or 0,
         reverse=True,
     )

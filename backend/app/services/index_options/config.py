@@ -1,8 +1,7 @@
 """Frozen configuration surface for the modular index-options engine.
 
 Everything the strategy modules, economics, execution and lifecycle layers read
-lives here so parallel workstreams share one contract. Values are conservative
-by default and every new-family flag is OFF unless explicitly enabled.
+lives here so parallel workstreams share one contract.
 """
 
 from __future__ import annotations
@@ -10,21 +9,21 @@ from __future__ import annotations
 import os
 from typing import Any
 
-# --- Feature flags (all new families default OFF) ---------------------------
-def _flag(name: str) -> bool:
-    return os.getenv(name, "0").strip().lower() in {"1", "true", "yes", "on"}
+# --- Feature flags ----------------------------------------------------------
+def _flag(name: str, default: str = "0") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def debit_spreads_enabled() -> bool:
-    return _flag("INDEX_STRAT_DEBIT_SPREADS")
+    return _flag("INDEX_STRAT_DEBIT_SPREADS", "1")
 
 
 def long_vol_enabled() -> bool:
-    return _flag("INDEX_STRAT_LONG_VOL")
+    return _flag("INDEX_STRAT_LONG_VOL", "1")
 
 
 def butterflies_enabled() -> bool:
-    return _flag("INDEX_STRAT_BUTTERFLIES")
+    return _flag("INDEX_STRAT_BUTTERFLIES", "1")
 
 
 def calendars_enabled() -> bool:

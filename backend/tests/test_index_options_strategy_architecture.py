@@ -367,18 +367,18 @@ class TestFeatureFlags:
         assert is_strategy_enabled("BEAR_CALL_CREDIT_SPREAD")
         assert is_strategy_enabled("IRON_CONDOR")
 
-    def test_phase2_disabled_by_default(self):
-        assert not is_strategy_enabled("BULL_CALL_DEBIT_SPREAD")
-        assert not is_strategy_enabled("BEAR_PUT_DEBIT_SPREAD")
+    def test_phase2_enabled_by_default(self):
+        assert is_strategy_enabled("BULL_CALL_DEBIT_SPREAD")
+        assert is_strategy_enabled("BEAR_PUT_DEBIT_SPREAD")
 
-    def test_phase3_disabled_by_default(self):
-        assert not is_strategy_enabled("LONG_STRADDLE")
-        assert not is_strategy_enabled("LONG_STRANGLE")
+    def test_phase3_enabled_by_default(self):
+        assert is_strategy_enabled("LONG_STRADDLE")
+        assert is_strategy_enabled("LONG_STRANGLE")
 
-    def test_phase4_disabled_by_default(self):
-        assert not is_strategy_enabled("IRON_BUTTERFLY")
-        assert not is_strategy_enabled("LONG_CALL_BUTTERFLY")
-        assert not is_strategy_enabled("LONG_PUT_BUTTERFLY")
+    def test_phase4_enabled_by_default(self):
+        assert is_strategy_enabled("IRON_BUTTERFLY")
+        assert is_strategy_enabled("LONG_CALL_BUTTERFLY")
+        assert is_strategy_enabled("LONG_PUT_BUTTERFLY")
 
     def test_phase5_disabled_by_default(self):
         assert not is_strategy_enabled("CALL_CALENDAR")
@@ -410,7 +410,7 @@ class TestRegistry:
         }
         assert set(strategies.keys()) == expected
 
-    def test_enabled_strategy_ids_phase1_only(self):
+    def test_enabled_strategy_ids_excludes_term_structures(self):
         ids = enabled_strategy_ids()
         assert set(ids) == {
             "LONG_CALL",
@@ -418,4 +418,11 @@ class TestRegistry:
             "BULL_PUT_CREDIT_SPREAD",
             "BEAR_CALL_CREDIT_SPREAD",
             "IRON_CONDOR",
+            "BULL_CALL_DEBIT_SPREAD",
+            "BEAR_PUT_DEBIT_SPREAD",
+            "LONG_STRADDLE",
+            "LONG_STRANGLE",
+            "IRON_BUTTERFLY",
+            "LONG_CALL_BUTTERFLY",
+            "LONG_PUT_BUTTERFLY",
         }
