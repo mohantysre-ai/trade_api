@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from app.services import cross_book_resolution as xbook
+from app.services import desk_book_symbols as desk
 from app.services import swing_session as swing
 
 
@@ -107,3 +108,16 @@ def test_reconcile_swing_untouched_intraday_blocks_on_conflict(tmp_path, monkeyp
     # Swing file unchanged
     saved_swing = __import__("json").loads(swing_path.read_text(encoding="utf-8"))
     assert any(r.get("symbol") == "RELIANCE" for r in saved_swing.get("long", []))
+
+
+def test_v2_swing_ownership_survives_same_day_exit(monkeypatch):
+    monkeypatch.setenv("SWING_STRATEGY_AUTHORITY", "V2")
+    monkeypatch.setattr(
+        "app.services.swing_v2.authoritative.get_authoritative_session",
+        lambda live=False: {
+            "sessionDate": "2026-08-28",
+            "long": [{"symbol": "TCS", "sessionDate": "2026-08-27", "terminal": False}],
+            "closedPositions": [{"symbol": "RELIANCE", "sessionDate": "2026-08-28", "terminal": True, "lastEventAt": "2026-08-28T12:00:00+05:30"}],
+        },
+    )
+    assert desk.swing_locked_symbols("2026-08-28") == {"RELIANCE", "TCS"}

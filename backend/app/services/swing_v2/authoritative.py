@@ -34,6 +34,7 @@ _SESSION_READ_CACHE: dict[str, Any] | None = None
 _SESSION_READ_CACHE_AT = 0.0
 _SESSION_READ_TTL = float(os.getenv("SWING_SESSION_READ_TTL", "2"))
 _EOD_READ_CACHE: dict[str, dict[str, Any]] = {}
+_SWING_SCAN_INTERVAL_SECONDS = float(os.getenv("SWING_SCAN_INTERVAL_SECONDS", "15"))
 
 
 def is_v2_authoritative(config: SwingV2Config | None = None) -> bool:
@@ -399,11 +400,13 @@ def _manage_open_positions(ledger: SwingLedger, now: datetime, cfg: SwingV2Confi
         age = session_age(entry_day, now.astimezone(IST).date())
         due = time_exit_due(now, age, max_overnights=cfg.max_overnights, exit_clock=cfg.mandatory_exit_ist)
         for index, bar in enumerate(bars):
+            data_status = str(bar.get("dataHealth") or bar.get("dataStatus") or bar.get("qualityStatus") or "LIVE").upper()
             state = process_position_bar(
                 ledger,
                 position_id,
                 bar,
                 is_d2_exit=due and index == len(bars) - 1,
+                data_status=data_status,
             )
             if state.get("terminal"):
                 break
@@ -445,7 +448,14 @@ def run_authoritative_cycle(*, now: datetime | None = None, force: bool = False)
         existing_open = [row for row in _positions(ledger) if not row.get("terminal")]
         start, freeze, expiry = (_clock(cfg.decision_start_ist), _clock(cfg.decision_freeze_ist), _clock(cfg.order_expire_ist))
         scan: dict[str, Any] | None = current.get("scan") if isinstance(current.get("scan"), dict) else None
-        if start <= local_time < freeze and not current.get("selectionFinalized"):
+        last_scan_at = current.get("lastScanAt")
+        scan_due = True
+        if last_scan_at:
+            try:
+                scan_due = (now - datetime.fromisoformat(str(last_scan_at).replace("Z", "+00:00")).astimezone(IST)).total_seconds() >= _SWING_SCAN_INTERVAL_SECONDS
+            except (TypeError, ValueError):
+                scan_due = True
+        if start <= local_time < freeze and not current.get("selectionFinalized") and scan_due:
             # Hunt and lock qualified Swing names throughout the session. The
             # ledger is idempotent, so each cycle fills only remaining slots.
             # Shared snapshots avoid a full Angel refresh on every scheduler tick.

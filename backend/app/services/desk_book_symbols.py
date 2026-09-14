@@ -64,11 +64,15 @@ def swing_locked_symbols(day: str) -> set[str]:
             from .swing_v2.authoritative import get_authoritative_session
 
             session = get_authoritative_session(live=False)
-            return {
-                str(row.get("symbol") or row.get("ticker") or "").upper().strip()
-                for row in (session.get("long") or [])
-                if isinstance(row, dict) and (row.get("symbol") or row.get("ticker")) and not row.get("terminal")
-            }
+            owned: set[str] = set()
+            for row in [*(session.get("long") or []), *(session.get("closedPositions") or [])]:
+                if not isinstance(row, dict) or not (row.get("symbol") or row.get("ticker")):
+                    continue
+                session_day = str(row.get("sessionDate") or "")[:10]
+                closed_at = str(row.get("lastEventAt") or row.get("exitTimestamp") or "")[:10]
+                if not row.get("terminal") or session_day == str(day)[:10] or closed_at == str(day)[:10]:
+                    owned.add(str(row.get("symbol") or row.get("ticker") or "").upper().strip())
+            return owned
         except Exception as exc:
             log.error("V2 cross-book symbol read failed closed: %s", exc)
             return set()

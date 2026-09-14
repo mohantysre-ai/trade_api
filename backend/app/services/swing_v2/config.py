@@ -140,7 +140,7 @@ def load_config() -> SwingV2Config:
         min_upside_capacity_r=float(os.getenv("SWING_MIN_UPSIDE_CAPACITY_R", "1.50")),
         min_expected_net_r=float(os.getenv("SWING_MIN_EXPECTED_NET_R", "0.12")),
         required_coverage=float(os.getenv("SWING_REQUIRED_UNIVERSE_COVERAGE", "0.99")),
-        decision_start_ist=os.getenv("SWING_DECISION_START_IST", "09:30"),
+        decision_start_ist=os.getenv("SWING_DECISION_START_IST", "09:45"),
         decision_freeze_ist=os.getenv("SWING_DECISION_FREEZE_IST", "15:10"),
         order_expire_ist=os.getenv("SWING_ORDER_EXPIRE_IST", "15:20"),
         mandatory_exit_ist=os.getenv("SWING_MANDATORY_EXIT_IST", "15:15"),

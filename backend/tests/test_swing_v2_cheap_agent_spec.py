@@ -17,6 +17,7 @@ from app.services.swing_v2.lifecycle import (
     time_exit_due,
     update_stop,
 )
+from app.services.swing_v2.data_quality import evaluate_freshness
 from app.services.swing_v2.market_data import (
     historical_bars,
     intraday_occupied_symbols,
@@ -249,6 +250,60 @@ def test_1445_ist_entry_cutoff():
         universe_coverage=1.0, regime="NORMAL", final_lock=False, now=now_after, config=cfg
     )
     assert len(scan_after.get("candidates") or []) == 0
+
+
+def test_score_above_70_overrides_setup_gate_but_not_safety_gate():
+    now = datetime(2026, 9, 11, 10, 0, tzinfo=IST)
+    row = {
+        "symbol": "HIGH_SCORE",
+        "universeSegment": "NIFTY100",
+        "decisionPrice": 2500.0,
+        "structureStop": 2450.0,
+        "atr14": 40.0,
+        "trendPriorPctile": 90,
+        "residualStrengthPctile": 90,
+        "setupQualityPctile": 90,
+        "rvolPctile": 90,
+        "clvPctile": 90,
+        "sectorStrengthPctile": 90,
+        "liquidityPctile": 90,
+        "mdtv20": 3e9,
+        "dailyObservationCount": 260,
+        "modeledRoundTripCostPct": 0.15,
+        "spreadPct": 0.05,
+        "availableAskDepth": 1000,
+        "dailyBarsThroughPreviousClose": True,
+        "corporateEventsCurrent": True,
+        "surveillanceCurrent": True,
+        "universeCurrent": True,
+        "sourceTimestamps": {"quote": now.isoformat(), "depth": now.isoformat(), "bars5m": now.isoformat()},
+        "upsideCapacityR": 2.5,
+        "plannedMaxBlendedR": 2.5,
+        "passes_hard_filters": True,
+        "passes_quality_filters": True,
+        "priceAboveVwap": True,
+        "priceAboveEma9": True,
+        "vwap": 2400.0,
+        "ema9": 2450.0,
+        "breakoutPass": True,
+        "pivotR1Breakout": True,
+        "rsiPivotBreak": True,
+        "riskAuditVerdict": "APPROVE",
+    }
+    cfg = SwingV2Config(enabled=True, mode="PAPER", authority="V2")
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr("app.services.swing_v2.shadow.evaluate_setups", lambda _: {"eligible": False, "passedSetupIds": [], "rejections": {"test": "forced"}})
+        result = build_shadow_v2([row], universe_coverage=1.0, regime="NORMAL", final_lock=True, now=now, config=cfg)
+    assert result["candidates"][0]["score"] > 70
+    assert result["candidates"][0]["scoreLockEligible"] is True
+
+
+def test_score_above_70_still_fails_stale_data():
+    now = datetime(2026, 9, 11, 10, 0, tzinfo=IST)
+    row = {"symbol": "STALE_HIGH_SCORE", "universeSegment": "NIFTY100", "decisionPrice": 2500.0, "structureStop": 2450.0, "atr14": 40.0, "trendPriorPctile": 90, "residualStrengthPctile": 90, "setupQualityPctile": 90, "rvolPctile": 90, "clvPctile": 90, "sectorStrengthPctile": 90, "liquidityPctile": 90, "mdtv20": 3e9, "dailyObservationCount": 260, "modeledRoundTripCostPct": 0.15, "spreadPct": 0.05, "availableAskDepth": 1000, "upsideCapacityR": 2.5, "plannedMaxBlendedR": 2.5, "dailyBarsThroughPreviousClose": True, "corporateEventsCurrent": True, "surveillanceCurrent": True, "universeCurrent": True, "sourceTimestamps": {"quote": "2026-09-11T09:00:00+05:30", "depth": "2026-09-11T09:00:00+05:30", "bars5m": "2026-09-11T09:00:00+05:30"}}
+    fresh, reasons = evaluate_freshness(row, final_lock=True, now=now)
+    assert fresh is False
+    assert "STALE_QUOTE" in reasons
 
 
 # 11. Factor / Setup Concentration Guard

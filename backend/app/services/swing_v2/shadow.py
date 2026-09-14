@@ -102,7 +102,10 @@ def build_shadow_v2(
         gate_ok, gate_reasons = _quality_and_safety(row, final_lock=final_lock, now=now)
         funnel["freshData"] += int(fresh_ok); funnel["tradable"] += int(trade_ok); funnel["safetyPass"] += int(gate_ok)
         setup = evaluate_setups(row) if gate_ok else {"eligible": False, "passedSetupIds": [], "rejections": {}}
-        funnel["setupPass"] += int(setup["eligible"])
+        rank = rank_score(row)
+        score_lock_eligible = rank["status"] == "RATED" and float(rank.get("score") or 0) > 70
+        setup_ok = bool(setup["eligible"] or score_lock_eligible)
+        funnel["setupPass"] += int(setup_ok)
         capacity_ok = float(row.get("upsideCapacityR") or 0) >= cfg.min_upside_capacity_r
         planned_ok = float(row.get("plannedMaxBlendedR") or 1.5) >= cfg.min_planned_blended_r
 
@@ -122,19 +125,18 @@ def build_shadow_v2(
         calibrated = expected is not None and str(row.get("expectedNetRStatus") or "").upper() == "CALIBRATED"
         expectancy_ok = calibrated and float(expected) >= cfg.min_expected_net_r
         funnel["expectancyPass"] += int(expectancy_ok)
-        rank = rank_score(row)
         reasons = fresh_reasons + trade_reasons + gate_reasons
         if not net_reward_ok:
             reasons.append("NET_REWARD_BELOW_MINIMUM")
         if not segment_active:
             reasons.append("SEGMENT_NOT_ACTIVE")
-        if not segment_active or not gate_ok or not setup["eligible"] or not capacity_ok or not planned_ok or not net_reward_ok or rank["status"] != "RATED":
+        if not segment_active or not gate_ok or not setup_ok or not capacity_ok or not planned_ok or not net_reward_ok or rank["status"] != "RATED":
             rejected.append({"symbol": symbol, "reasonCodes": sorted(set(reasons)), "setupRejections": setup.get("rejections"), "expectancyStatus": "PASS" if expectancy_ok else ("UNRATED" if expected is None else "LOW_OR_UNCALIBRATED"), "capacityStatus": "PASS" if capacity_ok else "LOW"})
             continue
         # Unrated expectancy may collect shadow fills; it can never confer promotion/live eligibility.
         gross_utility = float(expected) if expectancy_ok else float(rank["score"]) / 1000.0
         utility = gross_utility - float(row.get("costPenaltyR") or 0) - float(row.get("gapRiskPenaltyR") or 0)
-        qualified.append({**row, **rank, "symbol": symbol, "setupIds": setup["passedSetupIds"], "expectedUtilityR": utility, "expectedNetRStatus": row.get("expectedNetRStatus") or "UNRATED", "promotionEligible": expectancy_ok, "decisionId": _decision_id(snapshot_id, session_date, symbol), "sourceSnapshotId": snapshot_id})
+        qualified.append({**row, **rank, "symbol": symbol, "setupIds": setup["passedSetupIds"], "scoreLockEligible": score_lock_eligible, "expectedUtilityR": utility, "expectedNetRStatus": row.get("expectedNetRStatus") or "UNRATED", "promotionEligible": expectancy_ok, "decisionId": _decision_id(snapshot_id, session_date, symbol), "sourceSnapshotId": snapshot_id})
 
     qualified = assign_segment_percentiles(qualified)
     scaled_cfg = SwingV2Config(**{**cfg.__dict__, "max_positions": min(cfg.max_positions, regime_cap), "core_risk_bps": max(1, int(cfg.core_risk_bps * risk_scale)), "microcap_risk_bps": max(1, int(cfg.microcap_risk_bps * risk_scale))})

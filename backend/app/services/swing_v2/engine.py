@@ -87,12 +87,13 @@ def process_position_bar(
     *,
     is_d2_exit: bool = False,
     thesis_broken: bool = False,
+    data_status: str = "LIVE",
 ) -> dict[str, Any]:
     events = ledger.events(position_id=position_id)
     if not events:
         raise ValueError(f"unknown position {position_id}")
     before = materialize_position(events)
-    after = evaluate_position(before, bar, is_d2_exit=is_d2_exit, thesis_broken=thesis_broken)
+    after = evaluate_position(before, bar, is_d2_exit=is_d2_exit, thesis_broken=thesis_broken, data_status=data_status)
     timestamp = str(bar.get("timestamp") or datetime.now().astimezone().isoformat())
     event_types: list[EventType] = []
     if after.get("t1Filled") and not before.get("t1Filled"):

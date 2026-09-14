@@ -94,7 +94,7 @@ def evaluate_position_health(
     return {"positionHealth": pos_health, "dataHealth": data_health}
 
 
-def evaluate_position(position: dict[str, Any], bar: dict[str, Any], *, is_d2_exit: bool = False, thesis_broken: bool = False) -> dict[str, Any]:
+def evaluate_position(position: dict[str, Any], bar: dict[str, Any], *, is_d2_exit: bool = False, thesis_broken: bool = False, data_status: str = "LIVE") -> dict[str, Any]:
     """Apply exactly one chronological bar; ambiguous stop/target paths are adverse-first."""
     out = dict(position)
     if out.get("closed") or out.get("terminal"):
@@ -138,7 +138,7 @@ def evaluate_position(position: dict[str, Any], bar: dict[str, Any], *, is_d2_ex
             "executionQuality": "GAP_THROUGH_STOP" if is_gap else "NORMAL_STOP",
             "gapSlippage": round(stop - exit_price, 4) if is_gap else 0.0,
             "positionHealth": "EXIT_REQUIRED",
-            "dataHealth": "LIVE",
+            "dataHealth": str(data_status or "LIVE").upper(),
         })
         return out
 
@@ -175,7 +175,7 @@ def evaluate_position(position: dict[str, Any], bar: dict[str, Any], *, is_d2_ex
         unrealized = _fill_pnl(out, remaining, close)
         out.update({"unrealizedPnl": round(unrealized, 2), "totalPnl": round(realized + unrealized, 2)})
 
-    out.update(evaluate_position_health(out, bar, is_d2_exit=is_d2_exit, thesis_broken=thesis_broken))
+    out.update(evaluate_position_health(out, bar, is_d2_exit=is_d2_exit, thesis_broken=thesis_broken, data_status=data_status))
     return out
 
 
