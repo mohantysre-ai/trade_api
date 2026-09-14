@@ -71,6 +71,8 @@ def _build_context(index: dict[str, str], snapshot: dict[str, Any]) -> IndexOpti
         provider_status=provider_status,
         data_source=data_source,
         component_freshness=component_freshness,
+            raw_snapshot=supplied,
+            full_snapshot=snapshot,
     )
 
 

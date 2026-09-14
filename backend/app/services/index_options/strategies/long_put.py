@@ -53,38 +53,7 @@ class LongPutStrategy(OptionStrategy):
                 eligible=False,
             )
 
-        snapshot = {
-            "indexOptions": {
-                "indices": {
-                    context.index: {
-                        "spot": context.spot,
-                        "direction": context.direction,
-                        "scores": {
-                            "trend": context.trend_score,
-                            "breakout": context.breakout_score,
-                            "futuresOi": context.futures_oi_state,
-                            "optionChain": None,
-                            "breadth": context.breadth_score,
-                            "contract": None,
-                            "regime": None,
-                        },
-                        "gates": context.gate_evidence.get("gates", {}),
-                        "contract": None,
-                        "providerStatus": context.provider_status,
-                        "source": context.data_source,
-                        "expiry": context.expiry,
-                        "rawChain": context.chain,
-                        "structure": context.structure,
-                        "oiResearch": {},
-                        "componentFreshness": context.component_freshness,
-                        "dataLimitations": context.data_limitations,
-                        "gateEvidence": context.gate_evidence,
-                    }
-                }
-            },
-            "updatedAt": context.session_time.isoformat(),
-        }
-
+        snapshot = context.full_snapshot if context.full_snapshot is not None else {}
         raw = _candidate(index_cfg, snapshot)
         state = raw.get("state", "NO_TRADE")
         reason = raw.get("reason", "UNKNOWN")

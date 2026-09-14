@@ -45,9 +45,41 @@ class IndexOptionContext:
     data_source: str | None = None
     component_freshness: dict[str, Any] = field(default_factory=dict)
     extra: dict[str, Any] = field(default_factory=dict)
+    # --- Raw snapshot shard for legacy compatibility --------------------------
+    raw_snapshot: dict[str, Any] = field(default_factory=dict)
+    full_snapshot: dict[str, Any] | None = None
+    # --- Immutable decision identity (bind every candidate + paper position) --
+    snapshot_id: str | None = None
+    decision_timestamp: str | None = None
+    market_generation: str | None = None
+    # --- Extended market fields ----------------------------------------------
+    put_skew: float | None = None
+    call_skew: float | None = None
+    dte: int | None = None
+    far_expiry: str | None = None
+    far_chain: list[dict[str, Any]] = field(default_factory=list)
+    expiry_state: str = "NORMAL_EXPIRY_SESSION"
 
     def is_fresh(self) -> bool:
         return bool(self.provider_status and self.provider_status.upper() == "LIVE")
+
+    def identity(self) -> dict[str, Any]:
+        # Decision identity persisted on every candidate and locked position.
+        return {
+            "snapshotId": self.snapshot_id,
+            "decisionTimestamp": self.decision_timestamp,
+            "marketGeneration": self.market_generation,
+        }
+
+    def missing_material_fields(self, required: tuple[str, ...]) -> list[str]:
+        # Return the subset of ``required`` attributes that are None/empty.
+        # Used to emit ``DATA_INCOMPLETE`` instead of fabricating evidence.
+        missing: list[str] = []
+        for name in required:
+            value = getattr(self, name, None)
+            if value is None or (isinstance(value, (list, dict, str)) and len(value) == 0):
+                missing.append(name)
+        return missing
 
     def has_chain(self) -> bool:
         return bool(self.chain)
