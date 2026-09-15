@@ -218,7 +218,8 @@ def test_hunt_uses_volume_screen_beyond_display_50():
     assert diag["displayPool"] == 50
     assert diag["evaluated"] == 53
     assert diag["candleMetrics"] == 52
-    assert diag["swingUniverse"] == "Nifty 500"
+    assert diag["swingUniverse"] == "Intraday 750"
+    assert diag["candleTimeframe"] == "1h"
     assert diag["qualified"] == 2
     assert diag["universeSize"] == 500
     assert diag["volumeScreened"] == 200
@@ -497,3 +498,33 @@ def test_dhan_pick_missing_from_matrix_is_ignored():
     selected, _source = swing_session._picks_from_asset_matrix(snapshot)
     assert [row["symbol"] for row in selected] == ["VALID"]
     assert selected[0]["_candidateSource"] == "asset_matrix_deterministic_buy"
+def test_daily_candle_fallback_is_not_counted_as_swing_candle_data():
+    from app.services import angel_one_feed
+    from app.services import swing_session
+
+    daily = {
+        "data_source": "daily_candles",
+        "vwap": 0.0,
+        "ema9": 0.0,
+        "orb_high": 0.0,
+        "orb_low": 0.0,
+        "rsi": 55.0,
+    }
+    assert angel_one_feed._swing_candle_metrics_usable(daily) is False
+    assert swing_session._in_candle_screen({"symbol": "DAILY_ONLY", "intraday": daily}) is False
+
+
+def test_five_minute_candles_are_not_reused_for_swing():
+    from app.services import angel_one_feed
+
+    metrics = {
+        "data_source": "candles",
+        "timeframe": "5m",
+        "vwap": 100.0,
+        "ema9": 100.0,
+        "orb_high": 101.0,
+        "orb_low": 99.0,
+    }
+    assert angel_one_feed._swing_candle_metrics_usable(metrics) is False
+    metrics["timeframe"] = "1h"
+    assert angel_one_feed._swing_candle_metrics_usable(metrics) is True

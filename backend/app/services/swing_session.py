@@ -828,6 +828,10 @@ def _stock_is_matrix_buy(row: dict[str, Any]) -> bool:
 def _in_candle_screen(row: dict[str, Any]) -> bool:
     """True when the row has real candle metrics (VWAP or RSI), not quote-only."""
     intra = row.get("intraday") if isinstance(row.get("intraday"), dict) else {}
+    if intra.get("data_source") and intra.get("data_source") != "candles":
+        return False
+    if intra.get("timeframe") and intra.get("timeframe") != "1h":
+        return False
     vwap = _f(intra.get("vwap") or row.get("vwap"))
     rsi = _f(intra.get("rsi") or row.get("rsi"))
     return (vwap is not None and vwap > 0) or (rsi is not None and rsi > 0)
@@ -1416,7 +1420,8 @@ def _swing_universe_diagnostics(
         "evaluated": evaluated,
         "qualified": qualified,
         "crossBookExcluded": sorted(blocked),
-        "swingUniverse": "Nifty 500",
+        "swingUniverse": "Intraday 750",
+        "candleTimeframe": "1h",
         "topRejectionReasons": [{"reason": k, "count": v} for k, v in top],
     }
 

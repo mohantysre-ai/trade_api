@@ -411,8 +411,6 @@ def _session_is_valid_current_lock(session: dict[str, Any] | None) -> bool:
         return False
     if not session.get("committedAt"):
         return False
-    if session.get("entryPolicyVersion") != ENTRY_POLICY_VERSION:
-        return False
     return True
 
 
@@ -527,6 +525,20 @@ def save_session(payload: dict[str, Any], force: bool = False) -> None:
             for row in (payload.get(key) or [])
             if isinstance(row, dict) and row.get("symbol")
         }
+        if (
+            authoritative_existing
+            and existing.get("locked")
+            and existing_date == today
+            and existing_symbols
+            and (
+                not authoritative_payload
+                or not payload_symbols
+                or not existing_symbols.issubset(payload_symbols)
+            )
+        ):
+            raise RuntimeError(
+                "Refusing to remove or replace symbols from today's Intraday lock"
+            )
         if (
             authoritative_existing
             and authoritative_payload

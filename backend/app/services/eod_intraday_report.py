@@ -1199,22 +1199,23 @@ def project_session_live(
             sess_row.get("currentPrice")
         ) or _f(sess_row.get("ltp"))
         qty = int(sess_row.get("approxQty") or sess_row.get("qty") or 0)
-        pnl = _f(sess_row.get("realizedPnl"))
-        if pnl is None:
-            pnl = _f(sess_row.get("pnl"))
-        if pnl is None:
-            is_open = not bool(sess_row.get("closed")) and str(
-                sess_row.get("status") or ""
-            ).upper() not in ("CLOSED", "STOP LOSS HIT", "TRAIL STOP HIT", "SCALE COMPLETE")
-            if is_open and entry_px is not None and exit_px is not None and qty:
-                # Open-at-close position (F5.1): the raw persisted session row
-                # never carries a booked `realizedPnl`/`pnl` for a still-open
-                # leg. Mark it to the EOD close price instead of silently
-                # reporting zero P&L.
+        status = str(sess_row.get("status") or "").upper()
+        is_closed = bool(sess_row.get("closed")) or status in (
+            "CLOSED", "STOP LOSS HIT", "TRAIL STOP HIT", "SCALE COMPLETE"
+        )
+        if is_closed:
+            pnl = _f(sess_row.get("realizedPnl"))
+            if pnl is None:
+                pnl = _f(sess_row.get("pnl"))
+        else:
+            pnl = _f(sess_row.get("unrealizedPnl"))
+            if pnl is None:
+                pnl = _f(sess_row.get("pnl"))
+            if pnl is None and entry_px is not None and exit_px is not None and qty:
                 sign = 1.0 if str(direction or "LONG").upper() != "SHORT" else -1.0
                 pnl = round(sign * (exit_px - entry_px) * qty, 2)
-            else:
-                pnl = 0.0
+        if pnl is None:
+            pnl = 0.0
         exit_reason = str(
             sess_row.get("exitReason") or sess_row.get("status") or "EOD_SQUAREOFF"
         )
@@ -1402,6 +1403,15 @@ def generate_intraday_eod_report(
     session_live = load_intraday_session(for_date)
     sess_idx: dict[tuple[str, str], dict[str, Any]] = {}
     live_session_date = str(session_live.get("sessionDate") or "")[:10] == for_date.isoformat()
+    if force and live_session_date and session_live.get("locked"):
+        from .intraday_session_engine import get_session
+
+        enriched_session = get_session(include_live=True)
+        if (
+            enriched_session.get("locked")
+            and str(enriched_session.get("sessionDate") or "")[:10] == for_date.isoformat()
+        ):
+            session_live = enriched_session
     if live_session_date:
         sess_idx = _session_leg_index(session_live)
         # Spec V5 §36/§39/§62: once the session is closed (or a forced EOD
@@ -1466,6 +1476,8 @@ def generate_intraday_eod_report(
             if not after_close:
                 # RTH GET must not candle-walk. Rebuild only for missing/ghost books or a
                 # changed symbol set; P&L ticks are overlaid live in the UI.
+                if stale_reason == "symbol_set" and picks and session_live.get("locked"):
+                    return project_session_live(session_live, for_date=for_date, capital=capital)
                 if stale_reason in ("ghost", "mock", "row_economics_mismatch") or (
                     stale_reason == "symbol_set" and picks
                 ):
