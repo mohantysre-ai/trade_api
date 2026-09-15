@@ -206,3 +206,19 @@ def test_nse_intraday_drops_bars_outside_requested_window(monkeypatch):
     assert len(rows) == 1
     assert rows[0][0] == "2026-08-17 09:20:00"
     assert rows[0][1:] == [10.0, 11.0, 9.0, 10.5, 100.0]
+
+
+def test_nse_chart_disconnect_opens_circuit_and_suppresses_repeat_request(monkeypatch):
+    provider._NSE_CANDLE_CIRCUIT_UNTIL = 0.0
+    calls = []
+
+    def fail_session():
+        calls.append(1)
+        raise provider.requests.ConnectionError("remote closed")
+
+    monkeypatch.setattr(provider, "_nse_chart_session", fail_session)
+    params = {"symbol": "RELIANCE", "token": "2885"}
+    assert provider._nse_chart_get(params) is None
+    assert provider._NSE_CANDLE_CIRCUIT_UNTIL > 0
+    assert provider._nse_chart_get(params) is None
+    assert len(calls) == 1

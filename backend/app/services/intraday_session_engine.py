@@ -3082,7 +3082,7 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
 
     Time gate: primary 09:45–10:15 IST (or late-start catch-up). Only
     ``bypass_lock_window=True`` (operator emergency) skips the clock.
-    ``force`` only means rebuild an already-locked basket — it does not open early.
+    ``force`` only applies to stale-day rotation; a committed current-day lock is immutable.
     """
     today = _ist_now().strftime("%Y-%m-%d")
     reconcile_cross_book(today, persist=True)
@@ -3093,6 +3093,8 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
         and existing_date
         and existing_date != today
     )
+    if existing.get("locked") and not stale_day and existing.get("committedAt"):
+        return existing
     if stale_day and not force:
         log.info(
             "Intraday sessionDate %s != today %s — forcing daily rotate",
@@ -3365,15 +3367,14 @@ def ensure_intraday_session_locked() -> dict[str, Any]:
     # A current-day cash-held lock with zero names is valid. Replacement
     # hunting may fill it later; do not make it impossible to re-enter because
     # commit_session correctly refuses to overwrite today's immutable lock.
-    current_policy = existing.get("entryPolicyVersion") == ENTRY_POLICY_VERSION
     if (
         existing.get("locked") and existing_date == today
-        and existing.get("committedAt") and current_policy
+        and existing.get("committedAt")
     ):
         return existing
     malformed_current = bool(
         existing.get("locked") and existing_date == today
-        and (not existing.get("committedAt") or not current_policy)
+        and not existing.get("committedAt")
     )
     result = commit_session(
         force=bool(existing.get("locked") and (existing_date != today or malformed_current))
@@ -4840,10 +4841,7 @@ def _schedule_stale_session_rotation(existing: dict[str, Any] | None = None) -> 
     stale = bool(session.get("locked") and session_date and session_date != today)
     malformed_current = bool(
         session.get("locked") and session_date == today
-        and (
-            not session.get("committedAt")
-            or session.get("entryPolicyVersion") != ENTRY_POLICY_VERSION
-        )
+        and not session.get("committedAt")
     )
     if not (stale or malformed_current):
         return False

@@ -140,6 +140,35 @@ def test_current_day_lock_without_commit_timestamp_is_rebuilt(monkeypatch):
     assert calls == [{"force": True}]
 
 
+def test_current_day_committed_lock_is_preserved_across_policy_metadata_change(monkeypatch):
+    current = {
+        "locked": True,
+        "sessionDate": "2026-08-26",
+        "committedAt": "2026-08-26T10:00:00+05:30",
+        "entryPolicyVersion": "legacy_policy",
+        "long": [{"symbol": "LOCKED_LONG"}],
+        "short": [{"symbol": "LOCKED_SHORT"}],
+    }
+    monkeypatch.setattr(intraday, "load_session", lambda: current)
+    monkeypatch.setattr(intraday, "_ist_now", lambda: datetime(2026, 8, 26, 10, 1))
+    monkeypatch.setattr(intraday, "commit_session", lambda **kwargs: (_ for _ in ()).throw(AssertionError("must not recommit")))
+    assert intraday.ensure_intraday_session_locked() == current
+
+
+def test_force_cannot_replace_committed_current_day_lock(monkeypatch):
+    current = {
+        "locked": True,
+        "sessionDate": "2026-08-26",
+        "committedAt": "2026-08-26T10:00:00+05:30",
+        "long": [{"symbol": "LOCKED_LONG"}],
+        "short": [],
+    }
+    monkeypatch.setattr(intraday, "load_session", lambda: current)
+    monkeypatch.setattr(intraday, "_ist_now", lambda: datetime(2026, 8, 26, 10, 1))
+    monkeypatch.setattr(intraday, "generate_candidates", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not rescan")))
+    assert intraday.commit_session(force=True) == current
+
+
 def test_stale_snapshot_cannot_create_intraday_lock(monkeypatch):
     monkeypatch.setattr(intraday, "reconcile_cross_book", lambda *args, **kwargs: None)
     monkeypatch.setattr(intraday, "load_session", lambda: {})

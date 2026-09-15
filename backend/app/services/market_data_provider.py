@@ -256,8 +256,9 @@ def _nse_chart_get(params: dict[str, Any]) -> dict[str, Any] | None:
         response = _nse_chart_session().get(
             NSE_CHARTING_HISTORY_URL, params=params, timeout=(8, 20)
         )
-    except Exception as exc:
-        log.warning("NSE charting request failed: %s", exc)
+    except requests.RequestException as exc:
+        _trip_nse_candle_circuit()
+        log.warning("NSE charting connection failed; provider circuit opened: %s", exc)
         return None
     if response.status_code in {401, 403, 429, 503}:
         _trip_nse_candle_circuit()
