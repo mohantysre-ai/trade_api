@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "5a0942ea876fe62336b8a717a90618eff752fcd8",
-    "indexed_at": "2026-09-14T19:54:54Z",
+    "commit": "5e0dbef3202333f23dc58b20245440bd9617abc2",
+    "indexed_at": "2026-09-15T06:00:35Z",
     "project": "D-trade_api",
-    "nodes": 7650,
-    "edges": 29021,
+    "nodes": 7654,
+    "edges": 29025,
     "original_size": 25427968,
-    "compressed_size": 5682078,
+    "compressed_size": 5693536,
     "compression_level": 3
 }

@@ -292,7 +292,7 @@ export async function fetchRefreshMacros(): Promise<MarketDataResponse> {
     method: "POST",
     cache: "no-store",
     // Keep short — Angel/Yahoo can hang; SNAPSHOT paints from cache first
-    signal: AbortSignal.timeout(18_000),
+    signal: AbortSignal.timeout(25_000),
   });
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;

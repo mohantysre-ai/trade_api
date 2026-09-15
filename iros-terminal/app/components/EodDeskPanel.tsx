@@ -212,6 +212,10 @@ export default function EodDeskPanel({
     try {
       const st = await fetchEodLlmStatus(date);
       setLlmStatus(st);
+      if (!st.has_artifacts) {
+        setPmCommentary(null);
+        return;
+      }
     } catch {
       setLlmStatus({
         date,

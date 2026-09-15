@@ -366,7 +366,7 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
         cached_latest = max(cached_times, default=None)
         history_start = (
             cached_latest.astimezone(IST_ZONE) - timedelta(minutes=10)
-            if cached_latest
+            if cached_latest and len(cached_candles) >= 20
             else datetime.combine(now_ist.date() - timedelta(days=7), dt_time(9, 15), tzinfo=IST_ZONE)
         )
         cache_age = ((now_ist - cached_latest.astimezone(IST_ZONE)).total_seconds()

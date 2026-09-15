@@ -1286,7 +1286,7 @@ def _resolve_nse_equity(
     token_map: dict[str, tuple[str, str]] | None = None,
 ) -> tuple[str, str] | None:
     """Resolve an NSE cash equity symbol to (token, tradingsymbol)."""
-    key = symbol.upper()
+    key = symbol.upper().removesuffix("-EQ")
     mapping = token_map if token_map is not None else _load_nse_eq_token_map()
     if key in mapping:
         return mapping[key]
@@ -1295,23 +1295,23 @@ def _resolve_nse_equity(
         return None
 
     smart = client.connect()
-    for query in (f"{key}-EQ", key):
-        try:
-            search = smart.searchScrip("NSE", query)
-        except Exception:
-            continue
-        if not isinstance(search, dict) or not search.get("status"):
-            continue
-        data = search.get("data") or []
-        if not isinstance(data, list) or not data:
-            continue
-        pick = _pick_eq_search_result(data, key)
-        if not pick:
-            continue
-        token = str(pick.get("token") or pick.get("symboltoken") or "")
-        tradingsymbol = str(pick.get("symbol") or pick.get("tradingsymbol") or f"{key}-EQ")
-        if token:
-            return token, tradingsymbol
+    try:
+        search = smart.searchScrip("NSE", key)
+    except Exception:
+        return None
+    if not isinstance(search, dict) or not search.get("status"):
+        return None
+    data = search.get("data") or []
+    if not isinstance(data, list) or not data:
+        return None
+    pick = _pick_eq_search_result(data, key)
+    if not pick:
+        return None
+    token = str(pick.get("token") or pick.get("symboltoken") or "")
+    tradingsymbol = str(pick.get("symbol") or pick.get("tradingsymbol") or f"{key}-EQ")
+    if token:
+        mapping[key] = (token, tradingsymbol)
+        return mapping[key]
     return None
 
 
@@ -1324,7 +1324,7 @@ def _symbols_to_instruments(
     missing: list[str] = []
 
     for symbol in symbols:
-        key = symbol.upper()
+        key = symbol.upper().removesuffix("-EQ")
         entry = token_map.get(key)
         if entry:
             token, tradingsymbol = entry
