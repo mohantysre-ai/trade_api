@@ -1354,7 +1354,7 @@ export default function ForensicPanel({
                   WAITING · {swingSession?.sessionDate}
                 </span>
                 {' · '}WAITING_FOR_DECISION_WINDOW
-                {' · '}V2 scan opens {swingSession?.decisionWindow?.start || '14:30'} IST; final freeze {swingSession?.decisionWindow?.freeze || '15:10'} IST
+                {' · '}V2 market-hour hunt opens {swingSession?.decisionWindow?.start || '09:45'} IST; final freeze {swingSession?.decisionWindow?.freeze || '15:10'} IST
               </>
             ) : cashHeldSwing ? (
               <>
@@ -1716,7 +1716,7 @@ export default function ForensicPanel({
             </div>
             <p className="text-slate-700 text-[13px] font-semibold">
               {waitingSwingDecision
-                ? `Waiting for V2 decision window — ${swingSession?.decisionWindow?.start || '14:30'} IST`
+                ? `Waiting for V2 market-hour hunt — ${swingSession?.decisionWindow?.start || '09:45'} IST`
                 : huntingSwing
                 ? `Hunt open — ${swingSession?.entryHuntDiagnostics?.qualified ?? 0}/${swingSession?.entryHuntDiagnostics?.evaluated ?? '—'} qualified BUY`
                 : `Hunt closed — ${swingSession?.cashReason || 'NO_BUY_LOCKED_DURING_ENTRY_WINDOW'}`}

@@ -318,7 +318,7 @@ def enrich_v2_market_snapshot(payload: dict[str, Any], all_stocks: list[dict[str
             "corporateEventsCurrent": corporate_current,
             "featureRows": len(prepared),
             "historyReadyRows": sum(
-                1 for row in prepared if int(row.get("dailyObservationCount") or 0) >= 252
+                1 for row in prepared if int(row.get("dailyObservationCount") or 0) >= cfg.min_daily_observations
             ),
             "errors": [value for value in (universe_error, surveillance_error, corporate_error) if value],
         },

@@ -18,7 +18,7 @@ from .facade import build_from_market_snapshot
 from .ledger import SwingLedger, materialize_position
 from .reporting import ledger_eod_report
 IST=ZoneInfo("Asia/Kolkata"); _LOCK=threading.RLock(); _DATA_REFRESH_LOCK=threading.Lock()
-_FINAL_REFRESH_MARGIN_SECONDS=int(os.getenv("SWING_FINAL_REFRESH_MARGIN_SECONDS","90")); _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0.0; _SESSION_READ_TTL=float(os.getenv("SWING_SESSION_READ_TTL","2")); _EOD_READ_CACHE={}; _SWING_SCAN_INTERVAL_SECONDS=float(os.getenv("SWING_SCAN_INTERVAL_SECONDS","15"))
+_FINAL_REFRESH_MARGIN_SECONDS=int(os.getenv("SWING_FINAL_REFRESH_MARGIN_SECONDS","90")); _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0.0; _SESSION_READ_TTL=float(os.getenv("SWING_SESSION_READ_TTL","2")); _EOD_READ_CACHE={}; _SWING_SCAN_INTERVAL_SECONDS=float(os.getenv("SWING_SCAN_INTERVAL_SECONDS","300"))
 _RETRYABLE_FINAL_BLOCK_REASONS={"FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW","UNIVERSE_COVERAGE_BELOW_99PCT","UNIVERSE_COVERAGE_BELOW_90PCT","REGIME_UNRATED","SWING_V2_DATA_NOT_READY"}
 def is_v2_authoritative(config=None): return (config or load_config()).paper_authoritative
 def _state_path():
@@ -97,6 +97,8 @@ def _v2_snapshot_ready(snapshot,cfg):
  coverage=float(snapshot.get("swingV2UniverseCoverage") or 0.0)
  regime=str(snapshot.get("swingV2Regime") or "")
  return bool(isinstance(status,dict) and feature_rows>0 and history_ready/feature_rows>=cfg.required_coverage and coverage>=cfg.required_coverage and status.get("universeCurrent") and status.get("surveillanceCurrent") and status.get("corporateEventsCurrent") and regime and regime!="REGIME_UNRATED")
+def _scan_not_ready(snapshot,cfg):
+ return {"enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,"blockReason":"SWING_V2_DATA_NOT_READY","candidates":[],"funnel":{"universe":snapshot.get("swingV2UniverseSize") or 0,"freshData":0,"topRejectionReasons":[{"reason":f"SWING_V2_DATA_NOT_READY_MIN_{cfg.min_daily_observations}_OBS","count":1}]},"dataStatus":snapshot.get("swingV2DataStatus") or {}}
 def _quote_observations(symbols,now):
  if not symbols:return {}
  try:
@@ -153,14 +155,14 @@ def run_authoritative_cycle(*,now=None,force=False):
   if start<=local<freeze and not current.get("selectionFinalized") and due:
    snapshot=_refresh_snapshot("swing_v2_decision_scan")
    if not _v2_snapshot_ready(snapshot,cfg):
-    scan={"enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,"blockReason":"SWING_V2_DATA_NOT_READY","candidates":[],"funnel":{"universe":snapshot.get("swingV2UniverseSize") or 0,"freshData":0,"topRejectionReasons":[{"reason":"SWING_V2_DATA_NOT_READY","count":1}]},"dataStatus":snapshot.get("swingV2DataStatus") or {}}
+    scan=_scan_not_ready(snapshot,cfg)
    else:
     scan=build_from_market_snapshot(snapshot,final_lock=True,persist_events=True,occupied_symbols=occupied,existing_positions=existing,now=now)
    current.update(scan=scan,lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=snapshot.get("swingV2RefreshError"))
   elif freeze<=local and (not current.get("selectionFinalized") or (_retryable_final_block(scan) and due and local<=expiry)):
    snapshot=_refresh_snapshot("swing_v2_final_lock")
    if not _v2_snapshot_ready(snapshot,cfg):
-    scan={"enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,"blockReason":"SWING_V2_DATA_NOT_READY","candidates":[],"funnel":{"universe":snapshot.get("swingV2UniverseSize") or 0,"freshData":0,"topRejectionReasons":[{"reason":"SWING_V2_DATA_NOT_READY","count":1}]},"dataStatus":snapshot.get("swingV2DataStatus") or {}}
+    scan=_scan_not_ready(snapshot,cfg)
    else:
     scan=build_from_market_snapshot(snapshot,final_lock=True,persist_events=local<=expiry,occupied_symbols=occupied,existing_positions=existing,now=now)
    current.update(scan=scan,selectionFinalized=True,finalizedAt=now.astimezone(timezone.utc).isoformat(),lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=snapshot.get("swingV2RefreshError"))
