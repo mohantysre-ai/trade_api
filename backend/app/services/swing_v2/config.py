@@ -60,6 +60,7 @@ class SwingV2Config:
     coverage_degraded_risk_multiplier: float = 0.75
     coverage_defensive_risk_multiplier: float = 0.50
     coverage_hysteresis_cycles: int = 3
+    coverage_tiers_authoritative: bool = False
     max_average_correlation: float = 0.70
     decision_start_ist: str = "09:45"
     entry_cutoff_ist: str = "15:15"
@@ -71,8 +72,7 @@ class SwingV2Config:
 
     @property
     def required_coverage(self) -> float:
-        """Compatibility alias: only the <90% tier is a hard coverage block."""
-        return self.coverage_defensive_threshold
+        return self.coverage_normal_threshold
 
     @property
     def paper_authoritative(self) -> bool:
@@ -162,6 +162,7 @@ def load_config() -> SwingV2Config:
         coverage_degraded_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEGRADED_RISK_MULTIPLIER", "0.75")),
         coverage_defensive_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEFENSIVE_RISK_MULTIPLIER", "0.50")),
         coverage_hysteresis_cycles=int(os.getenv("SWING_COVERAGE_HYSTERESIS_CYCLES", "3")),
+        coverage_tiers_authoritative=_bool("SWING_COVERAGE_TIERS_AUTHORITATIVE", False),
         entry_cutoff_ist=os.getenv("SWING_ENTRY_CUTOFF_IST", "15:15"),
         decision_start_ist=os.getenv("SWING_DECISION_START_IST", "09:45"),
         decision_freeze_ist=os.getenv("SWING_DECISION_FREEZE_IST", "15:00"),
