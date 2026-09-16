@@ -21,9 +21,13 @@ def _clock(value: str, name: str) -> time:
 
 @dataclass(frozen=True)
 class SwingV2Config:
-    enabled: bool = False
-    mode: str = "SHADOW"
-    authority: str = "V1"
+    # V2 is the authoritative paper book by default.  The legacy V1 JSON book
+    # rotates on sessionDate and therefore cannot represent a carried 1-2
+    # session position without booking/re-entering it.  V2's immutable ledger
+    # owns entry identity across sessions and is the only safe default.
+    enabled: bool = True
+    mode: str = "PAPER"
+    authority: str = "V2"
     strategy_id: str = "SWING_2S_MOMENTUM_V2"
     policy_version: str = "2.0.0"
     feature_version: str = "swing_features_v2"
@@ -113,9 +117,11 @@ class SwingV2Config:
 def load_config() -> SwingV2Config:
     repo_root = Path(__file__).resolve().parents[4]
     c = SwingV2Config(
-        enabled=_bool("SWING_V2_ENABLED", False),
-        mode=os.getenv("SWING_V2_MODE", "SHADOW").upper(),
-        authority=os.getenv("SWING_STRATEGY_AUTHORITY", "V1").upper(),
+        # Default to the ledger-backed two-session paper book.  Explicit env
+        # overrides remain available for isolated legacy tests only.
+        enabled=_bool("SWING_V2_ENABLED", True),
+        mode=os.getenv("SWING_V2_MODE", "PAPER").upper(),
+        authority=os.getenv("SWING_STRATEGY_AUTHORITY", "V2").upper(),
         strategy_id=os.getenv("SWING_STRATEGY_ID", "SWING_2S_MOMENTUM_V2"),
         universe=os.getenv("SWING_UNIVERSE", "NIFTY_TOTAL_MARKET_750"),
         active_segments=tuple(p.strip().upper() for p in os.getenv("SWING_ACTIVE_SEGMENTS", "NIFTY100,NIFTY_MIDCAP150,NIFTY_SMALLCAP250").split(",") if p.strip()),

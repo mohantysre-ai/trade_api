@@ -59,7 +59,10 @@ def intraday_locked_symbols(day: str) -> set[str]:
 
 
 def swing_locked_symbols(day: str) -> set[str]:
-    if os.getenv("SWING_STRATEGY_AUTHORITY", "V1").strip().upper() == "V2":
+    # Keep this default in lock-step with swing_v2.config.  Otherwise an
+    # unset environment would route the Swing API through V2 while this
+    # cross-book guard silently read the obsolete V1 JSON book.
+    if os.getenv("SWING_STRATEGY_AUTHORITY", "V2").strip().upper() == "V2":
         try:
             from .swing_v2.authoritative import get_authoritative_session
 
