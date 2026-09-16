@@ -25,7 +25,7 @@ class SwingV2Config:
     mode: str = "PAPER"
     authority: str = "V2"
     strategy_id: str = "SWING_2S_MOMENTUM_V2"
-    policy_version: str = "2.1.0"
+    policy_version: str = "2.1.1"
     feature_version: str = "swing_features_v2"
     universe: str = "NIFTY_TOTAL_MARKET_750"
     active_segments: tuple[str, ...] = ("NIFTY100", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP250")
@@ -60,7 +60,7 @@ class SwingV2Config:
     coverage_degraded_risk_multiplier: float = 0.75
     coverage_defensive_risk_multiplier: float = 0.50
     coverage_hysteresis_cycles: int = 3
-    coverage_tiers_authoritative: bool = False
+    coverage_tiers_authoritative: bool = True
     max_average_correlation: float = 0.70
     decision_start_ist: str = "09:45"
     entry_cutoff_ist: str = "15:15"
@@ -72,7 +72,7 @@ class SwingV2Config:
 
     @property
     def required_coverage(self) -> float:
-        return self.coverage_normal_threshold
+        return self.coverage_defensive_threshold if self.coverage_tiers_authoritative else self.coverage_normal_threshold
 
     @property
     def paper_authoritative(self) -> bool:
@@ -162,7 +162,7 @@ def load_config() -> SwingV2Config:
         coverage_degraded_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEGRADED_RISK_MULTIPLIER", "0.75")),
         coverage_defensive_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEFENSIVE_RISK_MULTIPLIER", "0.50")),
         coverage_hysteresis_cycles=int(os.getenv("SWING_COVERAGE_HYSTERESIS_CYCLES", "3")),
-        coverage_tiers_authoritative=_bool("SWING_COVERAGE_TIERS_AUTHORITATIVE", False),
+        coverage_tiers_authoritative=_bool("SWING_COVERAGE_TIERS_AUTHORITATIVE", True),
         entry_cutoff_ist=os.getenv("SWING_ENTRY_CUTOFF_IST", "15:15"),
         decision_start_ist=os.getenv("SWING_DECISION_START_IST", "09:45"),
         decision_freeze_ist=os.getenv("SWING_DECISION_FREEZE_IST", "15:00"),
