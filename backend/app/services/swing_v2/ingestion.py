@@ -311,7 +311,17 @@ def enrich_v2_market_snapshot(payload: dict[str, Any], all_stocks: list[dict[str
         "swingV2SchemaVersion": "swing_market_facts_v2", "swingV2UniverseSize": len(active_members),
         "swingV2UniverseCoverage": coverage, "swingV2DiscoveryUniverseSize": len(member_by),
         "swingV2Regime": regime.get("state"), "swingV2RegimeDetail": regime,
-        "swingV2DataStatus": {"universeCurrent": universe_current, "membershipMode": membership_mode, "surveillanceCurrent": surveillance_current, "corporateEventsCurrent": corporate_current, "featureRows": len(prepared), "errors": [value for value in (universe_error, surveillance_error, corporate_error) if value]},
+        "swingV2DataStatus": {
+            "universeCurrent": universe_current,
+            "membershipMode": membership_mode,
+            "surveillanceCurrent": surveillance_current,
+            "corporateEventsCurrent": corporate_current,
+            "featureRows": len(prepared),
+            "historyReadyRows": sum(
+                1 for row in prepared if int(row.get("dailyObservationCount") or 0) >= 252
+            ),
+            "errors": [value for value in (universe_error, surveillance_error, corporate_error) if value],
+        },
     })
     return payload
 

@@ -152,6 +152,13 @@ REFRESH_TASK_RUNNING_MAX_IDLE_SECONDS = int(
 _REFRESH_TASKS: dict[str, dict[str, Any]] = {}
 _ONDEMAND_ACTIVE_BY_KEY: dict[str, str] = {}
 _REFRESH_TASK_LOCK = threading.Lock()
+_SCHEDULED_REFRESH_LOCK = threading.Lock()
+_SCHEDULED_REFRESH_STATE_LOCK = threading.Lock()
+_SCHEDULED_REFRESH_STATE: dict[str, Any] = {
+    "running": False,
+    "reason": None,
+    "startedAt": None,
+}
 _MACRO_REFRESH_LOCK = threading.Lock()
 _MACRO_REFRESH_TIMEOUT_SECONDS = float(os.getenv("MACRO_REFRESH_TIMEOUT_SECONDS", "18"))
 LLM_UNIVERSE_LIMIT = int(os.getenv("LLM_UNIVERSE_LIMIT", "30"))
@@ -829,7 +836,24 @@ def run_scheduled_morning_prework(*, force: bool = False) -> dict[str, Any]:
 def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dict[str, Any]:
     """Live quote/candle refresh with LLM day-lock reuse (no force LLM)."""
     log = logging.getLogger(__name__)
-    swing_hunt = reason == "swing_entry_hunt"
+    if not _SCHEDULED_REFRESH_LOCK.acquire(blocking=False):
+        with _SCHEDULED_REFRESH_STATE_LOCK:
+            active = dict(_SCHEDULED_REFRESH_STATE)
+        return {
+            "success": False,
+            "error": "market_refresh_already_running",
+            "reason": reason,
+            "activeRefresh": active,
+        }
+    with _SCHEDULED_REFRESH_STATE_LOCK:
+        _SCHEDULED_REFRESH_STATE.update(
+            {
+                "running": True,
+                "reason": reason,
+                "startedAt": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+    swing_hunt = reason == "swing_entry_hunt" or reason.startswith("swing_v2")
     intraday_hunt = reason.startswith("intraday_")
     pool = (
         INTRADAY_750_LABEL
@@ -849,6 +873,7 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
             allow_fallback=True,
             force_llm_refresh=False,
             angel_first_quotes=swing_hunt,
+            swing_v2_history=reason.startswith("swing_v2"),
         )
         if not payload.get("success", False):
             return {
@@ -881,6 +906,12 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
     except Exception as exc:
         log.exception("Scheduled live refresh failed: %s", exc)
         return {"success": False, "error": str(exc), "reason": reason}
+    finally:
+        with _SCHEDULED_REFRESH_STATE_LOCK:
+            _SCHEDULED_REFRESH_STATE.update(
+                {"running": False, "reason": None, "startedAt": None}
+            )
+        _SCHEDULED_REFRESH_LOCK.release()
 
 
 _thread_local_angel_client = threading.local()
@@ -3208,6 +3239,62 @@ def _intraday_metrics_from_daily(
         "hard_filter_reasons": ["5m bars unavailable; ATR/RSI/turnover from daily candles + quote volume"],
         "day_change_pct": None if day_move_pct is None else round(day_move_pct, 2),
         "volume_pace_adjusted": False,
+        "swingV2Raw": _swing_v2_raw_metrics(daily_candles, [], ltp, now),
+    }
+
+
+def _swing_v2_raw_metrics(
+    daily_candles: list[dict[str, Any]],
+    intraday_candles: list[dict[str, Any]],
+    ltp: float,
+    now: datetime,
+) -> dict[str, Any]:
+    previous = []
+    today = now.astimezone(IST_ZONE).date().isoformat()
+    for candle in daily_candles:
+        raw_ts = str(candle.get("ts") or "")[:10]
+        if raw_ts and raw_ts < today:
+            previous.append(candle)
+    closes = [float(row["close"]) for row in previous if float(row.get("close") or 0) > 0]
+    returns = [closes[i] / closes[i - 1] - 1 for i in range(1, len(closes)) if closes[i - 1] > 0]
+
+    def annualized_vol(window: int) -> float:
+        values = returns[-window:]
+        if len(values) < max(20, window // 2):
+            return 0.0
+        return statistics.pstdev(values) * math.sqrt(252)
+
+    def momentum(lookback: int, vol_window: int) -> float | None:
+        if len(closes) < lookback + 5:
+            return None
+        denominator = annualized_vol(vol_window)
+        return None if denominator <= 0 else (closes[-5] / closes[-lookback - 5] - 1) / denominator
+
+    ema20_values = _ema(closes, period=20)
+    atr_pct = _atr_percent(previous)
+    atr = (atr_pct / 100.0) * (closes[-1] if closes else ltp)
+    prior20 = previous[-20:]
+    prior_high = max((float(row.get("high") or 0) for row in prior20), default=0.0)
+    mdtv_values = [float(row.get("close") or 0) * float(row.get("volume") or 0) for row in previous[-20:]]
+    intraday_closes = [float(row.get("close") or 0) for row in intraday_candles]
+    intraday_lows = [float(row.get("low") or 0) for row in intraday_candles]
+    last_ts = intraday_candles[-1].get("ts") if intraday_candles else None
+    return {
+        "dailyObservationCount": len(previous),
+        "dailyBarsThroughPreviousClose": bool(previous),
+        "historyReady": len(previous) >= 252,
+        "mom6mRaw": momentum(126, 126),
+        "mom12mRaw": momentum(252, 252),
+        "return5dRaw": (closes[-1] / closes[-6] - 1) if len(closes) >= 6 and closes[-6] > 0 else None,
+        "ema20Daily": ema20_values[-1] if ema20_values else None,
+        "atr14": atr if atr > 0 else None,
+        "prior20dHigh": prior_high or None,
+        "mdtv20": statistics.median(mdtv_values) if mdtv_values else None,
+        "last3Closes": intraday_closes[-3:],
+        "intradayLow": min(intraday_lows) if intraday_lows else None,
+        "last5mTimestamp": last_ts,
+        "last1hTimestamp": last_ts,
+        "previous52wHigh": max((float(row.get("high") or 0) for row in previous[-252:]), default=0.0) or None,
     }
 
 
@@ -3221,6 +3308,7 @@ def _intraday_metrics(
     force_angel_fallback: bool = False,
     interval: str = "FIVE_MINUTE",
     timeframe: str = "5m",
+    daily_lookback_days: int = 45,
 ) -> dict[str, Any]:
     try:
         market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
@@ -3229,7 +3317,7 @@ def _intraday_metrics(
             if interval == "ONE_HOUR"
             else market_open
         )
-        daily_from = (now - timedelta(days=45)).replace(hour=9, minute=15, second=0, microsecond=0)
+        daily_from = (now - timedelta(days=max(45, daily_lookback_days))).replace(hour=9, minute=15, second=0, microsecond=0)
         daily_to = now
 
         dhan_id = load_dhan_security_ids().get(inst.key) if dhan_configured() else None
@@ -3392,6 +3480,7 @@ def _intraday_metrics(
         "volume_pace_adjusted": True,
         "passes_hard_filters": passes_hard_filters,
         "hard_filter_reasons": hard_filter_reasons,
+        "swingV2Raw": _swing_v2_raw_metrics(daily_candles, intraday_candles, ltp, now),
     }
     return attach_pivot_metrics(metrics, ltp, daily_candles)
 
@@ -3405,6 +3494,7 @@ def _fetch_intraday_chunk(
     force_angel_fallback: bool = False,
     interval: str = "FIVE_MINUTE",
     timeframe: str = "5m",
+    daily_lookback_days: int = 45,
 ) -> dict[str, dict[str, Any]]:
     results: dict[str, dict[str, Any]] = {}
     for row in rows:
@@ -3435,6 +3525,7 @@ def _fetch_intraday_chunk(
                 force_angel_fallback=force_angel_fallback,
                 interval=interval,
                 timeframe=timeframe,
+                daily_lookback_days=daily_lookback_days,
             )
         except Exception:
             import traceback as _traceback
@@ -3455,6 +3546,7 @@ def _fetch_all_intraday_chunked(
     force_angel_fallback: bool = False,
     interval: str = "FIVE_MINUTE",
     timeframe: str = "5m",
+    daily_lookback_days: int = 45,
 ) -> dict[str, dict[str, Any]]:
     chunks = [
         candidate_rows[i : i + INTRADAY_CHUNK_SIZE]
@@ -3479,6 +3571,7 @@ def _fetch_all_intraday_chunked(
             force_angel_fallback=force_angel_fallback,
             interval=interval,
             timeframe=timeframe,
+            daily_lookback_days=daily_lookback_days,
         )
 
     def report_chunk_progress() -> None:
@@ -4091,6 +4184,7 @@ def _build_payload_from_live_data(
     prior_snapshot: dict[str, Any] | None = None,
     on_progress: Callable[[str], None] | None = None,
     angel_first_quotes: bool = False,
+    swing_v2_history: bool = False,
 ) -> dict[str, Any]:
     def progress(msg: str) -> None:
         if on_progress:
@@ -4197,6 +4291,12 @@ def _build_payload_from_live_data(
             if angel_first_quotes
             else _intraday_metrics_usable(cached_intraday)
         )
+        if swing_v2_history and metrics_ready:
+            raw = cached_intraday.get("swingV2Raw") if isinstance(cached_intraday, dict) else None
+            try:
+                metrics_ready = bool(isinstance(raw, dict) and int(raw.get("dailyObservationCount") or 0) >= 252)
+            except (TypeError, ValueError):
+                metrics_ready = False
         if metrics_ready:
             row["intraday"] = cached_intraday
             stock_quotes[row["ticker"]] = row
@@ -4214,6 +4314,7 @@ def _build_payload_from_live_data(
             force_angel_fallback=angel_first_quotes,
             interval="ONE_HOUR" if angel_first_quotes else "FIVE_MINUTE",
             timeframe="1h" if angel_first_quotes else "5m",
+            daily_lookback_days=430 if swing_v2_history else 45,
         )
         for ticker, metrics in fetched_metrics.items():
             original = row_by_ticker.get(ticker)
@@ -4393,6 +4494,24 @@ def _build_payload_from_live_data(
         "deskIcByTicker": desk_ic_map if isinstance(desk_ic_map, dict) else {},
         "isSnapshotFallback": False,
     }
+    if swing_v2_history:
+        try:
+            from .swing_v2.ingestion import enrich_v2_market_snapshot
+
+            payload = enrich_v2_market_snapshot(payload, all_stocks, now=now)
+        except Exception as exc:
+            logging.getLogger(__name__).exception("Swing V2 governed enrichment failed closed: %s", exc)
+            payload.update(
+                {
+                    "swingV2UniverseCoverage": 0.0,
+                    "swingV2Regime": "REGIME_UNRATED",
+                    "swingV2DataStatus": {
+                        "errors": [str(exc)],
+                        "featureRows": 0,
+                        "historyReadyRows": 0,
+                    },
+                }
+            )
     # Day-lock: carry prior lock on reuse; stamp lock after a successful fresh LLM pass.
     if reused_llm and snapshot and snapshot.get("llmLockedForDate"):
         payload["llmLockedForDate"] = snapshot.get("llmLockedForDate")
@@ -4422,6 +4541,7 @@ def build_market_payload(
     force_llm_refresh: bool = False,  # When false, reuse day-locked / TTL-fresh snapshot AI
     on_progress: Callable[[str], None] | None = None,
     angel_first_quotes: bool = False,
+    swing_v2_history: bool = False,
 ) -> dict[str, Any]:
     snapshot = _load_last_snapshot()
 
@@ -4469,6 +4589,7 @@ def build_market_payload(
             prior_snapshot=snapshot,
             on_progress=on_progress,
             angel_first_quotes=angel_first_quotes,
+            swing_v2_history=swing_v2_history,
         )
         _save_last_snapshot(payload)
         return payload
@@ -5801,7 +5922,19 @@ def _run_ondemand_refresh_task(
     def update_progress(msg: str) -> None:
         _refresh_task_touch(task_id, msg)
 
+    acquired_refresh = False
     try:
+        update_progress("Waiting for the shared market refresh slot...")
+        _SCHEDULED_REFRESH_LOCK.acquire()
+        acquired_refresh = True
+        with _SCHEDULED_REFRESH_STATE_LOCK:
+            _SCHEDULED_REFRESH_STATE.update(
+                {
+                    "running": True,
+                    "reason": "on_demand_refresh",
+                    "startedAt": datetime.now(timezone.utc).isoformat(),
+                }
+            )
         update_progress("Starting live market refresh...")
         client = AngelOneClient()
         payload = build_market_payload(
@@ -5844,6 +5977,13 @@ def _run_ondemand_refresh_task(
         )
     except Exception as exc:
         _refresh_task_set_error(task_id, str(exc))
+    finally:
+        if acquired_refresh:
+            with _SCHEDULED_REFRESH_STATE_LOCK:
+                _SCHEDULED_REFRESH_STATE.update(
+                    {"running": False, "reason": None, "startedAt": None}
+                )
+            _SCHEDULED_REFRESH_LOCK.release()
 
 
 def _run_refresh_task(task_id: str, pool_name: str | None, custom_prompt: str | None) -> None:

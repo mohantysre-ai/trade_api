@@ -643,6 +643,9 @@ export default function ForensicPanel({
     cashHeld?: boolean;
     cashReason?: string;
     hunting?: boolean;
+    waitingForDecisionWindow?: boolean;
+    decisionPhase?: string;
+    decisionWindow?: { start?: string; freeze?: string; entryCutoff?: string; orderExpiry?: string; timezone?: string };
     selectionFinalized?: boolean;
     huntWindow?: { huntStart?: string; huntEnd?: string };
     entryHuntDiagnostics?: {
@@ -1151,9 +1154,17 @@ export default function ForensicPanel({
     todaySwingEmpty &&
       (swingSession?.hunting || swingSession?.cashReason === 'WAITING_FOR_QUALIFIED_BUY_ENTRY'),
   );
+  const waitingSwingDecision = Boolean(
+    todaySwingEmpty &&
+      !huntingSwing &&
+      (swingSession?.waitingForDecisionWindow ||
+        swingSession?.cashReason === 'WAITING_FOR_DECISION_WINDOW' ||
+        swingSession?.decisionPhase === 'WAITING_FOR_DECISION_WINDOW'),
+  );
   const cashHeldSwing = Boolean(
     todaySwingEmpty &&
       !huntingSwing &&
+      !waitingSwingDecision &&
       (swingSession?.cashHeld ||
         Boolean(swingSession?.cashReason) ||
         swingSession?.selectionFinalized),
@@ -1335,7 +1346,15 @@ export default function ForensicPanel({
                 {' · '}lock when a fully qualified BUY appears
                 {swingSession?.huntWindow?.huntStart && swingSession?.huntWindow?.huntEnd
                   ? ` · ${swingSession.huntWindow.huntStart}–${swingSession.huntWindow.huntEnd} IST`
-                  : ' · 09:45–14:45 IST'}
+                  : ` · ${swingSession?.decisionWindow?.start || '14:30'}–${swingSession?.decisionWindow?.freeze || '15:10'} IST`}
+              </>
+            ) : waitingSwingDecision ? (
+              <>
+                <span className="inline-flex items-center rounded border border-sky-300 bg-sky-50 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-sky-800">
+                  WAITING · {swingSession?.sessionDate}
+                </span>
+                {' · '}WAITING_FOR_DECISION_WINDOW
+                {' · '}V2 scan opens {swingSession?.decisionWindow?.start || '14:30'} IST; final freeze {swingSession?.decisionWindow?.freeze || '15:10'} IST
               </>
             ) : cashHeldSwing ? (
               <>
@@ -1679,7 +1698,7 @@ export default function ForensicPanel({
             </DeskCardTilt>
           );
         })}
-        {!portfolioDisplayRows.length && (huntingSwing || cashHeldSwing) && (
+        {!portfolioDisplayRows.length && (huntingSwing || waitingSwingDecision || cashHeldSwing) && (
           <div className="col-span-full space-y-3 py-2">
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {[
@@ -1696,7 +1715,9 @@ export default function ForensicPanel({
               ))}
             </div>
             <p className="text-slate-700 text-[13px] font-semibold">
-              {huntingSwing
+              {waitingSwingDecision
+                ? `Waiting for V2 decision window — ${swingSession?.decisionWindow?.start || '14:30'} IST`
+                : huntingSwing
                 ? `Hunt open — ${swingSession?.entryHuntDiagnostics?.qualified ?? 0}/${swingSession?.entryHuntDiagnostics?.evaluated ?? '—'} qualified BUY`
                 : `Hunt closed — ${swingSession?.cashReason || 'NO_BUY_LOCKED_DURING_ENTRY_WINDOW'}`}
               {typeof swingSession?.entryHuntDiagnostics?.displayPool === 'number'
