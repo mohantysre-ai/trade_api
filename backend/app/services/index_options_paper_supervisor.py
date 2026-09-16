@@ -1,10 +1,10 @@
 """Autonomous server-side supervisor for already-locked index-option paper trades.
 
-This module deliberately does not scan, score, select, or create trades. The
-existing index-options engine remains the only source of trade-entry decisions.
-The supervisor only wakes on a one-minute cadence, refreshes marks for positions
-already present in the durable paper book, applies the existing exit rules via
-``reconcile_paper_book``, and persists the resulting state.
+This module never scans, scores, selects, or creates trades. The engine remains
+the only entry authority. The supervisor is a fast durability/exit watchdog for
+positions already in the paper book: it retains every locked contract on the
+WebSocket, reconciles from the in-memory stream first, and lets the paper layer
+use REST only for stale/missing ticks.
 """
 from __future__ import annotations
 
@@ -22,7 +22,16 @@ from .market_snapshot_store import market_snapshot_path
 
 logger = logging.getLogger(__name__)
 
-SUPERVISOR_INTERVAL_SECONDS = 60
+
+def _interval_seconds() -> float:
+    try:
+        value = float(os.environ.get("INDEX_OPTIONS_PAPER_SUPERVISOR_INTERVAL_SECONDS", "5"))
+    except (TypeError, ValueError):
+        value = 5.0
+    return max(1.0, min(value, 60.0))
+
+
+SUPERVISOR_INTERVAL_SECONDS = _interval_seconds()
 SUPERVISOR_SESSION_START = dt_time(9, 15)
 SUPERVISOR_SESSION_END = dt_time(15, 30)
 
@@ -64,9 +73,8 @@ def _session_active(now: datetime) -> bool:
     return clock.weekday() < 5 and SUPERVISOR_SESSION_START <= local_time <= SUPERVISOR_SESSION_END
 
 
-def _next_minute_boundary(now: datetime) -> datetime:
-    clock = now.astimezone(IST_ZONE)
-    return clock.replace(second=0, microsecond=0) + timedelta(minutes=1)
+def _next_cycle(now: datetime) -> datetime:
+    return now.astimezone(IST_ZONE) + timedelta(seconds=SUPERVISOR_INTERVAL_SECONDS)
 
 
 def _set_local_status(**changes: Any) -> None:
@@ -75,11 +83,6 @@ def _set_local_status(**changes: Any) -> None:
 
 
 def _status_update(**changes: Any) -> None:
-    """Update owner-local state and durable heartbeat.
-
-    Only the cross-process lease owner calls this function. Non-owner workers
-    keep their process-local status but never overwrite the shared heartbeat.
-    """
     with _STATUS_LOCK:
         _STATUS.update(changes)
         payload = dict(_STATUS)
@@ -90,7 +93,6 @@ def _status_update(**changes: Any) -> None:
 
 
 def paper_supervisor_status() -> dict[str, Any]:
-    """Return the durable owner heartbeat plus this worker's ownership state."""
     with _STATUS_LOCK:
         current = dict(_STATUS)
     try:
@@ -108,13 +110,7 @@ def paper_supervisor_status() -> dict[str, Any]:
 
 
 def run_paper_supervisor_cycle(client: Any, *, now: datetime | None = None) -> dict[str, Any]:
-    """Hydrate subscriptions, then mark/exit existing paper positions.
-
-    No new trades can ever be created here: an empty radar is passed, so the
-    cycle never depends on today's radar candidates. Subscription hydration and
-    marking both read the durable paper book, and every open position is retained
-    on the WebSocket before its first mark of the cycle.
-    """
+    """Retain all locked legs, then mark/exit the durable paper book."""
     clock = (now or datetime.now(IST_ZONE)).astimezone(IST_ZONE)
     try:
         hydration = hydrate_open_position_subscriptions(client, now=clock)
@@ -122,17 +118,11 @@ def run_paper_supervisor_cycle(client: Any, *, now: datetime | None = None) -> d
         logger.exception("index-options paper subscription hydration failed")
         hydration = {"openPositions": None, "retainedContracts": 0, "error": "HYDRATION_FAILED"}
     _set_local_status(lastHydration=hydration)
-    radar = {
-        "candidates": [],
-        "sellerCandidates": [],
-        "selected": [],  # critical: supervisor can never create a new entry
-    }
+    radar = {"candidates": [], "sellerCandidates": [], "selected": []}
     return reconcile_paper_book(radar, client=client, now=clock, persist=True)
 
 
 class _ProcessLease:
-    """Best-effort cross-process ownership so multi-worker servers run one marker."""
-
     def __init__(self, path: Path) -> None:
         self.path = path
         self.handle: Any = None
@@ -141,8 +131,7 @@ class _ProcessLease:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.handle = self.path.open("a+", encoding="utf-8")
         try:
-            import fcntl  # Linux/Unix production path
-
+            import fcntl
             fcntl.flock(self.handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             self.handle.seek(0)
             self.handle.truncate()
@@ -150,7 +139,6 @@ class _ProcessLease:
             self.handle.flush()
             return True
         except ImportError:
-            # Windows/dev fallback: process-local singleton still prevents duplicate threads.
             return True
         except (BlockingIOError, OSError):
             self.handle.close()
@@ -163,7 +151,6 @@ class _ProcessLease:
         try:
             try:
                 import fcntl
-
                 fcntl.flock(self.handle.fileno(), fcntl.LOCK_UN)
             except (ImportError, OSError):
                 pass
@@ -174,8 +161,7 @@ class _ProcessLease:
 
 def _supervisor_loop(client_factory: Callable[[], Any]) -> None:
     lease = _ProcessLease(_lock_path())
-    owner = lease.acquire()
-    if not owner:
+    if not lease.acquire():
         _set_local_status(enabled=True, running=False, owner=False, pid=os.getpid())
         logger.info("index-options paper supervisor already owned by another worker")
         return
@@ -186,60 +172,35 @@ def _supervisor_loop(client_factory: Callable[[], Any]) -> None:
         while not _STOP_EVENT.is_set():
             now = datetime.now(IST_ZONE)
             if not _session_active(now):
-                _status_update(
-                    running=True,
-                    owner=True,
-                    sessionActive=False,
-                    nextCycleAt=None,
-                    lastError=None,
-                )
-                # Sleep lightly so a long-running service notices the next session without restart.
+                _status_update(running=True, owner=True, sessionActive=False, nextCycleAt=None, lastError=None)
                 _STOP_EVENT.wait(30.0)
                 continue
 
-            next_boundary = _next_minute_boundary(now)
-            wait_seconds = max(0.0, (next_boundary - now).total_seconds())
-            _status_update(
-                running=True,
-                owner=True,
-                sessionActive=True,
-                nextCycleAt=next_boundary.isoformat(),
-            )
-            if _STOP_EVENT.wait(wait_seconds):
+            next_cycle = _next_cycle(now)
+            _status_update(running=True, owner=True, sessionActive=True, nextCycleAt=next_cycle.isoformat())
+            if _STOP_EVENT.wait(SUPERVISOR_INTERVAL_SECONDS):
                 break
 
-            cycle_time = datetime.now(IST_ZONE).replace(second=0, microsecond=0)
+            cycle_time = datetime.now(IST_ZONE)
             try:
                 if client is None:
                     client = client_factory()
                 book = run_paper_supervisor_cycle(client, now=cycle_time)
                 _status_update(
-                    running=True,
-                    owner=True,
-                    sessionActive=True,
-                    lastCycleAt=cycle_time.isoformat(),
-                    lastSuccessAt=cycle_time.isoformat(),
-                    lastError=None,
-                    consecutiveFailures=0,
-                    openPositions=len(book.get("open") or []),
-                    closedPositions=len(book.get("closed") or []),
-                    entryCount=int(book.get("entryCount") or 0),
-                    markPipeline=book.get("markPipeline"),
-                    subscriptions=book.get("subscriptions"),
-                    lastHydration=_STATUS.get("lastHydration"),
+                    running=True, owner=True, sessionActive=True,
+                    lastCycleAt=cycle_time.isoformat(), lastSuccessAt=cycle_time.isoformat(),
+                    lastError=None, consecutiveFailures=0,
+                    openPositions=len(book.get("open") or []), closedPositions=len(book.get("closed") or []),
+                    entryCount=int(book.get("entryCount") or 0), markPipeline=book.get("markPipeline"),
+                    subscriptions=book.get("subscriptions"), lastHydration=_STATUS.get("lastHydration"),
                 )
             except Exception as exc:
-                # Drop the client so the next minute recreates the Angel session cleanly.
                 client = None
                 with _STATUS_LOCK:
                     failures = int(_STATUS.get("consecutiveFailures") or 0) + 1
                 _status_update(
-                    running=True,
-                    owner=True,
-                    sessionActive=True,
-                    lastCycleAt=cycle_time.isoformat(),
-                    lastError=str(exc),
-                    consecutiveFailures=failures,
+                    running=True, owner=True, sessionActive=True, lastCycleAt=cycle_time.isoformat(),
+                    lastError=str(exc), consecutiveFailures=failures,
                 )
                 logger.exception("index-options autonomous paper mark cycle failed")
     finally:
@@ -248,28 +209,23 @@ def _supervisor_loop(client_factory: Callable[[], Any]) -> None:
 
 
 def start_paper_supervisor(client_factory: Callable[[], Any]) -> bool:
-    """Start the one-minute autonomous marker once for this application process."""
     global _THREAD
     if not _enabled():
         _set_local_status(enabled=False, running=False, owner=False)
         return False
-
     with _THREAD_LOCK:
         if _THREAD is not None and _THREAD.is_alive():
             return True
         _STOP_EVENT.clear()
         _THREAD = threading.Thread(
-            target=_supervisor_loop,
-            args=(client_factory,),
-            name="index-options-paper-supervisor",
-            daemon=True,
+            target=_supervisor_loop, args=(client_factory,),
+            name="index-options-paper-supervisor", daemon=True,
         )
         _THREAD.start()
     return True
 
 
 def stop_paper_supervisor(*, join_timeout: float = 2.0) -> None:
-    """Stop the process-local supervisor; primarily used by tests/shutdown hooks."""
     global _THREAD
     _STOP_EVENT.set()
     with _THREAD_LOCK:
