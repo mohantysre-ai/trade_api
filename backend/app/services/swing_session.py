@@ -117,17 +117,9 @@ def _invalidate_swing_response_cache() -> None:
 
 
 def _atomic_write(path: str, payload: dict[str, Any]) -> None:
-    parent = os.path.dirname(path)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(payload, fh, indent=2, default=str)
-    try:
-        os.replace(tmp, path)
-    except OSError:
-        with open(path, "w", encoding="utf-8") as fh:
-            json.dump(payload, fh, indent=2, default=str)
+    from .json_atomic import atomic_write_json
+
+    atomic_write_json(path, payload)
     _invalidate_swing_response_cache()
 
 
@@ -836,6 +828,10 @@ def _stock_is_matrix_buy(row: dict[str, Any]) -> bool:
 def _in_candle_screen(row: dict[str, Any]) -> bool:
     """True when the row has real candle metrics (VWAP or RSI), not quote-only."""
     intra = row.get("intraday") if isinstance(row.get("intraday"), dict) else {}
+    if intra.get("data_source") and intra.get("data_source") != "candles":
+        return False
+    if intra.get("timeframe") and intra.get("timeframe") != "1h":
+        return False
     vwap = _f(intra.get("vwap") or row.get("vwap"))
     rsi = _f(intra.get("rsi") or row.get("rsi"))
     return (vwap is not None and vwap > 0) or (rsi is not None and rsi > 0)
@@ -1424,7 +1420,8 @@ def _swing_universe_diagnostics(
         "evaluated": evaluated,
         "qualified": qualified,
         "crossBookExcluded": sorted(blocked),
-        "swingUniverse": "Nifty 500",
+        "swingUniverse": "Intraday 750",
+        "candleTimeframe": "1h",
         "topRejectionReasons": [{"reason": k, "count": v} for k, v in top],
     }
 

@@ -472,6 +472,20 @@ def _intraday_metrics_usable(intraday: Any) -> bool:
     )
 
 
+def _swing_candle_metrics_usable(intraday: Any, timeframe: str = "1h") -> bool:
+    if not isinstance(intraday, dict) or intraday.get("data_source") != "candles":
+        return False
+    if intraday.get("timeframe") and intraday.get("timeframe") != timeframe:
+        return False
+    try:
+        return all(
+            float(intraday.get(key) or 0) > 0
+            for key in ("vwap", "ema9", "orb_high", "orb_low")
+        )
+    except (TypeError, ValueError):
+        return False
+
+
 def _prefer_intraday_metrics(quote_intra: Any, stock_intra: Any) -> dict[str, Any]:
     """Rank 5m candles over daily_candles; never let a hunt stub replace either."""
     from .desk_ic_criteria import prefer_intraday_blocks
@@ -818,7 +832,7 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
     swing_hunt = reason == "swing_entry_hunt"
     intraday_hunt = reason.startswith("intraday_")
     pool = (
-        NIFTY_500_LABEL
+        INTRADAY_750_LABEL
         if swing_hunt
         else INTRADAY_750_LABEL
         if intraday_hunt
@@ -1103,7 +1117,7 @@ def _normalize_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
         available_pools.append(LIVE_UNIVERSE_LABEL)
     payload["availablePools"] = available_pools
     payload.setdefault("activePool", NIFTY_500_LABEL)
-    payload.setdefault("poolDescription", "Nifty 500 Angel One live universe; swing hunt uses the full index.")
+    payload.setdefault("poolDescription", "Intraday 750 universe; Swing hunt uses 1h candles across the resolved pool.")
     payload.setdefault("tickerNewsByTicker", {})
     return payload
 
@@ -1286,7 +1300,7 @@ def _resolve_nse_equity(
     token_map: dict[str, tuple[str, str]] | None = None,
 ) -> tuple[str, str] | None:
     """Resolve an NSE cash equity symbol to (token, tradingsymbol)."""
-    key = symbol.upper()
+    key = symbol.upper().removesuffix("-EQ")
     mapping = token_map if token_map is not None else _load_nse_eq_token_map()
     if key in mapping:
         return mapping[key]
@@ -1295,23 +1309,23 @@ def _resolve_nse_equity(
         return None
 
     smart = client.connect()
-    for query in (f"{key}-EQ", key):
-        try:
-            search = smart.searchScrip("NSE", query)
-        except Exception:
-            continue
-        if not isinstance(search, dict) or not search.get("status"):
-            continue
-        data = search.get("data") or []
-        if not isinstance(data, list) or not data:
-            continue
-        pick = _pick_eq_search_result(data, key)
-        if not pick:
-            continue
-        token = str(pick.get("token") or pick.get("symboltoken") or "")
-        tradingsymbol = str(pick.get("symbol") or pick.get("tradingsymbol") or f"{key}-EQ")
-        if token:
-            return token, tradingsymbol
+    try:
+        search = smart.searchScrip("NSE", key)
+    except Exception:
+        return None
+    if not isinstance(search, dict) or not search.get("status"):
+        return None
+    data = search.get("data") or []
+    if not isinstance(data, list) or not data:
+        return None
+    pick = _pick_eq_search_result(data, key)
+    if not pick:
+        return None
+    token = str(pick.get("token") or pick.get("symboltoken") or "")
+    tradingsymbol = str(pick.get("symbol") or pick.get("tradingsymbol") or f"{key}-EQ")
+    if token:
+        mapping[key] = (token, tradingsymbol)
+        return mapping[key]
     return None
 
 
@@ -1324,7 +1338,7 @@ def _symbols_to_instruments(
     missing: list[str] = []
 
     for symbol in symbols:
-        key = symbol.upper()
+        key = symbol.upper().removesuffix("-EQ")
         entry = token_map.get(key)
         if entry:
             token, tradingsymbol = entry
@@ -2703,7 +2717,7 @@ def _fetch_quote_chunk(
 
     fetched: dict[str, dict[str, Any]] = {}
     try:
-        response = smart.getMarketData("FULL", tokens_by_exchange)
+        response = _getmarketdata_with_retry(smart, tokens_by_exchange)
         if response.get("status"):
             for item in response.get("data", {}).get("fetched", []):
                 token = str(item.get("symbolToken", ""))
@@ -2725,6 +2739,26 @@ def _fetch_quote_chunk(
                 raise
             continue
     return fetched
+
+
+def _getmarketdata_with_retry(
+    smart: SmartConnect,
+    tokens_by_exchange: dict[str, list[str]],
+    attempts: int = 3,
+    backoff: float = 0.5,
+) -> dict[str, Any]:
+    last_exc: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            return smart.getMarketData("FULL", tokens_by_exchange)
+        except Exception as exc:
+            last_exc = exc
+            msg = str(exc).lower()
+            if "timeout" in msg or "timed out" in msg or "read timed out" in msg:
+                time.sleep(backoff * (attempt + 1))
+                continue
+            raise
+    raise last_exc or RuntimeError("getMarketData failed after retries")
 
 
 def _fetch_batch_quotes_chunked(
@@ -2818,6 +2852,18 @@ def _parse_candle_rows(raw: list[list[Any]]) -> list[dict[str, Any]]:
             }
         )
     return candles
+
+
+def _candle_ist_date(value: Any) -> date | None:
+    try:
+        if isinstance(value, (int, float)):
+            return datetime.fromtimestamp(float(value), tz=timezone.utc).astimezone(IST_ZONE).date()
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=IST_ZONE)
+        return parsed.astimezone(IST_ZONE).date()
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
 
 
 def _ema(values: list[float], period: int = 9) -> list[float]:
@@ -3173,9 +3219,16 @@ def _intraday_metrics(
     quote_fallback: dict[str, Any] | None = None,
     *,
     force_angel_fallback: bool = False,
+    interval: str = "FIVE_MINUTE",
+    timeframe: str = "5m",
 ) -> dict[str, Any]:
     try:
         market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
+        intraday_from = (
+            (now - timedelta(days=15)).replace(hour=9, minute=15, second=0, microsecond=0)
+            if interval == "ONE_HOUR"
+            else market_open
+        )
         daily_from = (now - timedelta(days=45)).replace(hour=9, minute=15, second=0, microsecond=0)
         daily_to = now
 
@@ -3185,7 +3238,7 @@ def _intraday_metrics(
             # Dhan is the primary chart provider: it avoids Angel's AB1021 burst
             # limits while still letting Angel fill names with no Dhan security id.
             daily_raw = fetch_dhan_candles(dhan_id, "ONE_DAY", daily_from, daily_to)
-            intraday_raw = fetch_dhan_candles(dhan_id, "FIVE_MINUTE", market_open, now)
+            intraday_raw = fetch_dhan_candles(dhan_id, interval, intraday_from, now)
         else:
             daily_raw = []
             intraday_raw = []
@@ -3195,7 +3248,7 @@ def _intraday_metrics(
             daily_raw = fetch_nse_candles(inst.key, inst.token, "ONE_DAY", daily_from, daily_to)
         if not intraday_raw:
             intraday_raw = fetch_nse_candles(
-                inst.key, inst.token, "FIVE_MINUTE", market_open, now
+                inst.key, inst.token, interval, intraday_from, now
             )
         # Batch hunt skips Angel when a Dhan id exists (AB1021). Drawer single-name
         # fetches may force Angel so ATR/turnover are not left blank.
@@ -3203,7 +3256,7 @@ def _intraday_metrics(
         if not daily_raw and allow_angel and _angel_candle_calls_allowed():
             daily_raw = client.fetch_candles(inst.exchange, inst.token, "ONE_DAY", daily_from, daily_to)
         if not intraday_raw and allow_angel and _angel_candle_calls_allowed():
-            intraday_raw = client.fetch_candles(inst.exchange, inst.token, "FIVE_MINUTE", market_open, now)
+            intraday_raw = client.fetch_candles(inst.exchange, inst.token, interval, intraday_from, now)
 
         daily_candles = _parse_candle_rows(daily_raw)
         intraday_candles = _parse_candle_rows(intraday_raw)
@@ -3227,21 +3280,26 @@ def _intraday_metrics(
     avg_daily_volume_20 = (sum(daily_volumes) / len(daily_volumes)) if daily_volumes else 0.0
     atr_pct = _atr_percent(daily_candles)
 
-    today_volume = sum(row["volume"] for row in intraday_candles)
+    session_candles = [
+        row for row in intraday_candles if _candle_ist_date(row.get("ts")) == now.astimezone(IST_ZONE).date()
+    ]
+    if not session_candles:
+        session_candles = intraday_candles
+    today_volume = sum(row["volume"] for row in session_candles)
     volume_multiplier = pace_volume_multiplier(today_volume, avg_daily_volume_20, now)
 
-    vwap = _vwap(intraday_candles)
+    vwap = _vwap(session_candles)
     closes = [row["close"] for row in intraday_candles]
     ema9_values = _ema(closes, period=9)
     ema9 = ema9_values[-1] if ema9_values else 0.0
     ema_angle_deg = _ema_angle_deg(ema9_values)
 
-    orb_window = intraday_candles[:3] if len(intraday_candles) >= 3 else intraday_candles
+    orb_window = session_candles[:3] if len(session_candles) >= 3 else session_candles
     orb_high = max((row["high"] for row in orb_window), default=0.0)
     orb_low = min((row["low"] for row in orb_window), default=0.0)
     orb_velocity_pct = ((ltp - orb_high) / orb_high) * 100 if orb_high and ltp >= orb_high else 0.0
 
-    wick_noise_ratio = _wick_noise_ratio(intraday_candles)
+    wick_noise_ratio = _wick_noise_ratio(session_candles)
     turnover_cr = (ltp * today_volume) / 10_000_000 if ltp and today_volume else 0.0
 
     price_above_vwap = bool(vwap and ltp > vwap)
@@ -3263,7 +3321,7 @@ def _intraday_metrics(
     # Alpha score components (non-filter metrics — separate from hard filter variables)
     relative_volume = volume_multiplier
     liquidity_score = min(turnover_cr / 2.5, 20.0)
-    last_candle = intraday_candles[-1] if intraday_candles else {}
+    last_candle = session_candles[-1] if session_candles else {}
     body_ratio = (
         abs(last_candle.get("close", 0) - last_candle.get("open", 0))
         / max(last_candle.get("high", 0) - last_candle.get("low", 0), 0.001)
@@ -3306,6 +3364,7 @@ def _intraday_metrics(
 
     metrics = {
         "data_source": "candles",
+        "timeframe": timeframe,
         "atr_pct": round(atr_pct, 2),
         "volume_multiplier": round(volume_multiplier, 2),
         "today_volume": round(today_volume, 0),
@@ -3344,6 +3403,8 @@ def _fetch_intraday_chunk(
     now: datetime,
     *,
     force_angel_fallback: bool = False,
+    interval: str = "FIVE_MINUTE",
+    timeframe: str = "5m",
 ) -> dict[str, dict[str, Any]]:
     results: dict[str, dict[str, Any]] = {}
     for row in rows:
@@ -3366,7 +3427,14 @@ def _fetch_intraday_chunk(
         }
         try:
             metrics = _intraday_metrics(
-                client, inst, ltp, now, quote_fallback=quote_fallback, force_angel_fallback=force_angel_fallback,
+                client,
+                inst,
+                ltp,
+                now,
+                quote_fallback=quote_fallback,
+                force_angel_fallback=force_angel_fallback,
+                interval=interval,
+                timeframe=timeframe,
             )
         except Exception:
             import traceback as _traceback
@@ -3384,6 +3452,9 @@ def _fetch_all_intraday_chunked(
     stock_universe_by_key: dict[str, Instrument],
     now: datetime,
     on_progress: Callable[[str], None] | None = None,
+    force_angel_fallback: bool = False,
+    interval: str = "FIVE_MINUTE",
+    timeframe: str = "5m",
 ) -> dict[str, dict[str, Any]]:
     chunks = [
         candidate_rows[i : i + INTRADAY_CHUNK_SIZE]
@@ -3400,7 +3471,15 @@ def _fetch_all_intraday_chunked(
     def fetch_chunk(chunk: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         # Thread-local Angel clients avoid sharing SmartConnect state across workers.
         chunk_client = _get_thread_angel_client() if workers > 1 else client
-        return _fetch_intraday_chunk(chunk_client, chunk, stock_universe_by_key, now)
+        return _fetch_intraday_chunk(
+            chunk_client,
+            chunk,
+            stock_universe_by_key,
+            now,
+            force_angel_fallback=force_angel_fallback,
+            interval=interval,
+            timeframe=timeframe,
+        )
 
     def report_chunk_progress() -> None:
         nonlocal completed_chunks
@@ -4082,7 +4161,7 @@ def _build_payload_from_live_data(
     candle_limit = int(os.getenv("INTRADAY_CANDIDATE_LIMIT", str(VOLUME_PRESELECT_LIMIT)))
     volume_limit = int(os.getenv("VOLUME_PRESELECT_LIMIT", str(VOLUME_PRESELECT_LIMIT)))
     swing_limit = int(os.getenv("SWING_CANDIDATE_LIMIT", str(SWING_CANDIDATE_LIMIT)))
-    candle_limit = max(candle_limit, volume_limit, swing_limit)
+    candle_limit = len(stock_universe) if angel_first_quotes else max(candle_limit, volume_limit, swing_limit)
     top_by_volume = _select_top_volume_stocks(all_stocks, candle_limit)
     candidate_rows = top_by_volume[:candle_limit]
     candidate_keys = {row["ticker"] for row in candidate_rows}
@@ -4113,7 +4192,12 @@ def _build_payload_from_live_data(
     rows_to_fetch: list[dict[str, Any]] = []
     for row in candidate_rows:
         cached_intraday = intraday_cache.get(row["ticker"])
-        if _intraday_metrics_usable(cached_intraday):
+        metrics_ready = (
+            _swing_candle_metrics_usable(cached_intraday, "1h")
+            if angel_first_quotes
+            else _intraday_metrics_usable(cached_intraday)
+        )
+        if metrics_ready:
             row["intraday"] = cached_intraday
             stock_quotes[row["ticker"]] = row
         else:
@@ -4127,6 +4211,9 @@ def _build_payload_from_live_data(
             stock_universe_by_key,
             now,
             on_progress=on_progress,
+            force_angel_fallback=angel_first_quotes,
+            interval="ONE_HOUR" if angel_first_quotes else "FIVE_MINUTE",
+            timeframe="1h" if angel_first_quotes else "5m",
         )
         for ticker, metrics in fetched_metrics.items():
             original = row_by_ticker.get(ticker)
@@ -4135,7 +4222,13 @@ def _build_payload_from_live_data(
                 stock_quotes[ticker] = original
 
     candle_ready = sum(
-        1 for row in candidate_rows if _intraday_metrics_usable(row.get("intraday"))
+        1
+        for row in candidate_rows
+        if (
+            _swing_candle_metrics_usable(row.get("intraday"), "1h")
+            if angel_first_quotes
+            else _intraday_metrics_usable(row.get("intraday"))
+        )
     )
     candle_expected = len(candidate_rows)
     candle_coverage_pct = round(
@@ -4279,17 +4372,9 @@ def _build_payload_from_live_data(
         "rawSources": _news_feed_sources(),
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "mockTickers": sorted(MOCK_TICKERS),
-        "availablePools": [NIFTY_100_LABEL, "Nifty 500", LIVE_UNIVERSE_LABEL],
+        "availablePools": [NIFTY_100_LABEL, INTRADAY_750_LABEL, NIFTY_500_LABEL, LIVE_UNIVERSE_LABEL],
         "activePool": resolved_pool_name,
-        "poolDescription": (
-            "Nifty 500 universe: live quotes on full index, swing candles on top "
-            f"{candle_limit} by volume, Asset Matrix volume screen {volume_limit}."
-            if resolved_pool_name == NIFTY_500_LABEL
-            else (
-                "Matrix pool "
-                f"{resolved_pool_name}; swing hunt still quotes the full Nifty 500."
-            )
-        ),
+        "poolDescription": f"{resolved_pool_name} universe; swing hunt uses 1h candles across the resolved pool.",
         "universeSize": len(all_stocks),
         "volumeScreenedCount": len(candidate_rows),
         "marketDataCoverage": quote_coverage,
@@ -4423,9 +4508,9 @@ def build_market_payload(
                 "success": False,
                 "error": "Live refresh was requested but the scheduled refresh window is not active and fallback is disabled.",
                 "rawSources": _news_feed_sources(),
-                "availablePools": [NIFTY_100_LABEL, "Nifty 500", LIVE_UNIVERSE_LABEL],
+                "availablePools": [NIFTY_100_LABEL, INTRADAY_750_LABEL, NIFTY_500_LABEL, LIVE_UNIVERSE_LABEL],
                 "activePool": pool_name or NIFTY_500_LABEL,
-                "poolDescription": "Nifty 500 Angel One live universe; swing hunt uses the full index.",
+                "poolDescription": "Intraday 750 universe; Swing hunt uses 1h candles across the resolved pool.",
                 "stocks": [],
                 "stockQuotes": {},
                 "macroDataStrip": {"morning": [], "evening": []},
@@ -4447,9 +4532,9 @@ def build_market_payload(
             "success": False,
             "error": "No cached snapshot available. Live refresh runs only during the morning or evening IST windows.",
             "rawSources": _news_feed_sources(),
-            "availablePools": [NIFTY_100_LABEL, "Nifty 500", LIVE_UNIVERSE_LABEL],
+            "availablePools": [NIFTY_100_LABEL, INTRADAY_750_LABEL, NIFTY_500_LABEL, LIVE_UNIVERSE_LABEL],
             "activePool": pool_name or NIFTY_500_LABEL,
-            "poolDescription": "Nifty 500 Angel One live universe; swing hunt uses the full index.",
+            "poolDescription": "Intraday 750 universe; Swing hunt uses 1h candles across the resolved pool.",
             "stocks": [],
             "stockQuotes": {},
             "macroDataStrip": {"morning": [], "evening": []},
@@ -4874,6 +4959,7 @@ def create_app() -> FastAPI:
                 ensure_fresh_market_snapshot(reason="index_options_compose"),
                 live=live,
                 client=AngelOneClient(),
+                persist=live,
             )
 
         def _refresh_bg() -> None:

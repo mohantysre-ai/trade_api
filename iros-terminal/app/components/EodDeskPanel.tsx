@@ -212,6 +212,10 @@ export default function EodDeskPanel({
     try {
       const st = await fetchEodLlmStatus(date);
       setLlmStatus(st);
+      if (!st.has_artifacts) {
+        setPmCommentary(null);
+        return;
+      }
     } catch {
       setLlmStatus({
         date,
@@ -258,8 +262,8 @@ export default function EodDeskPanel({
       // One EOD date for Intraday + Swing. Retarget only when both locks share a stale day.
       try {
         const [intra, swing] = await Promise.all([
-          fetchLiveDesk<Record<string, any>>('intraday-session'),
-          fetchLiveDesk<Record<string, any>>('swing-session'),
+          fetchLiveDesk<Record<string, unknown>>('intraday-session'),
+          fetchLiveDesk<Record<string, unknown>>('swing-session'),
         ]);
         if (cancelled) return;
         const today = getIstMarketState().today;

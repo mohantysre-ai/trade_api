@@ -49,5 +49,6 @@
     "*.pyo": true,
     "target/**": true,
     "vendor/**": true
-  }
+  },
+  "CodeGPT.apiKey": "CodeGPT Plus Beta"
 }

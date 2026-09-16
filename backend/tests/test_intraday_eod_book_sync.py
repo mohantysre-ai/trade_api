@@ -7,6 +7,7 @@ from app.services.eod_intraday_report import (
     apply_session_leg_economics,
     generate_intraday_eod_report,
     intraday_book_cache_stale,
+    project_session_live,
     session_realized_pnl,
 )
 
@@ -138,6 +139,46 @@ def test_apply_session_leg_overrides_candle_walk():
     assert meta["exitState"]["closed"] is True
 
 
+def test_project_session_live_mirrors_open_unrealized_and_closed_realized_pnl():
+    session = {
+        "locked": True,
+        "sessionDate": "2026-08-18",
+        "long": [
+            {
+                "symbol": "OPEN",
+                "direction": "LONG",
+                "entryPrice": 100.0,
+                "ltp": 125.0,
+                "approxQty": 1,
+                "realizedPnl": 0.0,
+                "unrealizedPnl": 25.0,
+                "executionStatus": "TRIGGERED",
+                "status": "RUNNING",
+                "closed": False,
+            },
+            {
+                "symbol": "CLOSED",
+                "direction": "LONG",
+                "entryPrice": 100.0,
+                "ltp": 80.0,
+                "approxQty": 1,
+                "realizedPnl": -10.0,
+                "unrealizedPnl": 0.0,
+                "executionStatus": "TRIGGERED",
+                "status": "STOP LOSS HIT",
+                "closed": True,
+            },
+        ],
+        "short": [],
+    }
+    report = project_session_live(session, date(2026, 8, 18), 1000.0)
+    assert report["totalPnl"] == 15.0
+    assert {row["symbol"]: row["pnl"] for row in report["trades"]} == {
+        "OPEN": 25.0,
+        "CLOSED": -10.0,
+    }
+
+
 def test_canonical_picks_include_session_names_missing_levels():
     day = date(2026, 8, 20)
     session = {
@@ -225,3 +266,34 @@ def test_open_book_serves_cache_on_pnl_mismatch():
     assert out is cached
     save.assert_not_called()
     prefetch.assert_not_called()
+
+
+def test_open_book_never_serves_stale_symbol_set_when_session_is_locked():
+    day = date(2026, 8, 20)
+    cached = {
+        "isMock": False,
+        "symbolSource": "intraday_session",
+        "marketPhase": "OPEN",
+        "totalPnl": 0.0,
+        "cachedAt": datetime(2026, 8, 20, 4, 0, tzinfo=timezone.utc).isoformat(),
+        "trades": [{"symbol": "OLD", "pnl": 0.0}],
+    }
+    session = {
+        "locked": True,
+        "sessionDate": "2026-08-20",
+        "long": [{"symbol": "NEW", "direction": "LONG", "entryPrice": 100.0, "currentPrice": 101.0, "approxQty": 1}],
+        "short": [],
+    }
+    with (
+        patch(
+            "app.services.eod_intraday_report._load_canonical_intraday_picks",
+            return_value=([{"symbol": "NEW"}], False, "intraday_session", {"swing": 0, "intradayLong": 1, "intradayShort": 0, "total": 1}),
+        ),
+        patch("app.services.desk_clock.cash_session_phase", return_value="OPEN"),
+        patch("app.services.eod_engine.ingestion.load_intraday_session", return_value=session),
+        patch("app.services.eod_book_cache.load_book_cache", return_value=cached),
+        patch("app.services.eod_intraday_report.project_session_live", return_value={"trades": [{"symbol": "NEW"}]}) as project,
+    ):
+        out = generate_intraday_eod_report(day, force=False)
+    assert out["trades"][0]["symbol"] == "NEW"
+    project.assert_called_once()

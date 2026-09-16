@@ -36,8 +36,37 @@ class AngelIndexStream:
         self._subscribed: set[tuple[int, str]] = set()
         self._quotes: dict[str, dict[str, Any]] = {}
         self._bars: dict[str, dict[str, list[Any]]] = {}
+        # Persistent subscription registry. ``_ensure_keys`` holds advisory radar
+        # tokens (resubscribed on reconnect, never auto-dropped). ``_owners``
+        # holds counted references taken by open paper positions: a contract is
+        # only unsubscribed after the last position (owner) closes it.
+        self._ensure_keys: set[tuple[int, str]] = set()
+        self._owners: dict[str, set[tuple[int, str]]] = {}
         self._stop = False
         self._client: Any = None
+
+    def _register_locked(self, item: dict[str, Any]) -> tuple[tuple[int, str] | None, bool]:
+        """Register one instrument inside the lock; return (key, is_new)."""
+        exchange = str(item.get("exchange") or "").upper()
+        token = str(item.get("token") or "")
+        exchange_type = EXCHANGE_TYPES.get(exchange)
+        if not exchange_type or not token:
+            return None, False
+        key = (exchange_type, token)
+        is_new = key not in self._wanted
+        if is_new:
+            self._wanted[key] = dict(item)
+        return key, is_new
+
+    def _start_or_defer_locked(self, client: Any) -> tuple[Any, bool]:
+        """Start the worker if needed; return (socket, worker_started)."""
+        self._client = client
+        if self._thread is None or not self._thread.is_alive():
+            self._stop = False
+            self._thread = threading.Thread(target=self._run, name="angel-index-stream", daemon=True)
+            self._thread.start()
+            return None, True
+        return self._socket, False
 
     def ensure(self, client: Any, instruments: list[dict[str, str]]) -> None:
         if os.getenv("INDEX_OPTIONS_STREAM_ENABLED", "1") != "1" or not callable(getattr(client, "connect", None)):
@@ -46,21 +75,14 @@ class AngelIndexStream:
         with self._lock:
             self._client = client
             for item in instruments:
-                exchange = str(item.get("exchange") or "").upper()
-                token = str(item.get("token") or "")
-                exchange_type = EXCHANGE_TYPES.get(exchange)
-                if not exchange_type or not token:
+                key, is_new = self._register_locked(item)
+                if key is None:
                     continue
-                key = (exchange_type, token)
-                if key not in self._wanted:
-                    self._wanted[key] = dict(item)
-                    added = True
-            if self._thread is None or not self._thread.is_alive():
-                self._stop = False
-                self._thread = threading.Thread(target=self._run, name="angel-index-stream", daemon=True)
-                self._thread.start()
-                return
-            socket = self._socket
+                self._ensure_keys.add(key)
+                added = added or is_new
+            socket, started = self._start_or_defer_locked(client)
+        if started:
+            return
         if added and socket is not None:
             try:
                 self._subscribe_missing(socket)
@@ -69,12 +91,95 @@ class AngelIndexStream:
                 # _on_open/reconnect will subscribe the same pending tokens.
                 logging.getLogger(__name__).debug("Angel stream subscription deferred", exc_info=True)
 
-    def quote(self, token: str, *, max_age_seconds: float = 12.0) -> dict[str, Any] | None:
+    def retain(self, client: Any, instruments: list[dict[str, Any]], *, owner: str) -> int:
+        """Take a counted subscription reference for one open position.
+
+        Re-retaining with the same ``owner`` is idempotent, so a reconnect or a
+        repeated reconcile can never duplicate a subscription. A retained
+        contract stays subscribed until :meth:`release_owner` runs for the last
+        owner that holds it.
+        """
+        name = str(owner or "").strip()
+        if not name:
+            return 0
+        if os.getenv("INDEX_OPTIONS_STREAM_ENABLED", "1") != "1" or not callable(getattr(client, "connect", None)):
+            return 0
         with self._lock:
-            row = dict(self._quotes.get(str(token)) or {})
-        received = row.get("receivedEpoch")
+            self._client = client
+            keys: list[tuple[int, str]] = []
+            for item in instruments:
+                key, _ = self._register_locked(item)
+                if key is not None:
+                    keys.append(key)
+            if not keys:
+                return 0
+            self._owners[name] = set(keys)
+            socket, started = self._start_or_defer_locked(client)
+        if started:
+            return len(keys)
+        try:
+            self._subscribe_missing(socket)
+        except Exception:
+            logging.getLogger(__name__).debug("Angel retained subscription deferred", exc_info=True)
+        return len(keys)
+
+    def release_owner(self, owner: str) -> int:
+        """Drop one owner's references and unsubscribe only orphaned contracts."""
+        name = str(owner or "").strip()
+        if not name:
+            return 0
+        with self._lock:
+            held = self._owners.pop(name, set())
+            still_held = {key for keys in self._owners.values() for key in keys}
+            dropped = [key for key in held if key not in self._ensure_keys and key not in still_held]
+            for key in dropped:
+                self._wanted.pop(key, None)
+                self._subscribed.discard(key)
+                self._quotes.pop(key[1], None)
+            socket = self._socket if self._opened else None
+        if dropped and socket is not None:
+            self._unsubscribe(socket, dropped)
+        return len(dropped)
+
+    def retained_owners(self) -> dict[str, int]:
+        with self._lock:
+            return {owner: len(keys) for owner, keys in self._owners.items()}
+
+    def _unsubscribe(self, socket: Any, keys: list[tuple[int, str]]) -> None:
+        unsubscribe = getattr(socket, "unsubscribe", None)
+        if not callable(unsubscribe):
+            return
+        grouped: dict[int, list[str]] = {}
+        for exchange_type, token in keys:
+            grouped.setdefault(exchange_type, []).append(token)
+        token_list = [{"exchangeType": exchange, "tokens": tokens} for exchange, tokens in grouped.items()]
+        try:
+            unsubscribe("sigqixopt", 3, token_list)
+        except Exception:
+            logging.getLogger(__name__).debug("Angel stream unsubscribe failed", exc_info=True)
+
+    def quote(self, token: str, *, max_age_seconds: float = 12.0) -> dict[str, Any] | None:
+        row = self.quote_row(token)
+        received = (row or {}).get("receivedEpoch")
         if not row or not isinstance(received, (int, float)) or time.time() - received > max_age_seconds:
             return None
+        return row
+
+    def quote_row(self, token: str) -> dict[str, Any] | None:
+        """Return the last cached tick with its exact age, unfiltered by TTL.
+
+        Marking uses this to distinguish "no tick at all" from "stale tick", so a
+        locked contract is only re-quoted over REST when its stream data is
+        genuinely stale.
+        """
+        with self._lock:
+            row = dict(self._quotes.get(str(token)) or {})
+        if not row:
+            return None
+        received = row.get("receivedEpoch")
+        age = max(0.0, time.time() - received) if isinstance(received, (int, float)) else None
+        row["ageSeconds"] = round(age, 3) if age is not None else None
+        row["stale"] = age is None
         return row
 
     def candles(self, key: str) -> list[list[Any]]:
@@ -84,9 +189,13 @@ class AngelIndexStream:
     def status(self) -> dict[str, Any]:
         with self._lock:
             latest = max((row.get("receivedEpoch", 0) for row in self._quotes.values()), default=0)
+            retained = {key for keys in self._owners.values() for key in keys}
             return {
                 "connected": self._opened,
                 "subscribed": len(self._subscribed),
+                "wanted": len(self._wanted),
+                "retainedOwners": len(self._owners),
+                "retainedContracts": len(retained),
                 "lastTickAt": datetime.fromtimestamp(latest, timezone.utc).isoformat() if latest else None,
             }
 

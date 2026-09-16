@@ -6,6 +6,7 @@ from datetime import date, datetime
 from typing import Any, Callable
 
 from .angel_index_options import (
+    IST_ZONE,
     _apply_oi_baselines,
     _effective_breadth_gate,
     active_index_expiries,
@@ -291,6 +292,17 @@ def compose_live_index_options_radar(
         book["indexOptions"] = _apply_live_spot_risk_guard(strategy_inputs)
         book["indexOptionProvider"] = option_data
     result = build_index_options_radar(book)
+    from .index_options.config import butterflies_enabled, calendars_enabled, debit_spreads_enabled, diagonals_enabled, long_vol_enabled
+
+    if any((debit_spreads_enabled(), long_vol_enabled(), butterflies_enabled(), calendars_enabled(), diagonals_enabled())):
+        from .index_options.radar_builder import build_index_options_radar_v2
+        from .index_options.runtime import process_strategy_cycle
+
+        modular = build_index_options_radar_v2(book)
+        result["modularCandidates"] = modular.get("candidates", []) + modular.get("sellerCandidates", [])
+        result["modularSelected"] = modular.get("selected", [])
+        if persist:
+            result["strategyBook"] = process_strategy_cycle(result, book, now or datetime.now(IST_ZONE))
     market_open = index_options_market_open(now)
     result["paperBook"] = reconcile_paper_book(result, client=client, persist=persist, now=now)
     result["sessionStatus"] = "OPEN" if market_open else "CLOSED"

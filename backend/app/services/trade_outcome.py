@@ -1465,13 +1465,29 @@ def _compute_live_prices_for_plan(
         save_fixed_trade_plan(merged_plan)
     elif persist_transitions and plan_changed and book_source == "intraday_session":
         try:
-            from .intraday_session_engine import save_session, sync_fixed_plan_from_session
+            from .intraday_session_engine import (
+                load_session,
+                merge_session_row_updates,
+                sync_fixed_plan_from_session,
+            )
 
-            sess = dict(fixed)
-            sess["long"] = long_plan
-            sess["short"] = short_plan
-            sess["updatedAt"] = _utc_now()
-            save_session(sess)
+            # `fixed`/long_plan/short_plan were read at the top of this call and may
+            # be stale by now (external price fetches take time). Merge our
+            # outcome updates into the freshest on-disk session by symbol so a
+            # concurrent writer that added/changed rows in the meantime never
+            # gets clobbered — no locked symbol is ever dropped or replaced.
+            long_updates = {
+                str(r.get("symbol") or "").upper(): r
+                for r in long_plan
+                if isinstance(r, dict) and r.get("symbol")
+            }
+            short_updates = {
+                str(r.get("symbol") or "").upper(): r
+                for r in short_plan
+                if isinstance(r, dict) and r.get("symbol")
+            }
+            merge_session_row_updates(long_updates, short_updates)
+            sess = load_session() or {}
             sync_fixed_plan_from_session(sess)
         except Exception:
             log.exception("intraday session persist after live SL evaluation failed")

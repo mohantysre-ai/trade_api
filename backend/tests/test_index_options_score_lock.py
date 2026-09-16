@@ -1,19 +1,19 @@
 from app.services.index_options_engine import MIN_ELIGIBLE_SCORE, build_index_options_radar
 
 
-def _long_premium_payload(*, score=75.0, fresh=True, contract_economics=True, premium=100.0):
+def _long_premium_payload(*, score=75.0, fresh=True, contract_economics=True, premium=100.0, confirmations=True):
     scores = {name: score for name in (
         "trend", "breakout", "futuresOi", "optionChain", "breadth", "contract", "regime"
     )}
     gates = {
         "fresh": fresh,
-        "structure": False,
-        "breakout": False,
-        "futuresOi": False,
-        "optionChain": False,
-        "breadth": False,
+        "structure": confirmations,
+        "breakout": confirmations,
+        "futuresOi": confirmations,
+        "optionChain": confirmations,
+        "breadth": confirmations,
         "contractEconomics": contract_economics,
-        "riskReward": False,
+        "riskReward": confirmations,
     }
     return {
         "indexOptions": {
@@ -44,15 +44,24 @@ def test_long_premium_score_floor_is_70():
     assert MIN_ELIGIBLE_SCORE == 70.0
 
 
-def test_score_above_70_locks_even_when_confirmation_gates_fail():
+def test_score_above_70_locks_when_hard_gates_pass():
     radar = build_index_options_radar(_long_premium_payload(score=73.9))
     row = radar["candidates"][0]
     assert row["score"] == 73.9
     assert row["state"] == "ELIGIBLE"
     assert row["reason"] == "SCORE_LOCK_70"
     assert row["eligible"] is True
-    assert set(row["failedGates"]) >= {"structure", "breakout", "futuresOi", "optionChain", "breadth", "riskReward"}
+    assert row["failedGates"] == []
     assert radar["selected"][0]["key"] == "NIFTY"
+
+
+def test_score_above_70_does_not_override_failed_hard_gates():
+    radar = build_index_options_radar(_long_premium_payload(score=90.0, confirmations=False))
+    row = radar["candidates"][0]
+    assert row["state"] == "NO_TRADE"
+    assert row["eligible"] is False
+    assert row["reason"].startswith("SAFETY_GATE_FAILED:")
+    assert radar["selected"] == []
 
 
 def test_score_below_70_remains_watch():

@@ -411,8 +411,6 @@ def _session_is_valid_current_lock(session: dict[str, Any] | None) -> bool:
         return False
     if not session.get("committedAt"):
         return False
-    if session.get("entryPolicyVersion") != ENTRY_POLICY_VERSION:
-        return False
     return True
 
 
@@ -529,6 +527,20 @@ def save_session(payload: dict[str, Any], force: bool = False) -> None:
         }
         if (
             authoritative_existing
+            and existing.get("locked")
+            and existing_date == today
+            and existing_symbols
+            and (
+                not authoritative_payload
+                or not payload_symbols
+                or not existing_symbols.issubset(payload_symbols)
+            )
+        ):
+            raise RuntimeError(
+                "Refusing to remove or replace symbols from today's Intraday lock"
+            )
+        if (
+            authoritative_existing
             and authoritative_payload
             and existing.get("locked")
             and existing_date == today
@@ -544,6 +556,46 @@ def save_session(payload: dict[str, Any], force: bool = False) -> None:
         _atomic_write(_SESSION_FILE, payload)
     # Explicit mutations invalidate the response snapshot. The computing caller
     # will republish a fresh value after its state transition finishes.
+    _invalidate_session_response_cache()
+    try:
+        from .trade_outcome import invalidate_live_book_cache
+
+        invalidate_live_book_cache()
+    except Exception:
+        pass
+
+
+def merge_session_row_updates(
+    long_updates: dict[str, dict[str, Any]],
+    short_updates: dict[str, dict[str, Any]],
+) -> None:
+    """Apply per-symbol field updates to today's locked session, never dropping a row.
+
+    Reads the freshest on-disk session and writes back under the same lock
+    used by `save_session`, so a caller holding a stale plan snapshot (e.g. one
+    built before a slow external price fetch) can never clobber symbols that a
+    concurrent writer added or changed in the meantime. Symbols not present in
+    `long_updates`/`short_updates` are left untouched; no row is ever removed.
+    """
+    with _SESSION_PERSIST_LOCK, _session_interprocess_lock():
+        existing = load_session()
+        if not existing:
+            return
+        payload = dict(existing)
+        for key, updates_by_symbol in (("long", long_updates), ("short", short_updates)):
+            if not updates_by_symbol:
+                continue
+            rows = existing.get(key) or []
+            merged_rows = []
+            for row in rows:
+                if not isinstance(row, dict):
+                    merged_rows.append(row)
+                    continue
+                update = updates_by_symbol.get(str(row.get("symbol") or "").upper())
+                merged_rows.append({**row, **update} if update else row)
+            payload[key] = merged_rows
+        payload["updatedAt"] = _utc_now_iso()
+        _atomic_write(_SESSION_FILE, payload)
     _invalidate_session_response_cache()
     try:
         from .trade_outcome import invalidate_live_book_cache
@@ -3082,7 +3134,7 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
 
     Time gate: primary 09:45–10:15 IST (or late-start catch-up). Only
     ``bypass_lock_window=True`` (operator emergency) skips the clock.
-    ``force`` only means rebuild an already-locked basket — it does not open early.
+    ``force`` only applies to stale-day rotation; a committed current-day lock is immutable.
     """
     today = _ist_now().strftime("%Y-%m-%d")
     reconcile_cross_book(today, persist=True)
@@ -3093,6 +3145,8 @@ def commit_session(force: bool = False, *, bypass_lock_window: bool = False) -> 
         and existing_date
         and existing_date != today
     )
+    if existing.get("locked") and not stale_day and existing.get("committedAt"):
+        return existing
     if stale_day and not force:
         log.info(
             "Intraday sessionDate %s != today %s — forcing daily rotate",
@@ -3365,15 +3419,14 @@ def ensure_intraday_session_locked() -> dict[str, Any]:
     # A current-day cash-held lock with zero names is valid. Replacement
     # hunting may fill it later; do not make it impossible to re-enter because
     # commit_session correctly refuses to overwrite today's immutable lock.
-    current_policy = existing.get("entryPolicyVersion") == ENTRY_POLICY_VERSION
     if (
         existing.get("locked") and existing_date == today
-        and existing.get("committedAt") and current_policy
+        and existing.get("committedAt")
     ):
         return existing
     malformed_current = bool(
         existing.get("locked") and existing_date == today
-        and (not existing.get("committedAt") or not current_policy)
+        and not existing.get("committedAt")
     )
     result = commit_session(
         force=bool(existing.get("locked") and (existing_date != today or malformed_current))
@@ -4840,10 +4893,7 @@ def _schedule_stale_session_rotation(existing: dict[str, Any] | None = None) -> 
     stale = bool(session.get("locked") and session_date and session_date != today)
     malformed_current = bool(
         session.get("locked") and session_date == today
-        and (
-            not session.get("committedAt")
-            or session.get("entryPolicyVersion") != ENTRY_POLICY_VERSION
-        )
+        and not session.get("committedAt")
     )
     if not (stale or malformed_current):
         return False

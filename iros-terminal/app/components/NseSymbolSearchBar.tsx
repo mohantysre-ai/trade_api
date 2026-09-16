@@ -178,6 +178,7 @@ export default function NseSymbolSearchBar({ onSelect, selectedTicker }: NseSymb
         </span>
         <input
           type="search"
+          role="combobox"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);

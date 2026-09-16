@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .angel_index_options import IST_ZONE
-from .index_options_paper import reconcile_paper_book
+from .index_options_paper import hydrate_open_position_subscriptions, reconcile_paper_book
 from .json_atomic import atomic_write_json, load_json_with_fallback
 from .market_snapshot_store import market_snapshot_path
 
@@ -108,8 +108,20 @@ def paper_supervisor_status() -> dict[str, Any]:
 
 
 def run_paper_supervisor_cycle(client: Any, *, now: datetime | None = None) -> dict[str, Any]:
-    """Mark/exit existing paper positions without admitting any new trades."""
+    """Hydrate subscriptions, then mark/exit existing paper positions.
+
+    No new trades can ever be created here: an empty radar is passed, so the
+    cycle never depends on today's radar candidates. Subscription hydration and
+    marking both read the durable paper book, and every open position is retained
+    on the WebSocket before its first mark of the cycle.
+    """
     clock = (now or datetime.now(IST_ZONE)).astimezone(IST_ZONE)
+    try:
+        hydration = hydrate_open_position_subscriptions(client, now=clock)
+    except Exception:
+        logger.exception("index-options paper subscription hydration failed")
+        hydration = {"openPositions": None, "retainedContracts": 0, "error": "HYDRATION_FAILED"}
+    _set_local_status(lastHydration=hydration)
     radar = {
         "candidates": [],
         "sellerCandidates": [],
@@ -212,6 +224,9 @@ def _supervisor_loop(client_factory: Callable[[], Any]) -> None:
                     openPositions=len(book.get("open") or []),
                     closedPositions=len(book.get("closed") or []),
                     entryCount=int(book.get("entryCount") or 0),
+                    markPipeline=book.get("markPipeline"),
+                    subscriptions=book.get("subscriptions"),
+                    lastHydration=_STATUS.get("lastHydration"),
                 )
             except Exception as exc:
                 # Drop the client so the next minute recreates the Angel session cleanly.

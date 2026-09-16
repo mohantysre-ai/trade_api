@@ -1,10 +1,10 @@
+# Runtime session/state JSON (do not commit live market state)
+intraday_session.json
+swing_session.json
+fixed_trade_plan.json
+alert_history.json
+last_market_snapshot.json
 trade_api_snapshot.json
-backend/app/services/last_market_snapshot.json
-/intraday_session.json
-/swing_session.json
-/fixed_trade_plan.json
-/alert_history.json
-/last_market_snapshot.json
 *.log
 logs/
 *.log.*
@@ -37,9 +37,3 @@ strix_runs/
 *.sqlite3
 *.sqlite3-wal
 *.sqlite3-shm
-# Python runtime
-__pycache__/
-*.pyc
-*.pyo
-# Kilo IDE cache
-.aicache/

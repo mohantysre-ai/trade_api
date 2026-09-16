@@ -116,6 +116,7 @@ def test_current_day_cash_lock_is_a_valid_intraday_session(monkeypatch):
     monkeypatch.setattr(intraday, "load_session", lambda: current)
     monkeypatch.setattr(intraday, "_ist_now", lambda: datetime(2026, 8, 26, 10, 0))
     monkeypatch.setattr(intraday, "commit_session", lambda **kwargs: (_ for _ in ()).throw(AssertionError("must not recommit")))
+    assert intraday._session_is_valid_current_lock(current) is True
     assert intraday.ensure_intraday_session_locked() == current
 
 
@@ -138,6 +139,59 @@ def test_current_day_lock_without_commit_timestamp_is_rebuilt(monkeypatch):
     )
     assert intraday.ensure_intraday_session_locked() == rebuilt
     assert calls == [{"force": True}]
+
+
+def test_current_day_committed_lock_is_preserved_across_policy_metadata_change(monkeypatch):
+    current = {
+        "locked": True,
+        "sessionDate": "2026-08-26",
+        "committedAt": "2026-08-26T10:00:00+05:30",
+        "entryPolicyVersion": "legacy_policy",
+        "long": [{"symbol": "LOCKED_LONG"}],
+        "short": [{"symbol": "LOCKED_SHORT"}],
+    }
+    monkeypatch.setattr(intraday, "load_session", lambda: current)
+    monkeypatch.setattr(intraday, "_ist_now", lambda: datetime(2026, 8, 26, 10, 1))
+    monkeypatch.setattr(intraday, "commit_session", lambda **kwargs: (_ for _ in ()).throw(AssertionError("must not recommit")))
+    assert intraday.ensure_intraday_session_locked() == current
+
+
+def test_force_save_cannot_remove_current_day_locked_symbols(monkeypatch, tmp_path):
+    current = {
+        "locked": True,
+        "sessionDate": "2026-08-26",
+        "committedAt": "2026-08-26T10:00:00+05:30",
+        "entryPolicyVersion": "legacy_policy",
+        "long": [{"symbol": "LOCKED_LONG"}],
+        "short": [{"symbol": "LOCKED_SHORT"}],
+    }
+    monkeypatch.setattr(intraday, "load_session", lambda: current)
+    monkeypatch.setattr(intraday, "_ist_now", lambda: datetime(2026, 8, 26, 10, 1))
+    monkeypatch.setattr(intraday, "_SESSION_FILE", tmp_path / "intraday_session.json")
+    for payload in (
+        {"locked": True, "sessionDate": "2026-08-26", "committedAt": "2026-08-26T10:02:00+05:30", "long": [], "short": []},
+        {"locked": True, "sessionDate": "2026-08-26", "committedAt": "2026-08-26T10:02:00+05:30", "long": [{"symbol": "NEW"}], "short": []},
+    ):
+        try:
+            intraday.save_session(payload, force=True)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("force save replaced current-day locked symbols")
+
+
+def test_force_cannot_replace_committed_current_day_lock(monkeypatch):
+    current = {
+        "locked": True,
+        "sessionDate": "2026-08-26",
+        "committedAt": "2026-08-26T10:00:00+05:30",
+        "long": [{"symbol": "LOCKED_LONG"}],
+        "short": [],
+    }
+    monkeypatch.setattr(intraday, "load_session", lambda: current)
+    monkeypatch.setattr(intraday, "_ist_now", lambda: datetime(2026, 8, 26, 10, 1))
+    monkeypatch.setattr(intraday, "generate_candidates", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not rescan")))
+    assert intraday.commit_session(force=True) == current
 
 
 def test_stale_snapshot_cannot_create_intraday_lock(monkeypatch):
@@ -285,6 +339,17 @@ def test_intraday_stale_refresh_does_not_replace_after_save_session(monkeypatch)
     monkeypatch.setattr(intraday, "_SESSION_RESPONSE_REFRESHING", False)
     monkeypatch.setattr(intraday, "_SESSION_RESPONSE_GEN", 0)
     monkeypatch.setattr(trade_outcome, "invalidate_live_book_cache", lambda: None)
+    monkeypatch.setattr(
+        intraday,
+        "load_session",
+        lambda: {
+            "locked": True,
+            "sessionDate": "2026-08-26",
+            "committedAt": "2026-08-26T10:00:00+05:30",
+            "long": [],
+            "short": [],
+        },
+    )
     try:
         intraday.get_session(include_live=True)
         assert live_started.wait(timeout=0.5)

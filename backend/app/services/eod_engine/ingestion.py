@@ -22,7 +22,10 @@ _APP_DIR = os.path.dirname(_SERVICES_DIR)
 _BACKEND_DIR = os.path.dirname(_APP_DIR)
 _REPO_ROOT = os.path.dirname(_BACKEND_DIR)
 
-EOD_DATA_ROOT = os.path.join(_APP_DIR, "data", "eod")
+EOD_DATA_ROOT = os.environ.get(
+    "EOD_DATA_ROOT",
+    os.path.join(_APP_DIR, "data", "eod"),
+)
 _FIXED_PLAN_PATH = os.environ.get(
     "FIXED_PLAN_FILE",
     os.path.join(_REPO_ROOT, "fixed_trade_plan.json"),
@@ -41,18 +44,9 @@ def eod_day_dir(for_date: date) -> str:
 
 
 def atomic_write_json(path: str, payload: Any) -> None:
-    """Atomic JSON write via .tmp + os.replace (fallback to overwrite)."""
-    parent = os.path.dirname(path)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(payload, fh, indent=2, default=str)
-    try:
-        os.replace(tmp, path)
-    except OSError:
-        with open(path, "w", encoding="utf-8") as fh:
-            json.dump(payload, fh, indent=2, default=str)
+    from ..json_atomic import atomic_write_json as safe_atomic_write_json
+
+    safe_atomic_write_json(path, payload)
 
 
 def _read_json(path: str) -> dict[str, Any]:

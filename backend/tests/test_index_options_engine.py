@@ -37,6 +37,44 @@ def test_correlation_bucket_selects_only_best_index():
     assert [row["key"] for row in radar["selected"]] == ["NIFTY", "BANKNIFTY"]
 
 
+def _seller_snapshot(score: float = 95.0, *, strategy_type: str = "IRON_CONDOR", bias: str = "NEUTRAL") -> dict:
+    gates = {name: True for name in (
+        "fresh", "structure", "futuresRegime", "optionChain", "breadth", "volatilityEdge",
+        "contractEconomics", "definedRisk", "thetaCarry", "tailBuffer", "timeWindow",
+    )}
+    return {
+        "spot": 25000,
+        "seller": {
+            "scores": {name: score for name in (
+                "structure", "futuresRegime", "optionChain", "breadth", "volatilityEdge", "contract", "theta",
+            )},
+            "gates": gates,
+            "strategyType": strategy_type,
+            "bias": bias,
+        },
+    }
+
+
+def test_buy_and_sell_sleeves_select_the_same_index_independently():
+    supplied = {**_complete("CALL", 92.0), **_seller_snapshot(95.0)}
+    radar = build_index_options_radar({"indexOptions": {"indices": {"NIFTY": supplied}}})
+    assert [row["key"] for row in radar["buySelected"]] == ["NIFTY"]
+    assert [row["key"] for row in radar["sellSelected"]] == ["NIFTY"]
+    assert [row["key"] for row in radar["selected"]] == ["NIFTY", "NIFTY"]
+    assert radar["limits"]["maxConcurrent"] == 2
+    assert radar["limits"]["maxConcurrentPerSleeve"] == 2
+    assert radar["limits"]["sleeveIsolation"] == "INDEPENDENT_INDEX_AND_BUCKET_PER_SLEEVE"
+
+
+def test_sell_sleeve_keeps_its_own_bucket_pick_when_the_buy_sleeve_takes_one():
+    radar = build_index_options_radar({"indexOptions": {"indices": {
+        "NIFTY": {**_complete("CALL", 92.0), **_seller_snapshot(95.0)},
+        "SENSEX": {**_complete("CALL", 88.0), **_seller_snapshot(90.0)},
+    }}})
+    assert [row["key"] for row in radar["buySelected"]] == ["NIFTY"]
+    assert [row["key"] for row in radar["sellSelected"]] == ["NIFTY"]
+
+
 def test_profit_reentry_needs_cooldown_and_all_confirmations():
     governor = IndexOptionReEntryGovernor()
     governor.record_entry("NIFTY")
