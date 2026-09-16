@@ -3249,6 +3249,7 @@ def _swing_v2_raw_metrics(
     ltp: float,
     now: datetime,
 ) -> dict[str, Any]:
+    min_observations = int(os.getenv("SWING_MIN_DAILY_OBSERVATIONS", "90"))
     previous = []
     today = now.astimezone(IST_ZONE).date().isoformat()
     for candle in daily_candles:
@@ -3282,9 +3283,9 @@ def _swing_v2_raw_metrics(
     return {
         "dailyObservationCount": len(previous),
         "dailyBarsThroughPreviousClose": bool(previous),
-        "historyReady": len(previous) >= 252,
+        "historyReady": len(previous) >= min_observations,
         "mom6mRaw": momentum(126, 126),
-        "mom12mRaw": momentum(252, 252),
+        "mom12mRaw": momentum(126, 126),
         "return5dRaw": (closes[-1] / closes[-6] - 1) if len(closes) >= 6 and closes[-6] > 0 else None,
         "ema20Daily": ema20_values[-1] if ema20_values else None,
         "atr14": atr if atr > 0 else None,
@@ -3294,7 +3295,7 @@ def _swing_v2_raw_metrics(
         "intradayLow": min(intraday_lows) if intraday_lows else None,
         "last5mTimestamp": last_ts,
         "last1hTimestamp": last_ts,
-        "previous52wHigh": max((float(row.get("high") or 0) for row in previous[-252:]), default=0.0) or None,
+        "previous52wHigh": max((float(row.get("high") or 0) for row in previous[-max(min_observations, 90):]), default=0.0) or None,
     }
 
 
@@ -4294,7 +4295,7 @@ def _build_payload_from_live_data(
         if swing_v2_history and metrics_ready:
             raw = cached_intraday.get("swingV2Raw") if isinstance(cached_intraday, dict) else None
             try:
-                metrics_ready = bool(isinstance(raw, dict) and int(raw.get("dailyObservationCount") or 0) >= 252)
+                metrics_ready = bool(isinstance(raw, dict) and int(raw.get("dailyObservationCount") or 0) >= int(os.getenv("SWING_MIN_DAILY_OBSERVATIONS", "90")))
             except (TypeError, ValueError):
                 metrics_ready = False
         if metrics_ready:
@@ -4314,7 +4315,7 @@ def _build_payload_from_live_data(
             force_angel_fallback=angel_first_quotes,
             interval="ONE_HOUR" if angel_first_quotes else "FIVE_MINUTE",
             timeframe="1h" if angel_first_quotes else "5m",
-            daily_lookback_days=430 if swing_v2_history else 45,
+            daily_lookback_days=int(os.getenv("SWING_HISTORY_LOOKBACK_DAYS", "180")) if swing_v2_history else 45,
         )
         for ticker, metrics in fetched_metrics.items():
             original = row_by_ticker.get(ticker)

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .config import load_config
+
 LIMITS = {
     "NIFTY100": (2_500_000_000.0, 0.30, 0.0025),
     "NIFTY_100": (2_500_000_000.0, 0.30, 0.0025),
@@ -30,7 +32,7 @@ def evaluate_tradability(row: dict[str, Any]) -> tuple[bool, list[str]]:
     observations = int(row.get("dailyObservationCount") or 0)
     if price < 50:
         reasons.append("PRICE_BELOW_50")
-    if observations < 252:
+    if observations < load_config().min_daily_observations:
         reasons.append("INSUFFICIENT_DAILY_HISTORY")
     if mdtv < minimum_mdtv:
         reasons.append("MDTV20_BELOW_SEGMENT_MINIMUM")

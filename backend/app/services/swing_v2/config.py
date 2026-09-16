@@ -63,11 +63,13 @@ class SwingV2Config:
     coverage_hysteresis_cycles: int = 3
     coverage_tiers_authoritative: bool = False
     max_average_correlation: float = 0.70
-    decision_start_ist: str = "14:30"
+    decision_start_ist: str = "09:45"
     entry_cutoff_ist: str = "15:15"
     decision_freeze_ist: str = "15:10"
     order_expire_ist: str = "15:20"
     mandatory_exit_ist: str = "15:15"
+    history_lookback_days: int = 180
+    min_daily_observations: int = 90
     ledger_path: str = ""
     live_promotion: bool = False
 
@@ -92,6 +94,9 @@ class SwingV2Config:
         if not 0 < self.coverage_defensive_threshold < self.coverage_degraded_threshold < self.coverage_normal_threshold <= 1: raise ValueError("coverage thresholds must satisfy 0 < defensive < degraded < normal <= 1")
         if not 0 < self.coverage_defensive_risk_multiplier <= self.coverage_degraded_risk_multiplier <= self.coverage_normal_risk_multiplier <= 1: raise ValueError("coverage risk multipliers must be in (0,1] and monotonic")
         if self.coverage_hysteresis_cycles < 1: raise ValueError("SWING_COVERAGE_HYSTERESIS_CYCLES must be >= 1")
+        if self.history_lookback_days < 90: raise ValueError("SWING_HISTORY_LOOKBACK_DAYS must be >= 90")
+        if self.min_daily_observations < 45: raise ValueError("SWING_MIN_DAILY_OBSERVATIONS must be >= 45")
+        if self.min_daily_observations > self.history_lookback_days: raise ValueError("SWING_MIN_DAILY_OBSERVATIONS must not exceed SWING_HISTORY_LOOKBACK_DAYS")
         if not 0 < self.max_name_notional_pct <= 20: raise ValueError("single-name notional may not exceed 20% NAV")
         if not 0 < self.max_sector_notional_pct <= 40: raise ValueError("sector notional may not exceed 40% NAV")
         if self.max_portfolio_risk_bps > 100 or self.max_sector_risk_bps > 50: raise ValueError("portfolio/sector initial-risk limits exceed mandate")
@@ -121,7 +126,8 @@ def load_config() -> SwingV2Config:
         min_upside_capacity_r=float(os.getenv("SWING_MIN_UPSIDE_CAPACITY_R", "1.50")), min_expected_net_r=float(os.getenv("SWING_MIN_EXPECTED_NET_R", "0.12")),
         coverage_normal_threshold=float(os.getenv("SWING_COVERAGE_NORMAL_THRESHOLD", "0.99")), coverage_degraded_threshold=float(os.getenv("SWING_COVERAGE_DEGRADED_THRESHOLD", "0.95")), coverage_defensive_threshold=float(os.getenv("SWING_COVERAGE_DEFENSIVE_THRESHOLD", "0.90")),
         coverage_normal_risk_multiplier=float(os.getenv("SWING_COVERAGE_NORMAL_RISK_MULTIPLIER", "1.00")), coverage_degraded_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEGRADED_RISK_MULTIPLIER", "0.75")), coverage_defensive_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEFENSIVE_RISK_MULTIPLIER", "0.50")), coverage_hysteresis_cycles=int(os.getenv("SWING_COVERAGE_HYSTERESIS_CYCLES", "3")), coverage_tiers_authoritative=_bool("SWING_COVERAGE_TIERS_AUTHORITATIVE", False),
-        entry_cutoff_ist=os.getenv("SWING_ENTRY_CUTOFF_IST", "15:15"), decision_start_ist=os.getenv("SWING_DECISION_START_IST", "14:30"), decision_freeze_ist=os.getenv("SWING_DECISION_FREEZE_IST", "15:10"), order_expire_ist=os.getenv("SWING_ORDER_EXPIRE_IST", "15:20"), mandatory_exit_ist=os.getenv("SWING_MANDATORY_EXIT_IST", "15:15"),
+        entry_cutoff_ist=os.getenv("SWING_ENTRY_CUTOFF_IST", "15:15"), decision_start_ist=os.getenv("SWING_DECISION_START_IST", "09:45"), decision_freeze_ist=os.getenv("SWING_DECISION_FREEZE_IST", "15:10"), order_expire_ist=os.getenv("SWING_ORDER_EXPIRE_IST", "15:20"), mandatory_exit_ist=os.getenv("SWING_MANDATORY_EXIT_IST", "15:15"),
+        history_lookback_days=int(os.getenv("SWING_HISTORY_LOOKBACK_DAYS", "180")), min_daily_observations=int(os.getenv("SWING_MIN_DAILY_OBSERVATIONS", "90")),
         ledger_path=os.getenv("SWING_V2_LEDGER_PATH", str(repo_root / "backend" / "app" / "data" / "swing_v2_ledger.sqlite3")), live_promotion=_bool("SWING_LIVE_PROMOTION", False),
     )
     c.validate(); return c
