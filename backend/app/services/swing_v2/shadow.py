@@ -90,6 +90,10 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
     fresh_rows = [r for r, result in freshness if result[0]]
     stale_rows = [r for r, result in freshness if not result[0]]
     stale_reason_counts = Counter(reason for _, result in freshness if not result[0] for reason in result[1])
+    candle_metrics = sum(
+        bool((row.get("sourceTimestamps") or {}).get("bars1h") or (row.get("sourceTimestamps") or {}).get("bars5m"))
+        for row in tradable_rows
+    )
     shadow_covered = sum(1 for r in shadow_rows if evaluate_freshness(r, final_lock=final_lock, now=now)[0])
     denominator = len(tradable_rows)
     tradable_coverage = len(fresh_rows) / denominator if denominator else universe_coverage
@@ -104,11 +108,11 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
         coverage_risk_multiplier = 1.0 if tier == "NORMAL" else 0.0
     _LOG.info("Swing V2 coverage session=%s final_lock=%s tiers_active=%s fresh=%d stale=%d denominator=%d coverage=%.4f denominator_source=ACTIVE_PAPER_HUNT_ROWS effective_tier=%s proposed_tier=%s stale_reasons=%s", session_date, final_lock, tiers_active, len(fresh_rows), len(stale_rows), denominator, tradable_coverage, tier, proposed_tier, dict(stale_reason_counts))
 
-    funnel = {"universe_size": len(rows), "evaluated_count": len(tradable_rows), "fresh_count": len(fresh_rows), "stale_excluded_count": len(stale_rows), "stale_reason_counts": dict(stale_reason_counts), "coverage_pct": round(tradable_coverage * 100.0, 4), "coverage_denominator": denominator, "coverage_numerator": len(fresh_rows), "coverage_denominator_source": "ACTIVE_PAPER_HUNT_ROWS", "gate_tier": tier, "proposed_gate_tier": proposed_tier, "coverage_risk_multiplier": coverage_risk_multiplier, "candidates_in": len(fresh_rows), "qualified_out": 0, "locked_out": 0, "block_reason": None, "hysteresis": hysteresis, "universe": len(rows), "freshData": len(fresh_rows), "tradable": 0, "safetyPass": 0, "setupPass": 0, "expectancyPass": 0, "portfolioPass": 0, "locked": 0, "filled": 0, "blocked": False}
+    funnel = {"universe_size": len(rows), "evaluated_count": len(tradable_rows), "fresh_count": len(fresh_rows), "stale_excluded_count": len(stale_rows), "stale_reason_counts": dict(stale_reason_counts), "candleMetrics": candle_metrics, "candleTimeframe": "1H", "coverage_pct": round(tradable_coverage * 100.0, 4), "coverage_denominator": denominator, "coverage_numerator": len(fresh_rows), "coverage_denominator_source": "ACTIVE_PAPER_HUNT_ROWS", "gate_tier": tier, "proposed_gate_tier": proposed_tier, "coverage_risk_multiplier": coverage_risk_multiplier, "candidates_in": len(fresh_rows), "qualified_out": 0, "qualified": 0, "locked_out": 0, "block_reason": None, "hysteresis": hysteresis, "universe": len(rows), "freshData": len(fresh_rows), "tradable": 0, "safetyPass": 0, "setupPass": 0, "expectancyPass": 0, "portfolioPass": 0, "locked": 0, "filled": 0, "blocked": False}
     if tier == "BLOCK":
         block_reason = "UNIVERSE_COVERAGE_BELOW_90PCT" if tiers_active and proposed_tier == "BLOCK" else "UNIVERSE_COVERAGE_BELOW_99PCT"
         funnel.update(blocked=True, block_reason=block_reason, candidates_in=0)
-        return {**base, "blocked": True, "retryable": True, "blockReason": block_reason, "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "coverageTier": tier, "proposedCoverageTier": proposed_tier, "coverageRiskMultiplier": 0.0, "coverageDenominatorSource": "ACTIVE_PAPER_HUNT_ROWS", "freshRows": len(fresh_rows), "staleExcludedRows": len(stale_rows), "staleReasonCounts": dict(stale_reason_counts), "shadowCoverage": shadow_coverage, "candidates": [], "qualifiedCount": 0, "funnel": funnel}
+        return {**base, "blocked": True, "retryable": True, "blockReason": block_reason, "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "coverageTier": tier, "proposedCoverageTier": proposed_tier, "coverageTiersAuthoritative": tiers_active, "coverageRiskMultiplier": 0.0, "coverageDenominatorSource": "ACTIVE_PAPER_HUNT_ROWS", "freshRows": len(fresh_rows), "missingFreshRows": len(stale_rows), "staleExcludedRows": len(stale_rows), "staleReasonCounts": dict(stale_reason_counts), "shadowCoverage": shadow_coverage, "candidates": [], "candidateCount": len(fresh_rows), "qualifiedCount": 0, "selectedCount": 0, "funnel": funnel}
 
     regime_risk_scale, regime_cap = _regime_scale(regime)
     if regime == "REGIME_UNRATED":

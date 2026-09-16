@@ -654,6 +654,7 @@ export default function ForensicPanel({
       universeSize?: number | null;
       volumeScreened?: number;
       candleMetrics?: number;
+      candleTimeframe?: string;
       displayPool?: number;
       crossBookExcluded?: string[];
       swingUniverse?: string;
@@ -1683,7 +1684,7 @@ export default function ForensicPanel({
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {[
                 ['Universe', swingSession?.entryHuntDiagnostics?.universeSize ?? '—'],
-                ['Hunt pool', swingSession?.entryHuntDiagnostics?.swingUniverse ?? 'Nifty 500'],
+                ['Target universe', swingSession?.entryHuntDiagnostics?.swingUniverse ?? 'Nifty 500'],
                 ['Candles', swingSession?.entryHuntDiagnostics?.candleMetrics ?? '—'],
                 ['Evaluated', swingSession?.entryHuntDiagnostics?.evaluated ?? '—'],
                 [swingSession?.entryHuntDiagnostics?.diagnosticPhase === 'POST_HUNT_EOD' ? 'Locked in window' : 'Qualified BUY', swingSession?.entryHuntDiagnostics?.qualified ?? 0],

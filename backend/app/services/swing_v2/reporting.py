@@ -50,4 +50,4 @@ def ledger_eod_report(ledger: SwingLedger, session_date: str) -> dict[str, Any]:
         if str(state.get("sessionDate") or "") == session_date or not state.get("terminal") or last_day == session_date:
             positions.append(state)
     event_counts = Counter(str(event.get("eventType") or "UNKNOWN") for event in events)
-    return {"strategyId": "SWING_2S_MOMENTUM_V2", "policyVersion": "2.0.0", "validationState": "RESEARCH_HYPOTHESIS", "date": session_date, "sessionDate": session_date, "eventCount": len(events), "eventCounts": dict(event_counts), "positions": positions, **reconcile_positions(positions)}
+    return {"strategyId": "SWING_2S_MOMENTUM_V2", "policyVersion": "2.0.0", "validationState": "RESEARCH_HYPOTHESIS", "source": "swing_v2_ledger", "authoritative": True, "executionMode": "PAPER", "date": session_date, "sessionDate": session_date, "eventCount": len(events), "eventCounts": dict(event_counts), "positions": positions, **reconcile_positions(positions)}
