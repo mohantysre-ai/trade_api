@@ -21,13 +21,11 @@ def _clock(value: str, name: str) -> time:
 
 @dataclass(frozen=True)
 class SwingV2Config:
-    # V2 is the authoritative paper book by default. The ledger owns entry
-    # identity across sessions and supports the governed 1-2 session lifecycle.
     enabled: bool = True
     mode: str = "PAPER"
     authority: str = "V2"
     strategy_id: str = "SWING_2S_MOMENTUM_V2"
-    policy_version: str = "2.0.0"
+    policy_version: str = "2.0.1"
     feature_version: str = "swing_features_v2"
     universe: str = "NIFTY_TOTAL_MARKET_750"
     active_segments: tuple[str, ...] = ("NIFTY100", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP250")
@@ -55,15 +53,15 @@ class SwingV2Config:
     min_upside_capacity_r: float = 1.50
     min_planned_blended_r: float = 1.50
     min_expected_net_r: float = 0.12
-    # Coverage is a portfolio-level circuit breaker, not a substitute for the
-    # per-symbol freshness gate. Missing/stale symbols are still individually
-    # rejected by evaluate_freshness(). A 90% floor prevents a handful of feed
-    # misses from zeroing the entire fresh momentum universe.
+    # Portfolio circuit breaker only. Per-symbol freshness remains mandatory.
     required_coverage: float = 0.90
     max_average_correlation: float = 0.70
     decision_start_ist: str = "09:45"
-    entry_cutoff_ist: str = "14:45"
-    decision_freeze_ist: str = "15:10"
+    # Keep the paper hunt alive into the closing window. 15:00 is the final
+    # decision/retry phase; new qualified locks may still be admitted until
+    # 15:15, leaving five minutes for post-decision paper fill evidence.
+    entry_cutoff_ist: str = "15:15"
+    decision_freeze_ist: str = "15:00"
     order_expire_ist: str = "15:20"
     mandatory_exit_ist: str = "15:15"
     ledger_path: str = ""
@@ -105,13 +103,14 @@ class SwingV2Config:
         if self.trail_lock_r >= self.trail_arm_r or not 0 < self.t1_qty_pct < 100:
             raise ValueError("invalid trail lock or T1 quantity")
         start = _clock(self.decision_start_ist, "SWING_DECISION_START_IST")
+        cutoff = _clock(self.entry_cutoff_ist, "SWING_ENTRY_CUTOFF_IST")
         freeze = _clock(self.decision_freeze_ist, "SWING_DECISION_FREEZE_IST")
         expire = _clock(self.order_expire_ist, "SWING_ORDER_EXPIRE_IST")
         mandatory = _clock(self.mandatory_exit_ist, "SWING_MANDATORY_EXIT_IST")
-        if not start < freeze < expire:
-            raise ValueError("decision clocks must satisfy start < freeze < order expiry")
-        if mandatory >= expire:
-            raise ValueError("mandatory exit must precede order expiry clock")
+        if not start < freeze < cutoff < expire:
+            raise ValueError("decision clocks must satisfy start < freeze < entry cutoff < order expiry")
+        if mandatory > expire:
+            raise ValueError("mandatory exit must not exceed order expiry clock")
         if self.live_promotion:
             raise ValueError("SWING_LIVE_PROMOTION is not permitted by this implementation")
 
@@ -146,8 +145,9 @@ def load_config() -> SwingV2Config:
         min_upside_capacity_r=float(os.getenv("SWING_MIN_UPSIDE_CAPACITY_R", "1.50")),
         min_expected_net_r=float(os.getenv("SWING_MIN_EXPECTED_NET_R", "0.12")),
         required_coverage=float(os.getenv("SWING_REQUIRED_UNIVERSE_COVERAGE", "0.90")),
+        entry_cutoff_ist=os.getenv("SWING_ENTRY_CUTOFF_IST", "15:15"),
         decision_start_ist=os.getenv("SWING_DECISION_START_IST", "09:45"),
-        decision_freeze_ist=os.getenv("SWING_DECISION_FREEZE_IST", "15:10"),
+        decision_freeze_ist=os.getenv("SWING_DECISION_FREEZE_IST", "15:00"),
         order_expire_ist=os.getenv("SWING_ORDER_EXPIRE_IST", "15:20"),
         mandatory_exit_ist=os.getenv("SWING_MANDATORY_EXIT_IST", "15:15"),
         ledger_path=os.getenv("SWING_V2_LEDGER_PATH", str(repo_root / "backend" / "app" / "data" / "swing_v2_ledger.sqlite3")),
