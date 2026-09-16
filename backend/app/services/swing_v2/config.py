@@ -21,10 +21,8 @@ def _clock(value: str, name: str) -> time:
 
 @dataclass(frozen=True)
 class SwingV2Config:
-    # V2 is the authoritative paper book by default.  The legacy V1 JSON book
-    # rotates on sessionDate and therefore cannot represent a carried 1-2
-    # session position without booking/re-entering it.  V2's immutable ledger
-    # owns entry identity across sessions and is the only safe default.
+    # V2 is the authoritative paper book by default. The ledger owns entry
+    # identity across sessions and supports the governed 1-2 session lifecycle.
     enabled: bool = True
     mode: str = "PAPER"
     authority: str = "V2"
@@ -57,7 +55,11 @@ class SwingV2Config:
     min_upside_capacity_r: float = 1.50
     min_planned_blended_r: float = 1.50
     min_expected_net_r: float = 0.12
-    required_coverage: float = 0.99
+    # Coverage is a portfolio-level circuit breaker, not a substitute for the
+    # per-symbol freshness gate. Missing/stale symbols are still individually
+    # rejected by evaluate_freshness(). A 90% floor prevents a handful of feed
+    # misses from zeroing the entire fresh momentum universe.
+    required_coverage: float = 0.90
     max_average_correlation: float = 0.70
     decision_start_ist: str = "09:45"
     entry_cutoff_ist: str = "14:45"
@@ -117,8 +119,6 @@ class SwingV2Config:
 def load_config() -> SwingV2Config:
     repo_root = Path(__file__).resolve().parents[4]
     c = SwingV2Config(
-        # Default to the ledger-backed two-session paper book.  Explicit env
-        # overrides remain available for isolated legacy tests only.
         enabled=_bool("SWING_V2_ENABLED", True),
         mode=os.getenv("SWING_V2_MODE", "PAPER").upper(),
         authority=os.getenv("SWING_STRATEGY_AUTHORITY", "V2").upper(),
@@ -145,7 +145,7 @@ def load_config() -> SwingV2Config:
         t2_r=float(os.getenv("SWING_T2_R", "2.00")),
         min_upside_capacity_r=float(os.getenv("SWING_MIN_UPSIDE_CAPACITY_R", "1.50")),
         min_expected_net_r=float(os.getenv("SWING_MIN_EXPECTED_NET_R", "0.12")),
-        required_coverage=float(os.getenv("SWING_REQUIRED_UNIVERSE_COVERAGE", "0.99")),
+        required_coverage=float(os.getenv("SWING_REQUIRED_UNIVERSE_COVERAGE", "0.90")),
         decision_start_ist=os.getenv("SWING_DECISION_START_IST", "09:45"),
         decision_freeze_ist=os.getenv("SWING_DECISION_FREEZE_IST", "15:10"),
         order_expire_ist=os.getenv("SWING_ORDER_EXPIRE_IST", "15:20"),
