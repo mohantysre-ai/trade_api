@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Script from "next/script";
 import { DeskPrefsProvider } from "./components/DeskPrefsProvider";
 import ServiceWorkerRegister from "./components/ServiceWorkerRegister";
 import "./globals.css";
@@ -73,7 +72,9 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
-        <Script src="/theme-boot.js" strategy="beforeInteractive" />
+        {/* blocking inline theme boot: no React <script> component, so no client-execution warning */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script src="/theme-boot.js" />
       </head>
       <body className="min-h-full min-h-[100dvh] flex flex-col overflow-x-hidden overscroll-none" suppressHydrationWarning>
         <DeskPrefsProvider>
