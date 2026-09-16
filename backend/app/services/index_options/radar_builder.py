@@ -8,6 +8,7 @@ from .context import IndexOptionContext
 from .config import LEGACY_ALWAYS_ENABLED
 from .strategy_registry import get_registered_strategies, is_strategy_enabled
 from .strategy_selector import select_strategies
+from ..index_options_engine import INDEX_CONFIG, MAX_CONCURRENT_PER_SLEEVE, select_sleeve_rows
 
 
 def _num(value: Any) -> float | None:
@@ -171,7 +172,7 @@ def build_index_options_radar_v2(snapshot: dict[str, Any] | None) -> dict[str, A
     payload = snapshot if isinstance(snapshot, dict) else {}
     candidates = []
     seller_candidates = []
-    for index in __import__("app.services.index_options_engine", fromlist=["INDEX_CONFIG"]).INDEX_CONFIG:
+    for index in INDEX_CONFIG:
         context = _build_context(index, payload)
         if context is None:
             continue
@@ -193,21 +194,14 @@ def build_index_options_radar_v2(snapshot: dict[str, Any] | None) -> dict[str, A
             else:
                 candidates.append(legacy)
 
-    eligible = sorted(
-        [row for row in [*candidates, *seller_candidates] if row.get("eligible") and row.get("strategyId") not in LEGACY_ALWAYS_ENABLED],
-        key=lambda row: row.get("score") or 0,
-        reverse=True,
-    )
-    selected: list[dict[str, Any]] = []
-    used_buckets: set[str] = set()
-    used_indexes: set[str] = set()
-    for row in eligible:
-        bucket = next((idx["bucket"] for idx in __import__("app.services.index_options_engine", fromlist=["INDEX_CONFIG"]).INDEX_CONFIG if idx["key"] == row.get("key")), "")
-        if bucket in used_buckets or row.get("key") in used_indexes or len(selected) >= 2:
-            continue
-        selected.append(row)
-        used_buckets.add(bucket)
-        used_indexes.add(row.get("key", ""))
+    def _comparable(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [row for row in rows if row.get("strategyId") not in LEGACY_ALWAYS_ENABLED]
+
+    # Each sleeve ranks its own candidates independently, so a BUY can never
+    # consume the index or correlation bucket that the SELL sleeve needs.
+    buy_selected = select_sleeve_rows(_comparable(candidates), max_rows=MAX_CONCURRENT_PER_SLEEVE)
+    sell_selected = select_sleeve_rows(_comparable(seller_candidates), max_rows=MAX_CONCURRENT_PER_SLEEVE)
+    selected = [*buy_selected, *sell_selected]
 
     return {
         "success": True,
@@ -217,11 +211,15 @@ def build_index_options_radar_v2(snapshot: dict[str, Any] | None) -> dict[str, A
         "candidates": candidates,
         "sellerCandidates": seller_candidates,
         "selected": selected,
+        "buySelected": buy_selected,
+        "sellSelected": sell_selected,
         "limits": {
             "minDailyEntries": 0,
             "maxDailyEntries": 20,
             "maxConcurrent": 2,
+            "maxConcurrentPerSleeve": MAX_CONCURRENT_PER_SLEEVE,
             "maxPerCorrelationBucket": 1,
+            "sleeveIsolation": "INDEPENDENT_INDEX_AND_BUCKET_PER_SLEEVE",
             "scoreFloor": 70.0,
             "huntMode": "CONTINUOUS_MARKET_SESSION",
         },

@@ -30,6 +30,40 @@ def _decision_id(snapshot_id: str, session_date: str, symbol: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_URL, f"{snapshot_id}:{session_date}:{symbol.upper()}"))
 
 
+def _blocked_funnel(
+    rows: list[dict[str, Any]],
+    *,
+    tradable_rows: list[dict[str, Any]],
+    shadow_rows: list[dict[str, Any]],
+    final_lock: bool,
+    now: datetime,
+) -> dict[str, Any]:
+    """Diagnostics for a blocked scan so the desk never renders blank fields.
+
+    A coverage/regime halt still evaluated the universe; report the real counts
+    (fresh, tradable, safety, segment mix) instead of omitting the funnel.
+    """
+    fresh_ok = sum(1 for r in rows if evaluate_freshness(r, final_lock=final_lock, now=now)[0])
+    trade_ok = sum(1 for r in rows if evaluate_tradability(r)[0])
+    gate_ok = sum(1 for r in rows if _quality_and_safety(r, final_lock=final_lock, now=now)[0])
+    micro = sum(1 for r in rows if "MICRO" in str(r.get("universeSegment") or "").upper())
+    return {
+        "universe": len(rows),
+        "tradableUniverse": len(tradable_rows),
+        "shadowUniverse": len(shadow_rows),
+        "microUniverse": micro,
+        "freshData": fresh_ok,
+        "tradable": trade_ok,
+        "safetyPass": gate_ok,
+        "setupPass": 0,
+        "expectancyPass": 0,
+        "portfolioPass": 0,
+        "locked": 0,
+        "filled": 0,
+        "blocked": True,
+    }
+
+
 def _quality_and_safety(row: dict[str, Any], *, final_lock: bool, now: datetime) -> tuple[bool, list[str]]:
     fresh, freshness_reasons = evaluate_freshness(row, final_lock=final_lock, now=now)
     tradable, trade_reasons = evaluate_tradability(row)
@@ -78,13 +112,14 @@ def build_shadow_v2(
     tradable_coverage = tradable_covered / max(1, len(tradable_rows)) if tradable_rows else universe_coverage
     shadow_coverage = shadow_covered / max(1, len(shadow_rows)) if shadow_rows else 1.0
 
+    block_funnel = _blocked_funnel(rows, tradable_rows=tradable_rows, shadow_rows=shadow_rows, final_lock=final_lock, now=now)
     if tradable_coverage < cfg.required_coverage:
-        return {**base, "blocked": True, "blockReason": "UNIVERSE_COVERAGE_BELOW_99PCT", "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "shadowCoverage": shadow_coverage, "candidates": []}
+        return {**base, "blocked": True, "blockReason": "UNIVERSE_COVERAGE_BELOW_99PCT", "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "shadowCoverage": shadow_coverage, "candidates": [], "funnel": block_funnel}
     risk_scale, regime_cap = _regime_scale(regime)
     if regime == "REGIME_UNRATED":
-        return {**base, "blocked": True, "blockReason": "REGIME_UNRATED", "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "shadowCoverage": shadow_coverage, "candidates": []}
+        return {**base, "blocked": True, "blockReason": "REGIME_UNRATED", "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "shadowCoverage": shadow_coverage, "candidates": [], "funnel": block_funnel}
     if risk_scale == 0:
-        return {**base, "blocked": True, "blockReason": "HALT_NEW_LONGS", "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "shadowCoverage": shadow_coverage, "regime": regime, "candidates": []}
+        return {**base, "blocked": True, "blockReason": "HALT_NEW_LONGS", "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "shadowCoverage": shadow_coverage, "regime": regime, "candidates": [], "funnel": block_funnel}
 
     snapshot_id = _snapshot_hash(rows)
     session_date = now.astimezone(ZoneInfo("Asia/Kolkata")).date().isoformat()

@@ -25,8 +25,18 @@ INDEX_CONFIG: tuple[dict[str, str], ...] = (
 MIN_DAILY_ENTRIES = 0
 MAX_DAILY_ENTRIES = 20
 MAX_ATTEMPTS_PER_INDEX = 20
+# Portfolio-wide cap. It is applied only after the BUY and the SELL sleeve have
+# each independently picked their best index/bucket, so one sleeve can never
+# consume the other sleeve's slot during selection.
 MAX_CONCURRENT_TRADES = 2
+# Per-sleeve cap. Each sleeve owns its own index and correlation-bucket
+# bookkeeping (BROAD and FINANCIAL are the only buckets), so a BUY on NIFTY
+# never removes the SELL sleeve's own NIFTY candidate.
+MAX_CONCURRENT_PER_SLEEVE = 2
 MIN_ELIGIBLE_SCORE = 70.0
+
+BUY_SLEEVE = "BUY_PREMIUM"
+SELL_SLEEVE = "SELL_PREMIUM"
 
 _LONG_PREMIUM_SAFETY_GATES = (
     "fresh",
@@ -301,21 +311,65 @@ def _seller_candidate(index: dict[str, str], snapshot: dict[str, Any]) -> dict[s
     }
 
 
+def sleeve_of(entry: dict[str, Any]) -> str:
+    """Route one candidate or position to its owning sleeve.
+
+    Long-premium buying and defined-risk premium selling are independent books:
+    they never share an index lock, a correlation-bucket lock, or a selection
+    slot. Only the portfolio caps in :func:`build_index_options_radar` and the
+    paper book are shared.
+    """
+    mode = str((entry or {}).get("strategyMode") or "").upper()
+    return SELL_SLEEVE if mode == SELL_SLEEVE else BUY_SLEEVE
+
+
+def select_sleeve_rows(
+    rows: list[dict[str, Any]] | None, *, max_rows: int = MAX_CONCURRENT_PER_SLEEVE,
+) -> list[dict[str, Any]]:
+    """Rank ONE sleeve independently: one index and one bucket each, best first.
+
+    Nothing outside this sleeve is consulted, so a BUY candidate can no longer
+    consume the correlation bucket (or index) that the SELL sleeve needs.
+    """
+    ranked = sorted(
+        (row for row in (rows or []) if isinstance(row, dict) and row.get("eligible")),
+        key=lambda row: row.get("score") or 0,
+        reverse=True,
+    )
+    selected: list[dict[str, Any]] = []
+    used_buckets: set[str] = set()
+    used_indexes: set[str] = set()
+    for row in ranked:
+        if len(selected) >= max_rows:
+            break
+        if row.get("bucket") in used_buckets or row.get("key") in used_indexes:
+            continue
+        selected.append(row)
+        used_buckets.add(str(row.get("bucket")))
+        used_indexes.add(str(row.get("key")))
+    return selected
+
+
+def select_radar_candidates(
+    candidates: list[dict[str, Any]] | None,
+    seller_candidates: list[dict[str, Any]] | None,
+) -> dict[str, list[dict[str, Any]]]:
+    """Select each sleeve independently and return them keyed by sleeve."""
+    return {
+        BUY_SLEEVE: select_sleeve_rows(candidates),
+        SELL_SLEEVE: select_sleeve_rows(seller_candidates),
+    }
+
+
 def build_index_options_radar(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     payload = snapshot if isinstance(snapshot, dict) else {}
     candidates = [_candidate(index, payload) for index in INDEX_CONFIG]
     seller_candidates = [_seller_candidate(index, payload) for index in INDEX_CONFIG]
-    eligible = sorted((row for row in [*candidates, *seller_candidates] if row["eligible"]),
-                      key=lambda row: row["score"] or 0, reverse=True)
-    selected: list[dict[str, Any]] = []
-    used_buckets: set[str] = set()
-    used_indexes: set[str] = set()
-    for row in eligible:
-        if row["bucket"] in used_buckets or row["key"] in used_indexes or len(selected) >= MAX_CONCURRENT_TRADES:
-            continue
-        selected.append(row)
-        used_buckets.add(row["bucket"])
-        used_indexes.add(row["key"])
+    # Each sleeve selects its own best candidate independently; the portfolio cap
+    # is a shared admission limit, never a selection input.
+    sleeves = select_radar_candidates(candidates, seller_candidates)
+    buy_selected, sell_selected = sleeves[BUY_SLEEVE], sleeves[SELL_SLEEVE]
+    selected = [*buy_selected, *sell_selected]
     return {
         "success": True,
         "executionPolicy": "AUTO_PAPER_ONLY",
@@ -324,11 +378,15 @@ def build_index_options_radar(snapshot: dict[str, Any] | None) -> dict[str, Any]
         "candidates": candidates,
         "sellerCandidates": seller_candidates,
         "selected": selected,
+        "buySelected": buy_selected,
+        "sellSelected": sell_selected,
         "limits": {
             "minDailyEntries": MIN_DAILY_ENTRIES,
             "maxDailyEntries": MAX_DAILY_ENTRIES,
             "maxConcurrent": MAX_CONCURRENT_TRADES,
+            "maxConcurrentPerSleeve": MAX_CONCURRENT_PER_SLEEVE,
             "maxPerCorrelationBucket": 1,
+            "sleeveIsolation": "INDEPENDENT_INDEX_AND_BUCKET_PER_SLEEVE",
             "scoreFloor": MIN_ELIGIBLE_SCORE,
             "huntMode": "CONTINUOUS_MARKET_SESSION",
         },

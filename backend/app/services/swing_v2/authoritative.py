@@ -141,6 +141,36 @@ def _marks(snapshot: dict[str, Any]) -> dict[str, float]:
     return result
 
 
+def _entry_hunt_diagnostics(scan: dict[str, Any] | None, snapshot: dict[str, Any]) -> dict[str, Any] | None:
+    # Blend the V2 scan funnel with the display keys the desk panel reads.
+
+    # The panel was authored against the V1 matrix diagnostics (universeSize,
+    # swingUniverse, candleMetrics, evaluated, displayPool). V2 is now the
+    # authority and only emits funnel counters, so map the live snapshot facts
+    # onto those keys to stop the panel rendering blanks.
+    funnel = (scan or {}).get("funnel")
+    if not isinstance(funnel, dict):
+        return funnel
+    stocks = snapshot.get("stocks") if isinstance(snapshot.get("stocks"), list) else []
+    try:
+        universe_size = int(snapshot.get("universeSize") or 0)
+    except (TypeError, ValueError):
+        universe_size = 0
+    try:
+        volume_screened = int(snapshot.get("volumeScreenedCount") or 0)
+    except (TypeError, ValueError):
+        volume_screened = 0
+    pool = str(snapshot.get("activePool") or "").strip()
+    blended = {
+        **funnel,
+        "universeSize": universe_size or None,
+        "volumeScreened": volume_screened or universe_size or None,
+        "evaluated": funnel.get("evaluated", funnel.get("universe")),
+        "displayPool": len(stocks) if stocks else None,
+        "swingUniverse": pool or "Nifty 500",
+    }
+    return blended
+
 def _session(scan: dict[str, Any] | None = None, *, now: datetime | None = None) -> dict[str, Any]:
     cfg = load_config()
     now = (now or datetime.now(timezone.utc)).astimezone(IST)
@@ -206,7 +236,7 @@ def _session(scan: dict[str, Any] | None = None, *, now: datetime | None = None)
         },
         "portfolio": {"swingCapital": cfg.nav, "realizedPnl": round(realized, 2), "unrealizedPnl": round(unrealized, 2), "totalPnl": round(realized + unrealized, 2), "lockedCount": len(rows)},
         "v2": effective_scan or {"enabled": True, "authoritative": True, "candidates": []},
-        "entryHuntDiagnostics": (effective_scan or {}).get("funnel"),
+        "entryHuntDiagnostics": _entry_hunt_diagnostics(effective_scan, snapshot),
         "updatedAt": datetime.now(timezone.utc).isoformat(),
     }
 

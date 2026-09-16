@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from app.services.angel_index_options import IST_ZONE
+from app.services.angel_index_stream import ANGEL_INDEX_STREAM
 from app.services.index_options_paper import reconcile_paper_book
 from app.services.index_options_paper_supervisor import (
     _next_minute_boundary,
@@ -85,6 +86,45 @@ def test_supervisor_applies_existing_target_exit(tmp_path, monkeypatch):
     assert closed["closed"][0]["exitReason"] == "TARGET"
     assert closed["closed"][0]["exitPremium"] == 140
     assert closed["closed"][0]["pnl"] == 1200
+
+
+def test_supervisor_hydrates_subscriptions_then_marks_from_websocket_only(tmp_path, monkeypatch):
+    monkeypatch.setenv("INDEX_OPTIONS_PAPER_BOOK_FILE", str(tmp_path / "paper.json"))
+    now = datetime(2027, 6, 15, 11, 0, tzinfo=IST_ZONE)
+    row = _candidate(100)
+    entered = reconcile_paper_book({"candidates": [row], "selected": [row]}, now=now)
+    position_id = entered["open"][0]["id"]
+
+    class Client:
+        def connect(self):
+            return self
+
+        def fetch_batch_quotes(self, instruments):
+            raise AssertionError("a hydrated subscription must be marked from the WebSocket cache")
+
+    class LiveWorker:
+        def is_alive(self):
+            return True
+
+    monkeypatch.setattr(ANGEL_INDEX_STREAM, "_thread", LiveWorker())
+    monkeypatch.setattr(ANGEL_INDEX_STREAM, "_socket", None)
+    ANGEL_INDEX_STREAM._on_data({
+        "exchange_type": 2, "token": "12345", "last_traded_price": 11500,
+        "best_5_buy_data": [{"price": 11450}], "best_5_sell_data": [{"price": 11550}],
+    })
+    try:
+        marked = run_paper_supervisor_cycle(Client(), now=now + timedelta(minutes=1))
+    finally:
+        ANGEL_INDEX_STREAM.release_owner(f"paper:{position_id}")
+        with ANGEL_INDEX_STREAM._lock:
+            ANGEL_INDEX_STREAM._quotes.pop("12345", None)
+
+    assert marked["entryCount"] == 1
+    assert marked["open"][0]["currentPremium"] == 115
+    assert marked["open"][0]["markQuality"] == "FRESH_WEBSOCKET"
+    assert marked["open"][0]["markSource"] == "ANGEL_WEBSOCKET_LOCKED_CONTRACT"
+    assert marked["markPipeline"]["restRequested"] == 0
+    assert marked["subscriptions"]["contracts"] == 1
 
 
 def test_supervisor_session_window_includes_eod_squareoff_minute():

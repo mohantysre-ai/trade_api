@@ -1334,6 +1334,12 @@ def project_session_live(
         ):
             if desk.get(_k) is not None:
                 row[_k] = desk[_k]
+        if str(row.get("exitReason") or "").upper() == "OPEN":
+            row["realizedPnl"] = 0.0
+            row["unrealizedPnl"] = float(row.get("pnl") or 0)
+        else:
+            row["realizedPnl"] = float(row.get("pnl") or 0)
+            row["unrealizedPnl"] = 0.0
         rows.append(row)
 
     long_count = len(session.get("long") or [])
@@ -1811,6 +1817,13 @@ def generate_intraday_eod_report(
         ):
             if desk.get(_k) is not None:
                 row[_k] = desk[_k]
+        # EOD closed positions must carry realised P&L; open positions carry unrealised.
+        if str(row.get("exitReason") or "").upper() == "OPEN":
+            row["realizedPnl"] = 0.0
+            row["unrealizedPnl"] = float(row.get("pnl") or 0)
+        else:
+            row["realizedPnl"] = float(row.get("pnl") or 0)
+            row["unrealizedPnl"] = 0.0
         # Invariant: never report WIN with negative Book P&L
         if float(row.get("pnl") or 0) < 0 and row.get("outcomeBucket") == "WIN":
             row["outcomeBucket"] = "LOSS"

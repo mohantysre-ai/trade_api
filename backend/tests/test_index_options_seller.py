@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from app.services.angel_index_options import IST_ZONE
+from app.services.angel_index_stream import ANGEL_INDEX_STREAM
 from app.services.index_options_engine import build_index_options_radar
 from app.services.index_options_paper import reconcile_paper_book
 from app.services.index_options_seller import build_defined_risk_seller_setup
@@ -113,6 +114,88 @@ def test_eligible_condor_auto_locks_and_takes_half_credit_profit(tmp_path, monke
     assert closed["closed"][0]["exitReason"] == "PROFIT_TARGET_50PCT_CREDIT"
     assert closed["closed"][0]["exitDebit"] == 0.62
     assert closed["closed"][0]["pnl"] == 122.0
+
+
+def _supplied():
+    setup = _seller()
+    return {"spot": 100, "source": "ANGEL_ONE", "providerStatus": "LIVE", "expiry": "2026-09-01",
+            "rawChain": _chain(), "seller": setup}
+
+
+def _inject_tick(token, ltp, *, bid=None, ask=None):
+    message = {"exchange_type": 2, "token": str(token), "last_traded_price": ltp * 100}
+    if bid is not None:
+        message["best_5_buy_data"] = [{"price": bid * 100}]
+    if ask is not None:
+        message["best_5_sell_data"] = [{"price": ask * 100}]
+    ANGEL_INDEX_STREAM._on_data(message)
+
+
+def _clear_ticks(*tokens):
+    with ANGEL_INDEX_STREAM._lock:
+        for token in tokens:
+            ANGEL_INDEX_STREAM._quotes.pop(str(token), None)
+
+
+def test_locked_condor_reprices_every_leg_from_websocket_depth(tmp_path, monkeypatch):
+    monkeypatch.setenv("INDEX_OPTIONS_PAPER_BOOK_FILE", str(tmp_path / "paper.json"))
+    now = datetime(2026, 8, 31, 11, 0, tzinfo=IST_ZONE)
+    radar = build_index_options_radar({"indexOptions": {"indices": {"NIFTY": _supplied()}}})
+    entered = reconcile_paper_book(radar, now=now)
+    position = entered["open"][0]
+    assert position["strategyMode"] == "SELL_PREMIUM"
+
+    # Executable close depth: shorts bought back at ask, hedge wings sold at bid.
+    _inject_tick("PE-95", 2.80, bid=2.80, ask=2.82)
+    _inject_tick("PE-90", 0.60, bid=0.60, ask=0.61)
+    _inject_tick("CE-105", 2.80, bid=2.80, ask=2.82)
+    _inject_tick("CE-110", 0.60, bid=0.60, ask=0.61)
+    try:
+        marked = reconcile_paper_book(
+            {"candidates": [], "sellerCandidates": [], "selected": []}, now=now + timedelta(minutes=1),
+        )
+    finally:
+        _clear_ticks("PE-95", "PE-90", "CE-105", "CE-110")
+
+    updated = marked["open"][0]
+    assert updated["markSource"] == "ANGEL_WEBSOCKET_DEPTH"
+    assert updated["spreadMarkQuality"] == "FRESH"
+    assert updated["spreadStaleLegs"] == []
+    assert updated["currentDebit"] == 4.44
+    prices = {leg["symbol"]: leg["currentPrice"] for leg in updated["legs"]}
+    assert prices["NIFTY01SEP2695PE"] == 2.82
+    assert prices["NIFTY01SEP2690PE"] == 0.60
+    assert prices["NIFTY01SEP26105CE"] == 2.82
+    assert prices["NIFTY01SEP26110CE"] == 0.60
+    assert all(leg["markSource"] == "ANGEL_WEBSOCKET_DEPTH" for leg in updated["legs"])
+
+
+def test_one_stale_leg_reuses_its_last_known_price_instead_of_invalidating_the_spread(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.setenv("INDEX_OPTIONS_PAPER_BOOK_FILE", str(tmp_path / "paper.json"))
+    now = datetime(2026, 8, 31, 11, 0, tzinfo=IST_ZONE)
+    radar = build_index_options_radar({"indexOptions": {"indices": {"NIFTY": _supplied()}}})
+    reconcile_paper_book(radar, now=now)
+    # First mark records every leg from the executable radar depth.
+    reconcile_paper_book(radar, now=now + timedelta(minutes=1))
+
+    class Client:
+        def fetch_batch_quotes(self, instruments):
+            first = instruments[0]
+            return {first.key: {"ltp": 2.82}}
+
+    degraded = reconcile_paper_book(
+        {"candidates": [], "sellerCandidates": [], "selected": []},
+        client=Client(), now=now + timedelta(minutes=2),
+    )
+    updated = degraded["open"][0]
+    assert updated["spreadMarkQuality"] == "DEGRADED_STALE_LEG"
+    assert len(updated["spreadStaleLegs"]) == 3
+    assert updated["currentDebit"] == 4.44
+    last_known = [leg for leg in updated["legs"] if leg["markSource"] == "BOOK_LAST_KNOWN_LEG"]
+    assert len(last_known) == 3
+    assert all(leg["currentPrice"] in {2.82, 0.60} for leg in last_known)
 
 
 def test_oi_rise_without_premium_softening_is_not_classified_as_writing():
