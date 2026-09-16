@@ -21,11 +21,13 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Homepage shell must revalidate: cached HTML referencing pruned dev
+        // chunks surfaces as "module factory is not available".
         source: "/",
         headers: [
           {
             key: "Cache-Control",
-            value: "public, max-age=60, s-maxage=300, stale-while-revalidate=3600, stale-if-error=86400",
+            value: "public, max-age=60, must-revalidate",
           },
           {
             key: "CDN-Cache-Control",
@@ -36,6 +38,16 @@ const nextConfig: NextConfig = {
             value: "public, max-age=300, stale-while-revalidate=3600, stale-if-error=86400",
           },
           { key: "X-IROS-Homepage-Cache", value: "edge-ready" },
+        ],
+      },
+      {
+        // Hashed Next chunks are content-addressed — safe to cache immutably.
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
         ],
       },
     ];
