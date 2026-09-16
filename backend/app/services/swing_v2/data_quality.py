@@ -3,8 +3,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-SCAN_MAX_AGE = {"quote": 60, "depth": 60, "bars5m": 420}
-LOCK_MAX_AGE = {"quote": 10, "depth": 10, "bars5m": 420}
+# Swing is a 1-hour / two-session strategy, not the 5-minute Intraday desk.
+# A 10-second lock gate made a 500-750 name sequential scan practically
+# impossible to lock even when the underlying 1h setup was valid. Keep quotes
+# and depth genuinely recent, while allowing the latest completed 1h bar to
+# remain valid for its natural timeframe.
+SCAN_MAX_AGE = {"quote": 180, "depth": 180, "bars1h": 5400}
+LOCK_MAX_AGE = {"quote": 60, "depth": 60, "bars1h": 5400}
 
 
 def age_seconds(timestamp: str | None, now: datetime | None = None) -> float | None:
@@ -22,7 +27,11 @@ def evaluate_freshness(row: dict[str, Any], *, final_lock: bool, now: datetime |
     reasons: list[str] = []
     stamps = row.get("sourceTimestamps") or {}
     for field, maximum in limits.items():
-        age = age_seconds(stamps.get(field), now)
+        # Compatibility for snapshots produced before the 1h timestamp rename.
+        stamp = stamps.get(field)
+        if field == "bars1h" and not stamp:
+            stamp = stamps.get("bars5m")
+        age = age_seconds(stamp, now)
         if age is None:
             reasons.append(f"MISSING_{field.upper()}_TIMESTAMP")
         elif age > maximum:
