@@ -25,7 +25,7 @@ class SwingV2Config:
     mode: str = "PAPER"
     authority: str = "V2"
     strategy_id: str = "SWING_2S_MOMENTUM_V2"
-    policy_version: str = "2.0.1"
+    policy_version: str = "2.1.0"
     feature_version: str = "swing_features_v2"
     universe: str = "NIFTY_TOTAL_MARKET_750"
     active_segments: tuple[str, ...] = ("NIFTY100", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP250")
@@ -53,19 +53,26 @@ class SwingV2Config:
     min_upside_capacity_r: float = 1.50
     min_planned_blended_r: float = 1.50
     min_expected_net_r: float = 0.12
-    # Portfolio circuit breaker only. Per-symbol freshness remains mandatory.
-    required_coverage: float = 0.90
+    coverage_normal_threshold: float = 0.99
+    coverage_degraded_threshold: float = 0.95
+    coverage_defensive_threshold: float = 0.90
+    coverage_normal_risk_multiplier: float = 1.00
+    coverage_degraded_risk_multiplier: float = 0.75
+    coverage_defensive_risk_multiplier: float = 0.50
+    coverage_hysteresis_cycles: int = 3
     max_average_correlation: float = 0.70
     decision_start_ist: str = "09:45"
-    # Keep the paper hunt alive into the closing window. 15:00 is the final
-    # decision/retry phase; new qualified locks may still be admitted until
-    # 15:15, leaving five minutes for post-decision paper fill evidence.
     entry_cutoff_ist: str = "15:15"
     decision_freeze_ist: str = "15:00"
     order_expire_ist: str = "15:20"
     mandatory_exit_ist: str = "15:15"
     ledger_path: str = ""
     live_promotion: bool = False
+
+    @property
+    def required_coverage(self) -> float:
+        """Compatibility alias: only the <90% tier is a hard coverage block."""
+        return self.coverage_defensive_threshold
 
     @property
     def paper_authoritative(self) -> bool:
@@ -88,8 +95,12 @@ class SwingV2Config:
             raise ValueError("SWING_MAX_OVERNIGHTS must be 1 or 2")
         if self.nav <= 0:
             raise ValueError("SWING_CAPITAL must be positive")
-        if not 0 < self.required_coverage <= 1:
-            raise ValueError("SWING_REQUIRED_UNIVERSE_COVERAGE must be in (0,1]")
+        if not 0 < self.coverage_defensive_threshold < self.coverage_degraded_threshold < self.coverage_normal_threshold <= 1:
+            raise ValueError("coverage thresholds must satisfy 0 < defensive < degraded < normal <= 1")
+        if not 0 < self.coverage_defensive_risk_multiplier <= self.coverage_degraded_risk_multiplier <= self.coverage_normal_risk_multiplier <= 1:
+            raise ValueError("coverage risk multipliers must be in (0,1] and monotonic")
+        if self.coverage_hysteresis_cycles < 1:
+            raise ValueError("SWING_COVERAGE_HYSTERESIS_CYCLES must be >= 1")
         if not 0 < self.max_name_notional_pct <= 20:
             raise ValueError("single-name notional may not exceed 20% NAV")
         if not 0 < self.max_sector_notional_pct <= 40:
@@ -144,7 +155,13 @@ def load_config() -> SwingV2Config:
         t2_r=float(os.getenv("SWING_T2_R", "2.00")),
         min_upside_capacity_r=float(os.getenv("SWING_MIN_UPSIDE_CAPACITY_R", "1.50")),
         min_expected_net_r=float(os.getenv("SWING_MIN_EXPECTED_NET_R", "0.12")),
-        required_coverage=float(os.getenv("SWING_REQUIRED_UNIVERSE_COVERAGE", "0.90")),
+        coverage_normal_threshold=float(os.getenv("SWING_COVERAGE_NORMAL_THRESHOLD", "0.99")),
+        coverage_degraded_threshold=float(os.getenv("SWING_COVERAGE_DEGRADED_THRESHOLD", "0.95")),
+        coverage_defensive_threshold=float(os.getenv("SWING_COVERAGE_DEFENSIVE_THRESHOLD", "0.90")),
+        coverage_normal_risk_multiplier=float(os.getenv("SWING_COVERAGE_NORMAL_RISK_MULTIPLIER", "1.00")),
+        coverage_degraded_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEGRADED_RISK_MULTIPLIER", "0.75")),
+        coverage_defensive_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEFENSIVE_RISK_MULTIPLIER", "0.50")),
+        coverage_hysteresis_cycles=int(os.getenv("SWING_COVERAGE_HYSTERESIS_CYCLES", "3")),
         entry_cutoff_ist=os.getenv("SWING_ENTRY_CUTOFF_IST", "15:15"),
         decision_start_ist=os.getenv("SWING_DECISION_START_IST", "09:45"),
         decision_freeze_ist=os.getenv("SWING_DECISION_FREEZE_IST", "15:00"),
