@@ -1,235 +1,41 @@
-"""Radar builder: converts new StrategyResult back to legacy format."""
-
+"""Quant V2 radar: construct legal structures, then let one portfolio engine select."""
 from __future__ import annotations
-
 from typing import Any
-
 from .context import IndexOptionContext
-from .config import LEGACY_ALWAYS_ENABLED
-from .strategy_registry import get_registered_strategies, is_strategy_enabled
-from .strategy_selector import select_strategies
-from ..index_options_engine import INDEX_CONFIG, MAX_CONCURRENT_PER_SLEEVE, select_sleeve_rows
+from .strategy_registry import get_registered_strategies,is_strategy_enabled
+from .quant_v2 import select_quant_portfolio
+from ..index_options_engine import INDEX_CONFIG
 
-
-def _num(value: Any) -> float | None:
-    if value is None:
-        return None
+def _num(v):
     try:
-        n = float(value)
-        return n if n == n else None
-    except (TypeError, ValueError):
-        return None
+        n=float(v); return n if n==n else None
+    except (TypeError,ValueError): return None
 
+def _build_context(index,snapshot):
+    s=((snapshot.get("indexOptions") or {}).get("indices") or {}).get(index["key"],{}); spot=_num(s.get("spot"))
+    if spot is None:return None
+    scores=s.get("scores") if isinstance(s.get("scores"),dict) else {}; structure=s.get("structure") if isinstance(s.get("structure"),dict) else {}; breadth=s.get("breadth") if isinstance(s.get("breadth"),dict) else {}; oi=s.get("futuresOi") if isinstance(s.get("futuresOi"),dict) else {}; now=__import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    return IndexOptionContext(index=index["key"],spot=spot,futures_price=None,direction=str(s.get("direction") or "").upper() or None,direction_score=_num(scores.get("regime")),trend_score=_num(scores.get("trend")),breakout_score=_num(scores.get("breakout")),breadth_score=_num(breadth.get("score")),breadth_coverage=_num(breadth.get("coveragePct")),breadth_directional_score=_num(breadth.get("directionalScore")),futures_oi_state=str(oi.get("state") or "").upper() or None,futures_oi_aligned=oi.get("aligned"),realized_vol=_num(s.get("realizedVol")),atm_iv=_num(s.get("atmIv")),iv_rank=_num(s.get("ivRank")),iv_percentile=_num(s.get("ivPercentile")),skew=_num(s.get("skew")),term_structure=_num(s.get("termStructure")),expected_move=_num(s.get("expectedMove")),chain=s.get("rawChain") or [],expiry=str(s.get("expiry")) if s.get("expiry") else None,session_time=now,structure=structure,breadth=breadth,futures_oi=oi,gate_evidence=s.get("gateEvidence") or {},data_limitations=s.get("dataLimitations") or [],provider_status=s.get("providerStatus"),data_source=s.get("source"),component_freshness=s.get("componentFreshness") or {},raw_snapshot=s,full_snapshot=snapshot,snapshot_id=str(snapshot.get("snapshotId") or snapshot.get("updatedAt") or ""),decision_timestamp=str(snapshot.get("updatedAt") or now.isoformat()),market_generation=str(snapshot.get("marketGeneration") or ""),put_skew=_num(s.get("putSkew")),call_skew=_num(s.get("callSkew")),dte=int(s["dte"]) if s.get("dte") is not None else None,far_expiry=str(s.get("farExpiry")) if s.get("farExpiry") else None,far_chain=s.get("farChain") if isinstance(s.get("farChain"),list) else [],expiry_state=str(s.get("expiryState") or "NORMAL_EXPIRY_SESSION"))
 
-def _build_context(index: dict[str, str], snapshot: dict[str, Any]) -> IndexOptionContext | None:
-    supplied = ((snapshot.get("indexOptions") or {}).get("indices") or {}).get(index["key"], {})
-    spot = _num(supplied.get("spot"))
-    if spot is None:
-        return None
+def _row(result,index,context):
+    is_seller=result.family=="VOLATILITY_COMPRESSION"; x={**index,"spot":context.spot,"realizedVol":context.realized_vol,"atmIv":context.atm_iv,"dte":context.dte,"direction":(result.bias or "").upper() or context.direction,"state":result.state,"reason":result.reason,"score":result.strategy_score,"strategyMode":"SELL_PREMIUM" if is_seller else "BUY_PREMIUM","strategyType":result.strategy_id,"strategyId":result.strategy_id,"family":result.family,"bias":result.bias,"eligible":result.eligible,"expiry":result.expiry,"dataLimitations":result.reason_codes,"gateEvidence":context.gate_evidence,"entryDebit":result.entry_debit,"entryCredit":result.entry_credit,"maxProfit":result.max_profit,"maxLoss":result.max_loss,"breakevens":result.breakevens,"rewardRisk":result.reward_risk,"delta":result.delta,"gamma":result.gamma,"theta":result.theta,"vega":result.vega,"margin":result.margin,"liquidityScore":result.liquidity_score,"executionScore":result.execution_score,"snapshotId":context.snapshot_id,"decisionTimestamp":context.decision_timestamp,"marketGeneration":context.market_generation,"farExpiry":context.far_expiry,"expiryState":context.expiry_state,"legs":result.legs,"risk":result.extra.get("risk",{}),"gates":result.extra.get("gates",{}),"componentFreshness":context.component_freshness,"providerStatus":context.provider_status,"dataSource":context.data_source}
+    if not x["legs"] and result.extra.get("contract"): x["legs"]=[{**result.extra["contract"],"side":"BUY","qty":1,"expiry":result.expiry}]
+    return x
 
-    scores = supplied.get("scores") if isinstance(supplied.get("scores"), dict) else {}
-    gates = supplied.get("gates") if isinstance(supplied.get("gates"), dict) else {}
-    structure = supplied.get("structure") if isinstance(supplied.get("structure"), dict) else {}
-    breadth = supplied.get("breadth") if isinstance(supplied.get("breadth"), dict) else {}
-    futures_oi = supplied.get("futuresOi") if isinstance(supplied.get("futuresOi"), dict) else {}
-    chain = supplied.get("rawChain") or []
-    expiry = supplied.get("expiry")
-    provider_status = supplied.get("providerStatus")
-    data_source = supplied.get("source")
-    component_freshness = supplied.get("componentFreshness") or {}
-    data_limitations = supplied.get("dataLimitations") or []
-    gate_evidence = supplied.get("gateEvidence") or {}
-
-    now = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
-
-    return IndexOptionContext(
-        index=index["key"],
-        spot=spot,
-        futures_price=None,
-        direction=str(supplied.get("direction") or "").upper() or None,
-        direction_score=_num(scores.get("regime")),
-        trend_score=_num(scores.get("trend")),
-        breakout_score=_num(scores.get("breakout")),
-        breadth_score=_num(breadth.get("score")),
-        breadth_coverage=_num(breadth.get("coveragePct")),
-        breadth_directional_score=_num(breadth.get("directionalScore")),
-        futures_oi_state=str(futures_oi.get("state") or "").upper() or None,
-        futures_oi_aligned=futures_oi.get("aligned"),
-        realized_vol=_num(supplied.get("realizedVol")),
-        atm_iv=_num(supplied.get("atmIv")),
-        iv_rank=_num(supplied.get("ivRank")),
-        iv_percentile=_num(supplied.get("ivPercentile")),
-        skew=_num(supplied.get("skew")),
-        term_structure=_num(supplied.get("termStructure")),
-        expected_move=_num(supplied.get("expectedMove")),
-        chain=chain,
-        expiry=str(expiry) if expiry else None,
-        session_time=now,
-        structure=structure,
-        breadth=breadth,
-        futures_oi=futures_oi,
-        gate_evidence=gate_evidence,
-        data_limitations=data_limitations,
-        provider_status=provider_status,
-        data_source=data_source,
-        component_freshness=component_freshness,
-        raw_snapshot=supplied,
-        full_snapshot=snapshot,
-        snapshot_id=str(snapshot.get("snapshotId") or snapshot.get("updatedAt") or ""),
-        decision_timestamp=str(snapshot.get("updatedAt") or now.isoformat()),
-        market_generation=str(snapshot.get("marketGeneration") or ""),
-        put_skew=_num(supplied.get("putSkew")),
-        call_skew=_num(supplied.get("callSkew")),
-        dte=int(supplied["dte"]) if supplied.get("dte") is not None else None,
-        far_expiry=str(supplied.get("farExpiry")) if supplied.get("farExpiry") else None,
-        far_chain=supplied.get("farChain") if isinstance(supplied.get("farChain"), list) else [],
-        expiry_state=str(supplied.get("expiryState") or "NORMAL_EXPIRY_SESSION"),
-    )
-
-
-def _legacy_from_strategy_result(result: Any, index_config: dict[str, str]) -> dict[str, Any]:
-    """Convert a StrategyResult to the legacy candidate/seller dict format."""
-    is_seller = result.family == "VOLATILITY_COMPRESSION"
-    base = {
-        **index_config,
-        "spot": result.extra.get("spot"),
-        "direction": (result.bias or "").upper() if result.bias else None,
-        "state": result.state,
-        "reason": result.reason,
-        "score": result.strategy_score,
-        "scoreFloor": None,
-        "failedGates": [],
-        "gates": {},
-        "missingInputs": [],
-        "strategyMode": "SELL_PREMIUM" if is_seller else "BUY_PREMIUM",
-        "strategyType": result.strategy_id,
-        "strategyId": result.strategy_id,
-        "family": result.family,
-        "bias": result.bias,
-        "eligible": result.eligible,
-        "providerStatus": None,
-        "dataSource": None,
-        "expiry": result.expiry,
-        "dataLimitations": result.reason_codes,
-        "gateEvidence": {},
-        "chain": [],
-        "structure": {},
-        "oiResearch": {},
-        "componentFreshness": {},
-        "entryDebit": result.entry_debit,
-        "entryCredit": result.entry_credit,
-        "maxProfit": result.max_profit,
-        "maxLoss": result.max_loss,
-        "breakevens": result.breakevens,
-        "rewardRisk": result.reward_risk,
-        "delta": result.delta,
-        "gamma": result.gamma,
-        "theta": result.theta,
-        "vega": result.vega,
-        "margin": result.margin,
-        "liquidityScore": result.liquidity_score,
-        "executionScore": result.execution_score,
-        "snapshotId": result.extra.get("snapshotId"),
-        "decisionTimestamp": result.extra.get("decisionTimestamp"),
-        "marketGeneration": result.extra.get("marketGeneration"),
-        "farExpiry": result.extra.get("farExpiry"),
-        "expiryState": result.extra.get("expiryState"),
-        "atmIv": result.extra.get("atmIv"),
-    }
-    if not is_seller:
-        base.update({
-            "contract": result.extra.get("contract"),
-            "failedGates": result.extra.get("failedGates", []),
-            "missingInputs": result.extra.get("missingInputs", []),
-            "gates": result.extra.get("gates", {}),
-            "gateEvidence": result.extra.get("gateEvidence", {}),
-            "chain": result.extra.get("chain", []),
-            "structure": result.extra.get("structure"),
-            "providerStatus": result.extra.get("providerStatus"),
-            "dataSource": result.extra.get("dataSource"),
-            "componentFreshness": result.extra.get("componentFreshness", {}),
-            "dataLimitations": result.extra.get("dataLimitations", []),
-            "scoreFloor": result.extra.get("scoreFloor"),
-        })
-    else:
-        base.update({
-            "legs": result.legs,
-            "scores": result.extra.get("scores", {}),
-            "gates": result.extra.get("gates", {}),
-            "risk": result.extra.get("risk", {}),
-            "constructionStatus": result.extra.get("constructionStatus"),
-            "gateEvidence": result.extra.get("gateEvidence", {}),
-            "dataLimitations": result.extra.get("dataLimitations", []),
-            "primaryContract": result.extra.get("contract"),
-            "providerStatus": result.extra.get("providerStatus"),
-            "dataSource": result.extra.get("dataSource"),
-            "componentFreshness": result.extra.get("componentFreshness", {}),
-        })
-    return base
-
-
-def build_index_options_radar_v2(snapshot: dict[str, Any] | None) -> dict[str, Any]:
-    payload = snapshot if isinstance(snapshot, dict) else {}
-    candidates = []
-    seller_candidates = []
+def build_index_options_radar_v2(snapshot):
+    payload=snapshot if isinstance(snapshot,dict) else {}; candidates=[]
+    # V2 no longer preselects by V1 regime. Every enabled legal structure is built;
+    # the common-distribution optimizer decides among them and NO_TRADE.
     for index in INDEX_CONFIG:
-        context = _build_context(index, payload)
-        if context is None:
-            continue
-        selected_by_regime = {row["strategyId"] for row in select_strategies(context)}
-        for strategy_id, strategy in get_registered_strategies().items():
-            if not is_strategy_enabled(strategy_id):
-                continue
-            if strategy_id not in LEGACY_ALWAYS_ENABLED and strategy_id not in selected_by_regime:
-                continue
-            if not strategy.eligible(context):
-                continue
+        ctx=_build_context(index,payload)
+        if ctx is None:continue
+        for sid,strategy in get_registered_strategies().items():
+            if not is_strategy_enabled(sid):continue
             try:
-                result = strategy.build(context)
-            except Exception:
-                continue
-            legacy = _legacy_from_strategy_result(result, index)
-            if strategy.family == "VOLATILITY_COMPRESSION":
-                seller_candidates.append(legacy)
-            else:
-                candidates.append(legacy)
-
-    def _comparable(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return [row for row in rows if row.get("strategyId") not in LEGACY_ALWAYS_ENABLED]
-
-    # Each sleeve ranks its own candidates independently, so a BUY can never
-    # consume the index or correlation bucket that the SELL sleeve needs.
-    buy_selected = select_sleeve_rows(_comparable(candidates), max_rows=MAX_CONCURRENT_PER_SLEEVE)
-    sell_selected = select_sleeve_rows(_comparable(seller_candidates), max_rows=MAX_CONCURRENT_PER_SLEEVE)
-    selected = [*buy_selected, *sell_selected]
-
-    return {
-        "success": True,
-        "executionPolicy": "AUTO_PAPER_ONLY",
-        "strategy": "LONG_PREMIUM_OR_DEFINED_RISK_PREMIUM_SELLING",
-        "updatedAt": payload.get("updatedAt"),
-        "candidates": candidates,
-        "sellerCandidates": seller_candidates,
-        "selected": selected,
-        "buySelected": buy_selected,
-        "sellSelected": sell_selected,
-        "limits": {
-            "minDailyEntries": 0,
-            "maxDailyEntries": 20,
-            "maxConcurrent": 2,
-            "maxConcurrentPerSleeve": MAX_CONCURRENT_PER_SLEEVE,
-            "maxPerCorrelationBucket": 1,
-            "sleeveIsolation": "INDEPENDENT_INDEX_AND_BUCKET_PER_SLEEVE",
-            "scoreFloor": 70.0,
-            "huntMode": "CONTINUOUS_MARKET_SESSION",
-        },
-        "reentryPolicy": {
-            "maxAttemptsPerIndex": 20,
-            "hardBanAfterStopLosses": 2,
-            "targetCooldownMin": 20,
-            "profitTrailCooldownMin": 30,
-            "sameDirectionStopCooldownMin": 45,
-            "confirmationRequired": ["freshBreakout", "futuresOi", "weightedBreadth"],
-            "riskScale": 0.5,
-        },
-    }
+                if not strategy.eligible(ctx):continue
+                candidates.append(_row(strategy.build(ctx),index,ctx))
+            except Exception:continue
+    quant=select_quant_portfolio(candidates,max_positions=2)
+    keys={(x["strategy_id"],x["index"]) for x in quant["selected"]}; selected=[c for c in candidates if (str(c.get("strategyId")),str(c.get("key"))) in keys]
+    for c in selected:c["quantAuthority"]="INDEX_OPTIONS_QUANT_V2"
+    return {"success":True,"executionPolicy":"AUTO_PAPER_ONLY","strategy":"QUANT_V2_COMMON_DISTRIBUTION_PORTFOLIO","updatedAt":payload.get("updatedAt"),"candidates":[c for c in candidates if c.get("strategyMode")!="SELL_PREMIUM"],"sellerCandidates":[c for c in candidates if c.get("strategyMode")=="SELL_PREMIUM"],"selected":selected,"buySelected":[c for c in selected if c.get("strategyMode")!="SELL_PREMIUM"],"sellSelected":[c for c in selected if c.get("strategyMode")=="SELL_PREMIUM"],"quantDecision":quant,"limits":{"minDailyEntries":0,"maxDailyEntries":20,"maxConcurrent":2,"selectionAuthority":"INDEX_OPTIONS_QUANT_V2","noTradeUtility":0.0}}
