@@ -18,12 +18,14 @@ def test_coverage_tier_boundaries_and_risk_multipliers():
         assert _raw_coverage_tier(coverage, cfg) == (tier, multiplier)
 
 
+def test_494_and_493_of_498_are_both_degraded_not_blocked():
+    cfg = SwingV2Config()
+    assert _raw_coverage_tier(494 / 498, cfg) == ("DEGRADED", 0.75)
+    assert _raw_coverage_tier(493 / 498, cfg) == ("DEGRADED", 0.75)
+
+
 def test_coverage_risk_multipliers_are_tunable():
-    cfg = replace(
-        SwingV2Config(),
-        coverage_degraded_risk_multiplier=0.70,
-        coverage_defensive_risk_multiplier=0.40,
-    )
+    cfg = replace(SwingV2Config(), coverage_degraded_risk_multiplier=0.70, coverage_defensive_risk_multiplier=0.40)
     assert _raw_coverage_tier(0.97, cfg) == ("DEGRADED", 0.70)
     assert _raw_coverage_tier(0.92, cfg) == ("DEFENSIVE", 0.40)
 
@@ -38,3 +40,9 @@ def test_full_coverage_is_behavior_neutral_for_risk():
 def test_block_is_distinct_below_90_percent():
     cfg = SwingV2Config()
     assert _raw_coverage_tier(0.899999, cfg) == ("BLOCK", 0.0)
+
+
+def test_tiered_gate_is_not_authoritative_by_default():
+    cfg = SwingV2Config()
+    assert cfg.coverage_tiers_authoritative is False
+    assert cfg.required_coverage == 0.99
