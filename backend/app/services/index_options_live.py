@@ -6,6 +6,7 @@ from datetime import date, datetime
 from typing import Any, Callable
 
 from .angel_index_options import (
+    IST_ZONE,
     _apply_oi_baselines,
     _effective_breadth_gate,
     active_index_expiries,

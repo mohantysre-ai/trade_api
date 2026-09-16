@@ -79,12 +79,10 @@ def session_realized_pnl(session: dict[str, Any] | None) -> float:
     for row in _session_leg_index(session).values():
         if not _session_leg_is_triggered(row):
             continue
-        # Zero is an authoritative booked value.  Do not fall through to the
-        # (often stale/unrealised) legacy ``pnl`` field when realisedPnl == 0.
         value = row.get("realizedPnl")
         if value is None:
             value = row.get("pnl")
-        total += float(value or 0)
+        total += round(float(value or 0), 2)
     return round(total, 2)
 
 

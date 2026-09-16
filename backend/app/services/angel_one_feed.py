@@ -2717,7 +2717,7 @@ def _fetch_quote_chunk(
 
     fetched: dict[str, dict[str, Any]] = {}
     try:
-        response = smart.getMarketData("FULL", tokens_by_exchange)
+        response = _getmarketdata_with_retry(smart, tokens_by_exchange)
         if response.get("status"):
             for item in response.get("data", {}).get("fetched", []):
                 token = str(item.get("symbolToken", ""))
@@ -2739,6 +2739,26 @@ def _fetch_quote_chunk(
                 raise
             continue
     return fetched
+
+
+def _getmarketdata_with_retry(
+    smart: SmartConnect,
+    tokens_by_exchange: dict[str, list[str]],
+    attempts: int = 3,
+    backoff: float = 0.5,
+) -> dict[str, Any]:
+    last_exc: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            return smart.getMarketData("FULL", tokens_by_exchange)
+        except Exception as exc:
+            last_exc = exc
+            msg = str(exc).lower()
+            if "timeout" in msg or "timed out" in msg or "read timed out" in msg:
+                time.sleep(backoff * (attempt + 1))
+                continue
+            raise
+    raise last_exc or RuntimeError("getMarketData failed after retries")
 
 
 def _fetch_batch_quotes_chunked(

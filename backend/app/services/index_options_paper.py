@@ -505,7 +505,17 @@ def reconcile_paper_book(
         open_indexes = {str(row.get("index")) for row in book["open"]}
         open_buckets = {str(row.get("bucket")) for row in book["open"]}
         if _market_open(clock):
-            for row in radar.get("selected") or []:
+            selected_rows = radar.get("selected") or []
+            modular_rows = radar.get("modularSelected") or []
+            seen_identities: set[str] = set()
+            combined_rows: list[dict[str, Any]] = []
+            for row in selected_rows + modular_rows:
+                identity = str(row.get("strategyId") or row.get("strategyType") or "") + "|" + str(row.get("key") or "")
+                if identity in seen_identities:
+                    continue
+                seen_identities.add(identity)
+                combined_rows.append(row)
+            for row in combined_rows:
                 if book["entryCount"] >= MAX_DAILY_ENTRIES or len(book["open"]) >= MAX_CONCURRENT_TRADES:
                     break
                 if row.get("state") != "ELIGIBLE" or row.get("key") in open_indexes or row.get("bucket") in open_buckets:

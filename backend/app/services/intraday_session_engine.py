@@ -565,6 +565,46 @@ def save_session(payload: dict[str, Any], force: bool = False) -> None:
         pass
 
 
+def merge_session_row_updates(
+    long_updates: dict[str, dict[str, Any]],
+    short_updates: dict[str, dict[str, Any]],
+) -> None:
+    """Apply per-symbol field updates to today's locked session, never dropping a row.
+
+    Reads the freshest on-disk session and writes back under the same lock
+    used by `save_session`, so a caller holding a stale plan snapshot (e.g. one
+    built before a slow external price fetch) can never clobber symbols that a
+    concurrent writer added or changed in the meantime. Symbols not present in
+    `long_updates`/`short_updates` are left untouched; no row is ever removed.
+    """
+    with _SESSION_PERSIST_LOCK, _session_interprocess_lock():
+        existing = load_session()
+        if not existing:
+            return
+        payload = dict(existing)
+        for key, updates_by_symbol in (("long", long_updates), ("short", short_updates)):
+            if not updates_by_symbol:
+                continue
+            rows = existing.get(key) or []
+            merged_rows = []
+            for row in rows:
+                if not isinstance(row, dict):
+                    merged_rows.append(row)
+                    continue
+                update = updates_by_symbol.get(str(row.get("symbol") or "").upper())
+                merged_rows.append({**row, **update} if update else row)
+            payload[key] = merged_rows
+        payload["updatedAt"] = _utc_now_iso()
+        _atomic_write(_SESSION_FILE, payload)
+    _invalidate_session_response_cache()
+    try:
+        from .trade_outcome import invalidate_live_book_cache
+
+        invalidate_live_book_cache()
+    except Exception:
+        pass
+
+
 def _persist_if_close_transition(session: dict[str, Any], long_rows: list[dict[str, Any]], short_rows: list[dict[str, Any]]) -> None:
     """Persist any live close / exit-state transition immediately to disk.
 
