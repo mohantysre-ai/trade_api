@@ -65,6 +65,7 @@ def _entry_hunt_diagnostics(scan,snapshot):
  except: us=0
  try: vs=int(snapshot.get("volumeScreenedCount") or 0)
  except: vs=0
+ f={**f,"evaluated":f.get("evaluated",f.get("evaluated_count",f.get("universe"))),"qualified":f.get("qualified",f.get("qualified_out",(scan or {}).get("qualifiedCount",0))),"candleMetrics":f.get("candleMetrics",f.get("fresh_count",f.get("freshData",0))),"candleTimeframe":f.get("candleTimeframe","1H")}
  return {**f,"universeSize":us or None,"volumeScreened":vs or us or None,"evaluated":f.get("evaluated",f.get("universe")),"displayPool":len(stocks) if stocks else None,"swingUniverse":"Total Market 750","corePriorityUniverse":"Top 500 by liquidity","microcapPolicy":"SATELLITE · 20% priority · max 1 position","candleTimeframe":"1H"}
 def _session(scan=None,*,now=None):
  cfg=load_config(); now=(now or datetime.now(timezone.utc)).astimezone(IST); day=now.date().isoformat(); ledger=SwingLedger(cfg.ledger_path); positions=_positions(ledger); snapshot=_snapshot(); marks=_marks(snapshot); active=[r for r in positions if r.get("positionId") and not r.get("terminal")]; closed=[]

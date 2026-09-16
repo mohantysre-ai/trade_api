@@ -245,7 +245,10 @@ def enrich_v2_market_snapshot(payload: dict[str, Any], all_stocks: list[dict[str
         upper, lower = _number(row.get("upperCircuit")), _number(row.get("lowerCircuit"))
         last3 = raw.get("last3Closes") if isinstance(raw.get("last3Closes"), list) else []
         quote_stamp = str(row.get("quoteReceivedAt") or now.astimezone(timezone.utc).isoformat())
-        bars_stamp = _iso_timestamp(raw.get("last5mTimestamp"), quote_stamp)
+        bars_stamp = _iso_timestamp(
+            raw.get("last1hTimestamp") or raw.get("last60mTimestamp") or raw.get("last5mTimestamp"),
+            quote_stamp,
+        )
         record = {
             **raw, "symbol": symbol, "universeSegment": segment,
             "membershipSource": (
@@ -273,7 +276,7 @@ def enrich_v2_market_snapshot(payload: dict[str, Any], all_stocks: list[dict[str
             "scheduledResultBeforeD2": symbol in result_events,
             "nearPriceBand": bool(price and ((upper and abs(upper - price) / price <= .01) or (lower and abs(price - lower) / price <= .01))),
             "stressedExitCapacityFailed": False,
-            "sourceTimestamps": {"quote": quote_stamp, "depth": quote_stamp if ask and row.get("availableAskDepth") else None, "bars5m": bars_stamp},
+            "sourceTimestamps": {"quote": quote_stamp, "depth": quote_stamp if ask and row.get("availableAskDepth") else None, "bars1h": bars_stamp},
         }
         prepared.append(record)
     sector_returns: dict[str, list[float]] = defaultdict(list)
