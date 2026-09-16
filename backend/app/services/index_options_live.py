@@ -74,13 +74,12 @@ def _apply_live_spot_risk_guard(strategy_inputs: dict[str, Any]) -> dict[str, An
 
 
 def _strategy_projection(strategy_book: dict[str, Any] | None) -> list[dict[str, Any]]:
-    """Project durable defined-risk positions into the legacy table without a second authority."""
     if not isinstance(strategy_book,dict): return []
-    durable={"BULL_PUT_CREDIT_SPREAD","BEAR_CALL_CREDIT_SPREAD","IRON_CONDOR"}; rows=[]
+    rows=[]
     for p in strategy_book.get("positions") or []:
-        if p.get("strategyId") not in durable: continue
+        if p.get("authority")!="INDEX_OPTIONS_QUANT_V2": continue
         legs=p.get("legs") or []; quantity=sum(int(l.get("lotSize") or 0) for l in legs[:1]) or 1
-        rows.append({"id":p.get("strategyPositionId"),"strategyPositionId":p.get("strategyPositionId"),"index":p.get("index"),"symbol":p.get("strategyId"),"direction":"DEFINED_RISK","quantity":quantity,"status":p.get("status"),"strategyMode":"SELL_PREMIUM","strategyType":p.get("strategyId"),"entryCredit":p.get("entryCredit"),"currentDebit":abs(_float(p.get("combinedStructureValue")) or 0),"maxLossPerLot":p.get("maxLoss"),"unrealizedPnl":p.get("unrealizedPnl"),"pnl":p.get("realizedPnl"),"exitReason":p.get("exitReason"),"enteredAt":p.get("enteredAt"),"markedAt":p.get("updatedAt"),"markStatus":p.get("markStatus"),"markSource":"MULTI_LEG_STRATEGY_BOOK","projectionOnly":True})
+        rows.append({"id":p.get("strategyPositionId"),"strategyPositionId":p.get("strategyPositionId"),"index":p.get("index"),"symbol":p.get("strategyId"),"direction":"QUANT_V2","quantity":quantity,"status":p.get("status"),"strategyMode":"QUANT_V2","strategyType":p.get("strategyId"),"entryCredit":p.get("entryCredit"),"currentDebit":abs(_float(p.get("combinedStructureValue")) or 0),"maxLossPerLot":p.get("maxLoss"),"unrealizedPnl":p.get("unrealizedPnl"),"pnl":p.get("realizedPnl"),"exitReason":p.get("exitReason"),"enteredAt":p.get("enteredAt"),"markedAt":p.get("updatedAt"),"markStatus":p.get("markStatus"),"markSource":"INDEX_OPTIONS_QUANT_V2","projectionOnly":True})
     return rows
 
 
@@ -88,11 +87,9 @@ def _merge_strategy_projection(paper_book: dict[str, Any], strategy_book: dict[s
     projected=_strategy_projection(strategy_book)
     if not projected: return paper_book
     durable_ids={str(r.get("strategyPositionId")) for r in projected}; durable_keys={(str(r.get("index")),str(r.get("strategyType"))) for r in projected}
-    def keep(row: dict[str,Any]) -> bool:
-        return str(row.get("strategyPositionId") or "") not in durable_ids and (str(row.get("index")),str(row.get("strategyType"))) not in durable_keys
-    native_open=[r for r in paper_book.get("open") or [] if keep(r)]; native_closed=[r for r in paper_book.get("closed") or [] if keep(r)]
-    paper_book["open"]=[*native_open,*[r for r in projected if r.get("status")=="OPEN"]]; paper_book["closed"]=[*native_closed,*[r for r in projected if r.get("status")=="CLOSED"]]
-    paper_book["openPnl"]=round(sum(float(r.get("unrealizedPnl") or 0) for r in paper_book["open"]),2); paper_book["realizedPnl"]=round(sum(float(r.get("pnl") or 0) for r in paper_book["closed"]),2); paper_book["totalPnl"]=round(paper_book["openPnl"]+paper_book["realizedPnl"],2); paper_book["projectionAuthority"]="MULTI_LEG_STRATEGY_BOOK_FOR_DEFINED_RISK_SELLERS"
+    def keep(row): return str(row.get("strategyPositionId") or "") not in durable_ids and (str(row.get("index")),str(row.get("strategyType"))) not in durable_keys
+    paper_book["open"]=[*[r for r in paper_book.get("open") or [] if keep(r)],*[r for r in projected if r.get("status")=="OPEN"]]; paper_book["closed"]=[*[r for r in paper_book.get("closed") or [] if keep(r)],*[r for r in projected if r.get("status")=="CLOSED"]]
+    paper_book["openPnl"]=round(sum(float(r.get("unrealizedPnl") or 0) for r in paper_book["open"]),2); paper_book["realizedPnl"]=round(sum(float(r.get("pnl") or 0) for r in paper_book["closed"]),2); paper_book["totalPnl"]=round(paper_book["openPnl"]+paper_book["realizedPnl"],2); paper_book["projectionAuthority"]="INDEX_OPTIONS_QUANT_V2"
     return paper_book
 
 
@@ -116,19 +113,18 @@ def compose_live_index_options_radar(snapshot: dict[str,Any],*,live:bool=True,cl
         except Exception as exc: option_data["oiEnrichment"]={"source":"SIGQ_RESEARCH","status":"UNAVAILABLE","error":str(exc)}
         option_data=_apply_oi_baselines(option_data); strategy_inputs=option_data_to_strategy_inputs(option_data,book); book["indexOptions"]=_apply_live_spot_risk_guard(strategy_inputs); book["indexOptionProvider"]=option_data
     result=build_index_options_radar(book)
-    from .index_options.config import butterflies_enabled,calendars_enabled,debit_spreads_enabled,diagonals_enabled,long_vol_enabled
-    if any((debit_spreads_enabled(),long_vol_enabled(),butterflies_enabled(),calendars_enabled(),diagonals_enabled())):
-        from .index_options.radar_builder import build_index_options_radar_v2
-        from .index_options.runtime import process_strategy_cycle
-        modular=build_index_options_radar_v2(book); result["modularCandidates"]=modular.get("candidates",[])+modular.get("sellerCandidates",[]); result["modularSelected"]=modular.get("selected",[])
-        if persist: result["strategyBook"]=process_strategy_cycle(result,book,now or datetime.now(IST_ZONE))
-    market_open=index_options_market_open(now); paper=reconcile_paper_book(result,client=client,persist=persist,now=now); result["paperBook"]=_merge_strategy_projection(paper,result.get("strategyBook")); result["sessionStatus"]="OPEN" if market_open else "CLOSED"; result["huntActive"]=market_open; result["limits"]["huntMode"]="CONTINUOUS_MARKET_SESSION" if market_open else "SESSION_CLOSED"; result["provider"]="ANGEL_ONE_WITH_SCANX_AND_LEMONN_FALLBACK"; result["providerEvidence"]=book.get("indexOptionProvider"); result["streamStatus"]=ANGEL_INDEX_STREAM.status()
+    from .index_options.radar_builder import build_index_options_radar_v2
+    from .index_options.runtime import process_strategy_cycle
+    modular=build_index_options_radar_v2(book)
+    result["modularCandidates"]=modular.get("candidates",[])+modular.get("sellerCandidates",[]); result["modularSelected"]=modular.get("selected",[]); result["quantDecision"]=modular.get("quantDecision"); result["quantEngine"]="INDEX_OPTIONS_QUANT_V2"; result["selectionAuthority"]="INDEX_OPTIONS_QUANT_V2"
+    if persist: result["strategyBook"]=process_strategy_cycle(result,book,now or datetime.now(IST_ZONE))
+    market_open=index_options_market_open(now); paper=reconcile_paper_book(result,client=client,persist=persist,now=now); result["paperBook"]=_merge_strategy_projection(paper,result.get("strategyBook")); result["sessionStatus"]="OPEN" if market_open else "CLOSED"; result["huntActive"]=market_open; result["limits"]["huntMode"]="CONTINUOUS_MARKET_SESSION" if market_open else "SESSION_CLOSED"; result["limits"]["selectionAuthority"]="INDEX_OPTIONS_QUANT_V2"; result["provider"]="ANGEL_ONE_WITH_SCANX_AND_LEMONN_FALLBACK"; result["providerEvidence"]=book.get("indexOptionProvider"); result["streamStatus"]=ANGEL_INDEX_STREAM.status()
     if persist: persist_radar(result)
     return result
 
 
 def finalize_closed_index_options_radar(radar:dict[str,Any],*,client:Any,persist:bool=True,now:datetime|None=None)->dict[str,Any]:
-    result=dict(radar); result["paperBook"]=_merge_strategy_projection(reconcile_paper_book(result,client=client,persist=persist,now=now),result.get("strategyBook")); result["sessionStatus"]="CLOSED"; result["huntActive"]=False; limits=dict(result.get("limits") or {}); limits["huntMode"]="SESSION_CLOSED"; result["limits"]=limits; result["cacheStatus"]="SESSION_FROZEN"
+    result=dict(radar); result["paperBook"]=_merge_strategy_projection(reconcile_paper_book(result,client=client,persist=persist,now=now),result.get("strategyBook")); result["sessionStatus"]="CLOSED"; result["huntActive"]=False; limits=dict(result.get("limits") or {}); limits["huntMode"]="SESSION_CLOSED"; limits["selectionAuthority"]="INDEX_OPTIONS_QUANT_V2"; result["limits"]=limits; result["cacheStatus"]="SESSION_FROZEN"
     if persist: persist_radar(result)
     return result
 
