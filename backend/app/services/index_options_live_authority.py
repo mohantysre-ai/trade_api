@@ -195,7 +195,7 @@ def _reconcile(radar: dict[str, Any], *, client: Any = None, now: datetime | Non
         closed_now: list[dict[str, Any]] = []
         for position in book["open"]:
             if _mode(position) == "SELL_PREMIUM":
-                debit, marked_legs, source = paper._credit_close_debit(position, candidates, direct_marks)
+                debit, marked_legs, source, _stale = paper._credit_close_debit(position, candidates, direct_marks)
                 if debit is None:
                     position.update({"markStatus": "UNAVAILABLE", "markError": direct_error or "SPREAD_LEG_MARK_UNAVAILABLE"})
                     next_open.append(position)
