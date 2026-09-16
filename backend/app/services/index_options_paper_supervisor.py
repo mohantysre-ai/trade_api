@@ -40,15 +40,10 @@ _THREAD: threading.Thread | None = None
 _STOP_EVENT = threading.Event()
 _STATUS_LOCK = threading.Lock()
 _STATUS: dict[str, Any] = {
-    "enabled": False,
-    "running": False,
-    "owner": False,
+    "enabled": False, "running": False, "owner": False,
     "intervalSeconds": SUPERVISOR_INTERVAL_SECONDS,
-    "lastCycleAt": None,
-    "lastSuccessAt": None,
-    "lastError": None,
-    "consecutiveFailures": 0,
-    "pid": os.getpid(),
+    "lastCycleAt": None, "lastSuccessAt": None, "lastError": None,
+    "consecutiveFailures": 0, "pid": os.getpid(),
 }
 
 
@@ -100,12 +95,7 @@ def paper_supervisor_status() -> dict[str, Any]:
     except (FileNotFoundError, ValueError, TypeError):
         persisted = {}
     if isinstance(persisted, dict) and persisted:
-        return {
-            **persisted,
-            "localWorkerPid": os.getpid(),
-            "localWorkerOwner": bool(current.get("owner")),
-            "localWorkerRunning": bool(current.get("running")),
-        }
+        return {**persisted, "localWorkerPid": os.getpid(), "localWorkerOwner": bool(current.get("owner")), "localWorkerRunning": bool(current.get("running"))}
     return current
 
 
@@ -118,6 +108,17 @@ def run_paper_supervisor_cycle(client: Any, *, now: datetime | None = None) -> d
         logger.exception("index-options paper subscription hydration failed")
         hydration = {"openPositions": None, "retainedContracts": 0, "error": "HYDRATION_FAILED"}
     _set_local_status(lastHydration=hydration)
+
+    # The legacy paper module originally throttled long-premium marks to one
+    # minute. The watchdog now owns the persistence cadence, so align the due
+    # gate with this fast cycle. Seller multi-leg positions were already marked
+    # every reconciliation. This assignment changes no entry/exit thresholds.
+    try:
+        from . import index_options_paper as paper
+        paper.LONG_PREMIUM_MARK_INTERVAL_SECONDS = SUPERVISOR_INTERVAL_SECONDS
+    except Exception:
+        logger.exception("failed to align option mark interval with supervisor")
+
     radar = {"candidates": [], "sellerCandidates": [], "selected": []}
     return reconcile_paper_book(radar, client=client, now=clock, persist=True)
 
@@ -133,17 +134,12 @@ class _ProcessLease:
         try:
             import fcntl
             fcntl.flock(self.handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            self.handle.seek(0)
-            self.handle.truncate()
-            self.handle.write(f"pid={os.getpid()}\n")
-            self.handle.flush()
+            self.handle.seek(0); self.handle.truncate(); self.handle.write(f"pid={os.getpid()}\n"); self.handle.flush()
             return True
         except ImportError:
             return True
         except (BlockingIOError, OSError):
-            self.handle.close()
-            self.handle = None
-            return False
+            self.handle.close(); self.handle = None; return False
 
     def release(self) -> None:
         if self.handle is None:
@@ -165,7 +161,6 @@ def _supervisor_loop(client_factory: Callable[[], Any]) -> None:
         _set_local_status(enabled=True, running=False, owner=False, pid=os.getpid())
         logger.info("index-options paper supervisor already owned by another worker")
         return
-
     _status_update(enabled=True, running=True, owner=True, pid=os.getpid())
     client: Any = None
     try:
@@ -175,12 +170,10 @@ def _supervisor_loop(client_factory: Callable[[], Any]) -> None:
                 _status_update(running=True, owner=True, sessionActive=False, nextCycleAt=None, lastError=None)
                 _STOP_EVENT.wait(30.0)
                 continue
-
             next_cycle = _next_cycle(now)
             _status_update(running=True, owner=True, sessionActive=True, nextCycleAt=next_cycle.isoformat())
             if _STOP_EVENT.wait(SUPERVISOR_INTERVAL_SECONDS):
                 break
-
             cycle_time = datetime.now(IST_ZONE)
             try:
                 if client is None:
@@ -198,29 +191,21 @@ def _supervisor_loop(client_factory: Callable[[], Any]) -> None:
                 client = None
                 with _STATUS_LOCK:
                     failures = int(_STATUS.get("consecutiveFailures") or 0) + 1
-                _status_update(
-                    running=True, owner=True, sessionActive=True, lastCycleAt=cycle_time.isoformat(),
-                    lastError=str(exc), consecutiveFailures=failures,
-                )
+                _status_update(running=True, owner=True, sessionActive=True, lastCycleAt=cycle_time.isoformat(), lastError=str(exc), consecutiveFailures=failures)
                 logger.exception("index-options autonomous paper mark cycle failed")
     finally:
-        lease.release()
-        _status_update(running=False, owner=False, nextCycleAt=None)
+        lease.release(); _status_update(running=False, owner=False, nextCycleAt=None)
 
 
 def start_paper_supervisor(client_factory: Callable[[], Any]) -> bool:
     global _THREAD
     if not _enabled():
-        _set_local_status(enabled=False, running=False, owner=False)
-        return False
+        _set_local_status(enabled=False, running=False, owner=False); return False
     with _THREAD_LOCK:
         if _THREAD is not None and _THREAD.is_alive():
             return True
         _STOP_EVENT.clear()
-        _THREAD = threading.Thread(
-            target=_supervisor_loop, args=(client_factory,),
-            name="index-options-paper-supervisor", daemon=True,
-        )
+        _THREAD = threading.Thread(target=_supervisor_loop, args=(client_factory,), name="index-options-paper-supervisor", daemon=True)
         _THREAD.start()
     return True
 
