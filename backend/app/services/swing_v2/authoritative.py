@@ -19,7 +19,7 @@ from .ledger import SwingLedger, materialize_position
 from .reporting import ledger_eod_report
 IST=ZoneInfo("Asia/Kolkata"); _LOCK=threading.RLock(); _DATA_REFRESH_LOCK=threading.Lock()
 _FINAL_REFRESH_MARGIN_SECONDS=int(os.getenv("SWING_FINAL_REFRESH_MARGIN_SECONDS","90")); _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0.0; _SESSION_READ_TTL=float(os.getenv("SWING_SESSION_READ_TTL","2")); _EOD_READ_CACHE={}; _SWING_SCAN_INTERVAL_SECONDS=float(os.getenv("SWING_SCAN_INTERVAL_SECONDS","15"))
-_RETRYABLE_FINAL_BLOCK_REASONS={"FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW","UNIVERSE_COVERAGE_BELOW_99PCT","UNIVERSE_COVERAGE_BELOW_90PCT","REGIME_UNRATED"}
+_RETRYABLE_FINAL_BLOCK_REASONS={"FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW","UNIVERSE_COVERAGE_BELOW_99PCT","UNIVERSE_COVERAGE_BELOW_90PCT","REGIME_UNRATED","SWING_V2_DATA_NOT_READY"}
 def is_v2_authoritative(config=None): return (config or load_config()).paper_authoritative
 def _state_path():
  p=os.getenv("SWING_V2_SESSION_FILE","").strip(); return Path(p) if p else Path(__file__).resolve().parents[2]/"data"/"swing_v2_session.json"
@@ -74,11 +74,29 @@ def _session(scan=None,*,now=None):
   try: cd=datetime.fromisoformat(str(r.get("lastEventAt") or "").replace("Z","+00:00")).astimezone(IST).date().isoformat()
   except: cd=None
   if str(r.get("sessionDate") or "")==day or cd==day: closed.append(r)
- rows=[_position_row(r,marks.get(str(r.get("symbol") or "").upper())) for r in active]; state=_read_json(_state_path()); state=state if str(state.get("sessionDate") or "")==day else {}; effective=scan if isinstance(scan,dict) else state.get("scan"); freeze=now.time().replace(tzinfo=None)>=_clock(cfg.decision_freeze_ist); finalized=bool(state.get("selectionFinalized")); locked_today=any(str(r.get("sessionDate") or "")==day for r in positions); blocked=bool((effective or {}).get("blocked")); cash=finalized and not locked_today; realized=sum(float(r.get("realizedPnl") or 0) for r in rows); unreal=sum(float(r.get("unrealizedPnl") or 0) for r in rows)
- return {"success":True,"book":"SWING","strategyId":cfg.strategy_id,"policyVersion":cfg.policy_version,"featureVersion":cfg.feature_version,"validationState":"RESEARCH_HYPOTHESIS","authority":"V2","authoritative":True,"executionMode":"PAPER","manualBrokerOrderPlaced":False,"v1Enabled":False,"sessionDate":day,"locked":bool(active) or locked_today or cash,"hunting":not finalized and not freeze and not blocked,"selectionFinalized":finalized,"cashHeld":cash,"cashReason":(effective or {}).get("blockReason") if cash or blocked else None,"source":"swing_v2_ledger","selectionContract":cfg.strategy_id,"long":rows,"short":[],"closedPositions":[_position_row(r) for r in closed],"counts":{"long":len(rows),"short":0,"total":len(rows)},"capital":{"swingCapital":cfg.nav,"slots":len(rows),"deployedCapital":round(sum(float(r.get("deployedCapital") or 0) for r in rows),2),"remainingCapital":round(max(0,cfg.nav-sum(float(r.get("deployedCapital") or 0) for r in rows)),2),"portfolioRisk":round(sum(float(r.get("initialRiskRupees") or 0) for r in rows),2)},"portfolio":{"swingCapital":cfg.nav,"realizedPnl":round(realized,2),"unrealizedPnl":round(unreal,2),"totalPnl":round(realized+unreal,2),"lockedCount":len(rows)},"v2":effective or {"enabled":True,"authoritative":True,"candidates":[]},"entryHuntDiagnostics":_entry_hunt_diagnostics(effective,snapshot),"updatedAt":datetime.now(timezone.utc).isoformat()}
+ rows=[_position_row(r,marks.get(str(r.get("symbol") or "").upper())) for r in active]; state=_read_json(_state_path()); state=state if str(state.get("sessionDate") or "")==day else {}; effective=scan if isinstance(scan,dict) else state.get("scan"); local=now.time().replace(tzinfo=None); start=_clock(cfg.decision_start_ist); freeze_clock=_clock(cfg.decision_freeze_ist); freeze=local>=freeze_clock; before_decision=local<start; in_window=start<=local<freeze_clock; finalized=bool(state.get("selectionFinalized")); locked_today=any(str(r.get("sessionDate") or "")==day for r in positions); blocked=bool((effective or {}).get("blocked")); cash=finalized and not locked_today; realized=sum(float(r.get("realizedPnl") or 0) for r in rows); unreal=sum(float(r.get("unrealizedPnl") or 0) for r in rows); diagnostics=_entry_hunt_diagnostics(effective,snapshot) or {}; diagnostics={**diagnostics,"diagnosticPhase":"WAITING_FOR_DECISION_WINDOW" if before_decision and not finalized else ("V2_DECISION_SCAN" if in_window and not finalized else "V2_FINALIZED"),"refreshError":state.get("refreshError")}
+ cash_reason="WAITING_FOR_DECISION_WINDOW" if before_decision and not finalized else ((effective or {}).get("blockReason") if cash or blocked else None)
+ return {"success":True,"book":"SWING","strategyId":cfg.strategy_id,"policyVersion":cfg.policy_version,"featureVersion":cfg.feature_version,"validationState":"RESEARCH_HYPOTHESIS","authority":"V2","authoritative":True,"executionMode":"PAPER","manualBrokerOrderPlaced":False,"v1Enabled":False,"sessionDate":day,"locked":bool(active) or locked_today or cash,"hunting":in_window and not finalized and not blocked,"waitingForDecisionWindow":before_decision and not finalized,"decisionPhase":diagnostics["diagnosticPhase"],"decisionWindow":{"start":cfg.decision_start_ist,"freeze":cfg.decision_freeze_ist,"entryCutoff":cfg.entry_cutoff_ist,"orderExpiry":cfg.order_expire_ist,"timezone":"Asia/Kolkata"},"selectionFinalized":finalized,"cashHeld":cash,"cashReason":cash_reason,"source":"swing_v2_ledger","selectionContract":cfg.strategy_id,"long":rows,"short":[],"closedPositions":[_position_row(r) for r in closed],"counts":{"long":len(rows),"short":0,"total":len(rows)},"capital":{"swingCapital":cfg.nav,"slots":len(rows),"deployedCapital":round(sum(float(r.get("deployedCapital") or 0) for r in rows),2),"remainingCapital":round(max(0,cfg.nav-sum(float(r.get("deployedCapital") or 0) for r in rows)),2),"portfolioRisk":round(sum(float(r.get("initialRiskRupees") or 0) for r in rows),2)},"portfolio":{"swingCapital":cfg.nav,"realizedPnl":round(realized,2),"unrealizedPnl":round(unreal,2),"totalPnl":round(realized+unreal,2),"lockedCount":len(rows)},"v2":effective or {"enabled":True,"authoritative":True,"candidates":[]},"entryHuntDiagnostics":diagnostics,"updatedAt":datetime.now(timezone.utc).isoformat()}
 def _time_until_expiry(now,expiry): return datetime.combine(now.astimezone(IST).date(),expiry,tzinfo=IST)-now.astimezone(IST)
 def _retryable_final_block(scan): return str((scan or {}).get("blockReason") or "") in _RETRYABLE_FINAL_BLOCK_REASONS
-def _refresh_snapshot(reason,*,deadline=None): return _snapshot()
+def _refresh_snapshot(reason,*,deadline=None):
+ try:
+  from ..angel_one_feed import run_scheduled_live_refresh
+  with _DATA_REFRESH_LOCK:
+   result=run_scheduled_live_refresh(reason=reason)
+ except Exception as exc:
+  result={"success":False,"error":str(exc),"reason":reason}
+ snapshot=_snapshot()
+ if not isinstance(result,dict) or result.get("success") is not True:
+  snapshot=dict(snapshot); snapshot["swingV2RefreshError"]=result.get("error") if isinstance(result,dict) else "unknown_refresh_failure"
+ return snapshot
+def _v2_snapshot_ready(snapshot,cfg):
+ status=snapshot.get("swingV2DataStatus")
+ feature_rows=int(status.get("featureRows") or 0) if isinstance(status,dict) else 0
+ history_ready=int(status.get("historyReadyRows") or 0) if isinstance(status,dict) else 0
+ coverage=float(snapshot.get("swingV2UniverseCoverage") or 0.0)
+ regime=str(snapshot.get("swingV2Regime") or "")
+ return bool(isinstance(status,dict) and feature_rows>0 and history_ready/feature_rows>=cfg.required_coverage and coverage>=cfg.required_coverage and status.get("universeCurrent") and status.get("surveillanceCurrent") and status.get("corporateEventsCurrent") and regime and regime!="REGIME_UNRATED")
 def _quote_observations(symbols,now):
  if not symbols:return {}
  try:
@@ -133,9 +151,19 @@ def run_authoritative_cycle(*,now=None,force=False):
    try: due=(now-datetime.fromisoformat(str(current["lastScanAt"]).replace("Z","+00:00")).astimezone(IST)).total_seconds()>=_SWING_SCAN_INTERVAL_SECONDS
    except: pass
   if start<=local<freeze and not current.get("selectionFinalized") and due:
-   scan=build_from_market_snapshot(_snapshot(),final_lock=True,persist_events=True,occupied_symbols=occupied,existing_positions=existing,now=now); current.update(scan=scan,lastScanAt=now.astimezone(timezone.utc).isoformat())
+   snapshot=_refresh_snapshot("swing_v2_decision_scan")
+   if not _v2_snapshot_ready(snapshot,cfg):
+    scan={"enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,"blockReason":"SWING_V2_DATA_NOT_READY","candidates":[],"funnel":{"universe":snapshot.get("swingV2UniverseSize") or 0,"freshData":0,"topRejectionReasons":[{"reason":"SWING_V2_DATA_NOT_READY","count":1}]},"dataStatus":snapshot.get("swingV2DataStatus") or {}}
+   else:
+    scan=build_from_market_snapshot(snapshot,final_lock=True,persist_events=True,occupied_symbols=occupied,existing_positions=existing,now=now)
+   current.update(scan=scan,lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=snapshot.get("swingV2RefreshError"))
   elif freeze<=local and (not current.get("selectionFinalized") or (_retryable_final_block(scan) and due and local<=expiry)):
-   snapshot=_refresh_snapshot("swing_v2_final_lock"); scan=build_from_market_snapshot(snapshot,final_lock=True,persist_events=local<=expiry,occupied_symbols=occupied,existing_positions=existing,now=now); current.update(scan=scan,selectionFinalized=True,finalizedAt=now.astimezone(timezone.utc).isoformat(),lastScanAt=now.astimezone(timezone.utc).isoformat())
+   snapshot=_refresh_snapshot("swing_v2_final_lock")
+   if not _v2_snapshot_ready(snapshot,cfg):
+    scan={"enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,"blockReason":"SWING_V2_DATA_NOT_READY","candidates":[],"funnel":{"universe":snapshot.get("swingV2UniverseSize") or 0,"freshData":0,"topRejectionReasons":[{"reason":"SWING_V2_DATA_NOT_READY","count":1}]},"dataStatus":snapshot.get("swingV2DataStatus") or {}}
+   else:
+    scan=build_from_market_snapshot(snapshot,final_lock=True,persist_events=local<=expiry,occupied_symbols=occupied,existing_positions=existing,now=now)
+   current.update(scan=scan,selectionFinalized=True,finalizedAt=now.astimezone(timezone.utc).isoformat(),lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=snapshot.get("swingV2RefreshError"))
   if freeze<=local: _fill_locked_orders(ledger,now,cfg)
   _write_state(current); return _session(scan,now=now)
 def get_authoritative_session(*,live=False):
