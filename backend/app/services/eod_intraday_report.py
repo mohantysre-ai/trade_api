@@ -86,6 +86,92 @@ def session_realized_pnl(session: dict[str, Any] | None) -> float:
     return round(total, 2)
 
 
+def _session_leg_pnl(sess_row: dict[str, Any]) -> float:
+    """Mirror of project_session_live per-leg P&L selection (Issue 3 parity)."""
+    status = str(sess_row.get("status") or "").upper()
+    is_closed = bool(sess_row.get("closed")) or status in (
+        "CLOSED", "STOP LOSS HIT", "TRAIL STOP HIT", "SCALE COMPLETE",
+    )
+    if is_closed:
+        value = sess_row.get("realizedPnl")
+        if value is None:
+            value = sess_row.get("pnl")
+    else:
+        value = sess_row.get("unrealizedPnl")
+        if value is None:
+            value = sess_row.get("pnl")
+    try:
+        return round(float(value or 0), 2)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def intraday_eod_parity(
+    session: dict[str, Any] | None,
+    report: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Assert 100% parity between live Intraday execution state and the EOD book.
+
+    Every locked session leg must appear in the EOD trades with the same
+    trigger status and the same P&L (0.05 rounding tolerance). Any drift is
+    reported per-symbol instead of being silently papered over.
+    """
+    sess_idx = _session_leg_index(session if isinstance(session, dict) else None)
+    rows = {
+        (str(t.get("symbol") or "").upper(), str(t.get("direction") or "LONG").upper()): t
+        for t in ((report or {}).get("trades") or [])
+        if isinstance(t, dict) and t.get("symbol")
+    }
+    drifts: list[dict[str, Any]] = []
+    for (sym, direction), sess_row in sess_idx.items():
+        row = rows.get((sym, direction))
+        if row is None:
+            drifts.append({
+                "symbol": sym, "direction": direction, "kind": "MISSING_IN_EOD",
+            })
+            continue
+        triggered = _session_leg_is_triggered(sess_row)
+        eod_status = str(row.get("executionStatus") or row.get("exitReason") or "").upper()
+        if triggered == (eod_status == "NOT_TRIGGERED"):
+            drifts.append({
+                "symbol": sym, "direction": direction, "kind": "STATUS_MISMATCH",
+                "sessionTriggered": triggered, "eodStatus": eod_status,
+            })
+            continue
+        sess_pnl = 0.0 if not triggered else _session_leg_pnl(sess_row)
+        try:
+            eod_pnl = round(float(row.get("pnl") or 0), 2)
+        except (TypeError, ValueError):
+            eod_pnl = 0.0
+        if abs(sess_pnl - eod_pnl) > 0.05:
+            drifts.append({
+                "symbol": sym, "direction": direction, "kind": "PNL_MISMATCH",
+                "sessionPnl": sess_pnl, "eodPnl": eod_pnl,
+            })
+    eod_only = sorted(
+        f"{sym}|{direction}"
+        for (sym, direction) in rows
+        if (sym, direction) not in sess_idx
+    )
+    if eod_only:
+        drifts.append({"kind": "EXTRA_IN_EOD", "symbols": eod_only})
+    session_pnl = round(session_realized_pnl(session) if isinstance(session, dict) else 0.0, 2)
+    try:
+        book_pnl = round(float((report or {}).get("totalPnl") or 0), 2)
+    except (TypeError, ValueError):
+        book_pnl = 0.0
+    return {
+        "parity": not drifts,
+        "checkedAt": datetime.now(timezone.utc).isoformat(),
+        "sessionRealizedPnl": session_pnl,
+        "bookTotalPnl": book_pnl,
+        "sessionLegs": len(sess_idx),
+        "eodRows": len(rows),
+        "driftCount": len(drifts),
+        "drifts": drifts,
+    }
+
+
 def apply_session_leg_economics(
     sess_row: dict[str, Any] | None,
     *,
@@ -97,14 +183,19 @@ def apply_session_leg_economics(
     """Live locked session is Book source of truth for the matching IST date."""
     if not _session_leg_is_triggered(sess_row) or sess_row is None:
         return reason, exit_price, pnl, scale_meta
-    sp = sess_row.get("realizedPnl")
-    if sp is None:
-        sp = sess_row.get("pnl")
-    if sp is not None:
-        pnl = float(sp)
     er = sess_row.get("exitReason") or sess_row.get("status")
     if er:
         reason = str(er)
+    realized = _f(sess_row.get("realizedPnl")) or 0.0
+    unrealized = _f(sess_row.get("unrealizedPnl"))
+    if _position_is_open(sess_row, er):
+        session_pnl = realized + unrealized if unrealized is not None else _f(sess_row.get("pnl"))
+    else:
+        session_pnl = _f(sess_row.get("realizedPnl"))
+        if session_pnl is None:
+            session_pnl = _f(sess_row.get("pnl"))
+    if session_pnl is not None:
+        pnl = session_pnl
     ep = sess_row.get("exitPrice")
     if ep is not None:
         try:
@@ -112,6 +203,7 @@ def apply_session_leg_economics(
         except (TypeError, ValueError):
             pass
     st = sess_row.get("exitState")
+    merged = dict(scale_meta or {})
     if isinstance(st, dict):
         fills = st.get("legsFilled") or []
         if fills and isinstance(fills[-1], dict):
@@ -119,16 +211,14 @@ def apply_session_leg_economics(
                 reason = "STOP LOSS HIT"
             elif fills[-1].get("r") == "TRAIL_SL":
                 reason = "TRAIL STOP HIT"
-        merged = dict(scale_meta or {})
         merged["exitState"] = st
-        # Do not mix replayed top-level economics with the locked session's
-        # fill state (e.g. PRESTIGE +101.27 total but -490.77 realised).
-        for key in ("realizedPnl", "unrealizedPnl", "remainingQty", "effectiveStop", "closed", "rMultiple"):
-            value = sess_row.get(key)
-            if value is None:
-                value = st.get(key)
-            if value is not None:
-                merged[key] = value
+    for key in ("realizedPnl", "unrealizedPnl", "remainingQty", "effectiveStop", "closed", "rMultiple"):
+        value = sess_row.get(key)
+        if value is None and isinstance(st, dict):
+            value = st.get(key)
+        if value is not None:
+            merged[key] = value
+    if merged:
         scale_meta = merged
     return reason, float(exit_price or 0), pnl, scale_meta
 
@@ -179,6 +269,19 @@ def intraday_book_cache_stale(
                     return "row_economics_mismatch"
     sess_date = str((session or {}).get("sessionDate") or "")[:10]
     if session and sess_date == for_date.isoformat() and bool(session.get("locked")):
+        sess_idx = _session_leg_index(session)
+        for row in cached.get("trades") or []:
+            sym = str(row.get("symbol") or "").upper()
+            direction = str(row.get("direction") or "LONG").upper()
+            sess_row = sess_idx.get((sym, direction))
+            if sess_row is None:
+                continue
+            # A leg the live desk has since filled must never keep showing
+            # NOT_TRIGGERED from a cache written before the fill (Issue 3).
+            if _session_leg_is_triggered(sess_row) and str(
+                row.get("executionStatus") or ""
+            ).upper() == "NOT_TRIGGERED":
+                return "status_drift"
         sess_pnl = session_realized_pnl(session)
         cache_pnl = round(float(cached.get("totalPnl") or 0), 2)
         if abs(sess_pnl - cache_pnl) > 0.05:
@@ -371,6 +474,32 @@ def _round(v: float | None, digits: int = 2) -> float | None:
     if v is None:
         return None
     return round(float(v), digits)
+
+
+def _position_is_open(row: dict[str, Any], exit_reason: Any = None) -> bool:
+    if row.get("closed") is not None:
+        return not bool(row.get("closed"))
+    status = str(exit_reason or row.get("exitReason") or row.get("status") or "").upper()
+    return status in {"OPEN", "RUNNING", "ACTIVE"}
+
+
+def _apply_pnl_components(row: dict[str, Any], *, is_open: bool) -> None:
+    total = _f(row.get("pnl")) or 0.0
+    if is_open:
+        realized = _f(row.get("realizedPnl")) or 0.0
+        unrealized = _f(row.get("unrealizedPnl"))
+        if unrealized is None:
+            unrealized = total - realized
+        total = realized + unrealized
+    else:
+        realized = _f(row.get("realizedPnl"))
+        if realized is None:
+            realized = total
+        unrealized = 0.0
+        total = realized
+    row["pnl"] = round(total, 2)
+    row["realizedPnl"] = round(realized, 2)
+    row["unrealizedPnl"] = round(unrealized, 2)
 
 
 def _exit_reason_from_scale_eval(eval_result: dict[str, Any]) -> str:
@@ -1206,9 +1335,9 @@ def project_session_live(
             if pnl is None:
                 pnl = _f(sess_row.get("pnl"))
         else:
-            pnl = _f(sess_row.get("unrealizedPnl"))
-            if pnl is None:
-                pnl = _f(sess_row.get("pnl"))
+            realized_pnl = _f(sess_row.get("realizedPnl")) or 0.0
+            unrealized_pnl = _f(sess_row.get("unrealizedPnl"))
+            pnl = realized_pnl + unrealized_pnl if unrealized_pnl is not None else _f(sess_row.get("pnl"))
             if pnl is None and entry_px is not None and exit_px is not None and qty:
                 sign = 1.0 if str(direction or "LONG").upper() != "SHORT" else -1.0
                 pnl = round(sign * (exit_px - entry_px) * qty, 2)
@@ -1310,10 +1439,13 @@ def project_session_live(
             "policyChain": desk.get("policyChain") or desk.get("chain"),
             "outcomeSchemaVersion": desk.get("outcomeSchemaVersion"),
             "executionBasis": "MODELED_PAPER",
-            "pnlKind": "realised",
+            "pnlKind": "realised" if is_closed else "unrealised",
             "executionEvidence": "SESSION_LOCK",
             "entryEvidence": session_lock_fill_evidence(sess_row)
             or {"triggered": True, "triggerSource": "session_lock"},
+            "closed": is_closed,
+            "realizedPnl": sess_row.get("realizedPnl"),
+            "unrealizedPnl": sess_row.get("unrealizedPnl"),
         }
         if desk.get("rMultiple") is not None:
             row["rMultiple"] = desk.get("rMultiple")
@@ -1334,12 +1466,7 @@ def project_session_live(
         ):
             if desk.get(_k) is not None:
                 row[_k] = desk[_k]
-        if str(row.get("exitReason") or "").upper() == "OPEN":
-            row["realizedPnl"] = 0.0
-            row["unrealizedPnl"] = float(row.get("pnl") or 0)
-        else:
-            row["realizedPnl"] = float(row.get("pnl") or 0)
-            row["unrealizedPnl"] = 0.0
+        _apply_pnl_components(row, is_open=_position_is_open(row, exit_reason))
         rows.append(row)
 
     long_count = len(session.get("long") or [])
@@ -1386,6 +1513,7 @@ def project_session_live(
         "dayLessons": [],
         "trades": rows,
     }
+    report["parity"] = intraday_eod_parity(session, report)
     return report
 
 
@@ -1817,13 +1945,7 @@ def generate_intraday_eod_report(
         ):
             if desk.get(_k) is not None:
                 row[_k] = desk[_k]
-        # EOD closed positions must carry realised P&L; open positions carry unrealised.
-        if str(row.get("exitReason") or "").upper() == "OPEN":
-            row["realizedPnl"] = 0.0
-            row["unrealizedPnl"] = float(row.get("pnl") or 0)
-        else:
-            row["realizedPnl"] = float(row.get("pnl") or 0)
-            row["unrealizedPnl"] = 0.0
+        _apply_pnl_components(row, is_open=_position_is_open(row, reason))
         # Invariant: never report WIN with negative Book P&L
         if float(row.get("pnl") or 0) < 0 and row.get("outcomeBucket") == "WIN":
             row["outcomeBucket"] = "LOSS"
@@ -1895,6 +2017,7 @@ def generate_intraday_eod_report(
         "dayLessons": lessons,
         "trades": rows,
     }
+    report["parity"] = intraday_eod_parity(session_live, report)
     return save_book_cache(for_date, "intraday", report)
 
 

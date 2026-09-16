@@ -35,6 +35,11 @@ _SESSION_READ_CACHE_AT = 0.0
 _SESSION_READ_TTL = float(os.getenv("SWING_SESSION_READ_TTL", "2"))
 _EOD_READ_CACHE: dict[str, dict[str, Any]] = {}
 _SWING_SCAN_INTERVAL_SECONDS = float(os.getenv("SWING_SCAN_INTERVAL_SECONDS", "15"))
+_RETRYABLE_FINAL_BLOCK_REASONS = {
+    "FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW",
+    "UNIVERSE_COVERAGE_BELOW_99PCT",
+    "REGIME_UNRATED",
+}
 
 
 def is_v2_authoritative(config: SwingV2Config | None = None) -> bool:
@@ -245,6 +250,10 @@ def _time_until_expiry(now: datetime, expiry: time) -> timedelta:
     """Wall-clock room still available before ``expiry`` in the final window."""
     expiry_local = datetime.combine(now.astimezone(IST).date(), expiry, tzinfo=IST)
     return expiry_local - now.astimezone(IST)
+
+
+def _retryable_final_block(scan: dict[str, Any] | None) -> bool:
+    return str((scan or {}).get("blockReason") or "") in _RETRYABLE_FINAL_BLOCK_REASONS
 
 
 def _refresh_snapshot(reason: str, *, deadline: datetime | None = None) -> dict[str, Any]:
@@ -496,12 +505,8 @@ def run_authoritative_cycle(*, now: datetime | None = None, force: bool = False)
             # retry when a previous pass aborted on a missed order window, so a
             # slow broker refresh can never permanently poison the book into a
             # cash-hold with zero qualified signals.
-            poisoned_final = bool(
-                current.get("selectionFinalized")
-                and str((current.get("scan") or {}).get("blockReason"))
-                == "FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW"
-            )
-            if not current.get("selectionFinalized") or poisoned_final:
+            poisoned_final = bool(current.get("selectionFinalized") and _retryable_final_block(scan))
+            if not current.get("selectionFinalized") or (poisoned_final and scan_due and local_time <= expiry):
                 expiry_local = datetime.combine(now.astimezone(IST).date(), expiry, tzinfo=IST)
                 refresh_deadline = expiry_local - timedelta(seconds=_FINAL_REFRESH_MARGIN_SECONDS)
                 snapshot = _refresh_snapshot("swing_v2_final_lock", deadline=refresh_deadline)
@@ -525,13 +530,15 @@ def run_authoritative_cycle(*, now: datetime | None = None, force: bool = False)
                 if remaining.total_seconds() >= _FINAL_REFRESH_MARGIN_SECONDS:
                     snapshot = _refresh_final_candidate_facts(snapshot, prelock, now)
                 scan = build_from_market_snapshot(snapshot, final_lock=True, persist_events=inside_window, occupied_symbols=occupied, existing_positions=existing_open, now=now)
+                prior_block = str((current.get("scan") or {}).get("blockReason") or "")
                 if poisoned_final:
-                    scan = {**scan, "recoveredFrom": "FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW"}
+                    scan = {**scan, "recoveredFrom": prior_block}
                 current.update({
                     "scan": scan,
                     "selectionFinalized": True,
                     "finalizedAt": now.astimezone(timezone.utc).isoformat(),
-                    **({"recoveredFrom": "FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW"} if poisoned_final else {}),
+                    "lastScanAt": now.astimezone(timezone.utc).isoformat(),
+                    **({"recoveredFrom": prior_block} if poisoned_final else {}),
                 })
         if freeze <= local_time <= expiry:
             _fill_locked_orders(ledger, now, cfg)

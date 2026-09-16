@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import uuid
 from datetime import datetime, time, timezone
 from typing import Any
@@ -114,7 +115,8 @@ def build_shadow_v2(
 
     block_funnel = _blocked_funnel(rows, tradable_rows=tradable_rows, shadow_rows=shadow_rows, final_lock=final_lock, now=now)
     if tradable_coverage < cfg.required_coverage:
-        return {**base, "blocked": True, "blockReason": "UNIVERSE_COVERAGE_BELOW_99PCT", "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "shadowCoverage": shadow_coverage, "candidates": [], "funnel": block_funnel}
+        required_fresh = math.ceil(cfg.required_coverage * len(tradable_rows))
+        return {**base, "blocked": True, "retryable": True, "blockReason": "UNIVERSE_COVERAGE_BELOW_99PCT", "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "requiredCoverage": cfg.required_coverage, "freshRows": tradable_covered, "missingFreshRows": max(0, required_fresh - tradable_covered), "shadowCoverage": shadow_coverage, "candidates": [], "funnel": block_funnel}
     risk_scale, regime_cap = _regime_scale(regime)
     if regime == "REGIME_UNRATED":
         return {**base, "blocked": True, "blockReason": "REGIME_UNRATED", "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "shadowCoverage": shadow_coverage, "candidates": [], "funnel": block_funnel}
