@@ -20,7 +20,7 @@ from typing import Any
 
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.responses import StreamingResponse
 
 from app.services.shared_state import (
@@ -32,6 +32,7 @@ from app.services.shared_state import (
     init_shared_state,
 )
 from app.services.angel_one_feed import AngelOneClient, create_app
+from app.services.angel_index_options import _float
 from app.services.index_options_hunt_supervisor import (
     index_options_hunt_status,
     start_index_options_hunt_supervisor,
@@ -243,6 +244,90 @@ def index_options_paper_supervisor_status() -> dict:
 def index_options_hunt_supervisor_status() -> dict:
     """Read-only health for autonomous BUY/SELL index-option discovery."""
     return {"success": True, "supervisor": index_options_hunt_status()}
+
+
+@app.get("/api/diagnostics/angel-circuit-state")
+def angel_circuit_state() -> dict[str, Any]:
+    """Return current Angel One AB1021 candle-circuit and cooldown state."""
+    try:
+        from app.services.angel_one_feed import (
+            _ANGEL_CANDLE_CIRCUIT_UNTIL,
+            _CANDLE_COOLDOWN_UNTIL_MONO,
+            _CANDLE_LAST_CALL_MONO,
+            ANGEL_CANDLE_CIRCUIT_SECONDS,
+            _angel_candle_calls_allowed,
+        )
+        now = time.monotonic()
+        circuit_remaining = max(0.0, _ANGEL_CANDLE_CIRCUIT_UNTIL - now)
+        cooldown_remaining = max(0.0, _CANDLE_COOLDOWN_UNTIL_MONO - now)
+        last_call_age = max(0.0, now - _CANDLE_LAST_CALL_MONO)
+        return {
+            "success": True,
+            "circuitOpen": circuit_remaining > 0,
+            "circuitRemainingSeconds": round(circuit_remaining, 2),
+            "cooldownRemainingSeconds": round(cooldown_remaining, 2),
+            "lastCandleCallAgeSeconds": round(last_call_age, 2),
+            "callsAllowed": _angel_candle_calls_allowed(),
+            "configuredCircuitSeconds": ANGEL_CANDLE_CIRCUIT_SECONDS,
+        }
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
+@app.get("/api/diagnostics/angel-option-chain")
+def angel_option_chain_diagnostic() -> dict[str, Any]:
+    """Test Angel One option chain fetch for all supported indexes."""
+    try:
+        from app.services.angel_index_options import fetch_angel_index_option_snapshot
+        from app.services.angel_one_feed import AngelOneClient
+
+        client = AngelOneClient()
+        snapshot = fetch_angel_index_option_snapshot(client)
+        indices = snapshot.get("indices") or {}
+        results = {}
+        for key, payload in indices.items():
+            chain = payload.get("chain") or []
+            results[key] = {
+                "source": payload.get("source"),
+                "status": payload.get("status"),
+                "error": payload.get("error"),
+                "spot": payload.get("spot"),
+                "expiry": payload.get("expiry"),
+                "chainContracts": len(chain),
+                "hasDepth": any(
+                    _float(row.get("bestBid")) is not None and _float(row.get("bestAsk")) is not None
+                    for row in chain if isinstance(row, dict)
+                ),
+                "hasGreeks": any(
+                    _float(row.get("delta")) is not None for row in chain if isinstance(row, dict)
+                ),
+                "componentFreshness": payload.get("componentFreshness") or {},
+            }
+        return {
+            "success": True,
+            "fetchedAt": snapshot.get("fetchedAt"),
+            "indices": results,
+        }
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
+@app.post("/api/eod/warm-caches")
+def eod_warm_caches(date: str | None = None) -> dict[str, Any]:
+    """Force-warm EOD book caches from live state for the given date."""
+    try:
+        from datetime import date as _date
+        from app.services.eod_book_cache import warm_book_caches
+
+        for_date = _date.fromisoformat(date) if date else datetime.now(tz=timezone.utc).date()
+        result = warm_book_caches(for_date)
+        return {
+            "success": True,
+            "date": for_date.isoformat(),
+            "warmResult": result,
+        }
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
 
 
 if __name__ == "__main__":
