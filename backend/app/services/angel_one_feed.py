@@ -834,18 +834,63 @@ def run_scheduled_morning_prework(*, force: bool = False) -> dict[str, Any]:
         return {"success": False, "date": today, "error": str(exc), "llm_locked": False}
 
 
+def _stale_refresh_timeout_seconds() -> float:
+    """Return the configured timeout for a refresh to be considered stuck."""
+    return float(os.getenv("SWING_REFRESH_STALE_TIMEOUT_SECONDS", "300"))
+
+
+def _is_refresh_stale() -> bool:
+    """True when the scheduled refresh lock has been held past its timeout."""
+    with _SCHEDULED_REFRESH_STATE_LOCK:
+        state = dict(_SCHEDULED_REFRESH_STATE)
+    if not state.get("running"):
+        return False
+    started = state.get("startedAt")
+    if not started:
+        return True
+    try:
+        started_at = datetime.fromisoformat(str(started).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return True
+    elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
+    return elapsed > _stale_refresh_timeout_seconds()
+
+
+def _clear_stale_refresh_lock() -> bool:
+    """Force-clear a stuck scheduled refresh lock so scans can proceed."""
+    with _SCHEDULED_REFRESH_STATE_LOCK:
+        if not _SCHEDULED_REFRESH_STATE.get("running"):
+            return False
+        prior = dict(_SCHEDULED_REFRESH_STATE)
+        _SCHEDULED_REFRESH_STATE.update(
+            running=False,
+            reason=None,
+            startedAt=None,
+            clearedAt=datetime.now(timezone.utc).isoformat(),
+            clearedReason="stale_refresh_timeout",
+        )
+    log.warning(
+        "Cleared stuck scheduled refresh lock: prior=%s", prior
+    )
+    return True
+
+
 def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dict[str, Any]:
     """Live quote/candle refresh with LLM day-lock reuse (no force LLM)."""
     log = logging.getLogger(__name__)
     if not _SCHEDULED_REFRESH_LOCK.acquire(blocking=False):
-        with _SCHEDULED_REFRESH_STATE_LOCK:
-            active = dict(_SCHEDULED_REFRESH_STATE)
-        return {
-            "success": False,
-            "error": "market_refresh_already_running",
-            "reason": reason,
-            "activeRefresh": active,
-        }
+        if _is_refresh_stale():
+            _clear_stale_refresh_lock()
+            _SCHEDULED_REFRESH_LOCK.acquire(blocking=True)
+        else:
+            with _SCHEDULED_REFRESH_STATE_LOCK:
+                active = dict(_SCHEDULED_REFRESH_STATE)
+            return {
+                "success": False,
+                "error": "market_refresh_already_running",
+                "reason": reason,
+                "activeRefresh": active,
+            }
     with _SCHEDULED_REFRESH_STATE_LOCK:
         _SCHEDULED_REFRESH_STATE.update(
             {
@@ -5056,6 +5101,7 @@ def create_app() -> FastAPI:
         background_tasks: BackgroundTasks,
         live: bool = True,
         sessionDate: str | None = None,
+        force: bool = False,
     ) -> dict[str, Any]:
         """Return the deterministic index-options radar; never mock missing chain data."""
         from .angel_index_options import _RADAR_REFRESH_LOCK, load_persisted_radar
@@ -5094,6 +5140,8 @@ def create_app() -> FastAPI:
                 _RADAR_REFRESH_LOCK.release()
 
         view = get_view_store().get("index_options")
+        if force:
+            return _compose()
         if view:
             payload = view.get("payload") or {}
             if payload.get("success"):
