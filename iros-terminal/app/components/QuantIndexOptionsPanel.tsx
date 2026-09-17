@@ -94,6 +94,7 @@ const sideClass = (side?: string) =>
     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
     : 'border-rose-200 bg-rose-50 text-rose-700';
 const pnlClass = (value?: number) => ((value ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500');
+const UI_VERSION = 'LEG_TICKET_UI_V3';
 
 function legPnl(leg: Leg): number | null {
   const entry = leg.entryFill ?? leg.entryPrice;
@@ -103,6 +104,17 @@ function legPnl(leg: Leg): number | null {
   const qty = Math.max(1, Number(leg.qty || 1)) * Math.max(1, Number(leg.lotSize || 1));
   const sign = side === 'SELL' ? -1 : 1;
   return (current - entry) * qty * sign;
+}
+
+function legActionLine(leg: Leg, fallbackExpiry?: string): string {
+  const side = String(leg.side || '—').toUpperCase();
+  const symbol = leg.symbol || 'contract unavailable';
+  const expiry = leg.expiry || fallbackExpiry || 'expiry —';
+  const strike = leg.strike == null ? 'strike —' : n(leg.strike, 0);
+  const optionType = leg.optionType || 'CE/PE —';
+  const qty = n((leg.qty || 1) * (leg.lotSize || 1), 0);
+  const entry = money(leg.entryFill ?? leg.entryPrice);
+  return `${side} ${qty} qty · ${symbol} · ${expiry} · ${strike} ${optionType} · entry ${entry}`;
 }
 
 function StrategyCard({ position }: { position: Position }) {
@@ -135,6 +147,26 @@ function StrategyCard({ position }: { position: Position }) {
         <Metric label="Structure mark" value={money(position.combinedStructureValue)} />
         <Metric label="Max profit" value={money(position.maxProfit)} />
         <Metric label="Updated" value={position.updatedAt ? new Date(position.updatedAt).toLocaleTimeString('en-IN') : '—'} />
+      </div>
+
+      <div className="mt-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="desk-panel-title text-emerald-600">TRADE TICKET · WHAT TO BUY / SELL</div>
+          <span className="desk-pill desk-pill--ok">MANUAL EXECUTION</span>
+        </div>
+        {legs.length ? (
+          <div className="mt-2 space-y-1">
+            {legs.map((leg, index) => (
+              <div key={`ticket-${leg.symbol || index}-${index}`} className="rounded-md border border-[var(--terminal-line)] bg-[var(--surface)] px-2.5 py-2 text-[11px] font-bold text-[var(--fg-strong)]">
+                {index + 1}. {legActionLine(leg, position.expiry)}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[11px] font-bold text-amber-600">
+            Leg details are missing from the durable book, so this strategy is not actionable from the UI.
+          </div>
+        )}
       </div>
 
       <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--terminal-line)]">
@@ -247,6 +279,7 @@ export default function QuantIndexOptionsPanel({ refreshToken = 0 }: { refreshTo
             <p className="mt-1 text-[11px] text-[var(--fg-muted)]">
               Exact strategy legs · strikes · entry marks · durable paper book
             </p>
+            <p className="mt-1 text-[9px] font-bold tracking-wider text-[var(--fg-subtle)]">{UI_VERSION}</p>
           </div>
           <div className="flex flex-wrap gap-1.5">
             <span className="desk-pill desk-pill--ok">SOLE SELECTION AUTHORITY</span>
