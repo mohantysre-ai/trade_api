@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -8,8 +9,14 @@ from typing import Any
 # impossible to lock even when the underlying 1h setup was valid. Keep quotes
 # and depth genuinely recent, while allowing the latest completed 1h bar to
 # remain valid for its natural timeframe.
-SCAN_MAX_AGE = {"quote": 180, "depth": 180, "bars1h": 5400}
-LOCK_MAX_AGE = {"quote": 60, "depth": 60, "bars1h": 5400}
+SCAN_MAX_AGE = {
+    "quote": int(os.getenv("SWING_SCAN_QUOTE_MAX_AGE_SEC", "900")),
+    "bars1h": int(os.getenv("SWING_SCAN_BARS1H_MAX_AGE_SEC", "86400")),
+}
+LOCK_MAX_AGE = {
+    "quote": int(os.getenv("SWING_LOCK_QUOTE_MAX_AGE_SEC", "300")),
+    "bars1h": int(os.getenv("SWING_LOCK_BARS1H_MAX_AGE_SEC", "86400")),
+}
 
 
 def age_seconds(timestamp: str | None, now: datetime | None = None) -> float | None:
