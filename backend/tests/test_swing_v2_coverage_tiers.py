@@ -1,7 +1,9 @@
 from dataclasses import replace
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from app.services.swing_v2.config import SwingV2Config
-from app.services.swing_v2.shadow import _raw_coverage_tier
+from app.services.swing_v2.shadow import _raw_coverage_tier, build_shadow_v2
 
 
 def test_coverage_tier_boundaries_and_risk_multipliers():
@@ -49,7 +51,37 @@ def test_block_is_distinct_below_90_percent():
     assert _raw_coverage_tier(0.899999, cfg) == ("BLOCK", 0.0)
 
 
-def test_tiered_gate_is_not_authoritative_by_default():
+def test_tiered_gate_is_authoritative_by_default():
     cfg = SwingV2Config()
-    assert cfg.coverage_tiers_authoritative is False
-    assert cfg.required_coverage == 0.99
+    assert cfg.coverage_tiers_authoritative is True
+    assert cfg.required_coverage == 0.90
+
+
+def test_final_lock_490_of_505_is_degraded_not_99pct_block():
+    now = datetime(2026, 9, 17, 10, 30, tzinfo=ZoneInfo("Asia/Kolkata"))
+    rows = []
+    for index in range(505):
+        fresh = index < 490
+        rows.append({
+            "symbol": f"SYM{index}",
+            "universeSegment": "NIFTY100",
+            "dailyBarsThroughPreviousClose": fresh,
+            "corporateEventsCurrent": fresh,
+            "surveillanceCurrent": fresh,
+            "universeCurrent": fresh,
+            "sourceTimestamps": {"quote": now.isoformat(), "bars1h": now.isoformat()} if fresh else {},
+        })
+    result = build_shadow_v2(
+        rows,
+        universe_coverage=490 / 505,
+        regime="NORMAL",
+        final_lock=True,
+        now=now,
+        config=SwingV2Config(),
+        apply_coverage_hysteresis=False,
+    )
+    assert result.get("blocked") is not True
+    assert result["coverageTier"] == "DEGRADED"
+    assert result["funnel"]["block_reason"] is None
+    assert result["funnel"]["coverage_numerator"] == 490
+    assert result["funnel"]["coverage_denominator"] == 505

@@ -61,7 +61,7 @@ class SwingV2Config:
     coverage_degraded_risk_multiplier: float = 0.75
     coverage_defensive_risk_multiplier: float = 0.50
     coverage_hysteresis_cycles: int = 3
-    coverage_tiers_authoritative: bool = False
+    coverage_tiers_authoritative: bool = True
     max_average_correlation: float = 0.70
     decision_start_ist: str = "09:45"
     entry_cutoff_ist: str = "15:15"
@@ -125,7 +125,7 @@ def load_config() -> SwingV2Config:
         t1_r=float(os.getenv("SWING_T1_R", "1.00")), t1_qty_pct=float(os.getenv("SWING_T1_QTY_PCT", "50")), trail_arm_r=float(os.getenv("SWING_TRAIL_ARM_R", "1.50")), trail_lock_r=float(os.getenv("SWING_TRAIL_LOCK_R", "0.75")), t2_r=float(os.getenv("SWING_T2_R", "2.00")),
         min_upside_capacity_r=float(os.getenv("SWING_MIN_UPSIDE_CAPACITY_R", "1.50")), min_expected_net_r=float(os.getenv("SWING_MIN_EXPECTED_NET_R", "0.12")),
         coverage_normal_threshold=float(os.getenv("SWING_COVERAGE_NORMAL_THRESHOLD", "0.99")), coverage_degraded_threshold=float(os.getenv("SWING_COVERAGE_DEGRADED_THRESHOLD", "0.95")), coverage_defensive_threshold=float(os.getenv("SWING_COVERAGE_DEFENSIVE_THRESHOLD", "0.90")),
-        coverage_normal_risk_multiplier=float(os.getenv("SWING_COVERAGE_NORMAL_RISK_MULTIPLIER", "1.00")), coverage_degraded_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEGRADED_RISK_MULTIPLIER", "0.75")), coverage_defensive_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEFENSIVE_RISK_MULTIPLIER", "0.50")), coverage_hysteresis_cycles=int(os.getenv("SWING_COVERAGE_HYSTERESIS_CYCLES", "3")), coverage_tiers_authoritative=_bool("SWING_COVERAGE_TIERS_AUTHORITATIVE", False),
+        coverage_normal_risk_multiplier=float(os.getenv("SWING_COVERAGE_NORMAL_RISK_MULTIPLIER", "1.00")), coverage_degraded_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEGRADED_RISK_MULTIPLIER", "0.75")), coverage_defensive_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEFENSIVE_RISK_MULTIPLIER", "0.50")), coverage_hysteresis_cycles=int(os.getenv("SWING_COVERAGE_HYSTERESIS_CYCLES", "3")), coverage_tiers_authoritative=_bool("SWING_COVERAGE_TIERS_AUTHORITATIVE", True),
         entry_cutoff_ist=os.getenv("SWING_ENTRY_CUTOFF_IST", "15:15"), decision_start_ist=os.getenv("SWING_DECISION_START_IST", "09:45"), decision_freeze_ist=os.getenv("SWING_DECISION_FREEZE_IST", "15:10"), order_expire_ist=os.getenv("SWING_ORDER_EXPIRE_IST", "15:20"), mandatory_exit_ist=os.getenv("SWING_MANDATORY_EXIT_IST", "15:15"),
         history_lookback_days=int(os.getenv("SWING_HISTORY_LOOKBACK_DAYS", "180")), min_daily_observations=int(os.getenv("SWING_MIN_DAILY_OBSERVATIONS", "90")),
         ledger_path=os.getenv("SWING_V2_LEDGER_PATH", str(repo_root / "backend" / "app" / "data" / "swing_v2_ledger.sqlite3")), live_promotion=_bool("SWING_LIVE_PROMOTION", False),
