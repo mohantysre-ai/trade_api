@@ -21,6 +21,7 @@ import re
 import sys
 import threading
 import time
+import statistics
 import uuid
 from urllib.parse import quote
 from concurrent.futures import ThreadPoolExecutor, as_completed

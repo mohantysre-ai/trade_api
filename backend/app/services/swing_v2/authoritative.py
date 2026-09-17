@@ -17,7 +17,7 @@ from .engine import execute_paper_order, process_position_bar
 from .facade import build_from_market_snapshot
 from .ledger import SwingLedger, materialize_position
 from .reporting import ledger_eod_report
-IST=ZoneInfo("Asia/Kolkata"); _LOCK=threading.RLock(); _DATA_REFRESH_LOCK=threading.Lock()
+IST=ZoneInfo("Asia/Kolkata"); _LOCK=threading.RLock(); _DATA_REFRESH_LOCK=threading.Lock(); _SESSION_CACHE_LOCK=threading.Lock()
 _FINAL_REFRESH_MARGIN_SECONDS=int(os.getenv("SWING_FINAL_REFRESH_MARGIN_SECONDS","90")); _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0.0; _SESSION_READ_TTL=float(os.getenv("SWING_SESSION_READ_TTL","2")); _EOD_READ_CACHE={}; _SWING_SCAN_INTERVAL_SECONDS=float(os.getenv("SWING_SCAN_INTERVAL_SECONDS","300"))
 _RETRYABLE_FINAL_BLOCK_REASONS={"FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW","UNIVERSE_COVERAGE_BELOW_99PCT","UNIVERSE_COVERAGE_BELOW_90PCT","REGIME_UNRATED","SWING_V2_DATA_NOT_READY"}
 def is_v2_authoritative(config=None): return (config or load_config()).paper_authoritative
@@ -142,7 +142,8 @@ def run_authoritative_cycle(*,now=None,force=False):
  if not cfg.paper_authoritative: raise RuntimeError("Swing V2 is not configured as paper authority")
  now=(now or datetime.now(timezone.utc)).astimezone(IST)
  with _LOCK:
-  _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0; _EOD_READ_CACHE={}; ledger=SwingLedger(cfg.ledger_path)
+  with _SESSION_CACHE_LOCK: _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0
+  _EOD_READ_CACHE={}; ledger=SwingLedger(cfg.ledger_path)
   from ..nse_trading_calendar import is_nse_trading_day
   if not is_nse_trading_day(now.date()): return _session({"enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,"blockReason":"NSE_MARKET_HOLIDAY","candidates":[],"funnel":{"universe":0}},now=now)
   _manage_open_positions(ledger,now,cfg); current=_read_json(_state_path()); day=now.date().isoformat(); current=current if str(current.get("sessionDate") or "")==day else {"sessionDate":day,"selectionFinalized":False}; local=now.time().replace(tzinfo=None)
@@ -167,14 +168,27 @@ def run_authoritative_cycle(*,now=None,force=False):
     scan=build_from_market_snapshot(snapshot,final_lock=True,persist_events=local<=expiry,occupied_symbols=occupied,existing_positions=existing,now=now)
    current.update(scan=scan,selectionFinalized=True,finalizedAt=now.astimezone(timezone.utc).isoformat(),lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=snapshot.get("swingV2RefreshError"))
   if freeze<=local: _fill_locked_orders(ledger,now,cfg)
-  _write_state(current); return _session(scan,now=now)
+  _write_state(current); session=_session(scan,now=now)
+  with _SESSION_CACHE_LOCK: _SESSION_READ_CACHE=session; _SESSION_READ_CACHE_AT=monotonic_time.monotonic()
+  return session
 def get_authoritative_session(*,live=False):
  global _SESSION_READ_CACHE,_SESSION_READ_CACHE_AT
  now=monotonic_time.monotonic()
- with _LOCK:
-  ttl=0.75 if live else _SESSION_READ_TTL
-  if _SESSION_READ_CACHE is None or now-_SESSION_READ_CACHE_AT>=ttl: _SESSION_READ_CACHE=_session(); _SESSION_READ_CACHE_AT=monotonic_time.monotonic()
-  return copy.deepcopy(_SESSION_READ_CACHE)
+ ttl=0.75 if live else _SESSION_READ_TTL
+ with _SESSION_CACHE_LOCK:
+  if _SESSION_READ_CACHE is not None and now-_SESSION_READ_CACHE_AT<ttl:
+   return copy.deepcopy(_SESSION_READ_CACHE)
+  cached = copy.deepcopy(_SESSION_READ_CACHE)
+ if cached is not None:
+  return cached
+ fresh = _session()
+ with _SESSION_CACHE_LOCK:
+  if _SESSION_READ_CACHE is None or now-_SESSION_READ_CACHE_AT>=ttl:
+   _SESSION_READ_CACHE = fresh
+   _SESSION_READ_CACHE_AT = monotonic_time.monotonic()
+  else:
+   fresh = copy.deepcopy(_SESSION_READ_CACHE)
+ return fresh
 def lock_authoritative_session(*,force=False):
  s=run_authoritative_cycle(force=force); return {"success":True,"alreadyLocked":bool(s.get("locked")),"session":s}
 def authoritative_eod_report(for_date): return ledger_eod_report(SwingLedger(load_config().ledger_path),for_date.isoformat())
