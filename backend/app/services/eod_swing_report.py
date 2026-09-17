@@ -762,8 +762,53 @@ def generate_swing_eod_report(
 ) -> dict[str, Any]:
     """Build swing Book P&L from locked swing portfolio (not intradAy mirror)."""
     from .swing_v2.authoritative import authoritative_eod_report, is_v2_authoritative
+    from .eod_book_cache import save_book_cache
+
+    as_of = for_date or date.fromisoformat(_today_ist())
+
     if is_v2_authoritative():
-        return authoritative_eod_report(for_date or date.fromisoformat(_today_ist()))
+        report = authoritative_eod_report(as_of)
+        positions = report.get("positions") or []
+        picks = []
+        for p in positions:
+            picks.append(
+                {
+                    "symbol": p.get("symbol"),
+                    "direction": "LONG",
+                    "status": "CLOSED" if p.get("terminal") else "RUNNING",
+                    "terminal": p.get("terminal"),
+                    "pnl": p.get("totalPnl"),
+                    "deployedCapital": p.get("deployedCapital"),
+                    "realizedPnl": p.get("realizedPnl"),
+                    "unrealizedPnl": p.get("unrealizedPnl"),
+                    "sessionDate": p.get("sessionDate") or report.get("sessionDate"),
+                    "lastEventAt": p.get("lastEventAt"),
+                }
+            )
+        cache_report = {
+            "date": report.get("date"),
+            "sessionDate": report.get("sessionDate"),
+            "archiveStatus": "ARCHIVED" if picks else "NO_BOOK",
+            "picks": picks,
+            "totalPicks": len(picks),
+            "activePicks": sum(1 for p in picks if not p.get("terminal")),
+            "skippedNotTriggered": 0,
+            "totalDeployed": sum(float(p.get("deployedCapital") or 0) for p in picks),
+            "totalPnl": report.get("totalPnl"),
+            "realizedPnl": report.get("realizedPnl"),
+            "unrealizedPnl": report.get("unrealizedPnl"),
+            "symbolSource": "swing_v2_ledger",
+            "isMock": False,
+            "attribution": {
+                "locked": len(picks),
+                "triggered": sum(1 for p in picks if not p.get("terminal")),
+                "skipped": 0,
+                "wins": sum(1 for p in picks if float(p.get("totalPnl") or 0) > 0),
+                "losses": sum(1 for p in picks if float(p.get("totalPnl") or 0) < 0),
+                "deployed": sum(float(p.get("deployedCapital") or 0) for p in picks),
+            },
+        }
+        return save_book_cache(as_of, "swing", cache_report)
 
     from .eod_book_cache import load_book_cache, save_book_cache
 
