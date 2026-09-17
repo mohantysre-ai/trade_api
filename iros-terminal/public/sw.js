@@ -1,5 +1,5 @@
 /* Alphix Terminal — installability assets only; never cache the Next.js shell. */
-const CACHE = "alphix-install-v3";
+const CACHE = "alphix-install-v4";
 const PRECACHE = [
   "/manifest.webmanifest",
   "/icon-192-v3.png",

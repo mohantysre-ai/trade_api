@@ -21,23 +21,23 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Homepage shell must revalidate: cached HTML referencing pruned dev
-        // chunks surfaces as "module factory is not available".
+        // Trading shell must not stay stale: old HTML can keep rendering an
+        // obsolete desk while live APIs continue updating underneath it.
         source: "/",
         headers: [
           {
             key: "Cache-Control",
-            value: "public, max-age=60, must-revalidate",
+            value: "no-store, max-age=0",
           },
           {
             key: "CDN-Cache-Control",
-            value: "public, max-age=300, stale-while-revalidate=3600, stale-if-error=86400",
+            value: "no-store",
           },
           {
             key: "Cloudflare-CDN-Cache-Control",
-            value: "public, max-age=300, stale-while-revalidate=3600, stale-if-error=86400",
+            value: "no-store",
           },
-          { key: "X-IROS-Homepage-Cache", value: "edge-ready" },
+          { key: "X-IROS-Homepage-Cache", value: "no-store-trading-shell" },
         ],
       },
       {
