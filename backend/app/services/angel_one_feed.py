@@ -869,7 +869,7 @@ def _clear_stale_refresh_lock() -> bool:
             clearedAt=datetime.now(timezone.utc).isoformat(),
             clearedReason="stale_refresh_timeout",
         )
-    log.warning(
+    logging.getLogger(__name__).warning(
         "Cleared stuck scheduled refresh lock: prior=%s", prior
     )
     return True
@@ -2893,6 +2893,12 @@ def _build_stock_row(
     ltp = float(quote.get("ltp", 0) or 0)
     close = float(quote.get("close", 0) or 0)
     delta, state = _pct_change(ltp, close if close else None)
+    depth = quote.get("depth") if isinstance(quote.get("depth"), dict) else {}
+    buy = depth.get("buy") if isinstance(depth.get("buy"), list) else []
+    sell = depth.get("sell") if isinstance(depth.get("sell"), list) else []
+    best_bid = float(buy[0].get("price")) if buy and isinstance(buy[0], dict) and buy[0].get("price") else None
+    best_ask = float(sell[0].get("price")) if sell and isinstance(sell[0], dict) and sell[0].get("price") else None
+    ask_depth = int(sell[0].get("quantity")) if sell and isinstance(sell[0], dict) and sell[0].get("quantity") is not None else None
     return {
         "ticker": inst.key,
         "name": (inst.label or inst.tradingsymbol).replace("-EQ", "").replace("-BE", "").replace("-", " ").strip(),
@@ -2908,6 +2914,9 @@ def _build_stock_row(
         "close": quote.get("close"),
         "oi": float(quote.get("opnInterest", 0) or quote.get("oi", 0) or 0),
         "prev_oi": float(quote.get("previousOI", 0) or quote.get("prev_oi", 0) or 0),
+        "bestBid": best_bid,
+        "bestAsk": best_ask,
+        "availableAskDepth": ask_depth,
         "intraday": intraday or {},
     }
 
@@ -5108,6 +5117,7 @@ def create_app() -> FastAPI:
         from .index_options_live import (
             compose_live_index_options_radar,
             finalize_closed_index_options_radar,
+            hydrate_durable_index_options_radar,
             replay_session_payload,
         )
         from .index_options_paper import index_options_market_open
@@ -5147,12 +5157,12 @@ def create_app() -> FastAPI:
             if payload.get("success"):
                 age = time.time() - (view.get("updatedAt") or 0)
                 if age < 90.0:
-                    return {**payload, "cacheStatus": "HIT"}
+                    return hydrate_durable_index_options_radar({**payload, "cacheStatus": "HIT"})
                 if age < 300.0:
                     background_tasks.add_task(_refresh_bg)
-                    return {**payload, "cacheStatus": "REFRESHING"}
+                    return hydrate_durable_index_options_radar({**payload, "cacheStatus": "REFRESHING"})
                 background_tasks.add_task(_refresh_bg)
-                return {**payload, "cacheStatus": "STALE"}
+                return hydrate_durable_index_options_radar({**payload, "cacheStatus": "STALE"})
 
         cached = load_persisted_radar()
         if not index_options_market_open(datetime.now(tz=IST_ZONE)):
@@ -5175,7 +5185,7 @@ def create_app() -> FastAPI:
                 cached = {**cached, "cacheStatus": "REFRESHING" if recent else "STALE"}
             else:
                 cached = {**cached, "cacheStatus": "HIT"}
-            return cached
+            return hydrate_durable_index_options_radar(cached)
         return _compose()
 
     @app.get("/api/dhan-scanner-matrix")

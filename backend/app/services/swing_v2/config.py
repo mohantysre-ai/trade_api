@@ -117,7 +117,7 @@ def load_config() -> SwingV2Config:
         enabled=_bool("SWING_V2_ENABLED", True), mode=os.getenv("SWING_V2_MODE", "PAPER").upper(), authority=os.getenv("SWING_STRATEGY_AUTHORITY", "V2").upper(),
         strategy_id=os.getenv("SWING_STRATEGY_ID", "SWING_2S_MOMENTUM_V2"), universe=os.getenv("SWING_UNIVERSE", "NIFTY_TOTAL_MARKET_750"),
         active_segments=tuple(p.strip().upper() for p in os.getenv("SWING_ACTIVE_SEGMENTS", "NIFTY100,NIFTY_MIDCAP150,NIFTY_SMALLCAP250,NIFTY_MICROCAP250").split(",") if p.strip()),
-        microcap_mode=os.getenv("SWING_MICROCAP_MODE", "SATELLITE").upper(), microcap_priority_weight=float(os.getenv("SWING_MICROCAP_PRIORITY_WEIGHT", "0.20")),
+        microcap_mode=os.getenv("SWING_MICROCAP_MODE", "SHADOW").upper(), microcap_priority_weight=float(os.getenv("SWING_MICROCAP_PRIORITY_WEIGHT", "0.20")),
         max_positions=int(os.getenv("SWING_MAX_POSITIONS", "5")), max_overnights=int(os.getenv("SWING_MAX_OVERNIGHTS", "2")), nav=float(os.getenv("SWING_CAPITAL", "1000000")),
         core_risk_bps=int(os.getenv("SWING_CORE_RISK_BPS", "25")), microcap_risk_bps=int(os.getenv("SWING_MICROCAP_RISK_BPS", "15")), max_portfolio_risk_bps=int(os.getenv("SWING_MAX_PORTFOLIO_RISK_BPS", "100")),
         max_name_notional_pct=float(os.getenv("SWING_MAX_NAME_NOTIONAL_PCT", "20")), max_sector_notional_pct=float(os.getenv("SWING_MAX_SECTOR_NOTIONAL_PCT", "40")),

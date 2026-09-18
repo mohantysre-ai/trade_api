@@ -23,13 +23,55 @@ echo ================================================
 echo.
 echo [*] Mode: NATIVE (Python venv + Next.js)
 echo     Root launchers:  start-app.bat / start-docker.bat / docker-refresh.bat / refresh-data.bat
-echo     Do not run native + Docker together ^(same ports^).
+echo     Do not run native ^& Docker together ^(same ports^).
 echo.
 echo [*] Target services:
 echo     Market API:   http://localhost:8000
 echo     AI News API:  http://localhost:8001
 echo     Frontend:     http://localhost:3000
 echo     Public URL:   %PUBLIC_URL%
+echo.
+
+REM =========================================================
+REM CLEAR STALE BACKEND CACHES
+REM =========================================================
+echo [CACHE-CLEAN] Clearing stale swing V2 caches...
+if exist "%BACKEND_DIR%\app\data\swing_v2_session.json" (
+    del /f /q "%BACKEND_DIR%\app\data\swing_v2_session.json" >nul 2>&1
+    echo [CACHE-CLEAN] Removed swing_v2_session.json
+)
+if exist "%BACKEND_DIR%\app\services\swing_v2\__pycache__" (
+    del /f /q "%BACKEND_DIR%\app\services\swing_v2\__pycache__\*.pyc" >nul 2>&1
+    echo [CACHE-CLEAN] Cleared swing_v2 bytecode cache
+)
+
+echo [CACHE-CLEAN] Clearing stale index-options runtime caches...
+for %%f in (
+    "%BACKEND_DIR%\app\services\index_options_paper_supervisor.json"
+    "%BACKEND_DIR%\app\services\index_options_hunt_supervisor.json"
+) do (
+    if exist "%%f" del /f /q "%%f" >nul 2>&1
+)
+for %%f in (
+    "%BACKEND_DIR%\app\services\index_options_paper_supervisor.lock"
+    "%BACKEND_DIR%\app\services\index_options_hunt_supervisor.lock"
+) do (
+    if exist "%%f" del /f /q "%%f" >nul 2>&1
+)
+for %%f in (
+    "%BACKEND_DIR%\app\services\index_options_paper_supervisor.json.bak"
+    "%BACKEND_DIR%\app\services\index_options_hunt_supervisor.json.bak"
+    "%BACKEND_DIR%\app\services\index_options_radar.json.bak"
+) do (
+    if exist "%%f" del /f /q "%%f" >nul 2>&1
+)
+for %%f in (
+    "%BACKEND_DIR%\app\services\index_options_hunt_supervisor.json.tmp"
+    "%BACKEND_DIR%\app\services\index_options_paper_supervisor.json.tmp"
+) do (
+    if exist "%%f" del /f /q "%%f" >nul 2>&1
+)
+echo [CACHE-CLEAN] Done.
 echo.
 
 REM =========================================================

@@ -53,6 +53,10 @@ type Position = {
   maxLoss?: number;
   maxProfit?: number;
   markStatus?: string;
+  exitedAt?: string;
+  exitReason?: string;
+  breakevens?: number[];
+  exitGreeks?: Record<string, number>;
   netGreeks?: Record<string, number>;
   legs?: Leg[];
 };
@@ -80,6 +84,8 @@ type Radar = {
     };
   };
   strategyBook?: { open?: Position[]; closed?: Position[] };
+  sessionDate?: string;
+  paperBook?: { entryCount?: number; closedCount?: number; realizedPnl?: number; openPnl?: number; totalPnl?: number };
   error?: string;
 };
 
@@ -219,6 +225,51 @@ function StrategyCard({ position }: { position: Position }) {
   );
 }
 
+function ClosedPositionCard({ position }: { position: any }) {
+  const exitReason = label(position.exitReason || 'CLOSED');
+  const pnl = Number(position.realizedPnl ?? 0);
+  return (
+    <div className="desk-card p-3 sm:p-4 opacity-90">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="desk-panel-title text-[var(--fg-strong)]">{position.strategyId || '—'}</span>
+            <span className="desk-pill desk-pill--warn">{position.status || 'CLOSED'}</span>
+          </div>
+          <div className="mt-1 text-[10px] text-[var(--fg-muted)]">
+            Entered {position.enteredAt ? new Date(position.enteredAt).toLocaleString('en-IN') : '—'} · Exited {position.exitedAt ? new Date(position.exitedAt).toLocaleString('en-IN') : '—'}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className={`text-xl font-black tabular-nums ${pnlClass(pnl)}`}>
+            {money(pnl)}
+          </div>
+          <div className="text-[10px] text-[var(--fg-muted)]">Realized P&L</div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Metric label="Max loss" value={money(position.maxLoss)} />
+        <Metric label="Max profit" value={money(position.maxProfit)} />
+        <Metric label="Exit reason" value={exitReason} />
+        <Metric label="Unrealized" value={money(position.unrealizedPnl)} />
+      </div>
+
+      {position.breakevens?.length ? (
+        <div className="mt-3 text-[10px] text-[var(--fg-muted)]">
+          Breakevens: {position.breakevens.map((b: number) => n(b, 2)).join(' / ')}
+        </div>
+      ) : null}
+
+      {position.exitGreeks ? (
+        <div className="mt-2 text-[10px] text-[var(--fg-muted)]">
+          Exit Greeks: Δ {n(position.exitGreeks.delta, 3)} / Γ {n(position.exitGreeks.gamma, 5)} / Θ {n(position.exitGreeks.theta, 2)} / Vega {n(position.exitGreeks.vega, 2)}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function Metric({ label: metricLabel, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-[var(--terminal-line)] bg-[var(--surface-muted)] px-2.5 py-2">
@@ -264,6 +315,8 @@ export default function QuantIndexOptionsPanel({ refreshToken = 0 }: { refreshTo
   const q = radar?.quantDecision;
   const ranked = q?.ranked ?? [];
   const open = radar?.strategyBook?.open ?? [];
+  const closed = radar?.strategyBook?.closed ?? [];
+  const isClosed = radar?.sessionStatus === 'CLOSED';
   const greek = q?.portfolioRisk?.greeks ?? {};
   const top = useMemo(() => ranked.slice(0, 10), [ranked]);
 
@@ -315,17 +368,27 @@ export default function QuantIndexOptionsPanel({ refreshToken = 0 }: { refreshTo
       <div className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <div className="desk-panel-title text-[var(--fg-strong)]">OPEN QUANT STRATEGIES</div>
+            <div className="desk-panel-title text-[var(--fg-strong)]">
+              {isClosed && !open.length ? 'CLOSED QUANT STRATEGIES' : 'OPEN QUANT STRATEGIES'}
+            </div>
             <div className="mt-1 text-[10px] text-[var(--fg-muted)]">
-              These are the actual paper positions with exact option contracts and strikes.
+              {isClosed && !open.length
+                ? 'These positions were closed during today’s session.'
+                : 'These are the actual paper positions with exact option contracts and strikes.'}
             </div>
           </div>
-          <span className="desk-pill desk-pill--ok">{open.length} open</span>
+          <span className="desk-pill desk-pill--ok">
+            {isClosed && !open.length ? `${closed.length} closed` : `${open.length} open`}
+          </span>
         </div>
-        {open.map((position) => (
-          <StrategyCard key={position.strategyPositionId} position={position} />
-        ))}
-        {!open.length && !loading && (
+        {(isClosed && !open.length ? closed : open).map((position) =>
+          isClosed && !open.length ? (
+            <ClosedPositionCard key={position.strategyPositionId} position={position} />
+          ) : (
+            <StrategyCard key={position.strategyPositionId} position={position} />
+          ),
+        )}
+        {!open.length && !closed.length && !loading && (
           <div className="desk-card py-6 text-center text-[var(--fg-muted)]">
             No open Quant V2 position · NO TRADE is valid.
           </div>
@@ -349,9 +412,11 @@ export default function QuantIndexOptionsPanel({ refreshToken = 0 }: { refreshTo
         </div>
         <div className="desk-card p-3">
           <div className="desk-panel-title">MARKET DECISION</div>
-          <div className="mt-2 text-xl font-bold">{q?.decision ?? (loading ? 'CALCULATING' : 'NO TRADE')}</div>
+          <div className="mt-2 text-xl font-bold">
+            {isClosed ? 'SESSION CLOSED' : (q?.decision ?? (loading ? 'CALCULATING' : 'NO TRADE'))}
+          </div>
           <div className="mt-2 text-[10px] text-[var(--fg-muted)]">
-            {q?.engine ?? radar?.selectionAuthority ?? 'INDEX_OPTIONS_QUANT_V2'}
+            {isClosed ? 'EOD archive active — review closed positions below.' : (q?.engine ?? radar?.selectionAuthority ?? 'INDEX_OPTIONS_QUANT_V2')}
           </div>
         </div>
       </div>

@@ -23,7 +23,7 @@ INDEX_CONFIG: tuple[dict[str, str], ...] = (
 )
 
 MIN_DAILY_ENTRIES = 0
-MAX_DAILY_ENTRIES = 20
+MAX_DAILY_ENTRIES = 5
 MAX_ATTEMPTS_PER_INDEX = 20
 # Portfolio-wide cap. It is applied only after the BUY and the SELL sleeve have
 # each independently picked their best index/bucket, so one sleeve can never

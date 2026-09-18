@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 from .config import PAPER_SLIPPAGE_POINTS
 
+DURABLE_LEGACY_SELLERS = {"BULL_PUT_CREDIT_SPREAD", "BEAR_CALL_CREDIT_SPREAD", "IRON_CONDOR"}
+
 def _db_path():
     override=os.getenv("INDEX_OPTIONS_STRATEGY_DB","").strip()
     if override:return Path(override)
@@ -72,13 +74,28 @@ def load_events(pid):
 def load_shadows(d):
     with _connect() as db:rows=db.execute("SELECT payload_json FROM index_option_shadows WHERE session_date=? ORDER BY created_at",(d,)).fetchall()
     return [json.loads(r[0]) for r in rows]
+def daily_entry_count(d):
+    with _connect() as db:return db.execute("SELECT COUNT(*) FROM index_option_positions WHERE session_date=?",(d,)).fetchone()[0]
+def _paper_daily_count(d):
+    try:
+        from ..index_options_paper import paper_book_path
+        from ..json_atomic import load_json_with_fallback
+        b=load_json_with_fallback(paper_book_path())
+        if isinstance(b,dict) and b.get("sessionDate")==d:return max(0,int(b.get("entryCount") or 0))
+    except Exception:pass
+    return 0
 def process_strategy_cycle(radar,snapshot,now):
     """Quant V2 selected structures are the only source of new durable entries."""
+    from ..angel_index_options import IST_ZONE
+
+    now = now.astimezone(IST_ZONE)
     d=now.date().isoformat();q=_quotes(snapshot)
+    from ..index_options_engine import MAX_DAILY_ENTRIES
+    daily_entries=daily_entry_count(d)+_paper_daily_count(d)
     with _connect() as db:
         db.execute("BEGIN IMMEDIATE")
         for row in db.execute("SELECT payload_json FROM index_option_positions WHERE session_date=? AND status='OPEN'",(d,)).fetchall():
-            stored=json.loads(row[0]);market=(((snapshot.get("indexOptions") or {}).get("indices") or {}).get(stored.get("index")) or {});marked=_mark_position(stored,q,now,market);reason=_exit_reason(marked,now) if marked.get("markStatus")=="LIVE" else None;updated=_close(marked,reason,now) if reason else marked;_save_position(db,updated)
+            stored=json.loads(row[0]);market=(((snapshot.get("indexOptions") or {}).get("indices") or {}).get(stored.get("index")) or {});marked=_mark_position(stored,q,now,market);reason=_exit_reason(marked,now);updated=_close(marked,reason,now) if reason else marked;_save_position(db,updated)
             if reason:db.execute("INSERT OR IGNORE INTO index_option_events VALUES(?,?,?,?,?)",(_stable_id(updated["strategyPositionId"],"CLOSE"),updated["strategyPositionId"],"CLOSED",json.dumps(updated),now.isoformat()))
         candidates=radar.get("modularCandidates") or []; selected=radar.get("modularSelected") or []; selected_ids={str(r.get("strategyId"))+"|"+str(r.get("key")) for r in selected}
         for c in candidates:
@@ -86,6 +103,11 @@ def process_strategy_cycle(radar,snapshot,now):
             if not c.get("eligible") or identity not in selected_ids:
                 db.execute("INSERT OR IGNORE INTO index_option_shadows VALUES(?,?,?,?,?,?)",(_stable_id("SHADOW",decision_id),decision_id,sid,d,json.dumps({**c,"quantDecision":"NO_TRADE_OR_NOT_SELECTED"}),now.isoformat()));continue
             if c.get("quantAuthority")!="INDEX_OPTIONS_QUANT_V2":continue
+            if daily_entries>=MAX_DAILY_ENTRIES:c["paperEntryState"]="ENTRY_BLOCKED";c["paperEntryReason"]="MAX_DAILY_ENTRIES_REACHED";continue
+            if now.weekday() >= 5 or now.time().replace(tzinfo=None) < time(9, 15) or _exit_reason({"family": c.get("family")}, now) == "TIME_EXIT":
+                c["paperEntryState"] = "ENTRY_BLOCKED"
+                c["paperEntryReason"] = "SESSION_ENTRY_CUTOFF"
+                continue
             if db.execute("SELECT COUNT(*) FROM index_option_positions WHERE session_date=? AND status='OPEN'",(d,)).fetchone()[0]>=2:c["paperEntryState"]="ENTRY_BLOCKED";c["paperEntryReason"]="QUANT_PORTFOLIO_MAX_CONCURRENT";continue
             if db.execute("SELECT 1 FROM index_option_positions WHERE decision_id=? OR(session_date=? AND index_key=? AND strategy_id=? AND status='OPEN')",(decision_id,d,c.get("key"),sid)).fetchone():continue
             fills=[_entry_fill(x,now.isoformat()) for x in _candidate_legs(c)]
@@ -96,8 +118,37 @@ def process_strategy_cycle(radar,snapshot,now):
             p={"strategyPositionId":pid,"decisionId":decision_id,"strategyId":sid,"family":c.get("family"),"index":c.get("key"),"status":"OPEN","sessionDate":d,"expiry":c.get("expiry"),"farExpiry":c.get("farExpiry"),"expiryState":c.get("expiryState"),"legs":legs,"entryValue":ev,"entryDebit":max(0.,ev),"entryCredit":max(0.,-ev),"maxLoss":ml,"maxProfit":mp,"breakevens":be,"entryGreeks":{n:c.get(n) for n in("delta","gamma","theta","vega")},"netGreeks":{n:c.get(n) for n in("delta","gamma","theta","vega")},"entrySpot":c.get("spot"),"entryIv":c.get("atmIv"),"unrealizedPnl":0.,"realizedPnl":0.,"lifecycleState":"NO_ACTION","enteredAt":now.isoformat(),"updatedAt":now.isoformat(),"authority":"INDEX_OPTIONS_QUANT_V2","selectionModel":"COMMON_SCENARIO_DISTRIBUTION_REPRICER"}
             try:db.execute("INSERT INTO index_option_positions VALUES(?,?,?,?,?,?,?,?)",(pid,decision_id,sid,d,c.get("key"),"OPEN",json.dumps(p),now.isoformat()))
             except sqlite3.IntegrityError:continue
-            db.execute("INSERT INTO index_option_events VALUES(?,?,?,?,?)",(_stable_id(pid,"OPEN"),pid,"OPENED",json.dumps(p),now.isoformat()));c["strategyPositionId"]=pid;c["paperEntryState"]="FILLED"
+            db.execute("INSERT INTO index_option_events VALUES(?,?,?,?,?)",(_stable_id(pid,"OPEN"),pid,"OPENED",json.dumps(p),now.isoformat()));c["strategyPositionId"]=pid;c["paperEntryState"]="FILLED";daily_entries+=1
         db.commit()
     p=load_positions(d);return {"authority":"INDEX_OPTIONS_QUANT_V2","positions":p,"open":[x for x in p if x.get("status")=="OPEN"],"closed":[x for x in p if x.get("status")=="CLOSED"]}
+def strategy_book(d):
+    positions = load_positions(d)
+    return {
+        "sessionDate": d,
+        "authority": "INDEX_OPTIONS_QUANT_V2",
+        "positions": positions,
+        "open": [p for p in positions if p.get("status") == "OPEN"],
+        "closed": [p for p in positions if p.get("status") == "CLOSED"],
+    }
+
+
 def strategy_eod(d):
-    p=load_positions(d);rows=[{"strategy":x.get("strategyId"),"strategyPositionId":x.get("strategyPositionId"),"authority":x.get("authority"),"entry":x.get("enteredAt"),"exit":x.get("exitedAt"),"realizedPnl":x.get("realizedPnl"),"unrealizedPnl":x.get("unrealizedPnl"),"maxLoss":x.get("maxLoss"),"maxProfit":x.get("maxProfit"),"breakevens":x.get("breakevens"),"entryGreeks":x.get("entryGreeks"),"exitGreeks":x.get("exitGreeks"),"exitReason":x.get("exitReason")} for x in p];return {"sessionDate":d,"authority":"INDEX_OPTIONS_QUANT_V2","positions":rows,"realizedPnl":round(sum(float(x.get("realizedPnl") or 0) for x in p),2),"unrealizedPnl":round(sum(float(x.get("unrealizedPnl") or 0) for x in p),2)}
+    book = strategy_book(d)
+    rows = []
+    for p in book["positions"]:
+        spot, entry_spot = _float(p.get("currentSpot")), _float(p.get("entrySpot"))
+        iv, entry_iv = _float(p.get("currentIv")), _float(p.get("entryIv"))
+        rows.append({
+            **p,
+            "strategy": p.get("strategyId"),
+            "entry": p.get("enteredAt"),
+            "exit": p.get("exitedAt"),
+            "spotMove": round(spot - entry_spot, 6) if spot is not None and entry_spot is not None else None,
+            "ivMove": round(iv - entry_iv, 6) if iv is not None and entry_iv is not None else None,
+        })
+    return {
+        **book,
+        "positions": rows,
+        "realizedPnl": round(sum(float(p.get("realizedPnl") or 0) for p in book["closed"]), 2),
+        "unrealizedPnl": round(sum(float(p.get("unrealizedPnl") or 0) for p in book["open"]), 2),
+    }

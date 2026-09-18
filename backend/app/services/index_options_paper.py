@@ -95,6 +95,15 @@ def _load_book(session_date: str) -> dict[str, Any]:
     return book
 
 
+def _daily_entries_total(session_date: str, book_count: int) -> int:
+    """Paper + durable strategy entries share one daily cap."""
+    try:
+        from .index_options.runtime import daily_entry_count
+        return book_count + daily_entry_count(session_date)
+    except Exception:
+        return book_count
+
+
 def _mark_for(position: dict[str, Any], candidates: list[dict[str, Any]]) -> float | None:
     symbol = str(position.get("symbol") or "")
     for row in candidates:
@@ -949,7 +958,7 @@ def reconcile_paper_book(
             #    sleeve's first pick.
             for row, position in _interleave_sleeve_entries(entries_by_sleeve):
                 sleeve = sleeve_of(row)
-                if book["entryCount"] >= MAX_DAILY_ENTRIES:
+                if _daily_entries_total(session, book["entryCount"]) >= MAX_DAILY_ENTRIES:
                     row["entryBlockedBy"] = "MAX_DAILY_ENTRIES_REACHED"
                     continue
                 if len(book["open"]) >= MAX_CONCURRENT_TRADES:

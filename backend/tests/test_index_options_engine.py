@@ -109,11 +109,21 @@ def test_twenty_daily_entries_hard_block_even_after_confirmation():
     assert decision["reason"] == "MAX_DAILY_ENTRIES_REACHED"
 
 
-def test_no_minimum_quota_and_hunt_remains_open_below_twenty():
+def test_no_minimum_quota_and_hunt_remains_open_below_cap():
     radar = build_index_options_radar({})
     assert radar["limits"]["minDailyEntries"] == 0
-    assert radar["limits"]["maxDailyEntries"] == 20
+    assert radar["limits"]["maxDailyEntries"] == 5
     assert radar["limits"]["huntMode"] == "CONTINUOUS_MARKET_SESSION"
-    governor = IndexOptionReEntryGovernor(trade_counts={"NIFTY": 5, "SENSEX": 5, "BANKNIFTY": 4, "FINNIFTY": 5})
+    governor = IndexOptionReEntryGovernor(trade_counts={"NIFTY": 1, "SENSEX": 1, "BANKNIFTY": 1, "FINNIFTY": 1})
     decision = can_reenter_index_option("BANKNIFTY", "PUT", NOW, governor)
     assert decision["allowed"] is True
+
+
+def test_five_total_daily_entries_across_indices_hard_block():
+    governor = IndexOptionReEntryGovernor(trade_counts={"NIFTY": 2, "SENSEX": 1, "BANKNIFTY": 1, "FINNIFTY": 1})
+    decision = can_reenter_index_option(
+        "BANKNIFTY", "PUT", NOW, governor,
+        fresh_breakout_confirmed=True, oi_aligned=True, breadth_aligned=True,
+    )
+    assert decision["allowed"] is False
+    assert decision["reason"] == "MAX_DAILY_ENTRIES_REACHED"

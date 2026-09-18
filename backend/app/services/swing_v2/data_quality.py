@@ -11,11 +11,11 @@ from typing import Any
 # remain valid for its natural timeframe.
 SCAN_MAX_AGE = {
     "quote": int(os.getenv("SWING_SCAN_QUOTE_MAX_AGE_SEC", "900")),
-    "bars1h": int(os.getenv("SWING_SCAN_BARS1H_MAX_AGE_SEC", "86400")),
+    "bars1h": int(os.getenv("SWING_SCAN_BARS1H_MAX_AGE_SEC", "90000")),
 }
 LOCK_MAX_AGE = {
     "quote": int(os.getenv("SWING_LOCK_QUOTE_MAX_AGE_SEC", "300")),
-    "bars1h": int(os.getenv("SWING_LOCK_BARS1H_MAX_AGE_SEC", "86400")),
+    "bars1h": int(os.getenv("SWING_LOCK_BARS1H_MAX_AGE_SEC", "90000")),
 }
 
 

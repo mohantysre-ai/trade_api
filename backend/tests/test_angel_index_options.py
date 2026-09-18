@@ -42,8 +42,8 @@ def test_contract_resolution_keeps_enough_strikes_for_hedged_selling():
                          "name": "NIFTY", "expiry": "01JAN2099", "strike": str(strike * 100),
                          "lotsize": "75", "instrumenttype": "OPTIDX", "exch_seg": "NFO"})
     _, options, _ = _contracts(rows, INDEXES[0], 25_000)
-    assert len({row["_strike"] for row in options}) == 15
-    assert len(options) == 30
+    assert len({row["_strike"] for row in options}) == 21
+    assert len(options) == 42
 
 
 def test_sensex_resolution_does_not_select_sensex50_future():
