@@ -69,6 +69,8 @@ def _row_pnl_pct(row: dict[str, Any]) -> float | None:
 
 
 def _is_triggered_swing(row: dict[str, Any]) -> bool:
+    if row.get("terminal") is not None:
+        return not row.get("terminal")
     return not bool(row.get("skipped")) and str(row.get("status") or "").upper() != "NOT_TRIGGERED"
 
 

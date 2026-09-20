@@ -1,5 +1,6 @@
 # Runtime session/state JSON (do not commit live market state)
 intraday_session.json
+intraday_session.json.lock
 swing_session.json
 fixed_trade_plan.json
 alert_history.json

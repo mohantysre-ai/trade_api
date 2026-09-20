@@ -9,6 +9,7 @@ from urllib.request import Request, urlopen
 
 SCANX_OPTION_URL = "https://open-web-scanx.dhan.co/scanx/optchainactive"
 SCANX_SIDS = {"NIFTY": 13, "BANKNIFTY": 25, "FINNIFTY": 27, "SENSEX": 51}
+_SCANX_EXPIRY_CACHE: dict[int, dict[int, str]] = {}
 
 
 def _number(value: Any) -> float | None:
@@ -151,15 +152,65 @@ def _post(payload: bytes, timeout: float) -> Any:
         return json.loads(response.read().decode("utf-8"))
 
 
+def discover_scanx_expiries(sid: int, *, requester: Callable[[bytes, float], Any] = _post, timeout: float = 8.0) -> dict[int, str]:
+    """Discover expiry timestamps from ScanX's own futures list.
+
+    Returns a mapping of epoch timestamp -> futures symbol, e.g.
+    {1475087400: "NIFTY SEP FUT", ...}
+    """
+    body = json.dumps({"Data": {"Seg": 0, "Sid": sid}}, separators=(",", ":")).encode("utf-8")
+    payload = requester(body, timeout)
+    data = payload.get("data") or payload.get("Data") or {}
+    fl = data.get("fl") if isinstance(data, dict) else {}
+    if not isinstance(fl, dict):
+        return {}
+    result: dict[int, str] = {}
+    for ts, row in fl.items():
+        try:
+            result[int(ts)] = str(row.get("sym") or row.get("symbol") or "") if isinstance(row, dict) else ""
+        except (TypeError, ValueError):
+            continue
+    return result
+
+
 def fetch_scanx_option_chain(index_key: str, expiry: date, *, requester: Callable[[bytes, float], Any] = _post, timeout: float = 8.0) -> dict[str, Any]:
     key = index_key.upper().strip()
     if key not in SCANX_SIDS:
         return {"source": "SCANX_FALLBACK", "status": "NOT_SUPPORTED", "error": f"No ScanX SID configured for {key}", "chain": []}
-    body = json.dumps({"Data": {"Seg": 0, "Sid": SCANX_SIDS[key], "Exp": expiry_epoch(expiry)}}, separators=(",", ":")).encode("utf-8")
+    sid = SCANX_SIDS[key]
+    exp = _resolve_scanx_expiry(sid, expiry, requester=requester, timeout=timeout)
+    if exp is None:
+        return {"source": "SCANX_FALLBACK", "status": "DATA_UNAVAILABLE", "error": f"ScanX does not advertise expiry {expiry} for SID {sid}", "chain": [], "request": {"sid": sid, "expiryEpoch": None}}
+    body = json.dumps({"Data": {"Seg": 0, "Sid": sid, "Exp": exp}}, separators=(",", ":")).encode("utf-8")
     payload = requester(body, timeout)
     spot, chain = normalize_scanx_chain(payload)
     return {"source": "SCANX_FALLBACK", "status": "LIVE" if chain else "DATA_INCOMPLETE", "fetchedAt": datetime.now(timezone.utc).isoformat(),
-            "spot": spot, "expiry": expiry.isoformat(), "chain": chain, "request": {"sid": SCANX_SIDS[key], "expiryEpoch": expiry_epoch(expiry)}}
+            "spot": spot, "expiry": expiry.isoformat(), "chain": chain, "request": {"sid": sid, "expiryEpoch": exp}}
+
+
+def _resolve_scanx_expiry(sid: int, expiry: date, *, requester: Callable[[bytes, float], Any] = _post, timeout: float = 8.0) -> int | None:
+    """Resolve the expiry epoch using ScanX's own expiry list when available.
+
+    Returns None when ScanX does not advertise the requested expiry, so the
+    caller can report DATA_UNAVAILABLE instead of sending a guessed epoch.
+    """
+    discovered = _SCANX_EXPIRY_CACHE.get(sid)
+    if discovered is None:
+        try:
+            discovered = discover_scanx_expiries(sid, requester=requester, timeout=timeout)
+        except Exception:
+            discovered = {}
+        _SCANX_EXPIRY_CACHE[sid] = discovered
+
+    for ts, symbol in discovered.items():
+        try:
+            ts_date = datetime.fromtimestamp(int(ts), tz=timezone.utc).date()
+            if ts_date == expiry:
+                return int(ts)
+        except (TypeError, ValueError, OSError):
+            continue
+
+    return None
 
 
 def apply_scanx_fallback(angel_payload: dict[str, Any], expiries: dict[str, date], *, fetcher: Callable[[str, date], dict[str, Any]] = fetch_scanx_option_chain) -> dict[str, Any]:

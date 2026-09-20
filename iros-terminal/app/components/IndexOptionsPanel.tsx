@@ -7,6 +7,12 @@
 // client module factory in dev and surface as "module factory is not available".
 import QuantIndexOptionsPanel from './QuantIndexOptionsPanel';
 
-export default function IndexOptionsPanel({ refreshToken = 0 }: { refreshToken?: number }) {
-  return <QuantIndexOptionsPanel refreshToken={refreshToken} />;
+export default function IndexOptionsPanel({
+  refreshToken = 0,
+  sessionDate,
+}: {
+  refreshToken?: number;
+  sessionDate?: string;
+}) {
+  return <QuantIndexOptionsPanel refreshToken={refreshToken} sessionDate={sessionDate} />;
 }

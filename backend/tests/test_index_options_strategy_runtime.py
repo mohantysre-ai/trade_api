@@ -42,6 +42,7 @@ def _candidate(strategy="BULL_CALL_DEBIT_SPREAD", key="NIFTY"):
         "family": "DIRECTIONAL",
         "key": key,
         "eligible": True,
+        "quantAuthority": "INDEX_OPTIONS_QUANT_V2",
         "expiry": "2026-09-17",
         "legs": legs,
         "maxLoss": 3100,

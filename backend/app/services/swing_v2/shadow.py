@@ -84,8 +84,8 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
     if not cfg.enabled:
         return {**base, "candidates": [], "funnel": {"universe_size": len(rows), "evaluated_count": 0, "block_reason": "V2_DISABLED"}, "tradableCoverage": 0.0, "shadowCoverage": 0.0}
 
-    tradable_rows = [r for r in rows if "MICRO" not in str(r.get("universeSegment") or "").upper()]
-    shadow_rows = [r for r in rows if "MICRO" in str(r.get("universeSegment") or "").upper()]
+    tradable_rows = [r for r in rows if cfg.microcap_mode == "SHADOW" or "MICRO" not in str(r.get("universeSegment") or "").upper()]
+    shadow_rows = [r for r in rows if cfg.microcap_mode != "SHADOW" and "MICRO" in str(r.get("universeSegment") or "").upper()]
     freshness = [(r, evaluate_freshness(r, final_lock=final_lock, now=now)) for r in tradable_rows]
     fresh_rows = [r for r, result in freshness if result[0]]
     stale_rows = [r for r, result in freshness if not result[0]]

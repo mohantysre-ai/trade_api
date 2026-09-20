@@ -148,7 +148,10 @@ type IndexOptionsReport = {
   realizedPnl: number | null;
   openPnl: number | null;
   totalPnl: number | null;
-  positions?: Array<{ symbol?: string; index?: string; pnl?: number; pnlKind?: string }>;
+  positions?: Array<{
+    id?: string; strategyPositionId?: string; symbol?: string; index?: string; pnl?: number; pnlKind?: string;
+    legs?: Array<{ symbol?: string; side?: string; qty?: number; lotSize?: number; entryFill?: number; entryPrice?: number; exitFill?: number; currentPrice?: number }>;
+  }>;
   fromCache?: boolean;
 };
 
@@ -1695,8 +1698,15 @@ export default function EodAnalysisPanel({
                   <table className="w-full min-w-[560px] text-[10px]">
                     <thead><tr className="border-b border-slate-200 text-left uppercase text-slate-500"><th>Contract</th><th>Index</th><th>Kind</th><th className="text-right">P&amp;L</th></tr></thead>
                     <tbody>{(indexOptions.positions || []).map((p, i) => (
-                      <tr key={`${p.symbol || p.index || 'option'}-${i}`} className="border-b border-slate-100">
-                        <td className="py-1 font-bold">{p.symbol || 'Defined-risk structure'}</td><td>{p.index || '—'}</td><td>{p.pnlKind || '—'}</td>
+                      <tr key={p.id || p.strategyPositionId || `${p.symbol || p.index || 'option'}-${i}`} className="border-b border-slate-100">
+                        <td className="py-1 font-bold">
+                          {p.symbol || 'Defined-risk structure'}
+                          {p.legs?.map((leg, legIndex) => (
+                            <div key={`${leg.symbol}-${legIndex}`} className="mt-1 font-normal text-slate-500">
+                              {leg.side} {(leg.qty || 1) * (leg.lotSize || 1)} qty · {leg.symbol || 'Contract unavailable'} · Entry {fmtInr(leg.entryFill ?? leg.entryPrice, 2)} · {p.pnlKind === 'realised' ? 'Exit' : 'Mark'} {fmtInr(leg.exitFill ?? leg.currentPrice, 2)}
+                            </div>
+                          ))}
+                        </td><td>{p.index || '—'}</td><td>{p.pnlKind || '—'}</td>
                         <td className={`text-right font-bold ${pnlTone(p.pnl)}`}>{fmtInr(p.pnl, 2)}</td>
                       </tr>
                     ))}</tbody>

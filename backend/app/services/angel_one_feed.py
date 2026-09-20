@@ -17,6 +17,7 @@ import json
 import logging
 import math
 import os
+import random
 import re
 import sys
 import threading
@@ -176,7 +177,7 @@ NIFTY_100_LABEL = "Nifty 100"
 NIFTY_100_CACHE_PATH = BASE_DIR / "nifty100_instruments.json"
 ANGEL_API_TIMEOUT_SECONDS = int(os.getenv("ANGEL_API_TIMEOUT_SECONDS", "24"))
 LLM_CALL_TIMEOUT_SECONDS = min(max(1, int(os.getenv("LLM_CALL_TIMEOUT_SECONDS", "180"))), 300)
-QUOTE_CHUNK_SIZE = int(os.getenv("QUOTE_CHUNK_SIZE", "10"))
+QUOTE_CHUNK_SIZE = int(os.getenv("QUOTE_CHUNK_SIZE", "25"))
 INTRADAY_CHUNK_SIZE = int(os.getenv("INTRADAY_CHUNK_SIZE", "5"))
 # Global candle throttle across all threads (Angel AB1021 / ~3–5 req/s soft limit).
 CANDLE_MIN_INTERVAL_SECONDS = float(os.getenv("CANDLE_MIN_INTERVAL_SECONDS", "1.1"))
@@ -193,6 +194,67 @@ _CANDLE_THROTTLE_LOCK = threading.Lock()
 _CANDLE_LAST_CALL_MONO = 0.0
 _CANDLE_COOLDOWN_UNTIL_MONO = 0.0
 _ANGEL_CANDLE_CIRCUIT_UNTIL = 0.0
+# Process-wide non-candle REST throttle: every product (intraday feed, swing,
+# index options, EOD engine) shares these so a burst from one cannot get the
+# IP blocked while others keep firing.
+ANGEL_MARKETDATA_MIN_INTERVAL_SECONDS = float(os.getenv("ANGEL_MARKETDATA_MIN_INTERVAL_SECONDS", "0.6"))
+ANGEL_LTP_MIN_INTERVAL_SECONDS = float(os.getenv("ANGEL_LTP_MIN_INTERVAL_SECONDS", "0.35"))
+ANGEL_GREEKS_MIN_INTERVAL_SECONDS = float(os.getenv("ANGEL_GREEKS_MIN_INTERVAL_SECONDS", "0.6"))
+ANGEL_QUOTE_CIRCUIT_SECONDS = float(os.getenv("ANGEL_QUOTE_CIRCUIT_SECONDS", "30"))
+_ANGEL_REQUEST_GATE_LOCK = threading.RLock()
+_ANGEL_LAST_CALL_BY_CLASS: dict[str, float] = {}
+_ANGEL_COOLDOWN_BY_CLASS: dict[str, float] = {}
+_ANGEL_CLASS_MIN_INTERVALS: dict[str, float] = {
+    "marketdata": ANGEL_MARKETDATA_MIN_INTERVAL_SECONDS,
+    "ltp": ANGEL_LTP_MIN_INTERVAL_SECONDS,
+    "greeks": ANGEL_GREEKS_MIN_INTERVAL_SECONDS,
+}
+# Hard ceiling across ALL gated classes (Angel blocks per client/IP, not per
+# endpoint): with per-class pacing alone the aggregate worst case is ~6+ req/s.
+ANGEL_GLOBAL_MIN_INTERVAL_SECONDS = float(os.getenv("ANGEL_GLOBAL_MIN_INTERVAL_SECONDS", "0.25"))
+# Bounded wait: a caller whose slot is further away than its deadline fails
+# fast (snapshot/stream fallback) instead of blocking a thread for minutes.
+ANGEL_GATE_MAX_WAIT_SECONDS = float(os.getenv("ANGEL_GATE_MAX_WAIT_SECONDS", "20"))
+# Process-wide login pacing: Angel login is itself rate-limited and a re-login
+# storm during auth expiry is indistinguishable from an API-key flood.
+ANGEL_LOGIN_MIN_INTERVAL_SECONDS = float(os.getenv("ANGEL_LOGIN_MIN_INTERVAL_SECONDS", "5"))
+ANGEL_LOGIN_LOCK = threading.Lock()
+_ANGEL_LOGIN_LAST_AT_MONO = 0.0
+_ANGEL_LOGIN_COUNT = 0
+ANGEL_GATE_ENABLED = os.getenv("ANGEL_GATE_ENABLED", "1").strip().lower() not in ("0", "false", "no")
+# Cooldown backoff ladder on repeated AB1021 within a 120s window.
+ANGEL_CIRCUIT_BACKOFF_MULTIPLIER = 1.5
+ANGEL_CIRCUIT_BACKOFF_CAP_SECONDS = float(os.getenv("ANGEL_CIRCUIT_BACKOFF_CAP_SECONDS", "300"))
+ANGEL_CIRCUIT_JITTER = 0.2
+_ANGEL_LAST_CALL_ANY_MONO = 0.0
+_ANGEL_TRIP_COUNT = 0
+_ANGEL_LAST_TRIP_AT_MONO = 0.0
+_ANGEL_GATE_STATS_LOCK = threading.Lock()
+_ANGEL_GATE_STATS: dict[str, dict[str, Any]] = {}
+
+
+class AngelGateTimeout(RuntimeError):
+    """Raised when a caller cannot acquire an Angel request slot within its deadline."""
+
+
+def _angel_stat(cls: str, key: str, amount: float = 1) -> None:
+    with _ANGEL_GATE_STATS_LOCK:
+        stats = _ANGEL_GATE_STATS.setdefault(cls, {
+            "callsTotal": 0, "gateTimeoutsTotal": 0, "rateLimitTripsTotal": 0,
+            "partialBatchesTotal": 0, "requestedTokensTotal": 0, "returnedTokensTotal": 0,
+            "gateWaitSecondsTotal": 0.0, "gateWaitSecondsMax": 0.0, "lastCallAtMono": None,
+        })
+        if key == "lastCallAtMono":
+            # Timestamp key: set (overwrite), never summed.
+            stats[key] = amount
+        elif key == "gateWaitSecondsMax":
+            stats[key] = max(float(stats.get(key) or 0.0), amount)
+        else:
+            stats[key] = stats.get(key, 0) + amount
+
+
+def _angel_cooldown_active(request_class: str) -> bool:
+    return time.monotonic() < _ANGEL_COOLDOWN_BY_CLASS.get(request_class, 0.0)
 
 AI_NEWS_API_URL = os.getenv("AI_NEWS_API_URL", "http://127.0.0.1:8001")
 
@@ -869,7 +931,7 @@ def _clear_stale_refresh_lock() -> bool:
             clearedAt=datetime.now(timezone.utc).isoformat(),
             clearedReason="stale_refresh_timeout",
         )
-    log.warning(
+    logging.getLogger(__name__).warning(
         "Cleared stuck scheduled refresh lock: prior=%s", prior
     )
     return True
@@ -981,7 +1043,12 @@ def _candle_api_slot():
             try:
                 yield
             finally:
-                _CANDLE_LAST_CALL_MONO = time.monotonic()
+                stamped = time.monotonic()
+                _CANDLE_LAST_CALL_MONO = stamped
+                # Candles also consume the cross-class global budget so the
+                # combined candle+quote worst case stays under one ceiling.
+                global _ANGEL_LAST_CALL_ANY_MONO
+                _ANGEL_LAST_CALL_ANY_MONO = stamped
 
     return _slot()
 
@@ -1006,8 +1073,150 @@ def _trip_candle_rate_limit_cooldown(seconds: float = 8.0) -> None:
     _CANDLE_COOLDOWN_UNTIL_MONO = max(_CANDLE_COOLDOWN_UNTIL_MONO, time.monotonic() + seconds)
 
 
+def _is_angel_rate_limited(response_or_exc: Any) -> bool:
+    """Detect Angel rate limiting across any REST endpoint (AB1021 etc.)."""
+    if isinstance(response_or_exc, dict):
+        msg = str(response_or_exc.get("message") or "")
+        code = str(response_or_exc.get("errorcode") or response_or_exc.get("errorCode") or "")
+    else:
+        msg = str(response_or_exc or "")
+        code = ""
+    blob = f"{code} {msg}".lower()
+    return "ab1021" in blob or "too many requests" in blob or "rate limit" in blob
+
+
+def _pause_all_angel_classes(seconds: float) -> None:
+    """When Angel rate-limits one endpoint, every product must go quiet.
+
+    Candle (AB1021) and quote bursts share the same IP/API-key quota, so a
+    block on any endpoint pauses the whole process, not just the caller.
+    """
+    until = time.monotonic() + max(1.0, seconds)
+    with _ANGEL_REQUEST_GATE_LOCK:
+        for cls in _ANGEL_CLASS_MIN_INTERVALS:
+            if until > _ANGEL_COOLDOWN_BY_CLASS.get(cls, 0.0):
+                _ANGEL_COOLDOWN_BY_CLASS[cls] = until
+    global _CANDLE_COOLDOWN_UNTIL_MONO
+    _CANDLE_COOLDOWN_UNTIL_MONO = max(_CANDLE_COOLDOWN_UNTIL_MONO, until)
+
+
+def _next_quote_circuit_hold() -> float:
+    """Backoff ladder (base × 1.5^n, capped) with ±jitter so repeated trips
+    escalate instead of pulsing every ``ANGEL_QUOTE_CIRCUIT_SECONDS``."""
+    global _ANGEL_TRIP_COUNT, _ANGEL_LAST_TRIP_AT_MONO
+    now = time.monotonic()
+    if now - _ANGEL_LAST_TRIP_AT_MONO > 120:
+        _ANGEL_TRIP_COUNT = 0
+    _ANGEL_TRIP_COUNT += 1
+    _ANGEL_LAST_TRIP_AT_MONO = now
+    base = ANGEL_QUOTE_CIRCUIT_SECONDS * (ANGEL_CIRCUIT_BACKOFF_MULTIPLIER ** min(_ANGEL_TRIP_COUNT - 1, 4))
+    hold = min(base, ANGEL_CIRCUIT_BACKOFF_CAP_SECONDS) * (1.0 + random.uniform(-ANGEL_CIRCUIT_JITTER, ANGEL_CIRCUIT_JITTER))
+    return max(1.0, hold)
+
+
+def _angel_request_gate(request_class: str, deadline: float | None = None):
+    """Serialize one REST class process-wide: a single in-flight call per
+    class, paced at its min interval and by a cross-class global floor,
+    honoring cooldowns. The lock is held for the full HTTP round trip by
+    design: one in-flight Angel call per class is the safety property, and
+    the deadline below bounds the head-of-line cost of that choice.
+
+    The wait loop re-checks the cooldown after every sleep, so a pause
+    tripped by another thread mid-wait re-blocks this caller before it can
+    fire (no stale request escapes a just-declared cooldown).
+    """
+    min_interval = _ANGEL_CLASS_MIN_INTERVALS.get(request_class, 0.5)
+
+    @contextmanager
+    def _gate():
+        global _ANGEL_LAST_CALL_ANY_MONO
+        if not ANGEL_GATE_ENABLED:
+            yield
+            return
+        entered = time.monotonic()
+        expires = entered + deadline if deadline is not None else None
+        acquired = False
+        try:
+            while True:
+                remaining = None if expires is None else expires - time.monotonic()
+                if remaining is not None and remaining <= 0:
+                    _angel_stat(request_class, "gateTimeoutsTotal")
+                    raise AngelGateTimeout(
+                        f"Angel gate wait exceeded {deadline:.1f}s for {request_class}"
+                    )
+                # Bounded lock acquisition: a classmate's in-flight HTTP call
+                # must not turn our deadline into an unbounded queue wait.
+                if remaining is not None:
+                    acquired = _ANGEL_REQUEST_GATE_LOCK.acquire(timeout=max(remaining, 0.001))
+                else:
+                    acquired = _ANGEL_REQUEST_GATE_LOCK.acquire()
+                if not acquired:
+                    _angel_stat(request_class, "gateTimeoutsTotal")
+                    raise AngelGateTimeout(
+                        f"Angel gate lock not acquired within {deadline:.1f}s for {request_class}"
+                    )
+                now = time.monotonic()
+                wait = _ANGEL_COOLDOWN_BY_CLASS.get(request_class, 0.0) - now
+                if wait <= 0:
+                    wait = min_interval - (now - _ANGEL_LAST_CALL_BY_CLASS.get(request_class, 0.0))
+                if wait <= 0:
+                    wait = ANGEL_GLOBAL_MIN_INTERVAL_SECONDS - (now - _ANGEL_LAST_CALL_ANY_MONO)
+                if wait > 0:
+                    if expires is not None:
+                        wait = min(wait, expires - now)
+                    if wait <= 0:
+                        _angel_stat(request_class, "gateTimeoutsTotal")
+                        raise AngelGateTimeout(
+                            f"Angel gate wait exceeded {deadline:.1f}s for {request_class}"
+                        )
+                    # Sleep OUTSIDE the lock and loop: cooldowns tripped while
+                    # we wait are re-checked before we may fire.
+                    _ANGEL_REQUEST_GATE_LOCK.release()
+                    acquired = False
+                    time.sleep(wait)
+                    continue
+                try:
+                    yield
+                finally:
+                    stamped = time.monotonic()
+                    _ANGEL_LAST_CALL_BY_CLASS[request_class] = stamped
+                    _ANGEL_LAST_CALL_ANY_MONO = stamped
+                    _angel_stat(request_class, "gateWaitSecondsTotal", stamped - entered)
+                    _angel_stat(request_class, "gateWaitSecondsMax", stamped - entered)
+                    _angel_stat(request_class, "lastCallAtMono", stamped)
+                    _angel_stat(request_class, "callsTotal")
+                return
+        finally:
+            if acquired:
+                _ANGEL_REQUEST_GATE_LOCK.release()
+
+    return _gate()
+
+
+def _angel_marketdata_gate(deadline: float | None = None):
+    return _angel_request_gate("marketdata", deadline)
+
+
+def _angel_ltp_gate(deadline: float | None = None):
+    return _angel_request_gate("ltp", deadline)
+
+
+def _angel_greeks_gate(deadline: float | None = None):
+    return _angel_request_gate("greeks", deadline)
+
+
+def _trip_angel_quote_circuit(seconds: float | None = None) -> None:
+    hold = _next_quote_circuit_hold() if seconds is None else float(seconds)
+    _pause_all_angel_classes(hold)
+    _angel_stat("marketdata", "rateLimitTripsTotal")
+    logging.getLogger(__name__).warning(
+        "Angel quote/greeks rate-limited; all Angel REST classes paused %.0fs",
+        hold,
+    )
+
+
 def _angel_candle_calls_allowed() -> bool:
-    return time.monotonic() >= _ANGEL_CANDLE_CIRCUIT_UNTIL
+    return time.monotonic() >= max(_ANGEL_CANDLE_CIRCUIT_UNTIL, _CANDLE_COOLDOWN_UNTIL_MONO)
 
 
 def _trip_angel_candle_circuit(seconds: float | None = None) -> None:
@@ -1022,17 +1231,16 @@ def _trip_angel_candle_circuit(seconds: float | None = None) -> None:
         )
     _ANGEL_CANDLE_CIRCUIT_UNTIL = max(_ANGEL_CANDLE_CIRCUIT_UNTIL, until)
     _trip_candle_rate_limit_cooldown(hold)
+    # Angel throttles per client/IP, not per endpoint: quote and greeks
+    # classes pause too so no product keeps hitting a blocked connection.
+    with _ANGEL_REQUEST_GATE_LOCK:
+        for cls in _ANGEL_CLASS_MIN_INTERVALS:
+            if until > _ANGEL_COOLDOWN_BY_CLASS.get(cls, 0.0):
+                _ANGEL_COOLDOWN_BY_CLASS[cls] = until
 
 
 def _is_candle_rate_limited(response_or_exc: Any) -> bool:
-    if isinstance(response_or_exc, dict):
-        msg = str(response_or_exc.get("message") or "")
-        code = str(response_or_exc.get("errorcode") or response_or_exc.get("errorCode") or "")
-    else:
-        msg = str(response_or_exc or "")
-        code = ""
-    blob = f"{code} {msg}".lower()
-    return "ab1021" in blob or "too many requests" in blob or "rate limit" in blob
+    return _is_angel_rate_limited(response_or_exc)
 
 
 def _get_thread_angel_client() -> AngelOneClient:
@@ -2575,21 +2783,35 @@ class AngelOneClient:
     def connect(self) -> SmartConnect:
         if self._smart is not None:
             return self._smart
-        smart = SmartConnect(api_key=self.api_key, timeout=ANGEL_API_TIMEOUT_SECONDS)
-        totp = pyotp.TOTP(self.totp_secret).now()
-        session = smart.generateSession(self.client_id, self.credential, totp)
-        if not session.get("status"):
-            raise RuntimeError(f"Angel One login failed: {session.get('message', 'Unknown login error')}")
-        # generateSession already calls setAccessToken / setRefreshToken / setFeedToken
-        # with the raw token (without Bearer prefix). The returned data has "Bearer "
-        # prefixed, so calling the setters again would double-prefix and break auth.
-        self._smart = smart
-        return smart
+        global _ANGEL_LOGIN_LAST_AT_MONO, _ANGEL_LOGIN_COUNT
+        with ANGEL_LOGIN_LOCK:
+            # Double-check: another thread may have completed login while we
+            # waited on the process-wide login mutex.
+            if self._smart is not None:
+                return self._smart
+            wait = _ANGEL_LOGIN_LAST_AT_MONO + ANGEL_LOGIN_MIN_INTERVAL_SECONDS - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+            smart = SmartConnect(api_key=self.api_key, timeout=ANGEL_API_TIMEOUT_SECONDS)
+            totp = pyotp.TOTP(self.totp_secret).now()
+            session = smart.generateSession(self.client_id, self.credential, totp)
+            # Failed logins count too: a failing credential must not hammer
+            # the login endpoint at request rate.
+            _ANGEL_LOGIN_LAST_AT_MONO = time.monotonic()
+            _ANGEL_LOGIN_COUNT += 1
+            if not session.get("status"):
+                raise RuntimeError(f"Angel One login failed: {session.get('message', 'Unknown login error')}")
+            # generateSession already calls setAccessToken / setRefreshToken / setFeedToken
+            # with the raw token (without Bearer prefix). The returned data has "Bearer "
+            # prefixed, so calling the setters again would double-prefix and break auth.
+            self._smart = smart
+            return smart
 
     def fetch_quote(self, exchange: str, tradingsymbol: str, token: str) -> dict[str, Any]:
         def _fetch():
             smart = self.connect()
-            response = smart.ltpData(exchange, tradingsymbol, token)
+            with _angel_ltp_gate(ANGEL_GATE_MAX_WAIT_SECONDS):
+                response = smart.ltpData(exchange, tradingsymbol, token)
             if not response.get("status"):
                 raise RuntimeError(f"{tradingsymbol}: {response.get('message', 'Quote fetch failed')}")
             return response["data"]
@@ -2599,6 +2821,8 @@ class AngelOneClient:
             if self._is_auth_error(exc):
                 self._reset_connection()
                 return _fetch()
+            if _is_angel_rate_limited(exc):
+                _trip_angel_quote_circuit()
             raise
 
     def fetch_symbol_quote(self, symbol: str) -> dict[str, Any] | None:
@@ -2615,7 +2839,8 @@ class AngelOneClient:
                 return None
             token, tradingsymbol = resolved
             try:
-                resp = smart.ltpData("NSE", tradingsymbol, token)
+                with _angel_ltp_gate(ANGEL_GATE_MAX_WAIT_SECONDS):
+                    resp = smart.ltpData("NSE", tradingsymbol, token)
             except Exception:
                 return None
             if not isinstance(resp, dict) or not resp.get("status"):
@@ -2641,10 +2866,13 @@ class AngelOneClient:
         def _fetch() -> list[dict[str, Any]]:
             smart = self.connect()
             method = getattr(smart, "optionGreek", None)
-            response = method(params) if callable(method) else smart._postRequest("api.optionGreek", params)
+            with _angel_greeks_gate(ANGEL_GATE_MAX_WAIT_SECONDS):
+                response = method(params) if callable(method) else smart._postRequest("api.optionGreek", params)
             if not isinstance(response, dict) or not response.get("status"):
                 message = response.get("message") if isinstance(response, dict) else "invalid response"
                 code = response.get("errorcode") if isinstance(response, dict) else None
+                if _is_angel_rate_limited(response):
+                    _trip_angel_quote_circuit()
                 raise RuntimeError(f"Angel option Greeks unavailable: {code or 'UNKNOWN'} {message}")
             data = response.get("data") or []
             return [row for row in data if isinstance(row, dict)]
@@ -2655,6 +2883,8 @@ class AngelOneClient:
             if self._is_auth_error(exc):
                 self._reset_connection()
                 return _fetch()
+            if _is_angel_rate_limited(exc):
+                _trip_angel_quote_circuit()
             raise
 
     def fetch_candles(
@@ -2787,30 +3017,79 @@ def _fetch_quote_chunk(
     chunk: list[Instrument],
     token_to_key: dict[str, str],
     client: AngelOneClient | None = None,
+    deadline: float | None = None,
 ) -> dict[str, dict[str, Any]]:
     tokens_by_exchange: dict[str, list[str]] = {}
     for inst in chunk:
         tokens_by_exchange.setdefault(inst.exchange, []).append(inst.token)
 
     fetched: dict[str, dict[str, Any]] = {}
-    try:
-        response = _getmarketdata_with_retry(smart, tokens_by_exchange)
-        if response.get("status"):
-            for item in response.get("data", {}).get("fetched", []):
-                token = str(item.get("symbolToken", ""))
-                key = token_to_key.get(token)
-                if key:
-                    fetched[key] = item
-            return fetched
-    except Exception as exc:
-        if client and client._is_auth_error(exc):
+    rate_limited = False
+    gate_deadline = ANGEL_GATE_MAX_WAIT_SECONDS if deadline is None else deadline
+    response: Any = None
+    # One network attempt per gate hold: a retry must re-enter the gate so a
+    # wedged upstream cannot monopolize the slot across all its attempts.
+    for attempt in range(max(1, int(os.getenv("ANGEL_MARKETDATA_ATTEMPTS", "3")))):
+        try:
+            with _angel_marketdata_gate(gate_deadline):
+                response = smart.getMarketData("FULL", tokens_by_exchange)
+            break
+        except AngelGateTimeout:
             raise
+        except Exception as exc:
+            if client and client._is_auth_error(exc):
+                raise
+            if _is_angel_rate_limited(exc):
+                rate_limited = True
+                _trip_angel_quote_circuit()
+                break
+            msg = str(exc).lower()
+            if ("timeout" in msg or "timed out" in msg) and attempt + 1 < int(os.getenv("ANGEL_MARKETDATA_ATTEMPTS", "3")):
+                # Backoff sleeps OUTSIDE the gate slot.
+                time.sleep(min(8.0, 0.5 * (attempt + 1)))
+                continue
+            response = {"status": False}
+            break
+
+    if rate_limited:
+        # A rate-limited batch must not degrade into N rapid ltpData calls —
+        # that amplifies the burst that caused the block.
+        return fetched
+
+    if isinstance(response, dict) and _is_angel_rate_limited(response):
+        _trip_angel_quote_circuit()
+        return fetched
+
+    if isinstance(response, dict) and response.get("status"):
+        for item in response.get("data", {}).get("fetched", []) or []:
+            token = str(item.get("symbolToken", ""))
+            key = token_to_key.get(token)
+            if key:
+                fetched[key] = item
+        if len(fetched) < len(token_to_key):
+            # Partial batch: missing tokens must not silently become zero LTPs.
+            # Coverage telemetry (market_data_provider) plus this counter makes
+            # the gap visible; the missing keys simply stay missing.
+            _angel_stat("marketdata", "requestedTokensTotal", len(token_to_key))
+            _angel_stat("marketdata", "returnedTokensTotal", len(fetched))
+            _angel_stat("marketdata", "partialBatchesTotal")
+            logging.getLogger(__name__).debug(
+                "Angel batch partial: %d/%d tokens fetched", len(fetched), len(token_to_key)
+            )
+        return fetched
 
     for inst in chunk:
+        if _angel_cooldown_active("ltp"):
+            # Fail fast while a rate-limit pause is active; these fallback
+            # calls are best-effort for a batch that already failed once.
+            break
         try:
-            response = smart.ltpData(inst.exchange, inst.tradingsymbol, inst.token)
+            with _angel_ltp_gate(gate_deadline):
+                response = smart.ltpData(inst.exchange, inst.tradingsymbol, inst.token)
             if response.get("status"):
                 fetched[inst.key] = response["data"]
+        except AngelGateTimeout:
+            break
         except Exception as exc:
             if client and client._is_auth_error(exc):
                 raise
@@ -2849,6 +3128,14 @@ def _fetch_batch_quotes_chunked(
         all_fetched: dict[str, dict[str, Any]] = {}
 
         for chunk in chunks:
+            if _angel_cooldown_active("marketdata"):
+                # Don't re-pressure Angel mid-batch after a trip; the remaining
+                # chunk(s) are picked up by the next refresh cycle.
+                logging.getLogger(__name__).warning(
+                    "Angel marketdata cooldown active; skipping %d remaining quote chunk(s)",
+                    len(chunks) - chunks.index(chunk),
+                )
+                break
             all_fetched.update(_fetch_quote_chunk(smart, chunk, token_to_key, self))
 
         return all_fetched
@@ -2893,6 +3180,12 @@ def _build_stock_row(
     ltp = float(quote.get("ltp", 0) or 0)
     close = float(quote.get("close", 0) or 0)
     delta, state = _pct_change(ltp, close if close else None)
+    depth = quote.get("depth") if isinstance(quote.get("depth"), dict) else {}
+    buy = depth.get("buy") if isinstance(depth.get("buy"), list) else []
+    sell = depth.get("sell") if isinstance(depth.get("sell"), list) else []
+    best_bid = float(buy[0].get("price")) if buy and isinstance(buy[0], dict) and buy[0].get("price") else None
+    best_ask = float(sell[0].get("price")) if sell and isinstance(sell[0], dict) and sell[0].get("price") else None
+    ask_depth = int(sell[0].get("quantity")) if sell and isinstance(sell[0], dict) and sell[0].get("quantity") is not None else None
     return {
         "ticker": inst.key,
         "name": (inst.label or inst.tradingsymbol).replace("-EQ", "").replace("-BE", "").replace("-", " ").strip(),
@@ -2908,7 +3201,15 @@ def _build_stock_row(
         "close": quote.get("close"),
         "oi": float(quote.get("opnInterest", 0) or quote.get("oi", 0) or 0),
         "prev_oi": float(quote.get("previousOI", 0) or quote.get("prev_oi", 0) or 0),
+        "bestBid": best_bid,
+        "bestAsk": best_ask,
+        "availableAskDepth": ask_depth,
         "intraday": intraday or {},
+        **(
+            {"fresh": False, "staleReason": "zero_or_missing_ltp"}
+            if ltp <= 0
+            else {"fresh": True}
+        ),
     }
 
 
@@ -5108,20 +5409,28 @@ def create_app() -> FastAPI:
         from .index_options_live import (
             compose_live_index_options_radar,
             finalize_closed_index_options_radar,
+            hydrate_durable_index_options_radar,
             replay_session_payload,
         )
         from .index_options_paper import index_options_market_open
         from app.services.shared_state.view_store import get_view_store
 
         if sessionDate:
+            from .index_options_live import attach_durable_session_book
+            from .index_options_replay import parse_session_date
+
             try:
-                return replay_session_payload(
+                replay_day = parse_session_date(sessionDate, today=datetime.now(tz=IST_ZONE).date())
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"Invalid sessionDate: {exc}") from exc
+            return attach_durable_session_book(
+                replay_session_payload(
                     AngelOneClient(),
                     sessionDate,
                     today=datetime.now(tz=IST_ZONE).date(),
-                )
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=f"Invalid sessionDate: {exc}") from exc
+                ),
+                replay_day,
+            )
 
         def _compose() -> dict[str, Any]:
             return compose_live_index_options_radar(
@@ -5147,12 +5456,12 @@ def create_app() -> FastAPI:
             if payload.get("success"):
                 age = time.time() - (view.get("updatedAt") or 0)
                 if age < 90.0:
-                    return {**payload, "cacheStatus": "HIT"}
+                    return hydrate_durable_index_options_radar({**payload, "cacheStatus": "HIT"})
                 if age < 300.0:
                     background_tasks.add_task(_refresh_bg)
-                    return {**payload, "cacheStatus": "REFRESHING"}
+                    return hydrate_durable_index_options_radar({**payload, "cacheStatus": "REFRESHING"})
                 background_tasks.add_task(_refresh_bg)
-                return {**payload, "cacheStatus": "STALE"}
+                return hydrate_durable_index_options_radar({**payload, "cacheStatus": "STALE"})
 
         cached = load_persisted_radar()
         if not index_options_market_open(datetime.now(tz=IST_ZONE)):
@@ -5175,7 +5484,7 @@ def create_app() -> FastAPI:
                 cached = {**cached, "cacheStatus": "REFRESHING" if recent else "STALE"}
             else:
                 cached = {**cached, "cacheStatus": "HIT"}
-            return cached
+            return hydrate_durable_index_options_radar(cached)
         return _compose()
 
     @app.get("/api/dhan-scanner-matrix")
@@ -5485,6 +5794,40 @@ def create_app() -> FastAPI:
                 "reason": "No coverage metadata in current snapshot",
             },
             "snapshotUpdatedAt": snapshot.get("updatedAt"),
+        }
+
+    @app.get("/api/diagnostics/angel-gate")
+    def angel_gate_diagnostics() -> dict[str, Any]:
+        """Live view of the Angel request gate: pacing, cooldowns, counters."""
+        now = time.monotonic()
+        classes: dict[str, Any] = {}
+        for cls, min_interval in _ANGEL_CLASS_MIN_INTERVALS.items():
+            with _ANGEL_GATE_STATS_LOCK:
+                stats = dict(_ANGEL_GATE_STATS.get(cls, {}))
+            stats["minIntervalSeconds"] = min_interval
+            stats["cooldownRemainingSeconds"] = round(
+                max(0.0, _ANGEL_COOLDOWN_BY_CLASS.get(cls, 0.0) - now), 2
+            )
+            if stats.get("lastCallAtMono") is not None:
+                stats["secondsSinceLastCall"] = round(now - stats["lastCallAtMono"], 2)
+            classes[cls] = stats
+        return {
+            "success": True,
+            "enabled": ANGEL_GATE_ENABLED,
+            "globalMinIntervalSeconds": ANGEL_GLOBAL_MIN_INTERVAL_SECONDS,
+            "gateMaxWaitSeconds": ANGEL_GATE_MAX_WAIT_SECONDS,
+            "login": {
+                "minIntervalSeconds": ANGEL_LOGIN_MIN_INTERVAL_SECONDS,
+                "totalLogins": _ANGEL_LOGIN_COUNT,
+                "secondsSinceLastLogin": round(now - _ANGEL_LOGIN_LAST_AT_MONO, 2)
+                if _ANGEL_LOGIN_LAST_AT_MONO
+                else None,
+            },
+            "candleCircuitRemainingSeconds": round(
+                max(0.0, max(_ANGEL_CANDLE_CIRCUIT_UNTIL, _CANDLE_COOLDOWN_UNTIL_MONO) - now), 2
+            ),
+            "tripCount": _ANGEL_TRIP_COUNT,
+            "classes": classes,
         }
 
     @app.get("/api/market-intelligence")

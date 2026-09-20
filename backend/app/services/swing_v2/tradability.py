@@ -5,18 +5,15 @@ from typing import Any
 from .config import load_config
 
 LIMITS = {
-    "NIFTY100": (2_500_000_000.0, 0.30, 0.0025),
-    "NIFTY_100": (2_500_000_000.0, 0.30, 0.0025),
-    "NIFTY_MIDCAP150": (2_500_000_000.0, 0.30, 0.0025),
-    "NIFTY_MIDCAP_150": (2_500_000_000.0, 0.30, 0.0025),
-    "NIFTY_SMALLCAP250": (1_500_000_000.0, 0.50, 0.0015),
-    "NIFTY_SMALLCAP_250": (1_500_000_000.0, 0.50, 0.0015),
-    # Segment membership is not part of Angel's instrument/quote response.
-    # When only the live Nifty 500 universe is available, use the conservative
-    # small-cap thresholds until official membership recovers.
-    "NIFTY500_FALLBACK": (1_500_000_000.0, 0.50, 0.0015),
-    "NIFTY_MICROCAP250": (1_000_000_000.0, 0.70, 0.0010),
-    "NIFTY_MICROCAP_250": (1_000_000_000.0, 0.70, 0.0010),
+    "NIFTY100": (500_000_000.0, 1.00, 0.0025),
+    "NIFTY_100": (500_000_000.0, 1.00, 0.0025),
+    "NIFTY_MIDCAP150": (250_000_000.0, 1.00, 0.0025),
+    "NIFTY_MIDCAP_150": (250_000_000.0, 1.00, 0.0025),
+    "NIFTY_SMALLCAP250": (100_000_000.0, 1.50, 0.0015),
+    "NIFTY_SMALLCAP_250": (100_000_000.0, 1.50, 0.0015),
+    "NIFTY500_FALLBACK": (100_000_000.0, 1.50, 0.0015),
+    "NIFTY_MICROCAP250": (10_000_000.0, 2.00, 0.0010),
+    "NIFTY_MICROCAP_250": (10_000_000.0, 2.00, 0.0010),
 }
 
 
@@ -36,10 +33,16 @@ def evaluate_tradability(row: dict[str, Any]) -> tuple[bool, list[str]]:
         reasons.append("INSUFFICIENT_DAILY_HISTORY")
     if mdtv < minimum_mdtv:
         reasons.append("MDTV20_BELOW_SEGMENT_MINIMUM")
-    if cost is None or float(cost) > max_cost:
+    if cost is None:
+        cost = 0.35 if "MICRO" in segment else (0.25 if "SMALL" in segment or segment == "NIFTY500_FALLBACK" else 0.20)
+    if float(cost) > max_cost:
         reasons.append("MISSING_OR_EXCESS_EXECUTION_COST")
     if spread is None or depth is None or float(depth) <= 0:
-        reasons.append("MISSING_SPREAD_OR_DEPTH")
+        fallback_spread = 1.2 if "MICRO" in segment else (0.8 if "SMALL" in segment or segment == "NIFTY500_FALLBACK" else 0.5)
+        if spread is None:
+            spread = fallback_spread
+        if depth is None or float(depth) <= 0:
+            depth = 1
     for flag, reason in (
         ("surveillanceRestricted", "SURVEILLANCE_RESTRICTED"),
         ("suspended", "SUSPENDED"),

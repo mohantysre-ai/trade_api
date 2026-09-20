@@ -23,7 +23,7 @@ INDEX_CONFIG: tuple[dict[str, str], ...] = (
 )
 
 MIN_DAILY_ENTRIES = 0
-MAX_DAILY_ENTRIES = 20
+MAX_DAILY_ENTRIES = 5
 MAX_ATTEMPTS_PER_INDEX = 20
 # Portfolio-wide cap. It is applied only after the BUY and the SELL sleeve have
 # each independently picked their best index/bucket, so one sleeve can never
@@ -304,6 +304,7 @@ def _seller_candidate(index: dict[str, str], snapshot: dict[str, Any]) -> dict[s
         "expiry": supplied.get("expiry"),
         "dataLimitations": seller.get("dataLimitations") or [],
         "gateEvidence": seller.get("gateEvidence") or {},
+        "selectionEvidence": seller.get("selectionEvidence") or {},
         "chain": supplied.get("rawChain") or [],
         "structure": supplied.get("structure"),
         "componentFreshness": supplied.get("componentFreshness") or {},

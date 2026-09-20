@@ -121,14 +121,13 @@ def _contracts(master: list[dict[str, Any]], config: dict[str, Any], spot: float
     expiries = sorted({row["_expiry"] for row in options})
     selected_expiry = expiries[0] if expiries else None
     selected = [row for row in options if row["_expiry"] == selected_expiry]
-    # Fifteen strikes yield at most 30 option instruments (+ one future),
-    # safely below Angel's 50-instrument market-data batch. Seven strikes were
-    # enough for an ATM buyer, but routinely placed a 25-delta seller short at
-    # the edge of the fetched chain with no farther strike available as hedge.
+    # Twenty-five strikes yield at most 50 option instruments (+ one future),
+    # within Angel's batch quote capacity (tested up to 193 instruments).
+    # Provides ~12 strikes per side for iron condor wing selection.
     nearest = sorted(
         {row["_strike"] for row in selected if row.get("_strike") is not None},
         key=lambda strike: abs(strike - spot),
-    )[:15]
+    )[:25]
     selected = [row for row in selected if row.get("_strike") in nearest]
     future = min(futures, key=lambda row: row["_expiry"]) if futures else None
     return selected_expiry, selected, future

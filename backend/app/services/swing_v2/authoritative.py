@@ -28,7 +28,13 @@ def _read_json(path):
   v=json.loads(path.read_text(encoding="utf-8-sig")); return v if isinstance(v,dict) else {}
  except (OSError,ValueError): return {}
 def _write_state(payload):
- t=_state_path(); t.parent.mkdir(parents=True,exist_ok=True); tmp=t.with_suffix(t.suffix+".tmp"); tmp.write_text(json.dumps(payload,indent=2,default=str),encoding="utf-8"); os.replace(tmp,t)
+ t=_state_path(); t.parent.mkdir(parents=True,exist_ok=True); tmp=t.with_suffix(t.suffix+".tmp"); tmp.write_text(json.dumps(payload,indent=2,default=str),encoding="utf-8")
+ for attempt in range(5):
+  try: os.replace(tmp,t); return
+  except PermissionError:
+   if attempt==4: break
+   monotonic_time.sleep(0.2*(attempt+1))
+ t.write_text(json.dumps(payload,indent=2,default=str),encoding="utf-8")
 def _snapshot():
  from ..market_snapshot_store import readable_market_snapshot_path
  return _read_json(readable_market_snapshot_path())

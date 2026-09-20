@@ -24,46 +24,36 @@ def generate_index_options_eod_report(for_date: date) -> dict[str, Any]:
         live = {}
 
     day = for_date.isoformat()
-    if not isinstance(live, dict) or str(live.get("sessionDate") or "")[:10] != day:
-        cached = load_book_cache(for_date, "index_options")
-        if cached is not None:
-            return cached
+    from .index_options.runtime import strategy_eod
+    from .index_options.accounting import eod_positions, merge_paper_books
+
+    strategy = strategy_eod(day)
+    matching_live = isinstance(live, dict) and str(live.get("sessionDate") or "")[:10] == day
+    cached = None if matching_live else load_book_cache(for_date, "index_options")
+    if not matching_live:
+        live = {"sessionDate": day, "open": [], "closed": []}
+        if cached:
+            for row in cached.get("positions") or []:
+                closed = row.get("pnlKind") == "realised" or row.get("status") == "CLOSED"
+                live["closed" if closed else "open"].append(row)
+            if not strategy["positions"]:
+                strategy = cached.get("strategyAttribution") or strategy
+    if not matching_live and not cached and not strategy["positions"]:
         return {
             "date": day,
             "sessionDate": day,
             "archiveStatus": "NO_BOOK",
+            "entryCount": 0,
+            "closedCount": 0,
             "totalPnl": None,
             "realizedPnl": None,
             "openPnl": None,
             "positions": [],
         }
 
-    # Live parity path — the paper book is the execution source of truth.
-    open_rows = [dict(r) for r in (live.get("open") or []) if isinstance(r, dict)]
-    closed_rows = [dict(r) for r in (live.get("closed") or []) if isinstance(r, dict)]
-    realized = round(sum(float(r.get("pnl") or 0) for r in closed_rows), 2)
-    unrealized = round(sum(float(r.get("unrealizedPnl") or 0) for r in open_rows), 2)
-    positions = [
-        {**r, "pnl": float(r.get("unrealizedPnl") or 0), "pnlKind": "unrealised"}
-        for r in open_rows
-    ] + [
-        {**r, "pnl": float(r.get("pnl") or 0), "pnlKind": "realised"}
-        for r in closed_rows
-    ]
-
-    strategy: dict[str, Any] = {
-        "sessionDate": day,
-        "positions": [],
-        "realizedPnl": 0.0,
-        "unrealizedPnl": 0.0,
-    }
-    try:
-        from .index_options.runtime import strategy_eod
-
-        strategy = strategy_eod(day)
-    except Exception:
-        pass
-    strategy_rows = [dict(r) for r in (strategy.get("positions") or []) if isinstance(r, dict)]
+    book = merge_paper_books(live, strategy)
+    positions = eod_positions(book)
+    strategy_rows = strategy["positions"]
     strategy_realized = round(float(strategy.get("realizedPnl") or 0), 2)
     strategy_unrealized = round(float(strategy.get("unrealizedPnl") or 0), 2)
 
@@ -72,10 +62,12 @@ def generate_index_options_eod_report(for_date: date) -> dict[str, Any]:
         "sessionDate": day,
         "archiveStatus": "ARCHIVED",
         "mode": live.get("mode") or "AUTO_PAPER_ONLY",
-        "entryCount": len(positions),
-        "realizedPnl": realized,
-        "openPnl": unrealized,
-        "totalPnl": round(realized + unrealized + strategy_realized + strategy_unrealized, 2),
+        "entryCount": book["entryCount"],
+        "closedCount": book["closedCount"],
+        "openCount": book["openCount"],
+        "realizedPnl": book["realizedPnl"],
+        "openPnl": book["openPnl"],
+        "totalPnl": book["totalPnl"],
         "positions": positions,
         "strategyEntryCount": len(strategy_rows),
         "strategyPositions": strategy_rows,
