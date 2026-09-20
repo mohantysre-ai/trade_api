@@ -301,14 +301,23 @@ test('candidates prefer modularCandidates.length over other counts', () => {
 /* -------------------------------------------------------------------------- */
 
 test('stat metric row is rendered as bordered card tiles', () => {
-  assert.match(panelSource, /desk-metric-grid/);
-  assert.match(panelSource, /className="desk-metric-tile min-w-0 overflow-hidden"/);
+  assert.match(panelSource, /desk-metric-grid [^"]*grid-cols/);
+  assert.match(panelSource, /className="desk-metric-tile min-w-0 overflow-hidden[^"]*"/);
   assert.match(panelSource, /function StatCard/);
+});
+
+test('every grid-cols container also sets display:grid so tiles lay out horizontally', () => {
+  const gridClassNames = [...panelSource.matchAll(/className="([^"]*grid-cols[^"]*)"/g)].map((m) => m[1]);
+  assert.ok(gridClassNames.length > 0, 'expected at least one grid-cols container');
+  for (const className of gridClassNames) {
+    const tokens = className.split(' ');
+    assert.ok(tokens.includes('grid'), `grid-cols without display:grid in: ${className}`);
+  }
 });
 
 test('section containers use the shared card primitive', () => {
   assert.match(panelSource, /function SectionCard/);
-  assert.match(panelSource, /className=\{`desk-card p-3 sm:p-4 \$\{className\}`\}/);
+  assert.match(panelSource, /className=\{`desk-card min-w-0 overflow-hidden p-3 sm:p-4 \$\{className\}`\}/);
 });
 
 test('primary sections are rendered through SectionCard', () => {
@@ -339,4 +348,50 @@ test('empty state text is present for historical and live modes', () => {
 test('closed historical trade renders a dedicated closed-position card', () => {
   assert.match(panelSource, /function ClosedPositionCard/);
   assert.match(panelSource, /DURABLE LEDGER/);
+});
+
+test('summary section uses responsive 1/2/3-column grid', () => {
+  assert.match(panelSource, /className="(ix-summary-grid )?grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"/);
+});
+
+test('summary cards are wrapped in desk-card via SectionCard', () => {
+  for (const title of ['PORTFOLIO RISK GOVERNOR', 'NO-TRADE BENCHMARK', 'MARKET DECISION']) {
+    const idx = panelSource.indexOf(`title="${title}"`);
+    assert.ok(idx !== -1, `missing ${title}`);
+    const before = panelSource.slice(Math.max(0, idx - 200), idx);
+    assert.match(before, /SectionCard/);
+  }
+});
+
+test('long metric text uses compact wrapping style', () => {
+  assert.match(panelSource, /isCompactMetric/);
+  assert.match(panelSource, /desk-metric-value--compact/);
+  assert.match(panelSource, /COMPACT_METRIC_THRESHOLD/);
+});
+
+test('help text uses multiline-safe classes', () => {
+  assert.match(panelSource, /leading-snug/);
+  assert.match(panelSource, /break-words/);
+  assert.match(panelSource, /whitespace-normal/);
+});
+
+test('no forced single-line overflow on metric tiles', () => {
+  assert.match(panelSource, /h-full flex flex-col justify-between/);
+  assert.match(panelSource, /min-w-0 overflow-hidden/);
+});
+
+test('historical qualification metric remains visible', () => {
+  assert.match(panelSource, /Qualification History:.*archived.*Not Archived/);
+});
+
+test('replay diagnostic text remains visible', () => {
+  assert.match(
+    panelSource,
+    /Replay is analytical only and does not override durable executions/,
+  );
+});
+
+test('long exit reason renders completely', () => {
+  assert.match(panelSource, /label="Exit reason" value=\{exitReason\}/);
+  assert.match(panelSource, /isCompactMetric/);
 });

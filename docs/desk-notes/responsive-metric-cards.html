@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Responsive Metric Card Row</title>
+<style>
+  :root {
+    --card-gap: clamp(6px, 1.2vw, 16px);
+    --card-radius: 20px;
+    --card-bg: #ffffff8c;
+    --card-border: #0f172a14;
+    --card-accent: #0f766e;
+    --fg-strong: #263238;
+    --fg-muted: #64748b;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 24px;
+    font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+    background: #f4f6f5;
+  }
+
+  /* Single row that wraps only when there is truly no room left,
+     and every card is forced to the same width via the same
+     minmax() basis on each grid track. */
+  .metric-row {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: var(--card-gap);
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    padding-bottom: 4px;
+  }
+
+  .metric-card {
+    scroll-snap-align: start;
+    min-width: 0;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: clamp(8px, 1.4vw, 14px);
+    border-radius: var(--card-radius);
+    background: var(--card-bg);
+    border: 0.8px solid var(--card-border);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 3px 0 0 var(--card-accent);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    container-type: inline-size;
+  }
+
+  .metric-label {
+    font-size: clamp(9px, 0.8vw + 6px, 11px);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fg-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .metric-value {
+    font-size: clamp(13px, 1.4vw + 8px, 20px);
+    font-weight: 800;
+    color: var(--fg-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .metric-delta {
+    font-size: clamp(8px, 0.6vw + 5px, 9px);
+    color: var(--fg-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Breakpoints only change how many columns are visible at once;
+     card width stays uniform because grid-auto-columns is 1fr for all. */
+  @media (max-width: 1280px) {
+    .metric-row { grid-auto-columns: minmax(160px, 1fr); }
+  }
+  @media (max-width: 900px) {
+    .metric-row { grid-auto-columns: minmax(140px, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .metric-row {
+      grid-auto-flow: row;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-auto-columns: unset;
+      overflow-x: visible;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="metric-row">
+  <div class="metric-card" style="--card-accent:#10b981;">
+    <div class="metric-label">Decision</div>
+    <div class="metric-value" style="color:#10b981;">ADMIT</div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-label">Executed</div>
+    <div class="metric-value">1</div>
+    <div class="metric-delta">durable Quant V2 ledger</div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-label">Closed</div>
+    <div class="metric-value">1</div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-label">Open</div>
+    <div class="metric-value">0</div>
+  </div>
+
+  <div class="metric-card" style="--card-accent:#d97706;">
+    <div class="metric-label">Qualification History</div>
+    <div class="metric-value" style="color:#d97706;">Not Archived</div>
+    <div class="metric-delta">decision audit not archived for this session</div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-label">Replay Diagnostics</div>
+    <div class="metric-value">1 repriced</div>
+    <div class="metric-delta">analytical only</div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-label">Net &Delta;</div>
+    <div class="metric-value">0</div>
+    <div class="metric-delta">current exposure 0 · 1 closed</div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-label">Net &Gamma;</div>
+    <div class="metric-value">0</div>
+    <div class="metric-delta">current exposure 0 · 1 closed</div>
+  </div>
+</div>
+
+</body>
+</html>

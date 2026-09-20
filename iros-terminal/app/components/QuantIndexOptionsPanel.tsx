@@ -19,6 +19,41 @@ const sideClass = (side?: string) =>
     : 'border-rose-200 bg-rose-50 text-rose-700';
 const pnlClass = (value?: number | null) => ((value ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500');
 const UI_VERSION = 'LEG_TICKET_UI_V4';
+const COMPACT_METRIC_THRESHOLD = 12;
+
+function isCompactMetric(value: unknown): boolean {
+  return String(value ?? '').length > COMPACT_METRIC_THRESHOLD;
+}
+
+function metricValueClass(value: unknown, toneClass = ''): string {
+  const compact = isCompactMetric(value);
+  return [
+    'desk-metric-value',
+    'tabular-nums',
+    'w-full',
+    'min-w-0',
+    compact ? 'text-xs sm:text-sm leading-tight whitespace-normal break-words desk-metric-value--compact' : '',
+    toneClass,
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function deltaClass(compact = false): string {
+  return [
+    'desk-metric-delta',
+    'w-full',
+    'min-w-0',
+    'text-[10px]',
+    'sm:text-[11px]',
+    'leading-snug',
+    'break-words',
+    'whitespace-normal',
+    compact ? 'desk-metric-delta--multiline' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
 
 function legPnl(leg: Leg): number | null {
   const entry = leg.entryFill ?? leg.entryPrice;
@@ -42,10 +77,13 @@ function legActionLine(leg: Leg, fallbackExpiry?: string): string {
 }
 
 function MiniTile({ label: metricLabel, value }: { label: string; value: string }) {
+  const compact = isCompactMetric(value);
   return (
-    <div className="desk-metric-tile min-w-0 overflow-hidden">
-      <div className="desk-metric-label w-full min-w-0">{metricLabel}</div>
-      <div className="desk-metric-value tabular-nums w-full min-w-0">{value}</div>
+    <div className="desk-metric-tile min-w-0 overflow-hidden h-full flex flex-col justify-between">
+      <div className="min-w-0">
+        <div className="desk-metric-label w-full min-w-0">{metricLabel}</div>
+        <div className={metricValueClass(value)}>{value}</div>
+      </div>
     </div>
   );
 }
@@ -60,18 +98,21 @@ function StatCard({ metric }: { metric: MetricRow }) {
         : metric.tone === 'danger'
           ? 'text-red-500'
           : 'text-[var(--fg-strong)]';
+  const compact = isCompactMetric(metric.value);
   return (
     <div
-      className="desk-metric-tile min-w-0 overflow-hidden"
+      className="desk-metric-tile min-w-0 overflow-hidden h-full flex flex-col justify-between"
       title={metric.hint ? `${metric.source} · ${metric.hint}` : metric.source}
       data-metric={metric.id}
       data-source={metric.source}
       data-nullable={metric.nullable ? 'true' : 'false'}
     >
-      <div className="desk-metric-label w-full min-w-0">{metric.label}</div>
-      <div className={`desk-metric-value tabular-nums w-full min-w-0 ${toneClass}`}>{metric.value}</div>
+      <div className="min-w-0">
+        <div className="desk-metric-label w-full min-w-0">{metric.label}</div>
+        <div className={metricValueClass(metric.value, toneClass)}>{metric.value}</div>
+      </div>
       {metric.hint ? (
-        <div className="desk-metric-delta w-full min-w-0 text-[9px] text-[var(--fg-muted)]">{metric.hint}</div>
+        <div className={deltaClass(compact)}>{metric.hint}</div>
       ) : null}
     </div>
   );
@@ -85,6 +126,7 @@ function SectionCard({
   badgeClass = 'desk-pill--muted',
   children,
   className = '',
+  compact = false,
 }: {
   title: string;
   subtitle?: string;
@@ -92,15 +134,16 @@ function SectionCard({
   badgeClass?: string;
   children: React.ReactNode;
   className?: string;
+  compact?: boolean;
 }) {
   return (
-    <div className={`desk-card p-3 sm:p-4 ${className}`}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <div className={`desk-card min-w-0 overflow-hidden ${compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4'} ${className}`}>
+      <div className="flex flex-nowrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="desk-panel-title text-[var(--fg-strong)]">{title}</div>
-          {subtitle ? <div className="mt-1 text-[10px] text-[var(--fg-muted)]">{subtitle}</div> : null}
+          <div className="desk-panel-title truncate text-[var(--fg-strong)]">{title}</div>
+          {subtitle ? <div className="mt-1 text-[10px] sm:text-[11px] leading-snug text-[var(--fg-muted)] break-words whitespace-normal">{subtitle}</div> : null}
         </div>
-        {badge ? <span className={`desk-pill ${badgeClass}`}>{badge}</span> : null}
+        {badge ? <span className={`desk-pill shrink-0 ${badgeClass}`}>{badge}</span> : null}
       </div>
       <div className="mt-3">{children}</div>
     </div>
@@ -135,7 +178,7 @@ function StrategyCard({ position }: { position: Position }) {
         </div>
       </div>
 
-      <div className="mt-3 grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <MiniTile label="Entry debit" value={money(position.entryDebit ?? position.entryValue)} />
         <MiniTile label="Structure mark" value={money(position.combinedStructureValue)} />
         <MiniTile label="Max profit" value={money(position.maxProfit)} />
@@ -248,7 +291,7 @@ function ClosedPositionCard({ position, historical }: { position: Position; hist
         </div>
       </div>
 
-      <div className="mt-3 grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <MiniTile label="Max loss" value={money(position.maxLoss)} />
         <MiniTile label="Max profit" value={money(position.maxProfit)} />
         <MiniTile label="Entry debit" value={money(position.entryDebit ?? position.entryValue)} />
@@ -441,7 +484,7 @@ export default function QuantIndexOptionsPanel({
 
       {radar?.error && <div className="desk-card p-3 text-red-500">{radar.error}</div>}
 
-      <div className="desk-metric-grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+      <div className="desk-metric-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {metrics.map((metric) => (
           <StatCard key={metric.id} metric={metric} />
         ))}
@@ -494,23 +537,25 @@ export default function QuantIndexOptionsPanel({
         </div>
       </SectionCard>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="ix-summary-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         <SectionCard
           title="PORTFOLIO RISK GOVERNOR"
           badge={q?.portfolioRisk?.pass === false ? 'BLOCKED' : 'WITHIN LIMITS'}
           badgeClass={q?.portfolioRisk?.pass === false ? 'desk-pill--warn' : 'desk-pill--ok'}
+          className="signal-widget signal-widget--radar"
+          compact
         >
-          <div className="desk-metric-value tabular-nums">
+          <div className={metricValueClass(q?.portfolioRisk?.pass === false ? 'BLOCKED' : 'WITHIN LIMITS')}>
             {q?.portfolioRisk?.pass === false ? 'BLOCKED' : 'WITHIN LIMITS'}
           </div>
-          <div className="mt-2 text-[10px] text-[var(--fg-muted)]">
+          <div className="mt-2 text-[10px] sm:text-[11px] leading-snug text-[var(--fg-muted)] break-words whitespace-normal">
             Stress loss {money(q?.portfolioRisk?.stressLoss)} · hard portfolio admission before durable lock
           </div>
         </SectionCard>
 
-        <SectionCard title="NO-TRADE BENCHMARK" badge="DO NOTHING FLOOR" badgeClass="desk-pill--muted">
-          <div className="desk-metric-value tabular-nums">Utility {n(q?.noTradeUtility, 2)}</div>
-          <div className="mt-2 text-[10px] text-[var(--fg-muted)]">
+        <SectionCard title="NO-TRADE BENCHMARK" badge="DO NOTHING FLOOR" badgeClass="desk-pill--muted" className="signal-widget signal-widget--radar" compact>
+          <div className={metricValueClass(`Utility ${n(q?.noTradeUtility, 2)}`)}>Utility {n(q?.noTradeUtility, 2)}</div>
+          <div className="mt-2 text-[10px] sm:text-[11px] leading-snug text-[var(--fg-muted)] break-words whitespace-normal">
             Positive utility must beat doing nothing after costs, tail, Greeks and concentration penalties.
           </div>
         </SectionCard>
@@ -519,11 +564,13 @@ export default function QuantIndexOptionsPanel({
           title="MARKET DECISION"
           badge={isHistorical ? 'HISTORICAL' : (radar?.sessionStatus ?? '—')}
           badgeClass={isHistorical ? 'desk-pill--muted' : 'desk-pill--info'}
+          className="signal-widget signal-widget--radar"
+          compact
         >
-          <div className="desk-metric-value">
+          <div className={metricValueClass(isHistorical ? 'HISTORICAL SESSION' : (view?.decision ?? (loading ? 'CALCULATING' : 'NO TRADE')))}>
             {isHistorical ? 'HISTORICAL SESSION' : (view?.decision ?? (loading ? 'CALCULATING' : 'NO TRADE'))}
           </div>
-          <div className="mt-2 text-[10px] text-[var(--fg-muted)]">
+          <div className="mt-2 text-[10px] sm:text-[11px] leading-snug text-[var(--fg-muted)] break-words whitespace-normal">
             {isHistorical
               ? `Durable executions: ${view?.executed ?? '—'} · Qualification history: ${view?.qualificationAvailable ? 'archived' : 'not archived'
               }`
@@ -691,7 +738,7 @@ export default function QuantIndexOptionsPanel({
           </tbody>
         </table>
         {!top.length && !loading && (
-          <div className="py-5 text-center text-[var(--fg-muted)]">No repriced structures available.</div>
+          <div className="rounded-xl border-[var(--terminal-line)] bg-[var(--terminal-panel-2)] py-6 text-center text-[var(--fg-muted)]">No repriced structures available.</div>
         )}
       </SectionCard>
     </section>
