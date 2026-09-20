@@ -8,7 +8,14 @@ from app.services.dhan_scanx_options import (
     normalize_scanx_chain,
     has_usable_option_chain,
     chain_needs_oi_enrichment,
+    discover_scanx_expiries,
+    _SCANX_EXPIRY_CACHE,
 )
+
+
+def _seed_discovery(sid: int, expiry: date) -> None:
+    ts = expiry_epoch(expiry)
+    _SCANX_EXPIRY_CACHE[sid] = {ts: f"TEST FUT {expiry}"}
 
 
 def test_expiry_epoch_uses_actual_contract_date_at_1830_ist():
@@ -25,9 +32,11 @@ def test_fetch_uses_sid_and_normalizes_nested_call_put_rows():
              "pe": {"ltp": 140, "oi": 900, "previousOi": 950, "delta": -.45}}
         ]}}
 
-    result = fetch_scanx_option_chain("NIFTY", date(2026, 8, 25), requester=requester)
+    expiry = date(2026, 8, 25)
+    _seed_discovery(13, expiry)
+    result = fetch_scanx_option_chain("NIFTY", expiry, requester=requester)
     assert seen["Data"]["Sid"] == 13
-    assert seen["Data"]["Exp"] == expiry_epoch(date(2026, 8, 25))
+    assert seen["Data"]["Exp"] == expiry_epoch(expiry)
     assert result["status"] == "LIVE"
     assert {row["optionType"] for row in result["chain"]} == {"CALL", "PUT"}
 
@@ -56,9 +65,19 @@ def test_sensex_uses_scanx_sid_51():
             {"strike": 82000, "ce": {"ltp": 200}, "pe": {"ltp": 180}}
         ]}}
 
-    result = fetch_scanx_option_chain("SENSEX", date(2026, 8, 25), requester=requester)
+    expiry = date(2026, 8, 25)
+    _seed_discovery(51, expiry)
+    result = fetch_scanx_option_chain("SENSEX", expiry, requester=requester)
     assert seen["Data"]["Sid"] == 51
     assert result["status"] == "LIVE"
+
+
+def test_fetch_returns_data_unavailable_when_expiry_not_in_scanx_list():
+    _SCANX_EXPIRY_CACHE[13] = {1475087400: "NIFTY SEP FUT"}
+    result = fetch_scanx_option_chain("NIFTY", date(2026, 8, 25))
+    assert result["status"] == "DATA_UNAVAILABLE"
+    assert result["request"]["expiryEpoch"] is None
+    assert "does not advertise expiry" in result.get("error", "")
 
 
 def test_live_chain_without_executable_direction_quote_uses_fallback():

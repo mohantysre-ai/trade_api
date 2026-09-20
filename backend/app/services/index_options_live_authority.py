@@ -178,6 +178,7 @@ def _governor_for_mode(paper: Any, book: dict[str, Any], mode: str) -> Any:
 
 def _reconcile(radar: dict[str, Any], *, client: Any = None, now: datetime | None = None, persist: bool = True) -> dict[str, Any]:
     from . import index_options_paper as paper
+    from .angel_index_stream import ANGEL_INDEX_STREAM
 
     clock = (now or datetime.now(paper.IST_ZONE)).astimezone(paper.IST_ZONE)
     session = clock.date().isoformat()
@@ -189,35 +190,71 @@ def _reconcile(radar: dict[str, Any], *, client: Any = None, now: datetime | Non
         candidates = [*buy_candidates, *seller_candidates]
         paper._hydrate_locked_instruments(book["open"], candidates)
         due = [p for p in book["open"] if _mode(p) == "SELL_PREMIUM" or paper._long_mark_due(p, clock)]
-        direct_marks, direct_error = _stream_marks(paper, client, due)
+
+        instruments: list[dict[str, str]] = []
+        symbols_by_token: dict[str, str] = {}
+        for position in due:
+            legs = (position.get("legs") or []) if _mode(position) == "SELL_PREMIUM" else [position]
+            for leg in legs:
+                if not isinstance(leg, dict):
+                    continue
+                symbol = str(leg.get("symbol") or "")
+                token = str(leg.get("token") or "")
+                exchange = str(leg.get("exchange") or "")
+                if symbol and token and exchange:
+                    instruments.append({
+                        "exchange": exchange,
+                        "token": token,
+                        "indexKey": str(position.get("index") or ""),
+                        "kind": "OPTION",
+                    })
+                    symbols_by_token[token] = symbol
+        if client is not None and instruments:
+            ANGEL_INDEX_STREAM.ensure(client, instruments)
+
+        locked_marks, mark_depth, mark_error, mark_pipeline = paper._locked_marks(client, due)
 
         next_open: list[dict[str, Any]] = []
         closed_now: list[dict[str, Any]] = []
         for position in book["open"]:
             if _mode(position) == "SELL_PREMIUM":
-                debit, marked_legs, source, _stale = paper._credit_close_debit(position, candidates, direct_marks)
+                debit, marked_legs, spread_source, stale_legs = paper._credit_close_debit(
+                    position, candidates, locked_marks, mark_depth,
+                )
                 if debit is None:
-                    position.update({"markStatus": "UNAVAILABLE", "markError": direct_error or "SPREAD_LEG_MARK_UNAVAILABLE"})
+                    position.update({"markStatus": "UNAVAILABLE", "markError": mark_error or "SPREAD_LEG_MARK_UNAVAILABLE"})
                     next_open.append(position)
                     continue
-                position.update({"markSource": "ANGEL_WEBSOCKET" if source != "RADAR_EXECUTABLE_DEPTH" and all(
-                    str(leg.get("symbol") or "") in direct_marks for leg in (position.get("legs") or [])
-                ) else source, "markedAt": clock.isoformat(), "markStatus": "LIVE", "markError": direct_error})
-                active, closed = paper._update_credit_open(position, debit, marked_legs, paper._spot_for(position, candidates), clock)
+                active, closed = paper._update_credit_open(
+                    position, debit, marked_legs, paper._spot_for(position, candidates), clock,
+                    mark_source=spread_source, stale_legs=stale_legs,
+                )
             else:
                 if not paper._long_mark_due(position, clock):
                     next_open.append(position)
                     continue
                 symbol = str(position.get("symbol") or "")
-                mark = direct_marks.get(symbol)
-                source = "ANGEL_WEBSOCKET_LOCKED_CONTRACT" if mark is not None else "RADAR_CHAIN_FALLBACK"
+                meta = mark_depth.get(symbol) or {}
+                mark = locked_marks.get(symbol)
                 if mark is None:
                     mark = paper._mark_for(position, candidates)
+                    mark_source = "RADAR_CHAIN_FALLBACK"
+                    quality = "RADAR_FALLBACK"
+                elif meta.get("source") == "ANGEL_WEBSOCKET":
+                    mark_source = "ANGEL_WEBSOCKET_LOCKED_CONTRACT"
+                    quality = "FRESH_WEBSOCKET"
+                else:
+                    mark_source = "ANGEL_DIRECT_LOCKED_CONTRACT"
+                    quality = "REST_FALLBACK"
                 if mark is None:
-                    position.update({"markStatus": "UNAVAILABLE", "markError": direct_error, "lastMarkAttemptAt": clock.isoformat()})
+                    position.update({"markStatus": "UNAVAILABLE", "markError": mark_error, "lastMarkAttemptAt": clock.isoformat()})
                     next_open.append(position)
                     continue
-                active, closed = paper._update_open(position, mark, clock, mark_source=source)
+                active, closed = paper._update_open(
+                    position, mark, clock, mark_source=mark_source,
+                    quality=quality, data_age_seconds=meta.get("ageSeconds"),
+                    bid=paper._float(meta.get("bid")), ask=paper._float(meta.get("ask")),
+                )
             if active:
                 next_open.append(active)
             if closed:

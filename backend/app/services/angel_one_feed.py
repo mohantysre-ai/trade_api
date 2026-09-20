@@ -5416,14 +5416,21 @@ def create_app() -> FastAPI:
         from app.services.shared_state.view_store import get_view_store
 
         if sessionDate:
+            from .index_options_live import attach_durable_session_book
+            from .index_options_replay import parse_session_date
+
             try:
-                return replay_session_payload(
+                replay_day = parse_session_date(sessionDate, today=datetime.now(tz=IST_ZONE).date())
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"Invalid sessionDate: {exc}") from exc
+            return attach_durable_session_book(
+                replay_session_payload(
                     AngelOneClient(),
                     sessionDate,
                     today=datetime.now(tz=IST_ZONE).date(),
-                )
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=f"Invalid sessionDate: {exc}") from exc
+                ),
+                replay_day,
+            )
 
         def _compose() -> dict[str, Any]:
             return compose_live_index_options_radar(

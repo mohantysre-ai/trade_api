@@ -45,6 +45,10 @@ NSE_CHARTING_HISTORY_URL = os.getenv(
     "NSE_CHARTING_HISTORY_URL",
     f"{NSE_CHARTING_BASE_URL.rstrip('/')}/v1/charts/symbolHistoricalData",
 )
+NSE_OPTION_CHAIN_URL = os.getenv(
+    "NSE_OPTION_CHAIN_URL",
+    "https://www.nseindia.com/api/option-chain-v3",
+)
 NSE_CANDLE_MIN_INTERVAL_SECONDS = float(os.getenv("NSE_CANDLE_MIN_INTERVAL_SECONDS", "0.15"))
 NSE_CANDLE_CIRCUIT_SECONDS = float(os.getenv("NSE_CANDLE_CIRCUIT_SECONDS", "60"))
 MARKET_DATA_MIN_COVERAGE_PCT = float(os.getenv("MARKET_DATA_MIN_COVERAGE_PCT", "99"))
@@ -517,3 +521,126 @@ def fetch_quotes_with_failover(
         missing_symbols=missing,
     )
     return quotes, coverage
+
+
+_NSE_OPTION_CHAIN_SESSION: requests.Session | None = None
+_NSE_OPTION_CHAIN_LOCK = threading.Lock()
+_NSE_OPTION_CHAIN_LAST_CALL = 0.0
+_NSE_OPTION_CHAIN_HEADERS = {
+    "Accept": "application/json, text/plain, */*",
+    "Referer": "https://www.nseindia.com/",
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    ),
+}
+
+
+def _nse_option_chain_session() -> requests.Session:
+    global _NSE_OPTION_CHAIN_SESSION
+    with _NSE_OPTION_CHAIN_LOCK:
+        if _NSE_OPTION_CHAIN_SESSION is None:
+            session = requests.Session()
+            session.headers.update(_NSE_OPTION_CHAIN_HEADERS)
+            try:
+                session.get("https://www.nseindia.com/", timeout=(5, 15))
+            except Exception as exc:
+                log.warning("NSE option-chain session init failed: %s", exc)
+            _NSE_OPTION_CHAIN_SESSION = session
+        return _NSE_OPTION_CHAIN_SESSION
+
+
+def _float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def fetch_nse_option_chain(symbol: str, expiry: date, *, timeout: tuple[float, float] = (10, 30)) -> dict[str, Any]:
+    """Fetch live option chain from NSE's public API.
+
+    Returns a normalized payload compatible with the ScanX/Lemonn shape:
+    {
+        "source": "NSE",
+        "status": "LIVE" | "DATA_INCOMPLETE" | "SOURCE_UNAVAILABLE",
+        "spot": float | None,
+        "chain": [{"strike": ..., "optionType": "CALL"/"PUT", "ltp": ..., ...}],
+        "fetchedAt": "...",
+        "request": {"symbol": ..., "expiry": ...}
+    }
+    """
+    expiry_text = expiry.strftime("%d-%b-%Y").upper()
+    url = f"{NSE_OPTION_CHAIN_URL}?type=Indices&symbol={symbol}&expiry={expiry_text}"
+    try:
+        session = _nse_option_chain_session()
+        response = session.get(url, timeout=timeout)
+        response.raise_for_status()
+        payload = response.json()
+    except Exception as exc:
+        return {"source": "NSE", "status": "SOURCE_UNAVAILABLE", "error": str(exc), "chain": [], "request": {"symbol": symbol, "expiry": expiry_text}}
+
+    chain: list[dict[str, Any]] = []
+    spot: float | None = None
+    records = payload.get("records", {}) if isinstance(payload, dict) else {}
+    if isinstance(records, dict):
+        spot = _float(records.get("underlyingValue") or records.get("spot") or records.get("ltp"))
+        for row in records.get("data", []) or []:
+            if not isinstance(row, dict):
+                continue
+            strike = _float(row.get("strikePrice") or row.get("strike"))
+            if strike is None:
+                continue
+            ce = row.get("CE") if isinstance(row.get("CE"), dict) else {}
+            pe = row.get("PE") if isinstance(row.get("PE"), dict) else {}
+            if ce:
+                chain.append({
+                    "symbol": ce.get("identifier") or ce.get("underlying") or "",
+                    "strike": strike,
+                    "optionType": "CALL",
+                    "ltp": _float(ce.get("lastPrice")),
+                    "close": _float(ce.get("prevClose") or ce.get("close")),
+                    "volume": _float(ce.get("totalTradedVolume") or ce.get("volume")),
+                    "oi": _float(ce.get("openInterest") or ce.get("oi")),
+                    "previousOi": _float(ce.get("changeinOpenInterest")),
+                    "oiChange": _float(ce.get("pchangeinOpenInterest")),
+                    "bestBid": _float(ce.get("buyPrice1")),
+                    "bestAsk": _float(ce.get("sellPrice1")),
+                    "iv": _float(ce.get("impliedVolatility") or ce.get("iv")),
+                    "delta": None,
+                    "gamma": None,
+                    "theta": None,
+                    "vega": None,
+                    "quoteSource": "NSE",
+                })
+            if pe:
+                chain.append({
+                    "symbol": pe.get("identifier") or pe.get("underlying") or "",
+                    "strike": strike,
+                    "optionType": "PUT",
+                    "ltp": _float(pe.get("lastPrice")),
+                    "close": _float(pe.get("prevClose") or pe.get("close")),
+                    "volume": _float(pe.get("totalTradedVolume") or pe.get("volume")),
+                    "oi": _float(pe.get("openInterest") or pe.get("oi")),
+                    "previousOi": _float(pe.get("changeinOpenInterest")),
+                    "oiChange": _float(pe.get("pchangeinOpenInterest")),
+                    "bestBid": _float(pe.get("buyPrice1")),
+                    "bestAsk": _float(pe.get("sellPrice1")),
+                    "iv": _float(pe.get("impliedVolatility") or pe.get("iv")),
+                    "delta": None,
+                    "gamma": None,
+                    "theta": None,
+                    "vega": None,
+                    "quoteSource": "NSE",
+                })
+
+    status = "LIVE" if chain else "DATA_INCOMPLETE"
+    return {
+        "source": "NSE",
+        "status": status,
+        "fetchedAt": datetime.now(timezone.utc).isoformat(),
+        "spot": spot,
+        "expiry": expiry.isoformat(),
+        "chain": chain,
+        "request": {"symbol": symbol, "expiry": expiry_text},
+    }

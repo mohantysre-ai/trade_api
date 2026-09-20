@@ -304,6 +304,7 @@ def _seller_candidate(index: dict[str, str], snapshot: dict[str, Any]) -> dict[s
         "expiry": supplied.get("expiry"),
         "dataLimitations": seller.get("dataLimitations") or [],
         "gateEvidence": seller.get("gateEvidence") or {},
+        "selectionEvidence": seller.get("selectionEvidence") or {},
         "chain": supplied.get("rawChain") or [],
         "structure": supplied.get("structure"),
         "componentFreshness": supplied.get("componentFreshness") or {},

@@ -13,6 +13,7 @@ from .index_options_engine import build_index_options_radar
 from .index_options_paper import index_options_market_open, reconcile_paper_book
 from .index_options_replay import parse_session_date, replay_index_options_session
 from .lemonn_options import LEMONN_SLUGS, apply_lemonn_fallback, discover_lemonn_expiries
+from .market_data_provider import fetch_nse_option_chain
 from .trendlyne_oi import apply_oi_enrichment
 
 
@@ -89,6 +90,63 @@ def _merge_strategy_projection(paper_book: dict[str, Any], strategy_book: dict[s
     return merge_paper_books(paper_book, strategy_book)
 
 
+def update_locked_position_prices(positions: list[dict[str, Any]]) -> None:
+    """Update live prices for locked positions using NSE public API.
+
+    This is called during market hours to keep MTM fresh without
+    hammering the Angel One API.
+    """
+    for position in positions:
+        if position.get("status") != "OPEN":
+            continue
+        index_key = str(position.get("index") or position.get("symbol") or "").upper()
+        if index_key not in LEMONN_SLUGS:
+            continue
+        expiry_raw = position.get("expiry") or position.get("expiryDate")
+        if not expiry_raw:
+            continue
+        try:
+            expiry = date.fromisoformat(str(expiry_raw))
+        except (TypeError, ValueError):
+            continue
+        try:
+            result = fetch_nse_option_chain(index_key, expiry)
+        except Exception:
+            continue
+        chain = result.get("chain") or []
+        if not chain:
+            continue
+        _apply_nse_chain_to_position(position, result)
+
+
+def _apply_nse_chain_to_position(position: dict[str, Any], nse_result: dict[str, Any]) -> None:
+    """Apply NSE option-chain prices to a locked position's legs."""
+    legs = position.get("legs") or []
+    chain = nse_result.get("chain") or []
+    if not legs or not chain:
+        return
+    lookup = {
+        (round(float(leg.get("strike") or 0), 2), str(leg.get("optionType") or "").upper()): leg
+        for leg in legs if isinstance(leg, dict)
+    }
+    updated = 0
+    for row in chain:
+        if not isinstance(row, dict):
+            continue
+        key = (round(float(row.get("strike") or 0), 2), str(row.get("optionType") or "").upper())
+        if key not in lookup:
+            continue
+        leg = lookup[key]
+        ltp = row.get("ltp")
+        if ltp is not None:
+            leg["currentPrice"] = float(ltp)
+            leg["priceSource"] = "NSE"
+            updated += 1
+    if updated:
+        position["markSource"] = "NSE"
+        position["markedAt"] = datetime.now(timezone.utc).isoformat()
+
+
 def compose_live_index_options_radar(snapshot: dict[str,Any],*,live:bool=True,client:Any,persist:bool=True,scanx_fn:Callable[...,dict[str,Any]]=apply_scanx_fallback,lemonn_fn:Callable[...,dict[str,Any]]=apply_lemonn_fallback,lemonn_discover_fn:Callable[...,dict[str,date]]=discover_lemonn_expiries,oi_enrichment_fn:Callable[...,dict[str,Any]]=apply_oi_enrichment,expiries_fn:Callable[...,dict[str,date]]=active_index_expiries,snapshot_fn:Callable[...,dict[str,Any]]=cached_angel_index_option_snapshot,now:datetime|None=None)->dict[str,Any]:
     book=ensure_fresh_market_snapshot(snapshot,reason="index_options_breadth"); option_data=None
     if live:
@@ -144,7 +202,95 @@ def finalize_closed_index_options_radar(radar:dict[str,Any],*,client:Any,persist
     return result
 
 
+def load_historical_execution(session_date: date) -> dict[str, Any]:
+    """Load actual executed trades from the durable Quant V2 ledger.
+
+    Falls back to the EOD book cache when the live DB is empty so that
+    historical screens remain authoritative across restarts.
+    """
+    from .index_options.runtime import strategy_eod
+    from .eod_book_cache import load_book_cache
+
+    day = session_date.isoformat()
+    book = strategy_eod(day)
+    positions = [p for p in book.get("positions") or [] if isinstance(p, dict)]
+
+    if not positions:
+        cached = load_book_cache(session_date, "index_options")
+        if cached:
+            strategy_attribution = cached.get("strategyAttribution") or {}
+            positions = [p for p in strategy_attribution.get("positions") or [] if isinstance(p, dict)]
+            if positions:
+                book = strategy_attribution
+
+    return {
+        "sessionDate": day,
+        "authority": "INDEX_OPTIONS_QUANT_V2",
+        "positions": positions,
+        "open": [p for p in positions if str(p.get("status") or "").upper() == "OPEN"],
+        "closed": [p for p in positions if str(p.get("status") or "").upper() == "CLOSED"],
+    }
+
+
 def replay_session_payload(client:Any,raw_session_date:str,*,today:date|None=None,persist:bool=True,master:list[dict[str,Any]]|None=None)->dict[str,Any]:
     replay_day=parse_session_date(raw_session_date,today=today)
     try: return replay_index_options_session(client,replay_day,persist=persist,master=master)
     except Exception as exc: return {"success":False,"mode":"SESSION_REPLAY","sessionDate":replay_day.isoformat(),"executionPolicy":"MANUAL_ONLY","candidates":[],"selected":[],"buySideContracts":[],"implemented":[],"error":str(exc)}
+def _durable_quant_decision(positions: list[dict[str, Any]]) -> dict[str, Any]:
+    rows=[]
+    for p in positions:
+        realized=_float(p.get("realizedPnl")) or 0.0; unrealized=_float(p.get("unrealizedPnl")) or 0.0; pnl=realized+unrealized; max_loss=_float(p.get("maxLoss")); is_open=str(p.get("status") or "").upper()=="OPEN"
+        rows.append({"strategy_id":p.get("strategyId"),"index":p.get("index"),"utility":round(pnl,4),"expected_value":round(pnl,4),"cvar95":round(max_loss,4) if max_loss is not None else None,"stress_loss":round(max_loss,4) if max_loss is not None else None,"transaction_cost":0.0,"decision":"ADMIT","reasons":[str(p.get("status") or ""),("OPEN" if is_open else str(p.get("exitReason") or "CLOSED"))]})
+    return {"engine":"INDEX_OPTIONS_QUANT_V2","model":"DURABLE_PAPER_BOOK","decision":"ADMIT" if rows else "NO_TRADE","noTradeUtility":0.0,"selected":rows,"ranked":rows,"rejected":[]}
+
+
+def attach_durable_session_book(payload: dict[str, Any], session_date: date) -> dict[str, Any]:
+    """Merge the durable Quant V2 paper book into a closed-session replay payload."""
+    from .index_options_paper import _load_book
+    from .index_options.runtime import load_decision_audit
+
+    strategy_book = load_historical_execution(session_date)
+    positions = strategy_book["positions"]
+    result = dict(payload if isinstance(payload, dict) else {})
+    result["sessionDate"] = strategy_book["sessionDate"]
+    result["sessionStatus"] = "CLOSED"
+    result["huntActive"] = False
+    result["strategyBook"] = strategy_book
+    result["paperBook"] = _merge_strategy_projection(_load_book(strategy_book["sessionDate"]), strategy_book)
+    result["quantEngine"] = "INDEX_OPTIONS_QUANT_V2"
+    result["selectionAuthority"] = "INDEX_OPTIONS_QUANT_V2"
+    result["quantDecision"] = _durable_quant_decision(positions)
+    result["limits"] = {**(result.get("limits") or {}), "selectionAuthority": "INDEX_OPTIONS_QUANT_V2", "huntMode": "SESSION_CLOSED"}
+
+    replay_limitations = [str(item) for item in (result.get("limitations") or [])]
+    result["historicalExecution"] = {
+        "authority": "INDEX_OPTIONS_QUANT_V2_DURABLE_LEDGER",
+        "source": "shared_state.db" if positions else "eod_book_cache",
+        "entryCount": len(positions),
+        "openCount": len(strategy_book["open"]),
+        "closedCount": len(strategy_book["closed"]),
+    }
+    result["replayDiagnostics"] = {
+        "mode": result.get("mode", "SESSION_REPLAY"),
+        "limitations": replay_limitations,
+        "indices": result.get("indices", []),
+        "implemented": result.get("implemented", []),
+        "buySideContracts": result.get("buySideContracts", []),
+    }
+
+    day = session_date.isoformat()
+    decision_audit = load_decision_audit(day)
+    result["qualificationHistoryAvailable"] = bool(decision_audit.get("audits"))
+    result["qualificationLimitations"] = replay_limitations
+    result["historicalQualification"] = {
+        "evaluatedCount": decision_audit.get("evaluatedCount", 0),
+        "eligibleCount": decision_audit.get("eligibleCount", 0),
+        "qualifiedCount": decision_audit.get("qualifiedCount", 0),
+        "selectedCount": decision_audit.get("selectedCount", 0),
+        "executedCount": decision_audit.get("executedCount", 0),
+        "rejectedCount": decision_audit.get("rejectedCount", 0),
+        "entryBlockedCount": decision_audit.get("entryBlockedCount", 0),
+        "rejectionSummary": decision_audit.get("rejectionSummary", {}),
+    }
+    result["candidateHistory"] = decision_audit.get("audits", [])
+    return result

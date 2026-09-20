@@ -8,11 +8,14 @@ bid and hedge-leg ask so a paper fill cannot manufacture credit from LTPs.
 from __future__ import annotations
 
 import math
+import os
 from datetime import date, datetime, time as dt_time
 from statistics import median
 from typing import Any
 
 from .angel_index_options import IST_ZONE, _expiry, _float
+
+PAPER_SLIPPAGE_POINTS = float(os.getenv("INDEX_PAPER_SLIPPAGE_POINTS", "0.0"))
 
 
 SELLER_MIN_SCORE = 82.0
@@ -55,6 +58,17 @@ def _construction_failure(
                 "structureDirection": structure.get("direction"),
                 **(details or {}),
             }
+        },
+        "selectionEvidence": {
+            "marketRegime": structure.get("status"),
+            "direction": structure.get("direction"),
+            "trend": structure.get("trend"),
+            "breadth": {},
+            "futuresOi": {},
+            "ivEdge": None,
+            "creditRiskRatio": None,
+            "selectionReasons": [],
+            "rejectionReasons": [reason],
         },
         "dataLimitations": [reason],
     }
@@ -115,7 +129,51 @@ def _pick_wing(rows: list[dict[str, Any]], short: dict[str, Any], option_type: s
 
 
 def _leg(row: dict[str, Any], action: str, role: str) -> dict[str, Any]:
-    entry = _float(row.get("bestBid" if action == "SELL" else "bestAsk"))
+    bid = _float(row.get("bestBid"))
+    ask = _float(row.get("bestAsk"))
+    ltp = _float(row.get("ltp"))
+    mid = (bid + ask) / 2.0 if bid is not None and ask is not None else None
+    spread = ((ask - bid) / mid * 100.0) if mid and mid > 0 and bid is not None and ask is not None else None
+    slippage = PAPER_SLIPPAGE_POINTS
+    if action == "SELL":
+        fill = bid - slippage if bid is not None and bid > 0 else None
+        fill_source = "SELL_BID_CONSERVATIVE" if bid is not None and bid > 0 else None
+    else:
+        fill = ask + slippage if ask is not None and ask > 0 else None
+        fill_source = "BUY_ASK_CONSERVATIVE" if ask is not None and ask > 0 else None
+    if fill is None:
+        fill = ltp - slippage if ltp is not None and ltp > 0 else None
+        fill_source = "LTP_FALLBACK_CONSERVATIVE" if ltp is not None and ltp > 0 else None
+    if fill is None or fill <= 0:
+        return {
+            "action": action,
+            "role": role,
+            "symbol": row.get("symbol"),
+            "token": row.get("token"),
+            "exchange": row.get("exchange"),
+            "optionType": row.get("optionType"),
+            "strike": _float(row.get("strike")),
+            "expiry": row.get("expiry") or row.get("expiryValue"),
+            "entryPrice": None,
+            "ltp": ltp,
+            "close": _float(row.get("close")),
+            "bestBid": bid,
+            "bestAsk": ask,
+            "delta": _float(row.get("delta")),
+            "gamma": _float(row.get("gamma")),
+            "theta": _float(row.get("theta")),
+            "vega": _float(row.get("vega")),
+            "iv": _float(row.get("iv")),
+            "oi": _float(row.get("oi")),
+            "oiChange": _float(row.get("oiChange")),
+            "spreadPct": spread,
+            "lotSize": int(_float(row.get("lotSize")) or 0),
+            "selectedFill": None,
+            "entryFillSource": None,
+            "entryBid": round(bid, 2) if bid is not None else None,
+            "entryAsk": round(ask, 2) if ask is not None else None,
+            "entrySlippage": slippage,
+        }
     return {
         "action": action,
         "role": role,
@@ -124,11 +182,12 @@ def _leg(row: dict[str, Any], action: str, role: str) -> dict[str, Any]:
         "exchange": row.get("exchange"),
         "optionType": row.get("optionType"),
         "strike": _float(row.get("strike")),
-        "entryPrice": round(entry, 2) if entry is not None else None,
-        "ltp": _float(row.get("ltp")),
+        "expiry": row.get("expiry") or row.get("expiryValue"),
+        "entryPrice": round(fill, 2),
+        "ltp": ltp,
         "close": _float(row.get("close")),
-        "bestBid": _float(row.get("bestBid")),
-        "bestAsk": _float(row.get("bestAsk")),
+        "bestBid": bid,
+        "bestAsk": ask,
         "delta": _float(row.get("delta")),
         "gamma": _float(row.get("gamma")),
         "theta": _float(row.get("theta")),
@@ -136,9 +195,50 @@ def _leg(row: dict[str, Any], action: str, role: str) -> dict[str, Any]:
         "iv": _float(row.get("iv")),
         "oi": _float(row.get("oi")),
         "oiChange": _float(row.get("oiChange")),
-        "spreadPct": round(_leg_spread(row) or 0.0, 3),
+        "spreadPct": round(spread, 3) if spread is not None else None,
         "lotSize": int(_float(row.get("lotSize")) or 0),
+        "selectedFill": round(fill, 4),
+        "entryFillSource": fill_source,
+        "entryBid": round(bid, 2) if bid is not None else None,
+        "entryAsk": round(ask, 2) if ask is not None else None,
+        "entrySlippage": round(slippage, 4),
     }
+
+
+def _validate_seller_legs(legs: list[dict[str, Any]]) -> list[str]:
+    """Enforce hard structural invariants on a constructed seller spread.
+
+    Returns a list of violation reasons. An empty list means the structure is
+    a valid defined-risk seller setup with no naked short legs.
+    """
+    violations: list[str] = []
+    sell_legs = [leg for leg in legs if leg.get("action") == "SELL"]
+    buy_legs = [leg for leg in legs if leg.get("action") == "BUY"]
+    if not sell_legs:
+        violations.append("NO_SHORT_LEG")
+    if not buy_legs:
+        violations.append("Naked_SHORT_NO_HEDGE")
+    seen_expiry = {leg.get("expiry") or leg.get("expiryValue") for leg in legs}
+    if len(seen_expiry) > 1:
+        violations.append("MULTIPLE_EXPIRIES")
+    seen_symbol = {str(leg.get("exchange") or "").upper() for leg in legs}
+    if len(seen_symbol) > 1:
+        violations.append("MULTIPLE_UNDERLYINGS")
+    quantities = {int(leg.get("qty") or leg.get("lotSize") or 0) for leg in legs}
+    if len(quantities) > 1:
+        violations.append("UNEQUAL_QUANTITY")
+    put_strikes = sorted(leg["strike"] for leg in sell_legs + buy_legs if leg.get("optionType") == "PUT" and leg.get("strike") is not None)
+    call_strikes = sorted(leg["strike"] for leg in sell_legs + buy_legs if leg.get("optionType") == "CALL" and leg.get("strike") is not None)
+    if put_strikes and len(put_strikes) == 2:
+        if put_strikes[0] >= put_strikes[1]:
+            violations.append("PUT_STRIKE_ORDER_WRONG")
+    if call_strikes and len(call_strikes) == 2:
+        if call_strikes[0] >= call_strikes[1]:
+            violations.append("CALL_STRIKE_ORDER_WRONG")
+    if len(legs) == 4 and len(put_strikes) == 2 and len(call_strikes) == 2:
+        if not (put_strikes[0] < put_strikes[1] < call_strikes[0] < call_strikes[1]):
+            violations.append("IRON_CONDOR_STRIKE_ORDER_WRONG")
+    return violations
 
 
 def _structure_ready(structure: dict[str, Any], *, neutral: bool) -> bool | None:
@@ -187,6 +287,14 @@ def _setup_from_legs(
     provider_live: bool,
     now: datetime,
 ) -> dict[str, Any]:
+    violations = _validate_seller_legs(legs)
+    if violations:
+        return _construction_failure(
+            "SELLER_STRUCTURE_INVALID:" + ",".join(violations),
+            chain=[],
+            structure=structure,
+            details={"violations": violations, "legs": legs},
+        )
     sell_legs = [leg for leg in legs if leg["action"] == "SELL"]
     buy_legs = [leg for leg in legs if leg["action"] == "BUY"]
     neutral = strategy_type == "IRON_CONDOR"
@@ -322,6 +430,17 @@ def _setup_from_legs(
             "timeWindow": {"aligned": time_ok, **time_evidence},
         },
         "dataLimitations": [name for name, value in gates.items() if value is None],
+        "selectionEvidence": {
+            "marketRegime": structure.get("status"),
+            "direction": bias,
+            "trend": structure.get("trend"),
+            "breadth": {k: v for k, v in breadth.items() if k != "aligned"},
+            "futuresOi": {k: v for k, v in futures_oi.items() if k != "aligned"},
+            "ivEdge": round(iv_edge, 3) if iv_edge is not None else None,
+            "creditRiskRatio": round(credit_to_risk, 3),
+            "selectionReasons": [name for name, value in gates.items() if value is True],
+            "rejectionReasons": [name for name, value in gates.items() if value is False],
+        },
     }
 
 
