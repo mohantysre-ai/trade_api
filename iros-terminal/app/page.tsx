@@ -384,7 +384,7 @@ function useAdaptiveTooltip() {
 /* -------------------------------------------------------------------------- */
 
 function MiniSparkline({ positive }: { positive: boolean }) {
-  const color = positive ? '#10b981' : '#ef4444';
+  const color = positive ? '#6ee7b7' : '#fca5a5';
   const stableId = useId().replace(/:/g, '');
   const id = `mini-${positive ? 'g' : 'r'}-${stableId}`;
   const fillUrl = 'url(#' + id + ')';
@@ -400,15 +400,15 @@ function MiniSparkline({ positive }: { positive: boolean }) {
   }
 
   return (
-    <svg className="w-full h-8" viewBox="0 0 100 30" preserveAspectRatio="none">
+    <svg className="w-full h-8" viewBox="0 0 100 30" preserveAspectRatio="none" style={{ filter: 'drop-shadow(0 0 1px ' + color + ')' }}>
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.9" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.2" />
         </linearGradient>
       </defs>
       <path d={areaD} fill={fillUrl} />
-      <path d={pathD} pathLength={1} stroke={color} strokeWidth="0.75" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={pathD} pathLength={1} stroke={color} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -2276,7 +2276,7 @@ function catmullRomToBezier(points: readonly (readonly [number, number])[]): str
  * Uses Catmull-Rom spline for smooth, organic curves. */
 function SparklineSVG({ positive, data }: { positive: boolean; data?: number[] }) {
   const [id] = useState(() => `spk-${positive ? 'g' : 'r'}-${++sparkIdCounter}`);
-  const color = positive ? '#10b981' : '#ef4444';
+  const color = positive ? '#6ee7b7' : '#fca5a5';
   const fillUrl = 'url(#' + id + ')';
 
   if (!data || data.length < 2) return null;
@@ -2300,25 +2300,26 @@ function SparklineSVG({ positive, data }: { positive: boolean; data?: number[] }
   const lastPoint = points[points.length - 1];
 
   return (
-    <svg className="absolute top-0 right-0 w-full h-full opacity-70 desk-sparkline" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+    <svg className="absolute top-0 right-0 w-full h-full desk-sparkline" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ filter: 'drop-shadow(0 0 3px ' + color + ')' }}>
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.5" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.05" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.95" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.25" />
         </linearGradient>
       </defs>
       <path d={areaD} fill={fillUrl} className="desk-spark-fill" />
+      <path d={pathD} pathLength={1} stroke="rgba(255,255,255,0.25)" strokeWidth="4.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       <path
         d={pathD}
         pathLength={1}
         stroke={color}
-        strokeWidth="1.5"
+        strokeWidth="3.5"
         fill="none"
         strokeLinecap="round"
         strokeLinejoin="round"
         className="desk-spark-stroke"
       />
-      <circle cx={lastPoint[0]} cy={lastPoint[1]} r="2" fill={color} stroke="white" strokeWidth="1" className="desk-spark-dot" />
+      <circle cx={lastPoint[0]} cy={lastPoint[1]} r="4" fill={color} stroke="white" strokeWidth="1.5" className="desk-spark-dot" />
     </svg>
   );
 }
