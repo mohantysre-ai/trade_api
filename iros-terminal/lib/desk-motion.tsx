@@ -391,7 +391,7 @@ export function DeskLiveTile({
       role="link"
       aria-label={`View ${label} details`}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-2 z-10 overflow-visible">
+      <div className="flex min-w-0 flex-1 items-center gap-2 z-10 overflow-visible pr-10">
         <MarketSymbolBadge symbol={label} kind="index" size="sm" />
         <div className="flex min-w-0 flex-1 flex-col justify-center overflow-visible">
           <span className="desk-metric-label">{label}</span>
