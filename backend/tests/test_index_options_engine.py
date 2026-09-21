@@ -119,8 +119,8 @@ def test_no_minimum_quota_and_hunt_remains_open_below_cap():
     assert decision["allowed"] is True
 
 
-def test_five_total_daily_entries_across_indices_hard_block():
-    governor = IndexOptionReEntryGovernor(trade_counts={"NIFTY": 2, "SENSEX": 1, "BANKNIFTY": 1, "FINNIFTY": 1})
+def test_ten_total_daily_entries_across_indices_hard_block():
+    governor = IndexOptionReEntryGovernor(trade_counts={"NIFTY": 3, "SENSEX": 3, "BANKNIFTY": 2, "FINNIFTY": 2})
     decision = can_reenter_index_option(
         "BANKNIFTY", "PUT", NOW, governor,
         fresh_breakout_confirmed=True, oi_aligned=True, breadth_aligned=True,

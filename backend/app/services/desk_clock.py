@@ -171,7 +171,7 @@ def rotation_window_allowed(now: datetime | None = None) -> tuple[bool, str]:
     primary_end = _mins(_LOCK_END_H, _LOCK_END_M)
     cont_end = _mins(_ROT_CONT_END_H, _ROT_CONT_END_M)
     aft_start = _mins(_ROT_AFT_START_H, _ROT_AFT_START_M)
-    aft_end = _mins(_SWING_HUNT_END_H, _SWING_HUNT_END_M)
+    aft_end = _mins(_ROT_AFT_END_H, _ROT_AFT_END_M)
     if primary_end <= primary_start:
         primary_end = primary_start + 30
     if cont_end < primary_end:
@@ -252,7 +252,7 @@ def swing_entry_hunt_allowed(
 
     mins = _mins(n.hour, n.minute)
     start = _mins(_LOCK_START_H, _LOCK_START_M)
-    end = _mins(_ROT_AFT_END_H, _ROT_AFT_END_M)
+    end = _mins(_SWING_HUNT_END_H, _SWING_HUNT_END_M)
     if end <= start:
         end = start + 30
     if mins < start:
