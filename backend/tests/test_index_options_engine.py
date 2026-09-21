@@ -61,7 +61,7 @@ def test_buy_and_sell_sleeves_select_the_same_index_independently():
     assert [row["key"] for row in radar["buySelected"]] == ["NIFTY"]
     assert [row["key"] for row in radar["sellSelected"]] == ["NIFTY"]
     assert [row["key"] for row in radar["selected"]] == ["NIFTY", "NIFTY"]
-    assert radar["limits"]["maxConcurrent"] == 2
+    assert radar["limits"]["maxConcurrent"] == 8
     assert radar["limits"]["maxConcurrentPerSleeve"] == 2
     assert radar["limits"]["sleeveIsolation"] == "INDEPENDENT_INDEX_AND_BUCKET_PER_SLEEVE"
 

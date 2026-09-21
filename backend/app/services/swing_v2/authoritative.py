@@ -87,9 +87,9 @@ def _time_until_expiry(now,expiry): return datetime.combine(now.astimezone(IST).
 def _retryable_final_block(scan): return str((scan or {}).get("blockReason") or "") in _RETRYABLE_FINAL_BLOCK_REASONS
 def _refresh_snapshot(reason,*,deadline=None):
  try:
-  from ..angel_one_feed import run_scheduled_live_refresh
+  from ..market_refresh_facade import refresh_market_snapshot
   with _DATA_REFRESH_LOCK:
-   result=run_scheduled_live_refresh(reason=reason)
+   result=refresh_market_snapshot(reason=reason)
  except Exception as exc:
   result={"success":False,"error":str(exc),"reason":reason}
  snapshot=_snapshot()

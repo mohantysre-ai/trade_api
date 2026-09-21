@@ -250,16 +250,21 @@ def test_portfolio_concurrency_is_applied_after_both_sleeves_select(tmp_path, mo
 
     extra_buy = _candidate(100.0, key="BANKNIFTY", bucket="FINANCIAL")
     extra_sell = _seller_row(key="BANKNIFTY", bucket="FINANCIAL")
-    blocked = reconcile_paper_book(
+    expanded = reconcile_paper_book(
         {
             "candidates": [extra_buy], "sellerCandidates": [extra_sell],
             "selected": [extra_buy, extra_sell], "modularSelected": [extra_buy, extra_sell],
         },
         now=SESSION_DATE + timedelta(minutes=1),
     )
-    assert blocked["entryCount"] == 2
-    assert extra_buy["entryBlockedBy"] == "MAX_CONCURRENT_TRADES_REACHED"
-    assert extra_sell["entryBlockedBy"] == "MAX_CONCURRENT_TRADES_REACHED"
+    # The portfolio-wide cap is 8; the independent BROAD/FINANCIAL sleeve
+    # buckets currently bound this fixture to four simultaneous positions.
+    assert expanded["entryCount"] == 4
+    assert extra_buy.get("entryBlockedBy") is None
+    assert extra_sell.get("entryBlockedBy") is None
+    assert sorted(row["index"] for row in expanded["open"]) == [
+        "BANKNIFTY", "BANKNIFTY", "NIFTY", "NIFTY"
+    ]
 
 
 def test_duplicate_strategy_is_never_locked_twice(tmp_path, monkeypatch):

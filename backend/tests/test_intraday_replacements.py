@@ -747,3 +747,35 @@ def test_get_applies_current_exit_policy_without_writing(monkeypatch):
     notes = ((out.get("long") or [{}])[0].get("exitPlan") or {}).get("notes") or []
     assert "trail_after_2r_blended_1r" in notes
     assert "max_stop_0p5pct" in notes
+
+
+def test_midday_pause_proposal_can_be_applied_when_free_slot_exists():
+    session = {
+        "locked": True,
+        "sessionDate": "2026-08-11",
+        "long": [_closed_long("LOSER")],
+        "short": [],
+        "candidatePoolLong": [_pool_cand("NEWONE")],
+        "candidatePoolShort": [],
+        "events": [],
+    }
+    proposals = [
+        {
+            "symbol": "NEWONE",
+            "direction": "LONG",
+            "score": 70,
+            "entryState": eng.ENTRY_QUALIFIED,
+            "ltp": 200.0,
+            "proposalOnly": True,
+        }
+    ]
+    with patch.object(eng, "replacement_window_open", return_value=(False, "midday_pause")):
+        with patch.object(eng, "entry_quality_gate", side_effect=_qualified_gate):
+            with patch.object(eng, "sync_fixed_plan_from_session"):
+                with patch("app.services.trade_outcome.emit_replacement_alerts", return_value=[]):
+                    applied = eng.apply_replacements(
+                        session, proposals, {}, {}, bypass_window=False
+                    )
+    assert len(applied) == 1
+    assert applied[0]["symbol"] == "NEWONE"
+    assert eng.compute_free_slots(session["long"], session["short"])["total"] == eng.LOCK_SIZE - 1

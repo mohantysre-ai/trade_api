@@ -4282,7 +4282,7 @@ def apply_replacements(
             daily_loss_hit=bool(risk["dailyLossHit"]),
             max_names_hit=bool(risk["maxNamesHit"]),
         )
-        if not allowed:
+        if not allowed and _block != "midday_pause":
             return []
 
     free = compute_free_slots(long_rows, short_rows)
