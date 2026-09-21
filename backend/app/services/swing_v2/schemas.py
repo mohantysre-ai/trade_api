@@ -7,6 +7,13 @@ from enum import StrEnum
 from typing import Any
 
 
+class QualificationMode(StrEnum):
+    PRIMARY_SETUP = "PRIMARY_SETUP"
+    SCORE_SOFT_PASS = "SCORE_SOFT_PASS"
+    DIVERSIFIED_SOFT_PASS = "DIVERSIFIED_SOFT_PASS"
+    NONE = "NONE"
+
+
 class ValidationState(StrEnum):
     RESEARCH_HYPOTHESIS = "RESEARCH_HYPOTHESIS"
     OOS_VALIDATED = "OOS_VALIDATED"

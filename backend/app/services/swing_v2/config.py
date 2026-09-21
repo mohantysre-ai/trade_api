@@ -51,6 +51,15 @@ class SwingV2Config:
     trail_arm_r: float = 1.50
     trail_lock_r: float = 0.75
     t2_r: float = 2.0
+    # Tier B — Diversified Momentum Fallback thresholds.
+    # Only used when a candidate misses the formal-setup / Tier-A bar but
+    # still passes every hard safety gate with a structurally sound risk/reward.
+    tier_b_min_score: float = 60.0
+    tier_b_min_upside_capacity_r: float = 1.10
+    tier_b_min_planned_blended_r: float = 1.10
+    tier_b_min_expected_net_r: float = 0.05
+    tier_b_risk_multiplier: float = 0.50
+    prohibit_tier_b_microcaps: bool = True
     # Opportunity gates are intentionally softer than hard safety/risk gates.
     # Borderline momentum names may enter paper selection only when every
     # freshness/tradability/governance/risk invariant still passes.
@@ -106,6 +115,7 @@ class SwingV2Config:
         if self.max_portfolio_risk_bps > 100 or self.max_sector_risk_bps > 50: raise ValueError("portfolio/sector initial-risk limits exceed mandate")
         if self.max_gap_stress_bps > 250: raise ValueError("aggregate gap stress may not exceed 2.50% NAV")
         if not 50 <= self.setup_score_override <= 90: raise ValueError("SWING_SETUP_SCORE_OVERRIDE must be in [50,90]")
+        if not 0 < self.tier_b_min_expected_net_r <= self.tier_b_min_planned_blended_r <= self.tier_b_min_upside_capacity_r <= self.min_upside_capacity_r <= 3: raise ValueError("invalid Tier B opportunity thresholds")
         if not 0 < self.min_expected_net_r <= self.min_planned_blended_r <= self.min_upside_capacity_r <= 3: raise ValueError("invalid Swing opportunity thresholds")
         if self.t1_r < 1 or self.t2_r < self.t1_r or self.trail_arm_r < self.t1_r: raise ValueError("invalid T1/trail/T2 R ladder")
         if self.trail_lock_r >= self.trail_arm_r or not 0 < self.t1_qty_pct < 100: raise ValueError("invalid trail lock or T1 quantity")
@@ -131,6 +141,7 @@ def load_config() -> SwingV2Config:
         t1_r=float(os.getenv("SWING_T1_R", "1.00")), t1_qty_pct=float(os.getenv("SWING_T1_QTY_PCT", "50")), trail_arm_r=float(os.getenv("SWING_TRAIL_ARM_R", "1.50")), trail_lock_r=float(os.getenv("SWING_TRAIL_LOCK_R", "0.75")), t2_r=float(os.getenv("SWING_T2_R", "2.00")),
         setup_score_override=float(os.getenv("SWING_SETUP_SCORE_OVERRIDE", "65")),
         min_upside_capacity_r=float(os.getenv("SWING_MIN_UPSIDE_CAPACITY_R", "1.25")), min_planned_blended_r=float(os.getenv("SWING_MIN_PLANNED_BLENDED_R", "1.25")), min_expected_net_r=float(os.getenv("SWING_MIN_EXPECTED_NET_R", "0.08")),
+        tier_b_min_score=float(os.getenv("SWING_TIER_B_MIN_SCORE", "60")), tier_b_min_upside_capacity_r=float(os.getenv("SWING_TIER_B_MIN_UPSIDE_CAPACITY_R", "1.10")), tier_b_min_planned_blended_r=float(os.getenv("SWING_TIER_B_MIN_PLANNED_BLENDED_R", "1.10")), tier_b_min_expected_net_r=float(os.getenv("SWING_TIER_B_MIN_EXPECTED_NET_R", "0.05")), tier_b_risk_multiplier=float(os.getenv("SWING_TIER_B_RISK_MULTIPLIER", "0.50")), prohibit_tier_b_microcaps=_bool("SWING_PROHIBIT_TIER_B_MICROCAPS", True),
         coverage_normal_threshold=float(os.getenv("SWING_COVERAGE_NORMAL_THRESHOLD", "0.99")), coverage_degraded_threshold=float(os.getenv("SWING_COVERAGE_DEGRADED_THRESHOLD", "0.95")), coverage_defensive_threshold=float(os.getenv("SWING_COVERAGE_DEFENSIVE_THRESHOLD", "0.90")),
         coverage_normal_risk_multiplier=float(os.getenv("SWING_COVERAGE_NORMAL_RISK_MULTIPLIER", "1.00")), coverage_degraded_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEGRADED_RISK_MULTIPLIER", "0.75")), coverage_defensive_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEFENSIVE_RISK_MULTIPLIER", "0.50")), coverage_hysteresis_cycles=int(os.getenv("SWING_COVERAGE_HYSTERESIS_CYCLES", "3")), coverage_tiers_authoritative=_bool("SWING_COVERAGE_TIERS_AUTHORITATIVE", True),
         entry_cutoff_ist=os.getenv("SWING_ENTRY_CUTOFF_IST", "15:15"), decision_start_ist=os.getenv("SWING_DECISION_START_IST", "09:45"), decision_freeze_ist=os.getenv("SWING_DECISION_FREEZE_IST", "15:10"), order_expire_ist=os.getenv("SWING_ORDER_EXPIRE_IST", "15:20"), mandatory_exit_ist=os.getenv("SWING_MANDATORY_EXIT_IST", "15:15"),

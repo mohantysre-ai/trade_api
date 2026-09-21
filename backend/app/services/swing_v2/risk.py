@@ -23,6 +23,8 @@ def build_exit_and_size(row: dict[str, Any], cfg: SwingV2Config, *, remaining_ri
         return {**row, "riskEligible": False, "riskRejectReason": "STOP_OUTSIDE_SWING_BAND", "riskPct": round(risk_pct, 4)}
 
     risk_bps = cfg.microcap_risk_bps if "MICRO" in segment else cfg.core_risk_bps
+    row_multiplier = float(row.get("riskMultiplier") or 1.0)
+    risk_bps = max(1, int(round(risk_bps * row_multiplier)))
     risk_rupees = cfg.nav * risk_bps / 10_000.0
     if remaining_risk_rupees is not None:
         risk_rupees = min(risk_rupees, max(0.0, remaining_risk_rupees))

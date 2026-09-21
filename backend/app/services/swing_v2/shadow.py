@@ -15,7 +15,7 @@ from .data_quality import evaluate_data_freshness
 from .ledger import SwingLedger
 from .portfolio import construct_portfolio
 from .ranking import assign_segment_percentiles, rank_score
-from .schemas import EventType, ValidationState
+from .schemas import EventType, QualificationMode, ValidationState
 from .setups import evaluate_setups
 from .tradability import evaluate_tradability
 
@@ -27,6 +27,10 @@ _COVERAGE_STATE: dict[str, Any] = {"sessionDate": None, "tier": None, "pendingTi
 def _snapshot_hash(rows: list[dict[str, Any]]) -> str:
     encoded = json.dumps(rows, sort_keys=True, separators=(",", ":"), default=str).encode()
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _is_micro(row: dict[str, Any]) -> bool:
+    return "MICRO" in str(row.get("universeSegment") or "").upper()
 
 
 def _regime_scale(regime: str) -> tuple[float, int]:
@@ -152,25 +156,108 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
         funnel["tradable"] += int(trade_ok); funnel["safetyPass"] += int(gate_ok)
         if symbol in stale_symbols or not fresh_ok:
             rejected.append({"symbol": symbol, "reasonCodes": sorted(set(fresh_reasons or ["STALE_EXCLUDED_BY_COVERAGE_TIER"])), "qualificationStage": "FRESHNESS"}); continue
-        setup = evaluate_setups(row) if gate_ok else {"eligible": False, "passedSetupIds": [], "rejections": {}}; rank = rank_score(row)
+        setup = evaluate_setups(row) if gate_ok else {"eligible": False, "passedSetupIds": [], "rejections": {}}
+        rank = rank_score(row)
         score_lock_eligible = rank["status"] == "RATED" and float(rank.get("score") or 0) >= cfg.setup_score_override
-        setup_ok = bool(setup["eligible"] or score_lock_eligible)
-        qualification_mode = "FORMAL_SETUP" if setup["eligible"] else ("SCORE_SOFT_PASS" if score_lock_eligible else "NONE")
-        funnel["setupPass"] += int(setup_ok)
-        capacity_ok = float(row.get("upsideCapacityR") or 0) >= cfg.min_upside_capacity_r; planned_ok = float(row.get("plannedMaxBlendedR") or 1.5) >= cfg.min_planned_blended_r
-        gross_r = float(row.get("upsideCapacityR") or row.get("plannedMaxBlendedR") or 1.5); cost_r = float(row.get("costPenaltyR") or 0) + float(row.get("spreadPenaltyR") or 0) + float(row.get("slippagePenaltyR") or 0)
+        capacity_ok = float(row.get("upsideCapacityR") or 0) >= cfg.min_upside_capacity_r
+        planned_ok = float(row.get("plannedMaxBlendedR") or 1.5) >= cfg.min_planned_blended_r
+        gross_r = float(row.get("upsideCapacityR") or row.get("plannedMaxBlendedR") or 1.5)
+        cost_r = float(row.get("costPenaltyR") or 0) + float(row.get("spreadPenaltyR") or 0) + float(row.get("slippagePenaltyR") or 0)
         if cost_r == 0 and row.get("modeledRoundTripCostPct"):
-            risk_dist = float(row.get("riskPerShare") or 5.0); price = float(row.get("decisionPrice") or row.get("entryPrice") or 100.0)
-            if risk_dist > 0: cost_r = (float(row.get("modeledRoundTripCostPct")) / 100.0 * price) / risk_dist
-        net_reward_r = gross_r - cost_r; row["expectedNetR"] = round(net_reward_r, 4) if row.get("expectedNetR") is None else row["expectedNetR"]; net_reward_ok = net_reward_r >= cfg.min_expected_net_r
-        expected = row.get("expectedNetR"); calibrated = expected is not None and str(row.get("expectedNetRStatus") or "").upper() == "CALIBRATED"; expectancy_ok = calibrated and float(expected) >= cfg.min_expected_net_r; funnel["expectancyPass"] += int(expectancy_ok)
+            risk_dist = float(row.get("riskPerShare") or 5.0)
+            price = float(row.get("decisionPrice") or row.get("entryPrice") or 100.0)
+            if risk_dist > 0:
+                cost_r = (float(row.get("modeledRoundTripCostPct")) / 100.0 * price) / risk_dist
+        net_reward_r = gross_r - cost_r
+        row["expectedNetR"] = round(net_reward_r, 4) if row.get("expectedNetR") is None else row["expectedNetR"]
+        net_reward_ok = net_reward_r >= cfg.min_expected_net_r
+        expected = row.get("expectedNetR")
+        expected_status = str(row.get("expectedNetRStatus") or "").upper()
+        calibrated_negative = expected is not None and expected_status == "CALIBRATED" and float(expected) < 0
+        if calibrated_negative:
+            rejected.append({
+                "symbol": symbol,
+                "reasonCodes": sorted(set(fresh_reasons + trade_reasons + gate_reasons + ["CALIBRATED_NEGATIVE_EXPECTANCY"])),
+                "setupRejections": setup.get("rejections"),
+                "qualificationStage": "CANDIDATE_QUALIFICATION",
+                "expectancyStatus": "CALIBRATED_NEGATIVE",
+                "capacityStatus": "PASS" if capacity_ok else "LOW",
+            })
+            continue
+        expectancy_ok = expected is not None and expected_status == "CALIBRATED" and float(expected) >= cfg.min_expected_net_r
+        funnel["expectancyPass"] += int(expectancy_ok)
         reasons = fresh_reasons + trade_reasons + gate_reasons
-        if not net_reward_ok: reasons.append("NET_REWARD_BELOW_MINIMUM")
-        if not segment_active: reasons.append("SEGMENT_NOT_ACTIVE")
-        if not segment_active or not gate_ok or not setup_ok or not capacity_ok or not planned_ok or not net_reward_ok or rank["status"] != "RATED":
-            rejected.append({"symbol": symbol, "reasonCodes": sorted(set(reasons)), "setupRejections": setup.get("rejections"), "qualificationStage": "CANDIDATE_QUALIFICATION", "expectancyStatus": "PASS" if expectancy_ok else ("UNRATED" if expected is None else "LOW_OR_UNCALIBRATED"), "capacityStatus": "PASS" if capacity_ok else "LOW"}); continue
-        gross_utility = float(expected) if expectancy_ok else float(rank["score"]) / 1000.0; utility = gross_utility - float(row.get("costPenaltyR") or 0) - float(row.get("gapRiskPenaltyR") or 0)
-        qualified.append({**row, **rank, "symbol": symbol, "setupIds": setup["passedSetupIds"], "scoreLockEligible": score_lock_eligible, "qualificationMode": qualification_mode, "opportunityThresholds": {"setupScoreOverride": cfg.setup_score_override, "minUpsideCapacityR": cfg.min_upside_capacity_r, "minPlannedBlendedR": cfg.min_planned_blended_r, "minExpectedNetR": cfg.min_expected_net_r}, "expectedUtilityR": utility, "expectedNetRStatus": row.get("expectedNetRStatus") or "UNRATED", "promotionEligible": expectancy_ok, "decisionId": _decision_id(snapshot_id, session_date, symbol), "sourceSnapshotId": snapshot_id})
+        if not net_reward_ok:
+            reasons.append("NET_REWARD_BELOW_MINIMUM")
+        if not segment_active:
+            reasons.append("SEGMENT_NOT_ACTIVE")
+        tier_a_formal = setup["eligible"]
+        tier_a_score = score_lock_eligible
+        tier_a = (tier_a_formal or tier_a_score) and capacity_ok and planned_ok and net_reward_ok and gate_ok
+        tier_b_score_ok = rank["status"] == "RATED" and float(rank.get("score") or 0) >= cfg.tier_b_min_score
+        tier_b_capacity_ok = float(row.get("upsideCapacityR") or 0) >= cfg.tier_b_min_upside_capacity_r
+        tier_b_planned_ok = float(row.get("plannedMaxBlendedR") or 1.5) >= cfg.tier_b_min_planned_blended_r
+        tier_b_net_ok = net_reward_r >= cfg.tier_b_min_expected_net_r
+        tier_b = (
+            not tier_a
+            and tier_b_score_ok
+            and tier_b_capacity_ok
+            and tier_b_planned_ok
+            and tier_b_net_ok
+            and gate_ok
+        )
+        if tier_b and cfg.prohibit_tier_b_microcaps and _is_micro(row):
+            tier_b = False
+            reasons.append("TIER_B_MICROCAP_PROHIBITED")
+        setup_ok = tier_a or tier_b
+        funnel["setupPass"] += int(setup_ok)
+        qualification_mode = (
+            "PRIMARY_SETUP" if setup["eligible"]
+            else "SCORE_SOFT_PASS" if tier_a_score
+            else "DIVERSIFIED_SOFT_PASS" if tier_b
+            else "NONE"
+        )
+        if not segment_active or not gate_ok or not setup_ok or rank["status"] != "RATED":
+            if not tier_b:
+                if not capacity_ok:
+                    reasons.append("UPSIDE_CAPACITY_BELOW_MINIMUM")
+                if not planned_ok:
+                    reasons.append("PLANNED_BLENDED_R_BELOW_MINIMUM")
+                if not net_reward_ok:
+                    reasons.append("NET_REWARD_BELOW_MINIMUM")
+            rejected.append({
+                "symbol": symbol,
+                "reasonCodes": sorted(set(reasons)),
+                "setupRejections": setup.get("rejections"),
+                "qualificationStage": "CANDIDATE_QUALIFICATION",
+                "expectancyStatus": "PASS" if expectancy_ok else ("UNRATED" if expected is None else "LOW_OR_UNCALIBRATED"),
+                "capacityStatus": "PASS" if capacity_ok else "LOW",
+            })
+            continue
+        gross_utility = float(expected) if expectancy_ok else float(rank["score"]) / 1000.0
+        utility = gross_utility - float(row.get("costPenaltyR") or 0) - float(row.get("gapRiskPenaltyR") or 0)
+        risk_multiplier = 1.0 if tier_a else (cfg.tier_b_risk_multiplier if tier_b else 1.0)
+        qualified.append({
+            **row,
+            **rank,
+            "symbol": symbol,
+            "setupIds": setup["passedSetupIds"],
+            "scoreLockEligible": score_lock_eligible,
+            "qualificationMode": qualification_mode,
+            "opportunityThresholds": {
+                "setupScoreOverride": cfg.setup_score_override,
+                "minUpsideCapacityR": cfg.min_upside_capacity_r,
+                "minPlannedBlendedR": cfg.min_planned_blended_r,
+                "minExpectedNetR": cfg.min_expected_net_r,
+            },
+            "expectedUtilityR": utility,
+            "expectedNetRStatus": row.get("expectedNetRStatus") or "UNRATED",
+            "promotionEligible": expectancy_ok,
+            "decisionId": _decision_id(snapshot_id, session_date, symbol),
+            "sourceSnapshotId": snapshot_id,
+            "riskMultiplier": risk_multiplier,
+            "tier": "A" if tier_a else "B" if tier_b else "NONE",
+        })
 
     qualified = assign_segment_percentiles(qualified); funnel["qualified_out"] = len(qualified)
     effective_risk_scale = regime_risk_scale * coverage_risk_multiplier

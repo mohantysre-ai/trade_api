@@ -6,6 +6,14 @@ from .config import SwingV2Config
 from .risk import build_exit_and_size, gap_stress_loss
 
 
+_TIER_PRIORITY = {
+    "PRIMARY_SETUP": 3,
+    "SCORE_SOFT_PASS": 2,
+    "DIVERSIFIED_SOFT_PASS": 1,
+    "NONE": 0,
+}
+
+
 def _average_correlation(symbol: str, selected: list[dict[str, Any]], correlations: dict[tuple[str, str], float]) -> float:
     if not selected: return 0.0
     values = [float(correlations.get((symbol, str(row.get("symbol"))), correlations.get((str(row.get("symbol")), symbol), 1.0))) for row in selected]
@@ -16,16 +24,22 @@ def _is_micro(row: dict[str, Any]) -> bool:
     return "MICRO" in str(row.get("universeSegment") or "").upper()
 
 
-def _priority(row: dict[str, Any], cfg: SwingV2Config) -> tuple[float, float, float]:
-    """Core liquidity first; microcaps are a deliberately small satellite sleeve."""
+def _priority(row: dict[str, Any], cfg: SwingV2Config) -> tuple[float, float, float, float, float, float, float]:
+    tier_priority = float(_TIER_PRIORITY.get(row.get("qualificationMode", "NONE"), 0))
     utility = float(row.get("expectedUtilityR") if row.get("expectedUtilityR") is not None else row.get("expectedNetR") or -999)
     score = float(row.get("score") or 0)
     liquidity = float(row.get("liquidityPctile") or 0)
+    residual = float(row.get("residualStrengthPctile") or 0)
+    setup_quality = float(row.get("setupQualityPctile") or 0)
+    sector_strength = float(row.get("sectorStrengthPctile") or 0)
     if _is_micro(row):
         utility *= cfg.microcap_priority_weight
         score *= cfg.microcap_priority_weight
         liquidity *= cfg.microcap_priority_weight
-    return utility, score, liquidity
+        residual *= cfg.microcap_priority_weight
+        setup_quality *= cfg.microcap_priority_weight
+        sector_strength *= cfg.microcap_priority_weight
+    return tier_priority, utility, score, liquidity, residual, setup_quality, sector_strength
 
 
 def construct_portfolio(rows: list[dict[str, Any]], cfg: SwingV2Config, *, correlations: dict[tuple[str, str], float] | None = None, occupied_symbols: set[str] | None = None, existing_positions: list[dict[str, Any]] | None = None) -> dict[str, Any]:
@@ -68,7 +82,12 @@ def construct_portfolio(rows: list[dict[str, Any]], cfg: SwingV2Config, *, corre
         next_stress = stress + gap_stress_loss(sized)
         if next_stress > cfg.nav * cfg.max_gap_stress_bps / 10_000:
             rejected.append({"symbol": symbol, "portfolioRejectReason": "GAP_STRESS_CAP"}); continue
-        sized["selectionSleeve"] = "MICROCAP_SATELLITE_20PCT_PRIORITY" if _is_micro(sized) else "LIQUID_CORE_TOP500_PRIORITY"
+        if _is_micro(sized):
+            sized["selectionSleeve"] = "MICROCAP_SATELLITE_20PCT_PRIORITY"
+        elif sized.get("qualificationMode") == "DIVERSIFIED_SOFT_PASS":
+            sized["selectionSleeve"] = "DIVERSIFIED_MOMENTUM_SOFT_PASS"
+        else:
+            sized["selectionSleeve"] = "LIQUID_CORE_TOP500_PRIORITY"
         sized["priorityWeight"] = cfg.microcap_priority_weight if _is_micro(sized) else 1.0
         selected.append(sized); occupied.add(symbol)
         if _is_micro(row): microcaps += 1

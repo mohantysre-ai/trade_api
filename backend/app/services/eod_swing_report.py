@@ -797,7 +797,12 @@ def generate_swing_eod_report(
             "totalPnl": report.get("totalPnl"),
             "realizedPnl": report.get("realizedPnl"),
             "unrealizedPnl": report.get("unrealizedPnl"),
+            # V2 ledger markers. ``symbolSource`` stays the cache-attribution
+            # contract; ``source``/``authoritative`` surface the ledger that the
+            # report was built from so EOD consumers can assert V2 authority.
             "symbolSource": "swing_v2_ledger",
+            "source": report.get("source") or "swing_v2_ledger",
+            "authoritative": bool(report.get("authoritative")),
             "isMock": False,
             "attribution": {
                 "locked": len(picks),
