@@ -128,7 +128,7 @@ def _fill_locked_orders(ledger,now,cfg):
  for c in locked:
   o=obs.get(str(c.get("symbol") or "").upper()); execute_paper_order(ledger,c,[o] if o else [],expiry=expiry) if o or now.astimezone(IST)>=expiry else None
 def _manage_open_positions(ledger,now,cfg):
- opens=[]
+ opens=[]; terminalized=0
  for pid,events in _position_groups(ledger).items():
   s=materialize_position(events)
   if s.get("entryTimestamp") and not s.get("terminal"): opens.append((pid,s))
@@ -141,7 +141,10 @@ def _manage_open_positions(ledger,now,cfg):
   due=time_exit_due(now,age,max_overnights=cfg.max_overnights,exit_clock=cfg.mandatory_exit_ist)
   for i,bar in enumerate(bars):
    s=process_position_bar(ledger,pid,bar,is_d2_exit=due and i==len(bars)-1,data_status="LIVE")
-   if s.get("terminal"):break
+   if s.get("terminal"):
+    terminalized+=1
+    break
+ return terminalized
 def run_authoritative_cycle(*,now=None,force=False):
  global _SESSION_READ_CACHE,_SESSION_READ_CACHE_AT,_EOD_READ_CACHE
  cfg=load_config()
@@ -152,13 +155,15 @@ def run_authoritative_cycle(*,now=None,force=False):
   _EOD_READ_CACHE={}; ledger=SwingLedger(cfg.ledger_path)
   from ..nse_trading_calendar import is_nse_trading_day
   if not is_nse_trading_day(now.date()): return _session({"enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,"blockReason":"NSE_MARKET_HOLIDAY","candidates":[],"funnel":{"universe":0}},now=now)
-  _manage_open_positions(ledger,now,cfg); current=_read_json(_state_path()); day=now.date().isoformat(); current=current if str(current.get("sessionDate") or "")==day else {"sessionDate":day,"selectionFinalized":False}; local=now.time().replace(tzinfo=None)
+  terminalized=_manage_open_positions(ledger,now,cfg); current=_read_json(_state_path()); day=now.date().isoformat(); current=current if str(current.get("sessionDate") or "")==day else {"sessionDate":day,"selectionFinalized":False}; local=now.time().replace(tzinfo=None)
   from .market_data import intraday_occupied_symbols
   occupied=intraday_occupied_symbols(day); existing=[r for r in _positions(ledger) if not r.get("terminal")]; start,freeze,expiry=(_clock(cfg.decision_start_ist),_clock(cfg.decision_freeze_ist),_clock(cfg.order_expire_ist)); scan=current.get("scan") if isinstance(current.get("scan"),dict) else None
   due=True
   if current.get("lastScanAt"):
    try: due=(now-datetime.fromisoformat(str(current["lastScanAt"]).replace("Z","+00:00")).astimezone(IST)).total_seconds()>=_SWING_SCAN_INTERVAL_SECONDS
    except: pass
+  if terminalized>0:
+   due=True
   if start<=local<freeze and not current.get("selectionFinalized") and due:
    snapshot=_refresh_snapshot("swing_v2_decision_scan")
    if not _v2_snapshot_ready(snapshot,cfg):
@@ -173,7 +178,10 @@ def run_authoritative_cycle(*,now=None,force=False):
    else:
     scan=build_from_market_snapshot(snapshot,final_lock=True,persist_events=local<=expiry,occupied_symbols=occupied,existing_positions=existing,now=now)
    current.update(scan=scan,selectionFinalized=True,finalizedAt=now.astimezone(timezone.utc).isoformat(),lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=snapshot.get("swingV2RefreshError"))
-  if freeze<=local: _fill_locked_orders(ledger,now,cfg)
+  # A qualified candidate is locked and paper-filled during the hunt window;
+  # 15:10 is only the decision freeze, never a fill-start time. Entry price is
+  # immutable in the ledger; subsequent cycles update marks/exits only.
+  if start<=local<=expiry: _fill_locked_orders(ledger,now,cfg)
   _write_state(current); session=_session(scan,now=now)
   with _SESSION_CACHE_LOCK: _SESSION_READ_CACHE=session; _SESSION_READ_CACHE_AT=monotonic_time.monotonic()
   return session
