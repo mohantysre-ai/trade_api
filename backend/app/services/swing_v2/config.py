@@ -25,7 +25,7 @@ class SwingV2Config:
     mode: str = "PAPER"
     authority: str = "V2"
     strategy_id: str = "SWING_2S_MOMENTUM_V2"
-    policy_version: str = "2.2.0"
+    policy_version: str = "2.3.0"
     feature_version: str = "swing_features_v2"
     universe: str = "NIFTY_TOTAL_MARKET_750"
     active_segments: tuple[str, ...] = ("NIFTY100", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP250", "NIFTY_MICROCAP250")
@@ -51,9 +51,13 @@ class SwingV2Config:
     trail_arm_r: float = 1.50
     trail_lock_r: float = 0.75
     t2_r: float = 2.0
-    min_upside_capacity_r: float = 1.50
-    min_planned_blended_r: float = 1.50
-    min_expected_net_r: float = 0.12
+    # Opportunity gates are intentionally softer than hard safety/risk gates.
+    # Borderline momentum names may enter paper selection only when every
+    # freshness/tradability/governance/risk invariant still passes.
+    setup_score_override: float = 65.0
+    min_upside_capacity_r: float = 1.25
+    min_planned_blended_r: float = 1.25
+    min_expected_net_r: float = 0.08
     coverage_normal_threshold: float = 0.99
     coverage_degraded_threshold: float = 0.95
     coverage_defensive_threshold: float = 0.90
@@ -101,6 +105,8 @@ class SwingV2Config:
         if not 0 < self.max_sector_notional_pct <= 40: raise ValueError("sector notional may not exceed 40% NAV")
         if self.max_portfolio_risk_bps > 100 or self.max_sector_risk_bps > 50: raise ValueError("portfolio/sector initial-risk limits exceed mandate")
         if self.max_gap_stress_bps > 250: raise ValueError("aggregate gap stress may not exceed 2.50% NAV")
+        if not 50 <= self.setup_score_override <= 90: raise ValueError("SWING_SETUP_SCORE_OVERRIDE must be in [50,90]")
+        if not 0 < self.min_expected_net_r <= self.min_planned_blended_r <= self.min_upside_capacity_r <= 3: raise ValueError("invalid Swing opportunity thresholds")
         if self.t1_r < 1 or self.t2_r < self.t1_r or self.trail_arm_r < self.t1_r: raise ValueError("invalid T1/trail/T2 R ladder")
         if self.trail_lock_r >= self.trail_arm_r or not 0 < self.t1_qty_pct < 100: raise ValueError("invalid trail lock or T1 quantity")
         start, cutoff = _clock(self.decision_start_ist, "SWING_DECISION_START_IST"), _clock(self.entry_cutoff_ist, "SWING_ENTRY_CUTOFF_IST")
@@ -117,13 +123,14 @@ def load_config() -> SwingV2Config:
         enabled=_bool("SWING_V2_ENABLED", True), mode=os.getenv("SWING_V2_MODE", "PAPER").upper(), authority=os.getenv("SWING_STRATEGY_AUTHORITY", "V2").upper(),
         strategy_id=os.getenv("SWING_STRATEGY_ID", "SWING_2S_MOMENTUM_V2"), universe=os.getenv("SWING_UNIVERSE", "NIFTY_TOTAL_MARKET_750"),
         active_segments=tuple(p.strip().upper() for p in os.getenv("SWING_ACTIVE_SEGMENTS", "NIFTY100,NIFTY_MIDCAP150,NIFTY_SMALLCAP250,NIFTY_MICROCAP250").split(",") if p.strip()),
-        microcap_mode=os.getenv("SWING_MICROCAP_MODE", "SHADOW").upper(), microcap_priority_weight=float(os.getenv("SWING_MICROCAP_PRIORITY_WEIGHT", "0.20")),
+        microcap_mode=os.getenv("SWING_MICROCAP_MODE", "SATELLITE").upper(), microcap_priority_weight=float(os.getenv("SWING_MICROCAP_PRIORITY_WEIGHT", "0.20")),
         max_positions=int(os.getenv("SWING_MAX_POSITIONS", "5")), max_overnights=int(os.getenv("SWING_MAX_OVERNIGHTS", "2")), nav=float(os.getenv("SWING_CAPITAL", "1000000")),
         core_risk_bps=int(os.getenv("SWING_CORE_RISK_BPS", "25")), microcap_risk_bps=int(os.getenv("SWING_MICROCAP_RISK_BPS", "15")), max_portfolio_risk_bps=int(os.getenv("SWING_MAX_PORTFOLIO_RISK_BPS", "100")),
         max_name_notional_pct=float(os.getenv("SWING_MAX_NAME_NOTIONAL_PCT", "20")), max_sector_notional_pct=float(os.getenv("SWING_MAX_SECTOR_NOTIONAL_PCT", "40")),
         stop_atr_mult=float(os.getenv("SWING_STOP_ATR_MULT", "0.80")), min_stop_pct=float(os.getenv("SWING_MIN_STOP_PCT", "0.75")), max_stop_core_pct=float(os.getenv("SWING_MAX_STOP_CORE_PCT", "2.25")), max_stop_small_pct=float(os.getenv("SWING_MAX_STOP_SMALL_PCT", "2.50")),
         t1_r=float(os.getenv("SWING_T1_R", "1.00")), t1_qty_pct=float(os.getenv("SWING_T1_QTY_PCT", "50")), trail_arm_r=float(os.getenv("SWING_TRAIL_ARM_R", "1.50")), trail_lock_r=float(os.getenv("SWING_TRAIL_LOCK_R", "0.75")), t2_r=float(os.getenv("SWING_T2_R", "2.00")),
-        min_upside_capacity_r=float(os.getenv("SWING_MIN_UPSIDE_CAPACITY_R", "1.50")), min_expected_net_r=float(os.getenv("SWING_MIN_EXPECTED_NET_R", "0.12")),
+        setup_score_override=float(os.getenv("SWING_SETUP_SCORE_OVERRIDE", "65")),
+        min_upside_capacity_r=float(os.getenv("SWING_MIN_UPSIDE_CAPACITY_R", "1.25")), min_planned_blended_r=float(os.getenv("SWING_MIN_PLANNED_BLENDED_R", "1.25")), min_expected_net_r=float(os.getenv("SWING_MIN_EXPECTED_NET_R", "0.08")),
         coverage_normal_threshold=float(os.getenv("SWING_COVERAGE_NORMAL_THRESHOLD", "0.99")), coverage_degraded_threshold=float(os.getenv("SWING_COVERAGE_DEGRADED_THRESHOLD", "0.95")), coverage_defensive_threshold=float(os.getenv("SWING_COVERAGE_DEFENSIVE_THRESHOLD", "0.90")),
         coverage_normal_risk_multiplier=float(os.getenv("SWING_COVERAGE_NORMAL_RISK_MULTIPLIER", "1.00")), coverage_degraded_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEGRADED_RISK_MULTIPLIER", "0.75")), coverage_defensive_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEFENSIVE_RISK_MULTIPLIER", "0.50")), coverage_hysteresis_cycles=int(os.getenv("SWING_COVERAGE_HYSTERESIS_CYCLES", "3")), coverage_tiers_authoritative=_bool("SWING_COVERAGE_TIERS_AUTHORITATIVE", True),
         entry_cutoff_ist=os.getenv("SWING_ENTRY_CUTOFF_IST", "15:15"), decision_start_ist=os.getenv("SWING_DECISION_START_IST", "09:45"), decision_freeze_ist=os.getenv("SWING_DECISION_FREEZE_IST", "15:10"), order_expire_ist=os.getenv("SWING_ORDER_EXPIRE_IST", "15:20"), mandatory_exit_ist=os.getenv("SWING_MANDATORY_EXIT_IST", "15:15"),

@@ -252,7 +252,7 @@ def test_1445_ist_entry_cutoff():
     assert len(scan_after.get("candidates") or []) == 0
 
 
-def test_score_above_70_overrides_setup_gate_but_not_safety_gate():
+def test_score_soft_pass_overrides_setup_gate_but_not_safety_gate():
     now = datetime(2026, 9, 11, 10, 0, tzinfo=IST)
     row = {
         "symbol": "HIGH_SCORE",
@@ -294,8 +294,9 @@ def test_score_above_70_overrides_setup_gate_but_not_safety_gate():
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr("app.services.swing_v2.shadow.evaluate_setups", lambda _: {"eligible": False, "passedSetupIds": [], "rejections": {"test": "forced"}})
         result = build_shadow_v2([row], universe_coverage=1.0, regime="NORMAL", final_lock=True, now=now, config=cfg)
-    assert result["candidates"][0]["score"] > 70
+    assert result["candidates"][0]["score"] >= cfg.setup_score_override
     assert result["candidates"][0]["scoreLockEligible"] is True
+    assert result["candidates"][0]["qualificationMode"] == "SCORE_SOFT_PASS"
 
 
 def test_score_above_70_still_fails_stale_data():

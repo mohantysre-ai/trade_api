@@ -153,7 +153,10 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
         if symbol in stale_symbols or not fresh_ok:
             rejected.append({"symbol": symbol, "reasonCodes": sorted(set(fresh_reasons or ["STALE_EXCLUDED_BY_COVERAGE_TIER"])), "qualificationStage": "FRESHNESS"}); continue
         setup = evaluate_setups(row) if gate_ok else {"eligible": False, "passedSetupIds": [], "rejections": {}}; rank = rank_score(row)
-        score_lock_eligible = rank["status"] == "RATED" and float(rank.get("score") or 0) > 70; setup_ok = bool(setup["eligible"] or score_lock_eligible); funnel["setupPass"] += int(setup_ok)
+        score_lock_eligible = rank["status"] == "RATED" and float(rank.get("score") or 0) >= cfg.setup_score_override
+        setup_ok = bool(setup["eligible"] or score_lock_eligible)
+        qualification_mode = "FORMAL_SETUP" if setup["eligible"] else ("SCORE_SOFT_PASS" if score_lock_eligible else "NONE")
+        funnel["setupPass"] += int(setup_ok)
         capacity_ok = float(row.get("upsideCapacityR") or 0) >= cfg.min_upside_capacity_r; planned_ok = float(row.get("plannedMaxBlendedR") or 1.5) >= cfg.min_planned_blended_r
         gross_r = float(row.get("upsideCapacityR") or row.get("plannedMaxBlendedR") or 1.5); cost_r = float(row.get("costPenaltyR") or 0) + float(row.get("spreadPenaltyR") or 0) + float(row.get("slippagePenaltyR") or 0)
         if cost_r == 0 and row.get("modeledRoundTripCostPct"):
@@ -167,7 +170,7 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
         if not segment_active or not gate_ok or not setup_ok or not capacity_ok or not planned_ok or not net_reward_ok or rank["status"] != "RATED":
             rejected.append({"symbol": symbol, "reasonCodes": sorted(set(reasons)), "setupRejections": setup.get("rejections"), "qualificationStage": "CANDIDATE_QUALIFICATION", "expectancyStatus": "PASS" if expectancy_ok else ("UNRATED" if expected is None else "LOW_OR_UNCALIBRATED"), "capacityStatus": "PASS" if capacity_ok else "LOW"}); continue
         gross_utility = float(expected) if expectancy_ok else float(rank["score"]) / 1000.0; utility = gross_utility - float(row.get("costPenaltyR") or 0) - float(row.get("gapRiskPenaltyR") or 0)
-        qualified.append({**row, **rank, "symbol": symbol, "setupIds": setup["passedSetupIds"], "scoreLockEligible": score_lock_eligible, "expectedUtilityR": utility, "expectedNetRStatus": row.get("expectedNetRStatus") or "UNRATED", "promotionEligible": expectancy_ok, "decisionId": _decision_id(snapshot_id, session_date, symbol), "sourceSnapshotId": snapshot_id})
+        qualified.append({**row, **rank, "symbol": symbol, "setupIds": setup["passedSetupIds"], "scoreLockEligible": score_lock_eligible, "qualificationMode": qualification_mode, "opportunityThresholds": {"setupScoreOverride": cfg.setup_score_override, "minUpsideCapacityR": cfg.min_upside_capacity_r, "minPlannedBlendedR": cfg.min_planned_blended_r, "minExpectedNetR": cfg.min_expected_net_r}, "expectedUtilityR": utility, "expectedNetRStatus": row.get("expectedNetRStatus") or "UNRATED", "promotionEligible": expectancy_ok, "decisionId": _decision_id(snapshot_id, session_date, symbol), "sourceSnapshotId": snapshot_id})
 
     qualified = assign_segment_percentiles(qualified); funnel["qualified_out"] = len(qualified)
     effective_risk_scale = regime_risk_scale * coverage_risk_multiplier
