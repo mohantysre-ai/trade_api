@@ -1063,8 +1063,11 @@ def get_live_prices_for_plan() -> dict[str, Any]:
                 allow_external=False,
                 persist_transitions=False,
             )
-            fallback["dataStale"] = True
             fallback["liveRefreshPending"] = True
+            if fallback.get("dataStale"):
+                fallback["liveMarksStatus"] = "STALE"
+            else:
+                fallback["liveMarksStatus"] = "REFRESHING"
             _LIVE_BOOK_CACHE = copy.deepcopy(fallback)
             _LIVE_BOOK_CACHE_AT = 0.0
         if not _LIVE_BOOK_CACHE_REFRESHING:
@@ -1501,6 +1504,15 @@ def _compute_live_prices_for_plan(
         snapshot_age_sec is not None and snapshot_age_sec > max(_PRICE_TTL, 300)
     )
 
+    if any_stale:
+        live_marks_status = "STALE"
+    elif source_mix.get("ANGEL_WS") or source_mix.get("live"):
+        live_marks_status = "LIVE"
+    elif source_mix.get("snapshot"):
+        live_marks_status = "DEGRADED"
+    else:
+        live_marks_status = "STALE"
+
     return {
         "long": enriched_long,
         "short": enriched_short,
@@ -1525,6 +1537,7 @@ def _compute_live_prices_for_plan(
         "marketOpen": market_open,
         "sessionClosed": after_close if market_open else True,
         "dataStale": bool(any_stale),
+        "liveMarksStatus": live_marks_status,
         "ltpSourceMix": source_mix,
         "locked": bool(fixed.get("locked")),
         "executionPolicy": fixed.get("executionPolicy") or "MANUAL_ONLY",

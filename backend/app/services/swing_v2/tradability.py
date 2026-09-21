@@ -54,6 +54,13 @@ def evaluate_tradability(row: dict[str, Any]) -> tuple[bool, list[str]]:
     ):
         if row.get(flag):
             reasons.append(reason)
+    for flag, reason in (
+        ("corporateEventsCurrent", "CORPORATE_EVENTS_FEED_STALE"),
+        ("surveillanceCurrent", "SURVEILLANCE_FEED_STALE"),
+        ("universeCurrent", "UNIVERSE_FEED_STALE"),
+    ):
+        if row.get(flag) is not True:
+            reasons.append(reason)
     return not reasons, reasons
 
 

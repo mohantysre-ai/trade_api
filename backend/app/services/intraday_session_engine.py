@@ -356,6 +356,18 @@ def _clamp(x: float, lo: float = 0.0, hi: float = 100.0) -> float:
     return max(lo, min(hi, x))
 
 
+def _market_data_stale(snap: dict[str, Any]) -> bool:
+    updated_at = snap.get("updatedAt")
+    if not updated_at:
+        return True
+    try:
+        snap_dt = datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
+        age = max(0.0, (datetime.now(tz=timezone.utc) - snap_dt.astimezone(timezone.utc)).total_seconds())
+        return age > 300
+    except Exception:
+        return True
+
+
 def _atomic_write(path: Path, payload: dict[str, Any]) -> None:
     """Write JSON without truncating the live file (Windows Docker safe)."""
     from .json_atomic import atomic_write_json
@@ -2939,6 +2951,8 @@ def _maybe_refresh_live_snapshot(*, reason: str) -> dict[str, Any]:
     """
     global _SNAP_REFRESH_LAST
     from .angel_one_feed import _snapshot_needs_live_refresh
+    from .angel_one_feed import _SCHEDULED_REFRESH_STATE_LOCK
+    from .angel_one_feed import _SCHEDULED_REFRESH_STATE
     from .angel_one_feed import run_scheduled_live_refresh
     from .trade_outcome import _is_market_open
 
@@ -2949,6 +2963,10 @@ def _maybe_refresh_live_snapshot(*, reason: str) -> dict[str, Any]:
         return snap
     now = time.monotonic()
     if (now - _SNAP_REFRESH_LAST) < _SNAP_REFRESH_MIN_GAP_SEC:
+        return snap
+    with _SCHEDULED_REFRESH_STATE_LOCK:
+        refresh_state = dict(_SCHEDULED_REFRESH_STATE)
+    if refresh_state.get("running"):
         return snap
     try:
         result = run_scheduled_live_refresh(reason=reason)
@@ -4017,17 +4035,19 @@ def propose_replacements(
     long_rows = list(session.get("long") or [])
     short_rows = list(session.get("short") or [])
     all_rows = long_rows + short_rows
+    free = compute_free_slots(long_rows, short_rows)
+    if free["total"] <= 0:
+        return []
     risk = _portfolio_risk_flags(long_rows, short_rows)
     allowed, _block = replacement_window_open(
         daily_loss_hit=bool(risk["dailyLossHit"]),
         max_names_hit=bool(risk["maxNamesHit"]),
     )
     if not allowed:
-        return []
-
-    free = compute_free_slots(long_rows, short_rows)
-    if free["total"] <= 0:
-        return []
+        if free["total"] > 0 and _block == "midday_pause":
+            pass
+        else:
+            return []
 
     replacement_capacity = min(
         max(0, MAX_DAILY_REPLACEMENTS - _replacement_count(all_rows)),
@@ -5111,6 +5131,9 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
                 "marketOpen": live.get("marketOpen"),
                 "sessionClosed": live.get("sessionClosed"),
                 "dataStale": live.get("dataStale"),
+                "liveMarksStale": live.get("dataStale"),
+                "liveRefreshPending": live.get("liveRefreshPending"),
+                "liveMarksStatus": live.get("liveMarksStatus"),
                 "ltpSourceMix": live.get("ltpSourceMix"),
                 "priceSourcesNote": live.get("priceSourcesNote"),
                 "newAlerts": live.get("newAlerts") or [],
@@ -5296,7 +5319,10 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
             max_names_hit=bool(risk_flags["maxNamesHit"]),
         )
         if not allowed:
-            replacement_blocked_reason = win_reason or rot_code
+            if free_slots["total"] > 0 and win_reason == "midday_pause":
+                pass
+            else:
+                replacement_blocked_reason = win_reason or rot_code
         elif free_slots["total"] <= 0:
             replacement_blocked_reason = "no_free_slots"
         elif daily_positions_remaining <= 0:
@@ -5551,6 +5577,10 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
         "sessionClosed": session_closed,
         "closeMarksFrozenAt": session.get("closeMarksFrozenAt"),
         "dataStale": live_meta.get("dataStale") if "dataStale" in live_meta else session.get("dataStale"),
+        "marketDataStale": live_meta.get("marketDataStale") if "marketDataStale" in live_meta else _market_data_stale(snap),
+        "liveMarksStale": live_meta.get("liveMarksStale"),
+        "liveRefreshPending": live_meta.get("liveRefreshPending"),
+        "liveMarksStatus": live_meta.get("liveMarksStatus"),
         "ltpSourceMix": live_meta.get("ltpSourceMix"),
         "priceSourcesNote": live_meta.get("priceSourcesNote"),
         "feedStatus": feed_status,

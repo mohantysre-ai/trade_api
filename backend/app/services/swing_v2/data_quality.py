@@ -11,11 +11,11 @@ from typing import Any
 # remain valid for its natural timeframe.
 SCAN_MAX_AGE = {
     "quote": int(os.getenv("SWING_SCAN_QUOTE_MAX_AGE_SEC", "900")),
-    "bars1h": int(os.getenv("SWING_SCAN_BARS1H_MAX_AGE_SEC", "90000")),
+    "bars1h": int(os.getenv("SWING_SCAN_BARS1H_MAX_AGE_SEC", "259200")),
 }
 LOCK_MAX_AGE = {
     "quote": int(os.getenv("SWING_LOCK_QUOTE_MAX_AGE_SEC", "300")),
-    "bars1h": int(os.getenv("SWING_LOCK_BARS1H_MAX_AGE_SEC", "90000")),
+    "bars1h": int(os.getenv("SWING_LOCK_BARS1H_MAX_AGE_SEC", "259200")),
 }
 
 
@@ -29,12 +29,17 @@ def age_seconds(timestamp: str | None, now: datetime | None = None) -> float | N
         return None
 
 
-def evaluate_freshness(row: dict[str, Any], *, final_lock: bool, now: datetime | None = None) -> tuple[bool, list[str]]:
+def evaluate_data_freshness(row: dict[str, Any], *, final_lock: bool, now: datetime | None = None) -> tuple[bool, list[str]]:
+    """Data-availability freshness only.
+
+    Checks actual data timestamps and daily-bar presence. Tradability and
+    governance flags are evaluated separately so that coverage measures DATA
+    existence rather than strategy qualification.
+    """
     limits = LOCK_MAX_AGE if final_lock else SCAN_MAX_AGE
     reasons: list[str] = []
     stamps = row.get("sourceTimestamps") or {}
     for field, maximum in limits.items():
-        # Compatibility for snapshots produced before the 1h timestamp rename.
         stamp = stamps.get(field)
         if field == "bars1h" and not stamp:
             stamp = stamps.get("bars5m")
@@ -43,10 +48,18 @@ def evaluate_freshness(row: dict[str, Any], *, final_lock: bool, now: datetime |
             reasons.append(f"MISSING_{field.upper()}_TIMESTAMP")
         elif age > maximum:
             reasons.append(f"STALE_{field.upper()}")
-    for field in ("dailyBarsThroughPreviousClose", "corporateEventsCurrent", "surveillanceCurrent", "universeCurrent"):
-        if row.get(field) is not True:
-            reasons.append(f"MISSING_OR_STALE_{field.upper()}")
+    if row.get("dailyBarsThroughPreviousClose") is not True:
+        reasons.append("MISSING_OR_STALE_DAILY_BARS_THROUGH_PREVIOUS_CLOSE")
     return not reasons, reasons
+
+
+def evaluate_freshness(row: dict[str, Any], *, final_lock: bool, now: datetime | None = None) -> tuple[bool, list[str]]:
+    """Data-only freshness (backward-compatible alias for evaluate_data_freshness).
+
+    Tradability and governance checks are handled by evaluate_tradability and
+    _quality_and_safety respectively.
+    """
+    return evaluate_data_freshness(row, final_lock=final_lock, now=now)
 
 
 def source_lineage(value: Any, *, source: str, source_timestamp: str, received_at: str, quality: str = "OK") -> dict[str, Any]:

@@ -558,6 +558,16 @@ def _maybe_midday_refresh(now: datetime) -> None:
         if mins_now < start:
             continue
         try:
+            from ..angel_one_feed import _SCHEDULED_REFRESH_STATE, _SCHEDULED_REFRESH_STATE_LOCK
+
+            with _SCHEDULED_REFRESH_STATE_LOCK:
+                refresh_state = dict(_SCHEDULED_REFRESH_STATE)
+            if refresh_state.get("running"):
+                log.debug("Midday refresh %s skipped: another refresh already running", stage)
+                continue
+        except Exception:
+            pass
+        try:
             from ..angel_one_feed import run_scheduled_live_refresh
 
             def _job(stage_name: str = stage, done_key: str = key) -> None:
