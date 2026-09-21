@@ -126,7 +126,6 @@ $stateFileMap = @(
     @{ From = Join-Path $localStateRepo "intraday_session.json"; To = Join-Path $seedState "intraday_session.json" }
     @{ From = Join-Path $localStateRepo "intraday_session.json.bak"; To = Join-Path $seedState "intraday_session.json.bak" }
     @{ From = Join-Path $localStateRepo "intraday_session.json.lock"; To = Join-Path $seedState "intraday_session.json.lock" }
-    @{ From = Join-Path $localStateBackend "intraday_session.json"; To = Join-Path $seedState "intraday_session.json" }
     @{ From = Join-Path $localStateRepo "last_market_snapshot.json"; To = Join-Path $seedState "last_market_snapshot.json" }
     @{ From = Join-Path $localStateRepo "last_market_snapshot.json.bak"; To = Join-Path $seedState "last_market_snapshot.json.bak" }
     @{ From = Join-Path $localStateRoot "last_market_snapshot.json"; To = Join-Path $seedState "last_market_snapshot.json" }

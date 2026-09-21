@@ -404,8 +404,16 @@ def test_no_cross_book_scrubbing_or_deletion():
         assert "_scrub_cross_book_swing_rows" not in text
 
 
-def test_slow_swing_consumer_cannot_block_market_data_publishing():
+def test_slow_swing_consumer_cannot_block_market_data_publishing(monkeypatch):
     from app.services.swing_v2.authoritative import _refresh_snapshot
 
+    monkeypatch.setattr(
+        "app.services.swing_v2.authoritative._snapshot",
+        lambda: {"swingV2DataStatus": {"featureRows": 1, "historyReadyRows": 1, "universeCurrent": True, "surveillanceCurrent": True, "corporateEventsCurrent": True}, "swingV2UniverseCoverage": 1.0, "swingV2Regime": "NORMAL"},
+    )
+    monkeypatch.setattr(
+        "app.services.market_refresh_facade.refresh_market_snapshot",
+        lambda *a, **kw: {"success": True},
+    )
     snap = _refresh_snapshot("test_call")
     assert isinstance(snap, dict)
