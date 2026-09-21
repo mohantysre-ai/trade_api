@@ -10,6 +10,8 @@ import os
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
+from .nse_trading_calendar import is_nse_trading_day
+
 _IST = timezone(timedelta(hours=5, minutes=30))
 
 
@@ -42,7 +44,7 @@ def cash_session_phase(for_date=None, now: datetime | None = None) -> str:
     """Return PRE_OPEN, OPEN, or CLOSED for an IST trading date."""
     n = ist_now(now)
     target = for_date or n.date()
-    if target < n.date() or target.weekday() >= 5:
+    if target < n.date() or not is_nse_trading_day(target):
         return "CLOSED"
     if target > n.date():
         return "PRE_OPEN"
@@ -86,8 +88,8 @@ def basket_lock_allowed(
         return True, "manual_override"
 
     n = ist_now(now)
-    if n.weekday() >= 5:
-        return False, "weekend"
+    if not is_nse_trading_day(n.date()):
+        return False, "market_holiday"
 
     mins = _mins(n.hour, n.minute)
     start = _mins(_LOCK_START_H, _LOCK_START_M)
@@ -109,8 +111,8 @@ def basket_lock_allowed(
 
 def basket_lock_block_message(reason: str) -> str:
     cfg = lock_window_config()
-    if reason == "weekend":
-        return "Basket lock disabled on weekends (NSE cash closed)."
+    if reason in {"weekend", "market_holiday"}:
+        return "Basket lock disabled because NSE cash market is closed."
     if reason == "pre_lock_window":
         return (
             f"Pre-open / early auction — lock opens {cfg['lockStart']} IST "
@@ -169,7 +171,7 @@ def rotation_window_allowed(now: datetime | None = None) -> tuple[bool, str]:
     primary_end = _mins(_LOCK_END_H, _LOCK_END_M)
     cont_end = _mins(_ROT_CONT_END_H, _ROT_CONT_END_M)
     aft_start = _mins(_ROT_AFT_START_H, _ROT_AFT_START_M)
-    aft_end = _mins(_ROT_AFT_END_H, _ROT_AFT_END_M)
+    aft_end = _mins(_SWING_HUNT_END_H, _SWING_HUNT_END_M)
     if primary_end <= primary_start:
         primary_end = primary_start + 30
     if cont_end < primary_end:
@@ -213,15 +215,18 @@ def can_add_replacement(
     return True, code
 
 
+_SWING_HUNT_END_H, _SWING_HUNT_END_M = _parse_hhmm(os.getenv("SWING_DECISION_FREEZE_IST", "15:10"), 15, 10)
+
+
 def swing_entry_hunt_config() -> dict[str, Any]:
-    """SWING hunts a qualified BUY entry — not a 10:15 hard stop."""
+    """Swing V2 hunts after Intraday freeze until its own decision freeze."""
     return {
         "huntStart": f"{_LOCK_START_H:02d}:{_LOCK_START_M:02d}",
-        "huntEnd": f"{_ROT_AFT_END_H:02d}:{_ROT_AFT_END_M:02d}",
+        "huntEnd": f"{_SWING_HUNT_END_H:02d}:{_SWING_HUNT_END_M:02d}",
         "timezone": "Asia/Kolkata",
         "rationale": (
-            "Hunt a fully qualified BUY from 09:45 IST; lock each entry when found; "
-            "do not cash-finalize at 10:15; hunt closes 14:45"
+            "Begin after the Intraday symbol set is frozen (never before 09:45); "
+            "lock qualified entries when found; decision hunt closes at 15:10"
         ),
     }
 

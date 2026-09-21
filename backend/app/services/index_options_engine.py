@@ -23,12 +23,12 @@ INDEX_CONFIG: tuple[dict[str, str], ...] = (
 )
 
 MIN_DAILY_ENTRIES = 0
-MAX_DAILY_ENTRIES = 5
+MAX_DAILY_ENTRIES = 10
 MAX_ATTEMPTS_PER_INDEX = 20
 # Portfolio-wide cap. It is applied only after the BUY and the SELL sleeve have
 # each independently picked their best index/bucket, so one sleeve can never
 # consume the other sleeve's slot during selection.
-MAX_CONCURRENT_TRADES = 8
+MAX_CONCURRENT_TRADES = 10
 # Per-sleeve cap. Each sleeve owns its own index and correlation-bucket
 # bookkeeping (BROAD and FINANCIAL are the only buckets), so a BUY on NIFTY
 # never removes the SELL sleeve's own NIFTY candidate.

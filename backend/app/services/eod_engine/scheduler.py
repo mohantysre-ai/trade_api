@@ -3,7 +3,7 @@
 Stages (weekdays, institutional open cadence):
   09:45+  Morning pre-work (Angel live + LLM day-lock) — post open-auction
   09:45–10:15  Primary intradAy basket lock; catch-up if app starts later
-  09:45–14:45  Swing entry hunt — lock each fully qualified BUY when found (not a 10:15 stop)
+  after Intraday freeze–15:10  Swing V2 entry hunt — lock qualified BUYs as found
   12:00   Midday live refresh (quotes/candles; LLM stays day-locked)
   14:00   Afternoon live refresh (same)
   15:31   Fixed-plan close marks
@@ -428,16 +428,17 @@ def _maybe_auto_commit(now: datetime) -> None:
 
 
 def _maybe_auto_swing_lock(now: datetime) -> None:
-    """Hunt SWING independently of intradAy commit success.
+    """Hunt Swing V2 after the Intraday symbol set is frozen.
 
-    09:45–14:45: keep evaluating Asset Matrix BUY until a qualified entry is
-    found, then lock it (and fill remaining slots). Do not cash-finalize at 10:15.
-    After 14:45: seal an empty hunt as cash-held.
+    Intraday owns symbols first. After the current-day Intraday session is locked,
+    Swing hunts independently until the V2 decision freeze (15:10 default).
     """
     if not _AUTO_COMMIT:
         return
     hunt_ok, hunt_code = swing_entry_hunt_allowed(now)
     day_key = now.strftime("%Y-%m-%d")
+    if hunt_ok and not _session_already_locked():
+        return
     try:
         from ..swing_session import (
             SWING_MATRIX_LOCK_COUNT,
