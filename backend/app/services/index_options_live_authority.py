@@ -299,15 +299,18 @@ def _reconcile(radar: dict[str, Any], *, client: Any = None, now: datetime | Non
                 book["entryAudit"].append({**audit, "outcome": "LOCKED", "reason": reason, "positionId": position.get("id")})
 
         book["entryAudit"] = book["entryAudit"][-200:]
+        subscriptions = paper._sync_position_subscriptions(client, book["open"], closed_now)
         open_pnl = round(sum(float(row.get("unrealizedPnl") or 0) for row in book["open"]), 2)
         realized = round(sum(float(row.get("pnl") or 0) for row in book["closed"]), 2)
         from .angel_index_stream import ANGEL_INDEX_STREAM
         book.update({"updatedAt": clock.isoformat(), "openPnl": open_pnl, "realizedPnl": realized,
                      "totalPnl": round(open_pnl + realized, 2), "dailyEntryCap": paper.MAX_DAILY_ENTRIES,
                      "marketOpen": paper._market_open(clock), "streamStatus": ANGEL_INDEX_STREAM.status(),
+                     "markPipeline": mark_pipeline, "subscriptions": subscriptions,
                      "executionAuthority": "INDEX_OPTIONS_LIVE_AUTHORITY_V2",
                      "sellerRiskCaps": {"singleTrade": paper._seller_single_risk_cap(), "portfolio": paper._seller_portfolio_risk_cap()},
                      "longPremiumRiskPolicy": {"markIntervalSeconds": paper.LONG_PREMIUM_MARK_INTERVAL_SECONDS,
+                         "stopPoints": paper.LONG_PREMIUM_STOP_POINTS, "targetPoints": paper.LONG_PREMIUM_TARGET_POINTS,
                          "stopPointsMax": paper.LONG_PREMIUM_STOP_POINTS, "targetPointsMax": paper.LONG_PREMIUM_TARGET_POINTS,
                          "riskReward": paper.LONG_PREMIUM_RISK_REWARD, "lowPremiumAdaptive": True}})
         if persist:

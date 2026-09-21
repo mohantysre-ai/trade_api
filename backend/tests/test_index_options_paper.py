@@ -52,12 +52,14 @@ def test_eligible_contract_auto_locks_one_lot_with_fixed_20_40_risk(tmp_path, mo
     assert position["riskModel"] == "FIXED_OPTION_PREMIUM_POINTS_1_TO_2"
     assert position["markIntervalSeconds"] == 60
     assert position["minuteMarks"] == [{"at": now.isoformat(), "premium": 100.0, "pnl": 0.0, "source": "ENTRY_LOCK"}]
-    assert entered["longPremiumRiskPolicy"] == {
-        "markIntervalSeconds": 60,
-        "stopPoints": 20.0,
-        "targetPoints": 40.0,
-        "riskReward": 2.0,
-    }
+    policy = entered["longPremiumRiskPolicy"]
+    assert policy["markIntervalSeconds"] == 60
+    assert policy["stopPoints"] == 20.0
+    assert policy["targetPoints"] == 40.0
+    assert policy["riskReward"] == 2.0
+    assert policy["stopPointsMax"] == 20.0
+    assert policy["targetPointsMax"] == 40.0
+    assert policy["lowPremiumAdaptive"] is True
 
 
 def test_price_does_not_reprice_before_one_minute_then_persists_minute_mark(tmp_path, monkeypatch):

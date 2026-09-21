@@ -9,6 +9,26 @@ def test_next_minute_boundary_is_wall_clock_aligned():
     assert sup._next_minute_boundary(now) == datetime(2026, 9, 1, 11, 8, 0, tzinfo=IST_ZONE)
 
 
+def test_next_minute_boundary_resets_second_and_microsecond():
+    now = datetime(2026, 9, 1, 11, 7, 43, 250000, tzinfo=IST_ZONE)
+    boundary = sup._next_minute_boundary(now)
+    assert boundary.second == 0
+    assert boundary.microsecond == 0
+    assert boundary == datetime(2026, 9, 1, 11, 8, tzinfo=IST_ZONE)
+
+
+def test_next_minute_boundary_preserves_timezone():
+    now = datetime(2026, 9, 1, 11, 7, 43, tzinfo=IST_ZONE)
+    boundary = sup._next_minute_boundary(now)
+    assert boundary.tzinfo == IST_ZONE
+    assert boundary.utcoffset() == now.utcoffset()
+
+
+def test_next_minute_boundary_rolls_over_hour_boundary():
+    now = datetime(2026, 9, 1, 11, 59, 30, tzinfo=IST_ZONE)
+    assert sup._next_minute_boundary(now) == datetime(2026, 9, 1, 12, 0, 0, tzinfo=IST_ZONE)
+
+
 def test_hunt_cycle_delegates_to_existing_live_radar(monkeypatch):
     observed = {}
 
