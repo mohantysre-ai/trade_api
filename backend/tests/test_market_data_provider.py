@@ -222,3 +222,16 @@ def test_nse_chart_disconnect_opens_circuit_and_suppresses_repeat_request(monkey
     assert provider._NSE_CANDLE_CIRCUIT_UNTIL > 0
     assert provider._nse_chart_get(params) is None
     assert len(calls) == 1
+
+
+def test_nse_quote_circuit_opens_and_failover_still_serves_quotes(monkeypatch):
+    provider._NSE_QUOTE_CIRCUIT_UNTIL = 0.0
+    def limited(_symbols):
+        provider._trip_nse_quote_circuit(60)
+        raise RuntimeError("NSE_QUOTE_HTTP_429")
+    monkeypatch.setattr(provider, "fetch_nse500_quotes", limited)
+    monkeypatch.setattr(provider, "fetch_dhan_bulk_quotes", lambda symbols: {s: {"ltp": 100, "quoteProvider": "dhan_scanx"} for s in symbols})
+    quotes, coverage = provider.fetch_quotes_with_failover(["AAA", "BBB"], lambda _symbols: {})
+    assert set(quotes) == {"AAA", "BBB"}
+    assert coverage.providers["dhan"] == 2
+    assert provider._NSE_QUOTE_CIRCUIT_UNTIL > 0

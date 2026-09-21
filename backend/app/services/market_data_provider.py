@@ -51,6 +51,7 @@ NSE_OPTION_CHAIN_URL = os.getenv(
 )
 NSE_CANDLE_MIN_INTERVAL_SECONDS = float(os.getenv("NSE_CANDLE_MIN_INTERVAL_SECONDS", "0.15"))
 NSE_CANDLE_CIRCUIT_SECONDS = float(os.getenv("NSE_CANDLE_CIRCUIT_SECONDS", "60"))
+NSE_QUOTE_CIRCUIT_SECONDS = float(os.getenv("NSE_QUOTE_CIRCUIT_SECONDS", "60"))
 MARKET_DATA_MIN_COVERAGE_PCT = float(os.getenv("MARKET_DATA_MIN_COVERAGE_PCT", "99"))
 _IST_ZONE = ZoneInfo("Asia/Kolkata")
 
@@ -63,6 +64,8 @@ _NSE_CHART_LOCK = threading.Lock()
 _NSE_CHART_SESSION: requests.Session | None = None
 _NSE_CHART_LAST_CALL = 0.0
 _NSE_CANDLE_CIRCUIT_UNTIL = 0.0
+_NSE_QUOTE_CIRCUIT_UNTIL = 0.0
+_NSE_QUOTE_CIRCUIT_LOCK = threading.Lock()
 _NSE_CHART_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Referer": f"{NSE_CHARTING_BASE_URL.rstrip('/')}/",
@@ -370,8 +373,22 @@ def _dhan_quote_to_canonical(raw: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _nse_quote_calls_allowed() -> bool:
+    return time.monotonic() >= _NSE_QUOTE_CIRCUIT_UNTIL
+
+
+def _trip_nse_quote_circuit(seconds: float | None = None) -> None:
+    global _NSE_QUOTE_CIRCUIT_UNTIL
+    hold = NSE_QUOTE_CIRCUIT_SECONDS if seconds is None else float(seconds)
+    with _NSE_QUOTE_CIRCUIT_LOCK:
+        _NSE_QUOTE_CIRCUIT_UNTIL = max(_NSE_QUOTE_CIRCUIT_UNTIL, time.monotonic() + max(1.0, hold))
+    log.warning("NSE equity quote circuit open for %.0fs; using fallback providers", hold)
+
+
 def fetch_nse500_quotes(symbols: Iterable[str]) -> dict[str, dict[str, Any]]:
     """Fetch the official NSE Nifty 500 snapshot used by the heat map."""
+    if not _nse_quote_calls_allowed():
+        raise RuntimeError("NSE_QUOTE_CIRCUIT_OPEN")
     wanted = {_norm(symbol) for symbol in symbols if _norm(symbol)}
     headers = {
         "Accept": "application/json, text/plain, */*",
@@ -382,12 +399,19 @@ def fetch_nse500_quotes(symbols: Iterable[str]) -> dict[str, dict[str, Any]]:
         ),
     }
     session = requests.Session()
-    session.get("https://www.nseindia.com/", headers=headers, timeout=(5, 15))
-    response = session.get(
-        NSE_EQUITY_STOCK_INDICES_URL, headers=headers, timeout=(10, 30)
-    )
-    response.raise_for_status()
-    payload = response.json()
+    try:
+        session.get("https://www.nseindia.com/", headers=headers, timeout=(4, 10))
+        response = session.get(NSE_EQUITY_STOCK_INDICES_URL, headers=headers, timeout=(4, 10))
+        if response.status_code in {401, 403, 429, 503}:
+            _trip_nse_quote_circuit()
+            raise RuntimeError(f"NSE_QUOTE_HTTP_{response.status_code}")
+        response.raise_for_status()
+        payload = response.json()
+    except requests.RequestException:
+        _trip_nse_quote_circuit()
+        raise
+    finally:
+        session.close()
     rows = payload.get("data", []) if isinstance(payload, dict) else []
     out: dict[str, dict[str, Any]] = {}
     for raw in rows if isinstance(rows, list) else []:
