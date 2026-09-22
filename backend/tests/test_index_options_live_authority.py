@@ -5,7 +5,7 @@ from app.services.index_options_live_authority import _rebalance_radar
 from app.services.index_options_paper import reconcile_paper_book
 
 
-def _buy(key="NIFTY", bucket="BROAD", score=80.0, premium=10.0):
+def _buy(key="NIFTY", bucket="BROAD", score=80.0, premium=100.0):
     contract = {"symbol": f"{key}TESTCE", "ltp": premium, "lotSize": 25, "token": "101", "exchange": "NFO"}
     return {"key": key, "bucket": bucket, "direction": "CALL", "state": "ELIGIBLE", "eligible": True,
             "score": score, "strategyMode": "BUY_PREMIUM", "strategyType": "LONG_CALL",

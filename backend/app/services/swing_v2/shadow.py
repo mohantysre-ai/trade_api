@@ -296,9 +296,19 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
     funnel["qualified"] = funnel["qualified_out"]
     if persist_events:
         ledger = SwingLedger(cfg.ledger_path); selected_ids = {row["decisionId"] for row in selected}; selected_by_id = {row["decisionId"]: row for row in selected}
+        already_locked_symbols = {
+            str(event.get("symbol") or "").upper()
+            for event in ledger.events(session_date=session_date)
+            if str(event.get("eventType") or "") == str(EventType.POSITION_LOCKED)
+        }
         for row in qualified:
-            event_type = EventType.POSITION_LOCKED if row["decisionId"] in selected_ids else EventType.CANDIDATE_QUALIFIED; event_payload = selected_by_id.get(row["decisionId"], row)
+            wants_lock = row["decisionId"] in selected_ids
+            if wants_lock and row["symbol"].upper() in already_locked_symbols:
+                continue
+            event_type = EventType.POSITION_LOCKED if wants_lock else EventType.CANDIDATE_QUALIFIED; event_payload = selected_by_id.get(row["decisionId"], row)
             ledger.append(idempotency_key=f"{row['decisionId']}:{event_type}", decision_id=row["decisionId"], position_id=row["decisionId"] if event_type == EventType.POSITION_LOCKED else None, symbol=row["symbol"], session_date=session_date, event_type=event_type, event_timestamp=now.isoformat(), payload=event_payload)
+            if event_type == EventType.POSITION_LOCKED:
+                already_locked_symbols.add(row["symbol"].upper())
         for index, row in enumerate(rejected):
             symbol = row.get("symbol") or f"UNKNOWN_{index}"; decision_id = _decision_id(snapshot_id, session_date, symbol)
             ledger.append(idempotency_key=f"{decision_id}:{EventType.CANDIDATE_REJECTED}", decision_id=decision_id, symbol=symbol, session_date=session_date, event_type=EventType.CANDIDATE_REJECTED, event_timestamp=now.isoformat(), payload=row)

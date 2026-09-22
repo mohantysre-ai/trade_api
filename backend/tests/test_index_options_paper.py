@@ -141,13 +141,17 @@ def test_cross_book_owner_blocks_new_paper_entry(tmp_path, monkeypatch):
     assert radar["selected"][0]["ownershipBlockedBy"] == "SWING"
 
 
-def test_premium_too_low_for_true_20_point_stop_is_not_locked(tmp_path, monkeypatch):
+def test_low_premium_uses_positive_adaptive_one_to_two_stop(tmp_path, monkeypatch):
     monkeypatch.setenv("INDEX_OPTIONS_PAPER_BOOK_FILE", str(tmp_path / "paper.json"))
     row = _candidate(mark=20.0)
     book = reconcile_paper_book({"candidates": [row], "selected": [row]},
                                 now=datetime(2026, 8, 24, 11, 0, tzinfo=IST_ZONE))
-    assert book["open"] == []
-    assert book["entryCount"] == 0
+    assert book["entryCount"] == 1
+    position = book["open"][0]
+    assert position["initialStopPremium"] == 10.0
+    assert position["stopDistancePoints"] == 10.0
+    assert position["targetDistancePoints"] == 20.0
+    assert position["riskRewardRatio"] == 2.0
 
 
 def test_missing_exchange_lot_never_fabricates_quantity(tmp_path, monkeypatch):

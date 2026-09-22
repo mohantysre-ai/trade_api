@@ -542,10 +542,12 @@ def _new_position(
         premium, pricing = ask, "ANGEL_WEBSOCKET_ASK"
     else:
         premium, pricing = _float(contract.get("ltp")), "LOCKED_CONTRACT_LTP"
-    if not premium or premium <= LONG_PREMIUM_STOP_POINTS or not lot or lot < 1:
+    if not premium or premium <= 0 or not lot or lot < 1:
         return None
-    stop = premium - LONG_PREMIUM_STOP_POINTS
-    target = premium + LONG_PREMIUM_TARGET_POINTS
+    distance = min(LONG_PREMIUM_STOP_POINTS, max(0.5, premium * 0.50))
+    target_distance = distance * LONG_PREMIUM_RISK_REWARD
+    stop = premium - distance
+    target = premium + target_distance
     return {
         "id": f"{now.astimezone(IST_ZONE).date().isoformat()}-{sequence:02d}-{row['key']}",
         "index": row["key"], "bucket": row["bucket"], "direction": row["direction"],
@@ -559,8 +561,8 @@ def _new_position(
         "status": "OPEN", "enteredAt": now.isoformat(), "updatedAt": now.isoformat(), "markedAt": now.isoformat(),
         "nextMarkDueAt": datetime.fromtimestamp(now.timestamp() + LONG_PREMIUM_MARK_INTERVAL_SECONDS, tz=now.tzinfo).isoformat(),
         "unrealizedPnl": 0.0, "source": row.get("dataSource"), "execution": "PAPER_ONLY",
-        "riskModel": "FIXED_OPTION_PREMIUM_POINTS_1_TO_2", "markIntervalSeconds": LONG_PREMIUM_MARK_INTERVAL_SECONDS,
-        "stopDistancePoints": LONG_PREMIUM_STOP_POINTS, "targetDistancePoints": LONG_PREMIUM_TARGET_POINTS,
+        "riskModel": "ADAPTIVE_OPTION_PREMIUM_POINTS_1_TO_2", "markIntervalSeconds": LONG_PREMIUM_MARK_INTERVAL_SECONDS,
+        "stopDistancePoints": round(distance, 2), "targetDistancePoints": round(target_distance, 2),
         "riskRewardRatio": LONG_PREMIUM_RISK_REWARD,
         "entryPricingSource": pricing,
         "entryBid": round(bid, 2) if bid is not None else None,
@@ -744,7 +746,18 @@ def _select_sleeve_entries(
             continue
         position = _new_position(row, clock, 1, depth=depth)
         if position is None:
-            row["entryBlockedBy"] = "POSITION_CONSTRUCTION_FAILED"
+            if sleeve == BUY_SLEEVE:
+                contract = row.get("contract") if isinstance(row.get("contract"), dict) else {}
+                premium = _float(contract.get("ltp"))
+                lot = _float(contract.get("lotSize"))
+                if premium is None or premium <= 0:
+                    row["entryBlockedBy"] = "BUY_PREMIUM_INVALID_PRICE"
+                elif lot is None or lot < 1:
+                    row["entryBlockedBy"] = "BUY_PREMIUM_INVALID_LOT"
+                else:
+                    row["entryBlockedBy"] = "POSITION_CONSTRUCTION_FAILED"
+            else:
+                row["entryBlockedBy"] = "SELLER_CONSTRUCTION_OR_RISK_INVALID"
             continue
         entries.append((row, position))
         used_indexes.add(index)
@@ -866,6 +879,7 @@ def reconcile_paper_book(
     session = clock.date().isoformat()
     with _PAPER_LOCK:
         book = _load_book(session)
+        book.setdefault("entryAudit", [])
         buy_candidates = radar.get("candidates") if isinstance(radar.get("candidates"), list) else []
         seller_candidates = radar.get("sellerCandidates") if isinstance(radar.get("sellerCandidates"), list) else []
         candidates = [*buy_candidates, *seller_candidates]
@@ -963,6 +977,14 @@ def reconcile_paper_book(
                     book, sleeve_locks[sleeve],
                     session=session, clock=clock, depth=entry_depth,
                 )
+            for row in radar_rows:
+                reason = row.get("entryBlockedBy") or row.get("ownershipBlockedBy")
+                if reason:
+                    book["entryAudit"].append({
+                        "at": clock.isoformat(), "index": row.get("key"), "bucket": row.get("bucket"),
+                        "strategyMode": sleeve_of(row), "score": row.get("score"),
+                        "outcome": "REJECTED", "reason": str(reason),
+                    })
             # 2. Only now are the portfolio limits applied, round-robin across
             #    sleeves so one sleeve's second pick cannot starve the other
             #    sleeve's first pick.
@@ -987,7 +1009,13 @@ def reconcile_paper_book(
                 book["entryCount"] += 1
                 sleeve_locks[sleeve]["indexes"].add(str(row.get("key")))
                 sleeve_locks[sleeve]["buckets"].add(str(row.get("bucket")))
+                book["entryAudit"].append({
+                    "at": clock.isoformat(), "index": row.get("key"), "bucket": row.get("bucket"),
+                    "strategyMode": sleeve, "score": row.get("score"),
+                    "outcome": "LOCKED", "reason": "LOCKED", "positionId": position.get("id"),
+                })
 
+        book["entryAudit"] = book["entryAudit"][-200:]
         subscriptions = _sync_position_subscriptions(client, book["open"], closed_now)
 
         open_pnl = round(sum(float(row.get("unrealizedPnl") or 0) for row in book["open"]), 2)
