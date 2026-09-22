@@ -655,6 +655,12 @@ export default function ForensicPanel({
       eodQualified?: number;
       diagnosticPhase?: string;
       universeSize?: number | null;
+      featureRows?: number;
+      historyReadyRows?: number;
+      shortMomentumReadyRows?: number;
+      historyReadyRatio?: number;
+      universeCoverage?: number;
+      regime?: string | null;
       volumeScreened?: number;
       candleMetrics?: number;
       candleTimeframe?: string;
@@ -1700,12 +1706,25 @@ export default function ForensicPanel({
         })}
         {!portfolioDisplayRows.length && (huntingSwing || waitingSwingDecision || cashHeldSwing) && (
           <div className="col-span-full space-y-3 py-2">
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2">
               {[
-                ['Universe', swingSession?.entryHuntDiagnostics?.universeSize ?? '—'],
-                ['Target universe', swingSession?.entryHuntDiagnostics?.swingUniverse ?? 'Nifty 500'],
-                ['Candles', swingSession?.entryHuntDiagnostics?.candleMetrics ?? '—'],
-                ['Evaluated', swingSession?.entryHuntDiagnostics?.evaluated ?? '—'],
+                ['Swing Universe', swingSession?.entryHuntDiagnostics?.universeSize ?? '—'],
+                ['Feature Rows', swingSession?.entryHuntDiagnostics?.featureRows ?? '—'],
+                ['History Ready Rows', swingSession?.entryHuntDiagnostics?.historyReadyRows ?? '—'],
+                ['Short-Momentum Ready Rows', swingSession?.entryHuntDiagnostics?.shortMomentumReadyRows ?? '—'],
+                [
+                  'History Ready Ratio',
+                  typeof swingSession?.entryHuntDiagnostics?.historyReadyRatio === 'number'
+                    ? `${(swingSession.entryHuntDiagnostics.historyReadyRatio * 100).toFixed(1)}%`
+                    : '—',
+                ],
+                [
+                  'Universe Coverage',
+                  typeof swingSession?.entryHuntDiagnostics?.universeCoverage === 'number'
+                    ? `${(swingSession.entryHuntDiagnostics.universeCoverage * 100).toFixed(1)}%`
+                    : '—',
+                ],
+                ['Regime', swingSession?.entryHuntDiagnostics?.regime || '—'],
                 [swingSession?.entryHuntDiagnostics?.diagnosticPhase === 'POST_HUNT_EOD' ? 'Locked in window' : 'Qualified BUY', swingSession?.entryHuntDiagnostics?.qualified ?? 0],
               ].map(([label, value]) => (
                 <div key={String(label)} className="rounded-lg border border-slate-200 bg-white/80 px-3 py-2">

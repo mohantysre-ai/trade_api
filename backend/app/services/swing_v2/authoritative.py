@@ -67,12 +67,22 @@ def _entry_hunt_diagnostics(scan,snapshot):
  f=(scan or {}).get("funnel")
  if not isinstance(f,dict): return f
  stocks=snapshot.get("stocks") if isinstance(snapshot.get("stocks"),list) else []
- try: us=int(snapshot.get("swingV2UniverseSize") or snapshot.get("universeSize") or 0)
- except: us=0
- try: vs=int(snapshot.get("swingV2DataStatus",{}).get("featureRows") or snapshot.get("volumeScreenedCount") or 0)
- except: vs=0
- f={**f,"evaluated":f.get("evaluated",f.get("evaluated_count",f.get("universe"))),"qualified":f.get("qualified",f.get("qualified_out",(scan or {}).get("qualifiedCount",0))),"candleMetrics":f.get("candleMetrics",f.get("fresh_count",f.get("freshData",0))),"candleTimeframe":f.get("candleTimeframe","1H")}
- return {**f,"universeSize":us or None,"volumeScreened":vs or us or None,"evaluated":f.get("evaluated",f.get("universe")),"displayPool":len(stocks) if stocks else None,"swingUniverse":"Total Market 750","corePriorityUniverse":"Top 500 by liquidity","microcapPolicy":"SATELLITE · 20% priority · max 1 position","candleTimeframe":"1H"}
+ status=snapshot.get("swingV2DataStatus")
+ status=status if isinstance(status,dict) else {}
+ try: universe_size=int(snapshot.get("swingV2UniverseSize") or 0)
+ except (TypeError,ValueError): universe_size=0
+ try: feature_rows=int(status.get("featureRows") or 0)
+ except (TypeError,ValueError): feature_rows=0
+ try: history_ready_rows=int(status.get("historyReadyRows") or 0)
+ except (TypeError,ValueError): history_ready_rows=0
+ try: short_momentum_ready_rows=int(status.get("shortMomentumReadyRows") or 0)
+ except (TypeError,ValueError): short_momentum_ready_rows=0
+ try: universe_coverage=float(snapshot.get("swingV2UniverseCoverage") or 0.0)
+ except (TypeError,ValueError): universe_coverage=0.0
+ history_ready_ratio=(history_ready_rows/feature_rows) if feature_rows>0 else 0.0
+ regime=str(snapshot.get("swingV2Regime") or "")
+ f={**f,"evaluated":f.get("evaluated",f.get("evaluated_count",feature_rows or f.get("universe"))),"qualified":f.get("qualified",f.get("qualified_out",(scan or {}).get("qualifiedCount",0))),"candleMetrics":f.get("candleMetrics",f.get("fresh_count",f.get("freshData",short_momentum_ready_rows))),"candleTimeframe":f.get("candleTimeframe","1H")}
+ return {**f,"universeSize":universe_size or None,"featureRows":feature_rows,"historyReadyRows":history_ready_rows,"shortMomentumReadyRows":short_momentum_ready_rows,"historyReadyRatio":round(history_ready_ratio,4),"universeCoverage":round(universe_coverage,4),"regime":regime or None,"volumeScreened":feature_rows or universe_size or None,"evaluated":f.get("evaluated",feature_rows or f.get("universe")),"displayPool":len(stocks) if stocks else None,"swingUniverse":"Total Market 750","corePriorityUniverse":"Top 500 by liquidity","microcapPolicy":"SATELLITE · 20% priority · max 1 position","candleTimeframe":"1H"}
 def _session(scan=None,*,now=None):
  cfg=load_config(); now=(now or datetime.now(timezone.utc)).astimezone(IST); day=now.date().isoformat(); ledger=SwingLedger(cfg.ledger_path); positions=_positions(ledger); snapshot=_snapshot(); marks=_marks(snapshot); active=[r for r in positions if r.get("positionId") and not r.get("terminal")]; closed=[]
  for r in positions:
