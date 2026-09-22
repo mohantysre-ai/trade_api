@@ -561,7 +561,7 @@ def _new_position(
         "status": "OPEN", "enteredAt": now.isoformat(), "updatedAt": now.isoformat(), "markedAt": now.isoformat(),
         "nextMarkDueAt": datetime.fromtimestamp(now.timestamp() + LONG_PREMIUM_MARK_INTERVAL_SECONDS, tz=now.tzinfo).isoformat(),
         "unrealizedPnl": 0.0, "source": row.get("dataSource"), "execution": "PAPER_ONLY",
-        "riskModel": "ADAPTIVE_OPTION_PREMIUM_POINTS_1_TO_2", "markIntervalSeconds": LONG_PREMIUM_MARK_INTERVAL_SECONDS,
+        "riskModel": ("FIXED_OPTION_PREMIUM_POINTS_1_TO_2" if distance >= LONG_PREMIUM_STOP_POINTS else "ADAPTIVE_OPTION_PREMIUM_POINTS_1_TO_2"), "markIntervalSeconds": LONG_PREMIUM_MARK_INTERVAL_SECONDS,
         "stopDistancePoints": round(distance, 2), "targetDistancePoints": round(target_distance, 2),
         "riskRewardRatio": LONG_PREMIUM_RISK_REWARD,
         "entryPricingSource": pricing,
