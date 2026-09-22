@@ -139,8 +139,18 @@ def _hydrate_locked_instruments(positions: list[dict[str, Any]], candidates: lis
         try:
             for raw in load_angel_scrip_master():
                 symbol = str(raw.get("symbol") or "")
-                if symbol and symbol not in by_symbol:
-                    by_symbol[symbol] = {"token": raw.get("token"), "exchange": raw.get("exch_seg")}
+                if not symbol:
+                    continue
+                master_entry = {"token": raw.get("token"), "exchange": raw.get("exch_seg")}
+                if symbol in by_symbol:
+                    existing = by_symbol[symbol]
+                    if not existing.get("token") or not existing.get("exchange"):
+                        if raw.get("token"):
+                            existing["token"] = raw.get("token")
+                        if raw.get("exch_seg"):
+                            existing["exchange"] = raw.get("exch_seg")
+                else:
+                    by_symbol[symbol] = master_entry
         except Exception:
             pass
     resolved = 0
