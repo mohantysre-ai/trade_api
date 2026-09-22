@@ -3612,11 +3612,28 @@ def _swing_v2_raw_metrics(
             return 0.0
         return statistics.pstdev(values) * math.sqrt(252)
 
-    def momentum(lookback: int, vol_window: int) -> float | None:
-        if len(closes) < lookback + 5:
+    def momentum(lookback: int, vol_window: int, *, skip_recent: int = 0) -> float | None:
+        """Volatility-adjusted close-to-close momentum.
+
+        Swing V2 holds for at most two sessions, so the production ranker uses
+        10d/20d momentum. Long-horizon fields remain diagnostic only and are
+        populated only when their full history exists.
+        """
+        required = lookback + skip_recent + 1
+        if len(closes) < required:
             return None
-        denominator = annualized_vol(vol_window)
-        return None if denominator <= 0 else (closes[-5] / closes[-lookback - 5] - 1) / denominator
+        end_index = len(closes) - 1 - skip_recent
+        start_index = end_index - lookback
+        if start_index < 0 or closes[start_index] <= 0:
+            return None
+        values = returns[-max(20, vol_window):]
+        if len(values) < min(20, vol_window):
+            return None
+        daily_vol = statistics.pstdev(values)
+        horizon_vol = daily_vol * math.sqrt(max(1, lookback))
+        if horizon_vol <= 0:
+            return None
+        return (closes[end_index] / closes[start_index] - 1) / horizon_vol
 
     ema20_values = _ema(closes, period=20)
     atr_pct = _atr_percent(previous)
@@ -3631,8 +3648,10 @@ def _swing_v2_raw_metrics(
         "dailyObservationCount": len(previous),
         "dailyBarsThroughPreviousClose": bool(previous),
         "historyReady": len(previous) >= min_observations,
+        "mom10dRaw": momentum(10, 20),
+        "mom20dRaw": momentum(20, 20),
         "mom6mRaw": momentum(126, 126),
-        "mom12mRaw": momentum(126, 126),
+        "mom12mRaw": momentum(252, 252),
         "return5dRaw": (closes[-1] / closes[-6] - 1) if len(closes) >= 6 and closes[-6] > 0 else None,
         "ema20Daily": ema20_values[-1] if ema20_values else None,
         "atr14": atr if atr > 0 else None,
@@ -3642,7 +3661,8 @@ def _swing_v2_raw_metrics(
         "intradayLow": min(intraday_lows) if intraday_lows else None,
         "last5mTimestamp": last_ts,
         "last1hTimestamp": last_ts,
-        "previous52wHigh": max((float(row.get("high") or 0) for row in previous[-max(min_observations, 90):]), default=0.0) or None,
+        "recent30dHigh": max((float(row.get("high") or 0) for row in previous[-30:]), default=0.0) or None,
+        "previous52wHigh": max((float(row.get("high") or 0) for row in previous[-252:]), default=0.0) if len(previous) >= 126 else None,
     }
 
 
@@ -4662,7 +4682,7 @@ def _build_payload_from_live_data(
             force_angel_fallback=angel_first_quotes,
             interval="ONE_HOUR" if angel_first_quotes else "FIVE_MINUTE",
             timeframe="1h" if angel_first_quotes else "5m",
-            daily_lookback_days=int(os.getenv("SWING_HISTORY_LOOKBACK_DAYS", "180")) if swing_v2_history else 45,
+            daily_lookback_days=int(os.getenv("SWING_HISTORY_LOOKBACK_DAYS", "60")) if swing_v2_history else 45,
         )
         for ticker, metrics in fetched_metrics.items():
             original = row_by_ticker.get(ticker)

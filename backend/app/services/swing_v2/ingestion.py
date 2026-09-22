@@ -240,7 +240,9 @@ def enrich_v2_market_snapshot(payload: dict[str, Any], all_stocks: list[dict[str
             candidates = [value for value in (vwap, prior_high - 0.25 * atr if prior_high else None) if value and value < price]
             structure_stop = max(candidates) if candidates else price - atr
         risk_distance = max(price - structure_stop, 0.8 * atr) if structure_stop and atr else None
-        next_high = _number(raw.get("previous52wHigh"))
+        # A two-session book should use nearby resistance, not a pseudo-52w
+        # level built from an incomplete provider history.
+        next_high = _number(raw.get("recent30dHigh")) or _number(raw.get("prior20dHigh"))
         capacity = max(1.5, (next_high - price) / risk_distance) if next_high and risk_distance and next_high > price else (1.5 if risk_distance else 0.0)
         upper, lower = _number(row.get("upperCircuit")), _number(row.get("lowerCircuit"))
         last3 = raw.get("last3Closes") if isinstance(raw.get("last3Closes"), list) else []
@@ -287,7 +289,23 @@ def enrich_v2_market_snapshot(payload: dict[str, Any], all_stocks: list[dict[str
     for row in prepared:
         sector_value = sector_medians.get(str(row.get("sector") or "UNKNOWN"))
         return5 = _number(row.get("return5dRaw"))
-        row["trendPriorRaw"] = statistics.mean([value for value in (_number(row.get("mom6mRaw")), _number(row.get("mom12mRaw"))) if value is not None]) if any(value is not None for value in (_number(row.get("mom6mRaw")), _number(row.get("mom12mRaw"))) ) else None
+        mom10 = _number(row.get("mom10dRaw"))
+        mom20 = _number(row.get("mom20dRaw"))
+        # Short-horizon trend prior for a max-two-session holding period:
+        # 20d carries the structural trend, 10d adds recency without letting
+        # one or two noisy sessions dominate the cross-sectional rank.
+        if mom10 is not None and mom20 is not None:
+            row["trendPriorRaw"] = 0.35 * mom10 + 0.65 * mom20
+            row["trendModel"] = "VOL_ADJ_10D_20D_35_65"
+        elif mom20 is not None:
+            row["trendPriorRaw"] = mom20
+            row["trendModel"] = "VOL_ADJ_20D_ONLY"
+        elif mom10 is not None:
+            row["trendPriorRaw"] = mom10
+            row["trendModel"] = "VOL_ADJ_10D_ONLY"
+        else:
+            row["trendPriorRaw"] = None
+            row["trendModel"] = "UNRATED_SHORT_HISTORY"
         row["residualStrengthRaw"] = return5 - sector_value if return5 is not None and sector_value is not None else None
         row["sectorStrengthRaw"] = sector_value
     factor_map = {
@@ -318,8 +336,15 @@ def enrich_v2_market_snapshot(payload: dict[str, Any], all_stocks: list[dict[str
             "corporateEventsCurrent": corporate_current,
             "featureRows": len(prepared),
             "historyReadyRows": sum(
-                1 for row in prepared if int(row.get("dailyObservationCount") or 0) >= cfg.min_daily_observations
+                1 for row in prepared
+                if int(row.get("dailyObservationCount") or 0) >= cfg.min_daily_observations
+                and _number(row.get("mom20dRaw")) is not None
             ),
+            "shortMomentumReadyRows": sum(
+                1 for row in prepared
+                if _number(row.get("mom10dRaw")) is not None and _number(row.get("mom20dRaw")) is not None
+            ),
+            "trendModel": "VOL_ADJ_10D_20D_35_65",
             "errors": [value for value in (universe_error, surveillance_error, corporate_error) if value],
         },
     })

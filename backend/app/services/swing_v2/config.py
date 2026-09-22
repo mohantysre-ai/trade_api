@@ -25,8 +25,8 @@ class SwingV2Config:
     mode: str = "PAPER"
     authority: str = "V2"
     strategy_id: str = "SWING_2S_MOMENTUM_V2"
-    policy_version: str = "2.3.0"
-    feature_version: str = "swing_features_v2"
+    policy_version: str = "2.4.0"
+    feature_version: str = "swing_features_v2_short_horizon"
     universe: str = "NIFTY_TOTAL_MARKET_750"
     active_segments: tuple[str, ...] = ("NIFTY100", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP250", "NIFTY_MICROCAP250")
     microcap_mode: str = "SATELLITE"
@@ -81,7 +81,7 @@ class SwingV2Config:
     decision_freeze_ist: str = "15:10"
     order_expire_ist: str = "15:20"
     mandatory_exit_ist: str = "15:15"
-    history_lookback_days: int = 180
+    history_lookback_days: int = 60
     min_daily_observations: int = 30
     ledger_path: str = ""
     live_promotion: bool = False
@@ -107,7 +107,7 @@ class SwingV2Config:
         if not 0 < self.coverage_defensive_threshold < self.coverage_degraded_threshold < self.coverage_normal_threshold <= 1: raise ValueError("coverage thresholds must satisfy 0 < defensive < degraded < normal <= 1")
         if not 0 < self.coverage_defensive_risk_multiplier <= self.coverage_degraded_risk_multiplier <= self.coverage_normal_risk_multiplier <= 1: raise ValueError("coverage risk multipliers must be in (0,1] and monotonic")
         if self.coverage_hysteresis_cycles < 1: raise ValueError("SWING_COVERAGE_HYSTERESIS_CYCLES must be >= 1")
-        if self.history_lookback_days < 90: raise ValueError("SWING_HISTORY_LOOKBACK_DAYS must be >= 90")
+        if self.history_lookback_days < 30: raise ValueError("SWING_HISTORY_LOOKBACK_DAYS must be >= 30")
         if self.min_daily_observations < 30: raise ValueError("SWING_MIN_DAILY_OBSERVATIONS must be >= 30")
         if self.min_daily_observations > self.history_lookback_days: raise ValueError("SWING_MIN_DAILY_OBSERVATIONS must not exceed SWING_HISTORY_LOOKBACK_DAYS")
         if not 0 < self.max_name_notional_pct <= 20: raise ValueError("single-name notional may not exceed 20% NAV")
@@ -145,7 +145,7 @@ def load_config() -> SwingV2Config:
         coverage_normal_threshold=float(os.getenv("SWING_COVERAGE_NORMAL_THRESHOLD", "0.99")), coverage_degraded_threshold=float(os.getenv("SWING_COVERAGE_DEGRADED_THRESHOLD", "0.95")), coverage_defensive_threshold=float(os.getenv("SWING_COVERAGE_DEFENSIVE_THRESHOLD", "0.90")),
         coverage_normal_risk_multiplier=float(os.getenv("SWING_COVERAGE_NORMAL_RISK_MULTIPLIER", "1.00")), coverage_degraded_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEGRADED_RISK_MULTIPLIER", "0.75")), coverage_defensive_risk_multiplier=float(os.getenv("SWING_COVERAGE_DEFENSIVE_RISK_MULTIPLIER", "0.50")), coverage_hysteresis_cycles=int(os.getenv("SWING_COVERAGE_HYSTERESIS_CYCLES", "3")), coverage_tiers_authoritative=_bool("SWING_COVERAGE_TIERS_AUTHORITATIVE", True),
         entry_cutoff_ist=os.getenv("SWING_ENTRY_CUTOFF_IST", "15:15"), decision_start_ist=os.getenv("SWING_DECISION_START_IST", "09:45"), decision_freeze_ist=os.getenv("SWING_DECISION_FREEZE_IST", "15:10"), order_expire_ist=os.getenv("SWING_ORDER_EXPIRE_IST", "15:20"), mandatory_exit_ist=os.getenv("SWING_MANDATORY_EXIT_IST", "15:15"),
-        history_lookback_days=int(os.getenv("SWING_HISTORY_LOOKBACK_DAYS", "180")), min_daily_observations=int(os.getenv("SWING_MIN_DAILY_OBSERVATIONS", "90")),
+        history_lookback_days=int(os.getenv("SWING_HISTORY_LOOKBACK_DAYS", "60")), min_daily_observations=int(os.getenv("SWING_MIN_DAILY_OBSERVATIONS", "30")),
         ledger_path=os.getenv("SWING_V2_LEDGER_PATH", str(repo_root / "backend" / "app" / "data" / "swing_v2_ledger.sqlite3")), live_promotion=_bool("SWING_LIVE_PROMOTION", False),
     )
     c.validate(); return c
