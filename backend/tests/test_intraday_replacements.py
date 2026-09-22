@@ -631,6 +631,10 @@ def test_maybe_refresh_does_not_stamp_gap_on_exception(monkeypatch):
 
 def test_maybe_refresh_stamps_gap_only_after_success(monkeypatch):
     eng._SNAP_REFRESH_LAST = 0.0
+    from app.services import angel_one_feed
+    monkeypatch.setitem(angel_one_feed._SCHEDULED_REFRESH_STATE, "running", False)
+    monkeypatch.setitem(angel_one_feed._SCHEDULED_REFRESH_STATE, "reason", None)
+    monkeypatch.setitem(angel_one_feed._SCHEDULED_REFRESH_STATE, "startedAt", None)
     monkeypatch.setattr("app.services.trade_outcome._is_market_open", lambda: True)
     monkeypatch.setattr(eng, "load_market_snapshot", _stale_snap)
     monkeypatch.setattr(
