@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import pytest
+
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from app.services import swing_session
 
+
+
+@pytest.fixture(autouse=True)
+def _legacy_swing_authority(monkeypatch):
+    monkeypatch.setenv("SWING_STRATEGY_AUTHORITY", "V1")
 
 def qualified_row(symbol: str = "VALID", **overrides) -> dict:
     intraday = {

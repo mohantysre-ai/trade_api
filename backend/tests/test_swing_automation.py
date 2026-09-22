@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from pathlib import Path
 from datetime import datetime, timezone
 from time import monotonic
@@ -7,6 +9,11 @@ from time import monotonic
 from app.services import swing_session
 from app.services.exit_plan import attach_exit_plan
 
+
+
+@pytest.fixture(autouse=True)
+def _legacy_swing_authority(monkeypatch):
+    monkeypatch.setenv("SWING_STRATEGY_AUTHORITY", "V1")
 
 def _qualified_locked_row(symbol: str = "VALID") -> dict:
     row = {

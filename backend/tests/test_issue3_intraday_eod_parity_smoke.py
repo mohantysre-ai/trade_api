@@ -142,6 +142,7 @@ def _multileg_candidate():
         "spot": 25000,
         "atmIv": 14.0,
         "snapshotId": "smoke-1",
+        "quantAuthority": "INDEX_OPTIONS_QUANT_V2",
     }
 
 

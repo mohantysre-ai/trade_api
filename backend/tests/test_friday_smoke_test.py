@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 import pytest
 
@@ -38,6 +38,28 @@ def load_friday_timelines() -> dict[str, list[dict]]:
                 timelines[symbol] = candles
             except Exception:
                 continue
+    if timelines:
+        return timelines
+
+    # CI does not ship archived production timeline files. Reconstruct a
+    # deterministic 60-name x 75-bucket fixture so the replay mechanics remain
+    # tested instead of depending on workstation-only data.
+    start = datetime(2026, 9, 11, 9, 15, tzinfo=IST)
+    for symbol_index, symbol in enumerate(["HDFCBANK"] + [f"SMOKE{i:02d}" for i in range(59)]):
+        base = 684.0 if symbol == "HDFCBANK" else 100.0 + symbol_index
+        bars = []
+        for index in range(75):
+            stamp = start + timedelta(minutes=5 * index)
+            close = base + 0.02 * index
+            bars.append({
+                "ts": stamp.isoformat(),
+                "open": round(close - 0.10, 2),
+                "high": round(close + 0.35, 2),
+                "low": round(close - 0.35, 2),
+                "close": round(close, 2),
+                "volume": 100000 + index * 100,
+            })
+        timelines[symbol] = bars
     return timelines
 
 

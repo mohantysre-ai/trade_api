@@ -1,3 +1,4 @@
+import pytest
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from threading import Event
@@ -8,6 +9,11 @@ from app.services import intraday_session_engine as intraday
 from app.services import swing_session
 from app.services import trade_outcome
 
+
+
+@pytest.fixture(autouse=True)
+def _legacy_swing_authority(monkeypatch):
+    monkeypatch.setenv("SWING_STRATEGY_AUTHORITY", "V1")
 
 def _wait_until(predicate, timeout=1.0):
     deadline = time.monotonic() + timeout
