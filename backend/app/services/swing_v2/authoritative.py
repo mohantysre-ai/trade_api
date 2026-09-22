@@ -67,9 +67,9 @@ def _entry_hunt_diagnostics(scan,snapshot):
  f=(scan or {}).get("funnel")
  if not isinstance(f,dict): return f
  stocks=snapshot.get("stocks") if isinstance(snapshot.get("stocks"),list) else []
- try: us=int(snapshot.get("universeSize") or 0)
+ try: us=int(snapshot.get("swingV2UniverseSize") or snapshot.get("universeSize") or 0)
  except: us=0
- try: vs=int(snapshot.get("volumeScreenedCount") or 0)
+ try: vs=int(snapshot.get("swingV2DataStatus",{}).get("featureRows") or snapshot.get("volumeScreenedCount") or 0)
  except: vs=0
  f={**f,"evaluated":f.get("evaluated",f.get("evaluated_count",f.get("universe"))),"qualified":f.get("qualified",f.get("qualified_out",(scan or {}).get("qualifiedCount",0))),"candleMetrics":f.get("candleMetrics",f.get("fresh_count",f.get("freshData",0))),"candleTimeframe":f.get("candleTimeframe","1H")}
  return {**f,"universeSize":us or None,"volumeScreened":vs or us or None,"evaluated":f.get("evaluated",f.get("universe")),"displayPool":len(stocks) if stocks else None,"swingUniverse":"Total Market 750","corePriorityUniverse":"Top 500 by liquidity","microcapPolicy":"SATELLITE · 20% priority · max 1 position","candleTimeframe":"1H"}
@@ -96,15 +96,59 @@ def _refresh_snapshot(reason,*,deadline=None):
  if not isinstance(result,dict) or result.get("success") is not True:
   snapshot=dict(snapshot); snapshot["swingV2RefreshError"]=result.get("error") if isinstance(result,dict) else "unknown_refresh_failure"
  return snapshot
-def _v2_snapshot_ready(snapshot,cfg):
+def _v2_readiness(snapshot,cfg):
  status=snapshot.get("swingV2DataStatus")
- feature_rows=int(status.get("featureRows") or 0) if isinstance(status,dict) else 0
- history_ready=int(status.get("historyReadyRows") or 0) if isinstance(status,dict) else 0
+ status=status if isinstance(status,dict) else {}
+ feature_rows=int(status.get("featureRows") or 0)
+ history_ready=int(status.get("historyReadyRows") or 0)
+ short_ready=int(status.get("shortMomentumReadyRows") or 0)
  coverage=float(snapshot.get("swingV2UniverseCoverage") or 0.0)
  regime=str(snapshot.get("swingV2Regime") or "")
- return bool(isinstance(status,dict) and feature_rows>0 and history_ready/feature_rows>=cfg.required_coverage and coverage>=cfg.required_coverage and status.get("universeCurrent") and status.get("surveillanceCurrent") and status.get("corporateEventsCurrent") and regime and regime!="REGIME_UNRATED")
+ history_ratio=(history_ready/feature_rows) if feature_rows>0 else 0.0
+ reasons=[]
+ if feature_rows<=0: reasons.append("NO_SWING_FEATURE_ROWS")
+ if feature_rows>0 and history_ratio<cfg.required_coverage:
+  reasons.append(f"HISTORY_READY_COVERAGE_{history_ratio:.3f}_BELOW_{cfg.required_coverage:.3f}")
+ if coverage<cfg.required_coverage:
+  reasons.append(f"UNIVERSE_QUOTE_COVERAGE_{coverage:.3f}_BELOW_{cfg.required_coverage:.3f}")
+ if status.get("universeCurrent") is not True: reasons.append("UNIVERSE_FEED_NOT_CURRENT")
+ if status.get("surveillanceCurrent") is not True: reasons.append("SURVEILLANCE_FEED_NOT_CURRENT")
+ if status.get("corporateEventsCurrent") is not True: reasons.append("CORPORATE_EVENTS_FEED_NOT_CURRENT")
+ if not regime or regime=="REGIME_UNRATED": reasons.append("REGIME_UNRATED")
+ return {
+  "ready":not reasons,
+  "reasons":reasons,
+  "featureRows":feature_rows,
+  "historyReadyRows":history_ready,
+  "shortMomentumReadyRows":short_ready,
+  "historyReadyRatio":round(history_ratio,4),
+  "requiredCoverage":cfg.required_coverage,
+  "universeCoverage":round(coverage,4),
+  "regime":regime,
+  "dataStatus":status,
+ }
+def _v2_snapshot_ready(snapshot,cfg):
+ return bool(_v2_readiness(snapshot,cfg)["ready"])
 def _scan_not_ready(snapshot,cfg):
- return {"enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,"blockReason":"SWING_V2_DATA_NOT_READY","candidates":[],"funnel":{"universe":snapshot.get("swingV2UniverseSize") or 0,"freshData":0,"topRejectionReasons":[{"reason":f"SWING_V2_DATA_NOT_READY_MIN_{cfg.min_daily_observations}_OBS","count":1}]},"dataStatus":snapshot.get("swingV2DataStatus") or {}}
+ readiness=_v2_readiness(snapshot,cfg)
+ status=readiness["dataStatus"]
+ feature_rows=readiness["featureRows"]
+ bars_count=int(status.get("shortMomentumReadyRows") or status.get("historyReadyRows") or 0)
+ reasons=readiness["reasons"] or [f"SWING_V2_DATA_NOT_READY_MIN_{cfg.min_daily_observations}_OBS"]
+ return {
+  "enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,
+  "blockReason":"SWING_V2_DATA_NOT_READY","candidates":[],
+  "funnel":{
+   "universe":snapshot.get("swingV2UniverseSize") or 0,
+   "evaluated":feature_rows,
+   "freshData":bars_count,
+   "candleMetrics":bars_count,
+   "qualified":0,
+   "topRejectionReasons":[{"reason":reason,"count":1} for reason in reasons[:6]],
+  },
+  "readiness":readiness,
+  "dataStatus":status,
+ }
 def _quote_observations(symbols,now):
  if not symbols:return {}
  try:
