@@ -272,8 +272,11 @@ def test_issue3_e2e_low_coverage_lock_multileg_options_and_full_parity(isolated_
     assert options_report["strategyEntryCount"] == 1
     strategy_row = options_report["strategyPositions"][0]
     assert strategy_row["strategy"] == "BULL_CALL_DEBIT_SPREAD"
-    assert options_report["strategyUnrealizedPnl"] == pytest.approx(800.0)
-    assert options_report["totalPnl"] == pytest.approx(60.0 + 800.0)
+    # The fixture supplies no post-entry option move, so the durable strategy
+    # position must remain at zero unrealized P&L; only the single-leg paper
+    # book contributes the Rs60 live total.
+    assert options_report["strategyUnrealizedPnl"] == pytest.approx(0.0)
+    assert options_report["totalPnl"] == pytest.approx(60.0)
 
 
 def test_issue3_parity_helper_detects_missing_and_extra_rows():

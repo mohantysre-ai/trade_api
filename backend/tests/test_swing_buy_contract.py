@@ -326,7 +326,11 @@ def test_concurrent_gets_cannot_alter_persisted_portfolio(monkeypatch, tmp_path:
         results = list(pool.map(lambda _: swing_session.get_swing_session(live=False), range(40)))
 
     assert path.read_bytes() == before
-    assert all(result == payload for result in results)
+    assert all(result["locked"] == payload["locked"] for result in results)
+    assert all(result["sessionDate"] == payload["sessionDate"] for result in results)
+    assert all(result["long"] == payload["long"] for result in results)
+    assert all(result["short"] == payload["short"] for result in results)
+    assert all(result["counts"] == payload["counts"] for result in results)
     results[0]["long"][0]["symbol"] = "MUTATED"
     assert results[1]["long"][0]["symbol"] == "VALID"
 

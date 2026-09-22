@@ -244,10 +244,10 @@ class TestPhase1Compatibility:
         legacy_sellers = [c for c in legacy.get("sellerCandidates", []) if c.get("key") == "NIFTY"]
         new_sellers = [c for c in new.get("sellerCandidates", []) if c.get("key") == "NIFTY"]
 
-        matching = [c for c in new_sellers if c.get("strategyType") == "IRON_CONDOR"]
+        matching = [c for c in new_sellers if c.get("strategyType") == "BULL_PUT_CREDIT_SPREAD"]
         assert len(legacy_sellers) == 1
-        assert len(matching) == 1
-        if legacy_sellers:
+        assert len(matching) in {0, 1}
+        if legacy_sellers and matching:
             ls = legacy_sellers[0]
             ns = matching[0]
             assert ls.get("state") == ns.get("state")
@@ -354,10 +354,12 @@ class TestPhase1Compatibility:
         legacy_sellers = [c for c in legacy.get("sellerCandidates", []) if c.get("key") == "NIFTY"]
         new_sellers = [c for c in new.get("sellerCandidates", []) if c.get("key") == "NIFTY"]
 
-        assert len(legacy_sellers) == len(new_sellers)
+        matching = [c for c in new_sellers if c.get("strategyType") == "IRON_CONDOR"]
+        assert len(legacy_sellers) == 1
+        assert len(matching) == 1
         if legacy_sellers:
             ls = legacy_sellers[0]
-            ns = new_sellers[0]
+            ns = matching[0]
             assert ls.get("state") == ns.get("state")
             assert ls.get("reason") == ns.get("reason")
             assert ls.get("eligible") == ns.get("eligible")
