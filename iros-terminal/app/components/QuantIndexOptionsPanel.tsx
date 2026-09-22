@@ -137,7 +137,7 @@ function SectionCard({
   compact?: boolean;
 }) {
   return (
-    <div className={`desk-card min-w-0 overflow-hidden ${compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4'} ${className}`}>
+    <div className={`desk-card min-w-0 overflow-hidden p-3 sm:p-4 ${className}`}>
       <div className="flex flex-nowrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="desk-panel-title truncate text-[var(--fg-strong)]">{title}</div>
@@ -537,7 +537,7 @@ export default function QuantIndexOptionsPanel({
         </div>
       </SectionCard>
 
-      <div className="ix-summary-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+      <div className="ix-summary-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <SectionCard
           title="PORTFOLIO RISK GOVERNOR"
           badge={q?.portfolioRisk?.pass === false ? 'BLOCKED' : 'WITHIN LIMITS'}

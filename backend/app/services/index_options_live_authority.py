@@ -332,5 +332,7 @@ def install() -> None:
         return _rebalance_radar(radar, engine.MAX_CONCURRENT_TRADES)
 
     engine.build_index_options_radar = build
-    paper.reconcile_paper_book = _reconcile
+    # The native paper reconciler now contains the current sleeve, ownership,
+    # entry-pricing, re-entry and subscription contracts. Do not replace it
+    # with the older compatibility reconciler in this module.
     _INSTALLED = True

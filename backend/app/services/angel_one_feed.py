@@ -1110,7 +1110,7 @@ def _next_quote_circuit_hold() -> float:
     _ANGEL_TRIP_COUNT += 1
     _ANGEL_LAST_TRIP_AT_MONO = now
     base = ANGEL_QUOTE_CIRCUIT_SECONDS * (ANGEL_CIRCUIT_BACKOFF_MULTIPLIER ** min(_ANGEL_TRIP_COUNT - 1, 4))
-    hold = min(base, ANGEL_CIRCUIT_BACKOFF_CAP_SECONDS) * (1.0 + random.uniform(-ANGEL_CIRCUIT_JITTER, ANGEL_CIRCUIT_JITTER))
+    hold = min(base * (1.0 + random.uniform(0.0, ANGEL_CIRCUIT_JITTER)), ANGEL_CIRCUIT_BACKOFF_CAP_SECONDS)
     return max(1.0, hold)
 
 

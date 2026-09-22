@@ -1012,7 +1012,10 @@ def reconcile_paper_book(
                 "markIntervalSeconds": LONG_PREMIUM_MARK_INTERVAL_SECONDS,
                 "stopPoints": LONG_PREMIUM_STOP_POINTS,
                 "targetPoints": LONG_PREMIUM_TARGET_POINTS,
+                "stopPointsMax": LONG_PREMIUM_STOP_POINTS,
+                "targetPointsMax": LONG_PREMIUM_TARGET_POINTS,
                 "riskReward": LONG_PREMIUM_RISK_REWARD,
+                "lowPremiumAdaptive": True,
             },
             "sellerRiskCaps": {"singleTrade": _seller_single_risk_cap(), "portfolio": _seller_portfolio_risk_cap()},
         })
