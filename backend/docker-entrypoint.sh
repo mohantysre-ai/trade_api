@@ -4,9 +4,11 @@ set -eu
 seed_if_empty() {
     _src="$1"
     _dst="$2"
-    if [ -d "$_src" ] && [ ! -d "$_dst" ]; then
+    if [ -d "$_src" ]; then
         mkdir -p "$_dst"
-        cp -a "$_src"/. "$_dst"/
+        if [ -z "$(find "$_dst" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
+            cp -a "$_src"/. "$_dst"/
+        fi
     fi
 }
 

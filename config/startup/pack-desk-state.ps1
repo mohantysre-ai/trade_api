@@ -108,54 +108,11 @@ Copy-Tree $tmpState $seedState | Out-Null
 Copy-Tree $tmpData $seedData | Out-Null
 Copy-Tree $tmpArchive $seedArchive | Out-Null
 
-$localData = Join-Path $Root "backend\app\data"
-$localArchive = Join-Path $Root "backend\app\services\eod_archive"
-if (Test-Path -LiteralPath $localData) {
-    Copy-Tree $localData $seedData | Out-Null
-}
-if (Test-Path -LiteralPath $localArchive) {
-    Copy-Tree $localArchive $seedArchive | Out-Null
-}
+# IMPORTANT: the live Docker volumes copied above are the sole source of truth.
+# Do not overlay git-working-tree JSON/data here: those files can be older than
+# the running desk and would silently downgrade the Hub seed (for example,
+# replacing a completed 2026-09-22 EOD cache with a stale repository copy).
 
-$localStateRoot = Join-Path $Root "backend\app\services"
-$localStateBackend = Join-Path $Root "backend"
-$localStateRepo = $Root
-$stateFileMap = @(
-    @{ From = Join-Path $localStateRepo "swing_session.json"; To = Join-Path $seedState "swing_session.json" }
-    @{ From = Join-Path $localStateRepo "swing_session.json.bak"; To = Join-Path $seedState "swing_session.json.bak" }
-    @{ From = Join-Path $localStateRepo "intraday_session.json"; To = Join-Path $seedState "intraday_session.json" }
-    @{ From = Join-Path $localStateRepo "intraday_session.json.bak"; To = Join-Path $seedState "intraday_session.json.bak" }
-    @{ From = Join-Path $localStateRepo "intraday_session.json.lock"; To = Join-Path $seedState "intraday_session.json.lock" }
-    @{ From = Join-Path $localStateRepo "last_market_snapshot.json"; To = Join-Path $seedState "last_market_snapshot.json" }
-    @{ From = Join-Path $localStateRepo "last_market_snapshot.json.bak"; To = Join-Path $seedState "last_market_snapshot.json.bak" }
-    @{ From = Join-Path $localStateRoot "last_market_snapshot.json"; To = Join-Path $seedState "last_market_snapshot.json" }
-    @{ From = Join-Path $localStateRoot "last_market_snapshot.json.bak"; To = Join-Path $seedState "last_market_snapshot.json.bak" }
-    @{ From = Join-Path $localStateRepo "fixed_trade_plan.json"; To = Join-Path $seedState "fixed_trade_plan.json" }
-    @{ From = Join-Path $localStateRepo "fixed_trade_plan.json.bak"; To = Join-Path $seedState "fixed_trade_plan.json.bak" }
-    @{ From = Join-Path $localStateRepo "trade_api_snapshot.json"; To = Join-Path $seedState "trade_api_snapshot.json" }
-    @{ From = Join-Path $localStateRepo "trade_api_snapshot.json.bak"; To = Join-Path $seedState "trade_api_snapshot.json.bak" }
-    @{ From = Join-Path $localStateRepo "alert_history.json"; To = Join-Path $seedState "alert_history.json" }
-    @{ From = Join-Path $localStateRepo "alert_history.json.lock"; To = Join-Path $seedState "alert_history.json.lock" }
-    @{ From = Join-Path $localStateRoot "index_options_radar.json"; To = Join-Path $seedState "index_options_radar.json" }
-    @{ From = Join-Path $localStateRoot "index_options_radar.json.bak"; To = Join-Path $seedState "index_options_radar.json.bak" }
-    @{ From = Join-Path $localStateRoot "index_options_oi_baseline.json"; To = Join-Path $seedState "index_options_oi_baseline.json" }
-    @{ From = Join-Path $localStateRoot "index_options_oi_baseline.json.bak"; To = Join-Path $seedState "index_options_oi_baseline.json.bak" }
-    @{ From = Join-Path $localStateRoot "index_options_candles.json"; To = Join-Path $seedState "index_options_candles.json" }
-    @{ From = Join-Path $localStateRoot "index_options_candles.json.bak"; To = Join-Path $seedState "index_options_candles.json.bak" }
-    @{ From = Join-Path $localStateRoot "index_options_paper_book.json"; To = Join-Path $seedState "index_options_paper_book.json" }
-    @{ From = Join-Path $localStateRoot "index_options_paper_book.json.bak"; To = Join-Path $seedState "index_options_paper_book.json.bak" }
-    @{ From = Join-Path $localStateRoot "index_options_paper_supervisor.json"; To = Join-Path $seedState "index_options_paper_supervisor.json" }
-    @{ From = Join-Path $localStateRoot "index_options_paper_supervisor.json.bak"; To = Join-Path $seedState "index_options_paper_supervisor.json.bak" }
-    @{ From = Join-Path $localStateRoot "index_options_paper_supervisor.lock"; To = Join-Path $seedState "index_options_paper_supervisor.lock" }
-    @{ From = Join-Path $localStateRoot "index_options_hunt_supervisor.json"; To = Join-Path $seedState "index_options_hunt_supervisor.json" }
-    @{ From = Join-Path $localStateRoot "index_options_hunt_supervisor.json.bak"; To = Join-Path $seedState "index_options_hunt_supervisor.json.bak" }
-    @{ From = Join-Path $localStateRoot "index_options_hunt_supervisor.lock"; To = Join-Path $seedState "index_options_hunt_supervisor.lock" }
-)
-foreach ($entry in $stateFileMap) {
-    if (Test-Path -LiteralPath $entry.From) {
-        Copy-Item -LiteralPath $entry.From -Destination $entry.To -Force -ErrorAction SilentlyContinue
-    }
-}
 
 function Get-TreeFiles {
     param([string]$Dir)

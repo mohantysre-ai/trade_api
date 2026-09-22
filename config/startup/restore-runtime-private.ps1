@@ -2,6 +2,10 @@
 # credentials, and the sigq_iros-* volumes from it, then remove the temp container.
 # Counterpart to config/startup/pack-runtime-private.ps1. Requires `docker login`
 # to an account with pull access to the private repo.
+param(
+    [switch]$PreserveSecrets
+)
+
 $ErrorActionPreference = "Stop"
 $Root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 Set-Location $Root
@@ -28,9 +32,13 @@ try {
     if (-not (Test-Path $cfFile)) { throw "cloudflare-credentials.json missing from image." }
 
     New-Item -ItemType Directory -Force -Path "config\cloudflare" | Out-Null
-    Copy-Item $envFile "backend\.env" -Force
-    Copy-Item $cfFile "config\cloudflare\credentials.json" -Force
-    Write-Host "[OK] Restored backend\.env and Cloudflare credentials."
+    if ($PreserveSecrets) {
+        Write-Host "[*] Preserving existing backend\.env and Cloudflare credentials; restoring volumes only."
+    } else {
+        Copy-Item $envFile "backend\.env" -Force
+        Copy-Item $cfFile "config\cloudflare\credentials.json" -Force
+        Write-Host "[OK] Restored backend\.env and Cloudflare credentials."
+    }
 
     foreach ($volume in @("iros-desk-state", "iros-backend-data", "iros-eod-archive")) {
         $archive = Join-Path $Stage "volumes\$volume.tar.gz"

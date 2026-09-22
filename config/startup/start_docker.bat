@@ -116,13 +116,17 @@ if %DO_PULL% equ 1 (
         if not "%IROS_NO_PAUSE%"=="1" pause
         exit /b 1
     )
-    echo [*] Seeding desk JSON ^(sessions + market snapshot + eod^) from Hub into volumes ...
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%seed-desk-state-from-hub.ps1"
-    if errorlevel 1 (
-        echo [FAIL] desk-state seed failed — docker login, or run push-docker-hub.bat on the live desk.
-        popd
-        if not "%IROS_NO_PAUSE%"=="1" pause
-        exit /b 1
+    if "%IROS_RUNTIME_RESTORED%"=="1" (
+        echo [*] Latest runtime-private volumes already restored - skipping second desk-state overlay.
+    ) else (
+        echo [*] Seeding desk JSON ^(sessions + market snapshot + eod^) from Hub into volumes ...
+        powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%seed-desk-state-from-hub.ps1"
+        if errorlevel 1 (
+            echo [FAIL] desk-state seed failed — docker login, or run push-docker-hub.bat on the live desk.
+            popd
+            if not "%IROS_NO_PAUSE%"=="1" pause
+            exit /b 1
+        )
     )
     echo [*] docker compose %COMPOSE_PROFILES% up -d ...
     docker compose %COMPOSE_PROFILES% up -d
