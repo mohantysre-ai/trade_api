@@ -164,9 +164,20 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
         gross_r = float(row.get("upsideCapacityR") or row.get("plannedMaxBlendedR") or 1.5)
         cost_r = float(row.get("costPenaltyR") or 0) + float(row.get("spreadPenaltyR") or 0) + float(row.get("slippagePenaltyR") or 0)
         if cost_r == 0 and row.get("modeledRoundTripCostPct"):
-            risk_dist = float(row.get("riskPerShare") or 5.0)
-            price = float(row.get("decisionPrice") or row.get("entryPrice") or 100.0)
-            if risk_dist > 0:
+            price = float(row.get("decisionPrice") or row.get("entryPrice") or 0)
+            explicit_risk = float(row.get("riskPerShare") or 0)
+            structure_stop = float(row.get("structureStop") or 0)
+            atr_risk = float(row.get("atr14") or 0)
+            risk_dist = (
+                explicit_risk
+                if explicit_risk > 0
+                else (price - structure_stop)
+                if price > 0 and structure_stop > 0 and structure_stop < price
+                else atr_risk
+                if atr_risk > 0
+                else 0.0
+            )
+            if risk_dist > 0 and price > 0:
                 cost_r = (float(row.get("modeledRoundTripCostPct")) / 100.0 * price) / risk_dist
         net_reward_r = gross_r - cost_r
         row["expectedNetR"] = round(net_reward_r, 4) if row.get("expectedNetR") is None else row["expectedNetR"]
@@ -187,6 +198,9 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
         expectancy_ok = expected is not None and expected_status == "CALIBRATED" and float(expected) >= cfg.min_expected_net_r
         funnel["expectancyPass"] += int(expectancy_ok)
         reasons = fresh_reasons + trade_reasons + gate_reasons
+        if rank["status"] != "RATED":
+            reasons.append("RANK_UNRATED")
+            reasons.extend(str(code) for code in (rank.get("reasonCodes") or []))
         if not net_reward_ok:
             reasons.append("NET_REWARD_BELOW_MINIMUM")
         if not segment_active:
@@ -211,6 +225,8 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
             reasons.append("TIER_B_MICROCAP_PROHIBITED")
         setup_ok = tier_a or tier_b
         funnel["setupPass"] += int(setup_ok)
+        if rank["status"] == "RATED" and not tier_a_score and not tier_b_score_ok and not setup["eligible"]:
+            reasons.append("SCORE_BELOW_TIER_B_MINIMUM")
         qualification_mode = (
             "PRIMARY_SETUP" if setup["eligible"]
             else "SCORE_SOFT_PASS" if tier_a_score
