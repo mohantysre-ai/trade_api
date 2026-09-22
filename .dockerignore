@@ -19,8 +19,13 @@
 iros-terminal/.next
 iros-terminal/node_modules
 backend/.venv
-*.md
+backend/app/services/client_secret.json
+backend/app/services/gemini_oauth_token.json
+**/*.md
 !backend/README.md
+!README.md
+**/tests
+**/test_*.py
 docs
 tmp
 .tmp

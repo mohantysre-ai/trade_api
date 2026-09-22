@@ -82,6 +82,8 @@ services:
       - iros-backend-data:/app/backend/app/data
       - iros-eod-archive:/app/backend/app/services/eod_archive
       - iros-desk-state:/app/state
+      - ./backend/app/services/client_secret.json:/app/backend/app/services/client_secret.json:ro
+      - ./backend/app/services/gemini_oauth_token.json:/app/backend/app/services/gemini_oauth_token.json:ro
     healthcheck:
       test:
         [
@@ -135,6 +137,8 @@ services:
       - iros-backend-data:/app/backend/app/data
       - iros-eod-archive:/app/backend/app/services/eod_archive
       - iros-desk-state:/app/state
+      - ./backend/app/services/client_secret.json:/app/backend/app/services/client_secret.json:ro
+      - ./backend/app/services/gemini_oauth_token.json:/app/backend/app/services/gemini_oauth_token.json:ro
     healthcheck:
       test:
         [

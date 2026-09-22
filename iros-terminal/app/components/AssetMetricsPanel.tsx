@@ -685,6 +685,10 @@ function StatusPill({
   );
 }
 
+function normalizeKpiLabel(raw: string): string {
+  return raw.replace(/^(?:LTP\s+src|Eff\s+SL|OI\s+setup|Eff\.\s+risk\s+frac|RS\s+vs\s+)/i, '').trim();
+}
+
 function Kpi({
   label,
   value,
@@ -698,14 +702,18 @@ function Kpi({
   title?: string;
   span2?: boolean;
 }) {
-  const showMarketBadge = /NIFTY|VIX|SENSEX|NASDAQ|DOW|S&P/i.test(label);
+  const norm = normalizeKpiLabel(label);
+  const showMarketBadge =
+    norm.length > 0 &&
+    !/^RS\b/i.test(label) &&
+    /^(?:NIFTY|BANKNIFTY|VIX|INDIA\s*VIX|SENSEX|NASDAQ|DOW|S&P|DJI)/i.test(norm);
   return (
     <div
       className={`flex min-w-0 items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/70 px-2 py-1.5 ${
         span2 ? 'col-span-2' : ''
       }`}
     >
-      {showMarketBadge ? <MarketSymbolBadge symbol={label} kind="index" size="sm" /> : null}
+      {showMarketBadge ? <MarketSymbolBadge symbol={norm} kind="index" size="sm" /> : null}
       <div className="min-w-0">
         <div className="text-[8px] uppercase tracking-wider text-slate-500 font-semibold">{label}</div>
         <div

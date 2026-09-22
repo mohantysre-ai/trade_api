@@ -51,6 +51,17 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
       /app/backend/app/data/eod \
       /app/backend/app/services/eod_archive \
       /app/state \
+      /opt/seed/data \
+      /opt/seed/archive \
+      /opt/seed/state \
+    && cp -a /app/backend/app/data/. /opt/seed/data/ \
+    && cp -a /app/backend/app/services/eod_archive/. /opt/seed/archive/ \
+    && for f in /app/backend/app/services/*.json /app/backend/app/services/*.lock; do \
+         case "$(basename "$f")" in \
+           client_secret.json|gemini_oauth_token.json) continue ;; \
+         esac; \
+         [ -f "$f" ] && cp -a "$f" /opt/seed/state/; \
+       done \
     && find /app/backend -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \
     && find /app/backend -type f -name "*.pyc" -delete
 
