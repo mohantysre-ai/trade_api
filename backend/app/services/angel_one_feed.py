@@ -3596,7 +3596,7 @@ def _swing_v2_raw_metrics(
     ltp: float,
     now: datetime,
 ) -> dict[str, Any]:
-    min_observations = int(os.getenv("SWING_MIN_DAILY_OBSERVATIONS", "90"))
+    min_observations = int(os.getenv("SWING_MIN_DAILY_OBSERVATIONS", "30"))
     previous = []
     today = now.astimezone(IST_ZONE).date().isoformat()
     for candle in daily_candles:
@@ -4642,7 +4642,7 @@ def _build_payload_from_live_data(
         if swing_v2_history and metrics_ready:
             raw = cached_intraday.get("swingV2Raw") if isinstance(cached_intraday, dict) else None
             try:
-                metrics_ready = bool(isinstance(raw, dict) and int(raw.get("dailyObservationCount") or 0) >= int(os.getenv("SWING_MIN_DAILY_OBSERVATIONS", "90")))
+                metrics_ready = bool(isinstance(raw, dict) and int(raw.get("dailyObservationCount") or 0) >= int(os.getenv("SWING_MIN_DAILY_OBSERVATIONS", "30")))
             except (TypeError, ValueError):
                 metrics_ready = False
         if metrics_ready:

@@ -82,7 +82,7 @@ class SwingV2Config:
     order_expire_ist: str = "15:20"
     mandatory_exit_ist: str = "15:15"
     history_lookback_days: int = 180
-    min_daily_observations: int = 90
+    min_daily_observations: int = 30
     ledger_path: str = ""
     live_promotion: bool = False
 
@@ -108,7 +108,7 @@ class SwingV2Config:
         if not 0 < self.coverage_defensive_risk_multiplier <= self.coverage_degraded_risk_multiplier <= self.coverage_normal_risk_multiplier <= 1: raise ValueError("coverage risk multipliers must be in (0,1] and monotonic")
         if self.coverage_hysteresis_cycles < 1: raise ValueError("SWING_COVERAGE_HYSTERESIS_CYCLES must be >= 1")
         if self.history_lookback_days < 90: raise ValueError("SWING_HISTORY_LOOKBACK_DAYS must be >= 90")
-        if self.min_daily_observations < 45: raise ValueError("SWING_MIN_DAILY_OBSERVATIONS must be >= 45")
+        if self.min_daily_observations < 30: raise ValueError("SWING_MIN_DAILY_OBSERVATIONS must be >= 30")
         if self.min_daily_observations > self.history_lookback_days: raise ValueError("SWING_MIN_DAILY_OBSERVATIONS must not exceed SWING_HISTORY_LOOKBACK_DAYS")
         if not 0 < self.max_name_notional_pct <= 20: raise ValueError("single-name notional may not exceed 20% NAV")
         if not 0 < self.max_sector_notional_pct <= 40: raise ValueError("sector notional may not exceed 40% NAV")
