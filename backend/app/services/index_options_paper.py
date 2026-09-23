@@ -945,6 +945,55 @@ def reconcile_paper_book(
                 else "REST_FALLBACK" if mark_source == "ANGEL_DIRECT_LOCKED_CONTRACT"
                 else "RADAR_FALLBACK"
             )
+            from .index_options_intraday_strategy import evaluate_position as _evaluate_intraday, position_from_dict as _intraday_from_dict
+            intraday_mode = str(position.get("strategyMode") or "").upper() == "INTRADAY_PYRAMID"
+            if intraday_mode:
+                pos = _intraday_from_dict(position, sequence=0)
+                if pos is not None:
+                    marks_map = {leg.symbol: mark for leg in pos.legs}
+                    updated_pos = _evaluate_intraday(pos, marks_map, clock)
+                    updated_dict = {
+                        **position,
+                        **{
+                            "status": updated_pos.status,
+                            "exitReason": updated_pos.exit_reason,
+                            "pnl": round(updated_pos.total_realized_pnl, 2),
+                            "realizedPnl": round(updated_pos.total_realized_pnl, 2),
+                            "remainingQty": updated_pos.remaining_qty,
+                            "pyramidedLots": updated_pos.pyramided_lots,
+                            "legs": [
+                                {
+                                    "symbol": leg.symbol,
+                                    "direction": leg.direction,
+                                    "entryPrice": leg.entry_price,
+                                    "qty": leg.current_qty,
+                                    "initialQty": leg.initial_qty,
+                                    "pyramidedQty": leg.pyramided_qty,
+                                    "partialBookedQty": leg.partial_booked_qty,
+                                    "stopPrice": leg.stop_price,
+                                    "targetPrice": leg.target_price,
+                                    "peakPrice": leg.peak_price,
+                                    "mfePoints": round(leg.mfe_points, 2),
+                                    "targetHit": leg.target_hit,
+                                    "trailActive": leg.trail_active,
+                                    "closed": leg.closed,
+                                    "exitReason": leg.exit_reason,
+                                    "exitPrice": leg.exit_price,
+                                    "realizedPnl": round(leg.realized_pnl, 2),
+                                    "minuteMarks": leg.minute_marks,
+                                }
+                                for leg in updated_pos.legs
+                            ],
+                        },
+                    }
+                    if updated_pos.all_legs_closed():
+                        closed_now.append(updated_dict)
+                    else:
+                        next_open.append(updated_dict)
+                else:
+                    next_open.append(position)
+                continue
+
             active, closed = _update_open(
                 position, mark, clock, mark_source=mark_source, quality=quality,
                 data_age_seconds=meta.get("ageSeconds"),

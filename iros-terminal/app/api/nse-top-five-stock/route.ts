@@ -31,6 +31,7 @@ export async function GET(request: Request) {
 
     const res = await fetch(nseUrl.toString(), {
       cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
       headers: {
         Accept: "application/json, text/plain, */*",
         Referer: "https://www.nseindia.com/",
@@ -51,6 +52,10 @@ export async function GET(request: Request) {
     return NextResponse.json(data);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const timedOut = /timeout|aborted|AbortError/i.test(message);
+    return NextResponse.json(
+      { error: timedOut ? "NSE request timed out — retry shortly" : message },
+      { status: timedOut ? 504 : 500 }
+    );
   }
 }
