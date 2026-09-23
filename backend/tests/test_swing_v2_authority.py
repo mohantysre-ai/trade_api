@@ -108,6 +108,24 @@ def test_swing_v2_is_paper_authoritative(v2_env):
     assert session["v1Enabled"] is False
 
 
+def test_session_reports_remaining_slots_and_scan_evidence(v2_env, monkeypatch):
+    auth = v2_env["auth"]
+    monkeypatch.setattr(auth, "_snapshot", lambda: {"swingV2Regime": "DEFENSIVE"})
+    monkeypatch.setattr(auth, "_positions", lambda _ledger: [{
+        "positionId": "one", "symbol": "AAA", "sessionDate": "2026-09-23", "terminal": False,
+    }])
+    scan = {"regime": "DEFENSIVE", "qualifiedCount": 4, "selectedCount": 1,
+            "correlationEvidencePairs": 0, "funnel": {"topRejectionReasons": [
+                {"reason": "MAX_TWO_NAMES_PER_SECTOR", "count": 2},
+            ]}}
+    session = auth._session(scan, now=datetime(2026, 9, 23, 11, 0, tzinfo=IST))
+    diagnostics = session["entryHuntDiagnostics"]
+    assert diagnostics["regimePositionCap"] == 2
+    assert diagnostics["availableSlots"] == 1
+    assert diagnostics["qualifiedCount"] == 4
+    assert diagnostics["correlationEvidencePairs"] == 0
+
+
 def test_swing_session_routes_through_v2(v2_env):
     sess = v2_env["sess"]
     loaded = sess.load_swing_session()

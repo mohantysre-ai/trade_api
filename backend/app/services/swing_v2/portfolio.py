@@ -14,10 +14,14 @@ _TIER_PRIORITY = {
 }
 
 
-def _average_correlation(symbol: str, selected: list[dict[str, Any]], correlations: dict[tuple[str, str], float]) -> float:
-    if not selected: return 0.0
-    values = [float(correlations.get((symbol, str(row.get("symbol"))), correlations.get((str(row.get("symbol")), symbol), 1.0))) for row in selected]
-    return sum(values) / len(values)
+def _average_correlation(symbol: str, selected: list[dict[str, Any]], correlations: dict[tuple[str, str], float]) -> float | None:
+    values = []
+    for row in selected:
+        other = str(row.get("symbol") or "")
+        value = correlations.get((symbol, other), correlations.get((other, symbol)))
+        if value is not None:
+            values.append(float(value))
+    return sum(values) / len(values) if values else None
 
 
 def _is_micro(row: dict[str, Any]) -> bool:
@@ -62,11 +66,12 @@ def construct_portfolio(rows: list[dict[str, Any]], cfg: SwingV2Config, *, corre
     for row in ordered:
         symbol, sector = str(row.get("symbol") or "").upper(), str(row.get("sector") or "UNKNOWN")
         reason = None
+        measured_correlation = _average_correlation(symbol, [*existing, *selected], correlations)
         if len(existing) + len(selected) >= cfg.max_positions: reason = "MAX_POSITIONS"
         elif symbol in occupied: reason = "CROSS_BOOK_CONFLICT"
         elif sum(1 for item in [*existing, *selected] if str(item.get("sector") or "UNKNOWN") == sector) >= 2: reason = "MAX_TWO_NAMES_PER_SECTOR"
         elif any(sum(1 for item in [*existing, *selected] if setup_id in (item.get("setupIds") or [])) >= 3 for setup_id in (row.get("setupIds") or [])): reason = "SETUP_CONCENTRATION_CAP"
-        elif _average_correlation(symbol, [*existing, *selected], correlations) > cfg.max_average_correlation: reason = "EXCESS_PORTFOLIO_CORRELATION"
+        elif measured_correlation is not None and measured_correlation > cfg.max_average_correlation: reason = "EXCESS_PORTFOLIO_CORRELATION"
         elif _is_micro(row) and cfg.microcap_mode != "SATELLITE": reason = "MICROCAP_NOT_ACTIVE"
         elif _is_micro(row) and microcaps >= 1: reason = "MAX_ONE_MICROCAP_SATELLITE"
         if reason:
@@ -93,4 +98,4 @@ def construct_portfolio(rows: list[dict[str, Any]], cfg: SwingV2Config, *, corre
         if _is_micro(row): microcaps += 1
         sector_notional[sector] = sector_notional.get(sector, 0) + notional; sector_risk[sector] = sector_risk.get(sector, 0) + risk
         remaining_risk -= risk; stress = next_stress
-    return {"selected": selected, "rejected": rejected, "portfolioInitialRisk": round(cfg.nav * cfg.max_portfolio_risk_bps / 10_000 - remaining_risk, 2), "gapStressLoss": round(stress, 2), "cash": round(cfg.nav - sum(float(row.get("deployedCapital") or 0) for row in [*existing, *selected]), 2), "selectionPolicy": "LIQUID_CORE_TOP500_THEN_MICROCAP_SATELLITE", "microcapPriorityWeight": cfg.microcap_priority_weight}
+    return {"selected": selected, "rejected": rejected, "portfolioInitialRisk": round(cfg.nav * cfg.max_portfolio_risk_bps / 10_000 - remaining_risk, 2), "gapStressLoss": round(stress, 2), "cash": round(cfg.nav - sum(float(row.get("deployedCapital") or 0) for row in [*existing, *selected]), 2), "selectionPolicy": "LIQUID_CORE_TOP500_THEN_MICROCAP_SATELLITE", "microcapPriorityWeight": cfg.microcap_priority_weight, "correlationEvidencePairs": len(correlations), "correlationPolicy": "ENFORCE_MEASURED_PAIRS_ONLY"}

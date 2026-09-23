@@ -26,6 +26,7 @@ MIN_CREDIT_TO_RISK = 0.20
 MIN_IV_EDGE_POINTS = 0.75
 MIN_IV_EDGE_RATIO = 1.05
 MAX_LEG_SPREAD_PCT = 2.0
+MAX_HEDGE_SPREAD_PCT = 4.0
 MIN_SHORT_DELTA = 0.15
 MAX_SHORT_DELTA = 0.40
 ESTIMATED_COST_PER_ORDER_INR = 20.0
@@ -95,6 +96,19 @@ def _usable(row: dict[str, Any]) -> bool:
     )
 
 
+def _usable_wing(row: dict[str, Any]) -> bool:
+    spread = _leg_spread(row)
+    return bool(
+        row.get("symbol")
+        and (_float(row.get("volume")) or 0) > 0
+        and (_float(row.get("lotSize")) or 0) >= 1
+        and _float(row.get("theta")) is not None
+        and _float(row.get("gamma")) is not None
+        and spread is not None
+        and spread <= MAX_HEDGE_SPREAD_PCT
+    )
+
+
 def _pick_short(rows: list[dict[str, Any]], spot: float, option_type: str) -> dict[str, Any] | None:
     wanted = []
     for row in rows:
@@ -118,7 +132,11 @@ def _pick_wing(rows: list[dict[str, Any]], short: dict[str, Any], option_type: s
     wings = []
     for row in rows:
         strike = _float(row.get("strike"))
-        if row.get("optionType") != option_type or strike is None or not _usable(row):
+        if row.get("optionType") != option_type or strike is None or not _usable_wing(row):
+            continue
+        if (row.get("expiry") or row.get("expiryValue")) != (short.get("expiry") or short.get("expiryValue")):
+            continue
+        if row.get("exchange") != short.get("exchange") or row.get("lotSize") != short.get("lotSize"):
             continue
         farther = strike > short_strike if option_type == "CALL" else strike < short_strike
         if farther:
@@ -327,7 +345,13 @@ def _setup_from_legs(
     gamma_cap = max(0.001, 75.0 / spot)
     leg_spreads = [_float(leg.get("spreadPct")) for leg in legs]
     max_spread = max((value for value in leg_spreads if value is not None), default=math.inf)
-    contract_ok = bool(credit > 0 and len(lots) == 1 and next(iter(lots), 0) > 0 and max_spread <= MAX_LEG_SPREAD_PCT)
+    contract_ok = bool(
+        credit > 0 and len(lots) == 1 and next(iter(lots), 0) > 0
+        and all(
+            spread is not None and spread <= (MAX_LEG_SPREAD_PCT if leg["action"] == "SELL" else MAX_HEDGE_SPREAD_PCT)
+            for leg, spread in zip(legs, leg_spreads)
+        )
+    )
 
     raw_breadth = _float(breadth.get("score"))
     coverage = _float(breadth.get("coveragePct"))

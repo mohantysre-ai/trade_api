@@ -175,6 +175,8 @@ def _position_instruments(position: dict[str, Any]) -> list[dict[str, Any]]:
     """Every contract that backs one position (all legs for a seller spread)."""
     if sleeve_of(position) == SELL_SLEEVE:
         return [leg for leg in (position.get("legs") or []) if isinstance(leg, dict)]
+    if str(position.get("strategyMode") or "").upper() == "INTRADAY_PYRAMID":
+        return [position, *(leg for leg in (position.get("legs") or []) if isinstance(leg, dict))]
     return [position]
 
 
@@ -572,13 +574,17 @@ def _new_position(
     }
 
 
-def _governor(book: dict[str, Any]) -> IndexOptionReEntryGovernor:
+def _governor(book: dict[str, Any], sleeve: str | None = None) -> IndexOptionReEntryGovernor:
     governor = IndexOptionReEntryGovernor()
     for row in [*(book.get("open") or []), *(book.get("closed") or [])]:
+        if sleeve is not None and sleeve_of(row) != sleeve:
+            continue
         key = str(row.get("index") or "")
         if key:
             governor.trade_counts[key] = governor.trade_counts.get(key, 0) + 1
     for row in book.get("closed") or []:
+        if sleeve is not None and sleeve_of(row) != sleeve:
+            continue
         key = str(row.get("index") or "")
         reason = str(row.get("exitReason") or "")
         pnl = float(row.get("pnl") or 0)
@@ -614,6 +620,14 @@ def _cross_book_owner(row: dict[str, Any], session_date: str) -> str | None:
 
 def _reentry_confirmations(row: dict[str, Any]) -> dict[str, bool]:
     gates = row.get("gates") if isinstance(row.get("gates"), dict) else {}
+    if sleeve_of(row) == SELL_SLEEVE:
+        structure = gates.get("fresh") is True and gates.get("structure") is True
+        return {
+            "fresh_breakout_confirmed": structure,
+            "oi_aligned": gates.get("futuresRegime") is True and gates.get("optionChain") is True,
+            "breadth_aligned": gates.get("breadth") is True,
+            "opposite_confirmation": structure,
+        }
     breakout = all(gates.get(name) is True for name in ("fresh", "structure", "breakout"))
     oi = gates.get("futuresOi") is True
     breadth = gates.get("breadth") is True
@@ -713,7 +727,7 @@ def _select_sleeve_entries(
     entries: list[tuple[dict[str, Any], dict[str, Any]]] = []
     used_indexes: set[str] = set()
     used_buckets: set[str] = set()
-    governor = _governor(book)
+    governor = _governor(book, sleeve_of(ranked[0])) if ranked else IndexOptionReEntryGovernor()
     for row in ranked:
         sleeve = sleeve_of(row)
         index, bucket = str(row.get("key") or ""), str(row.get("bucket") or "")
@@ -950,7 +964,13 @@ def reconcile_paper_book(
             if intraday_mode:
                 pos = _intraday_from_dict(position, sequence=0)
                 if pos is not None:
-                    marks_map = {leg.symbol: mark for leg in pos.legs}
+                    marks_map = {}
+                    for leg in pos.legs:
+                        leg_mark = mark if leg.symbol == symbol else locked_marks.get(leg.symbol)
+                        if leg_mark is None:
+                            leg_mark = _float(_candidate_contract(leg.symbol, candidates).get("ltp"))
+                        if leg_mark is not None and leg_mark > 0:
+                            marks_map[leg.symbol] = leg_mark
                     updated_pos = _evaluate_intraday(pos, marks_map, clock)
                     updated_dict = {
                         **position,
@@ -963,9 +983,12 @@ def reconcile_paper_book(
                             "pyramidedLots": updated_pos.pyramided_lots,
                             "legs": [
                                 {
+                                    **next((existing for existing in (position.get("legs") or [])
+                                            if isinstance(existing, dict) and existing.get("symbol") == leg.symbol), {}),
                                     "symbol": leg.symbol,
                                     "direction": leg.direction,
                                     "entryPrice": leg.entry_price,
+                                    "averageEntryPrice": leg.average_entry_price or leg.entry_price,
                                     "qty": leg.current_qty,
                                     "initialQty": leg.initial_qty,
                                     "pyramidedQty": leg.pyramided_qty,
@@ -984,6 +1007,12 @@ def reconcile_paper_book(
                                 }
                                 for leg in updated_pos.legs
                             ],
+                            "unrealizedPnl": round(sum(
+                                ((1 if leg.direction == "LONG" else -1) *
+                                 (marks_map.get(leg.symbol, leg.average_entry_price or leg.entry_price) -
+                                  (leg.average_entry_price or leg.entry_price)) * leg.current_qty)
+                                for leg in updated_pos.legs if not leg.closed
+                            ), 2),
                         },
                     }
                     if updated_pos.all_legs_closed():

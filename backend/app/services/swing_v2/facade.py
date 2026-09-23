@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime
 from typing import Any
 
 from .config import load_config
@@ -31,12 +31,6 @@ def _rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
         row["decisionPrice"] = raw.get("ltpRaw") or raw.get("decisionPrice")
         if isinstance(raw.get("swingV2"), dict):
             row.update(raw["swingV2"])
-        stamps = row.get("sourceTimestamps") or {}
-        quote_stamp = stamps.get("quote")
-        if not quote_stamp or datetime.fromisoformat(quote_stamp.replace("Z", "+00:00")).astimezone(timezone.utc) < datetime.now(timezone.utc) - timedelta(minutes=5):
-            stamps = dict(stamps)
-            stamps["quote"] = datetime.now(timezone.utc).isoformat()
-            row["sourceTimestamps"] = stamps
         result.append(row)
     return result
 

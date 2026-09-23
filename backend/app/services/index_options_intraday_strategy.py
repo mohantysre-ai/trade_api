@@ -58,6 +58,7 @@ class LegState:
     entry_price: float
     initial_qty: int
     current_qty: int
+    average_entry_price: float = 0.0
     pyramided_qty: int = 0
     partial_booked_qty: int = 0
     stop_price: float = 0.0
@@ -139,6 +140,7 @@ def create_position(
         entry_price=round(entry_price, 2),
         initial_qty=qty,
         current_qty=qty,
+        average_entry_price=round(entry_price, 2),
         stop_price=round(entry_price - INTRADAY_SL_POINTS, 2) if direction == "LONG" else round(entry_price + INTRADAY_SL_POINTS, 2),
         target_price=round(entry_price + INTRADAY_TARGET_POINTS, 2) if direction == "LONG" else round(entry_price - INTRADAY_TARGET_POINTS, 2),
         peak_price=entry_price,
@@ -160,7 +162,7 @@ def _eod_square_off(leg: LegState, mark: float, now: datetime) -> LegState | Non
     if leg.closed or leg.current_qty <= 0:
         return leg
     sign = 1.0 if leg.direction == "LONG" else -1.0
-    pnl = round(sign * (mark - leg.entry_price) * leg.current_qty, 2)
+    pnl = round(sign * (mark - (leg.average_entry_price or leg.entry_price)) * leg.current_qty, 2)
     leg.realized_pnl = round(leg.realized_pnl + pnl, 2)
     leg.current_qty = 0
     leg.closed = True
@@ -183,7 +185,7 @@ def _initial_stop_hit(leg: LegState, mark: float, now: datetime) -> LegState | N
     sl_hit = (mark <= leg.stop_price) if leg.direction == "LONG" else (mark >= leg.stop_price)
     if not sl_hit:
         return leg
-    pnl = round(sign * (mark - leg.entry_price) * leg.current_qty, 2)
+    pnl = round(sign * (mark - (leg.average_entry_price or leg.entry_price)) * leg.current_qty, 2)
     leg.realized_pnl = round(leg.realized_pnl + pnl, 2)
     leg.current_qty = 0
     leg.closed = True
@@ -209,12 +211,18 @@ def _target_hit(leg: LegState, mark: float, now: datetime) -> LegState | None:
     book_qty = max(1, int(math.floor(leg.current_qty * INTRADAY_PARTIAL_BOOK_PCT)))
     remain_qty = leg.current_qty - book_qty
     sign = 1.0 if leg.direction == "LONG" else -1.0
-    book_pnl = round(sign * (mark - leg.entry_price) * book_qty, 2)
+    book_pnl = round(sign * (mark - (leg.average_entry_price or leg.entry_price)) * book_qty, 2)
     leg.realized_pnl = round(leg.realized_pnl + book_pnl, 2)
     leg.partial_booked_qty = book_qty
     leg.current_qty = remain_qty
-    leg.stop_price = leg.entry_price
-    leg.trail_active = True
+    basis = leg.average_entry_price or leg.entry_price
+    trail = mark - INTRADAY_TRAIL_SL_AFTER_TARGET_POINTS if leg.direction == "LONG" else mark + INTRADAY_TRAIL_SL_AFTER_TARGET_POINTS
+    leg.stop_price = round(max(basis, trail) if leg.direction == "LONG" else min(basis, trail), 2)
+    leg.trail_active = remain_qty > 0
+    if remain_qty == 0:
+        leg.closed = True
+        leg.exit_reason = "TARGET"
+        leg.exit_price = round(mark, 2)
     leg.minute_marks.append({
         "at": now.isoformat(),
         "premium": round(mark, 2),
@@ -233,7 +241,7 @@ def _trail_stop_hit(leg: LegState, mark: float, now: datetime) -> LegState | Non
     if not trail_hit:
         return leg
     sign = 1.0 if leg.direction == "LONG" else -1.0
-    pnl = round(sign * (mark - leg.entry_price) * leg.current_qty, 2)
+    pnl = round(sign * (mark - (leg.average_entry_price or leg.entry_price)) * leg.current_qty, 2)
     leg.realized_pnl = round(leg.realized_pnl + pnl, 2)
     leg.current_qty = 0
     leg.closed = True
@@ -250,19 +258,26 @@ def _trail_stop_hit(leg: LegState, mark: float, now: datetime) -> LegState | Non
 
 
 def _pyramid_trigger(leg: LegState, mark: float, now: datetime, position: IntradayPosition) -> LegState | None:
-    if leg.closed or leg.target_hit:
+    if leg.closed or not leg.target_hit or leg.current_qty <= 0:
         return leg
     if position.pyramided_lots >= INTRADAY_MAX_PYRAMID_LOTS - 1:
         return leg
     profit = leg.profit_points(mark)
-    if profit < INTRADAY_TARGET_POINTS + INTRADAY_PYRAMID_TRIGGER_POINTS:
+    if profit < INTRADAY_TARGET_POINTS + (position.pyramided_lots + 1) * INTRADAY_PYRAMID_TRIGGER_POINTS:
         return leg
-    add_qty = min(INTRADAY_PYRAMID_ADD_LOTS * leg.initial_qty, leg.initial_qty)
+    add_lots = min(INTRADAY_PYRAMID_ADD_LOTS, INTRADAY_MAX_PYRAMID_LOTS - 1 - position.pyramided_lots)
+    add_qty = add_lots * leg.initial_qty
     if add_qty <= 0:
         return leg
+    old_basis = leg.average_entry_price or leg.entry_price
+    leg.average_entry_price = round((old_basis * leg.current_qty + mark * add_qty) / (leg.current_qty + add_qty), 4)
     leg.pyramided_qty += add_qty
     leg.current_qty += add_qty
-    position.pyramided_lots += 1
+    position.pyramided_lots += add_lots
+    if leg.direction == "LONG":
+        leg.stop_price = round(max(leg.stop_price, leg.average_entry_price), 2)
+    else:
+        leg.stop_price = round(min(leg.stop_price, leg.average_entry_price), 2)
     leg.minute_marks.append({
         "at": now.isoformat(),
         "premium": round(mark, 2),
@@ -276,6 +291,11 @@ def _pyramid_trigger(leg: LegState, mark: float, now: datetime, position: Intrad
 def evaluate_leg(leg: LegState, mark: float, now: datetime, position: IntradayPosition) -> LegState:
     if leg.closed:
         return leg
+    if leg.target_hit and leg.trail_active:
+        leg.update_peak(mark)
+        basis = leg.average_entry_price or leg.entry_price
+        trail = leg.peak_price - INTRADAY_TRAIL_SL_AFTER_TARGET_POINTS if leg.direction == "LONG" else leg.peak_price + INTRADAY_TRAIL_SL_AFTER_TARGET_POINTS
+        leg.stop_price = round(max(leg.stop_price, basis, trail) if leg.direction == "LONG" else min(leg.stop_price, basis, trail), 2)
     # After partial book, trail SL takes precedence over the breakeven stop.
     if leg.target_hit and leg.trail_active and leg.current_qty > 0:
         leg = _trail_stop_hit(leg, mark, now)
@@ -286,16 +306,13 @@ def evaluate_leg(leg: LegState, mark: float, now: datetime, position: IntradayPo
         leg = _initial_stop_hit(leg, mark, now)
         if leg.closed:
             return leg
-    # Pyramiding only before target is hit.
-    if not leg.target_hit:
-        leg = _pyramid_trigger(leg, mark, now, position)
-        if leg.closed:
-            return leg
     # Target hit check.
     if not leg.target_hit:
         leg = _target_hit(leg, mark, now)
         if leg.closed:
             return leg
+    if leg.target_hit and not leg.closed:
+        leg = _pyramid_trigger(leg, mark, now, position)
     # Update peak after all exit checks.
     leg.update_peak(mark)
     return leg
@@ -309,9 +326,10 @@ def evaluate_position(position: IntradayPosition, marks: dict[str, float], now: 
         mark = marks.get(leg.symbol)
         if mark is None or mark <= 0:
             continue
-        leg = evaluate_leg(leg, mark, now, position)
         if eod and not leg.closed:
             leg = _eod_square_off(leg, mark, now)
+        else:
+            leg = evaluate_leg(leg, mark, now, position)
     position.legs = [leg for leg in position.legs]
     position.total_realized_pnl = position.total_realized()
     position.remaining_qty = sum(leg.current_qty for leg in position.legs if not leg.closed)
@@ -355,6 +373,7 @@ def position_from_dict(row: dict[str, Any], sequence: int) -> IntradayPosition |
                 entry_price=round(entry, 2),
                 initial_qty=int(leg_raw.get("initialQty") or qty),
                 current_qty=qty,
+                average_entry_price=round(_float(leg_raw.get("averageEntryPrice")) or entry, 4),
                 pyramided_qty=int(leg_raw.get("pyramidedQty") or 0),
                 partial_booked_qty=int(leg_raw.get("partialBookedQty") or 0),
                 stop_price=round(stop_raw, 2) if stop_raw is not None else round(entry - INTRADAY_SL_POINTS, 2) if direction == "LONG" else round(entry + INTRADAY_SL_POINTS, 2),
@@ -408,6 +427,7 @@ def position_to_dict(position: IntradayPosition) -> dict[str, Any]:
                 "symbol": leg.symbol,
                 "direction": leg.direction,
                 "entryPrice": leg.entry_price,
+                "averageEntryPrice": leg.average_entry_price or leg.entry_price,
                 "qty": leg.current_qty,
                 "initialQty": leg.initial_qty,
                 "pyramidedQty": leg.pyramided_qty,

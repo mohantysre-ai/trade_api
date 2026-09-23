@@ -1,4 +1,5 @@
 import time
+import json
 from datetime import datetime, timedelta
 
 from app.services.angel_index_options import IST_ZONE
@@ -10,9 +11,50 @@ from app.services.index_options_paper import (
     LONG_PREMIUM_TARGET_POINTS,
     hydrate_open_position_subscriptions,
     reconcile_paper_book,
+    _governor,
+    _reentry_confirmations,
 )
+from app.services.index_options_engine import can_reenter_index_option, SELL_SLEEVE
 
 SESSION_DATE = datetime(2027, 6, 15, 11, 0, tzinfo=IST_ZONE)
+
+
+def test_seller_reentry_uses_seller_evidence_and_ignores_buy_exit():
+    prior = SESSION_DATE - timedelta(minutes=21)
+    book = {"open": [], "closed": [
+        {"index": "NIFTY", "strategyMode": "BUY_PREMIUM", "exitReason": "INITIAL_STOP",
+         "exitedAt": SESSION_DATE.isoformat(), "direction": "CALL", "pnl": -100},
+        {"index": "NIFTY", "strategyMode": SELL_SLEEVE, "exitReason": "PROFIT_TARGET_50PCT_CREDIT",
+         "exitedAt": prior.isoformat(), "direction": "BULLISH", "pnl": 100},
+    ]}
+    row = {"strategyMode": SELL_SLEEVE, "gates": {
+        "fresh": True, "structure": True, "futuresRegime": True,
+        "optionChain": True, "breadth": True,
+    }}
+    decision = can_reenter_index_option(
+        "NIFTY", "BULLISH", SESSION_DATE, _governor(book, SELL_SLEEVE),
+        **_reentry_confirmations(row),
+    )
+    assert decision["allowed"] is True
+
+
+def test_intraday_pyramid_marks_each_leg_from_its_own_contract(tmp_path, monkeypatch):
+    path = tmp_path / "paper.json"
+    monkeypatch.setenv("INDEX_OPTIONS_PAPER_BOOK_FILE", str(path))
+    now = SESSION_DATE
+    legs = [
+        {"symbol": symbol, "entryPrice": 100.0, "qty": 50, "initialQty": 50}
+        for symbol in ("NIFTY_LEG1", "NIFTY_LEG2")
+    ]
+    path.write_text(json.dumps({"sessionDate": now.date().isoformat(), "open": [{
+        "id": "PYRAMID-1", "index": "NIFTY", "bucket": "BROAD", "symbol": "NIFTY_LEG1",
+        "strategyMode": "INTRADAY_PYRAMID", "direction": "LONG", "legs": legs,
+        "enteredAt": (now - timedelta(minutes=1)).isoformat(), "markedAt": (now - timedelta(minutes=1)).isoformat(),
+    }], "closed": [], "entryCount": 1}), encoding="utf-8")
+    chain = [{"symbol": "NIFTY_LEG1", "ltp": 141.0}, {"symbol": "NIFTY_LEG2", "ltp": 95.0}]
+    book = reconcile_paper_book({"candidates": [{"chain": chain}], "selected": []}, now=now)
+    assert book["open"][0]["legs"][0]["targetHit"] is True
+    assert book["open"][0]["legs"][1]["targetHit"] is False
 
 
 def _candidate(mark=100.0, *, key="BANKNIFTY", bucket="FINANCIAL", lot=30):

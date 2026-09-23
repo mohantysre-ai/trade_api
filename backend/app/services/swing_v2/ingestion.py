@@ -268,10 +268,10 @@ def enrich_v2_market_snapshot(payload: dict[str, Any], all_stocks: list[dict[str
         capacity = max(1.5, (next_high - price) / risk_distance) if next_high and risk_distance and next_high > price else (1.5 if risk_distance else 0.0)
         upper, lower = _number(row.get("upperCircuit")), _number(row.get("lowerCircuit"))
         last3 = raw.get("last3Closes") if isinstance(raw.get("last3Closes"), list) else []
-        quote_stamp = str(row.get("quoteReceivedAt") or now.astimezone(timezone.utc).isoformat())
+        quote_stamp = _iso_timestamp(row.get("quoteReceivedAt"), "")
         bars_stamp = _iso_timestamp(
             raw.get("last1hTimestamp") or raw.get("last60mTimestamp") or raw.get("last5mTimestamp"),
-            quote_stamp,
+            "",
         )
         record = {
             **raw, "symbol": symbol, "universeSegment": segment,

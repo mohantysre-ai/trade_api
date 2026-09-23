@@ -200,6 +200,17 @@ def test_20260921_shaped_regression_targets_four_to_five_positions():
     assert len(diversified) >= 2
 
 
+def test_normal_scan_without_correlation_matrix_does_not_invent_perfect_correlation():
+    rows, cfg = _build_2026_shaped_fixture()
+    result = build_shadow_v2(
+        rows, regime="NORMAL", final_lock=True, now=NOW, config=cfg,
+        apply_coverage_hysteresis=False,
+    )
+    assert result["qualifiedCount"] >= 5
+    assert result["selectedCount"] >= 4
+    assert all(row.get("portfolioRejectReason") != "EXCESS_PORTFOLIO_CORRELATION" for row in result["rejected"])
+
+
 def test_old_vs_new_distribution_report():
     rows, cfg = _build_2026_shaped_fixture()
     scanner_symbols = [r["symbol"] for r in rows if r["symbol"].startswith(("STRONG", "DIV", "BORDER"))]

@@ -109,6 +109,13 @@ class TestInitialStopHit:
 
 
 class TestTargetAndPartialBook:
+    def test_single_quantity_target_closes_instead_of_leaving_zero_quantity_open(self):
+        p = _make_position(entry=100.0, qty=1)
+        evaluate_position(p, {p.legs[0].symbol: 140.0}, BASE)
+        assert p.status == "CLOSED"
+        assert p.legs[0].exit_reason == "TARGET"
+        assert p.total_realized_pnl == 40.0
+
     def test_long_target_triggers_partial_book(self):
         p = _make_position(entry=100.0, qty=100)
         p = evaluate_position(p, {p.legs[0].symbol: 141.0}, BASE)
@@ -116,7 +123,7 @@ class TestTargetAndPartialBook:
         assert leg.target_hit is True
         assert leg.partial_booked_qty == int(math.floor(100 * INTRADAY_PARTIAL_BOOK_PCT))
         assert leg.current_qty == 100 - leg.partial_booked_qty
-        assert leg.stop_price == leg.entry_price
+        assert leg.stop_price == 121.0
         assert leg.trail_active is True
 
     def test_short_target_triggers_partial_book(self):
@@ -126,7 +133,7 @@ class TestTargetAndPartialBook:
         assert leg.target_hit is True
         assert leg.partial_booked_qty == int(math.floor(100 * INTRADAY_PARTIAL_BOOK_PCT))
         assert leg.current_qty == 100 - leg.partial_booked_qty
-        assert leg.stop_price == leg.entry_price
+        assert leg.stop_price == 99.0
         assert leg.trail_active is True
 
 
@@ -142,7 +149,7 @@ class TestTrailStopAfterPartialBook:
     def test_no_trail_below_breakeven_after_partial(self):
         p = _make_position(entry=100.0, qty=100)
         p = evaluate_position(p, {p.legs[0].symbol: 141.0}, BASE)
-        p = evaluate_position(p, {p.legs[0].symbol: 100.5}, BASE + timedelta(minutes=1))
+        p = evaluate_position(p, {p.legs[0].symbol: 121.5}, BASE + timedelta(minutes=1))
         assert not p.all_legs_closed()
 
 
@@ -162,6 +169,22 @@ class TestEodSquareOff:
 
 
 class TestPyramiding:
+    def test_target_then_later_pyramid_uses_actual_add_price(self):
+        p = _make_position(entry=100.0, qty=50)
+        symbol = p.legs[0].symbol
+        evaluate_position(p, {symbol: 140.0}, BASE)
+        assert p.pyramided_lots == 0
+        assert p.legs[0].realized_pnl == 1000.0
+        evaluate_position(p, {symbol: 160.0}, BASE + timedelta(minutes=1))
+        assert p.pyramided_lots == 1
+        assert p.legs[0].average_entry_price == 140.0
+        assert p.legs[0].stop_price >= 140.0
+        evaluate_position(p, {symbol: 160.0}, BASE + timedelta(minutes=2))
+        assert p.pyramided_lots == 1
+        evaluate_position(p, {symbol: 140.0}, BASE + timedelta(minutes=3))
+        assert p.status == "CLOSED"
+        assert p.total_realized_pnl == 1000.0
+
     def test_pyramid_adds_lot_after_trigger(self):
         p = _make_position(entry=100.0, qty=50)
         p = evaluate_position(p, {p.legs[0].symbol: 161.0}, BASE)
@@ -202,7 +225,7 @@ class TestSerialization:
         restored = position_from_dict(d, sequence=1)
         assert restored is not None
         assert restored.legs[0].target_hit is True
-        assert restored.legs[0].stop_price == restored.legs[0].entry_price
+        assert restored.legs[0].stop_price == 121.0
 
     def test_book_reconcile_persists(self, tmp_path, monkeypatch):
         monkeypatch.setenv("INDEX_OPTIONS_INTRADAY_BOOK_FILE", str(tmp_path / "book.json"))
