@@ -76,13 +76,13 @@ export async function GET() {
     // same NSE fetch/cache used by intraday ranking. Direct NSE is a fallback.
     let response = await fetch(`${BACKEND_URL}/api/sector-heatmap`, {
       cache: 'no-store',
-      signal: AbortSignal.timeout(7_500),
+      signal: AbortSignal.timeout(20_000),
     });
     let rows = response.ok ? normalize(await response.json()) : [];
     if (!rows.length) {
       response = await fetch(NSE_URL, {
         cache: 'no-store',
-        signal: AbortSignal.timeout(7_500),
+        signal: AbortSignal.timeout(20_000),
         headers: NSE_HEADERS,
       });
       if (!response.ok) throw new Error(`NSE HTTP ${response.status}`);
@@ -93,7 +93,7 @@ export async function GET() {
       try {
         const levelsResponse = await fetch(NSE_ALL_INDICES_URL, {
           cache: 'no-store',
-          signal: AbortSignal.timeout(7_500),
+          signal: AbortSignal.timeout(20_000),
           headers: NSE_HEADERS,
         });
         if (levelsResponse.ok) rows = mergeLastLevels(rows, normalize(await levelsResponse.json()));

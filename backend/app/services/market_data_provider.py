@@ -51,6 +51,10 @@ NSE_OPTION_CHAIN_URL = os.getenv(
 )
 NSE_CANDLE_MIN_INTERVAL_SECONDS = float(os.getenv("NSE_CANDLE_MIN_INTERVAL_SECONDS", "0.15"))
 NSE_CANDLE_CIRCUIT_SECONDS = float(os.getenv("NSE_CANDLE_CIRCUIT_SECONDS", "60"))
+NSE_CANDLE_CONNECTION_RETRIES = max(0, int(os.getenv("NSE_CANDLE_CONNECTION_RETRIES", "1")))
+NSE_CANDLE_RETRY_BACKOFF_SECONDS = max(
+    0.0, float(os.getenv("NSE_CANDLE_RETRY_BACKOFF_SECONDS", "0.35"))
+)
 NSE_QUOTE_CIRCUIT_SECONDS = float(os.getenv("NSE_QUOTE_CIRCUIT_SECONDS", "60"))
 MARKET_DATA_MIN_COVERAGE_PCT = float(os.getenv("MARKET_DATA_MIN_COVERAGE_PCT", "99"))
 _IST_ZONE = ZoneInfo("Asia/Kolkata")
@@ -229,6 +233,18 @@ def _trip_nse_candle_circuit(seconds: float | None = None) -> None:
     log.warning("NSE charting circuit open for %.0fs", hold)
 
 
+def _reset_nse_chart_session() -> None:
+    global _NSE_CHART_SESSION
+    with _NSE_CHART_LOCK:
+        session = _NSE_CHART_SESSION
+        _NSE_CHART_SESSION = None
+    if session is not None:
+        try:
+            session.close()
+        except Exception:
+            pass
+
+
 def _nse_history_slot() -> None:
     global _NSE_CHART_LAST_CALL
     with _NSE_CHART_LOCK:
@@ -258,14 +274,30 @@ def _nse_bar_dt(ms: Any) -> datetime:
 def _nse_chart_get(params: dict[str, Any]) -> dict[str, Any] | None:
     if not _nse_candle_calls_allowed():
         return None
-    _nse_history_slot()
-    try:
-        response = _nse_chart_session().get(
-            NSE_CHARTING_HISTORY_URL, params=params, timeout=(8, 20)
-        )
-    except requests.RequestException as exc:
-        _trip_nse_candle_circuit()
-        log.warning("NSE charting connection failed; provider circuit opened: %s", exc)
+    response = None
+    for attempt in range(NSE_CANDLE_CONNECTION_RETRIES + 1):
+        _nse_history_slot()
+        try:
+            response = _nse_chart_session().get(
+                NSE_CHARTING_HISTORY_URL, params=params, timeout=(8, 20)
+            )
+            break
+        except requests.ConnectionError as exc:
+            _reset_nse_chart_session()
+            if attempt < NSE_CANDLE_CONNECTION_RETRIES:
+                if NSE_CANDLE_RETRY_BACKOFF_SECONDS > 0:
+                    time.sleep(NSE_CANDLE_RETRY_BACKOFF_SECONDS)
+                log.warning("NSE charting connection failed; retrying with a fresh session: %s", exc)
+                continue
+            _trip_nse_candle_circuit()
+            log.warning("NSE charting connection failed; provider circuit opened: %s", exc)
+            return None
+        except requests.RequestException as exc:
+            _reset_nse_chart_session()
+            _trip_nse_candle_circuit()
+            log.warning("NSE charting request failed; provider circuit opened: %s", exc)
+            return None
+    if response is None:
         return None
     if response.status_code in {401, 403, 429, 503}:
         _trip_nse_candle_circuit()

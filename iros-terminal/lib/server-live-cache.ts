@@ -14,7 +14,7 @@ export async function cachedBackendJson<T>(
   url: string,
   freshMs: number,
   staleMs = 30_000,
-  timeoutMs = 12_000,
+  timeoutMs = 60_000,
 ): Promise<{ data: T; cacheStatus: "HIT" | "MISS" | "STALE" | "STALE_IF_ERROR" }> {
   const now = Date.now();
   const entry = entries.get(key);

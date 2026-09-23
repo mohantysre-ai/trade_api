@@ -210,6 +210,7 @@ def test_nse_intraday_drops_bars_outside_requested_window(monkeypatch):
 
 def test_nse_chart_disconnect_opens_circuit_and_suppresses_repeat_request(monkeypatch):
     provider._NSE_CANDLE_CIRCUIT_UNTIL = 0.0
+    monkeypatch.setattr(provider, "NSE_CANDLE_RETRY_BACKOFF_SECONDS", 0.0)
     calls = []
 
     def fail_session():
@@ -221,7 +222,40 @@ def test_nse_chart_disconnect_opens_circuit_and_suppresses_repeat_request(monkey
     assert provider._nse_chart_get(params) is None
     assert provider._NSE_CANDLE_CIRCUIT_UNTIL > 0
     assert provider._nse_chart_get(params) is None
-    assert len(calls) == 1
+    assert len(calls) == 2
+
+
+def test_nse_chart_disconnect_retries_with_fresh_session_before_opening_circuit(monkeypatch):
+    provider._NSE_CANDLE_CIRCUIT_UNTIL = 0.0
+    monkeypatch.setattr(provider, "NSE_CANDLE_RETRY_BACKOFF_SECONDS", 0.0)
+    calls = []
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"status": True, "data": []}
+
+    class Session:
+        @staticmethod
+        def get(*_args, **_kwargs):
+            calls.append(1)
+            if len(calls) == 1:
+                raise provider.requests.ConnectionError("remote closed")
+            return Response()
+
+        @staticmethod
+        def close():
+            return None
+
+    monkeypatch.setattr(provider, "_nse_chart_session", lambda: Session())
+    assert provider._nse_chart_get({"symbol": "RELIANCE", "token": "2885"}) == {
+        "status": True,
+        "data": [],
+    }
+    assert provider._NSE_CANDLE_CIRCUIT_UNTIL == 0.0
+    assert len(calls) == 2
 
 
 def test_nse_quote_circuit_opens_and_failover_still_serves_quotes(monkeypatch):

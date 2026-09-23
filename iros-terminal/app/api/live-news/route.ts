@@ -21,7 +21,7 @@ export async function GET(request: Request) {
 
     const res = await fetch(backendUrl.toString(), {
       cache: "no-store",
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(45_000),
     });
 
     if (!res.ok) {

@@ -1091,11 +1091,8 @@ export default function EodAnalysisPanel({
         loadOne<IndexOptionsReport>(`/api/reports/eod-index-options${buildQs(dateStr)}`, 'Index Options'),
       ]);
       if (intraData) setIntraday(intraData);
-      else setIntraday(null);
       if (swingData) setSwing(swingData);
-      else setSwing(null);
       if (optionsData) setIndexOptions(optionsData);
-      else setIndexOptions(null);
       if (!intraData && !swingData && !optionsData) {
         setError((prev) => prev || 'Book P&L failed to load');
       }
