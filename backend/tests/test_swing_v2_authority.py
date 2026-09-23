@@ -176,6 +176,40 @@ def test_swing_ledger_initializes_each_path_once(monkeypatch, tmp_path):
     assert calls == [path]
 
 
+def test_unfilled_expired_swing_lock_is_skipped_not_closed(v2_env, monkeypatch):
+    from datetime import date
+    from app.services import eod_book_cache
+    from app.services.swing_v2.ledger import SwingLedger
+    from app.services.swing_v2.schemas import EventType
+
+    monkeypatch.setattr(eod_book_cache, "load_book_cache", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(eod_book_cache, "save_book_cache", lambda _day, _kind, payload: payload)
+    ledger = SwingLedger(v2_env["cfg"].load_config().ledger_path)
+    ledger.append(
+        idempotency_key="polycab-expired", decision_id="polycab", position_id="polycab",
+        symbol="POLYCAB", session_date="2026-09-23", event_type=EventType.ORDER_EXPIRED,
+        event_timestamp="2026-09-23T10:05:00Z",
+        payload={
+            "status": "ORDER_EXPIRED", "executionStatus": "EXPIRED_UNFILLED",
+            "filledQty": 0, "remainingQty": 20, "deployedCapital": 101082.0,
+            "realizedPnl": 0.0, "unrealizedPnl": 0.0, "totalPnl": 0.0,
+        },
+    )
+    report = v2_env["eod"].generate_swing_eod_report(date(2026, 9, 23), force=True)
+    row = report["picks"][0]
+    assert row["status"] == "NOT_TRIGGERED"
+    assert row["executionStatus"] == "EXPIRED_UNFILLED"
+    assert row["skipped"] is True
+    assert row["qty"] is None
+    assert row["filledQty"] == 0
+    assert row["entryPrice"] is None
+    assert row["deployedCapital"] == 0.0
+    assert row["pnl"] == 0.0
+    assert report["totalDeployed"] == 0.0
+    assert report["attribution"]["triggered"] == 0
+    assert report["attribution"]["skipped"] == 1
+
+
 def test_desk_book_symbols_reads_v2_ownership(v2_env):
     dbs = v2_env["dbs"]
     assert isinstance(dbs.swing_locked_symbols("2026-09-13"), set)

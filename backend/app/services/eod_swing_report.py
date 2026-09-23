@@ -776,13 +776,16 @@ def generate_swing_eod_report(
         positions = report.get("positions") or []
         picks = []
         for p in positions:
-            qty = p.get("filledQty") or p.get("qty") or p.get("approxQty")
             entry = p.get("entryPrice") or p.get("fillPrice")
-            mark = p.get("currentPrice") or p.get("ltp") or p.get("exitPrice") or entry
             pnl = p.get("totalPnl")
             terminal = bool(p.get("terminal"))
             last_event = str(p.get("lastEventType") or "")
             skipped = terminal and last_event == "ORDER_EXPIRED" and not entry
+            qty = None if skipped else (p.get("filledQty") or p.get("qty") or p.get("approxQty"))
+            mark = None if skipped else (p.get("currentPrice") or p.get("ltp") or p.get("exitPrice") or entry)
+            deployed = 0.0 if skipped else p.get("deployedCapital")
+            if skipped:
+                pnl = 0.0
             outcome = None
             if terminal and pnl is not None:
                 outcome = "WIN" if float(pnl) > 0 else ("LOSS" if float(pnl) < 0 else "FLAT")
@@ -790,28 +793,28 @@ def generate_swing_eod_report(
                 {
                     "symbol": p.get("symbol"),
                     "direction": "LONG",
-                    "status": p.get("status") or ("CLOSED" if terminal else "RUNNING"),
+                    "status": "NOT_TRIGGERED" if skipped else (p.get("status") or ("CLOSED" if terminal else "RUNNING")),
                     "terminal": terminal,
                     "skipped": skipped,
                     "executionStatus": p.get("executionStatus") or ("EXPIRED_UNFILLED" if skipped else ("FILLED" if entry else "LOCKED")),
                     "qty": qty,
                     "approxQty": qty,
-                    "filledQty": p.get("filledQty") or qty,
-                    "remainingQty": p.get("remainingQty"),
-                    "entryPrice": entry,
+                    "filledQty": 0 if skipped else (p.get("filledQty") or qty),
+                    "remainingQty": None if skipped else p.get("remainingQty"),
+                    "entryPrice": None if skipped else entry,
                     "currentPrice": mark,
-                    "exitPrice": p.get("exitPrice"),
+                    "exitPrice": None if skipped else p.get("exitPrice"),
                     "stopLoss": p.get("effectiveStop") or p.get("initialStop"),
                     "target1": p.get("t1"),
                     "target2": p.get("t2"),
                     "pnl": pnl,
                     "totalPnl": pnl,
-                    "pnlPct": (float(pnl) / float(p.get("deployedCapital")) * 100.0) if pnl is not None and p.get("deployedCapital") else None,
-                    "pnlKind": "realised" if terminal else "unrealised",
-                    "outcomeBucket": outcome,
-                    "deployedCapital": p.get("deployedCapital"),
-                    "realizedPnl": p.get("realizedPnl"),
-                    "unrealizedPnl": p.get("unrealizedPnl"),
+                    "pnlPct": (float(pnl) / float(deployed) * 100.0) if pnl is not None and deployed else None,
+                    "pnlKind": None if skipped else ("realised" if terminal else "unrealised"),
+                    "outcomeBucket": None if skipped else outcome,
+                    "deployedCapital": deployed,
+                    "realizedPnl": 0.0 if skipped else p.get("realizedPnl"),
+                    "unrealizedPnl": 0.0 if skipped else p.get("unrealizedPnl"),
                     "entryTimestamp": p.get("entryTimestamp"),
                     "exitReason": p.get("exitReason"),
                     "lastEventType": last_event,
