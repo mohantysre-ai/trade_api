@@ -36,6 +36,28 @@ _HEADERS = {
 FALLBACK_SEGMENT = "NIFTY500_FALLBACK"
 
 
+def _apply_factor_percentiles(prepared: list[dict[str, Any]]) -> None:
+    factor_map = {
+        "trendPriorPctile": ("trendPriorRaw", True),
+        "residualStrengthPctile": ("residualStrengthRaw", True),
+        "setupQualityPctile": ("breakoutDistanceAtr", False),
+        "rvolPctile": ("rvolPaced", True),
+        "clvPctile": ("clv", True),
+        "sectorStrengthPctile": ("sectorStrengthRaw", True),
+        "liquidityPctile": ("mdtv20", True),
+    }
+    by_symbol = {row["symbol"]: row for row in prepared}
+    for output, (source, higher_better) in factor_map.items():
+        values = {
+            row["symbol"]: float(row[source])
+            for row in prepared
+            if _number(row.get(source)) is not None
+        }
+        pct = _percentiles(values, ascending=higher_better)
+        for symbol, value in pct.items():
+            by_symbol[symbol][output] = value
+
+
 def _universe_dir() -> Path:
     return Path(os.getenv("SWING_V2_UNIVERSE_DIR", str(Path(__file__).resolve().parents[2] / "data" / "swing_v2_universe")))
 
@@ -308,18 +330,8 @@ def enrich_v2_market_snapshot(payload: dict[str, Any], all_stocks: list[dict[str
             row["trendModel"] = "UNRATED_SHORT_HISTORY"
         row["residualStrengthRaw"] = return5 - sector_value if return5 is not None and sector_value is not None else None
         row["sectorStrengthRaw"] = sector_value
-    factor_map = {
-        "trendPriorPctile": ("trendPriorRaw", True), "residualStrengthPctile": ("residualStrengthRaw", True),
-        "setupQualityPctile": ("breakoutDistanceAtr", False), "rvolPctile": ("rvolPaced", True),
-        "clvPctile": ("clv", True), "sectorStrengthPctile": ("sectorStrengthRaw", True),
-        "liquidityPctile": ("modeledRoundTripCostPct", False),
-    }
+    _apply_factor_percentiles(prepared)
     by_symbol = {row["symbol"]: row for row in prepared}
-    for output, (source, higher_better) in factor_map.items():
-        values = {row["symbol"]: float(row[source]) for row in prepared if _number(row.get(source)) is not None}
-        pct = _percentiles(values, ascending=higher_better)
-        for symbol, value in pct.items():
-            by_symbol[symbol][output] = value
     for row in all_stocks:
         enriched = by_symbol.get(str(row.get("ticker") or "").upper())
         if enriched:

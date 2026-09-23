@@ -2953,8 +2953,6 @@ def _maybe_refresh_live_snapshot(*, reason: str) -> dict[str, Any]:
     from .angel_one_feed import _snapshot_needs_live_refresh
     from .angel_one_feed import _SCHEDULED_REFRESH_STATE_LOCK
     from .angel_one_feed import _SCHEDULED_REFRESH_STATE
-    from .angel_one_feed import _is_refresh_stale
-    from .angel_one_feed import _clear_stale_refresh_lock
     from .angel_one_feed import run_scheduled_live_refresh
     from .trade_outcome import _is_market_open
 
@@ -2969,10 +2967,7 @@ def _maybe_refresh_live_snapshot(*, reason: str) -> dict[str, Any]:
     with _SCHEDULED_REFRESH_STATE_LOCK:
         refresh_state = dict(_SCHEDULED_REFRESH_STATE)
     if refresh_state.get("running"):
-        if _is_refresh_stale():
-            _clear_stale_refresh_lock()
-        else:
-            return snap
+        return snap
     try:
         result = run_scheduled_live_refresh(reason=reason)
     except Exception:
@@ -2980,9 +2975,10 @@ def _maybe_refresh_live_snapshot(*, reason: str) -> dict[str, Any]:
         return load_market_snapshot()
     if not isinstance(result, dict) or result.get("success") is not True:
         log.warning(
-            "intraday live snapshot refresh unsuccessful (%s): %s",
+            "intraday live snapshot refresh unsuccessful (%s): %s active=%s",
             reason,
             result.get("error") if isinstance(result, dict) else result,
+            result.get("activeRefresh") if isinstance(result, dict) else None,
         )
         return load_market_snapshot()
     _SNAP_REFRESH_LAST = time.monotonic()

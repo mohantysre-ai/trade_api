@@ -132,10 +132,7 @@ INTRADAY_750_CONSTITUENT_URLS = (
     "https://www.niftyindices.com/IndexConstituent/ind_niftymicrocap250_list.csv",
 )
 SCRIP_MASTER_URL = "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json"
-# Funnel: full Nifty 500 quotes → top N by volume for Asset Matrix (env: VOLUME_PRESELECT_LIMIT).
-# Swing hunt candles default to the full 500 (env: SWING_CANDIDATE_LIMIT).
 VOLUME_PRESELECT_LIMIT = int(os.getenv("VOLUME_PRESELECT_LIMIT", "200"))
-SWING_CANDIDATE_LIMIT = int(os.getenv("SWING_CANDIDATE_LIMIT", "500"))
 _NSE_EQ_TOKEN_MAP: dict[str, tuple[str, str]] | None = None
 _NSE_EQ_TOKEN_MAP_LOADED_AT = 0.0
 _NSE_EQ_TOKEN_MAP_TTL_SECONDS = int(os.getenv("NSE_EQ_TOKEN_MAP_TTL_SECONDS", "86400"))
@@ -593,18 +590,38 @@ def _persist_snapshot_ticker_facts(sym: str, merged: dict[str, Any]) -> None:
     atomic_update_json(_snapshot_path(), _mutator)
 
 
-def _snapshot_intraday_cache(snapshot: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
-    """Reuse intraday candle metrics from last_market_snapshot when still within TTL."""
+def _snapshot_intraday_cache(
+    snapshot: dict[str, Any] | None,
+    *,
+    allow_previous_swing_session: bool = False,
+    now: datetime | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Reuse candle metrics while they are valid for their strategy timeframe."""
     age = _snapshot_age_seconds(snapshot)
-    if age is None or age > INTRADAY_METRICS_TTL_SECONDS:
+    fresh_intraday = age is not None and age <= INTRADAY_METRICS_TTL_SECONDS
+    if not fresh_intraday and not allow_previous_swing_session:
         return {}
     cache: dict[str, dict[str, Any]] = {}
     for ticker, row in (snapshot.get("stockQuotes") or {}).items():
         if not isinstance(row, dict):
             continue
         intraday = row.get("intraday")
-        if _intraday_metrics_usable(intraday):
+        if fresh_intraday and _intraday_metrics_usable(intraday):
             cache[str(ticker)] = intraday
+            continue
+        if not allow_previous_swing_session or not _swing_candle_metrics_usable(intraday, "1h"):
+            continue
+        raw = intraday.get("swingV2Raw") if isinstance(intraday, dict) else None
+        if not isinstance(raw, dict) or raw.get("dailyBarsThroughPreviousClose") is not True:
+            continue
+        try:
+            from .swing_v2.data_quality import _bars1h_session_fresh
+
+            stamp = raw.get("last1hTimestamp") or raw.get("last60mTimestamp") or raw.get("last5mTimestamp")
+            if _bars1h_session_fresh(stamp, now):
+                cache[str(ticker)] = intraday
+        except Exception:
+            continue
     return cache
 
 
@@ -907,7 +924,7 @@ def _is_refresh_stale() -> bool:
         state = dict(_SCHEDULED_REFRESH_STATE)
     if not state.get("running"):
         return False
-    started = state.get("startedAt")
+    started = state.get("lastProgressAt") or state.get("startedAt")
     if not started:
         return True
     try:
@@ -919,48 +936,57 @@ def _is_refresh_stale() -> bool:
 
 
 def _clear_stale_refresh_lock() -> bool:
-    """Force-clear a stuck scheduled refresh lock so scans can proceed."""
+    """Record stale ownership without pretending a held mutex was released."""
     with _SCHEDULED_REFRESH_STATE_LOCK:
         if not _SCHEDULED_REFRESH_STATE.get("running"):
             return False
         prior = dict(_SCHEDULED_REFRESH_STATE)
         _SCHEDULED_REFRESH_STATE.update(
-            running=False,
-            reason=None,
-            startedAt=None,
-            clearedAt=datetime.now(timezone.utc).isoformat(),
-            clearedReason="stale_refresh_timeout",
+            staleDetectedAt=datetime.now(timezone.utc).isoformat(),
+            staleReason="refresh_progress_timeout",
         )
     logging.getLogger(__name__).warning(
-        "Cleared stuck scheduled refresh lock: prior=%s", prior
+        "Detected stale scheduled refresh owner; mutex remains owned: prior=%s", prior
     )
-    return True
+    return False
 
 
 def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dict[str, Any]:
     """Live quote/candle refresh with LLM day-lock reuse (no force LLM)."""
     log = logging.getLogger(__name__)
     if not _SCHEDULED_REFRESH_LOCK.acquire(blocking=False):
-        if _is_refresh_stale():
+        stale = _is_refresh_stale()
+        if stale:
             _clear_stale_refresh_lock()
-            _SCHEDULED_REFRESH_LOCK.acquire(blocking=True)
-        else:
-            with _SCHEDULED_REFRESH_STATE_LOCK:
-                active = dict(_SCHEDULED_REFRESH_STATE)
-            return {
-                "success": False,
-                "error": "market_refresh_already_running",
-                "reason": reason,
-                "activeRefresh": active,
-            }
+        with _SCHEDULED_REFRESH_STATE_LOCK:
+            active = dict(_SCHEDULED_REFRESH_STATE)
+        return {
+            "success": False,
+            "error": "market_refresh_stale_running" if stale else "market_refresh_already_running",
+            "reason": reason,
+            "activeRefresh": active,
+        }
+    started_mono = time.monotonic()
+    started_at = datetime.now(timezone.utc).isoformat()
     with _SCHEDULED_REFRESH_STATE_LOCK:
         _SCHEDULED_REFRESH_STATE.update(
             {
                 "running": True,
                 "reason": reason,
-                "startedAt": datetime.now(timezone.utc).isoformat(),
+                "startedAt": started_at,
+                "lastProgressAt": started_at,
+                "progress": "starting",
+                "staleDetectedAt": None,
+                "staleReason": None,
             }
         )
+
+    def refresh_progress(message: str) -> None:
+        with _SCHEDULED_REFRESH_STATE_LOCK:
+            _SCHEDULED_REFRESH_STATE.update(
+                lastProgressAt=datetime.now(timezone.utc).isoformat(),
+                progress=str(message),
+            )
     swing_hunt = reason == "swing_entry_hunt" or reason.startswith("swing_v2")
     intraday_hunt = reason.startswith("intraday_")
     pool = (
@@ -980,6 +1006,7 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
             prefer_cache=False,
             allow_fallback=True,
             force_llm_refresh=False,
+            on_progress=refresh_progress,
             angel_first_quotes=swing_hunt,
             swing_v2_history=reason.startswith("swing_v2"),
         )
@@ -1015,9 +1042,19 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
         log.exception("Scheduled live refresh failed: %s", exc)
         return {"success": False, "error": str(exc), "reason": reason}
     finally:
+        finished_at = datetime.now(timezone.utc).isoformat()
         with _SCHEDULED_REFRESH_STATE_LOCK:
             _SCHEDULED_REFRESH_STATE.update(
-                {"running": False, "reason": None, "startedAt": None}
+                {
+                    "running": False,
+                    "reason": None,
+                    "startedAt": None,
+                    "lastProgressAt": None,
+                    "progress": None,
+                    "lastReason": reason,
+                    "finishedAt": finished_at,
+                    "durationSeconds": round(time.monotonic() - started_mono, 3),
+                }
             )
         _SCHEDULED_REFRESH_LOCK.release()
 
@@ -3204,6 +3241,7 @@ def _build_stock_row(
         "bestBid": best_bid,
         "bestAsk": best_ask,
         "availableAskDepth": ask_depth,
+        "quoteReceivedAt": datetime.now(timezone.utc).isoformat(),
         "intraday": intraday or {},
         **(
             {"fresh": False, "staleReason": "zero_or_missing_ltp"}
@@ -4562,7 +4600,11 @@ def _build_payload_from_live_data(
     now = _ist_now()
     resolved_pool_name = pool_name or NIFTY_500_LABEL
     snapshot = prior_snapshot if prior_snapshot is not None else _load_last_snapshot()
-    intraday_cache = _snapshot_intraday_cache(snapshot)
+    intraday_cache = _snapshot_intraday_cache(
+        snapshot,
+        allow_previous_swing_session=swing_v2_history,
+        now=now,
+    )
 
     progress("Fetching live quotes...")
     stock_universe, active_pool_label = _quote_universe(resolved_pool_name, client)
@@ -4622,8 +4664,7 @@ def _build_payload_from_live_data(
 
     candle_limit = int(os.getenv("INTRADAY_CANDIDATE_LIMIT", str(VOLUME_PRESELECT_LIMIT)))
     volume_limit = int(os.getenv("VOLUME_PRESELECT_LIMIT", str(VOLUME_PRESELECT_LIMIT)))
-    swing_limit = int(os.getenv("SWING_CANDIDATE_LIMIT", str(SWING_CANDIDATE_LIMIT)))
-    candle_limit = len(stock_universe) if angel_first_quotes else max(candle_limit, volume_limit, swing_limit)
+    candle_limit = len(stock_universe) if angel_first_quotes else max(candle_limit, volume_limit)
     top_by_volume = _select_top_volume_stocks(all_stocks, candle_limit)
     candidate_rows = top_by_volume[:candle_limit]
     candidate_keys = {row["ticker"] for row in candidate_rows}
