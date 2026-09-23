@@ -136,21 +136,38 @@ def score_candidate(c,*,portfolio=None,scenarios=None,nav=1_000_000):
     if utility<=0:reasons.append("NO_TRADE_DOMINATES")
     return QuantDecision(sid,idx,round(utility,2),round(rp["ev"],2),round(rp["cvar95"],2),round(cost,2),round(tail,2),round(gp,2),round(conc,2),"ADMIT" if utility>0 else "REJECT",tuple(reasons),round(rp["stressLoss"],2),portfolio_greeks=g,greek_utilization=utilizations,greek_units=gov.get("greekUnits"),risk_limits=limits,risk_shocks=gov.get("riskShocks"),greek_shock_loss=gov.get("greekShockLoss"),utility_before_greek_risk=round(rp["ev"]-cost-tail-conc,2),risk_gate_passed=gov["pass"],risk_rejection_reasons=tuple(gov["reasons"]))
 
-def select_quant_portfolio(candidates,max_positions=2,nav=1_000_000):
+def select_quant_portfolio(candidates,max_positions=2,nav=1_000_000,max_per_sleeve=None):
     # Group by index so every competing structure sees exactly the same scenario distribution.
     scenarios={};
     for c in candidates:
         idx=str(c.get("key") or c.get("index") or "UNKNOWN")
         if idx not in scenarios: scenarios[idx]=common_scenarios(c)
     ranked=sorted((score_candidate(c,scenarios=scenarios[str(c.get("key") or c.get("index") or "UNKNOWN")],nav=nav) for c in candidates),key=lambda d:d.utility,reverse=True); source={(str(c.get("strategyId") or c.get("strategyType")),str(c.get("key") or c.get("index"))):c for c in candidates}; admitted=[]; admitted_rows=[]; rejected=[]
-    for initial in ranked:
+    def sleeve_for(decision):
+        candidate=source.get((decision.strategy_id,decision.index)) or {}
+        return str(candidate.get("strategyMode") or "BUY_PREMIUM").upper()
+    ordered=ranked
+    if max_per_sleeve is not None:
+        # Give every eligible sleeve its own admission opportunity before a
+        # second position from a stronger sleeve can consume the shared book.
+        # Risk/utility gates still decide whether any position is admitted.
+        groups={}
+        for decision in ranked: groups.setdefault(sleeve_for(decision),[]).append(decision)
+        sleeve_order=sorted(groups,key=lambda name:groups[name][0].utility,reverse=True)
+        ordered=[]
+        for offset in range(max((len(rows) for rows in groups.values()),default=0)):
+            ordered.extend(groups[name][offset] for name in sleeve_order if offset<len(groups[name]))
+    sleeve_counts={}
+    for initial in ordered:
         c=source.get((initial.strategy_id,initial.index));
         if not c or len(admitted)>=max_positions:continue
+        sleeve=sleeve_for(initial)
+        if max_per_sleeve is not None and sleeve_counts.get(sleeve,0)>=max_per_sleeve:continue
         d=score_candidate(c,portfolio=admitted_rows,scenarios=scenarios[initial.index],nav=nav)
         if d.utility<=0: rejected.append(d.to_dict()); continue
         gov=risk_governor(c,admitted_rows,nav,stress_loss=d.stress_loss)
         if not gov["pass"]:
             x=d.to_dict(); x["decision"]="REJECT"; x["reasons"]=gov["reasons"]; x["portfolioRisk"]=gov; rejected.append(x); continue
-        admitted.append(d); admitted_rows.append(c)
+        admitted.append(d); admitted_rows.append(c); sleeve_counts[sleeve]=sleeve_counts.get(sleeve,0)+1
     portfolio_stress_val=sum((x.stress_loss or 0) for x in admitted) if admitted_rows else 0
     return {"engine":QUANT_V2_ENGINE,"model":"COMMON_SCENARIO_DISTRIBUTION_REPRICER","noTradeUtility":0.0,"selected":[x.to_dict() for x in admitted],"rejected":rejected,"ranked":[x.to_dict() for x in ranked],"portfolioRisk":risk_governor({},admitted_rows,nav,stress_loss=portfolio_stress_val) if admitted_rows else {"pass":True,"greeks":portfolio_greeks([]),"stressLoss":0,"greekUnits":{"delta":"INR per 1 underlying point","gamma":"INR per 1 underlying point^2","theta":"INR per day","vega":"INR per 1 percentage point IV move"},"riskShocks":{"spot":0,"spotMovePct":SPOT_SHOCK_PCT,"spotMovePoints":0,"ivMovePoints":IV_SHOCK_POINTS},"greekShockLoss":{"delta":0,"gamma":0,"vega":0,"stress":0},"scenarioStress":{"stressLoss":0,"stressLimit":0,"utilization":0}},"decision":"TRADE" if admitted else NO_TRADE}

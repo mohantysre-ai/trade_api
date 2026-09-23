@@ -5757,19 +5757,18 @@ def create_app() -> FastAPI:
         Serves ``data/eod/{date}/book_intraday.json`` when present unless force=true.
         """
         try:
-            from datetime import date as _date
+            from datetime import date as _date, datetime as _dt
             from .eod_intraday_report import generate_intraday_eod_report
-            from datetime import datetime as _dt
             for_date = (
                 _date.fromisoformat(date)
                 if date
                 else _dt.now(tz=IST_ZONE).date()
             )
-            if for_date == _dt.now(tz=IST_ZONE).date():
-                # Session-economics projection (never a candle-rewrite of the
-                # locked session): generate reads the authoritative Intraday
-                # session directly for today's date.
-                return generate_intraday_eod_report(for_date, force=force)
+            if not force:
+                from .eod_book_cache import load_book_cache
+                cached = load_book_cache(for_date, "intraday")
+                if cached is not None:
+                    return cached
             return generate_intraday_eod_report(for_date, force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -5781,21 +5780,27 @@ def create_app() -> FastAPI:
     ) -> dict[str, Any]:
         """Day-bucketed swing P&L. Cached under book_swing.json unless force=true."""
         try:
-            from datetime import date as _date
+            from datetime import date as _date, datetime as _dt
             from .eod_swing_report import generate_swing_eod_report
+            from .eod_book_cache import load_book_cache
             for_date = _date.fromisoformat(date) if date else None
+            if not force:
+                effective_date = for_date or _dt.now(tz=IST_ZONE).date()
+                cached = load_book_cache(effective_date, "swing")
+                if cached is not None:
+                    return cached
             return generate_swing_eod_report(for_date, force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.get("/api/reports/eod-index-options")
-    def eod_index_options_report(date: str | None = None) -> dict[str, Any]:
+    def eod_index_options_report(date: str | None = None, force: bool = False) -> dict[str, Any]:
         """Date-locked Index Options paper P&L archived with the EOD books."""
         try:
             from datetime import date as _date, datetime as _dt
             from .eod_index_options_report import generate_index_options_eod_report
             for_date = _date.fromisoformat(date) if date else _dt.now(tz=IST_ZONE).date()
-            return generate_index_options_eod_report(for_date)
+            return generate_index_options_eod_report(for_date, force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 

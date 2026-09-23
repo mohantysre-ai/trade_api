@@ -124,6 +124,58 @@ def test_swing_eod_uses_v2_state(v2_env):
     assert report.get("authoritative") is True
 
 
+def test_swing_eod_preserves_filled_trade_lifecycle_fields(v2_env, monkeypatch):
+    from datetime import date
+    from app.services import eod_book_cache
+    from app.services.swing_v2.ledger import SwingLedger
+    from app.services.swing_v2.schemas import EventType
+
+    monkeypatch.setattr(eod_book_cache, "load_book_cache", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(eod_book_cache, "save_book_cache", lambda _day, _kind, payload: payload)
+    ledger = SwingLedger(v2_env["cfg"].load_config().ledger_path)
+    base = {
+        "status": "OPEN", "executionStatus": "FILLED", "filledQty": 20,
+        "remainingQty": 20, "entryPrice": 100.0, "entryTimestamp": "2026-09-13T04:30:00Z",
+        "deployedCapital": 2000.0, "initialStop": 95.0, "effectiveStop": 95.0,
+        "t1": 105.0, "t2": 110.0, "realizedPnl": 0.0, "unrealizedPnl": 0.0,
+        "totalPnl": 0.0,
+    }
+    ledger.append(
+        idempotency_key="poly-fill", decision_id="poly", position_id="poly",
+        symbol="POLYCAB", session_date="2026-09-13", event_type=EventType.FILL_COMPLETE,
+        event_timestamp="2026-09-13T04:30:00Z", payload=base,
+    )
+    ledger.append(
+        idempotency_key="poly-exit", decision_id="poly", position_id="poly",
+        symbol="POLYCAB", session_date="2026-09-13", event_type=EventType.TIME_EXIT_FILLED,
+        event_timestamp="2026-09-13T10:00:00Z",
+        payload={**base, "status": "CLOSED_TIME", "remainingQty": 0, "terminal": True,
+                 "exitReason": "TIME_EXIT_FILLED", "exitPrice": 108.0,
+                 "realizedPnl": 160.0, "totalPnl": 160.0},
+    )
+    report = v2_env["eod"].generate_swing_eod_report(date(2026, 9, 13), force=True)
+    row = report["picks"][0]
+    assert row["qty"] == 20
+    assert row["entryPrice"] == 100.0
+    assert row["currentPrice"] == 108.0
+    assert row["exitPrice"] == 108.0
+    assert row["exitReason"] == "TIME_EXIT_FILLED"
+    assert row["status"] == "CLOSED_TIME"
+    assert row["outcomeBucket"] == "WIN"
+    assert report["attribution"]["triggered"] == 1
+
+
+def test_swing_ledger_initializes_each_path_once(monkeypatch, tmp_path):
+    from app.services.swing_v2.ledger import SwingLedger
+
+    calls = []
+    monkeypatch.setattr(SwingLedger, "_initialize", lambda self: calls.append(self.path))
+    path = str(tmp_path / "once.sqlite3")
+    SwingLedger(path)
+    SwingLedger(path)
+    assert calls == [path]
+
+
 def test_desk_book_symbols_reads_v2_ownership(v2_env):
     dbs = v2_env["dbs"]
     assert isinstance(dbs.swing_locked_symbols("2026-09-13"), set)

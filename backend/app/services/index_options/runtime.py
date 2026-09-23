@@ -315,7 +315,11 @@ def process_strategy_cycle(radar,snapshot,now):
 
     now = now.astimezone(IST_ZONE)
     d=now.date().isoformat();q=_quotes(snapshot)
-    from ..index_options_engine import MAX_DAILY_ENTRIES
+    from ..index_options_engine import (
+        MAX_CONCURRENT_PER_SLEEVE,
+        MAX_CONCURRENT_TRADES,
+        MAX_DAILY_ENTRIES,
+    )
     daily_entries=daily_entry_count(d)+_paper_daily_count(d)
     snapshot_id=str(snapshot.get("snapshotId") or snapshot.get("updatedAt") or "")
     market_generation=str(snapshot.get("marketGeneration") or "")
@@ -348,7 +352,10 @@ def process_strategy_cycle(radar,snapshot,now):
                 c["paperEntryReason"] = "SESSION_ENTRY_CUTOFF"
                 _persist_decision_audit(db,c,"ENTRY_BLOCKED","REJECT",True,False,"ENTRY_BLOCKED",now,snapshot_id,market_generation)
                 continue
-            if db.execute("SELECT COUNT(*) FROM index_option_positions WHERE session_date=? AND status='OPEN'",(d,)).fetchone()[0]>=2:c["paperEntryState"]="ENTRY_BLOCKED";c["paperEntryReason"]="QUANT_PORTFOLIO_MAX_CONCURRENT";_persist_decision_audit(db,c,"ENTRY_BLOCKED","REJECT",True,False,"ENTRY_BLOCKED",now,snapshot_id,market_generation);continue
+            open_payloads=[json.loads(row[0]) for row in db.execute("SELECT payload_json FROM index_option_positions WHERE session_date=? AND status='OPEN'",(d,)).fetchall()]
+            if len(open_payloads)>=MAX_CONCURRENT_TRADES:c["paperEntryState"]="ENTRY_BLOCKED";c["paperEntryReason"]="QUANT_PORTFOLIO_MAX_CONCURRENT";_persist_decision_audit(db,c,"ENTRY_BLOCKED","REJECT",True,False,"ENTRY_BLOCKED",now,snapshot_id,market_generation);continue
+            sleeve=str(c.get("strategyMode") or "BUY_PREMIUM").upper()
+            if sum(1 for row in open_payloads if str(row.get("strategyMode") or "BUY_PREMIUM").upper()==sleeve)>=MAX_CONCURRENT_PER_SLEEVE:c["paperEntryState"]="ENTRY_BLOCKED";c["paperEntryReason"]="QUANT_SLEEVE_MAX_CONCURRENT";_persist_decision_audit(db,c,"ENTRY_BLOCKED","REJECT",True,False,"ENTRY_BLOCKED",now,snapshot_id,market_generation);continue
 
             if entry_state == "ENTRY_BLOCKED":
                 _persist_decision_audit(db, c, "ENTRY_BLOCKED", "REJECT", True, False, "ENTRY_BLOCKED", now, snapshot_id, market_generation)

@@ -1553,7 +1553,12 @@ def generate_intraday_eod_report(
         # analytics run separately and never re-derive live session economics.
         # During OPEN hours the existing cache flow below is preserved — P&L
         # ticks are overlaid live in the UI.
-        if after_close or force:
+        if force:
+            return project_session_live(session_live, for_date=for_date, capital=capital)
+        if after_close:
+            cached = load_book_cache(for_date, "intraday")
+            if cached is not None:
+                return cached
             return project_session_live(session_live, for_date=for_date, capital=capital)
 
     cached_hist = load_book_cache(for_date, "intraday")

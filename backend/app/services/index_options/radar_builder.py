@@ -4,7 +4,12 @@ from typing import Any
 from .context import IndexOptionContext
 from .strategy_registry import get_registered_strategies,is_strategy_enabled
 from .quant_v2 import select_quant_portfolio
-from ..index_options_engine import INDEX_CONFIG
+from ..index_options_engine import (
+    INDEX_CONFIG,
+    MAX_CONCURRENT_PER_SLEEVE,
+    MAX_CONCURRENT_TRADES,
+    MAX_DAILY_ENTRIES,
+)
 
 def _num(v):
     try:
@@ -35,7 +40,11 @@ def build_index_options_radar_v2(snapshot):
                 if not strategy.eligible(ctx):continue
                 candidates.append(_row(strategy.build(ctx),index,ctx))
             except Exception:continue
-    quant=select_quant_portfolio(candidates,max_positions=2)
+    quant=select_quant_portfolio(
+        candidates,
+        max_positions=MAX_CONCURRENT_TRADES,
+        max_per_sleeve=MAX_CONCURRENT_PER_SLEEVE,
+    )
     keys={(x["strategy_id"],x["index"]) for x in quant["selected"]}; selected=[c for c in candidates if (str(c.get("strategyId")),str(c.get("key"))) in keys]
     for c in selected:c["quantAuthority"]="INDEX_OPTIONS_QUANT_V2"
-    return {"success":True,"executionPolicy":"AUTO_PAPER_ONLY","strategy":"QUANT_V2_COMMON_DISTRIBUTION_PORTFOLIO","updatedAt":payload.get("updatedAt"),"candidates":[c for c in candidates if c.get("strategyMode")!="SELL_PREMIUM"],"sellerCandidates":[c for c in candidates if c.get("strategyMode")=="SELL_PREMIUM"],"selected":selected,"buySelected":[c for c in selected if c.get("strategyMode")!="SELL_PREMIUM"],"sellSelected":[c for c in selected if c.get("strategyMode")=="SELL_PREMIUM"],"quantDecision":quant,"limits":{"minDailyEntries":0,"maxDailyEntries":20,"maxConcurrent":2,"selectionAuthority":"INDEX_OPTIONS_QUANT_V2","noTradeUtility":0.0}}
+    return {"success":True,"executionPolicy":"AUTO_PAPER_ONLY","strategy":"QUANT_V2_COMMON_DISTRIBUTION_PORTFOLIO","updatedAt":payload.get("updatedAt"),"candidates":[c for c in candidates if c.get("strategyMode")!="SELL_PREMIUM"],"sellerCandidates":[c for c in candidates if c.get("strategyMode")=="SELL_PREMIUM"],"selected":selected,"buySelected":[c for c in selected if c.get("strategyMode")!="SELL_PREMIUM"],"sellSelected":[c for c in selected if c.get("strategyMode")=="SELL_PREMIUM"],"quantDecision":quant,"limits":{"minDailyEntries":0,"maxDailyEntries":MAX_DAILY_ENTRIES,"maxConcurrent":MAX_CONCURRENT_TRADES,"maxConcurrentPerSleeve":MAX_CONCURRENT_PER_SLEEVE,"selectionAuthority":"INDEX_OPTIONS_QUANT_V2","noTradeUtility":0.0}}

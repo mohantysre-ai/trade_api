@@ -33,13 +33,11 @@ echo     Public URL:   %PUBLIC_URL%
 echo.
 
 REM =========================================================
-REM CLEAR STALE BACKEND CACHES
+REM CLEAR REGENERABLE BYTECODE CACHES
 REM =========================================================
-echo [CACHE-CLEAN] Clearing stale swing V2 caches...
-if exist "%BACKEND_DIR%\app\data\swing_v2_session.json" (
-    del /f /q "%BACKEND_DIR%\app\data\swing_v2_session.json" >nul 2>&1
-    echo [CACHE-CLEAN] Removed swing_v2_session.json
-)
+REM swing_v2_session.json is durable strategy state, not a cache. Deleting it
+REM on startup can make localhost and the tunnel report different lock state.
+echo [CACHE-CLEAN] Preserving durable swing V2 session state...
 if exist "%BACKEND_DIR%\app\services\swing_v2\__pycache__" (
     del /f /q "%BACKEND_DIR%\app\services\swing_v2\__pycache__\*.pyc" >nul 2>&1
     echo [CACHE-CLEAN] Cleared swing_v2 bytecode cache

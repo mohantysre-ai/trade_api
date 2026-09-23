@@ -1,9 +1,7 @@
 """Date-locked EOD snapshot of the automatic Index Options paper book.
 
-Issue 3 parity: while the live paper book's IST sessionDate matches the
-requested day, the EOD snapshot is ALWAYS rebuilt from the live book — a
-stale cache must never hide positions (including modular multi-leg strategy
-positions) that were opened after the last cache write.
+Normal reads serve the completed snapshot. The close worker or an explicit
+``force=true`` request is responsible for rebuilding it from the live book.
 """
 from __future__ import annotations
 
@@ -14,9 +12,14 @@ from .index_options_paper import paper_book_path
 from .json_atomic import load_json_with_fallback
 
 
-def generate_index_options_eod_report(for_date: date) -> dict[str, Any]:
+def generate_index_options_eod_report(for_date: date, *, force: bool = False) -> dict[str, Any]:
     """Archive only the paper book whose IST session date matches ``for_date``."""
     from .eod_book_cache import load_book_cache, save_book_cache
+
+    if not force:
+        cached = load_book_cache(for_date, "index_options")
+        if cached is not None:
+            return cached
 
     try:
         live = load_json_with_fallback(paper_book_path())

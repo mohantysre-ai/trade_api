@@ -1,6 +1,13 @@
-type Entry = { value?: unknown; expiresAt: number; staleUntil: number; pending?: Promise<unknown> };
+type Entry = {
+  value?: unknown;
+  storedAt?: number;
+  expiresAt: number;
+  staleUntil: number;
+  pending?: Promise<unknown>;
+};
 
 const entries = new Map<string, Entry>();
+const MAX_STALE_IF_ERROR_MS = 5 * 60_000;
 
 export async function cachedBackendJson<T>(
   key: string,
@@ -8,7 +15,7 @@ export async function cachedBackendJson<T>(
   freshMs: number,
   staleMs = 30_000,
   timeoutMs = 12_000,
-): Promise<{ data: T; cacheStatus: "HIT" | "MISS" | "STALE" }> {
+): Promise<{ data: T; cacheStatus: "HIT" | "MISS" | "STALE" | "STALE_IF_ERROR" }> {
   const now = Date.now();
   const entry = entries.get(key);
   const fetchJson = () =>
@@ -28,7 +35,8 @@ export async function cachedBackendJson<T>(
       const refresh = fetchJson();
       entries.set(key, { ...entry, pending: refresh });
       void refresh.then((value) => {
-        entries.set(key, { value, expiresAt: Date.now() + freshMs, staleUntil: Date.now() + staleMs });
+        const storedAt = Date.now();
+        entries.set(key, { value, storedAt, expiresAt: storedAt + freshMs, staleUntil: storedAt + staleMs });
       }).catch(() => {
         entries.set(key, { ...entry, pending: undefined });
       });
@@ -44,19 +52,31 @@ export async function cachedBackendJson<T>(
 
   try {
     const value = await pending;
-    entries.set(key, { value, expiresAt: Date.now() + freshMs, staleUntil: Date.now() + staleMs });
+    const storedAt = Date.now();
+    entries.set(key, { value, storedAt, expiresAt: storedAt + freshMs, staleUntil: storedAt + staleMs });
     return { data: value, cacheStatus: "MISS" };
   } catch (error) {
-    entries.delete(key);
-    if (entry?.value !== undefined && now < entry.staleUntil) {
-      return { data: entry.value as T, cacheStatus: "STALE" };
+    if (
+      entry?.value !== undefined &&
+      entry.storedAt !== undefined &&
+      now - entry.storedAt <= MAX_STALE_IF_ERROR_MS
+    ) {
+      // A transient backend stall must not turn a usable live screen into a
+      // 503. Keep the last known value in process and make the fallback
+      // explicit in response headers. The browser/CDN is still forbidden from
+      // caching it, so recovery is visible on the very next request.
+      entries.set(key, { ...entry, pending: undefined });
+      return { data: entry.value as T, cacheStatus: "STALE_IF_ERROR" };
     }
+    entries.delete(key);
     throw error;
   }
 }
 
 export const liveCacheHeaders = (status: string) => ({
-  "Cache-Control": "public, max-age=2, s-maxage=4, stale-while-revalidate=30",
-  "Cloudflare-CDN-Cache-Control": "public, max-age=4, stale-while-revalidate=30",
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Cloudflare-CDN-Cache-Control": "no-store",
+  "Vary": "Cookie, Authorization",
   "X-Live-Cache": status,
 });

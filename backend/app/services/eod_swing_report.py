@@ -762,25 +762,59 @@ def generate_swing_eod_report(
 ) -> dict[str, Any]:
     """Build swing Book P&L from locked swing portfolio (not intradAy mirror)."""
     from .swing_v2.authoritative import authoritative_eod_report, is_v2_authoritative
-    from .eod_book_cache import save_book_cache
+    from .eod_book_cache import load_book_cache, save_book_cache
 
     as_of = for_date or date.fromisoformat(_today_ist())
+
+    if not force:
+        cached = load_book_cache(as_of, "swing")
+        if cached is not None:
+            return cached
 
     if is_v2_authoritative():
         report = authoritative_eod_report(as_of)
         positions = report.get("positions") or []
         picks = []
         for p in positions:
+            qty = p.get("filledQty") or p.get("qty") or p.get("approxQty")
+            entry = p.get("entryPrice") or p.get("fillPrice")
+            mark = p.get("currentPrice") or p.get("ltp") or p.get("exitPrice") or entry
+            pnl = p.get("totalPnl")
+            terminal = bool(p.get("terminal"))
+            last_event = str(p.get("lastEventType") or "")
+            skipped = terminal and last_event == "ORDER_EXPIRED" and not entry
+            outcome = None
+            if terminal and pnl is not None:
+                outcome = "WIN" if float(pnl) > 0 else ("LOSS" if float(pnl) < 0 else "FLAT")
             picks.append(
                 {
                     "symbol": p.get("symbol"),
                     "direction": "LONG",
-                    "status": "CLOSED" if p.get("terminal") else "RUNNING",
-                    "terminal": p.get("terminal"),
-                    "pnl": p.get("totalPnl"),
+                    "status": p.get("status") or ("CLOSED" if terminal else "RUNNING"),
+                    "terminal": terminal,
+                    "skipped": skipped,
+                    "executionStatus": p.get("executionStatus") or ("EXPIRED_UNFILLED" if skipped else ("FILLED" if entry else "LOCKED")),
+                    "qty": qty,
+                    "approxQty": qty,
+                    "filledQty": p.get("filledQty") or qty,
+                    "remainingQty": p.get("remainingQty"),
+                    "entryPrice": entry,
+                    "currentPrice": mark,
+                    "exitPrice": p.get("exitPrice"),
+                    "stopLoss": p.get("effectiveStop") or p.get("initialStop"),
+                    "target1": p.get("t1"),
+                    "target2": p.get("t2"),
+                    "pnl": pnl,
+                    "totalPnl": pnl,
+                    "pnlPct": (float(pnl) / float(p.get("deployedCapital")) * 100.0) if pnl is not None and p.get("deployedCapital") else None,
+                    "pnlKind": "realised" if terminal else "unrealised",
+                    "outcomeBucket": outcome,
                     "deployedCapital": p.get("deployedCapital"),
                     "realizedPnl": p.get("realizedPnl"),
                     "unrealizedPnl": p.get("unrealizedPnl"),
+                    "entryTimestamp": p.get("entryTimestamp"),
+                    "exitReason": p.get("exitReason"),
+                    "lastEventType": last_event,
                     "sessionDate": p.get("sessionDate") or report.get("sessionDate"),
                     "lastEventAt": p.get("lastEventAt"),
                 }
@@ -792,7 +826,7 @@ def generate_swing_eod_report(
             "picks": picks,
             "totalPicks": len(picks),
             "activePicks": sum(1 for p in picks if not p.get("terminal")),
-            "skippedNotTriggered": 0,
+            "skippedNotTriggered": sum(1 for p in picks if p.get("skipped")),
             "totalDeployed": sum(float(p.get("deployedCapital") or 0) for p in picks),
             "totalPnl": report.get("totalPnl"),
             "realizedPnl": report.get("realizedPnl"),
@@ -806,16 +840,14 @@ def generate_swing_eod_report(
             "isMock": False,
             "attribution": {
                 "locked": len(picks),
-                "triggered": sum(1 for p in picks if not p.get("terminal")),
-                "skipped": 0,
+                "triggered": sum(1 for p in picks if not p.get("skipped")),
+                "skipped": sum(1 for p in picks if p.get("skipped")),
                 "wins": sum(1 for p in picks if float(p.get("totalPnl") or 0) > 0),
                 "losses": sum(1 for p in picks if float(p.get("totalPnl") or 0) < 0),
                 "deployed": sum(float(p.get("deployedCapital") or 0) for p in picks),
             },
         }
         return save_book_cache(as_of, "swing", cache_report)
-
-    from .eod_book_cache import load_book_cache, save_book_cache
 
     as_of = for_date or date.fromisoformat(_today_ist())
     from .desk_clock import cash_session_phase

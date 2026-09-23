@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,20 +20,30 @@ class TerminalStateConflict(RuntimeError):
 
 
 class SwingLedger:
+    _initialization_lock = threading.Lock()
+    _initialized_paths: set[str] = set()
+
     def __init__(self, path: str):
         self.path = path
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        self._initialize()
+        resolved = str(Path(path).resolve())
+        if resolved not in self._initialized_paths:
+            with self._initialization_lock:
+                if resolved not in self._initialized_paths:
+                    self._initialize()
+                    self._initialized_paths.add(resolved)
 
-    def _connect(self) -> sqlite3.Connection:
+    def _connect(self, *, initialize: bool = False) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=10)
         connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("PRAGMA busy_timeout=10000")
+        if initialize:
+            connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("PRAGMA synchronous=FULL")
         return connection
 
     def _initialize(self) -> None:
-        with self._connect() as db:
+        with self._connect(initialize=True) as db:
             db.execute("""CREATE TABLE IF NOT EXISTS swing_events (
                 sequence INTEGER PRIMARY KEY AUTOINCREMENT,
                 event_id TEXT NOT NULL UNIQUE,

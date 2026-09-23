@@ -14,7 +14,7 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 log = logging.getLogger(__name__)
-BOOK_CACHE_SCHEMA_VERSION = 8
+BOOK_CACHE_SCHEMA_VERSION = 9
 
 
 def _day_dir(for_date) -> str:
@@ -69,9 +69,18 @@ def _row_pnl_pct(row: dict[str, Any]) -> float | None:
 
 
 def _is_triggered_swing(row: dict[str, Any]) -> bool:
-    if row.get("terminal") is not None:
-        return not row.get("terminal")
-    return not bool(row.get("skipped")) and str(row.get("status") or "").upper() != "NOT_TRIGGERED"
+    if row.get("skipped"):
+        return False
+    execution = str(row.get("executionStatus") or "").upper()
+    if execution in {"NOT_TRIGGERED", "EXPIRED_UNFILLED", "ORDER_EXPIRED"}:
+        return False
+    if row.get("entryTimestamp") or row.get("entryPrice") or row.get("filledQty") or row.get("qty"):
+        return True
+    # A terminal V2 row represents a completed lifecycle unless explicitly
+    # identified as an unfilled expiry. Closed trades must remain triggered.
+    if row.get("terminal"):
+        return str(row.get("lastEventType") or "").upper() != "ORDER_EXPIRED"
+    return str(row.get("status") or "").upper() != "NOT_TRIGGERED"
 
 
 def _reconcile_master_from_books(for_date) -> None:
@@ -247,7 +256,7 @@ def warm_book_caches(for_date) -> dict[str, Any]:
     intra = generate_intraday_eod_report(for_date, force=True)
     swing = generate_swing_eod_report(for_date, force=True)
     from .eod_index_options_report import generate_index_options_eod_report
-    options = generate_index_options_eod_report(for_date)
+    options = generate_index_options_eod_report(for_date, force=True)
     try:
         _reconcile_master_from_books(for_date)
     except Exception as exc:
@@ -283,7 +292,7 @@ def freeze_dated_books_from_live(for_date: date | str) -> dict[str, Any]:
     if not have_swing:
         generate_swing_eod_report(day, force=True)
     from .eod_index_options_report import generate_index_options_eod_report
-    generate_index_options_eod_report(day)
+    generate_index_options_eod_report(day, force=True)
     return {"skipped": False, "date": day.isoformat()}
 
 
