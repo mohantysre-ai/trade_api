@@ -61,8 +61,8 @@ def test_buy_and_sell_sleeves_select_the_same_index_independently():
     assert [row["key"] for row in radar["buySelected"]] == ["NIFTY"]
     assert [row["key"] for row in radar["sellSelected"]] == ["NIFTY"]
     assert [row["key"] for row in radar["selected"]] == ["NIFTY", "NIFTY"]
-    assert radar["limits"]["maxConcurrent"] == 10
-    assert radar["limits"]["maxConcurrentPerSleeve"] == 2
+    assert radar["limits"]["maxConcurrent"] == 20
+    assert radar["limits"]["maxConcurrentPerSleeve"] == 10
     assert radar["limits"]["sleeveIsolation"] == "INDEPENDENT_INDEX_AND_BUCKET_PER_SLEEVE"
 
 
@@ -112,15 +112,15 @@ def test_twenty_daily_entries_hard_block_even_after_confirmation():
 def test_no_minimum_quota_and_hunt_remains_open_below_cap():
     radar = build_index_options_radar({})
     assert radar["limits"]["minDailyEntries"] == 0
-    assert radar["limits"]["maxDailyEntries"] == 10
+    assert radar["limits"]["maxDailyEntries"] == 20
     assert radar["limits"]["huntMode"] == "CONTINUOUS_MARKET_SESSION"
     governor = IndexOptionReEntryGovernor(trade_counts={"NIFTY": 1, "SENSEX": 1, "BANKNIFTY": 1, "FINNIFTY": 1})
     decision = can_reenter_index_option("BANKNIFTY", "PUT", NOW, governor)
     assert decision["allowed"] is True
 
 
-def test_ten_total_daily_entries_across_indices_hard_block():
-    governor = IndexOptionReEntryGovernor(trade_counts={"NIFTY": 3, "SENSEX": 3, "BANKNIFTY": 2, "FINNIFTY": 2})
+def test_twenty_total_daily_entries_across_indices_hard_block():
+    governor = IndexOptionReEntryGovernor(trade_counts={"NIFTY": 5, "SENSEX": 5, "BANKNIFTY": 5, "FINNIFTY": 5})
     decision = can_reenter_index_option(
         "BANKNIFTY", "PUT", NOW, governor,
         fresh_breakout_confirmed=True, oi_aligned=True, breadth_aligned=True,

@@ -3704,6 +3704,19 @@ def _swing_v2_raw_metrics(
     }
 
 
+def _one_hour_candle_rows_fresh(rows: list[list[Any]], now: datetime) -> bool:
+    if not rows:
+        return False
+    parsed = _parse_candle_rows(rows)
+    timestamp = parsed[-1].get("ts") if parsed else None
+    try:
+        from .swing_v2.data_quality import _bars1h_session_fresh
+
+        return _bars1h_session_fresh(timestamp, now)
+    except Exception:
+        return False
+
+
 def _intraday_metrics(
     client: AngelOneClient,
     inst: Instrument,
@@ -3736,6 +3749,8 @@ def _intraday_metrics(
         else:
             daily_raw = []
             intraday_raw = []
+        if interval == "ONE_HOUR" and not _one_hour_candle_rows_fresh(intraday_raw, now):
+            intraday_raw = []
         # Public NSE charting fills daily (and T-1 5m) without Angel. Today's
         # 5m is usually empty while the session is open.
         if not daily_raw:
@@ -3744,6 +3759,8 @@ def _intraday_metrics(
             intraday_raw = fetch_nse_candles(
                 inst.key, inst.token, interval, intraday_from, now
             )
+        if interval == "ONE_HOUR" and not _one_hour_candle_rows_fresh(intraday_raw, now):
+            intraday_raw = []
         # Batch hunt skips Angel when a Dhan id exists (AB1021). Drawer single-name
         # fetches may force Angel so ATR/turnover are not left blank.
         allow_angel = force_angel_fallback or not tried_dhan
