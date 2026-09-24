@@ -96,22 +96,66 @@ try {
 }
 
 function Copy-Tree {
-    param([string]$From, [string]$To)
+    param([string]$From, [string]$To, [switch]$State)
     if (-not (Test-Path -LiteralPath $From)) { return 0 }
-    $items = Get-ChildItem -LiteralPath $From -Force -ErrorAction SilentlyContinue
+    $items = if ($State) {
+        Get-ChildItem -LiteralPath $From -File -Filter '*.json' -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notmatch '(\.bak|\.tmp|\.lock)\.json$' }
+    } else {
+        Get-ChildItem -LiteralPath $From -Force -ErrorAction SilentlyContinue
+    }
     if (-not $items) { return 0 }
-    Copy-Item -Path (Join-Path $From "*") -Destination $To -Recurse -Force -ErrorAction SilentlyContinue
+    foreach ($item in $items) {
+        Copy-Item -LiteralPath $item.FullName -Destination $To -Recurse -Force
+    }
     return @($items).Count
 }
 
-Copy-Tree $tmpState $seedState | Out-Null
+Copy-Tree $tmpState $seedState -State | Out-Null
 Copy-Tree $tmpData $seedData | Out-Null
 Copy-Tree $tmpArchive $seedArchive | Out-Null
 
-# IMPORTANT: the live Docker volumes copied above are the sole source of truth.
-# Do not overlay git-working-tree JSON/data here: those files can be older than
-# the running desk and would silently downgrade the Hub seed (for example,
-# replacing a completed 2026-09-22 EOD cache with a stale repository copy).
+function Merge-NewerFiles {
+    param([string]$From, [string]$To, [switch]$TopLevelOnly)
+    if (-not (Test-Path -LiteralPath $From)) { return }
+    $items = if ($TopLevelOnly) {
+        Get-ChildItem -LiteralPath $From -File -Force
+    } else {
+        Get-ChildItem -LiteralPath $From -Recurse -File -Force
+    }
+    foreach ($item in $items) {
+        if ($item.Extension -notin @('.json', '.sqlite3', '.db')) { continue }
+        if ($item.Name -match '(\.bak|\.tmp|\.lock)$') { continue }
+        if ($item.Name -in @('client_secret.json', 'gemini_oauth_token.json')) { continue }
+        $relative = $item.FullName.Substring($From.Length).TrimStart('\', '/')
+        $target = Join-Path $To $relative
+        if ((Test-Path -LiteralPath $target) -and
+            $item.LastWriteTimeUtc -le (Get-Item -LiteralPath $target).LastWriteTimeUtc) { continue }
+        New-Item -ItemType Directory -Force -Path (Split-Path $target -Parent) | Out-Null
+        if ($item.Extension -in @('.sqlite3', '.db')) {
+            $python = Join-Path $Root '.venv\Scripts\python.exe'
+            if (-not (Test-Path -LiteralPath $python)) { $python = Join-Path $Root '.test-venv\Scripts\python.exe' }
+            if (-not (Test-Path -LiteralPath $python)) { throw "Python venv required to snapshot active SQLite database $($item.FullName)" }
+            $backup = "$target.pack"
+            & $python -c 'import sqlite3,sys; source=sqlite3.connect("file:"+sys.argv[1].replace("\\", "/")+"?mode=ro",uri=True); destination=sqlite3.connect(sys.argv[2]); source.backup(destination); destination.close(); source.close()' $item.FullName $backup
+            if ($LASTEXITCODE -ne 0) { throw "SQLite backup failed: $($item.FullName)" }
+            Move-Item -LiteralPath $backup -Destination $target -Force
+            foreach ($suffix in @('-wal', '-shm')) {
+                $sidecar = "$target$suffix"
+                if (Test-Path -LiteralPath $sidecar) { Remove-Item -LiteralPath $sidecar -Force }
+            }
+        } else {
+            Copy-Item -LiteralPath $item.FullName -Destination $target -Force
+            try { $null = Get-Content -LiteralPath $target -Raw -Encoding utf8 | ConvertFrom-Json } catch { throw "Invalid JSON in $($item.FullName)" }
+        }
+        (Get-Item -LiteralPath $target).LastWriteTimeUtc = $item.LastWriteTimeUtc
+        Write-Host "  newer direct-app state: $relative"
+    }
+}
+
+Merge-NewerFiles (Join-Path $Root 'backend\app\services') $seedState -TopLevelOnly
+Merge-NewerFiles (Join-Path $Root 'backend\app\data') $seedData
+Merge-NewerFiles (Join-Path $Root 'backend\app\services\eod_archive') $seedArchive
 
 
 function Get-TreeFiles {
@@ -138,7 +182,7 @@ Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 $manifest = [ordered]@{
     packedAtUtc = [DateTime]::UtcNow.ToString("o")
     host        = $env:COMPUTERNAME
-    source      = "docker-volume"
+    source      = "newest-per-file:docker-volume+direct-app"
     layout      = "state+data+archive"
     files = @(
         $allFiles | ForEach-Object {

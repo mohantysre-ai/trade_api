@@ -78,6 +78,15 @@ echo.
 
 pushd "%PROJECT_ROOT%"
 
+echo [*] Packing latest Docker and direct-app state before recreation...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%pack-desk-state.ps1"
+if errorlevel 1 (
+    echo [FAIL] State pack failed. Existing containers and volumes were not replaced.
+    popd
+    if not "%IROS_NO_PAUSE%"=="1" pause
+    exit /b 1
+)
+
 echo [2/5] Stopping stack ^(volumes kept^)...
 docker compose --profile tunnel down --remove-orphans
 REM Fixed container_name values can survive a project rename / partial down.
@@ -101,6 +110,22 @@ if %BUILD_CODE% neq 0 (
     exit /b %BUILD_CODE%
 )
 echo.
+
+echo [*] Restoring packed state into stopped Docker volumes...
+docker compose create market-api
+if errorlevel 1 (
+    echo [FAIL] Could not create market-api for state restore.
+    popd
+    if not "%IROS_NO_PAUSE%"=="1" pause
+    exit /b 1
+)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%apply-packed-desk-state.ps1"
+if errorlevel 1 (
+    echo [FAIL] Packed state restore failed; stack was not started.
+    popd
+    if not "%IROS_NO_PAUSE%"=="1" pause
+    exit /b 1
+)
 
 echo [4/5] Starting stack with new images...
 docker compose %COMPOSE_PROFILES% up -d --force-recreate --remove-orphans --wait --wait-timeout 300

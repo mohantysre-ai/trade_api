@@ -17,6 +17,7 @@ from .engine import execute_paper_order, process_position_bar
 from .facade import build_from_market_snapshot
 from .ledger import SwingLedger, materialize_position
 from .reporting import ledger_eod_report
+from .schemas import EventType
 IST=ZoneInfo("Asia/Kolkata"); _LOCK=threading.RLock(); _DATA_REFRESH_LOCK=threading.Lock(); _SESSION_CACHE_LOCK=threading.Lock()
 _FINAL_REFRESH_MARGIN_SECONDS=int(os.getenv("SWING_FINAL_REFRESH_MARGIN_SECONDS","90")); _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0.0; _SESSION_READ_TTL=float(os.getenv("SWING_SESSION_READ_TTL","2")); _EOD_READ_CACHE={}; _SWING_SCAN_INTERVAL_SECONDS=float(os.getenv("SWING_SCAN_INTERVAL_SECONDS","300"))
 _RETRYABLE_FINAL_BLOCK_REASONS={"FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW","UNIVERSE_COVERAGE_BELOW_99PCT","UNIVERSE_COVERAGE_BELOW_90PCT","REGIME_UNRATED","SWING_V2_DATA_NOT_READY"}
@@ -172,52 +173,111 @@ def _quote_observations(symbols,now):
   except:continue
   if ask>0: out[str(s).upper()]={"timestamp":stamp,"ask":ask,"askDepth":depth,"open":float(q.get("open") or ask),"high":float(q.get("high") or ask),"low":float(q.get("low") or ask),"close":float(q.get("close") or ask),"source":str(q.get("quoteProvider") or "NEUTRAL_FEED")}
  return out
-def _refresh_final_candidate_facts(snapshot,scan,now): return snapshot
+ def _refresh_final_candidate_facts(snapshot,scan,now): return snapshot
 def _fill_locked_orders(ledger,now,cfg):
- locked=[]
- for _,events in _position_groups(ledger).items():
-  s=materialize_position(events)
-  if not s.get("terminal") and not s.get("entryTimestamp") and str(s.get("lastEventType") or "")=="POSITION_LOCKED": locked.append(s)
- obs=_quote_observations([s["symbol"] for s in locked],now); expiry=datetime.combine(now.astimezone(IST).date(),_clock(cfg.order_expire_ist),tzinfo=IST)
- for c in locked:
-  o=obs.get(str(c.get("symbol") or "").upper()); execute_paper_order(ledger,c,[o] if o else [],expiry=expiry) if o or now.astimezone(IST)>=expiry else None
+  locked=[]
+  for _,events in _position_groups(ledger).items():
+   s=materialize_position(events)
+   if not s.get("terminal") and not s.get("entryTimestamp") and str(s.get("lastEventType") or "")=="POSITION_LOCKED": locked.append(s)
+  obs=_quote_observations([s["symbol"] for s in locked],now); expiry=datetime.combine(now.astimezone(IST).date(),_clock(cfg.order_expire_ist),tzinfo=IST)
+  for c in locked:
+   o=obs.get(str(c.get("symbol") or "").upper()); execute_paper_order(ledger,c,[o] if o else [],expiry=expiry) if o or now.astimezone(IST)>=expiry else None
 def _manage_open_positions(ledger,now,cfg):
- opens=[]; terminalized=0
- for pid,events in _position_groups(ledger).items():
-  s=materialize_position(events)
-  if s.get("entryTimestamp") and not s.get("terminal"): opens.append((pid,s))
- obs=_quote_observations([s["symbol"] for _,s in opens],now)
- for pid,s in opens:
-  symbol=str(s.get("symbol") or "").upper(); bars=[obs[symbol]] if symbol in obs else []
-  if not bars:continue
-  try: age=session_age(date.fromisoformat(str(s.get("sessionDate"))[:10]),now.astimezone(IST).date())
-  except:continue
-  due=time_exit_due(now,age,max_overnights=cfg.max_overnights,exit_clock=cfg.mandatory_exit_ist)
-  for i,bar in enumerate(bars):
-   s=process_position_bar(ledger,pid,bar,is_d2_exit=due and i==len(bars)-1,data_status="LIVE")
-   if s.get("terminal"):
-    terminalized+=1
-    break
- return terminalized
+  opens=[]; terminalized=0; terminalized_symbols=[]
+  for pid,events in _position_groups(ledger).items():
+   s=materialize_position(events)
+   if s.get("entryTimestamp") and not s.get("terminal"): opens.append((pid,s))
+  obs=_quote_observations([s["symbol"] for _,s in opens],now)
+  for pid,s in opens:
+   symbol=str(s.get("symbol") or "").upper(); bars=[obs[symbol]] if symbol in obs else []
+   if not bars:continue
+   try: age=session_age(date.fromisoformat(str(s.get("sessionDate"))[:10]),now.astimezone(IST).date())
+   except:continue
+   due=time_exit_due(now,age,max_overnights=cfg.max_overnights,exit_clock=cfg.mandatory_exit_ist)
+   for i,bar in enumerate(bars):
+    s=process_position_bar(ledger,pid,bar,is_d2_exit=due and i==len(bars)-1,data_status="LIVE")
+    if s.get("terminal"):
+     terminalized+=1
+     if symbol:
+       terminalized_symbols.append(symbol)
+     break
+  return terminalized, terminalized_symbols
+def _try_replace_stopped(ledger, cfg, now, stopped_symbols, existing_positions, occupied_symbols):
+    terminalized = 0
+    if not stopped_symbols:
+        return 0
+    try:
+        snapshot = _snapshot()
+    except Exception:
+        return 0
+    if not _v2_snapshot_ready(snapshot, cfg):
+        return 0
+    regime = str(snapshot.get("swingV2Regime") or "")
+    regime_cap = {"NORMAL": cfg.max_positions, "DEFENSIVE": 2, "HALT_NEW_LONGS": 0}.get(regime, 0)
+    capacity = min(cfg.max_positions, regime_cap)
+    active_count = sum(1 for r in existing_positions if not r.get("terminal") and not r.get("closed"))
+    available = max(0, capacity - active_count)
+    if available <= 0:
+        return 0
+    occupied = set(occupied_symbols or [])
+    occupied.update(str(r.get("symbol") or "").upper() for r in existing_positions if r.get("symbol"))
+    occupied.update(symbol.upper() for symbol in stopped_symbols)
+    scan = build_from_market_snapshot(snapshot, final_lock=False, persist_events=False, occupied_symbols=occupied, existing_positions=existing_positions, now=now)
+    if scan.get("blocked") or not scan.get("candidates"):
+        return 0
+    candidates = scan.get("candidates", [])
+    if not candidates:
+        return 0
+    selected = candidates[: min(available, len(candidates))]
+    filled = 0
+    session_date = now.astimezone(IST).date().isoformat()
+    committed_at = now.astimezone(timezone.utc).isoformat()
+    for row in candidates[:available]:
+        decision_id = row.get("decisionId")
+        symbol = str(row.get("symbol") or "").upper()
+        if not decision_id or not symbol:
+            continue
+        try:
+            ledger.append(
+                idempotency_key=f"{decision_id}:{EventType.POSITION_LOCKED}",
+                decision_id=decision_id,
+                position_id=decision_id,
+                symbol=symbol,
+                session_date=session_date,
+                event_type=EventType.POSITION_LOCKED,
+                event_timestamp=committed_at,
+                payload=row,
+            )
+        except Exception:
+            continue
+        filled += 1
+        if filled >= available:
+            break
+    if filled > 0:
+        expiry = datetime.combine(now.astimezone(IST).date(), _clock(cfg.order_expire_ist), tzinfo=IST)
+        _fill_locked_orders(ledger, now, cfg)
+    return filled
 def run_authoritative_cycle(*,now=None,force=False):
- global _SESSION_READ_CACHE,_SESSION_READ_CACHE_AT,_EOD_READ_CACHE
- cfg=load_config()
- if not cfg.paper_authoritative: raise RuntimeError("Swing V2 is not configured as paper authority")
- now=(now or datetime.now(timezone.utc)).astimezone(IST)
- with _LOCK:
-  with _SESSION_CACHE_LOCK: _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0
-  _EOD_READ_CACHE={}; ledger=SwingLedger(cfg.ledger_path)
-  from ..nse_trading_calendar import is_nse_trading_day
-  if not is_nse_trading_day(now.date()): return _session({"enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,"blockReason":"NSE_MARKET_HOLIDAY","candidates":[],"funnel":{"universe":0}},now=now)
-  terminalized=_manage_open_positions(ledger,now,cfg); current=_read_json(_state_path()); day=now.date().isoformat(); current=current if str(current.get("sessionDate") or "")==day else {"sessionDate":day,"selectionFinalized":False}; local=now.time().replace(tzinfo=None)
-  from .market_data import intraday_occupied_symbols
-  occupied=intraday_occupied_symbols(day); existing=[r for r in _positions(ledger) if not r.get("terminal")]; start,freeze,expiry=(_clock(cfg.decision_start_ist),_clock(cfg.decision_freeze_ist),_clock(cfg.order_expire_ist)); scan=current.get("scan") if isinstance(current.get("scan"),dict) else None
-  due=True
-  if current.get("lastScanAt"):
-   try: due=(now-datetime.fromisoformat(str(current["lastScanAt"]).replace("Z","+00:00")).astimezone(IST)).total_seconds()>=_SWING_SCAN_INTERVAL_SECONDS
-   except: pass
-  if terminalized>0:
+  global _SESSION_READ_CACHE,_SESSION_READ_CACHE_AT,_EOD_READ_CACHE
+  cfg=load_config()
+  if not cfg.paper_authoritative: raise RuntimeError("Swing V2 is not configured as paper authority")
+  now=(now or datetime.now(timezone.utc)).astimezone(IST)
+  with _LOCK:
+   with _SESSION_CACHE_LOCK: _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0
+   _EOD_READ_CACHE={}; ledger=SwingLedger(cfg.ledger_path)
+   from ..nse_trading_calendar import is_nse_trading_day
+   if not is_nse_trading_day(now.date()): return _session({"enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,"blockReason":"NSE_MARKET_HOLIDAY","candidates":[],"funnel":{"universe":0}},now=now)
+   terminalized, terminalized_symbols = _manage_open_positions(ledger,now,cfg); current=_read_json(_state_path()); day=now.date().isoformat(); current=current if str(current.get("sessionDate") or "")==day else {"sessionDate":day,"selectionFinalized":False}; local=now.time().replace(tzinfo=None)
+   from .market_data import intraday_occupied_symbols
+   occupied=intraday_occupied_symbols(day); existing=[r for r in _positions(ledger) if not r.get("terminal")]; start,freeze,expiry=(_clock(cfg.decision_start_ist),_clock(cfg.decision_freeze_ist),_clock(cfg.order_expire_ist)); scan=current.get("scan") if isinstance(current.get("scan"),dict) else None
    due=True
+   if current.get("lastScanAt"):
+    try: due=(now-datetime.fromisoformat(str(current["lastScanAt"]).replace("Z","+00:00")).astimezone(IST)).total_seconds()>=_SWING_SCAN_INTERVAL_SECONDS
+    except: pass
+   if terminalized>0:
+    due=True
+    replaced=_try_replace_stopped(ledger,cfg,now,terminalized_symbols,existing,occupied)
+    terminalized+=replaced
   if start<=local<freeze and not current.get("selectionFinalized") and due:
    snapshot=_refresh_snapshot("swing_v2_decision_scan")
    if not _v2_snapshot_ready(snapshot,cfg):
