@@ -137,7 +137,7 @@ function Merge-NewerFiles {
             if (-not (Test-Path -LiteralPath $python)) { $python = Join-Path $Root '.test-venv\Scripts\python.exe' }
             if (-not (Test-Path -LiteralPath $python)) { throw "Python venv required to snapshot active SQLite database $($item.FullName)" }
             $backup = "$target.pack"
-            & $python -c 'import sqlite3,sys; source=sqlite3.connect("file:"+sys.argv[1].replace("\\", "/")+"?mode=ro",uri=True); destination=sqlite3.connect(sys.argv[2]); source.backup(destination); destination.close(); source.close()' $item.FullName $backup
+            & $python (Join-Path $PSScriptRoot 'sqlite-backup.py') $item.FullName $backup
             if ($LASTEXITCODE -ne 0) { throw "SQLite backup failed: $($item.FullName)" }
             Move-Item -LiteralPath $backup -Destination $target -Force
             foreach ($suffix in @('-wal', '-shm')) {

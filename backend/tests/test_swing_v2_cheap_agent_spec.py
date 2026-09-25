@@ -186,12 +186,14 @@ def test_friction_cost_rejection():
 # 9. Hard 1–2 Session Expiry
 def test_time_exit_due_on_d2():
     now_d0 = datetime(2026, 9, 11, 10, 0, tzinfo=IST)
-    now_d2_before = datetime(2026, 9, 15, 14, 0, tzinfo=IST)
-    now_d2_after = datetime(2026, 9, 15, 15, 16, tzinfo=IST)
+    now_d1_before = datetime(2026, 9, 14, 15, 14, tzinfo=IST)
+    now_d1_after = datetime(2026, 9, 14, 15, 16, tzinfo=IST)
+    now_d2_before = datetime(2026, 9, 15, 9, 15, tzinfo=IST)
 
     assert time_exit_due(now_d0, holding_session_age=0, max_overnights=2, exit_clock="15:15") is False
-    assert time_exit_due(now_d2_before, holding_session_age=2, max_overnights=2, exit_clock="15:15") is False
-    assert time_exit_due(now_d2_after, holding_session_age=2, max_overnights=2, exit_clock="15:15") is True
+    assert time_exit_due(now_d1_before, holding_session_age=1, max_overnights=2, exit_clock="15:15") is False
+    assert time_exit_due(now_d1_after, holding_session_age=1, max_overnights=2, exit_clock="15:15") is True
+    assert time_exit_due(now_d2_before, holding_session_age=2, max_overnights=2, exit_clock="15:15") is True
 
 
 # 10. Cutoff at 14:45 IST

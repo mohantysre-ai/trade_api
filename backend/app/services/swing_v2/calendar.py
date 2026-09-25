@@ -35,7 +35,11 @@ def session_age(entry_day: date, current_day: date, holidays: set[date] | None =
 def time_exit_due(now_ist: datetime, holding_session_age: int, *, max_overnights: int = 2, exit_clock: str = "15:15") -> bool:
     local = now_ist.astimezone(IST)
     hour, minute = (int(part) for part in exit_clock.split(":"))
-    return holding_session_age >= max_overnights and local.time().replace(tzinfo=None) >= time(hour, minute)
+    final_session_age = max(0, max_overnights - 1)
+    return holding_session_age > final_session_age or (
+        holding_session_age == final_session_age
+        and local.time().replace(tzinfo=None) >= time(hour, minute)
+    )
 
 
 def entry_window_state(now_ist: datetime, *, freeze: str = "15:10", expiry: str = "15:20") -> str:
