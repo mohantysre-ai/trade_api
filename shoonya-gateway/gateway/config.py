@@ -28,9 +28,13 @@ def _list(name: str) -> list[str]:
 @dataclass
 class Settings:
     api_base: str = "https://api.shoonya.com"
-    ws_url: str = "wss://api.shoonya.com/NorenWSAPI/"
+    ws_url: str = "wss://api.shoonya.com/NorenWSTP/"
     uid: str = ""
     account_id: str = ""
+    password: str = ""
+    totp_secret: str = ""
+    vendor_code: str = ""
+    api_secret: str = ""
     source: str = "API"
     auth_mode: str = "manual"
     login_hhmm: str = "08:15"
@@ -67,9 +71,13 @@ class Settings:
     def from_env(cls) -> "Settings":
         return cls(
             api_base=os.getenv("SHOONYA_API_BASE", "https://api.shoonya.com").rstrip("/"),
-            ws_url=os.getenv("SHOONYA_WS_URL", "wss://api.shoonya.com/NorenWSAPI/"),
+            ws_url=os.getenv("SHOONYA_WS_URL", "wss://api.shoonya.com/NorenWSTP/"),
             uid=os.getenv("SHOONYA_UID", ""),
             account_id=os.getenv("SHOONYA_ACCOUNT_ID", "") or os.getenv("SHOONYA_UID", ""),
+            password=os.getenv("SHOONYA_PASSWORD", ""),
+            totp_secret=os.getenv("SHOONYA_TOTP_SECRET", ""),
+            vendor_code=os.getenv("SHOONYA_CLIENT_ID", ""),
+            api_secret=os.getenv("SHOONYA_SECRET_CODE", ""),
             source=os.getenv("SHOONYA_SOURCE", "API"),
             auth_mode=os.getenv("SHOONYA_AUTH_MODE", "manual").lower(),
             login_hhmm=os.getenv("SHOONYA_LOGIN_HHMM", "08:15"),

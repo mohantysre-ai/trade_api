@@ -9,8 +9,12 @@ trade_api_snapshot.json
 *.log
 logs/
 *.log.*
+.env
+.env.*
+**/.env
+**/.env.*
 !.env.example
-!backend/.env.example
+!**/.env.example
 config/cloudflare/credentials.json
 config/docker/desk-state/seed/*.json
 config/docker/desk-state/seed/state/

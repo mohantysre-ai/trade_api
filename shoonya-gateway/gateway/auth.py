@@ -1,9 +1,11 @@
 """Daily-session auth state machine."""
 from __future__ import annotations
-import enum,json,logging,os,time
+import enum,hashlib,json,logging,os,time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Awaitable,Callable
+import httpx
+import pyotp
 from .config import IST,Settings
 log=logging.getLogger(__name__)
 class AuthState(str,enum.Enum):
@@ -17,7 +19,16 @@ LoginFn=Callable[[],Awaitable[Session]]
 def _hhmm(text): h,m=text.split(":"); return int(h),int(m)
 class AuthManager:
     def __init__(self,settings:Settings,login_fn:LoginFn|None=None,clock:Callable[[],datetime]=lambda:datetime.now(IST),mono:Callable[[],float]=time.monotonic)->None:
-        self._s=settings; self._login_fn=login_fn; self._clock=clock; self._mono=mono; self.state=AuthState.AUTH_REQUIRED; self.session=None; self.last_error=""; self._attempts=[]; self._next_attempt_at=0.; self._backoff=30.
+        self._s=settings; self._login_fn=login_fn or self._login; self._clock=clock; self._mono=mono; self.state=AuthState.AUTH_REQUIRED; self.session=None; self.last_error=""; self._attempts=[]; self._next_attempt_at=0.; self._backoff=30.
+    async def _login(self):
+        required=(self._s.uid,self._s.password,self._s.totp_secret,self._s.vendor_code,self._s.api_secret)
+        if not all(required): raise LoginUnavailable("automatic login credentials are incomplete")
+        payload={"apkversion":"1.0.0","source":self._s.source,"uid":self._s.uid,"pwd":hashlib.sha256(self._s.password.encode()).hexdigest(),"factor2":pyotp.TOTP(self._s.totp_secret).now(),"vc":self._s.vendor_code,"appkey":hashlib.sha256(f"{self._s.uid}|{self._s.api_secret}".encode()).hexdigest(),"imei":"shoonya-gateway"}
+        async with httpx.AsyncClient(timeout=20.0,verify=self._s.tls_verify) as client:
+            response=await client.post(f"{self._s.api_base}/NorenWClientTP/QuickAuth",content=("jData="+json.dumps(payload,separators=(",",":"))).encode(),headers={"Content-Type":"application/x-www-form-urlencoded"})
+            response.raise_for_status(); result=response.json()
+        if result.get("stat")!="Ok" or not result.get("susertoken"): raise LoginUnavailable(str(result.get("emsg") or "Shoonya login rejected"))
+        return Session(self._s.uid,str(result.get("actid") or self._s.account_id or self._s.uid),str(result["susertoken"]),self._clock().isoformat())
     def set_session(self,uid,account_id,access_token):
         if not access_token or not uid: raise ValueError("uid and access_token are required")
         self.session=Session(uid,account_id or uid,access_token,self._clock().isoformat()); self.state=AuthState.AUTHENTICATED; self.last_error=""; self._save()
