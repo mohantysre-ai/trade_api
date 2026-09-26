@@ -29,6 +29,8 @@ EXCHANGE_TYPES = {"NSE": 1, "NFO": 2, "BSE": 3, "BFO": 4}
 SOURCE_WS = "ANGEL_WS"
 SOURCE_REST_BOOTSTRAP = "ANGEL_REST_BOOTSTRAP"
 SOURCE_REST_RECOVERY = "ANGEL_REST_RECOVERY"
+SOURCE_STANDBY_WS = "SHOONYA_WS"
+LIVE_WS_SOURCES = frozenset({SOURCE_WS, SOURCE_STANDBY_WS})
 
 FRESH_SECONDS = float(os.getenv("INTRADAY_WS_FRESH_SECONDS", "8"))
 STALE_SECONDS = float(os.getenv("INTRADAY_WS_STALE_SECONDS", "30"))
@@ -217,6 +219,7 @@ class IntradayMarketState:
         self._generation = 0
         self._last_tick_at: datetime | None = None
         self._connected = False
+        self._standby_health: dict[str, Any] | None = None
 
     # ------------------------------------------------------------------ universe
 
@@ -509,6 +512,103 @@ class IntradayMarketState:
             pass
         return True
 
+    # ------------------------------------------------------------ standby lane
+
+    def apply_standby_tick(
+        self,
+        symbol: str,
+        quote: dict[str, Any] | None,
+        *,
+        promote_after_s: float = FRESH_SECONDS,
+        band_pct: float = 25.0,
+        handoff_divergence_pct: float = 1.0,
+    ) -> str:
+        if not isinstance(quote, dict):
+            _metric("standby_tick_invalid")
+            return "rejected_invalid"
+        ltp = _number(quote.get("ltp"))
+        if ltp is None or ltp <= 0:
+            _metric("standby_tick_invalid")
+            return "rejected_invalid"
+        exchange_ts_ms = quote.get("exchangeTsMs")
+        if isinstance(exchange_ts_ms, (int, float)) and exchange_ts_ms > 0:
+            try:
+                tick_date = datetime.fromtimestamp(float(exchange_ts_ms) / 1000.0, tz=IST_ZONE).date()
+            except (OverflowError, OSError, ValueError):
+                tick_date = None
+            if tick_date is not None and tick_date != _now_utc().astimezone(IST_ZONE).date():
+                _metric("standby_tick_stale_date")
+                return "rejected_date"
+        symbol = str(symbol or "").upper()
+        if not symbol:
+            _metric("standby_tick_invalid")
+            return "rejected_invalid"
+        now = _now_utc()
+        mono = time.monotonic()
+        with self._lock:
+            row = self._state.get(symbol)
+            if row is None:
+                row = next((s for s in self._state.values() if s.get("symbol") == symbol), None)
+            if row is None:
+                row = _new_symbol_row(None)
+                row["symbol"] = symbol
+                self._state[symbol] = row
+            received = row.get("receivedMonotonic") or 0.0
+            primary_age = (mono - received) if received else None
+            primary_source_is_ws = row.get("source") == SOURCE_WS
+            if primary_age is not None and primary_age <= promote_after_s and primary_source_is_ws:
+                _metric("standby_tick_rejected_primary_fresh")
+                return "rejected_primary_fresh"
+            prev_close = row.get("prevClose")
+            if prev_close and prev_close > 0:
+                band = abs(ltp - float(prev_close)) / float(prev_close) * 100.0
+                if band > band_pct:
+                    _metric("standby_tick_rejected_band")
+                    return "rejected_band"
+            prior_ltp = row.get("ltp")
+            if primary_age is not None and primary_age <= 120.0 and prior_ltp and float(prior_ltp) > 0:
+                divergence = abs(ltp - float(prior_ltp)) / float(prior_ltp) * 100.0
+                if divergence > handoff_divergence_pct:
+                    _metric("standby_tick_quarantined_divergence")
+                    return "quarantined_divergence"
+            row.update({
+                "ltp": ltp,
+                "receivedAt": _iso(now),
+                "receivedMonotonic": mono,
+                "source": SOURCE_STANDBY_WS,
+                "connected": True,
+                "failover": True,
+            })
+            standby_prev_close = quote.get("prevClose")
+            if isinstance(standby_prev_close, (int, float)) and standby_prev_close > 0:
+                row["prevClose"] = float(standby_prev_close)
+            volume = _number(quote.get("volume"))
+            if volume is not None:
+                row["tradeVolume"] = volume
+            row["stale"] = False
+            self._generation += 1
+            self._last_tick_at = now
+        _metric("standby_tick_applied")
+        try:
+            from app.services.shared_state.market_state import get_market_state
+            from app.services.shared_state.schemas import FeedStatus, Quote
+            get_market_state().update_quote(
+                Quote(
+                    symbol=symbol,
+                    ltp=ltp,
+                    volume=volume if volume is not None else None,
+                    source=SOURCE_STANDBY_WS,
+                    feed_status=FeedStatus.DEGRADED,
+                )
+            )
+        except Exception:
+            pass
+        return "applied"
+
+    def set_standby_health(self, health: dict[str, Any] | None) -> None:
+        with self._lock:
+            self._standby_health = dict(health) if isinstance(health, dict) else None
+
     # -------------------------------------------------- snapshot / status
 
     def capture_snapshot(self, symbols: list[str] | None = None) -> dict[str, Any]:
@@ -559,6 +659,7 @@ class IntradayMarketState:
             rows = list(self._state.values())
             connected = self._connected
             last_tick_at = self._last_tick_at
+            standby_health = dict(self._standby_health) if self._standby_health else None
         now_mono = time.monotonic()
         live = stale = unavailable = 0
         oldest_live: float | None = None
@@ -594,6 +695,7 @@ class IntradayMarketState:
             "lastTickAt": _iso(last_tick_at),
             "oldestLiveTickAgeSeconds": oldest_live,
             "feedStatus": health,
+            "standby": standby_health,
         }
 
     def stale_symbols(
@@ -939,6 +1041,45 @@ class _RecoveryCircuit:
         return False
 
 
+def _recover_via_standby(market_state: "IntradayMarketState") -> int:
+    from .standby_feed.config import StandbyConfig
+    from .standby_feed.gateway_client import GatewayClient
+
+    cfg = StandbyConfig.from_env()
+    if not cfg.promotable:
+        return 0
+    client = GatewayClient(cfg)
+    health = client.health()
+    if not health or not health.get("healthy"):
+        return 0
+    batch_size = int(os.getenv("INTRADAY_RECOVERY_BATCH", "25"))
+    symbols = [
+        str(row.get("symbol") or "").upper()
+        for row in market_state.stale_symbols()
+        if row.get("symbol")
+    ][:batch_size]
+    if not symbols:
+        return 0
+    quotes = client.quotes(symbols)
+    repaired = 0
+    for sym in symbols:
+        wire = quotes.get(sym)
+        if not isinstance(wire, dict) or wire.get("status") == "NOT_SUBSCRIBED":
+            continue
+        outcome = market_state.apply_standby_tick(
+            sym,
+            wire,
+            promote_after_s=cfg.promote_after_s,
+            band_pct=cfg.band_pct,
+            handoff_divergence_pct=cfg.handoff_divergence_pct,
+        )
+        if outcome == "applied":
+            repaired += 1
+    if repaired:
+        LOGGER.info("STANDBY_RECOVERY repaired=%d/%d", repaired, len(symbols))
+    return repaired
+
+
 def start_intraday_recovery_worker(client: Any) -> threading.Thread | None:
     """Targeted REST recovery for stale symbols only (spec §12D/§50/§57).
 
@@ -961,7 +1102,11 @@ def start_intraday_recovery_worker(client: Any) -> threading.Thread | None:
 
     def _recover_once() -> int:
         if market_state.stream_status().get("wsConnected") is not True:
-            return 0  # WS restoration is primary; REST recovery waits.
+            try:
+                return _recover_via_standby(market_state)
+            except Exception:
+                LOGGER.debug("standby recovery attempt failed", exc_info=True)
+                return 0
         if not circuit.allow():
             return 0
         stale = market_state.stale_symbols()
@@ -1046,6 +1191,9 @@ __all__ = [
     "AngelIntradayStream",
     "IntradayMarketState",
     "IntradayUniverse",
+    "LIVE_WS_SOURCES",
+    "SOURCE_STANDBY_WS",
+    "SOURCE_WS",
     "get_intraday_market_state",
     "get_intraday_stream",
     "metrics_snapshot",
