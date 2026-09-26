@@ -295,6 +295,16 @@ def angel_option_chain_diagnostic() -> dict[str, Any]:
         return {"success": False, "error": str(exc)}
 
 
+@app.get("/api/diagnostics/provider-router")
+def provider_router_diagnostics() -> dict[str, Any]:
+    try:
+        from app.services.provider_router import ProviderRouter
+        router = ProviderRouter()
+        return {"success": True, "router": router.diagnostics()}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
 @app.post("/api/eod/warm-caches")
 def eod_warm_caches(date: str | None = None) -> dict[str, Any]:
     try:

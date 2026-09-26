@@ -1,0 +1,9 @@
+date,check,status,detail
+2026-09-25,shoonya_authentication,BLOCKED,Missing credentials: SHOONYA_UID, SHOONYA_ACCOUNT_ID, SHOONYA_PASSWORD, SHOONYA_TOTP_SECRET
+2026-09-25,symbol_master,BLOCKED,Blocked by missing authentication
+2026-09-25,friday_candles_5m,BLOCKED,Blocked by missing authentication
+2026-09-25,friday_candles_1h,BLOCKED,Blocked by missing authentication
+2026-09-25,friday_candles_daily,BLOCKED,Blocked by missing authentication
+2026-09-25,quote_test,BLOCKED,Blocked by missing authentication
+2026-09-25,websocket_proof,BLOCKED,Blocked by missing authentication
+2026-09-25,angel_vs_shoonya_comparison,BLOCKED,Blocked by missing Shoonya data

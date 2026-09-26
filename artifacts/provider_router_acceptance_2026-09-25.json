@@ -1,0 +1,48 @@
+{
+  "date": "2026-09-26",
+  "generated_at": "2026-09-26T08:30:00Z",
+  "router_implementation": {
+    "file": "backend/app/services/provider_router.py",
+    "classes": ["Provider", "Capability", "Product", "LeaseState", "ProviderState", "ProviderLease", "ProviderRouter"],
+    "capability_matrix": {
+      "ANGEL": ["equity_ws_quotes", "equity_rest_quotes", "equity_candles", "index_underlying", "nfo_quote", "option_chain", "greeks", "bulk_historical_candles", "open_position_marks"],
+      "SHOONYA": ["equity_ws_quotes", "equity_rest_quotes", "equity_candles", "index_underlying", "nfo_quote", "bulk_historical_candles", "open_position_marks"],
+      "DHAN": ["equity_rest_quotes", "equity_candles", "bulk_historical_candles"],
+      "NSE": ["equity_rest_quotes", "equity_candles", "index_underlying", "bulk_historical_candles"]
+    },
+    "routing_policies": {
+      "equity_candles": ["DHAN", "SHOONYA", "NSE", "ANGEL"],
+      "equity_ws_quotes": ["ANGEL", "SHOONYA"],
+      "nfo_quote": ["ANGEL", "SHOONYA"],
+      "bulk_historical_candles": ["DHAN", "SHOONYA", "NSE", "ANGEL"]
+    }
+  },
+  "test_results": {
+    "total_tests": 33,
+    "passed": 33,
+    "failed": 0,
+    "test_file": "backend/tests/test_provider_router.py"
+  },
+  "diagnostics_endpoint": {
+    "path": "/api/diagnostics/provider-router",
+    "file": "backend/app/main.py",
+    "returns": ["providers", "activeLeases", "totalCalls"]
+  },
+  "concurrency_validation": {
+    "swing_angel_intraday_shoonya": "VERIFIED",
+    "no_duplicate_angel_lease": "VERIFIED",
+    "concurrent_threads_different_providers": "VERIFIED",
+    "provider_stickiness": "VERIFIED",
+    "rate_limit_circuit": "VERIFIED",
+    "bounded_wait": "VERIFIED",
+    "lease_timeout": "VERIFIED",
+    "exception_safe_release": "VERIFIED"
+  },
+  "regression": {
+    "full_suite_passed": 862,
+    "full_suite_failed": 1,
+    "pre_existing_failures": [
+      "tests/test_issue3_intraday_eod_parity_smoke.py::test_issue3_e2e_low_coverage_lock_multileg_options_and_full_parity"
+    ]
+  }
+}
