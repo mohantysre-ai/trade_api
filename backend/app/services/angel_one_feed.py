@@ -47,6 +47,7 @@ from ..utils.log_redaction import install_secret_redaction
 # SmartAPI logs complete request headers on failures. Install this before the
 # first client request so credentials never reach container logs.
 install_secret_redaction()
+log = logging.getLogger(__name__)
 
 from .bulk_deals import load_bulk_deals
 from .stock_quality import (

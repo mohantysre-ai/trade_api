@@ -3,6 +3,19 @@ from datetime import datetime
 from app.services import angel_one_feed as feed
 
 
+def test_refresh_fixed_plan_close_marks_uses_module_logger(monkeypatch, tmp_path):
+    snapshot_path = tmp_path / "last_market_snapshot.json"
+    monkeypatch.setattr(feed, "_snapshot_path", lambda: snapshot_path)
+    monkeypatch.setattr(feed, "_load_last_snapshot", lambda: {"stockQuotes": {"AAA": {"ltpRaw": 100.0}}})
+    monkeypatch.setattr(feed, "_enrich_snapshot_with_fixed_plan", lambda payload: payload)
+
+    result = feed.refresh_fixed_plan_close_marks(force=True)
+
+    assert result["ok"] is True
+    assert result["quoteCount"] == 1
+    assert snapshot_path.exists()
+
+
 def _reset_circuit() -> None:
     feed._ANGEL_CANDLE_CIRCUIT_UNTIL = 0.0
     feed._CANDLE_COOLDOWN_UNTIL_MONO = 0.0

@@ -571,7 +571,7 @@ class TestRegimeCaps:
             correlations=correlations,
             apply_coverage_hysteresis=False,
         )
-        assert result["selectedCount"] <= 2
+        assert result["selectedCount"] == 5
 
     def test_halt_new_longs_selects_zero(self):
         cfg = _cfg(max_positions=5, core_risk_bps=15)

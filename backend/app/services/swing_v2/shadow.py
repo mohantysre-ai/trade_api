@@ -34,7 +34,7 @@ def _is_micro(row: dict[str, Any]) -> bool:
 
 
 def _regime_scale(regime: str) -> tuple[float, int]:
-    return {"NORMAL": (1.0, 5), "DEFENSIVE": (.5, 2), "HALT_NEW_LONGS": (0.0, 0)}.get(regime, (0.0, 0))
+    return {"NORMAL": (1.0, 5), "DEFENSIVE": (.5, 5), "HALT_NEW_LONGS": (0.0, 0)}.get(regime, (0.0, 0))
 
 
 def _raw_coverage_tier(coverage: float, cfg: SwingV2Config) -> tuple[str, float]:

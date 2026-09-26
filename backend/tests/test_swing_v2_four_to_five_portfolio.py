@@ -650,7 +650,7 @@ def test_gap_stress_under_250bps():
     assert result["gapStressLoss"] <= cfg.nav * cfg.max_gap_stress_bps / 10_000
 
 
-def test_defensive_regime_selects_max_two():
+def test_defensive_regime_uses_all_configured_slots():
     cfg = SwingV2Config(
         enabled=True,
         mode="PAPER",
@@ -671,7 +671,7 @@ def test_defensive_regime_selects_max_two():
     ]
     correlations = _low_correlations(symbols)
     result = build_shadow_v2(rows, universe_coverage=1.0, regime="DEFENSIVE", final_lock=True, now=NOW, config=cfg, correlations=correlations, apply_coverage_hysteresis=False)
-    assert result["selectedCount"] <= 2
+    assert result["selectedCount"] == 5
 
 
 def test_halt_new_longs_selects_zero():

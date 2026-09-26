@@ -120,8 +120,8 @@ def test_session_reports_remaining_slots_and_scan_evidence(v2_env, monkeypatch):
             ]}}
     session = auth._session(scan, now=datetime(2026, 9, 23, 11, 0, tzinfo=IST))
     diagnostics = session["entryHuntDiagnostics"]
-    assert diagnostics["regimePositionCap"] == 2
-    assert diagnostics["availableSlots"] == 1
+    assert diagnostics["regimePositionCap"] == 5
+    assert diagnostics["availableSlots"] == 4
     assert diagnostics["qualifiedCount"] == 4
     assert diagnostics["correlationEvidencePairs"] == 0
 
