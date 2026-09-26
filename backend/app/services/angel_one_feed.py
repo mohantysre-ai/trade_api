@@ -76,7 +76,9 @@ from .market_data_provider import (
     fetch_dhan_candles,
     fetch_nse_candles,
     fetch_quotes_with_failover,
+    fetch_shoonya_candles,
     load_dhan_security_ids,
+    shoonya_gateway_configured,
 )
 from ..utils.symbols import MACRO_INSTRUMENTS, MOCK_TICKERS, NIFTY_50_KEYS, WATCHLIST, Instrument
 from .llm_client import (
@@ -3751,6 +3753,8 @@ def _intraday_metrics(
             intraday_raw = []
         if interval == "ONE_HOUR" and not _one_hour_candle_rows_fresh(intraday_raw, now):
             intraday_raw = []
+        if not intraday_raw and shoonya_gateway_configured():
+            intraday_raw = fetch_shoonya_candles(inst.key, interval, intraday_from, now)
         # Public NSE charting fills daily (and T-1 5m) without Angel. Today's
         # 5m is usually empty while the session is open.
         if not daily_raw:
