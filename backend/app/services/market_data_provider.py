@@ -221,6 +221,44 @@ def _as_ist(value: datetime) -> datetime:
     return value.astimezone(_IST_ZONE)
 
 
+def shoonya_gateway_configured() -> bool:
+    """True when the standby gateway and candle fallback are enabled by config."""
+    return (
+        os.getenv("SHOONYA_STANDBY_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
+        and os.getenv("SHOONYA_CANDLES_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
+        and bool(os.getenv("SHOONYA_GATEWAY_URL"))
+    )
+
+
+def fetch_shoonya_candles(
+    symbol: str,
+    interval: str,
+    fromdate: datetime,
+    todate: datetime,
+) -> list[list[Any]]:
+    """Fetch targeted Shoonya standby candles in the common candle-row shape."""
+    if not shoonya_gateway_configured() or not symbol:
+        return []
+    try:
+        from .standby_feed.config import StandbyConfig
+        from .standby_feed.gateway_client import GatewayClient
+    except Exception:
+        return []
+    client = GatewayClient(StandbyConfig.from_env())
+    fromdate = _as_ist(fromdate)
+    todate = _as_ist(todate)
+    result = client.candles(
+        str(symbol).upper(),
+        str(interval).upper(),
+        int(fromdate.timestamp()),
+        int(todate.timestamp()),
+    )
+    if not isinstance(result, dict) or result.get("status") != "OK":
+        return []
+    rows = result.get("rows")
+    return rows if isinstance(rows, list) else []
+
+
 def _nse_candle_calls_allowed() -> bool:
     return time.monotonic() >= _NSE_CANDLE_CIRCUIT_UNTIL
 

@@ -2541,7 +2541,7 @@ def _overlay_market_state(snap: dict[str, Any]) -> dict[str, Any]:
         if freshness in ("LIVE", "DEGRADED"):
             row["ltp"] = quote.get("ltp")
             row["ltpRaw"] = quote.get("ltp")
-            row["ltpSource"] = "ANGEL_WS"
+            row["ltpSource"] = quote.get("source") or "ANGEL_WS"
             row["receivedAt"] = quote.get("receivedAt")
             row["dataAge"] = quote.get("dataAge")
             row["dataStale"] = False

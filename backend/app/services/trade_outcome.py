@@ -1260,6 +1260,11 @@ def _compute_live_prices_for_plan(
             if price is not None:
                 live_quotes[sym] = price
 
+    try:
+        from .intraday_market_state import LIVE_WS_SOURCES as _LIVE_WS_SOURCES
+    except Exception:
+        _LIVE_WS_SOURCES = frozenset({"ANGEL_WS"})
+
     def enrich_pick(p: dict[str, Any]) -> dict[str, Any]:
         symbol = (p.get("symbol") or "").upper()
         ltp = None
@@ -1285,7 +1290,7 @@ def _compute_live_prices_for_plan(
                 if ws_meta.get("freshness") == "LOCKED_PRICE_UNAVAILABLE":
                     ltp_source = "LOCKED_PRICE_UNAVAILABLE"
                 else:
-                    ltp_source = "ANGEL_WS"
+                    ltp_source = ws_meta.get("source") or "ANGEL_WS"
                 from_snapshot = False
             else:
                 ltp_source = "live"
@@ -1317,7 +1322,7 @@ def _compute_live_prices_for_plan(
             "priceUpdatedAt": _utc_now(),
         }
         ws_entry = ws_quote_meta.get(symbol)
-        if ltp_source == "ANGEL_WS" and ws_entry is not None:
+        if ltp_source in _LIVE_WS_SOURCES and ws_entry is not None:
             entry["receivedAt"] = ws_entry.get("receivedAt")
             entry["dataAge"] = ws_entry.get("dataAge")
             # V5 freshness contract: the market-state mix source stays honest
