@@ -181,34 +181,20 @@ async def sse_stream(request: Request) -> StreamingResponse:
 
 app.include_router(_SNAPSHOT_ROUTER)
 
-# Position safety: mark already-locked index-option paper positions every minute,
-# independent of any dashboard/browser.
 start_paper_supervisor(AngelOneClient)
-
-# Candidate discovery: run the existing index-options BUY/SELL radar every minute.
-# This supervisor contains no trading rules; compose_live_index_options_radar remains
-# the single source of truth for scores, gates, selection, entry and risk controls.
 start_index_options_hunt_supervisor(AngelOneClient)
 
 
 def _start_intraday_stream() -> bool:
-    """Start the process-wide Intraday WS live state (all 750 -> WebSocket).
-
-    Async startup: REST bootstrap/recovery continues in the background and the
-    API never blocks on 750-symbol hydration (spec V5 §30). Disabled cleanly
-    when the env opt-out is set or the client/credentials are unavailable.
-    """
     if os.getenv("INTRADAY_WS_ENABLED", "1").strip().lower() in {"0", "false", "no"}:
         return False
     try:
         from app.services.intraday_market_state import get_intraday_stream
-
         global INTRADAY_CLIENT
         INTRADAY_CLIENT = AngelOneClient()
         return bool(get_intraday_stream().ensure(INTRADAY_CLIENT))
     except Exception:
         import logging
-
         logging.getLogger(__name__).exception(
             "intraday live stream failed to start; REST recovery path remains active"
         )
@@ -218,37 +204,40 @@ def _start_intraday_stream() -> bool:
 INTRADAY_CLIENT: AngelOneClient | None = None
 INTRADAY_STREAM_STARTED = _start_intraday_stream()
 
-# REST becomes an exceptional/recovery path: targeted recovery for symbols the
-# WS stream left stale (bounded batches, existing limiter), never a heartbeat.
+STANDBY_FEED_STARTED = False
+try:
+    from app.services.standby_feed.client import start_standby_feed
+    STANDBY_FEED_STARTED = start_standby_feed()
+except Exception:
+    import logging as _logging_standby
+    _logging_standby.getLogger(__name__).exception(
+        "shoonya standby feed failed to start; primary (Angel) path is unaffected"
+    )
+
 INTRADAY_RECOVERY_STARTED = False
 try:
     if os.getenv("INTRADAY_WS_ENABLED", "1").strip().lower() not in {"0", "false", "no"}:
         from app.services.intraday_market_state import start_intraday_recovery_worker
-
         if INTRADAY_CLIENT is not None:
             start_intraday_recovery_worker(INTRADAY_CLIENT)
         INTRADAY_RECOVERY_STARTED = True
 except Exception:
     import logging as _logging
-
     _logging.getLogger(__name__).exception("intraday recovery worker failed to start")
 
 
 @app.get("/api/index-options/paper-supervisor")
 def index_options_paper_supervisor_status() -> dict:
-    """Read-only operational health for the autonomous paper-position marker."""
     return {"success": True, "supervisor": paper_supervisor_status()}
 
 
 @app.get("/api/index-options/hunt-supervisor")
 def index_options_hunt_supervisor_status() -> dict:
-    """Read-only health for autonomous BUY/SELL index-option discovery."""
     return {"success": True, "supervisor": index_options_hunt_status()}
 
 
 @app.get("/api/diagnostics/angel-circuit-state")
 def angel_circuit_state() -> dict[str, Any]:
-    """Return current Angel One AB1021 candle-circuit and cooldown state."""
     try:
         from app.services.angel_one_feed import (
             _ANGEL_CANDLE_CIRCUIT_UNTIL,
@@ -276,11 +265,9 @@ def angel_circuit_state() -> dict[str, Any]:
 
 @app.get("/api/diagnostics/angel-option-chain")
 def angel_option_chain_diagnostic() -> dict[str, Any]:
-    """Test Angel One option chain fetch for all supported indexes."""
     try:
         from app.services.angel_index_options import fetch_angel_index_option_snapshot
         from app.services.angel_one_feed import AngelOneClient
-
         client = AngelOneClient()
         snapshot = fetch_angel_index_option_snapshot(client)
         indices = snapshot.get("indices") or {}
@@ -303,29 +290,19 @@ def angel_option_chain_diagnostic() -> dict[str, Any]:
                 ),
                 "componentFreshness": payload.get("componentFreshness") or {},
             }
-        return {
-            "success": True,
-            "fetchedAt": snapshot.get("fetchedAt"),
-            "indices": results,
-        }
+        return {"success": True, "fetchedAt": snapshot.get("fetchedAt"), "indices": results}
     except Exception as exc:
         return {"success": False, "error": str(exc)}
 
 
 @app.post("/api/eod/warm-caches")
 def eod_warm_caches(date: str | None = None) -> dict[str, Any]:
-    """Force-warm EOD book caches from live state for the given date."""
     try:
         from datetime import date as _date
         from app.services.eod_book_cache import warm_book_caches
-
         for_date = _date.fromisoformat(date) if date else datetime.now(tz=timezone.utc).date()
         result = warm_book_caches(for_date)
-        return {
-            "success": True,
-            "date": for_date.isoformat(),
-            "warmResult": result,
-        }
+        return {"success": True, "date": for_date.isoformat(), "warmResult": result}
     except Exception as exc:
         return {"success": False, "error": str(exc)}
 
