@@ -1,0 +1,14 @@
+services:
+  shoonya-gateway:
+    build: .
+    image: shoonya-gateway:local
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - shoonya-session:/data
+    ports:
+      - "8787:8787"
+
+volumes:
+  shoonya-session:
