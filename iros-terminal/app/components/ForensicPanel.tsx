@@ -648,6 +648,18 @@ export default function ForensicPanel({
     decisionWindow?: { start?: string; freeze?: string; entryCutoff?: string; orderExpiry?: string; timezone?: string };
     selectionFinalized?: boolean;
     huntWindow?: { huntStart?: string; huntEnd?: string };
+    isTradingDay?: boolean;
+    isHoliday?: boolean;
+    isWeekend?: boolean;
+    marketDayReason?: string;
+    marketDay?: {
+      date?: string;
+      weekday?: string;
+      isTradingDay?: boolean;
+      isWeekend?: boolean;
+      isHoliday?: boolean;
+      reason?: string;
+    };
     entryHuntDiagnostics?: {
       evaluated?: number;
       qualified?: number;
@@ -1156,6 +1168,17 @@ export default function ForensicPanel({
       swingBookPositions.length === 0 &&
       !lockedSwingMode,
   );
+  const swingNonTradingDay = Boolean(
+    swingSession?.isTradingDay === false ||
+      swingSession?.marketDay?.isTradingDay === false,
+  );
+  const swingMarketDayLabel = useMemo(() => {
+    const status = swingSession?.marketDay;
+    const reason = String(swingSession?.marketDayReason || status?.reason || '');
+    if (reason === 'WEEKEND') return `Market closed — weekend${status?.weekday ? ` (${status.weekday})` : ''}`;
+    if (reason === 'MARKET_HOLIDAY') return 'Market closed — NSE holiday';
+    return 'Market closed — non-trading day';
+  }, [swingSession?.marketDay, swingSession?.marketDayReason]);
   const huntingSwing = Boolean(
     todaySwingEmpty &&
       (swingSession?.hunting || swingSession?.cashReason === 'WAITING_FOR_QUALIFIED_BUY_ENTRY'),
@@ -1370,6 +1393,15 @@ export default function ForensicPanel({
                 {' · '}
                 {swingSession?.cashReason || 'NO_ACTIVE_VALID_SWING_SELECTIONS'}
                 {' · '}entry hunt closed — no qualified BUY locked
+              </>
+            ) : swingNonTradingDay ? (
+              <>
+                <span className="inline-flex items-center rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                  MARKET CLOSED · {swingSession?.sessionDate}
+                </span>
+                {' · '}
+                {swingMarketDayLabel}
+                {' · '}last trading session book — no rollover expected until the next trading day
               </>
             ) : staleSwingLock ? (
               <>
@@ -1771,14 +1803,18 @@ export default function ForensicPanel({
         {!portfolioDisplayRows.length && !huntingSwing && !cashHeldSwing && (
           <div className="col-span-full py-8 text-center">
             <p className="text-slate-700 text-[13px] font-semibold">
-              {institutionalMode
+              {swingNonTradingDay
+                ? swingMarketDayLabel
+                : institutionalMode
                 ? institutionalOffHours
                   ? 'No off-hours institutional BUY setups pass quant + SIGQ Research gates'
                   : 'No institutional-grade BUY setups pass all gates'
                 : 'No high-probability BUY setups right now'}
             </p>
             <p className="text-slate-500 text-[11px] mt-1">
-              {institutionalMode
+              {swingNonTradingDay
+                ? `No scan is expected today${swingSession?.sessionDate ? ` — book state is from the last trading session (${swingSession.sessionDate})` : ''}. Gates are evaluated on trading days only; this is a market-hours status, not a screening failure.`
+                : institutionalMode
                 ? institutionalOffHours
                   ? `Off-hours / snapshot mode: intraday volume gates are rank-penalized (0/${assetRows.filter((r) => !r.isMetaRow).length} hard-filter passers in pool). Still requires quant score ≥ ${SCORE_STRONG}, SIGQ Research confirm, LOW/MODERATE risk, and scanner R:R ≥2 or ATR-based estimate. No filler names — refresh after market open for live volume confirms.`
                   : `₹1cr+ book requires quant score ≥ ${SCORE_STRONG}, hard+quality filters, SIGQ Research confirm (checklist ≥70% preferred), LOW/MODERATE risk, and scanner R:R ≥2 when in the scanner LONG set. No filler names — refresh after market open.`

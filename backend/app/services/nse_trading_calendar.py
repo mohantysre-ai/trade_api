@@ -111,4 +111,24 @@ def is_nse_trading_day(day: date, *, refresh: bool = False) -> bool:
     return day.weekday() < 5 and day not in trading_holidays(refresh=refresh, today=day)
 
 
-__all__ = ["NSE_HOLIDAY_URL", "is_nse_trading_day", "trading_holidays"]
+def market_day_status(day: date, *, refresh: bool = False) -> dict[str, Any]:
+    """Why ``day`` is or is not an NSE trading day.
+
+    Exposed so desks can distinguish a deliberate non-trading state (weekend,
+    declared holiday) from a stalled book. Without this, a correctly finalized
+    Friday session is indistinguishable from a failed rollover over the
+    weekend — both present as an empty, unrotated book.
+    """
+    weekend = day.weekday() >= 5
+    holiday = day in trading_holidays(refresh=refresh, today=day)
+    return {
+        "date": day.isoformat(),
+        "weekday": day.strftime("%A"),
+        "isTradingDay": not weekend and not holiday,
+        "isWeekend": weekend,
+        "isHoliday": holiday,
+        "reason": "WEEKEND" if weekend else ("MARKET_HOLIDAY" if holiday else "TRADING_DAY"),
+    }
+
+
+__all__ = ["NSE_HOLIDAY_URL", "is_nse_trading_day", "market_day_status", "trading_holidays"]

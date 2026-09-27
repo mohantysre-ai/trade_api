@@ -57,7 +57,7 @@ function Invoke-Docker {
 
 function Copy-FromApi {
     param([string]$Cid, [string]$From, [string]$To, [switch]$Optional)
-    $code = Invoke-Docker cp "${Cid}:${From}/." $To
+    $code = Invoke-Docker -DockerArgs @('cp', "${Cid}:${From}/.", $To)
     if ($code -ne 0) {
         if ($Optional) {
             Write-Host "  skip $From (missing in container)"
@@ -70,29 +70,60 @@ function Copy-FromApi {
 function Copy-FromVolume {
     param([string]$Volume, [string]$Sub, [string]$To)
     $inner = if ($Sub) { "/vol/$Sub" } else { "/vol" }
-    $code = Invoke-Docker run --rm -v "${Volume}:/vol" -v "${To}:/out" alpine:3.21 sh -c "if [ -d $inner ]; then cp -a $inner/. /out/; fi"
+    $code = Invoke-Docker -DockerArgs @('run', '--rm', '-v', "${Volume}:/vol", '-v', "${To}:/out", 'alpine:3.21', 'sh', '-c', "if [ -d $inner ]; then cp -a $inner/. /out/; fi")
     if ($code -ne 0) { throw "volume pack of $Volume failed." }
 }
 
 try {
-    $cid = (docker ps -aq -f "name=iros-market-api").Trim()
+    $cid = [string](docker ps -aq -f "name=iros-market-api" | Select-Object -First 1)
+    $cid = "$cid".Trim()
     if ($cid) {
         Copy-FromApi $cid "/app/state" $tmpState
         Copy-FromApi $cid "/app/backend/app/data" $tmpData
         Copy-FromApi $cid "/app/backend/app/services/eod_archive" $tmpArchive -Optional
     } else {
         Write-Host "  iros-market-api missing - packing compose project volumes"
-        $stateVol = (docker volume ls -q | Select-String -Pattern "iros-desk-state$").Line
-        $dataVol = (docker volume ls -q | Select-String -Pattern "iros-backend-data$").Line
-        $archVol = (docker volume ls -q | Select-String -Pattern "iros-eod-archive$").Line
-        if (-not $stateVol) { throw "named volume iros-desk-state not found." }
-        Copy-FromVolume $stateVol "" $tmpState
-        if ($dataVol) { Copy-FromVolume $dataVol "" $tmpData }
-        if ($archVol) { Copy-FromVolume $archVol "" $tmpArchive }
+        $stateVol = [string](docker volume ls -q | Select-String -Pattern "iros-desk-state$" | Select-Object -First 1)
+        $dataVol = [string](docker volume ls -q | Select-String -Pattern "iros-backend-data$" | Select-Object -First 1)
+        $archVol = [string](docker volume ls -q | Select-String -Pattern "iros-eod-archive$" | Select-Object -First 1)
+        if ($stateVol) {
+            Copy-FromVolume $stateVol.Trim() "" $tmpState
+            if ($dataVol) { Copy-FromVolume $dataVol.Trim() "" $tmpData }
+            if ($archVol) { Copy-FromVolume $archVol.Trim() "" $tmpArchive }
+        } else {
+            Write-Host "  no IROS volumes found - packing direct-app state only"
+        }
     }
 } catch {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
     throw
+}
+
+function Copy-SqliteSnapshot {
+    param([string]$Source, [string]$Target)
+    $python = Join-Path $Root '.venv\Scripts\python.exe'
+    if (-not (Test-Path -LiteralPath $python)) { $python = Join-Path $Root '.test-venv\Scripts\python.exe' }
+    if (-not (Test-Path -LiteralPath $python)) {
+        Write-Host "  [WARN] no Python venv - skipping live database $Source (will not be packed)"
+        return $false
+    }
+    New-Item -ItemType Directory -Force -Path (Split-Path $Target -Parent) | Out-Null
+    $backup = "$Target.pack"
+    if (Test-Path -LiteralPath $backup) { Remove-Item -LiteralPath $backup -Force }
+    & $python (Join-Path $PSScriptRoot 'sqlite-backup.py') $Source $backup
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $backup)) {
+        Write-Host "  [WARN] SQLite snapshot failed for $Source - preserving existing seed copy"
+        return $false
+    }
+    Move-Item -LiteralPath $backup -Destination $Target -Force
+    (Get-Item -LiteralPath $Target).LastWriteTimeUtc = (Get-Item -LiteralPath $Source).LastWriteTimeUtc
+    # A WAL database must never travel with stale sidecars: an orphaned -wal from
+    # the source host is what makes the restored image report "database malformed".
+    foreach ($suffix in @('-wal', '-shm')) {
+        $sidecar = "$Target$suffix"
+        if (Test-Path -LiteralPath $sidecar) { Remove-Item -LiteralPath $sidecar -Force }
+    }
+    return $true
 }
 
 function Copy-Tree {
@@ -102,13 +133,26 @@ function Copy-Tree {
         Get-ChildItem -LiteralPath $From -File -Filter '*.json' -Force -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -notmatch '(\.bak|\.tmp|\.lock)\.json$' }
     } else {
-        Get-ChildItem -LiteralPath $From -Force -ErrorAction SilentlyContinue
+        Get-ChildItem -LiteralPath $From -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notmatch '\.(wal|shm)$' }
     }
     if (-not $items) { return 0 }
+    $copied = 0
     foreach ($item in $items) {
+        if (-not $item.PSIsContainer -and $item.Extension -in @('.sqlite3', '.db')) {
+            # Snapshot through SQLite itself: a byte copy of an open WAL database
+            # ships torn pages and produces "database disk image is malformed".
+            $dest = Join-Path $To $item.Name
+            if (Copy-SqliteSnapshot $item.FullName $dest) {
+                Write-Host "  snapshotted database $($item.Name)"
+                $copied++
+            }
+            continue
+        }
         Copy-Item -LiteralPath $item.FullName -Destination $To -Recurse -Force
+        $copied++
     }
-    return @($items).Count
+    return $copied
 }
 
 Copy-Tree $tmpState $seedState -State | Out-Null
@@ -129,20 +173,24 @@ function Merge-NewerFiles {
         if ($item.Name -in @('client_secret.json', 'gemini_oauth_token.json')) { continue }
         $relative = $item.FullName.Substring($From.Length).TrimStart('\', '/')
         $target = Join-Path $To $relative
-        if ((Test-Path -LiteralPath $target) -and
-            $item.LastWriteTimeUtc -le (Get-Item -LiteralPath $target).LastWriteTimeUtc) { continue }
+        if (Test-Path -LiteralPath $target) {
+            if ($item.Name -eq 'swing_v2_ledger.sqlite3') {
+                $python = Join-Path $Root '.venv\Scripts\python.exe'
+                if (-not (Test-Path -LiteralPath $python)) { $python = Join-Path $Root '.test-venv\Scripts\python.exe' }
+                $sequenceScript = Join-Path $PSScriptRoot 'sqlite-sequence.py'
+                $sourceSequence = [long](& $python $sequenceScript $item.FullName)
+                $targetSequence = [long](& $python $sequenceScript $target)
+                if ($sourceSequence -le $targetSequence) { continue }
+                Write-Host "  newer direct-app ledger sequence: $sourceSequence > $targetSequence"
+            } elseif ($item.LastWriteTimeUtc -le (Get-Item -LiteralPath $target).LastWriteTimeUtc) {
+                continue
+            }
+        }
         New-Item -ItemType Directory -Force -Path (Split-Path $target -Parent) | Out-Null
         if ($item.Extension -in @('.sqlite3', '.db')) {
-            $python = Join-Path $Root '.venv\Scripts\python.exe'
-            if (-not (Test-Path -LiteralPath $python)) { $python = Join-Path $Root '.test-venv\Scripts\python.exe' }
-            if (-not (Test-Path -LiteralPath $python)) { throw "Python venv required to snapshot active SQLite database $($item.FullName)" }
-            $backup = "$target.pack"
-            & $python (Join-Path $PSScriptRoot 'sqlite-backup.py') $item.FullName $backup
-            if ($LASTEXITCODE -ne 0) { throw "SQLite backup failed: $($item.FullName)" }
-            Move-Item -LiteralPath $backup -Destination $target -Force
-            foreach ($suffix in @('-wal', '-shm')) {
-                $sidecar = "$target$suffix"
-                if (Test-Path -LiteralPath $sidecar) { Remove-Item -LiteralPath $sidecar -Force }
+            if (-not (Copy-SqliteSnapshot $item.FullName $target)) {
+                Write-Host "  [WARN] live database not packed: $relative"
+                continue
             }
         } else {
             Copy-Item -LiteralPath $item.FullName -Destination $target -Force

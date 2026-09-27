@@ -15,12 +15,21 @@ from .trade_outcome import get_alert_history, _today_ist
 from .eod_reference import get_close_mark_price, get_reference_price, generate_swing_analysis
 from .eod_intraday_report import _build_levels_diagnostic, _exit_reason_from_scale_eval
 from .exit_plan import attach_exit_plan, blended_pnl_from_state, format_scale_progress, refresh_exit_policy
-from .quant_desk_exit_policy import build_trade_outcome
+from .quant_desk_exit_policy import build_trade_outcome, desk_miss_diagnostic
 
 log = logging.getLogger(__name__)
 
 DEFAULT_SWING_CAPITAL = 1_000_000.0  # ₹10L
 DAY_BUCKETS = (1, 7, 15, 30)
+
+
+def _number(value: Any) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return float(str(value).replace("₹", "").replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
 
 
 def _live_direction_conflicts() -> dict[str, str]:
@@ -776,19 +785,50 @@ def generate_swing_eod_report(
         positions = report.get("positions") or []
         picks = []
         for p in positions:
-            entry = p.get("entryPrice") or p.get("fillPrice")
-            pnl = p.get("totalPnl")
+            entry = _number(p.get("entryPrice")) or _number(p.get("fillPrice"))
+            pnl = _number(p.get("totalPnl"))
             terminal = bool(p.get("terminal"))
             last_event = str(p.get("lastEventType") or "")
             skipped = terminal and last_event == "ORDER_EXPIRED" and not entry
             qty = None if skipped else (p.get("filledQty") or p.get("qty") or p.get("approxQty"))
-            mark = None if skipped else (p.get("currentPrice") or p.get("ltp") or p.get("exitPrice") or entry)
-            deployed = 0.0 if skipped else p.get("deployedCapital")
+            mark = None if skipped else (_number(p.get("currentPrice")) or _number(p.get("ltp")) or _number(p.get("exitPrice")) or entry)
+            deployed = 0.0 if skipped else _number(p.get("deployedCapital"))
+            initial_stop = _number(p.get("initialStop"))
+            effective_stop = _number(p.get("effectiveStop"))
+            exit_price = _number(p.get("exitPrice"))
+            # Original trade risk, never the trailed/effective stop: R must stay
+            # comparable across the book as stops ratchet up.
+            risk_per_share = _number(p.get("riskPerShare"))
+            if risk_per_share is None and entry is not None and initial_stop is not None:
+                risk_per_share = abs(entry - initial_stop)
             if skipped:
                 pnl = 0.0
             outcome = None
             if terminal and pnl is not None:
                 outcome = "WIN" if float(pnl) > 0 else ("LOSS" if float(pnl) < 0 else "FLAT")
+            pnl_pct = (float(pnl) / float(deployed) * 100.0) if pnl is not None and deployed else None
+
+            # Ledger positions already carry mfeR/maeR; passing the position as
+            # exit_state lets the canonical policy reuse them instead of
+            # re-deriving excursion from a single close.
+            desk = build_trade_outcome(
+                triggered=not skipped,
+                realized_pnl=pnl,
+                exit_reason=p.get("exitReason") or last_event or None,
+                exit_state=p,
+                entry=entry,
+                exit_price=exit_price,
+                risk_per_share=risk_per_share,
+                qty=qty,
+                direction=str(p.get("direction") or "LONG"),
+                effective_stop=effective_stop or initial_stop,
+                day_high=_number(p.get("dayHigh")) or _number(p.get("high")),
+                day_low=_number(p.get("dayLow")) or _number(p.get("low")),
+                trigger_source="swing_v2_ledger",
+                lineage=p.get("lineage"),
+            )
+            diagnostic = desk_miss_diagnostic(desk, move_pct=pnl_pct, source="SWING_V2_LEDGER")
+
             picks.append(
                 {
                     "symbol": p.get("symbol"),
@@ -803,13 +843,15 @@ def generate_swing_eod_report(
                     "remainingQty": None if skipped else p.get("remainingQty"),
                     "entryPrice": None if skipped else entry,
                     "currentPrice": mark,
-                    "exitPrice": None if skipped else p.get("exitPrice"),
-                    "stopLoss": p.get("effectiveStop") or p.get("initialStop"),
+                    "exitPrice": None if skipped else exit_price,
+                    "stopLoss": effective_stop or initial_stop,
+                    "initialStop": initial_stop,
+                    "riskPerShare": risk_per_share,
                     "target1": p.get("t1"),
                     "target2": p.get("t2"),
                     "pnl": pnl,
                     "totalPnl": pnl,
-                    "pnlPct": (float(pnl) / float(deployed) * 100.0) if pnl is not None and deployed else None,
+                    "pnlPct": pnl_pct,
                     "pnlKind": None if skipped else ("realised" if terminal else "unrealised"),
                     "outcomeBucket": None if skipped else outcome,
                     "deployedCapital": deployed,
@@ -817,6 +859,21 @@ def generate_swing_eod_report(
                     "unrealizedPnl": 0.0 if skipped else p.get("unrealizedPnl"),
                     "entryTimestamp": p.get("entryTimestamp"),
                     "exitReason": p.get("exitReason"),
+                    "deskExitLabel": desk.get("deskExitLabel"),
+                    "deskProgress": desk.get("deskProgress"),
+                    "economicR": desk.get("economicR"),
+                    "rMultiple": desk.get("rMultiple"),
+                    "pathR": desk.get("pathR"),
+                    "mfeR": desk.get("mfeR"),
+                    "maeR": desk.get("maeR"),
+                    "effectiveStopR": desk.get("effectiveStopR"),
+                    "rootCause": desk.get("rootCause"),
+                    "factors": desk.get("factors"),
+                    "lineage": desk.get("lineage"),
+                    "policyChain": desk.get("policyChain") or desk.get("chain"),
+                    "outcomeSchemaVersion": desk.get("outcomeSchemaVersion"),
+                    "missAnalysis": None,
+                    "missDiagnostic": None if skipped else diagnostic,
                     "lastEventType": last_event,
                     "sessionDate": p.get("sessionDate") or report.get("sessionDate"),
                     "lastEventAt": p.get("lastEventAt"),

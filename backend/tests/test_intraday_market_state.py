@@ -4,6 +4,7 @@ from app.services.intraday_market_state import (
     AngelIntradayStream,
     IntradayMarketState,
     IntradayUniverse,
+    _RecoverySweep,
 )
 
 
@@ -86,6 +87,39 @@ def test_per_symbol_freshness_and_stale_isolation():
     # Only the stale symbol needs targeted recovery.
     stale = [row["symbol"] for row in state.stale_symbols()]
     assert stale == ["TCS"]
+
+
+def test_recovery_sweep_advances_through_all_stale_symbols():
+    sweep = _RecoverySweep()
+    stale = [{"symbol": f"SYM{i}"} for i in range(60)]
+
+    first = sweep.next_batch(stale, 25)
+    assert first == [f"SYM{i}" for i in range(25)]
+    assert sweep.record(25) is False
+
+    second = sweep.next_batch(stale, 25)
+    assert second == [f"SYM{i}" for i in range(25, 50)]
+    assert sweep.record(24) is False
+
+    third = sweep.next_batch(stale, 25)
+    assert third == [f"SYM{i}" for i in range(50, 60)]
+    assert sweep.record(10) is True
+    assert sweep.attempted == 60
+    assert sweep.repaired == 59
+
+    restarted = sweep.next_batch(stale, 25)
+    assert restarted == first
+
+
+def test_recovery_sweep_drops_symbols_that_are_no_longer_stale():
+    sweep = _RecoverySweep()
+    stale = [{"symbol": f"SYM{i}"} for i in range(30)]
+
+    assert sweep.next_batch(stale, 10) == [f"SYM{i}" for i in range(10)]
+    sweep.record(10)
+
+    still_stale = [{"symbol": f"SYM{i}"} for i in range(20, 30)]
+    assert sweep.next_batch(still_stale, 10) == [f"SYM{i}" for i in range(20, 30)]
 
 
 def test_diagnostic_block_handles_mapping_session_shapes():

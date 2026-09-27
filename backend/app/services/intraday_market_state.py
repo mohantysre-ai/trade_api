@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 
 IST_ZONE = ZoneInfo("Asia/Kolkata")
 LOGGER = logging.getLogger(__name__)
+RECOVERY_LOGGER = logging.getLogger("uvicorn.error").getChild("intraday_recovery")
 
 EXCHANGE_TYPES = {"NSE": 1, "NFO": 2, "BSE": 3, "BFO": 4}
 SOURCE_WS = "ANGEL_WS"
@@ -1024,7 +1025,7 @@ class _RecoveryCircuit:
         if self.failures >= self.threshold and self.opened_at == 0.0:
             self.opened_at = time.monotonic()
             _metric("rest_circuit_open")
-            LOGGER.warning("REST_CIRCUIT_OPEN reason=recovery_failures=%d", self.failures)
+            RECOVERY_LOGGER.warning("REST_CIRCUIT_OPEN reason=recovery_failures=%d", self.failures)
 
     def record_success(self) -> None:
         self.failures = 0
@@ -1041,7 +1042,48 @@ class _RecoveryCircuit:
         return False
 
 
-def _recover_via_standby(market_state: "IntradayMarketState") -> int:
+class _RecoverySweep:
+    def __init__(self) -> None:
+        self.pending: list[str] = []
+        self.total = 0
+        self.attempted = 0
+        self.repaired = 0
+
+    def next_batch(
+        self,
+        stale: list[dict[str, Any]],
+        batch_size: int,
+    ) -> list[str]:
+        stale_symbols = list(
+            dict.fromkeys(
+                str(row.get("symbol") or "").upper()
+                for row in stale
+                if row.get("symbol")
+            )
+        )
+        if not self.pending:
+            self.pending = stale_symbols
+            self.total = len(self.pending)
+            self.attempted = 0
+            self.repaired = 0
+        else:
+            stale_set = set(stale_symbols)
+            self.pending = [symbol for symbol in self.pending if symbol in stale_set]
+        size = max(1, batch_size)
+        batch = self.pending[:size]
+        del self.pending[:size]
+        self.attempted += len(batch)
+        return batch
+
+    def record(self, repaired: int) -> bool:
+        self.repaired += repaired
+        return self.total > 0 and not self.pending
+
+
+def _recover_via_standby(
+    market_state: "IntradayMarketState",
+    sweep: _RecoverySweep | None = None,
+) -> int:
     from .standby_feed.config import StandbyConfig
     from .standby_feed.gateway_client import GatewayClient
 
@@ -1053,11 +1095,8 @@ def _recover_via_standby(market_state: "IntradayMarketState") -> int:
     if not health or not health.get("healthy"):
         return 0
     batch_size = int(os.getenv("INTRADAY_RECOVERY_BATCH", "25"))
-    symbols = [
-        str(row.get("symbol") or "").upper()
-        for row in market_state.stale_symbols()
-        if row.get("symbol")
-    ][:batch_size]
+    sweep = sweep or _RecoverySweep()
+    symbols = sweep.next_batch(market_state.stale_symbols(), batch_size)
     if not symbols:
         return 0
     quotes = client.quotes(symbols)
@@ -1076,7 +1115,13 @@ def _recover_via_standby(market_state: "IntradayMarketState") -> int:
         if outcome == "applied":
             repaired += 1
     if repaired:
-        LOGGER.info("STANDBY_RECOVERY repaired=%d/%d", repaired, len(symbols))
+        RECOVERY_LOGGER.info("STANDBY_RECOVERY repaired=%d/%d", repaired, len(symbols))
+    if sweep.record(repaired):
+        RECOVERY_LOGGER.info(
+            "STANDBY_RECOVERY sweep_repaired=%d/%d",
+            sweep.repaired,
+            sweep.total,
+        )
     return repaired
 
 
@@ -1097,27 +1142,24 @@ def start_intraday_recovery_worker(client: Any) -> threading.Thread | None:
     interval = float(os.getenv("INTRADAY_RECOVERY_INTERVAL_SEC", "60"))
     batch_size = int(os.getenv("INTRADAY_RECOVERY_BATCH", "25"))
     circuit = _RecoveryCircuit()
+    rest_sweep = _RecoverySweep()
+    standby_sweep = _RecoverySweep()
     stream = get_intraday_stream()
     market_state = stream.market_state
 
     def _recover_once() -> int:
         if market_state.stream_status().get("wsConnected") is not True:
             try:
-                return _recover_via_standby(market_state)
+                return _recover_via_standby(market_state, standby_sweep)
             except Exception:
-                LOGGER.debug("standby recovery attempt failed", exc_info=True)
+                RECOVERY_LOGGER.debug("standby recovery attempt failed", exc_info=True)
                 return 0
         if not circuit.allow():
             return 0
-        stale = market_state.stale_symbols()
-        symbols = [
-            str(row.get("symbol") or "").upper()
-            for row in stale
-            if row.get("symbol")
-        ][:batch_size]
+        symbols = rest_sweep.next_batch(market_state.stale_symbols(), batch_size)
         if not symbols:
             return 0
-        LOGGER.info("REST_RECOVERY symbols=%d", len(symbols))
+        RECOVERY_LOGGER.info("REST_RECOVERY symbols=%d", len(symbols))
         try:
             from .trade_outcome import _fetch_angel_plan_prices
 
@@ -1125,7 +1167,7 @@ def start_intraday_recovery_worker(client: Any) -> threading.Thread | None:
         except Exception as exc:
             circuit.record_failure()
             _metric("rest_recovery_failures")
-            LOGGER.warning("REST_RECOVERY failed: %s", exc)
+            RECOVERY_LOGGER.warning("REST_RECOVERY failed: %s", exc)
             return 0
         repaired = 0
         for sym in symbols:
@@ -1134,9 +1176,21 @@ def start_intraday_recovery_worker(client: Any) -> threading.Thread | None:
                 repaired += 1
         if repaired:
             circuit.record_success()
-            LOGGER.info("REST_RECOVERY repaired=%d/%d", repaired, len(symbols))
+            RECOVERY_LOGGER.info(
+                "REST_RECOVERY repaired=%d/%d progress=%d/%d",
+                repaired,
+                len(symbols),
+                rest_sweep.repaired + repaired,
+                rest_sweep.total,
+            )
         else:
             circuit.record_failure()
+        if rest_sweep.record(repaired):
+            RECOVERY_LOGGER.info(
+                "REST_RECOVERY sweep_repaired=%d/%d",
+                rest_sweep.repaired,
+                rest_sweep.total,
+            )
         return repaired
 
     def _run() -> None:
@@ -1145,7 +1199,7 @@ def start_intraday_recovery_worker(client: Any) -> threading.Thread | None:
             try:
                 _recover_once()
             except Exception:
-                LOGGER.exception("intraday recovery cycle failed")
+                RECOVERY_LOGGER.exception("intraday recovery cycle failed")
 
     if not WS_ENABLED:
         return None

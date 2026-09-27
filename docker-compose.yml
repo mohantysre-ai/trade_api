@@ -74,8 +74,31 @@ services:
       INDEX_OPTIONS_CANDLE_CACHE_FILE: /app/state/index_options_candles.json
       INDEX_OPTIONS_PAPER_BOOK_FILE: /app/state/index_options_paper_book.json
       INDEX_OPTIONS_STREAM_ENABLED: "1"
+    # Keep one process because live streams, recovery workers, and in-memory
+    # market state are process-local. Request concurrency remains bounded by
+    # AnyIO's threadpool and Uvicorn's connection limits.
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--workers",
+        "1",
+        "--limit-concurrency",
+        "256",
+        "--backlog",
+        "2048",
+      ]
     ports:
       - "${SIGQ_BIND_ADDRESS:-127.0.0.1}:8000:8000"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 3g
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -161,22 +184,36 @@ services:
     restart: unless-stopped
     init: true
     environment:
+      # Server-side BFF calls use compose DNS. Never "localhost": inside the
+      # container that resolves to the frontend itself, not market-api.
       MARKET_API_URL: "http://market-api:8000"
-      NEXT_PUBLIC_BACKEND_URL: "http://localhost:8000"
+      # NEXT_PUBLIC_* is inlined at `npm run build`; setting it at runtime has no
+      # effect on the shipped client bundle. Kept empty so the browser stays
+      # same-origin and every call flows through the BFF proxy instead.
+      NEXT_PUBLIC_BACKEND_URL: ""
       NEXT_PUBLIC_MARKET_API_URL: ""
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
       # Market-data is edge cached now, so scale the HTML/static shell across
       # multiple Next.js workers without recreating the old backend read herd.
-      FRONTEND_WORKERS: "6"
+      # 6 workers was oversubscribing the host alongside 2 Python services;
+      # 4 keeps the same concurrency with real CPU/memory headroom.
+      FRONTEND_WORKERS: "4"
       MARKET_READ_CACHE_MS: "2000"
       MARKET_READ_STALE_MS: "30000"
-      MARKET_READ_BACKEND_TIMEOUT_MS: "8000"
+      # Must stay well under Cloudflare's ~100s proxy read timeout, otherwise the
+      # edge returns 524 while the BFF is still waiting.
+      MARKET_READ_BACKEND_TIMEOUT_MS: "20000"
       MARKET_EDGE_CACHE_MS: "5000"
       MARKET_EDGE_STALE_MS: "60000"
       TZ: Asia/Kolkata
     ports:
       - "${SIGQ_BIND_ADDRESS:-127.0.0.1}:3000:3000"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2g
     depends_on:
       market-api:
         condition: service_healthy

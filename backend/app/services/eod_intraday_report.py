@@ -20,7 +20,7 @@ from typing import Any
 from .eod_archive import load_archive
 from .exit_plan import EXIT_POLICY_VERSION, attach_exit_plan, blended_pnl_from_state, format_scale_progress, overwrite_row_with_current_policy, refresh_exit_policy, apply_max_stop_cap
 from .intraday_execution_evidence import session_lock_fill_evidence
-from .quant_desk_exit_policy import build_trade_outcome, classify_taxonomy
+from .quant_desk_exit_policy import build_trade_outcome, classify_taxonomy, desk_miss_diagnostic
 import time
 import urllib.request
 from zoneinfo import ZoneInfo
@@ -1433,7 +1433,7 @@ def project_session_live(
             "pnl": round(pnl, 2),
             "pnlPct": pnl_pct,
             "missAnalysis": None,
-            "missDiagnostic": None,
+            "missDiagnostic": desk_miss_diagnostic(desk, move_pct=pnl_pct, source="INTRADAY_SESSION"),
             "pickSource": sess_row.get("source") or "intraday_session",
             "lineage": desk.get("lineage"),
             "policyChain": desk.get("policyChain") or desk.get("chain"),
@@ -1563,9 +1563,15 @@ def generate_intraday_eod_report(
 
     cached_hist = load_book_cache(for_date, "intraday")
     if not live_session_date:
-        if cached_hist is not None:
+        # A forced rebuild must be able to re-derive an archived book, otherwise
+        # schema/normalization fixes can never reach historical dates.
+        if cached_hist is not None and not force:
             return cached_hist
         if not picks:
+            # Never let a forced rebuild blank an archived book: with no
+            # canonical picks there is nothing to re-derive from.
+            if cached_hist is not None:
+                return cached_hist
             return {
                 "date": for_date.isoformat(),
                 "capital": capital,

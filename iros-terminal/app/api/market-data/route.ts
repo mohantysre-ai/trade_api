@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { jsonCompressed } from "@/lib/json-compressed";
 
 export const runtime = "nodejs";
 const BACKEND_URL = process.env.MARKET_API_URL ?? "http://127.0.0.1:8000";
@@ -13,9 +14,13 @@ const state = globalState.__irosMarketReadState ??= { cache: new Map(), inFlight
 const cache = state.cache;
 const inFlight = state.inFlight;
 
-function reply(data: unknown, state: string, status = 200) {
-  return NextResponse.json(data, {
+function reply(data: unknown, state: string, status = 200, request?: Request) {
+  // Upstream is gzipped by FastAPI, but Node inflates it on arrival and this
+  // route re-serializes the value. Without re-compressing here the browser
+  // receives the full ~1.4 MB body even though the hop to market-api was small.
+  return jsonCompressed(data, {
     status,
+    request,
     headers: {
       "x-iros-market-cache": state,
       "cache-control": "private, no-store, max-age=0",
@@ -47,7 +52,7 @@ export async function GET(request: Request) {
   const key = prompt ? `private:${crypto.randomUUID()}` : `pool:${pool ?? "default"}`;
   const now = Date.now();
   const cached = cache.get(key);
-  if (cached && now < cached.expiresAt) return reply(cached.data, "HIT");
+  if (cached && now < cached.expiresAt) return reply(cached.data, "HIT", 200, request);
 
   try {
     let pending = inFlight.get(key);
@@ -62,12 +67,12 @@ export async function GET(request: Request) {
       expiresAt: Date.now() + CACHE_TTL_MS,
       staleUntil: Date.now() + STALE_TTL_MS,
     });
-    return reply(data, coalesced ? "COALESCED" : "MISS");
+    return reply(data, coalesced ? "COALESCED" : "MISS", 200, request);
   } catch (err) {
     const stale = cache.get(key);
-    if (stale && Date.now() < stale.staleUntil) return reply(stale.data, "STALE");
+    if (stale && Date.now() < stale.staleUntil) return reply(stale.data, "STALE", 200, request);
     const message = err instanceof Error ? err.message : "Backend unreachable";
-    return reply({ success: false, error: message }, "ERROR", 503);
+    return reply({ success: false, error: message }, "ERROR", 503, request);
   } finally {
     inFlight.delete(key);
   }

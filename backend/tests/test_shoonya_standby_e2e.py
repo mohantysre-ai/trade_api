@@ -399,7 +399,8 @@ class TestDivergenceMonitor:
 # ---------------------------------------------------------------------------
 
 class TestGatewayClient:
-    def test_unconfigured_returns_none_or_empty(self):
+    def test_unconfigured_returns_none_or_empty(self, monkeypatch):
+        monkeypatch.delenv("SHOONYA_GATEWAY_URL", raising=False)
         cfg = StandbyConfig.from_env()
         client = GatewayClient(cfg)
         assert client.health() is None

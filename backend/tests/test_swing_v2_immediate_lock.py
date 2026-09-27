@@ -51,7 +51,7 @@ def test_hunt_window_fills_locked_orders_before_1510(monkeypatch, tmp_path):
     monkeypatch.setattr(auth, "build_from_market_snapshot", lambda *_args, **_kwargs: {"blocked": False, "candidates": [{"symbol": "AAA"}]})
     monkeypatch.setattr(auth, "_fill_locked_orders", lambda *_args, **_kwargs: calls.append("fill"))
     monkeypatch.setattr(auth, "_write_state", lambda _payload: None)
-    monkeypatch.setattr(auth, "_session", lambda scan=None, now=None: {"locked": True, "scan": scan})
+    monkeypatch.setattr(auth, "_session", lambda scan=None, now=None, market=None: {"locked": True, "scan": scan, "marketDay": market})
     import app.services.nse_trading_calendar as cal
     import app.services.swing_v2.market_data as market_data
     monkeypatch.setattr(cal, "is_nse_trading_day", lambda _day: True)
@@ -61,3 +61,27 @@ def test_hunt_window_fills_locked_orders_before_1510(monkeypatch, tmp_path):
     auth.run_authoritative_cycle(now=now)
     assert calls == ["fill"]
     auth._SESSION_READ_CACHE = None
+
+
+def test_force_outside_window_is_read_only(monkeypatch):
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            value = cls(2026, 9, 28, 4, 0, tzinfo=timezone.utc)
+            return value if tz is None else value.astimezone(tz)
+
+    cfg = type("Cfg", (), {
+        "decision_start_ist": "09:45",
+        "order_expire_ist": "15:20",
+    })()
+    import app.services.nse_trading_calendar as cal
+    monkeypatch.setattr(auth, "datetime", FixedDateTime)
+    monkeypatch.setattr(auth, "load_config", lambda: cfg)
+    monkeypatch.setattr(cal, "is_nse_trading_day", lambda _day: True)
+    monkeypatch.setattr(auth, "get_authoritative_session", lambda **_kwargs: {"locked": False})
+    monkeypatch.setattr(auth, "run_authoritative_cycle", lambda **_kwargs: (_ for _ in ()).throw(AssertionError("cycle must not run")))
+
+    result = auth.lock_authoritative_session(force=True)
+
+    assert result["forced"] is False
+    assert result["forceBlockedReason"] == "DECISION_WINDOW_CLOSED"

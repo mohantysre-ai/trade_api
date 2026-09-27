@@ -222,6 +222,88 @@ def _reconcile_master_from_books(for_date) -> None:
     _write_json(os.path.join(day_dir, "pm_commentary.json"), master["pm_commentary"])
 
 
+_NUMERIC_ROW_FIELDS: tuple[str, ...] = (
+    "entryPrice",
+    "exitPrice",
+    "currentPrice",
+    "stopLoss",
+    "initialStop",
+    "riskPerShare",
+    "target1",
+    "target2",
+    "dayHigh",
+    "dayLow",
+    "pnl",
+    "totalPnl",
+    "pnlPct",
+    "deployedCapital",
+    "realizedPnl",
+    "unrealizedPnl",
+    "mfeR",
+    "maeR",
+    "economicR",
+    "rMultiple",
+    "pathR",
+    "effectiveStopR",
+)
+
+
+def _coerce_number(value: Any) -> Any:
+    """Parse rupee/thousands-formatted strings into numbers.
+
+    Numbers pass through untouched. A string in a numeric field that cannot be
+    parsed is absent data, not a value, so it becomes ``None`` rather than
+    reaching sort comparators and the UI as junk.
+    """
+    if not isinstance(value, str):
+        return value
+    text = value.strip().replace("₹", "").replace(",", "")
+    if not text or text.lower() in {"none", "null", "nan", "-", "—"}:
+        return None
+    try:
+        parsed = float(text)
+    except ValueError:
+        return None
+    return int(parsed) if parsed.is_integer() and "." not in text and "e" not in text.lower() else parsed
+
+
+def _normalize_cached_rows(report: dict[str, Any]) -> dict[str, Any]:
+    """Coerce formatted numeric row fields on cache read.
+
+    Books archived before a normalization change can still hold values like
+    ``"₹1,734.50"``. Left as strings they reach the UI as NaN and break MARK
+    ordering, so they are repaired at read time. Only string values are touched;
+    native numbers keep their exact stored precision and no field is recomputed.
+    """
+    rows_key = "picks" if "picks" in report else ("trades" if "trades" in report else "positions")
+    rows = report.get(rows_key)
+    if not isinstance(rows, list) or not rows:
+        return report
+    changed = False
+    normalized: list[Any] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            normalized.append(row)
+            continue
+        patched: dict[str, Any] | None = None
+        for field in _NUMERIC_ROW_FIELDS:
+            if field not in row:
+                continue
+            coerced = _coerce_number(row[field])
+            if coerced is not row[field]:
+                if patched is None:
+                    patched = dict(row)
+                patched[field] = coerced
+        if patched is None:
+            normalized.append(row)
+        else:
+            normalized.append(patched)
+            changed = True
+    if changed:
+        report = {**report, rows_key: normalized}
+    return report
+
+
 def load_book_cache(for_date, kind: str) -> dict[str, Any] | None:
     path = book_cache_path(for_date, kind)
     data = _read_json(path)
@@ -230,7 +312,7 @@ def load_book_cache(for_date, kind: str) -> dict[str, Any] | None:
     if int(data.get("bookCacheSchemaVersion") or 0) != BOOK_CACHE_SCHEMA_VERSION:
         log.info("Ignoring stale %s Book cache for %s (schema=%s current=%s)", kind, for_date, data.get("bookCacheSchemaVersion"), BOOK_CACHE_SCHEMA_VERSION)
         return None
-    out = dict(data)
+    out = _normalize_cached_rows(dict(data))
     out["fromCache"] = True
     return out
 

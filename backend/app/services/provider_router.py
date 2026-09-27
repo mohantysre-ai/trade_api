@@ -159,10 +159,11 @@ class ProviderLease:
 
 class ProviderRouter:
     _instance: ProviderRouter | None = None
+    _instance_lock = threading.Lock()
 
     def __new__(cls) -> ProviderRouter:
         if cls._instance is None:
-            with threading.Lock():
+            with cls._instance_lock:
                 if cls._instance is None:
                     inst = super().__new__(cls)
                     inst._lock = threading.RLock()
@@ -176,7 +177,7 @@ class ProviderRouter:
 
     @classmethod
     def reset_instance(cls) -> None:
-        with threading.Lock():
+        with cls._instance_lock:
             cls._instance = None
 
     def _next_owner(self, product: Product) -> str:
@@ -325,6 +326,9 @@ class ProviderRouter:
         self._cleanup_expired()
         with self._lock:
             return {
+                "mode": "OBSERVABILITY_ONLY",
+                "enforced": False,
+                "warning": "Provider leases are not connected to production provider call paths",
                 "providers": {
                     p.value: {
                         "state": s.state.value,

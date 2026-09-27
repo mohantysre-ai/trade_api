@@ -2,6 +2,14 @@
 tunnel: iros-desk
 credentials-file: /etc/cloudflared/credentials.json
 
+originRequest:
+  connectTimeout: 15s
+  tcpKeepAlive: 30s
+  keepAliveTimeout: 90s
+  keepAliveConnections: 100
+  httpHostHeader: sigq.in
+  disableChunkedEncoding: false
+
 ingress:
   - hostname: calendar.sigq.in
     service: http://host.docker.internal:8088

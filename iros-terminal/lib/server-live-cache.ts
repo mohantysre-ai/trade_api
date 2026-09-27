@@ -21,7 +21,11 @@ export async function cachedBackendJson<T>(
   const fetchJson = () =>
     fetch(url, {
       cache: "no-store",
-      headers: { Accept: "application/json" },
+      // Ask the backend for compressed payloads. Node's fetch inflates them
+      // transparently, so the parsed object below is identical either way -
+      // this only shrinks the bytes on the BFF<->API hop. Without it the
+      // request advertises no encoding support and large JSON arrives raw.
+      headers: { Accept: "application/json", "Accept-Encoding": "gzip, br" },
       signal: AbortSignal.timeout(timeoutMs),
     }).then(async (response) => {
       if (!response.ok) throw new Error(`Backend HTTP ${response.status}`);
@@ -77,6 +81,6 @@ export const liveCacheHeaders = (status: string) => ({
   "Cache-Control": "private, no-store, max-age=0, must-revalidate",
   "CDN-Cache-Control": "no-store",
   "Cloudflare-CDN-Cache-Control": "no-store",
-  "Vary": "Cookie, Authorization",
+  "Vary": "Cookie, Authorization, Accept-Encoding",
   "X-Live-Cache": status,
 });

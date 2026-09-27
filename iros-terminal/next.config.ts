@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Slim production image via `node server.js` (see iros-terminal/Dockerfile)
   output: "standalone",
+  // Next compresses its own responses when the client advertises gzip. Keep this
+  // on so the HTML shell and every BFF JSON route reach the tunnel compressed.
+  compress: true,
   // Hide the floating Next.js Dev Tools "N" badge in development
   devIndicators: false,
   allowedDevOrigins: [
@@ -37,6 +40,7 @@ const nextConfig: NextConfig = {
             key: "Cloudflare-CDN-Cache-Control",
             value: "no-store",
           },
+          { key: "Vary", value: "Accept-Encoding" },
           { key: "X-IROS-Homepage-Cache", value: "no-store-trading-shell" },
         ],
       },
@@ -48,6 +52,8 @@ const nextConfig: NextConfig = {
             key: "Cache-Control",
             value: "public, max-age=31536000, immutable",
           },
+          // The response body varies by encoding, so shared caches must key on it.
+          { key: "Vary", value: "Accept-Encoding" },
         ],
       },
     ];

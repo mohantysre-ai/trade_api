@@ -2798,7 +2798,7 @@ export default function IrosMasterAdvancedTerminal() {
 
         {activeTab === 'eod' && (
           <div key="eod" className="desk-panel-enter space-y-3 min-w-0">
-            <EodDeskPanel refreshToken={deskRefreshKey} />
+            <EodDeskPanel refreshToken={deskRefreshKey} onSymbolSelect={handleSelect} />
           </div>
         )}
         </main>

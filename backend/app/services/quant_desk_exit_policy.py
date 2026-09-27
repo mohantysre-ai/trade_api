@@ -69,8 +69,31 @@ def outcome_bucket(*, execution_status: str, pnl: float) -> str:
     return "FLAT"
 
 
-def desk_exit_label(exit_reason: str | None, pnl: float) -> str:
+_REASON_ALIASES: dict[str, str] = {
+    # swing_v2 lifecycle events
+    "STOP_LOSS_FILLED": "SL_HIT",
+    "STOP_FILLED": "SL_HIT",
+    "TRAIL_STOP_FILLED": "TRAIL_SL_HIT",
+    "TRAIL_FILLED": "TRAIL_SL_HIT",
+    "TIME_EXIT_FILLED": "EOD_SQUAREOFF",
+    "MANDATORY_EXIT_FILLED": "EOD_SQUAREOFF",
+    "T1_FILLED": "T1_HIT",
+    "T2_FILLED": "T2_HIT",
+    # intraday session engine
+    "EOD_SQUAREOFF_FILLED": "EOD_SQUAREOFF",
+    "TRAIL_STOP": "TRAIL_SL_HIT",
+    "INITIAL_SL": "SL_HIT",
+}
+
+
+def canonical_exit_reason(exit_reason: str | None) -> str:
+    """Map book-specific exit reasons onto the canonical taxonomy vocabulary."""
     reason = str(exit_reason or "EOD_SQUAREOFF").upper()
+    return _REASON_ALIASES.get(reason, reason)
+
+
+def desk_exit_label(exit_reason: str | None, pnl: float) -> str:
+    reason = canonical_exit_reason(exit_reason)
     if reason in {"TRAIL_SL", "TRAIL_SL_HIT"}:
         return "TRAIL_STOP"
     if reason == "SL_HIT":
@@ -227,7 +250,7 @@ def classify_taxonomy(
 ) -> tuple[str, list[str]]:
     """Forensic rootCause — never sets outcomeBucket. First match wins."""
     status = str(execution_status or "").upper()
-    reason = str(exit_reason or "").upper()
+    reason = canonical_exit_reason(exit_reason)
     mfe = float(mfe_r) if mfe_r is not None else None
     factors: list[str] = []
 
@@ -514,6 +537,39 @@ def build_trade_outcome(
             "desk_label",
             "outcome_bucket",
         ],
+    }
+
+
+def desk_miss_diagnostic(
+    desk: dict[str, Any],
+    *,
+    move_pct: float | None = None,
+    source: str = "BOOK",
+) -> dict[str, Any]:
+    """Project a canonical TradeOutcome into the ``missDiagnostic`` contract.
+
+    Every EOD book surface must ship this object; a trade without it renders a
+    blank Why (root) because root cause is only ever read from the diagnostic,
+    never from the flat row fields.
+    """
+    factors = desk.get("factors")
+    return {
+        "isMiss": bool(desk.get("isMiss")),
+        "isHit": bool(desk.get("isHit")),
+        "isSkip": bool(desk.get("isSkip")),
+        "rootCause": desk.get("rootCause"),
+        "factors": list(factors) if isinstance(factors, (list, tuple)) else [],
+        "mfeR": desk.get("mfeR"),
+        "maeR": desk.get("maeR"),
+        "maePct": desk.get("maePct"),
+        "mfePct": desk.get("mfePct"),
+        "pathR": desk.get("pathR"),
+        "economicR": desk.get("economicR"),
+        "rMultiple": desk.get("rMultiple"),
+        "effectiveStopR": desk.get("effectiveStopR"),
+        "initialRiskCapital": desk.get("initialRiskCapital"),
+        "movePct": move_pct,
+        "source": source,
     }
 
 

@@ -39,6 +39,7 @@ import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from SmartApi import SmartConnect
 
@@ -5255,6 +5256,13 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Market payloads are large JSON (last_market_snapshot is ~1.8 MB) and the
+    # same bytes cross the Cloudflare tunnel on every poll. Gzip cuts them ~5-8x.
+    # Level 5 is the deliberate trade: most of the win, a fraction of level-9 CPU,
+    # which matters because market hours are CPU-bound already. Registered after
+    # CORS so it wraps outermost and compresses the CORS response too.
+    app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
+
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
@@ -5700,12 +5708,30 @@ def create_app() -> FastAPI:
 
     @app.post("/api/swing-session/lock")
     def swing_session_lock(force: bool = False) -> dict[str, Any]:
-        """Lock Asset Matrix BUY set into swing_session.json for EOD."""
+        """Lock the swing book.
+
+        ``force=true`` requests an immediate V2 cycle inside the normal
+        trading window. Holidays and off-hours remain fail-closed.
+        """
         try:
             from .swing_session import lock_swing_session
             result = lock_swing_session(force=force)
             if not result.get("success") and result.get("error"):
                 raise HTTPException(status_code=409, detail=result.get("error"))
+            if force:
+                session = result.get("session")
+                session = session if isinstance(session, dict) else {}
+                result = {
+                    **result,
+                    "forceApplied": bool(result.get("forced")),
+                    "forceBypassed": result.get("forceBypassed"),
+                    "forceBlockedReason": (
+                        None
+                        if result.get("forced")
+                        else str(result.get("forceBlockedReason") or session.get("cashReason") or session.get("marketDayReason") or "")
+                        or None
+                    ),
+                }
             return result
         except HTTPException:
             raise

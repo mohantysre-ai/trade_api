@@ -28,6 +28,13 @@ def _read_json(path):
  try:
   v=json.loads(path.read_text(encoding="utf-8-sig")); return v if isinstance(v,dict) else {}
  except (OSError,ValueError): return {}
+def _market_day_status(now):
+ try:
+  from ..nse_trading_calendar import market_day_status
+  return market_day_status(now.date())
+ except Exception:
+  weekend=now.weekday()>=5
+  return {"date":now.date().isoformat(),"weekday":now.strftime("%A"),"isTradingDay":not weekend,"isWeekend":weekend,"isHoliday":False,"reason":"WEEKEND" if weekend else "TRADING_DAY"}
 def _write_state(payload):
  t=_state_path(); t.parent.mkdir(parents=True,exist_ok=True); tmp=t.with_suffix(t.suffix+".tmp"); tmp.write_text(json.dumps(payload,indent=2,default=str),encoding="utf-8")
  for attempt in range(5):
@@ -84,8 +91,8 @@ def _entry_hunt_diagnostics(scan,snapshot):
  regime=str(snapshot.get("swingV2Regime") or "")
  f={**f,"evaluated":f.get("evaluated",f.get("evaluated_count",feature_rows or f.get("universe"))),"qualified":f.get("qualified",f.get("qualified_out",(scan or {}).get("qualifiedCount",0))),"candleMetrics":f.get("candleMetrics",f.get("fresh_count",f.get("freshData",short_momentum_ready_rows))),"candleTimeframe":f.get("candleTimeframe","1H")}
  return {**f,"universeSize":universe_size or None,"featureRows":feature_rows,"historyReadyRows":history_ready_rows,"shortMomentumReadyRows":short_momentum_ready_rows,"historyReadyRatio":round(history_ready_ratio,4),"universeCoverage":round(universe_coverage,4),"regime":regime or None,"volumeScreened":feature_rows or universe_size or None,"evaluated":f.get("evaluated",feature_rows or f.get("universe")),"displayPool":len(stocks) if stocks else None,"swingUniverse":"Total Market 750","corePriorityUniverse":"Top 500 by liquidity","microcapPolicy":"SATELLITE · 20% priority · max 1 position","candleTimeframe":"1H"}
-def _session(scan=None,*,now=None):
- cfg=load_config(); now=(now or datetime.now(timezone.utc)).astimezone(IST); day=now.date().isoformat(); ledger=SwingLedger(cfg.ledger_path); positions=_positions(ledger); snapshot=_snapshot(); marks=_marks(snapshot); active=[r for r in positions if r.get("positionId") and not r.get("terminal")]; closed=[]
+def _session(scan=None,*,now=None,market=None):
+ cfg=load_config(); now=(now or datetime.now(timezone.utc)).astimezone(IST); day=now.date().isoformat(); market=market if isinstance(market,dict) else _market_day_status(now); trading_day=bool(market.get("isTradingDay")); ledger=SwingLedger(cfg.ledger_path); positions=_positions(ledger); snapshot=_snapshot(); marks=_marks(snapshot); active=[r for r in positions if r.get("positionId") and not r.get("terminal")]; closed=[]
  for r in positions:
   if not r.get("terminal"): continue
   try: cd=datetime.fromisoformat(str(r.get("lastEventAt") or "").replace("Z","+00:00")).astimezone(IST).date().isoformat()
@@ -93,7 +100,8 @@ def _session(scan=None,*,now=None):
   if str(r.get("sessionDate") or "")==day or cd==day: closed.append(r)
  rows=[_position_row(r,marks.get(str(r.get("symbol") or "").upper())) for r in active]; state=_read_json(_state_path()); state=state if str(state.get("sessionDate") or "")==day else {}; effective=scan if isinstance(scan,dict) else state.get("scan"); local=now.time().replace(tzinfo=None); start=_clock(cfg.decision_start_ist); freeze_clock=_clock(cfg.decision_freeze_ist); freeze=local>=freeze_clock; before_decision=local<start; in_window=start<=local<freeze_clock; finalized=bool(state.get("selectionFinalized")); locked_today=any(str(r.get("sessionDate") or "")==day for r in positions); blocked=bool((effective or {}).get("blocked")); cash=finalized and not locked_today; realized=sum(float(r.get("realizedPnl") or 0) for r in rows); unreal=sum(float(r.get("unrealizedPnl") or 0) for r in rows); diagnostics=_entry_hunt_diagnostics(effective,snapshot) or {}; regime=str((effective or {}).get("regime") or snapshot.get("swingV2Regime") or ""); regime_cap=0 if regime=="HALT_NEW_LONGS" else cfg.max_positions; capacity=regime_cap; diagnostics={**diagnostics,"diagnosticPhase":"WAITING_FOR_DECISION_WINDOW" if before_decision and not finalized else ("V2_DECISION_SCAN" if in_window and not finalized else "V2_FINALIZED"),"refreshError":state.get("refreshError"),"lastScanAt":state.get("lastScanAt"),"maxPositions":cfg.max_positions,"regimePositionCap":regime_cap,"openPositions":len(active),"availableSlots":max(0,capacity-len(active)),"qualifiedCount":(effective or {}).get("qualifiedCount"),"selectedCount":(effective or {}).get("selectedCount"),"correlationEvidencePairs":(effective or {}).get("correlationEvidencePairs"),"scanBlockReason":(effective or {}).get("blockReason")}
  cash_reason="WAITING_FOR_DECISION_WINDOW" if before_decision and not finalized else ((effective or {}).get("blockReason") if cash or blocked else None)
- return {"success":True,"book":"SWING","strategyId":cfg.strategy_id,"policyVersion":cfg.policy_version,"featureVersion":cfg.feature_version,"validationState":"RESEARCH_HYPOTHESIS","authority":"V2","authoritative":True,"executionMode":"PAPER","manualBrokerOrderPlaced":False,"v1Enabled":False,"sessionDate":day,"locked":bool(active) or locked_today or cash,"hunting":in_window and not finalized and not blocked,"waitingForDecisionWindow":before_decision and not finalized,"decisionPhase":diagnostics["diagnosticPhase"],"decisionWindow":{"start":cfg.decision_start_ist,"freeze":cfg.decision_freeze_ist,"entryCutoff":cfg.entry_cutoff_ist,"orderExpiry":cfg.order_expire_ist,"timezone":"Asia/Kolkata"},"selectionFinalized":finalized,"cashHeld":cash,"cashReason":cash_reason,"source":"swing_v2_ledger","selectionContract":cfg.strategy_id,"long":rows,"short":[],"closedPositions":[_position_row(r) for r in closed],"counts":{"long":len(rows),"short":0,"total":len(rows)},"capital":{"swingCapital":cfg.nav,"slots":len(rows),"deployedCapital":round(sum(float(r.get("deployedCapital") or 0) for r in rows),2),"remainingCapital":round(max(0,cfg.nav-sum(float(r.get("deployedCapital") or 0) for r in rows)),2),"portfolioRisk":round(sum(float(r.get("initialRiskRupees") or 0) for r in rows),2)},"portfolio":{"swingCapital":cfg.nav,"realizedPnl":round(realized,2),"unrealizedPnl":round(unreal,2),"totalPnl":round(realized+unreal,2),"lockedCount":len(rows)},"v2":effective or {"enabled":True,"authoritative":True,"candidates":[]},"entryHuntDiagnostics":diagnostics,"updatedAt":datetime.now(timezone.utc).isoformat()}
+ if not trading_day and not active and not locked_today: cash_reason="NON_TRADING_DAY"
+ return {"success":True,"book":"SWING","strategyId":cfg.strategy_id,"policyVersion":cfg.policy_version,"featureVersion":cfg.feature_version,"validationState":"RESEARCH_HYPOTHESIS","authority":"V2","authoritative":True,"executionMode":"PAPER","manualBrokerOrderPlaced":False,"v1Enabled":False,"sessionDate":day,"marketDay":market,"isTradingDay":trading_day,"isHoliday":bool(market.get("isHoliday")),"isWeekend":bool(market.get("isWeekend")),"marketDayReason":str(market.get("reason") or ""),"locked":bool(active) or locked_today or cash,"hunting":in_window and not finalized and not blocked,"waitingForDecisionWindow":before_decision and not finalized,"decisionPhase":diagnostics["diagnosticPhase"],"decisionWindow":{"start":cfg.decision_start_ist,"freeze":cfg.decision_freeze_ist,"entryCutoff":cfg.entry_cutoff_ist,"orderExpiry":cfg.order_expire_ist,"timezone":"Asia/Kolkata"},"selectionFinalized":finalized,"cashHeld":cash,"cashReason":cash_reason,"source":"swing_v2_ledger","selectionContract":cfg.strategy_id,"long":rows,"short":[],"closedPositions":[_position_row(r) for r in closed],"counts":{"long":len(rows),"short":0,"total":len(rows)},"capital":{"swingCapital":cfg.nav,"slots":len(rows),"deployedCapital":round(sum(float(r.get("deployedCapital") or 0) for r in rows),2),"remainingCapital":round(max(0,cfg.nav-sum(float(r.get("deployedCapital") or 0) for r in rows)),2),"portfolioRisk":round(sum(float(r.get("initialRiskRupees") or 0) for r in rows),2)},"portfolio":{"swingCapital":cfg.nav,"realizedPnl":round(realized,2),"unrealizedPnl":round(unreal,2),"totalPnl":round(realized+unreal,2),"lockedCount":len(rows)},"v2":effective or {"enabled":True,"authoritative":True,"candidates":[]},"entryHuntDiagnostics":diagnostics,"updatedAt":datetime.now(timezone.utc).isoformat()}
 def _time_until_expiry(now,expiry): return datetime.combine(now.astimezone(IST).date(),expiry,tzinfo=IST)-now.astimezone(IST)
 def _retryable_final_block(scan): return str((scan or {}).get("blockReason") or "") in _RETRYABLE_FINAL_BLOCK_REASONS
 def _refresh_snapshot(reason,*,deadline=None):
@@ -265,7 +273,8 @@ def run_authoritative_cycle(*,now=None,force=False):
    with _SESSION_CACHE_LOCK: _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0
    _EOD_READ_CACHE={}; ledger=SwingLedger(cfg.ledger_path)
    from ..nse_trading_calendar import is_nse_trading_day
-   if not is_nse_trading_day(now.date()): return _session({"enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,"blockReason":"NSE_MARKET_HOLIDAY","candidates":[],"funnel":{"universe":0}},now=now)
+   market=_market_day_status(now)
+   if not is_nse_trading_day(now.date()): return _session({"enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,"blockReason":"NSE_MARKET_HOLIDAY","candidates":[],"funnel":{"universe":0}},now=now,market=market)
    terminalized, terminalized_symbols = _manage_open_positions(ledger,now,cfg); current=_read_json(_state_path()); day=now.date().isoformat(); current=current if str(current.get("sessionDate") or "")==day else {"sessionDate":day,"selectionFinalized":False}; local=now.time().replace(tzinfo=None)
    from .market_data import intraday_occupied_symbols
    occupied=intraday_occupied_symbols(day); existing=[r for r in _positions(ledger) if not r.get("terminal")]; start,freeze,expiry=(_clock(cfg.decision_start_ist),_clock(cfg.decision_freeze_ist),_clock(cfg.order_expire_ist)); scan=current.get("scan") if isinstance(current.get("scan"),dict) else None
@@ -295,7 +304,7 @@ def run_authoritative_cycle(*,now=None,force=False):
   # 15:10 is only the decision freeze, never a fill-start time. Entry price is
   # immutable in the ledger; subsequent cycles update marks/exits only.
   if start<=local<=expiry: _fill_locked_orders(ledger,now,cfg)
-  _write_state(current); session=_session(scan,now=now)
+  _write_state(current); session=_session(scan,now=now,market=market)
   with _SESSION_CACHE_LOCK: _SESSION_READ_CACHE=session; _SESSION_READ_CACHE_AT=monotonic_time.monotonic()
   return session
 def get_authoritative_session(*,live=False):
@@ -317,6 +326,17 @@ def get_authoritative_session(*,live=False):
    fresh = copy.deepcopy(_SESSION_READ_CACHE)
  return fresh
 def lock_authoritative_session(*,force=False):
- s=run_authoritative_cycle(force=force); return {"success":True,"alreadyLocked":bool(s.get("locked")),"session":s}
+ """Operator lock that remains fail-closed outside a live trading window."""
+ if force:
+  now=datetime.now(timezone.utc).astimezone(IST)
+  cfg=load_config()
+  from ..nse_trading_calendar import is_nse_trading_day as _is_trading_day
+  start,expiry=_clock(cfg.decision_start_ist),_clock(cfg.order_expire_ist); local=now.time().replace(tzinfo=None)
+  if not _is_trading_day(now.date()):
+   s=run_authoritative_cycle(); return {"success":True,"alreadyLocked":bool(s.get("locked")),"forced":False,"forceBlockedReason":"NON_TRADING_DAY","session":s}
+  if local<start or local>expiry:
+   s=get_authoritative_session(live=True); return {"success":True,"alreadyLocked":bool(s.get("locked")),"forced":False,"forceBlockedReason":"DECISION_WINDOW_CLOSED","session":s}
+  s=run_authoritative_cycle(); return {"success":True,"alreadyLocked":bool(s.get("locked")),"forced":True,"forceBypassed":None,"session":s}
+ s=run_authoritative_cycle(); return {"success":True,"alreadyLocked":bool(s.get("locked")),"session":s}
 def authoritative_eod_report(for_date): return ledger_eod_report(SwingLedger(load_config().ledger_path),for_date.isoformat())
 __all__=["authoritative_eod_report","get_authoritative_session","is_v2_authoritative","lock_authoritative_session","run_authoritative_cycle"]

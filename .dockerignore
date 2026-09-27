@@ -44,3 +44,9 @@ backend/.env
 !backend/.env.example
 **/.DS_Store
 **/Thumbs.db
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm

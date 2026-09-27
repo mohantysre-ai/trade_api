@@ -247,6 +247,8 @@ class TestDiagnostics:
     def test_diagnostics_returns_all_providers(self):
         router = ProviderRouter()
         diag = router.diagnostics()
+        assert diag["mode"] == "OBSERVABILITY_ONLY"
+        assert diag["enforced"] is False
         assert set(diag["providers"].keys()) == {p.value for p in Provider}
 
     def test_diagnostics_tracks_active_leases(self):

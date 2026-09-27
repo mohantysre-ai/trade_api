@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { jsonCompressed } from "@/lib/json-compressed";
 import { cachedBackendJson, liveCacheHeaders } from "@/lib/server-live-cache";
 
 export const runtime = "nodejs";
@@ -23,7 +24,10 @@ export async function GET(request: Request) {
       staleMs,
       timeoutMs,
     );
-    return NextResponse.json(data, { headers: liveCacheHeaders(cacheStatus) });
+    return jsonCompressed(data, {
+      headers: liveCacheHeaders(cacheStatus),
+      request,
+    });
   } catch (error) {
     return NextResponse.json(
       {
