@@ -36,5 +36,4 @@ seed_state_files /opt/seed/state /app/state
 [ -f /app/state/alert_history.json ] || printf '%s\n' '[]' > /app/state/alert_history.json
 [ -f /app/state/last_market_snapshot.json ] || printf '%s\n' '{}' > /app/state/last_market_snapshot.json
 [ -f /app/state/intraday_session.json ] || printf '%s\n' '{}' > /app/state/intraday_session.json
-[ -f /app/state/swing_session.json ] || printf '%s\n' '{}' > /app/state/swing_session.json
 exec "$@"

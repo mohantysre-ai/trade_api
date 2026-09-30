@@ -260,9 +260,9 @@ All live state lives in **named volumes**, which do survive `docker compose down
 
 | Store | Path | Volume | Atomic? |
 |---|---|---|---|
-| Intraday session | `/app/state/intraday_session.json` | `sigq_iros-desk-state` | Yes — `json_atomic.py:34-76` |
-| Swing V1 session | `/app/state/swing_session.json` | `sigq_iros-desk-state` | Yes |
-| Market snapshot (~2.2 MB) | `/app/state/last_market_snapshot.json` | `sigq_iros-desk-state` | **No** on the 15:31 path |
+ | Intraday session | `/app/state/intraday_session.json` | `sigq_iros-desk-state` | Yes — `json_atomic.py:34-76` |
+ | Swing V2 session | `/app/state/swing_v2_session.json` | `sigq_iros-desk-state` | Yes |
+ | Market snapshot (~2.2 MB) | `/app/state/last_market_snapshot.json` | `sigq_iros-desk-state` | **No** on the 15:31 path |
 | Index-options radar / candles / OI / paper book | `/app/state/index_options_*.json` | `sigq_iros-desk-state` | Yes |
 | **Index-options strategy book** | `shared_state.db` → `index_option_positions/events/shadows/decision_audit` | `sigq_iros-backend-data` | SQLite WAL |
 | Swing V2 ledger | `swing_v2_ledger.sqlite3` | `sigq_iros-backend-data` | WAL, `synchronous=FULL` |

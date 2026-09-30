@@ -30,12 +30,12 @@ function Copy-NewerFile {
 }
 
 $copied = 0
-foreach ($name in @('intraday_session.json', 'swing_session.json')) {
+foreach ($name in @('intraday_session.json')) {
     if (Copy-NewerFile (Join-Path $State $name) (Join-Path $Root $name)) { $copied++ }
 }
 if (Test-Path -LiteralPath $State) {
     foreach ($item in Get-ChildItem -LiteralPath $State -File -Force) {
-        if ($item.Name -in @('intraday_session.json', 'swing_session.json', 'manifest.json')) { continue }
+        if ($item.Name -in @('intraday_session.json', 'manifest.json')) { continue }
         if (Copy-NewerFile $item.FullName (Join-Path $Root "backend\app\services\$($item.Name)")) { $copied++ }
     }
 }

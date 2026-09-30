@@ -331,11 +331,20 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
     try:
         spot_stream = ANGEL_INDEX_STREAM.quote(config["spotToken"])
         spot_quote = spot_stream or client.fetch_quote(config["exchange"], config["spotSymbol"], config["spotToken"])
+        spot_source = "ANGEL_WEBSOCKET" if spot_stream else "ANGEL_REST"
+        if spot_quote is None or _float(spot_quote.get("ltp")) is None or _float(spot_quote.get("ltp")) <= 0:
+            try:
+                from .market_data_provider import fetch_shoonya_quotes
+                shoonya_spot = fetch_shoonya_quotes([str(config["spotSymbol"]).upper()])
+                spot_quote = shoonya_spot.get(str(config["spotSymbol"]).upper())
+                spot_source = "SHOONYA"
+            except Exception:
+                spot_quote = None
         # Start the daemon only after a cold REST quote has established the
         # shared authenticated session; this avoids concurrent TOTP logins.
         ANGEL_INDEX_STREAM.ensure(client, [{"exchange": config["exchange"], "token": config["spotToken"],
                                             "indexKey": key, "kind": "INDEX"}])
-        spot = _float(spot_quote.get("ltp"))
+        spot = _float(spot_quote.get("ltp")) if isinstance(spot_quote, dict) else None
         if spot is None or spot <= 0:
             raise RuntimeError("spot quote unavailable")
         expiry, contracts, future = _contracts(rows, config, spot)
@@ -359,15 +368,37 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
         )
         quotes = ({key_: dict(value or {}) for key_, value in streamed.items()}
                   if stream_complete else client.fetch_batch_quotes(instruments))
+        quote_source = "ANGEL_WEBSOCKET" if stream_complete else "ANGEL_REST"
+        if not quotes:
+            try:
+                from .market_data_provider import fetch_shoonya_quotes
+                nfo_symbols = [str(contract.get("tradingSymbol") or contract.get("symbol") or "").upper()
+                               for contract in contracts if contract.get("tradingSymbol") or contract.get("symbol")]
+                if future:
+                    nfo_symbols.append(str(future.get("tradingSymbol") or future.get("symbol") or "").upper())
+                shoonya_quotes = fetch_shoonya_quotes([s for s in nfo_symbols if s])
+                if shoonya_quotes:
+                    quotes = {f"{key}:{contract.get('token')}": shoonya_quotes.get(str(contract.get("tradingSymbol") or contract.get("symbol") or "").upper(), {})
+                              for contract in contracts}
+                    if future:
+                        fut_sym = str(future.get("tradingSymbol") or future.get("symbol") or "").upper()
+                        quotes[f"{key}:FUT"] = shoonya_quotes.get(fut_sym, {})
+                    quote_source = "SHOONYA"
+            except Exception:
+                quotes = {}
         greek_rows: list[dict[str, Any]] = []
         greek_error = None
+        greeks_source = "ANGEL_REST"
         if config["segment"] == "NFO":
             try:
                 greek_rows = client.fetch_option_greeks(config["name"], expiry.strftime("%d%b%Y").upper())
+                greeks_source = "ANGEL_REST"
             except Exception as exc:
                 greek_error = str(exc)
+                greeks_source = "ANGEL_REST"
         else:
             greek_error = "ANGEL_GREEKS_NSE_ONLY"
+            greeks_source = "NSE_ONLY"
         greek_map = {(round(_float(row.get("strikePrice")) or -1, 4), str(row.get("optionType") or "").upper()): row for row in greek_rows}
         chain = []
         for contract in contracts:
@@ -375,7 +406,10 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
             greek = greek_map.get((round(contract.get("_strike") or -1, 4), option_type))
             quote = _overlay_stream_quote(quotes.get(f"{key}:{contract.get('token')}") or {},
                                           ANGEL_INDEX_STREAM.quote(str(contract.get("token") or "")))
-            chain.append(_quote_row(contract, quote, greek))
+            row = _quote_row(contract, quote, greek)
+            if quote_source == "SHOONYA":
+                row["quoteSource"] = "SHOONYA"
+            chain.append(row)
         future_quote = (_overlay_stream_quote(quotes.get(f"{key}:FUT") or {},
                         ANGEL_INDEX_STREAM.quote(str(future.get("token") or ""))) if future else None)
         now_ist = datetime.now(IST_ZONE)
@@ -438,18 +472,18 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
                         "close": _float((future_quote or {}).get("close")),
                         "oi": _float((future_quote or {}).get("opnInterest") or (future_quote or {}).get("oi")),
                         "previousOi": _float((future_quote or {}).get("previousOI") or (future_quote or {}).get("prev_oi"))} if future else None),
-            "greeksStatus": "LIVE" if greek_rows else "UNAVAILABLE", "greeksError": greek_error,
+            "greeksStatus": "LIVE" if greek_rows else "UNAVAILABLE", "greeksError": greek_error, "greeksSource": greeks_source,
             "componentFreshness": {
-                "spotQuote": {"status": "LIVE", "source": "ANGEL_WEBSOCKET" if spot_stream else "ANGEL_REST", "asOf": quote_at},
+                "spotQuote": {"status": "LIVE", "source": spot_source, "asOf": quote_at},
                 "optionChain": {"status": "LIVE" if chain else "UNAVAILABLE",
-                                "source": "ANGEL_WEBSOCKET" if stream_complete else "ANGEL_REST",
+                                "source": quote_source,
                                 "asOf": max((str((value or {}).get("receivedAt") or "") for value in streamed.values()), default="")
                                         if stream_complete else datetime.now(timezone.utc).isoformat()},
                 "futuresOi": {"status": "LIVE" if _float((future_quote or {}).get("opnInterest") or (future_quote or {}).get("oi")) is not None else "UNAVAILABLE",
-                              "source": (future_quote or {}).get("quoteSource") or "ANGEL_REST", "asOf": (future_quote or {}).get("streamReceivedAt") or datetime.now(timezone.utc).isoformat()},
+                              "source": (future_quote or {}).get("quoteSource") or quote_source, "asOf": (future_quote or {}).get("streamReceivedAt") or datetime.now(timezone.utc).isoformat()},
                 "candles5m": {"status": "LIVE" if candles else "UNAVAILABLE", "source": structure_source,
                                "asOf": latest_candle.isoformat() if latest_candle else None},
-                "greeks": {"status": "LIVE" if greek_rows else "LOCAL_OR_UNAVAILABLE", "asOf": datetime.now(timezone.utc).isoformat()},
+                "greeks": {"status": "LIVE" if greek_rows else "LOCAL_OR_UNAVAILABLE", "source": greeks_source, "asOf": datetime.now(timezone.utc).isoformat()},
             },
         }
     except Exception as exc:

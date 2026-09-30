@@ -3205,7 +3205,7 @@ def _fetch_stock_quotes_with_coverage(
     client: AngelOneClient,
     instruments: list[Instrument],
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
-    """NSE primary, then Dhan bulk and Angel for only missing symbols."""
+    """NSE primary, then Dhan bulk, Angel for missing, and Shoonya final fallback."""
     by_key = {inst.key: inst for inst in instruments}
 
     def angel_missing(symbols: list[str]) -> dict[str, dict[str, Any]]:
@@ -3216,7 +3216,20 @@ def _fetch_stock_quotes_with_coverage(
         ]
         return client.fetch_batch_quotes(eligible) if eligible else {}
 
-    quotes, coverage = fetch_quotes_with_failover(by_key, angel_missing)
+    def shoonya_missing(symbols: list[str]) -> dict[str, dict[str, Any]]:
+        if not symbols:
+            return {}
+        try:
+            from .market_data_provider import fetch_shoonya_quotes
+            return fetch_shoonya_quotes(symbols)
+        except Exception:
+            return {}
+
+    quotes, coverage = fetch_quotes_with_failover(
+        by_key,
+        angel_missing,
+        shoonya_fetch=shoonya_missing,
+    )
     return quotes, coverage.as_dict()
 
 
@@ -4642,13 +4655,38 @@ def _build_payload_from_live_data(
 
     if angel_first_quotes:
         # Swing contract: request every resolved Nifty 500 quote from Angel One
-        # first. Only missing Angel symbols use the existing provider failover.
-        angel_rows = client.fetch_batch_quotes(stock_universe)
+        # first. On rate-limit, immediately failover to Shoonya for the full
+        # universe; only symbols still missing fall through to NSE/Dhan.
+        angel_rows: dict[str, dict[str, Any]] = {}
+        try:
+            angel_rows = client.fetch_batch_quotes(stock_universe)
+        except Exception as exc:
+            if _is_angel_rate_limited(exc):
+                _trip_angel_quote_circuit()
+                log.warning("Angel quote rate-limited during swing hunt; failing over to Shoonya: %s", exc)
+            else:
+                log.warning("Angel quote fetch failed during swing hunt; trying Shoonya: %s", exc)
+
         stock_quotes_raw = {
             str(symbol).upper(): {**dict(row), "quoteProvider": "angel"}
             for symbol, row in angel_rows.items()
             if isinstance(row, dict)
         }
+
+        missing_instruments = [inst for inst in stock_universe if inst.key not in stock_quotes_raw]
+        shoonya_rows: dict[str, dict[str, Any]] = {}
+        if missing_instruments and not angel_rows:
+            try:
+                from .market_data_provider import fetch_shoonya_quotes
+                shoonya_symbols = [str(inst.key).upper() for inst in missing_instruments]
+                shoonya_raw = fetch_shoonya_quotes(shoonya_symbols)
+                for symbol, row in shoonya_raw.items():
+                    if isinstance(row, dict):
+                        stock_quotes_raw[symbol] = {**dict(row), "quoteProvider": "shoonya"}
+                        shoonya_rows[symbol] = row
+            except Exception as exc:
+                log.warning("Shoonya quote fallback failed during swing hunt: %s", exc)
+
         missing_instruments = [inst for inst in stock_universe if inst.key not in stock_quotes_raw]
         fallback_rows: dict[str, dict[str, Any]] = {}
         fallback_meta: dict[str, Any] = {}
@@ -4659,7 +4697,12 @@ def _build_payload_from_live_data(
         expected = len(stock_universe)
         received = len(stock_quotes_raw)
         coverage_pct = round((received / expected * 100.0) if expected else 0.0, 2)
-        providers = {"angel": len(angel_rows), "nse": 0, "dhan": 0}
+        providers = {
+            "angel": len(angel_rows),
+            "shoonya": len(shoonya_rows),
+            "nse": 0,
+            "dhan": 0,
+        }
         for provider, count in (fallback_meta.get("providers") or {}).items():
             providers[provider] = providers.get(provider, 0) + int(count or 0)
         quote_coverage = {

@@ -27,7 +27,7 @@ d:\trade_api\
 ```
 
 Runtime artifacts at root (state, not source): `last_market_snapshot.json` (~1.8 MB),
-`trade_api_snapshot.json`, `swing_session.json`, `fixed_trade_plan.json`,
+`trade_api_snapshot.json`, `swing_v2_session.json`, `fixed_trade_plan.json`,
 `intraday_session.json`, `alert_history.json`, `.api-test-ledger.sqlite3`.
 
 ## 3. Backend — `backend\`

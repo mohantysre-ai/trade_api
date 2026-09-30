@@ -221,6 +221,48 @@ def _as_ist(value: datetime) -> datetime:
     return value.astimezone(_IST_ZONE)
 
 
+def create_angel_fetch_callback(
+    instruments_by_key: dict[str, Any] | None = None,
+) -> Callable[[list[str]], dict[str, dict[str, Any]]]:
+    """Return an Angel-first fetch callback for ``fetch_quotes_with_failover``.
+
+    The callback accepts symbol keys and returns ``{key: quote}``.  When
+    ``instruments_by_key`` is provided, missing symbols are resolved through
+    that mapping; otherwise a bare ``Instrument`` is constructed per key.
+    """
+    def angel_fetch(symbols: list[str]) -> dict[str, dict[str, Any]]:
+        if not symbols:
+            return {}
+        try:
+            from ..angel_one_feed import AngelOneClient, Instrument
+
+            client = AngelOneClient()
+            if instruments_by_key:
+                eligible = [
+                    instruments_by_key[s]
+                    for s in symbols
+                    if s in instruments_by_key
+                ]
+            else:
+                eligible = [
+                    Instrument(key=str(s).upper(), token="", exchange="NSE", tradingsymbol=str(s).upper())
+                    for s in symbols
+                ]
+            raw = client.fetch_batch_quotes(eligible) if eligible else {}
+            out: dict[str, dict[str, Any]] = {}
+            for key, quote in (raw or {}).items():
+                if isinstance(quote, dict):
+                    row = dict(quote)
+                    row.setdefault("quoteProvider", "angel")
+                    out[str(key).upper()] = row
+            return out
+        except Exception as exc:
+            log.debug("angel fetch callback failed: %s", exc)
+            return {}
+
+    return angel_fetch
+
+
 def shoonya_gateway_configured() -> bool:
     """True when the standby gateway and candle fallback are enabled by config."""
     return (
@@ -573,19 +615,69 @@ class QuoteCoverage:
         }
 
 
+def fetch_shoonya_quotes(symbols: list[str]) -> dict[str, dict[str, Any]]:
+    """Fetch quotes from the Shoonya standby gateway."""
+    if not symbols:
+        return {}
+    try:
+        from .standby_feed.config import StandbyConfig
+        from .standby_feed.gateway_client import GatewayClient
+    except Exception:
+        return {}
+    try:
+        client = GatewayClient(StandbyConfig.from_env())
+        return {str(k).upper(): dict(v) for k, v in client.quotes([str(s).upper() for s in symbols]).items() if isinstance(v, dict)}
+    except Exception as exc:
+        log.debug("shoonya quote fetch failed: %s", exc)
+        return {}
+
+
 def fetch_quotes_with_failover(
     symbols: Iterable[str],
     angel_fetch: Callable[[list[str]], dict[str, dict[str, Any]]],
+    *,
+    shoonya_fetch: Callable[[list[str]], dict[str, dict[str, Any]]] | None = None,
+    angel_first: bool = False,
 ) -> tuple[dict[str, dict[str, Any]], QuoteCoverage]:
-    """NSE primary, Dhan missing-symbol fallback, then Angel final fallback."""
+    """Bulk quote coverage with Angel-first optional mode and Shoonya failover.
+
+    Default path: NSE -> Dhan -> Angel -> Shoonya.
+    With ``angel_first=True``: Angel -> NSE fill -> Dhan fill -> Shoonya.
+    Rate-limit errors from Angel open a circuit via ``ProviderRouter`` and
+    immediately route remaining symbols to Shoonya for this call.
+    """
+    from .provider_router import Provider, ProviderRouter, Capability
+
     ordered = list(dict.fromkeys(_norm(s) for s in symbols if _norm(s)))
     quotes: dict[str, dict[str, Any]] = {}
-    providers = {"nse": 0, "dhan": 0, "angel": 0}
-    try:
-        quotes.update(fetch_nse500_quotes(ordered))
-        providers["nse"] = len(quotes)
-    except Exception as exc:
-        log.warning("NSE Nifty 500 quote fetch failed; using Dhan fallback: %s", exc)
+    providers = {"nse": 0, "dhan": 0, "angel": 0, "shoonya": 0}
+
+    if angel_first:
+        try:
+            angel = angel_fetch(ordered)
+            for symbol, quote in angel.items():
+                if symbol in ordered and isinstance(quote, dict):
+                    row = dict(quote)
+                    row.setdefault("quoteProvider", "angel")
+                    quotes[symbol] = row
+                    providers["angel"] += 1
+        except Exception as exc:
+            log.warning("Angel-first quote fetch failed; filling from NSE/Dhan/Shoonya: %s", exc)
+            try:
+                ProviderRouter.mark_rate_limited(Provider.ANGEL, hold_seconds=60.0)
+            except Exception:
+                pass
+
+    missing = [symbol for symbol in ordered if symbol not in quotes]
+    if missing:
+        try:
+            nse = fetch_nse500_quotes(missing)
+            for symbol, quote in nse.items():
+                if symbol not in quotes and isinstance(quote, dict):
+                    quotes[symbol] = quote
+                    providers["nse"] += 1
+        except Exception as exc:
+            log.warning("NSE Nifty 500 quote fetch failed; using Dhan fallback: %s", exc)
 
     missing = [symbol for symbol in ordered if symbol not in quotes]
     if missing:
@@ -596,20 +688,44 @@ def fetch_quotes_with_failover(
                     quotes[symbol] = quote
                     providers["dhan"] += 1
         except Exception as exc:
-            log.warning("Dhan bulk quote fallback failed; using Angel: %s", exc)
+            log.warning("Dhan bulk quote fallback failed; using Angel/Shoonya: %s", exc)
 
     missing = [symbol for symbol in ordered if symbol not in quotes]
     if missing:
+        router_available = True
         try:
-            angel = angel_fetch(missing)
-            for symbol, quote in angel.items():
+            router = ProviderRouter()
+            router_available = router.is_available(Provider.ANGEL, Capability.EQUITY_REST_QUOTES)
+        except Exception:
+            pass
+        if router_available:
+            try:
+                angel = angel_fetch(missing)
+                for symbol, quote in angel.items():
+                    if symbol not in quotes and isinstance(quote, dict):
+                        quote = dict(quote)
+                        quote.setdefault("quoteProvider", "angel")
+                        quotes[symbol] = quote
+                        providers["angel"] += 1
+            except Exception as exc:
+                log.warning("Angel quote fallback failed; routing to Shoonya: %s", exc)
+                try:
+                    ProviderRouter.mark_rate_limited(Provider.ANGEL, hold_seconds=60.0)
+                except Exception:
+                    pass
+
+    missing = [symbol for symbol in ordered if symbol not in quotes]
+    if missing and shoonya_fetch is not None:
+        try:
+            shoonya = shoonya_fetch(missing)
+            for symbol, quote in shoonya.items():
                 if symbol not in quotes and isinstance(quote, dict):
                     quote = dict(quote)
-                    quote.setdefault("quoteProvider", "angel")
+                    quote.setdefault("quoteProvider", "shoonya")
                     quotes[symbol] = quote
-                    providers["angel"] += 1
+                    providers["shoonya"] += 1
         except Exception as exc:
-            log.warning("Angel quote fallback failed: %s", exc)
+            log.warning("Shoonya quote fallback failed: %s", exc)
 
     missing = [symbol for symbol in ordered if symbol not in quotes]
     expected = len(ordered)

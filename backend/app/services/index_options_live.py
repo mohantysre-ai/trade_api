@@ -152,7 +152,15 @@ def compose_live_index_options_radar(snapshot: dict[str,Any],*,live:bool=True,cl
     book=ensure_fresh_market_snapshot(snapshot,reason="index_options_breadth"); option_data=None
     if live:
         try: option_data=snapshot_fn(client)
-        except Exception as exc: option_data=unavailable_provider_snapshot(exc)
+        except Exception as exc:
+            option_data=unavailable_provider_snapshot(exc)
+            try:
+                from .market_data_provider import fetch_shoonya_quotes
+                shoonya_raw = fetch_shoonya_quotes([])
+                if shoonya_raw:
+                    option_data.setdefault("providerEvidence", {})["shoonyaQuotes"] = {"status": "AVAILABLE", "count": len(shoonya_raw)}
+            except Exception:
+                pass
         expiries={}
         try: expiries.update(expiries_fn())
         except Exception as exc: option_data["fallbackSource"]="SCANX"; option_data["expiryMasterError"]=str(exc)
@@ -175,7 +183,7 @@ def compose_live_index_options_radar(snapshot: dict[str,Any],*,live:bool=True,cl
     clock = (now or datetime.now(IST_ZONE)).astimezone(IST_ZONE)
     result["sessionDate"] = clock.date().isoformat()
     result["strategyBook"] = process_strategy_cycle(result, book, clock) if persist else strategy_book(result["sessionDate"])
-    market_open=index_options_market_open(now); paper=reconcile_paper_book(result,client=client,persist=persist,now=now); result["paperBook"]=_merge_strategy_projection(paper,result.get("strategyBook")); result["sessionStatus"]="OPEN" if market_open else "CLOSED"; result["huntActive"]=market_open; result["limits"]["huntMode"]="CONTINUOUS_MARKET_SESSION" if market_open else "SESSION_CLOSED"; result["limits"]["selectionAuthority"]="INDEX_OPTIONS_QUANT_V2"; result["provider"]="ANGEL_ONE_WITH_SCANX_AND_LEMONN_FALLBACK"; result["providerEvidence"]=book.get("indexOptionProvider"); result["streamStatus"]=ANGEL_INDEX_STREAM.status()
+    market_open=index_options_market_open(now); paper=reconcile_paper_book(result,client=client,persist=persist,now=now); result["paperBook"]=_merge_strategy_projection(paper,result.get("strategyBook")); result["sessionStatus"]="OPEN" if market_open else "CLOSED"; result["huntActive"]=market_open; result["limits"]["huntMode"]="CONTINUOUS_MARKET_SESSION" if market_open else "SESSION_CLOSED"; result["limits"]["selectionAuthority"]="INDEX_OPTIONS_QUANT_V2"; result["provider"]="ANGEL_ONE_WITH_SHOONYA_AND_SCANX_AND_LEMONN_FALLBACK"; result["providerEvidence"]=book.get("indexOptionProvider"); result["streamStatus"]=ANGEL_INDEX_STREAM.status()
     if persist: persist_radar(result)
     return result
 

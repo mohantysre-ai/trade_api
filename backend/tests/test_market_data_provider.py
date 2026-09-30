@@ -70,7 +70,7 @@ def test_quote_failover_fetches_only_symbols_missing_from_nse(monkeypatch):
     assert set(quotes) == {"AAA", "BBB"}
     assert quotes["BBB"]["quoteProvider"] == "dhan"
     assert coverage.selection_allowed is True
-    assert coverage.providers == {"nse": 1, "dhan": 1, "angel": 0}
+    assert coverage.providers == {"nse": 1, "dhan": 1, "angel": 0, "shoonya": 0}
 
 
 def test_angel_receives_only_symbols_missing_from_nse_and_dhan(monkeypatch):
@@ -95,7 +95,7 @@ def test_angel_receives_only_symbols_missing_from_nse_and_dhan(monkeypatch):
     )
     assert requested == ["CCC"]
     assert set(quotes) == {"AAA", "BBB", "CCC"}
-    assert coverage.providers == {"nse": 1, "dhan": 1, "angel": 1}
+    assert coverage.providers == {"nse": 1, "dhan": 1, "angel": 1, "shoonya": 0}
 
 
 def test_quote_coverage_fails_closed(monkeypatch):

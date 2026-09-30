@@ -18,10 +18,6 @@ _APP_DIR = os.path.dirname(_SERVICES_DIR)
 _BACKEND_DIR = os.path.dirname(_APP_DIR)
 _REPO_ROOT = os.path.dirname(_BACKEND_DIR)
 
-_SWING_SESSION_PATH = os.environ.get(
-    "SWING_SESSION_FILE",
-    os.path.join(_REPO_ROOT, "swing_session.json"),
-)
 _INTRADAY_SESSION_PATH = os.environ.get(
     "INTRADAY_SESSION_FILE",
     os.path.join(_REPO_ROOT, "intraday_session.json"),

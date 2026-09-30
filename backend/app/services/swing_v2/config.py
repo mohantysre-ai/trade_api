@@ -40,7 +40,7 @@ class SwingV2Config:
     max_name_notional_pct: float = 20.0
     max_sector_notional_pct: float = 40.0
     max_sector_risk_bps: int = 50
-    max_gap_stress_bps: int = 250
+    max_gap_stress_bps: int = 500
     stop_atr_mult: float = 0.80
     min_stop_pct: float = 0.75
     max_stop_core_pct: float = 2.25
@@ -113,7 +113,7 @@ class SwingV2Config:
         if not 0 < self.max_name_notional_pct <= 20: raise ValueError("single-name notional may not exceed 20% NAV")
         if not 0 < self.max_sector_notional_pct <= 40: raise ValueError("sector notional may not exceed 40% NAV")
         if self.max_portfolio_risk_bps > 100 or self.max_sector_risk_bps > 50: raise ValueError("portfolio/sector initial-risk limits exceed mandate")
-        if self.max_gap_stress_bps > 250: raise ValueError("aggregate gap stress may not exceed 2.50% NAV")
+        if self.max_gap_stress_bps > 500: raise ValueError("aggregate gap stress may not exceed 5.00% NAV")
         if not 50 <= self.setup_score_override <= 90: raise ValueError("SWING_SETUP_SCORE_OVERRIDE must be in [50,90]")
         if not 0 < self.tier_b_min_expected_net_r <= self.tier_b_min_planned_blended_r <= self.tier_b_min_upside_capacity_r <= self.min_upside_capacity_r <= 3: raise ValueError("invalid Tier B opportunity thresholds")
         if not 0 < self.min_expected_net_r <= self.min_planned_blended_r <= self.min_upside_capacity_r <= 3: raise ValueError("invalid Swing opportunity thresholds")

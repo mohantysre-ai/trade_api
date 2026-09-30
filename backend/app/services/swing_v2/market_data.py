@@ -53,7 +53,7 @@ def latest_quote(symbol: str) -> dict[str, Any] | None:
     try:
         from ..market_data_provider import fetch_quotes_with_failover
 
-        quotes, _coverage = fetch_quotes_with_failover([symbol], _no_angel_fetch)
+        quotes, _coverage = fetch_quotes_with_failover([symbol], _angel_fetch, shoonya_fetch=_shoonya_fetch, angel_first=True)
         return quotes.get(str(symbol).upper())
     except Exception as exc:
         log.debug("swing_v2 latest_quote failed for %s: %s", symbol, exc)
@@ -72,7 +72,7 @@ def latest_quotes(symbols: list[str]) -> dict[str, dict[str, Any]]:
     try:
         from ..market_data_provider import fetch_quotes_with_failover
 
-        quotes, _coverage = fetch_quotes_with_failover(missing, _no_angel_fetch)
+        quotes, _coverage = fetch_quotes_with_failover(missing, _angel_fetch, shoonya_fetch=_shoonya_fetch, angel_first=True)
         return {**quotes, **shared}
     except Exception as exc:
         log.debug("swing_v2 latest_quotes failed: %s", exc)
@@ -165,6 +165,27 @@ def historical_bars(symbol: str, interval: str, limit: int) -> list[dict[str, An
 def _no_angel_fetch(_symbols: list[str]) -> dict[str, dict[str, Any]]:
     """Angel One is never a quote source for Swing V2."""
     return {}
+
+
+def _shoonya_fetch(symbols: list[str]) -> dict[str, dict[str, Any]]:
+    try:
+        from ..market_data_provider import fetch_shoonya_quotes
+        return fetch_shoonya_quotes(symbols)
+    except Exception as exc:
+        log.debug("swing_v2 shoonya fetch failed: %s", exc)
+        return {}
+
+
+def _angel_fetch(symbols: list[str]) -> dict[str, dict[str, Any]]:
+    if not symbols:
+        return {}
+    try:
+        from ..market_data_provider import create_angel_fetch_callback
+
+        return create_angel_fetch_callback()(symbols)
+    except Exception as exc:
+        log.debug("swing_v2 angel fetch failed: %s", exc)
+        return {}
 
 
 __all__ = [

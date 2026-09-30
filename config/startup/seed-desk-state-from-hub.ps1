@@ -84,7 +84,7 @@ if (Test-Path -LiteralPath $layoutState) {
 } else {
     $legacyNames = @(
         "intraday_session.json",
-        "swing_session.json",
+        "swing_v2_session.json",
         "last_market_snapshot.json",
         "fixed_trade_plan.json",
         "alert_history.json",

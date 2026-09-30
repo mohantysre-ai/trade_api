@@ -204,7 +204,7 @@ function Merge-NewerFiles {
 Merge-NewerFiles (Join-Path $Root 'backend\app\services') $seedState -TopLevelOnly
 $nativeRootState = Join-Path $tmp 'native-root-state'
 New-Item -ItemType Directory -Force -Path $nativeRootState | Out-Null
-foreach ($name in @('intraday_session.json', 'swing_session.json')) {
+foreach ($name in @('intraday_session.json')) {
     $source = Join-Path $Root $name
     if (Test-Path -LiteralPath $source) {
         Copy-Item -LiteralPath $source -Destination (Join-Path $nativeRootState $name) -Force
@@ -256,7 +256,7 @@ Write-Host "  wrote manifest.json ($($allFiles.Count) files)"
 
 $snap = Join-Path $seedState "last_market_snapshot.json"
 $session = Join-Path $seedState "intraday_session.json"
-$swing = Join-Path $seedState "swing_session.json"
+$swing = Join-Path $seedData "swing_v2_session.json"
 if (-not (Test-Path -LiteralPath $snap)) {
     Write-Host "[WARN] last_market_snapshot.json missing on volume - other machines will not get live Matrix quotes."
 }

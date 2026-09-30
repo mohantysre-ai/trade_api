@@ -27,11 +27,11 @@ def test_pack_and_seed_scripts_reconcile_docker_and_native_state():
     assert "/app/backend/app/data/" in seed
     assert "Join-Path $Root" not in seed
     assert "intraday_session.json" in pack
-    assert "swing_session.json" in pack
+    assert "swing_v2_session.json" in pack
     native_apply = (root / "config" / "startup" / "apply-packed-desk-state-native.ps1").read_text(encoding="utf-8")
     native_sync = (root / "config" / "startup" / "sync-state-before-native.ps1").read_text(encoding="utf-8")
     assert "intraday_session.json" in native_apply
-    assert "swing_session.json" in native_apply
+    assert "swing_v2_session.json" not in native_apply
     assert "pack-desk-state.ps1" in native_sync
     assert "apply-packed-desk-state-native.ps1" in native_sync
     assert "up --no-start" in start
