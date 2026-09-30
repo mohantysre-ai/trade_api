@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .angel_index_options import IST_ZONE
-from .index_options_paper import hydrate_open_position_subscriptions, reconcile_paper_book
+from .index_options_paper import hydrate_open_position_subscriptions, reconcile_paper_book, SELLER_SQUARE_OFF_TIME
 from .json_atomic import atomic_write_json, load_json_with_fallback
 from .market_snapshot_store import market_snapshot_path
 
@@ -164,6 +164,37 @@ def _supervisor_loop(client_factory: Callable[[], Any]) -> None:
     _status_update(enabled=True, running=True, owner=True, pid=os.getpid())
     client: Any = None
     try:
+        now = datetime.now(IST_ZONE)
+        if now.weekday() < 5 and not _session_active(now):
+            eod_book = None
+            try:
+                from .index_options_paper import paper_book_path, _load_book
+                session = now.date().isoformat()
+                eod_book = _load_book(session)
+            except Exception:
+                logger.exception("index-options paper supervisor EOD pre-check load failed")
+            if eod_book:
+                past_eod_sells = [
+                    p for p in eod_book.get("open") or []
+                    if str(p.get("strategyMode") or "").upper() == "SELL_PREMIUM"
+                    and now.astimezone(IST_ZONE).time().replace(tzinfo=None) >= SELLER_SQUARE_OFF_TIME
+                ]
+                if past_eod_sells:
+                    try:
+                        if client is None:
+                            client = client_factory()
+                        book = run_paper_supervisor_cycle(client, now=now)
+                        _status_update(
+                            running=True, owner=True, sessionActive=False,
+                            lastCycleAt=now.isoformat(), lastSuccessAt=now.isoformat(),
+                            lastError=None, consecutiveFailures=0,
+                            openPositions=len(book.get("open") or []), closedPositions=len(book.get("closed") or []),
+                            entryCount=int(book.get("entryCount") or 0), markPipeline=book.get("markPipeline"),
+                            subscriptions=book.get("subscriptions"), lastHydration=_STATUS.get("lastHydration"),
+                        )
+                        logger.info("index-options paper supervisor ran EOD exit check at startup", extra={"squared_off": len(past_eod_sells)})
+                    except Exception:
+                        logger.exception("index-options paper supervisor EOD exit check failed")
         while not _STOP_EVENT.is_set():
             now = datetime.now(IST_ZONE)
             if not _session_active(now):

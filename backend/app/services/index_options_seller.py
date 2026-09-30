@@ -339,7 +339,18 @@ def _setup_from_legs(
     short_iv = median(short_ivs) if short_ivs else None
     iv_edge = short_iv - vix if short_iv is not None and vix is not None else None
     iv_ratio = short_iv / vix if short_iv is not None and vix and vix > 0 else None
-    volatility_edge = bool(iv_edge is not None and iv_ratio is not None and iv_edge >= MIN_IV_EDGE_POINTS and iv_ratio >= MIN_IV_EDGE_RATIO)
+    adaptive_min_credit_risk = MIN_CREDIT_TO_RISK
+    adaptive_min_iv_edge = MIN_IV_EDGE_POINTS
+    adaptive_min_iv_ratio = MIN_IV_EDGE_RATIO
+    low_vix_compression = vix is not None and vix < 15.0 and iv_edge is not None and iv_edge < 0
+    if low_vix_compression:
+        adaptive_min_credit_risk = MIN_CREDIT_TO_RISK * 0.75
+        adaptive_min_iv_edge = MIN_IV_EDGE_POINTS * 0.25
+        adaptive_min_iv_ratio = max(0.85, MIN_IV_EDGE_RATIO * 0.85)
+    volatility_edge = bool(
+        iv_edge is not None and iv_ratio is not None
+        and (iv_edge >= adaptive_min_iv_edge or (low_vix_compression and short_iv >= vix * adaptive_min_iv_ratio))
+    )
     carry_theta = sum(-(_float(leg.get("theta")) or 0) for leg in sell_legs) + sum((_float(leg.get("theta")) or 0) for leg in buy_legs)
     net_gamma = sum(-(_float(leg.get("gamma")) or 0) for leg in sell_legs) + sum((_float(leg.get("gamma")) or 0) for leg in buy_legs)
     gamma_cap = max(0.001, 75.0 / spot)
@@ -369,7 +380,7 @@ def _setup_from_legs(
     wall_ok = None if any(value is None for value in wall_checks) else all(value is True for value in wall_checks)
     structure_ok = _structure_ready(structure, neutral=neutral)
     time_ok, time_evidence = _time_gate(expiry_value, now)
-    defined_risk = width > 0 and max_loss > 0 and credit_to_risk >= MIN_CREDIT_TO_RISK
+    defined_risk = width > 0 and max_loss > 0 and credit_to_risk >= adaptive_min_credit_risk
     theta_ok = carry_theta > 0 and abs(net_gamma) <= gamma_cap
 
     atr = _float(structure.get("atr5m"))
@@ -442,10 +453,11 @@ def _setup_from_legs(
             "breadth": {**breadth, "aligned": breadth_ok, "sellerMode": "NEUTRAL" if neutral else "DIRECTIONAL"},
             "volatilityEdge": {"aligned": volatility_edge if iv_edge is not None else None, "shortIv": round(short_iv, 3) if short_iv is not None else None,
                                "indiaVix": vix, "ivEdgePoints": round(iv_edge, 3) if iv_edge is not None else None,
-                               "ivToVix": round(iv_ratio, 3) if iv_ratio is not None else None, "vixRegime": vix_regime},
+                               "ivToVix": round(iv_ratio, 3) if iv_ratio is not None else None, "vixRegime": vix_regime,
+                               "minimumEdgePoints": adaptive_min_iv_edge, "minimumIvToVix": adaptive_min_iv_ratio},
             "contractEconomics": {"aligned": contract_ok, "maxLegSpreadPct": round(max_spread, 3) if math.isfinite(max_spread) else None,
                                   "entryBasis": "SELL_BID_BUY_ASK"},
-            "definedRisk": {"aligned": defined_risk, "creditToRisk": round(credit_to_risk, 3), "minimum": MIN_CREDIT_TO_RISK,
+            "definedRisk": {"aligned": defined_risk, "creditToRisk": round(credit_to_risk, 3), "minimum": adaptive_min_credit_risk,
                             "maxLossPerLot": round(max_loss_lot, 2), "netMaxProfitPerLot": round(net_profit_lot, 2),
                             "estimatedRoundTripCosts": round(estimated_cost, 2)},
             "thetaCarry": {"aligned": theta_ok, "netTheta": round(carry_theta, 4), "netGamma": round(net_gamma, 6), "gammaCap": round(gamma_cap, 6)},
@@ -466,6 +478,35 @@ def _setup_from_legs(
             "rejectionReasons": [name for name, value in gates.items() if value is False],
         },
     }
+
+
+def _pick_short_with_wing(rows, spot, option_type):
+    """Pick a short option that has at least one valid hedge wing.
+
+    Falls back through candidates sorted by delta proximity to 0.25 so the
+    builder never fails merely because the mathematically-ideal short happens
+    to sit on the chain boundary with no room for a hedge.
+    """
+    candidates = []
+    for row in rows:
+        if row.get("optionType") != option_type or not _usable(row):
+            continue
+        strike, delta = _float(row.get("strike")), abs(_float(row.get("delta")) or 0)
+        if strike is None or not (MIN_SHORT_DELTA <= delta <= MAX_SHORT_DELTA):
+            continue
+        if option_type == "CALL" and strike <= spot:
+            continue
+        if option_type == "PUT" and strike >= spot:
+            continue
+        candidates.append(row)
+    if not candidates:
+        return None, None
+    candidates.sort(key=lambda row: abs(abs(_float(row.get("delta")) or 0) - 0.25))
+    for candidate in candidates:
+        wing = _pick_wing(rows, candidate, option_type)
+        if wing:
+            return candidate, wing
+    return candidates[0], None
 
 
 def build_defined_risk_seller_setup(
@@ -491,8 +532,7 @@ def build_defined_risk_seller_setup(
     clock = (now or datetime.now(IST_ZONE)).astimezone(IST_ZONE)
     direction = structure.get("direction")
     if direction == "CALL":
-        short = _pick_short(chain, spot, "PUT")
-        wing = _pick_wing(chain, short, "PUT") if short else None
+        short, wing = _pick_short_with_wing(chain, spot, "PUT")
         if short and wing:
             fut = {**futures_oi, "aligned": directional_oi_aligned}
             return _setup_from_legs(
@@ -508,8 +548,7 @@ def build_defined_risk_seller_setup(
             details={"requiredShortDelta": "0.15-0.40", "requiredHedge": "LOWER_STRIKE_PUT"},
         )
     elif direction == "PUT":
-        short = _pick_short(chain, spot, "CALL")
-        wing = _pick_wing(chain, short, "CALL") if short else None
+        short, wing = _pick_short_with_wing(chain, spot, "CALL")
         if short and wing:
             fut = {**futures_oi, "aligned": directional_oi_aligned}
             return _setup_from_legs(
