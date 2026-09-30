@@ -33,6 +33,9 @@ from .market_snapshot_store import market_snapshot_path
 _PAPER_LOCK = threading.Lock()
 PAPER_SQUARE_OFF_TIME = dt_time(15, 29)
 SELLER_SQUARE_OFF_TIME = dt_time(15, 20)
+EXITED_LIVE_AT_EOD = "EXITED_LIVE_AT_EOD"
+RECOVERED_AFTER_EOD = "RECOVERED_AFTER_EOD"
+EOD_PRICE_UNAVAILABLE = "EOD_PRICE_UNAVAILABLE"
 DEFAULT_SELLER_MAX_SINGLE_RISK_INR = 5_000.0
 DEFAULT_SELLER_MAX_PORTFOLIO_RISK_INR = 10_000.0
 LONG_PREMIUM_MARK_INTERVAL_SECONDS = 60
@@ -550,12 +553,12 @@ def _spot_for(position: dict[str, Any], candidates: list[dict[str, Any]]) -> flo
     return None
 
 
-def _close_credit(position: dict[str, Any], debit: float, reason: str, now: datetime) -> dict[str, Any]:
+def _close_credit(position: dict[str, Any], debit: float, reason: str, now: datetime, *, exit_state: str | None = None) -> dict[str, Any]:
     credit, qty = float(position["entryCredit"]), int(position["quantity"])
     costs = float(position.get("estimatedRoundTripCosts") or 0)
     pnl = round((credit - debit) * qty - costs, 2)
     max_loss = max(float(position.get("maxLossPerLot") or 0), 0.01)
-    return {
+    closed = {
         **position,
         "status": "CLOSED",
         "exitDebit": round(debit, 2),
@@ -566,11 +569,14 @@ def _close_credit(position: dict[str, Any], debit: float, reason: str, now: date
         "pnlPct": round(pnl / max_loss * 100.0, 2),
         "unrealizedPnl": 0.0,
     }
+    if exit_state:
+        closed["eodExitState"] = exit_state
+    return closed
 
 
 def _update_credit_open(
     position: dict[str, Any], debit: float, marked_legs: list[dict[str, Any]], spot: float | None, now: datetime,
-    *, mark_source: str = "RADAR_EXECUTABLE_DEPTH", stale_legs: list[str] | None = None,
+    *, mark_source: str = "RADAR_EXECUTABLE_DEPTH", stale_legs: list[str] | None = None, exit_state: str | None = None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     credit, qty = float(position["entryCredit"]), int(position["quantity"])
     costs = float(position.get("estimatedRoundTripCosts") or 0)
@@ -597,13 +603,13 @@ def _update_credit_open(
     upper = _float(position.get("shortCallStrike"))
     breached = bool(spot is not None and ((lower is not None and spot <= lower) or (upper is not None and spot >= upper)))
     if breached:
-        return None, _close_credit(updated, debit, "UNDERLYING_SHORT_STRIKE_BREACH", now)
+        return None, _close_credit(updated, debit, "UNDERLYING_SHORT_STRIKE_BREACH", now, exit_state=exit_state)
     if debit <= profit_debit:
-        return None, _close_credit(updated, debit, "PROFIT_TARGET_50PCT_CREDIT", now)
+        return None, _close_credit(updated, debit, "PROFIT_TARGET_50PCT_CREDIT", now, exit_state=exit_state)
     if debit >= stop_debit:
-        return None, _close_credit(updated, debit, "DEFINED_RISK_STOP", now)
+        return None, _close_credit(updated, debit, "DEFINED_RISK_STOP", now, exit_state=exit_state)
     if now.astimezone(IST_ZONE).time().replace(tzinfo=None) >= SELLER_SQUARE_OFF_TIME:
-        return None, _close_credit(updated, debit, "EOD_GAMMA_SQUAREOFF", now)
+        return None, _close_credit(updated, debit, "EOD_GAMMA_SQUAREOFF", now, exit_state=exit_state or EXITED_LIVE_AT_EOD)
     return updated, None
 
 
@@ -626,6 +632,7 @@ def _new_position(
             return None
         lot = next(iter(lots))
         primary = next((leg for leg in legs if leg.get("action") == "SELL"), legs[0])
+        intended_eod = datetime.combine(now.date(), SELLER_SQUARE_OFF_TIME).replace(tzinfo=now.tzinfo).isoformat()
         return {
             "id": f"{now.astimezone(IST_ZONE).date().isoformat()}-{sequence:02d}-{row['key']}-SELL",
             "index": row["key"], "bucket": row["bucket"], "direction": row.get("direction"),
@@ -642,6 +649,7 @@ def _new_position(
             "unrealizedPnl": 0.0, "source": row.get("dataSource"), "execution": "DEFINED_RISK_PAPER_ONLY",
             "entryBasis": "SELL_BID_BUY_ASK", "nakedRisk": False,
             "markQuality": "FRESH", "spreadMarkQuality": "FRESH", "spreadStaleLegs": [],
+            "intendedEodSquareOffAt": intended_eod,
         }
 
     contract = row.get("contract") if isinstance(row.get("contract"), dict) else {}
@@ -999,7 +1007,7 @@ def hydrate_open_position_subscriptions(
 
 
 def reconcile_paper_book(
-    radar: dict[str, Any], *, client: Any = None, now: datetime | None = None, persist: bool = True,
+    radar: dict[str, Any], *, client: Any = None, now: datetime | None = None, persist: bool = True, eod_exit_state: str | None = None,
 ) -> dict[str, Any]:
     clock = (now or datetime.now(IST_ZONE)).astimezone(IST_ZONE)
     session = clock.date().isoformat()
@@ -1037,7 +1045,7 @@ def reconcile_paper_book(
                 )
                 active, closed = _update_credit_open(
                     position, debit, marked_legs, _spot_for(position, candidates), clock,
-                    mark_source=spread_source, stale_legs=stale_legs,
+                    mark_source=spread_source, stale_legs=stale_legs, exit_state=eod_exit_state,
                 )
                 if active:
                     next_open.append(active)

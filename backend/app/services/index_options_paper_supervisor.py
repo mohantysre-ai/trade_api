@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .angel_index_options import IST_ZONE
-from .index_options_paper import hydrate_open_position_subscriptions, reconcile_paper_book, SELLER_SQUARE_OFF_TIME
+from .index_options_paper import hydrate_open_position_subscriptions, reconcile_paper_book, SELLER_SQUARE_OFF_TIME, EXITED_LIVE_AT_EOD, RECOVERED_AFTER_EOD
 from .json_atomic import atomic_write_json, load_json_with_fallback
 from .market_snapshot_store import market_snapshot_path
 
@@ -99,7 +99,7 @@ def paper_supervisor_status() -> dict[str, Any]:
     return current
 
 
-def run_paper_supervisor_cycle(client: Any, *, now: datetime | None = None) -> dict[str, Any]:
+def run_paper_supervisor_cycle(client: Any, *, now: datetime | None = None, eod_exit_state: str | None = None) -> dict[str, Any]:
     """Retain all locked legs, then mark/exit the durable paper book."""
     clock = (now or datetime.now(IST_ZONE)).astimezone(IST_ZONE)
     try:
@@ -113,14 +113,25 @@ def run_paper_supervisor_cycle(client: Any, *, now: datetime | None = None) -> d
     # minute. The watchdog now owns the persistence cadence, so align the due
     # gate with this fast cycle. Seller multi-leg positions were already marked
     # every reconciliation. This assignment changes no entry/exit thresholds.
+    original_mark_interval = None
     try:
         from . import index_options_paper as paper
+        original_mark_interval = getattr(paper, "LONG_PREMIUM_MARK_INTERVAL_SECONDS", None)
         paper.LONG_PREMIUM_MARK_INTERVAL_SECONDS = SUPERVISOR_INTERVAL_SECONDS
     except Exception:
         logger.exception("failed to align option mark interval with supervisor")
 
     radar = {"candidates": [], "sellerCandidates": [], "selected": []}
-    return reconcile_paper_book(radar, client=client, now=clock, persist=True)
+    result = reconcile_paper_book(radar, client=client, now=clock, persist=True, eod_exit_state=eod_exit_state)
+
+    if original_mark_interval is not None:
+        try:
+            from . import index_options_paper as paper
+            paper.LONG_PREMIUM_MARK_INTERVAL_SECONDS = original_mark_interval
+        except Exception:
+            logger.exception("failed to restore option mark interval after supervisor cycle")
+
+    return result
 
 
 class _ProcessLease:
@@ -179,11 +190,26 @@ def _supervisor_loop(client_factory: Callable[[], Any]) -> None:
                     if str(p.get("strategyMode") or "").upper() == "SELL_PREMIUM"
                     and now.astimezone(IST_ZONE).time().replace(tzinfo=None) >= SELLER_SQUARE_OFF_TIME
                 ]
-                if past_eod_sells:
+            else:
+                past_eod_sells = []
+            if not past_eod_sells:
+                try:
+                    yesterday = (now - timedelta(days=1)).date().isoformat()
+                    prior_book = _load_book(yesterday)
+                    if prior_book:
+                        past_eod_sells = [
+                            p for p in prior_book.get("open") or []
+                            if str(p.get("strategyMode") or "").upper() == "SELL_PREMIUM"
+                        ]
+                        if past_eod_sells:
+                            logger.info("index-options paper supervisor found orphan SELL_PREMIUM positions from prior session", extra={"orphan_count": len(past_eod_sells)})
+                except Exception:
+                    logger.exception("index-options paper supervisor prior-session orphan load failed")
+            if past_eod_sells:
                     try:
                         if client is None:
                             client = client_factory()
-                        book = run_paper_supervisor_cycle(client, now=now)
+                        book = run_paper_supervisor_cycle(client, now=now, eod_exit_state=RECOVERED_AFTER_EOD)
                         _status_update(
                             running=True, owner=True, sessionActive=False,
                             lastCycleAt=now.isoformat(), lastSuccessAt=now.isoformat(),
@@ -209,7 +235,7 @@ def _supervisor_loop(client_factory: Callable[[], Any]) -> None:
             try:
                 if client is None:
                     client = client_factory()
-                book = run_paper_supervisor_cycle(client, now=cycle_time)
+                book = run_paper_supervisor_cycle(client, now=cycle_time, eod_exit_state=EXITED_LIVE_AT_EOD)
                 _status_update(
                     running=True, owner=True, sessionActive=True,
                     lastCycleAt=cycle_time.isoformat(), lastSuccessAt=cycle_time.isoformat(),

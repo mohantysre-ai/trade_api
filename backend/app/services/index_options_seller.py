@@ -23,6 +23,7 @@ SELLER_ENTRY_START = dt_time(9, 45)
 SELLER_ENTRY_CUTOFF = dt_time(14, 30)
 SELLER_EXPIRY_DAY_CUTOFF = dt_time(13, 30)
 MIN_CREDIT_TO_RISK = 0.20
+MIN_CREDIT_TO_RISK_CHEAP_VOL = 0.15
 MIN_IV_EDGE_POINTS = 0.75
 MIN_IV_EDGE_RATIO = 1.05
 MAX_LEG_SPREAD_PCT = 2.0
@@ -342,15 +343,63 @@ def _setup_from_legs(
     adaptive_min_credit_risk = MIN_CREDIT_TO_RISK
     adaptive_min_iv_edge = MIN_IV_EDGE_POINTS
     adaptive_min_iv_ratio = MIN_IV_EDGE_RATIO
-    low_vix_compression = vix is not None and vix < 15.0 and iv_edge is not None and iv_edge < 0
-    if low_vix_compression:
-        adaptive_min_credit_risk = MIN_CREDIT_TO_RISK * 0.75
-        adaptive_min_iv_edge = MIN_IV_EDGE_POINTS * 0.25
-        adaptive_min_iv_ratio = max(0.85, MIN_IV_EDGE_RATIO * 0.85)
-    volatility_edge = bool(
-        iv_edge is not None and iv_ratio is not None
-        and (iv_edge >= adaptive_min_iv_edge or (low_vix_compression and short_iv >= vix * adaptive_min_iv_ratio))
-    )
+    cheap_volatility_regime = vix is not None and vix < 15.0 and iv_edge is not None and iv_edge < 0
+    low_vix_positive_edge = vix is not None and vix < 15.0 and iv_edge is not None and iv_edge >= 0
+    if cheap_volatility_regime:
+        adaptive_min_credit_risk = MIN_CREDIT_TO_RISK * 1.50
+        adaptive_min_iv_edge = MIN_IV_EDGE_POINTS * 2.0
+        adaptive_min_iv_ratio = max(1.15, MIN_IV_EDGE_RATIO * 1.15)
+    if cheap_volatility_regime and credit_to_risk < MIN_CREDIT_TO_RISK_CHEAP_VOL:
+        volatility_edge = False
+        gate_evidence_vol = {
+            "aligned": False, "shortIv": round(short_iv, 3) if short_iv is not None else None,
+            "indiaVix": vix, "ivEdgePoints": round(iv_edge, 3) if iv_edge is not None else None,
+            "ivToVix": round(iv_ratio, 3) if iv_ratio is not None else None, "vixRegime": vix_regime,
+            "regime": "CHEAP_VOLATILITY_DISABLED", "reason": "INSUFFICIENT_EXPECTED_COMPENSATION",
+            "minimumEdgePoints": adaptive_min_iv_edge, "minimumIvToVix": adaptive_min_iv_ratio,
+            "minimumCreditToRisk": adaptive_min_credit_risk,
+        }
+    elif cheap_volatility_regime:
+        volatility_edge = bool(
+            iv_edge is not None and iv_ratio is not None
+            and iv_edge >= adaptive_min_iv_edge
+            and iv_ratio >= adaptive_min_iv_ratio
+        )
+        gate_evidence_vol = {
+            "aligned": volatility_edge, "shortIv": round(short_iv, 3) if short_iv is not None else None,
+            "indiaVix": vix, "ivEdgePoints": round(iv_edge, 3) if iv_edge is not None else None,
+            "ivToVix": round(iv_ratio, 3) if iv_ratio is not None else None, "vixRegime": vix_regime,
+            "regime": "CHEAP_VOLATILITY_STRONGER_GATE",
+            "minimumEdgePoints": adaptive_min_iv_edge, "minimumIvToVix": adaptive_min_iv_ratio,
+            "minimumCreditToRisk": adaptive_min_credit_risk,
+        }
+    elif low_vix_positive_edge:
+        volatility_edge = bool(
+            iv_edge is not None and iv_ratio is not None
+            and iv_edge >= adaptive_min_iv_edge
+            and iv_ratio >= adaptive_min_iv_ratio
+        )
+        gate_evidence_vol = {
+            "aligned": volatility_edge, "shortIv": round(short_iv, 3) if short_iv is not None else None,
+            "indiaVix": vix, "ivEdgePoints": round(iv_edge, 3) if iv_edge is not None else None,
+            "ivToVix": round(iv_ratio, 3) if iv_ratio is not None else None, "vixRegime": vix_regime,
+            "regime": "LOW_VIX_POSITIVE_EDGE_NO_RELAXATION",
+            "minimumEdgePoints": adaptive_min_iv_edge, "minimumIvToVix": adaptive_min_iv_ratio,
+            "minimumCreditToRisk": adaptive_min_credit_risk,
+        }
+    else:
+        volatility_edge = bool(
+            iv_edge is not None and iv_ratio is not None
+            and iv_edge >= adaptive_min_iv_edge
+            and iv_ratio >= adaptive_min_iv_ratio
+        )
+        gate_evidence_vol = {
+            "aligned": volatility_edge, "shortIv": round(short_iv, 3) if short_iv is not None else None,
+            "indiaVix": vix, "ivEdgePoints": round(iv_edge, 3) if iv_edge is not None else None,
+            "ivToVix": round(iv_ratio, 3) if iv_ratio is not None else None, "vixRegime": vix_regime,
+            "regime": "NORMAL", "minimumEdgePoints": adaptive_min_iv_edge,
+            "minimumIvToVix": adaptive_min_iv_ratio, "minimumCreditToRisk": adaptive_min_credit_risk,
+        }
     carry_theta = sum(-(_float(leg.get("theta")) or 0) for leg in sell_legs) + sum((_float(leg.get("theta")) or 0) for leg in buy_legs)
     net_gamma = sum(-(_float(leg.get("gamma")) or 0) for leg in sell_legs) + sum((_float(leg.get("gamma")) or 0) for leg in buy_legs)
     gamma_cap = max(0.001, 75.0 / spot)
@@ -451,10 +500,7 @@ def _setup_from_legs(
             "optionChain": {"aligned": wall_ok, "reason": "TWO_SIDED_OI_UP_PREMIUM_DOWN_WRITING" if neutral else "DIRECTIONAL_OI_UP_PREMIUM_DOWN_WRITING",
                             "shortLegWalls": wall_checks},
             "breadth": {**breadth, "aligned": breadth_ok, "sellerMode": "NEUTRAL" if neutral else "DIRECTIONAL"},
-            "volatilityEdge": {"aligned": volatility_edge if iv_edge is not None else None, "shortIv": round(short_iv, 3) if short_iv is not None else None,
-                               "indiaVix": vix, "ivEdgePoints": round(iv_edge, 3) if iv_edge is not None else None,
-                               "ivToVix": round(iv_ratio, 3) if iv_ratio is not None else None, "vixRegime": vix_regime,
-                               "minimumEdgePoints": adaptive_min_iv_edge, "minimumIvToVix": adaptive_min_iv_ratio},
+            "volatilityEdge": gate_evidence_vol,
             "contractEconomics": {"aligned": contract_ok, "maxLegSpreadPct": round(max_spread, 3) if math.isfinite(max_spread) else None,
                                   "entryBasis": "SELL_BID_BUY_ASK"},
             "definedRisk": {"aligned": defined_risk, "creditToRisk": round(credit_to_risk, 3), "minimum": adaptive_min_credit_risk,
@@ -483,7 +529,8 @@ def _setup_from_legs(
 def _pick_short_with_wing(rows, spot, option_type):
     """Pick a short option that has at least one valid hedge wing.
 
-    Falls back through candidates sorted by delta proximity to 0.25 so the
+    Spread-aware: prefers tighter short-leg spreads first, then delta
+    proximity to 0.25 as tiebreaker. Falls back through candidates so the
     builder never fails merely because the mathematically-ideal short happens
     to sit on the chain boundary with no room for a hedge.
     """
@@ -501,7 +548,14 @@ def _pick_short_with_wing(rows, spot, option_type):
         candidates.append(row)
     if not candidates:
         return None, None
-    candidates.sort(key=lambda row: abs(abs(_float(row.get("delta")) or 0) - 0.25))
+
+    def _short_sort_key(row):
+        spread = _leg_spread(row)
+        spread_component = spread if spread is not None else float("inf")
+        delta_proximity = abs(abs(_float(row.get("delta")) or 0) - 0.25)
+        return (spread_component, delta_proximity)
+
+    candidates.sort(key=_short_sort_key)
     for candidate in candidates:
         wing = _pick_wing(rows, candidate, option_type)
         if wing:
