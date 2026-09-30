@@ -202,6 +202,16 @@ function Merge-NewerFiles {
 }
 
 Merge-NewerFiles (Join-Path $Root 'backend\app\services') $seedState -TopLevelOnly
+$nativeRootState = Join-Path $tmp 'native-root-state'
+New-Item -ItemType Directory -Force -Path $nativeRootState | Out-Null
+foreach ($name in @('intraday_session.json', 'swing_session.json')) {
+    $source = Join-Path $Root $name
+    if (Test-Path -LiteralPath $source) {
+        Copy-Item -LiteralPath $source -Destination (Join-Path $nativeRootState $name) -Force
+        (Get-Item -LiteralPath (Join-Path $nativeRootState $name)).LastWriteTimeUtc = (Get-Item -LiteralPath $source).LastWriteTimeUtc
+    }
+}
+Merge-NewerFiles $nativeRootState $seedState -TopLevelOnly
 Merge-NewerFiles (Join-Path $Root 'backend\app\data') $seedData
 Merge-NewerFiles (Join-Path $Root 'backend\app\services\eod_archive') $seedArchive
 

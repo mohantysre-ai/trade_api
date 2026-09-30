@@ -4,7 +4,7 @@ import { jsonCompressed } from "@/lib/json-compressed";
 export const runtime = "nodejs";
 const BACKEND_URL = process.env.MARKET_API_URL ?? "http://127.0.0.1:8000";
 const CACHE_TTL_MS = Math.max(250, Number(process.env.MARKET_READ_CACHE_MS ?? 2000));
-const STALE_TTL_MS = Math.max(CACHE_TTL_MS, Number(process.env.MARKET_READ_STALE_MS ?? 30000));
+const STALE_TTL_MS = Math.max(CACHE_TTL_MS, Number(process.env.MARKET_READ_STALE_MS ?? 300000));
 const BACKEND_TIMEOUT_MS = Math.max(1000, Number(process.env.MARKET_READ_BACKEND_TIMEOUT_MS ?? 8000));
 
 type CacheEntry = { data: unknown; expiresAt: number; staleUntil: number };

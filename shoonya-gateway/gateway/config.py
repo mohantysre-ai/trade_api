@@ -28,13 +28,17 @@ def _list(name: str) -> list[str]:
 @dataclass
 class Settings:
     api_base: str = "https://api.shoonya.com"
-    ws_url: str = "wss://api.shoonya.com/NorenWSTP/"
+    ws_url: str = "wss://api.shoonya.com/NorenWSAPI/"
     uid: str = ""
     account_id: str = ""
     password: str = ""
     totp_secret: str = ""
     vendor_code: str = ""
     api_secret: str = ""
+    oauth_url: str = "https://api.shoonya.com/OAuthlogin/authorize/oauth"
+    oauth_login_url: str = "https://api.shoonya.com/OAuthlogin/investor-entry-level/login"
+    oauth_auth_code: str = ""
+    oauth_browser_timeout_s: float = 90.0
     source: str = "API"
     auth_mode: str = "manual"
     login_hhmm: str = "08:15"
@@ -71,13 +75,23 @@ class Settings:
     def from_env(cls) -> "Settings":
         return cls(
             api_base=os.getenv("SHOONYA_API_BASE", "https://api.shoonya.com").rstrip("/"),
-            ws_url=os.getenv("SHOONYA_WS_URL", "wss://api.shoonya.com/NorenWSTP/"),
+            ws_url=os.getenv("SHOONYA_WS_URL", "wss://api.shoonya.com/NorenWSAPI/"),
             uid=os.getenv("SHOONYA_UID", ""),
             account_id=os.getenv("SHOONYA_ACCOUNT_ID", "") or os.getenv("SHOONYA_UID", ""),
             password=os.getenv("SHOONYA_PASSWORD", ""),
             totp_secret=os.getenv("SHOONYA_TOTP_SECRET", ""),
             vendor_code=os.getenv("SHOONYA_CLIENT_ID", ""),
             api_secret=os.getenv("SHOONYA_SECRET_CODE", ""),
+            oauth_url=os.getenv(
+                "SHOONYA_OAUTH_URL",
+                "https://api.shoonya.com/OAuthlogin/authorize/oauth",
+            ),
+            oauth_login_url=os.getenv(
+                "SHOONYA_OAUTH_LOGIN_URL",
+                "https://api.shoonya.com/OAuthlogin/investor-entry-level/login",
+            ),
+            oauth_auth_code=os.getenv("SHOONYA_AUTH_CODE", ""),
+            oauth_browser_timeout_s=_f("SHOONYA_OAUTH_BROWSER_TIMEOUT_SECONDS", 90.0),
             source=os.getenv("SHOONYA_SOURCE", "API"),
             auth_mode=os.getenv("SHOONYA_AUTH_MODE", "manual").lower(),
             login_hhmm=os.getenv("SHOONYA_LOGIN_HHMM", "08:15"),

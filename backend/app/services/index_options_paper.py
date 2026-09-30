@@ -237,6 +237,110 @@ def _rest_marks(client: Any, instruments: list[Instrument]) -> tuple[dict[str, f
     return marks, None
 
 
+def _shoonya_marks(instruments: list[Instrument]) -> tuple[dict[str, float], dict[str, dict[str, Any]]]:
+    if not instruments:
+        return {}, {}
+    try:
+        from .standby_feed.config import StandbyConfig
+        from .standby_feed.gateway_client import GatewayClient
+
+        cfg = StandbyConfig.from_env()
+        if not cfg.promotable:
+            return {}, {}
+        client = GatewayClient(cfg)
+        keys = [f"{instrument.exchange}|{instrument.token}" for instrument in instruments]
+        client.pin("index-options-paper", keys, ttl_seconds=120.0)
+        quotes = client.quotes([instrument.tradingsymbol for instrument in instruments])
+    except Exception:
+        return {}, {}
+    marks: dict[str, float] = {}
+    depth: dict[str, dict[str, Any]] = {}
+    for instrument in instruments:
+        row = quotes.get(instrument.tradingsymbol) or {}
+        mark = _float(row.get("ltp"))
+        age_ms = _float(row.get("ageMs"))
+        if mark is None or mark <= 0 or age_ms is None or age_ms < 0 or age_ms / 1000.0 > _mark_stale_seconds() or row.get("status") == "NOT_SUBSCRIBED":
+            continue
+        marks[instrument.tradingsymbol] = mark
+        depth[instrument.tradingsymbol] = {
+            "mark": mark,
+            "bid": _float(row.get("bestBid") or row.get("bid")),
+            "ask": _float(row.get("bestAsk") or row.get("ask")),
+            "source": "SHOONYA_WEBSOCKET_LOCKED_CONTRACT",
+            "ageSeconds": age_ms / 1000.0,
+            "stale": False,
+        }
+    return marks, depth
+
+
+def _chain_marks(positions: list[dict[str, Any]], symbols: set[str]) -> tuple[dict[str, float], dict[str, dict[str, Any]]]:
+    if not symbols:
+        return {}, {}
+    marks: dict[str, float] = {}
+    depth: dict[str, dict[str, Any]] = {}
+    requests: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for position in positions:
+        index_key = str(position.get("index") or position.get("key") or "").upper()
+        for leg in _position_instruments(position):
+            symbol = str(leg.get("symbol") or "")
+            expiry = str(leg.get("expiry") or position.get("expiry") or "")[:10]
+            if symbol in symbols and index_key and expiry:
+                requests.setdefault((index_key, expiry), []).append({
+                    **leg,
+                    "_positionDirection": position.get("direction"),
+                })
+    for (index_key, expiry_text), legs in requests.items():
+        try:
+            expiry = datetime.fromisoformat(expiry_text).date()
+        except ValueError:
+            continue
+        from .dhan_scanx_options import fetch_scanx_option_chain
+        from .lemonn_options import fetch_lemonn_option_chain
+        from .market_data_provider import fetch_nse_option_chain
+
+        fetchers = (
+            lambda: fetch_nse_option_chain(index_key, expiry, timeout=(3, 5)),
+            lambda: fetch_scanx_option_chain(index_key, expiry, timeout=5.0),
+            lambda: fetch_lemonn_option_chain(index_key, expiry, timeout=5.0),
+        )
+        unresolved = list(legs)
+        for fetcher in fetchers:
+            if not unresolved:
+                break
+            try:
+                payload = fetcher()
+            except Exception:
+                continue
+            next_unresolved: list[dict[str, Any]] = []
+            for leg in unresolved:
+                symbol = str(leg.get("symbol") or "")
+                strike = _float(leg.get("strike"))
+                option_type = str(leg.get("optionType") or leg.get("direction") or leg.get("_positionDirection") or "").upper()
+                option_type = "CALL" if option_type in {"CE", "CALL"} else "PUT" if option_type in {"PE", "PUT"} else option_type
+                source = str(payload.get("source") or "OPTION_CHAIN_FALLBACK")
+                match = next((row for row in payload.get("chain") or [] if isinstance(row, dict) and (
+                    str(row.get("symbol") or "").upper() == symbol.upper() or (
+                        strike is not None and _float(row.get("strike")) == strike
+                        and str(row.get("optionType") or "").upper() in {option_type, option_type[:1] + "E"}
+                    )
+                )), None)
+                mark = _float((match or {}).get("ltp"))
+                if mark is None or mark <= 0:
+                    next_unresolved.append(leg)
+                    continue
+                marks[symbol] = mark
+                depth[symbol] = {
+                    "mark": mark,
+                    "bid": _float(match.get("bestBid")),
+                    "ask": _float(match.get("bestAsk")),
+                    "source": source,
+                    "ageSeconds": None,
+                    "stale": False,
+                }
+            unresolved = next_unresolved
+    return marks, depth
+
+
 def _locked_marks(
     client: Any, positions: list[dict[str, Any]],
 ) -> tuple[dict[str, float], dict[str, dict[str, Any]], str | None, dict[str, Any]]:
@@ -263,13 +367,21 @@ def _locked_marks(
             "mark": mark, "bid": None, "ask": None,
             "source": "ANGEL_DIRECT_LOCKED_CONTRACT", "ageSeconds": None, "stale": True,
         }
+    missing = [instrument for instrument in pending if instrument.tradingsymbol not in rest_marks]
+    shoonya_marks, shoonya_depth = _shoonya_marks(missing)
+    depth.update(shoonya_depth)
+    missing_symbols = {instrument.tradingsymbol for instrument in missing if instrument.tradingsymbol not in shoonya_marks}
+    chain_marks, chain_depth = _chain_marks(positions, missing_symbols) if missing_symbols else ({}, {})
+    depth.update(chain_depth)
     pipeline.update({
         "streamMarks": len(stream_marks),
         "restMarks": len(rest_marks),
+        "shoonyaMarks": len(shoonya_marks),
+        "chainMarks": len(chain_marks),
         "staleContracts": len(pending),
         "restRequested": len(pending) if client is not None else 0,
     })
-    return {**rest_marks, **stream_marks}, depth, rest_error, pipeline
+    return {**chain_marks, **shoonya_marks, **rest_marks, **stream_marks}, depth, rest_error, pipeline
 
 
 def _direct_locked_marks(client: Any, positions: list[dict[str, Any]]) -> tuple[dict[str, float], str | None]:
@@ -940,23 +1052,28 @@ def reconcile_paper_book(
             symbol = str(position.get("symbol") or "")
             meta = mark_depth.get(symbol) or {}
             mark = locked_marks.get(symbol)
+            executable_bid = _float(meta.get("bid"))
+            stop_premium = _float(position.get("initialStopPremium"))
+            if executable_bid is not None and executable_bid > 0 and stop_premium is not None and executable_bid <= stop_premium:
+                mark = executable_bid
             if mark is None:
                 mark = _mark_for(position, candidates)
                 mark_source = "RADAR_CHAIN_FALLBACK"
-            elif meta.get("source") == "ANGEL_WEBSOCKET":
-                mark_source = "ANGEL_WEBSOCKET_LOCKED_CONTRACT"
             else:
-                mark_source = "ANGEL_DIRECT_LOCKED_CONTRACT"
+                mark_source = str(meta.get("source") or "LOCKED_CONTRACT_FALLBACK")
+                if mark_source == "ANGEL_WEBSOCKET":
+                    mark_source = "ANGEL_WEBSOCKET_LOCKED_CONTRACT"
             if mark is None:
                 position["markStatus"] = "UNAVAILABLE"
                 position["markError"] = mark_error
                 position["lastMarkAttemptAt"] = clock.isoformat()
                 next_open.append(position)
                 continue
-            position["markError"] = mark_error if mark_source != "ANGEL_DIRECT_LOCKED_CONTRACT" else None
+            position["markError"] = mark_error if mark_source == "RADAR_CHAIN_FALLBACK" else None
             quality = (
                 "FRESH_WEBSOCKET" if mark_source == "ANGEL_WEBSOCKET_LOCKED_CONTRACT"
-                else "REST_FALLBACK" if mark_source == "ANGEL_DIRECT_LOCKED_CONTRACT"
+                else "FRESH_WEBSOCKET" if mark_source == "SHOONYA_WEBSOCKET_LOCKED_CONTRACT"
+                else "REST_FALLBACK" if mark_source != "RADAR_CHAIN_FALLBACK"
                 else "RADAR_FALLBACK"
             )
             from .index_options_intraday_strategy import evaluate_position as _evaluate_intraday, position_from_dict as _intraday_from_dict

@@ -210,25 +210,23 @@ def build_straddle_legs(
     strategy_position_id: str,
     expiry: str | None,
 ) -> tuple[OptionLeg, OptionLeg] | None:
-    call_row = atm_row(chain, "CALL", spot)
-    put_row = atm_row(chain, "PUT", spot)
-    if call_row is None or put_row is None:
+    calls = executable_rows(chain, "CALL")
+    puts = executable_rows(chain, "PUT")
+    put_strikes = {
+        strike
+        for row in puts
+        if (strike := _float(row.get("strike"))) is not None
+    }
+    shared_strikes = {
+        strike
+        for row in calls
+        if (strike := _float(row.get("strike"))) is not None and strike in put_strikes
+    }
+    if not shared_strikes:
         return None
-    # Prefer a shared strike when the chain offers both at the same strike.
-    call_strike = _float(call_row.get("strike"))
-    put_strike = _float(put_row.get("strike"))
-    if call_strike != put_strike:
-        shared = min(
-            (
-                r
-                for r in executable_rows(chain, "CALL")
-                if _float(r.get("strike")) == put_strike
-            ),
-            key=lambda r: 0,
-            default=None,
-        )
-        if shared is not None:
-            call_row = shared
+    strike = min(shared_strikes, key=lambda value: abs(value - spot))
+    call_row = next(row for row in calls if _float(row.get("strike")) == strike)
+    put_row = next(row for row in puts if _float(row.get("strike")) == strike)
     call_leg = _mk_leg(
         call_row,
         strategy_position_id=strategy_position_id,

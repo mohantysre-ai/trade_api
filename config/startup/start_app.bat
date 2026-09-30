@@ -101,6 +101,15 @@ if %PORT_BUSY% equ 1 (
 echo [PASS] All ports are free. Proceeding...
 echo.
 
+echo [*] Reconciling newest durable state from native and Docker stores...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%sync-state-before-native.ps1"
+if errorlevel 1 (
+    echo [FAIL] Durable-state reconciliation failed. App was not started.
+    if not "%IROS_NO_PAUSE%"=="1" pause
+    exit /b 1
+)
+echo.
+
 REM Stop previous cloudflared for clean reconnect
 echo [*] Stopping any existing cloudflared tunnel...
 powershell -NoProfile -Command "Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue"

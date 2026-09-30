@@ -91,7 +91,11 @@ def _tick(ltp: float, seq: int | None = None, close: float | None = None):
 
 class TestCaseADisabled:
     def test_config_disabled_by_default(self, monkeypatch):
+        # Both keys must be cleared: the live backend/.env enables the standby
+        # lane, and any earlier import that loads it pollutes the process env.
         monkeypatch.delenv("SHOONYA_STANDBY_ENABLED", raising=False)
+        monkeypatch.delenv("SHOONYA_STANDBY_MODE", raising=False)
+        monkeypatch.delenv("SHOONYA_GATEWAY_URL", raising=False)
         cfg = StandbyConfig.from_env()
         assert cfg.enabled is False
         assert cfg.mode == "shadow"

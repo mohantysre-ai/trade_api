@@ -54,6 +54,8 @@ def _coverage_tier(coverage: float, cfg: SwingV2Config, *, session_date: str, ap
     with _COVERAGE_LOCK:
         if _COVERAGE_STATE["sessionDate"] != session_date:
             _COVERAGE_STATE.update(sessionDate=session_date, tier=raw_tier, pendingTier=None, pendingCycles=0)
+        elif _COVERAGE_STATE["tier"] == "BLOCK" and raw_tier != "BLOCK":
+            _COVERAGE_STATE.update(tier=raw_tier, pendingTier=None, pendingCycles=0)
         elif _COVERAGE_STATE["tier"] != raw_tier:
             if _COVERAGE_STATE["pendingTier"] == raw_tier:
                 _COVERAGE_STATE["pendingCycles"] += 1
@@ -301,14 +303,26 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
             for event in ledger.events(session_date=session_date)
             if str(event.get("eventType") or "") == str(EventType.POSITION_LOCKED)
         }
+        active_non_terminal = sum(1 for p in ledger.positions_state().values() if not p.get("terminal"))
+        lock_budget = max(0, scaled_cfg.max_positions - active_non_terminal)
+        if lock_budget <= 0:
+            for row in qualified:
+                if row["decisionId"] in selected_ids:
+                    portfolio["rejected"].append({"symbol": row.get("symbol"), "portfolioRejectReason": "MAX_POSITIONS_LEDGER_CAP"})
+            selected = []
+            selected_ids = set()
         for row in qualified:
             wants_lock = row["decisionId"] in selected_ids
             if wants_lock and row["symbol"].upper() in already_locked_symbols:
+                continue
+            if wants_lock and lock_budget <= 0:
+                portfolio["rejected"].append({"symbol": row.get("symbol"), "portfolioRejectReason": "MAX_POSITIONS_LEDGER_CAP"})
                 continue
             event_type = EventType.POSITION_LOCKED if wants_lock else EventType.CANDIDATE_QUALIFIED; event_payload = selected_by_id.get(row["decisionId"], row)
             ledger.append(idempotency_key=f"{row['decisionId']}:{event_type}", decision_id=row["decisionId"], position_id=row["decisionId"] if event_type == EventType.POSITION_LOCKED else None, symbol=row["symbol"], session_date=session_date, event_type=event_type, event_timestamp=now.isoformat(), payload=event_payload)
             if event_type == EventType.POSITION_LOCKED:
                 already_locked_symbols.add(row["symbol"].upper())
+                lock_budget -= 1
         for index, row in enumerate(rejected):
             symbol = row.get("symbol") or f"UNKNOWN_{index}"; decision_id = _decision_id(snapshot_id, session_date, symbol)
             ledger.append(idempotency_key=f"{decision_id}:{EventType.CANDIDATE_REJECTED}", decision_id=decision_id, symbol=symbol, session_date=session_date, event_type=EventType.CANDIDATE_REJECTED, event_timestamp=now.isoformat(), payload=row)

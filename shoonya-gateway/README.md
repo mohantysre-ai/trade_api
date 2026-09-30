@@ -20,8 +20,11 @@ and TPSeries field meanings are verified.
 
 ## Auth
 
-`SHOONYA_AUTH_MODE=manual` is the default. Complete the vendor OAuth login and POST
-the result to `/admin/oauth/code` using `SHOONYA_ADMIN_TOKEN`.
+Set `SHOONYA_AUTH_MODE=oauth_auto` for a scheduled daily headless OAuth login using
+`SHOONYA_UID`, `SHOONYA_PASSWORD`, and `SHOONYA_TOTP_SECRET`. The same-day session is
+restored after restarts. Manual fallback remains available through `/admin/oauth/url`
+and `/admin/oauth/code` using `X-Admin-Token`. `/admin/oauth/refresh` runs the same
+headless renewal immediately for validation or recovery.
 
 ## API
 

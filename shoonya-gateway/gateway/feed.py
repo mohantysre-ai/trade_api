@@ -59,12 +59,12 @@ class FeedManager:
         self.connected=False; self.subscribed.clear(); self.acked.clear(); self.not_streaming.clear(); self._pending.clear(); self._key_to_name.clear(); self._book.reset_connection()
     async def _handshake(self,ws):
         session=self._auth.session; assert session is not None
-        await ws.send(json.dumps({"t":"a","uid":session.uid,"actid":session.account_id,"source":self._s.source,"accesstoken":session.access_token}))
+        await ws.send(json.dumps({"t":"a","uid":session.uid,"actid":session.account_id,"source":self._s.source,"accesstoken":session.websocket_token or session.access_token}))
         deadline=self._mono()+10.
         while self._mono()<deadline:
             raw=await asyncio.wait_for(ws.recv(),timeout=10.); msg=self._parse(raw)
             if not msg or msg.get("t")!="ak": continue
-            if msg.get("s")=="Ok": self.connected=True; return True
+            if str(msg.get("s") or "").upper()=="OK": self.connected=True; return True
             self._auth.mark_expired("ws connect ack Not_Ok"); return False
         return False
     @staticmethod

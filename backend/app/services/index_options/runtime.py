@@ -7,6 +7,11 @@ from .config import PAPER_SLIPPAGE_POINTS
 
 DURABLE_LEGACY_SELLERS = {"BULL_PUT_CREDIT_SPREAD", "BEAR_CALL_CREDIT_SPREAD", "IRON_CONDOR"}
 
+def _leg_stop_points():
+    try:
+        v=float(os.getenv("INDEX_OPTIONS_LEG_STOP_POINTS","20"));return v if v>0 else 20.0
+    except (TypeError,ValueError):return 20.0
+
 def _db_path():
     override=os.getenv("INDEX_OPTIONS_STRATEGY_DB","").strip()
     if override:return Path(override)
@@ -51,19 +56,47 @@ def _mark_position(p,q,now,m):
         for n in g:g[n]+=(_float(r.get(n)) or 0)*qty*sign
         legs.append({**l,"currentBid":bid,"currentAsk":ask,"currentPrice":round(mark,4),"currentIv":_float(r.get("iv")),"markedAt":now.isoformat()})
     return {**p,"legs":legs,"combinedStructureValue":round(sum((1 if _side(l)=="BUY" else -1)*float(l.get("currentPrice") or 0)*int(l.get("qty") or 1) for l in legs),4),"unrealizedPnl":round(pnl,2),"netGreeks":{k:round(v,6) for k,v in g.items()},"markStatus":"LIVE" if complete else "INCOMPLETE","currentSpot":_float(m.get("spot")),"currentIv":_float(m.get("atmIv")),"structuralInvalidated":str((m.get("structure") or {}).get("status") or "").upper()=="INVALIDATED","lifecycleState":"NO_ACTION","updatedAt":now.isoformat()}
+def _leg_pnl(l):
+    mark=_float(l.get("currentPrice"));entry=_float(l.get("entryFill"))
+    if mark is None or entry is None:return 0.
+    qty=max(1,int(_num_leg(l.get("qty"),1)))*max(1,int(_num_leg(l.get("lotSize"),1)));sign=1 if _side(l)=="BUY" else -1
+    return (mark-entry)*qty*sign
+
+def _num_leg(v,d=1):
+    try:x=int(float(v));return x if x==x else d
+    except (TypeError,ValueError):return d
+
+def _leg_stop_close(p,now):
+    """Cut any leg whose adverse move from entry reaches LEG_STOP_POINTS and let the rest run."""
+    stop=_leg_stop_points();legs=[];stopped=[];cut=0.
+    for l in p.get("legs") or []:
+        if l.get("legExited") or not l.get("currentPrice"):legs.append(l);continue
+        qty=max(1,_num_leg(l.get("qty")))*max(1,_num_leg(l.get("lotSize")));adverse=(_float(l["currentPrice"])-float(l["entryFill"]))*(1 if _side(l)=="BUY" else -1)
+        if adverse<=-stop:
+            fill=l["currentPrice"];bid=_float(l.get("currentBid"));ask=_float(l.get("currentAsk"));mid=(bid+ask)/2 if bid is not None and ask is not None else None
+            stopped.append({**l,"legExited":True,"exitReason":"LEG_STOP","exitFill":fill,"exitSlippage":None if mid is None else round(abs(float(fill)-mid),4),"exitTimestamp":now.isoformat()})
+            cut+=(float(fill)-float(l["entryFill"]))*qty*(1 if _side(l)=="BUY" else -1)
+        else:legs.append(l)
+    if not stopped:return p,0.
+    if not legs:
+        return {**p,"legs":stopped,"status":"CLOSED","exitReason":"LEG_STOP_ALL","exitedAt":now.isoformat(),"realizedPnl":round(float(p.get("realizedPnl") or 0)+cut+float(p.get("unrealizedPnl") or 0),2),"unrealizedPnl":0.,"exitGreeks":p.get("netGreeks"),"lifecycleState":"EXIT_ALL","updatedAt":now.isoformat()},0.
+    return {**p,"legs":legs,"stoppedLegs":[*(p.get("stoppedLegs") or []),*stopped],"realizedPnl":round(float(p.get("realizedPnl") or 0)+cut,2),"unrealizedPnl":round(sum(_leg_pnl(l) for l in legs),2),"combinedStructureValue":round(sum((1 if _side(l)=="BUY" else -1)*float(l.get("currentPrice") or 0)*max(1,_num_leg(l.get("qty")))*max(1,_num_leg(l.get("lotSize"))) for l in legs),4),"lifecycleState":"LEG_STOP","updatedAt":now.isoformat()},cut
+
 def _exit_reason(p,now):
     family=str(p.get("family") or "");pnl=float(p.get("unrealizedPnl") or 0);ml=abs(float(p.get("maxLoss") or 0));mp=abs(float(p.get("maxProfit") or 0));limits={"DIRECTIONAL":(.5,.5,time(15,20)),"VOLATILITY_EXPANSION":(.4,.35,time(15,15)),"RANGE":(.4,.5,time(15,0)),"TERM_STRUCTURE":(.25,.3,time(15,0))};pf,lf,cut=limits.get(family,(.5,.35,time(15,20)))
     if p.get("structuralInvalidated"):return "STRUCTURAL_INVALIDATION"
+    mp=mp or 0
     if mp and pnl>=mp*pf:return "PROFIT_TARGET"
     if ml and pnl<=-(ml*lf):return "STRUCTURE_RISK_STOP"
     if str(p.get("expiryState") or "")=="EXPIRY_CUTOFF":return "EXPIRY_CUTOFF"
     if now.timetz().replace(tzinfo=None)>=cut:return "TIME_EXIT"
     return None
+
 def _close(p,reason,now):
     legs=[]
     for l in p.get("legs") or []:
         fill=l.get("currentPrice");bid=_float(l.get("currentBid"));ask=_float(l.get("currentAsk"));mid=(bid+ask)/2 if bid is not None and ask is not None else None;slip=abs(float(fill)-mid) if fill is not None and mid is not None else None;legs.append({**l,"exitBid":bid,"exitAsk":ask,"exitFill":fill,"exitSlippage":None if slip is None else round(slip,4),"exitTimestamp":now.isoformat()})
-    return {**p,"legs":legs,"status":"CLOSED","exitReason":reason,"exitedAt":now.isoformat(),"realizedPnl":round(float(p.get("unrealizedPnl") or 0),2),"unrealizedPnl":0.,"exitGreeks":p.get("netGreeks"),"exitSpot":p.get("currentSpot"),"exitIv":p.get("currentIv"),"lifecycleState":"EXIT_ALL","updatedAt":now.isoformat()}
+    return {**p,"legs":legs,"status":"CLOSED","exitReason":reason,"exitedAt":now.isoformat(),"realizedPnl":round(float(p.get("realizedPnl") or 0)+float(p.get("unrealizedPnl") or 0),2),"unrealizedPnl":0.,"exitGreeks":p.get("netGreeks"),"exitSpot":p.get("currentSpot"),"exitIv":p.get("currentIv"),"lifecycleState":"EXIT_ALL","updatedAt":now.isoformat()}
 def _save_position(db,p):db.execute("UPDATE index_option_positions SET status=?,payload_json=?,updated_at=? WHERE strategy_position_id=?",(p["status"],json.dumps(p),p["updatedAt"],p["strategyPositionId"]))
 def load_positions(session_date=None):
     with _connect() as db:rows=db.execute("SELECT payload_json FROM index_option_positions WHERE session_date=? ORDER BY updated_at",(session_date,)).fetchall() if session_date else db.execute("SELECT payload_json FROM index_option_positions ORDER BY updated_at").fetchall()
@@ -326,8 +359,8 @@ def process_strategy_cycle(radar,snapshot,now):
     with _connect() as db:
         db.execute("BEGIN IMMEDIATE")
         for row in db.execute("SELECT payload_json FROM index_option_positions WHERE session_date=? AND status='OPEN'",(d,)).fetchall():
-            stored=json.loads(row[0]);market=(((snapshot.get("indexOptions") or {}).get("indices") or {}).get(stored.get("index")) or {});marked=_mark_position(stored,q,now,market);reason=_exit_reason(marked,now);updated=_close(marked,reason,now) if reason else marked;_save_position(db,updated)
-            if reason:db.execute("INSERT OR IGNORE INTO index_option_events VALUES(?,?,?,?,?)",(_stable_id(updated["strategyPositionId"],"CLOSE"),updated["strategyPositionId"],"CLOSED",json.dumps(updated),now.isoformat()))
+            stored=json.loads(row[0]);market=(((snapshot.get("indexOptions") or {}).get("indices") or {}).get(stored.get("index")) or {});marked=_mark_position(stored,q,now,market);marked,leg_cut=_leg_stop_close(marked,now) if marked.get("status")=="OPEN" else (marked,0.);reason=_exit_reason(marked,now) if marked.get("status")=="OPEN" else marked.get("exitReason");updated=_close(marked,reason,now) if reason and marked.get("status")=="OPEN" else marked;_save_position(db,updated)
+            if reason or leg_cut:db.execute("INSERT OR IGNORE INTO index_option_events VALUES(?,?,?,?,?)",(_stable_id(updated["strategyPositionId"],"CLOSE" if reason else "LEG_STOP"),updated["strategyPositionId"],"CLOSED" if reason else "LEG_STOPPED",json.dumps(updated),now.isoformat()))
         candidates=radar.get("modularCandidates") or []; selected=radar.get("modularSelected") or []; selected_ids={str(r.get("strategyId"))+"|"+str(r.get("key")) for r in selected}
         selected_map={(str(r.get("strategyId") or r.get("strategyType") or ""), str(r.get("key") or r.get("index") or "")): r for r in selected}
         for c in candidates:

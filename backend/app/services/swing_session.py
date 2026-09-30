@@ -133,21 +133,14 @@ def _read_json(path: str) -> dict[str, Any]:
 
 
 def load_swing_session() -> dict[str, Any]:
-    try:
-        from .swing_v2.authoritative import get_authoritative_session, is_v2_authoritative
+    from .swing_v2.authoritative import get_authoritative_session, is_v2_authoritative
 
-        if is_v2_authoritative():
-            return get_authoritative_session(live=False)
-    except ValueError:
-        raise
-    except Exception as exc:
-        log.error("V2 authoritative session read failed closed: %s", exc)
-        return {
-            "success": False, "locked": False, "hunting": False,
-            "cashHeld": True, "cashReason": "SWING_V2_SESSION_READ_FAILED",
-            "authority": "V2", "v1Enabled": False, "long": [], "short": [],
-        }
-    return _read_json(_SWING_SESSION_PATH)
+    if is_v2_authoritative():
+        return get_authoritative_session(live=False)
+
+    raise RuntimeError(
+        "Swing V1 has been removed. Set SWING_STRATEGY_AUTHORITY=V2 and SWING_V2_ENABLED=true."
+    )
 
 
 def _f(v: Any) -> float | None:
@@ -1692,288 +1685,9 @@ def lock_swing_session(*, force: bool = False, bypass_lock_window: bool = False)
     if is_v2_authoritative():
         return lock_authoritative_session(force=force)
 
-    today = _ist_today()
-    reconcile_cross_book(today, persist=True)
-    existing = load_swing_session()
-    existing_date = str(existing.get("sessionDate") or "").strip()[:10]
-    stale_day = bool(existing.get("locked") and existing_date and existing_date != today)
-    if stale_day and not force:
-        log.info(
-            "Swing sessionDate %s != today %s — forcing fresh deterministic BUY evaluation",
-            existing_date,
-            today,
-        )
-        force = True
-
-    if stale_day and existing_date:
-        try:
-            from datetime import date as _date
-
-            from .eod_book_cache import freeze_dated_books_from_live
-
-            freeze_dated_books_from_live(_date.fromisoformat(existing_date[:10]))
-        except Exception as exc:
-            log.warning("Prior-day swing EOD freeze failed for %s: %s", existing_date, exc)
-
-    hunt_ok, hunt_code = swing_entry_hunt_allowed(
-        allow_manual_override=bool(bypass_lock_window)
+    raise RuntimeError(
+        "Swing V1 has been removed. Set SWING_STRATEGY_AUTHORITY=V2 and SWING_V2_ENABLED=true."
     )
-    has_today_book = bool(
-        existing.get("locked")
-        and existing_date == today
-        and any(
-            isinstance(r, dict) and r.get("symbol")
-            for r in (existing.get("long") or []) + (existing.get("short") or [])
-        )
-    )
-
-    if has_today_book:
-        rebuild = bool(force and hunt_ok)
-        if not rebuild:
-            if hunt_ok:
-                filled = _append_new_swing_entries(existing)
-                if filled is not None:
-                    return filled
-            scrubbed, removed_dup = _dedupe_swing_session_rows(existing)
-            scrubbed, removed_gate = _scrub_ineligible_swing_rows(scrubbed)
-            scrubbed, removed_cross = _scrub_cross_book_swing_rows(scrubbed)
-            scrubbed, removed_cap = _enforce_swing_position_cap(scrubbed)
-            removed = removed_dup + removed_gate + removed_cross + removed_cap
-            if removed:
-                scrubbed = _persist_swing_if_changed(existing, scrubbed)
-            return {
-                "success": True,
-                "alreadyLocked": True,
-                "scrubbed": removed,
-                "crossBookExcluded": removed_cross,
-                "capExcluded": removed_cap,
-                "session": scrubbed,
-            }
-
-    if not hunt_ok and hunt_code != "after_hunt":
-        return {
-            "success": False,
-            "error": swing_entry_hunt_block_message(hunt_code),
-            "lockWindow": hunt_code,
-            "huntWindow": swing_entry_hunt_config(),
-            "session": existing,
-        }
-
-    session_date = today
-    committed_at = _utc_now_iso()
-    exclude = intraday_locked_symbols_respecting_swing(today)
-    skipped: list[str] = []
-    snap_src = "asset_matrix_deterministic_buy"
-    long_rows: list[dict[str, Any]] = []
-
-    if hunt_ok:
-        matrix_state = _ensure_today_matrix_snapshot()
-        matrix_ready, matrix_reason = (
-            matrix_state if isinstance(matrix_state, tuple) else (True, "READY")
-        )
-        if matrix_ready:
-            raw_picks, snap_src = _picks_from_asset_matrix(exclude_symbols=exclude)
-            long_rows, skipped = _normalize_candidate_rows(
-                raw_picks,
-                session_date,
-                committed_at=committed_at,
-                snap_src=snap_src,
-            )
-        else:
-            skipped.append(matrix_reason)
-
-    diagnostics = _swing_universe_diagnostics(exclude_symbols=exclude)
-    hunt_started = committed_at
-    if (
-        existing_date == today
-        and (existing.get("hunting") or existing.get("huntStartedAt"))
-    ):
-        hunt_started = str(existing.get("huntStartedAt") or existing.get("committedAt") or committed_at)
-
-    if long_rows:
-        sized = _paper_execute_swing_rows(_size_new_swing_rows(long_rows), filled_at=committed_at)
-        deployed = round(sum(float(r.get("deployedCapital") or 0) for r in sized), 2)
-        portfolio_risk = round(sum(float(r.get("maxLoss") or 0) for r in sized), 2)
-        if deployed > SWING_CAPITAL + 0.01 or portfolio_risk > SWING_CAPITAL * SWING_MAX_PORTFOLIO_RISK + 0.01:
-            return {"success": False, "error": "SWING_CAPITAL_INVARIANT_VIOLATION", "session": existing}
-        still_hunting = hunt_ok and len(sized) < SWING_MATRIX_LOCK_COUNT
-        session = {
-            "success": True,
-            "locked": True,
-            "hunting": still_hunting,
-            "selectionFinalized": not still_hunting,
-            "cashHeld": False,
-            "book": "SWING",
-            "sessionDate": session_date,
-            "committedAt": committed_at,
-            "updatedAt": committed_at,
-            "huntStartedAt": hunt_started,
-            "executionPolicy": SWING_EXECUTION_POLICY,
-            "source": snap_src,
-            "selectionContract": SWING_SELECTION_CONTRACT,
-            "rotation": "DAILY",
-            "priorSessionDate": existing_date if stale_day else None,
-            "long": sized,
-            "short": [],
-            "skippedIncomplete": skipped,
-            "excludedInvalidSelections": copy.deepcopy(existing.get("excludedInvalidSelections") or []),
-            "preservedExecutionHistory": copy.deepcopy(existing.get("preservedExecutionHistory") or []),
-            "capital": {
-                "swingCapital": SWING_CAPITAL,
-                "riskFraction": SWING_RISK_FRACTION,
-                "slots": len(sized),
-                "deployedCapital": deployed,
-                "remainingCapital": round(max(0.0, SWING_CAPITAL - deployed), 2),
-                "portfolioRisk": portfolio_risk,
-            },
-            "counts": {"long": len(sized), "short": 0, "total": len(sized)},
-            "deskGates": {"minPrice": SWING_MIN_PRICE, "rejectDvr": True},
-            "crossBookExcluded": sorted(exclude),
-            "huntWindow": swing_entry_hunt_config(),
-            "entryHuntDiagnostics": diagnostics,
-        }
-        _atomic_write(_SWING_SESSION_PATH, session)
-        try:
-            from .trade_outcome import emit_book_lock_alerts
-
-            emit_book_lock_alerts(
-                book="SWING",
-                session_date=session_date,
-                long_rows=sized,
-                short_rows=[],
-            )
-        except Exception as exc:
-            log.warning("Swing lock alerts failed: %s", exc)
-        log.info(
-            "Locked swing session from %s: %d LONGs (%s)%s%s",
-            session["source"],
-            len(sized),
-            session_date,
-            f" rotated from {existing_date}" if stale_day else "",
-            f" excluded intradAy={sorted(exclude)}" if exclude else "",
-        )
-        return {
-            "success": True,
-            "alreadyLocked": False,
-            "rotated": stale_day,
-            "hunting": still_hunting,
-            "session": session,
-        }
-
-    if hunt_ok:
-        hunting_session = {
-            "success": True,
-            "locked": False,
-            "hunting": True,
-            "selectionFinalized": False,
-            "cashHeld": False,
-            "book": "SWING",
-            "sessionDate": session_date,
-            "committedAt": hunt_started,
-            "updatedAt": committed_at,
-            "huntStartedAt": hunt_started,
-            "executionPolicy": SWING_EXECUTION_POLICY,
-            "source": snap_src,
-            "selectionContract": SWING_SELECTION_CONTRACT,
-            "rotation": "DAILY",
-            "priorSessionDate": existing_date if stale_day else None,
-            "long": [],
-            "short": [],
-            "skippedIncomplete": skipped,
-            "excludedInvalidSelections": copy.deepcopy(existing.get("excludedInvalidSelections") or []),
-            "preservedExecutionHistory": copy.deepcopy(existing.get("preservedExecutionHistory") or []),
-            "capital": {
-                "swingCapital": SWING_CAPITAL,
-                "riskFraction": SWING_RISK_FRACTION,
-                "slots": 0,
-                "deployedCapital": 0.0,
-                "remainingCapital": SWING_CAPITAL,
-                "portfolioRisk": 0.0,
-            },
-            "counts": {"long": 0, "short": 0, "total": 0},
-            "deskGates": {"minPrice": SWING_MIN_PRICE, "rejectDvr": True},
-            "crossBookExcluded": sorted(exclude),
-            "cashReason": (
-                "WAITING_FOR_QUALIFIED_BUY_ENTRY"
-                if not skipped or not skipped[0].startswith("MATRIX_")
-                else skipped[0]
-            ),
-            "huntWindow": swing_entry_hunt_config(),
-            "entryHuntDiagnostics": diagnostics,
-        }
-        _atomic_write(_SWING_SESSION_PATH, hunting_session)
-        log.info(
-            "Swing entry hunt open for %s — no fully qualified BUY yet (evaluated=%s qualified=%s)",
-            session_date,
-            diagnostics.get("evaluated"),
-            diagnostics.get("qualified"),
-        )
-        return {
-            "success": True,
-            "alreadyLocked": False,
-            "hunting": True,
-            "cashHeld": False,
-            "reason": "WAITING_FOR_QUALIFIED_BUY_ENTRY",
-            "skipped": skipped,
-            "session": hunting_session,
-            "staleDay": stale_day,
-        }
-
-    cash_session = {
-        "success": True,
-        "locked": True,
-        "hunting": False,
-        "selectionFinalized": True,
-        "cashHeld": True,
-        "book": "SWING",
-        "sessionDate": session_date,
-        "committedAt": committed_at,
-        "updatedAt": committed_at,
-        "huntStartedAt": hunt_started,
-        "executionPolicy": SWING_EXECUTION_POLICY,
-        "source": snap_src,
-        "selectionContract": SWING_SELECTION_CONTRACT,
-        "rotation": "DAILY",
-        "priorSessionDate": existing_date if stale_day else None,
-        "long": [],
-        "short": [],
-        "skippedIncomplete": skipped,
-        "excludedInvalidSelections": copy.deepcopy(existing.get("excludedInvalidSelections") or []),
-        "preservedExecutionHistory": copy.deepcopy(existing.get("preservedExecutionHistory") or []),
-        "capital": {
-            "swingCapital": SWING_CAPITAL,
-            "riskFraction": SWING_RISK_FRACTION,
-            "slots": 0,
-            "deployedCapital": 0.0,
-            "remainingCapital": SWING_CAPITAL,
-            "portfolioRisk": 0.0,
-        },
-        "counts": {"long": 0, "short": 0, "total": 0},
-        "deskGates": {"minPrice": SWING_MIN_PRICE, "rejectDvr": True},
-        "crossBookExcluded": sorted(exclude),
-        "cashReason": "NO_BUY_LOCKED_DURING_ENTRY_WINDOW",
-        "huntWindow": swing_entry_hunt_config(),
-        "entryHuntDiagnostics": {
-            **diagnostics,
-            "qualifiedDuringHunt": 0,
-            "eodQualified": diagnostics.get("qualified", 0),
-            "qualified": 0,
-            "diagnosticPhase": "POST_HUNT_EOD",
-        },
-    }
-    _atomic_write(_SWING_SESSION_PATH, cash_session)
-    return {
-        "success": True,
-        "alreadyLocked": False,
-        "cashHeld": True,
-        "hunting": False,
-        "reason": "NO_BUY_LOCKED_DURING_ENTRY_WINDOW",
-        "skipped": skipped,
-        "session": cash_session,
-        "staleDay": stale_day,
-    }
-
-
 def _active_swing_rows(session: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for side in ("long", "short"):
@@ -1995,32 +1709,9 @@ def ensure_swing_session_locked(*, retry_empty: bool = False) -> dict[str, Any]:
     if is_v2_authoritative():
         return run_authoritative_cycle()
 
-    existing = load_swing_session()
-    today = _ist_today()
-    existing_date = str(existing.get("sessionDate") or "").strip()[:10]
-    if existing.get("locked") and existing_date == today:
-        if retry_empty and not _active_swing_rows(existing):
-            has_names = any(
-                isinstance(r, dict) and r.get("symbol")
-                for r in (existing.get("long") or []) + (existing.get("short") or [])
-            )
-            result = lock_swing_session(force=not has_names)
-            return result.get("session") or existing
-        if retry_empty:
-            result = lock_swing_session(force=False)
-            return result.get("session") or existing
-        scrubbed, removed_dup = _dedupe_swing_session_rows(existing)
-        scrubbed, removed_gate = _scrub_ineligible_swing_rows(scrubbed)
-        scrubbed, removed_cross = _scrub_cross_book_swing_rows(scrubbed)
-        scrubbed, removed_cap = _enforce_swing_position_cap(scrubbed)
-        if removed_dup or removed_gate or removed_cross or removed_cap:
-            return _persist_swing_if_changed(existing, scrubbed)
-        return scrubbed
-    if existing.get("hunting") and existing_date == today:
-        result = lock_swing_session(force=False)
-        return result.get("session") or existing
-    result = lock_swing_session(force=True if (existing.get("locked") and existing_date != today) else False)
-    return result.get("session") or existing
+    raise RuntimeError(
+        "Swing V1 has been removed. Set SWING_STRATEGY_AUTHORITY=V2 and SWING_V2_ENABLED=true."
+    )
 
 
 def refresh_swing_session_state() -> dict[str, Any]:
@@ -2034,88 +1725,9 @@ def refresh_swing_session_state() -> dict[str, Any]:
     if is_v2_authoritative():
         return run_authoritative_cycle()
 
-    sess = load_swing_session()
-    if not sess.get("locked"):
-        return sess
-    day = str(sess.get("sessionDate") or "")[:10]
-    if day != _ist_today():
-        return sess
-    reconcile_cross_book(day, persist=True)
-    sess = load_swing_session()
-    live = _compute_swing_session(live=True)
-    changed = False
-    sess, dupes = _dedupe_swing_session_rows(sess)
-    if dupes:
-        changed = True
-    for side in ("long", "short"):
-        orig_rows = _unique_swing_rows(
-            [r for r in (sess.get(side) or []) if isinstance(r, dict)]
-        )
-        live_by = {
-            str(r.get("symbol") or "").upper(): r
-            for r in _unique_swing_rows(
-                [r for r in (live.get(side) or []) if isinstance(r, dict)]
-            )
-            if r.get("symbol")
-        }
-        updated_rows: list[dict[str, Any]] = []
-        for row in orig_rows:
-            symbol = str(row.get("symbol") or "").upper()
-            if row.get("closed") or str((row.get("exitState") or {}).get("pathReplay") or ""):
-                updated_rows.append(row)
-                continue
-            live_row = live_by.get(symbol)
-            if not live_row:
-                updated_rows.append(row)
-                continue
-            merged = dict(row)
-            for key in (
-                "ltp",
-                "currentPrice",
-                "ltpSource",
-                "dayChangePct",
-                "realizedPnl",
-                "unrealizedPnl",
-                "unrealizedPnlPct",
-                "totalPnl",
-                "exitState",
-                "outcome",
-                "effectiveStop",
-                "remainingQty",
-                "exitPlan",
-                "status",
-                "bookExitReason",
-                "executionStatus",
-                "triggered",
-                "skipped",
-                "skipReason",
-            ):
-                if live_row.get(key) is not None and merged.get(key) != live_row.get(key):
-                    merged[key] = live_row.get(key)
-                    changed = True
-            if live_row.get("closed") and not row.get("closed"):
-                merged["closed"] = True
-                merged["status"] = str(live_row.get("status") or "CLOSED")
-                changed = True
-            updated_rows.append(merged)
-        sess[side] = updated_rows
-
-    if isinstance(live.get("portfolio"), dict):
-        if sess.get("portfolio") != live.get("portfolio"):
-            sess["portfolio"] = copy.deepcopy(live["portfolio"])
-            changed = True
-
-    if not changed:
-        return sess
-    sess["updatedAt"] = _utc_now_iso()
-    sess["priceOnly"] = True
-    sess["automation"] = {
-        "lastRefreshAt": sess["updatedAt"],
-        "source": "refresh_swing_session_state",
-        "executionPolicy": sess.get("executionPolicy") or SWING_EXECUTION_POLICY,
-    }
-    _atomic_write(_SWING_SESSION_PATH, sess)
-    return sess
+    raise RuntimeError(
+        "Swing V1 has been removed. Set SWING_STRATEGY_AUTHORITY=V2 and SWING_V2_ENABLED=true."
+    )
 
 
 def _enrich_swing_row_prices(
@@ -2251,46 +1863,9 @@ def get_swing_session(*, live: bool = False) -> dict[str, Any]:
     if is_v2_authoritative():
         return get_authoritative_session(live=live)
 
-    global _SWING_RESPONSE_CACHE, _SWING_RESPONSE_CACHE_AT, _SWING_RESPONSE_REFRESHING
-    if not live:
-        return copy.deepcopy(_compute_swing_session(live=False))
-    ttl = _SWING_RESPONSE_OPEN_TTL if _is_market_open() else _SWING_RESPONSE_CLOSED_TTL
-    now = time.monotonic()
-    if _SWING_RESPONSE_CACHE is not None and now - _SWING_RESPONSE_CACHE_AT < ttl:
-        return copy.deepcopy(_SWING_RESPONSE_CACHE)
-
-    start_refresh = False
-    started_gen = 0
-    with _SWING_RESPONSE_LOCK:
-        now = time.monotonic()
-        if _SWING_RESPONSE_CACHE is not None and now - _SWING_RESPONSE_CACHE_AT < ttl:
-            return copy.deepcopy(_SWING_RESPONSE_CACHE)
-        if _SWING_RESPONSE_CACHE is None:
-            fallback = _compute_swing_session(live=False)
-            fallback["dataStale"] = True
-            fallback["liveRefreshPending"] = True
-            _SWING_RESPONSE_CACHE = copy.deepcopy(fallback)
-            _SWING_RESPONSE_CACHE_AT = 0.0
-        if not _SWING_RESPONSE_REFRESHING:
-            _SWING_RESPONSE_REFRESHING = True
-            start_refresh = True
-            started_gen = _SWING_RESPONSE_GEN
-        result = copy.deepcopy(_SWING_RESPONSE_CACHE)
-        result["liveRefreshPending"] = True
-
-    if start_refresh:
-        try:
-            threading.Thread(
-                target=_refresh_swing_response_cache,
-                args=(started_gen,),
-                name="swing-live-refresh",
-                daemon=True,
-            ).start()
-        except Exception:
-            with _SWING_RESPONSE_LOCK:
-                _SWING_RESPONSE_REFRESHING = False
-            log.exception("failed to start swing live refresh")
-    return result
+    raise RuntimeError(
+        "Swing V1 has been removed. Set SWING_STRATEGY_AUTHORITY=V2 and SWING_V2_ENABLED=true."
+    )
 
 
 def _refresh_swing_response_cache(started_gen: int) -> None:

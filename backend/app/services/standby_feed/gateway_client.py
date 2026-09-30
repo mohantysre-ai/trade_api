@@ -83,13 +83,19 @@ class GatewayClient:
             LOGGER.debug("shoonya gateway unpin failed: %s", type(exc).__name__)
             return False
 
-    def candles(self, symbol: str, interval: str, start_ts: int, end_ts: int) -> dict[str, Any]:
+    def candles(self, symbol: str, interval: str, start_ts: int, end_ts: int, *, exchange: str = "NSE") -> dict[str, Any]:
         if not self.configured:
             return {"status": "UNCONFIGURED", "rows": []}
         try:
             resp = requests.get(
                 f"{self._cfg.gateway_url}/v1/candles",
-                params={"symbol": symbol, "interval": interval, "from": start_ts, "to": end_ts},
+                params={
+                    "symbol": symbol,
+                    "interval": interval,
+                    "from": start_ts,
+                    "to": end_ts,
+                    "exchange": str(exchange).upper(),
+                },
                 headers=self._headers(),
                 timeout=self._cfg.request_timeout_s,
             )

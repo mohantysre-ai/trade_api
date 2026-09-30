@@ -12,20 +12,35 @@ class DivergenceMonitor:
         self._sustain_s = float(sustain_s)
         self._clock = clock
         self._breach_since: float | None = None
+        self._clear_since: float | None = None
         self._disabled = False
         self.last_offenders: dict[str, float] = {}
 
     def observe(self, deltas_pct: dict[str, float]) -> None:
-        offenders = {s: d for s, d in deltas_pct.items() if abs(d) > self._alert_pct}
-        self.last_offenders = offenders
+        offenders = {s for s, d in deltas_pct.items() if abs(d) > self._alert_pct}
+        self.last_offenders = {
+            s: d for s, d in deltas_pct.items() if abs(d) > self._alert_pct
+        }
         now = self._clock()
         if len(offenders) >= self._min_symbols:
+            self._clear_since = None
             if self._breach_since is None:
                 self._breach_since = now
             elif now - self._breach_since >= self._sustain_s:
                 self._disabled = True
         else:
             self._breach_since = None
+            if not self._disabled:
+                self._clear_since = None
+                return
+            # Symmetric hysteresis: one breach must not disable the standby
+            # lane for the rest of the process lifetime. It re-arms only after
+            # divergence has stayed quiet for a full sustain window.
+            if self._clear_since is None:
+                self._clear_since = now
+            elif now - self._clear_since >= self._sustain_s:
+                self._disabled = False
+                self._clear_since = None
 
     @property
     def disabled(self) -> bool:
@@ -34,6 +49,12 @@ class DivergenceMonitor:
     def clear(self) -> None:
         self._disabled = False
         self._breach_since = None
+        self._clear_since = None
 
     def snapshot(self) -> dict[str, object]:
-        return {"disabled": self._disabled, "offenders": dict(self.last_offenders), "breachSinceMonotonic": self._breach_since}
+        return {
+            "disabled": self._disabled,
+            "offenders": dict(self.last_offenders),
+            "breachSinceMonotonic": self._breach_since,
+            "clearSinceMonotonic": self._clear_since,
+        }

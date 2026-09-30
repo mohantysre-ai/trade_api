@@ -33,6 +33,15 @@ class TestMarketStateStore:
         assert "RELIANCE" in result
         assert "INFY" not in result
 
+    def test_dirty_quotes_are_coalesced_by_symbol(self):
+        store = MarketStateStore()
+        store.update_quote(Quote(symbol="RELIANCE", ltp=2500.0))
+        store.update_quote(Quote(symbol="RELIANCE", ltp=2501.0))
+        dirty = store.drain_dirty_quotes()
+        assert len(dirty) == 1
+        assert dirty[0].ltp == 2501.0
+        assert store.drain_dirty_quotes() == []
+
     def test_thread_safety(self):
         store = MarketStateStore()
 
@@ -141,6 +150,18 @@ class TestSQLiteStore:
         result = store.load_view_snapshot("intraday")
         assert result is not None
         assert result["version"] == 3
+        assert result["payload"]["locked"] is True
+
+    def test_persist_view_snapshot_accepts_worker_snapshot(self, tmp_path):
+        store = SQLiteStore(tmp_path / "test.db")
+        store.persist_view_snapshot(
+            "swing",
+            {"version": 7, "updatedAt": 1234.0, "payload": {"locked": True}},
+        )
+        time.sleep(0.2)
+        result = store.load_view_snapshot("swing")
+        assert result is not None
+        assert result["version"] == 7
         assert result["payload"]["locked"] is True
 
     def test_enqueue_does_not_block(self, tmp_path):

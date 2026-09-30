@@ -7,6 +7,8 @@ ALLOWED_REST_PATHS = frozenset(
         "/NorenWClientAPI/TPSeries",
         "/NorenWClientAPI/SearchScrip",
         "/NSE_symbols.txt.zip",
+        "/NFO_symbols.txt.zip",
+        "/BFO_symbols.txt.zip",
     }
 )
 

@@ -183,6 +183,38 @@ def test_swing_eod_preserves_filled_trade_lifecycle_fields(v2_env, monkeypatch):
     assert report["attribution"]["triggered"] == 1
 
 
+def test_current_swing_eod_rebuilds_authoritative_cached_book(v2_env, monkeypatch):
+    from datetime import date
+    from app.services import eod_book_cache
+    from app.services.swing_v2.ledger import SwingLedger
+    from app.services.swing_v2.schemas import EventType
+
+    day = date(2026, 9, 23)
+    monkeypatch.setattr(v2_env["eod"], "_today_ist", lambda: day.isoformat())
+    monkeypatch.setattr(
+        eod_book_cache,
+        "load_book_cache",
+        lambda *_args, **_kwargs: {"picks": [{"symbol": "STALE"}]},
+    )
+    monkeypatch.setattr(eod_book_cache, "save_book_cache", lambda _day, _kind, payload: payload)
+    ledger = SwingLedger(v2_env["cfg"].load_config().ledger_path)
+    ledger.append(
+        idempotency_key="fresh-current-entry", decision_id="fresh-current-entry",
+        position_id="fresh-current-entry", symbol="FRESH", session_date=day.isoformat(),
+        event_type=EventType.FILL_COMPLETE, event_timestamp="2026-09-23T04:30:00Z",
+        payload={
+            "status": "OPEN", "executionStatus": "FILLED", "filledQty": 1,
+            "remainingQty": 1, "entryPrice": 100.0, "initialStop": 95.0,
+            "effectiveStop": 95.0, "deployedCapital": 100.0,
+            "realizedPnl": 0.0, "unrealizedPnl": 0.0, "totalPnl": 0.0,
+        },
+    )
+
+    report = v2_env["eod"].generate_swing_eod_report(day)
+
+    assert [row["symbol"] for row in report["picks"]] == ["FRESH"]
+
+
 def test_swing_ledger_initializes_each_path_once(monkeypatch, tmp_path):
     from app.services.swing_v2.ledger import SwingLedger
 

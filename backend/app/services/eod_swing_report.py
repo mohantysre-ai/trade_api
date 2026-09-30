@@ -773,14 +773,16 @@ def generate_swing_eod_report(
     from .swing_v2.authoritative import authoritative_eod_report, is_v2_authoritative
     from .eod_book_cache import load_book_cache, save_book_cache
 
-    as_of = for_date or date.fromisoformat(_today_ist())
+    today = date.fromisoformat(_today_ist())
+    as_of = for_date or today
+    v2_authoritative = is_v2_authoritative()
 
-    if not force:
+    if not force and (not v2_authoritative or as_of != today):
         cached = load_book_cache(as_of, "swing")
         if cached is not None:
             return cached
 
-    if is_v2_authoritative():
+    if v2_authoritative:
         report = authoritative_eod_report(as_of)
         positions = report.get("positions") or []
         picks = []

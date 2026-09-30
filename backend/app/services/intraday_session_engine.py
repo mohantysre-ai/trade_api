@@ -55,6 +55,9 @@ _CLOSE_FREEZE_LOCK = threading.Lock()
 # stale disk state and race a lost-update onto intraday_session.json.
 _SESSION_PERSIST_LOCK = threading.RLock()
 _SESSION_RESPONSE_LOCK = threading.Lock()
+# Cold builds run under this lock instead of the response lock so cache
+# publication/invalidation never waits behind a full session rebuild.
+_SESSION_COLD_COMPUTE_LOCK = threading.Lock()
 _SESSION_RESPONSE_CACHE: dict[str, Any] | None = None
 _SESSION_RESPONSE_CACHE_AT = 0.0
 _SESSION_RESPONSE_REFRESHING = False
@@ -4973,19 +4976,29 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
         now = time.monotonic()
         if _SESSION_SNAPSHOT_CACHE is not None and now - _SESSION_SNAPSHOT_CACHE_AT < _SESSION_SNAPSHOT_TTL:
             return copy.deepcopy(_SESSION_SNAPSHOT_CACHE)
-        with _SESSION_RESPONSE_LOCK:
-            now = time.monotonic()
-            if _SESSION_SNAPSHOT_CACHE is None:
-                _SESSION_SNAPSHOT_CACHE = copy.deepcopy(_compute_session(include_live=False))
-                _SESSION_SNAPSHOT_CACHE_AT = now
-            elif now - _SESSION_SNAPSHOT_CACHE_AT >= _SESSION_SNAPSHOT_TTL and not _SESSION_SNAPSHOT_REFRESHING:
-                _SESSION_SNAPSHOT_REFRESHING = True
-                threading.Thread(
-                    target=_refresh_session_snapshot_cache,
-                    name="intraday-session-snapshot-refresh",
-                    daemon=True,
-                ).start()
-            return copy.deepcopy(_SESSION_SNAPSHOT_CACHE)
+        with _SESSION_COLD_COMPUTE_LOCK:
+            with _SESSION_RESPONSE_LOCK:
+                now = time.monotonic()
+                if _SESSION_SNAPSHOT_CACHE is not None and now - _SESSION_SNAPSHOT_CACHE_AT < _SESSION_SNAPSHOT_TTL:
+                    return copy.deepcopy(_SESSION_SNAPSHOT_CACHE)
+            computed = copy.deepcopy(_compute_session(include_live=False))
+            with _SESSION_RESPONSE_LOCK:
+                if _SESSION_SNAPSHOT_CACHE is None:
+                    _SESSION_SNAPSHOT_CACHE = computed
+                    _SESSION_SNAPSHOT_CACHE_AT = time.monotonic()
+                now = time.monotonic()
+                if _SESSION_SNAPSHOT_CACHE is not None and now - _SESSION_SNAPSHOT_CACHE_AT < _SESSION_SNAPSHOT_TTL:
+                    return copy.deepcopy(_SESSION_SNAPSHOT_CACHE)
+            with _SESSION_RESPONSE_LOCK:
+                now = time.monotonic()
+                if _SESSION_SNAPSHOT_CACHE is not None and now - _SESSION_SNAPSHOT_CACHE_AT >= _SESSION_SNAPSHOT_TTL and not _SESSION_SNAPSHOT_REFRESHING:
+                    _SESSION_SNAPSHOT_REFRESHING = True
+                    threading.Thread(
+                        target=_refresh_session_snapshot_cache,
+                        name="intraday-session-snapshot-refresh",
+                        daemon=True,
+                    ).start()
+                return copy.deepcopy(_SESSION_SNAPSHOT_CACHE)
     disk_session = load_session()
     rollover_pending = _schedule_stale_session_rotation(disk_session)
 
@@ -5010,18 +5023,35 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
         now = time.monotonic()
         if _SESSION_RESPONSE_CACHE is not None and now - _SESSION_RESPONSE_CACHE_AT < ttl:
             return _with_rollover_state(_SESSION_RESPONSE_CACHE)
-        if _SESSION_RESPONSE_CACHE is None:
-            fallback = _compute_session(include_live=False, persist=False)
-            fallback["dataStale"] = True
-            fallback["liveRefreshPending"] = True
-            _SESSION_RESPONSE_CACHE = copy.deepcopy(fallback)
-            _SESSION_RESPONSE_CACHE_AT = 0.0
+    if _SESSION_RESPONSE_CACHE is None:
+        # Cold first read: rebuild outside the response lock. One worker
+        # computes while concurrent GETs wait here, never on the response
+        # lock, so cache publication/invalidation stays responsive.
+        with _SESSION_COLD_COMPUTE_LOCK:
+            with _SESSION_RESPONSE_LOCK:
+                now = time.monotonic()
+                if _SESSION_RESPONSE_CACHE is not None and now - _SESSION_RESPONSE_CACHE_AT < ttl:
+                    return _with_rollover_state(_SESSION_RESPONSE_CACHE)
+            if _SESSION_RESPONSE_CACHE is None:
+                fallback = _compute_session(include_live=False, persist=False)
+                fallback["dataStale"] = True
+                fallback["liveRefreshPending"] = True
+                with _SESSION_RESPONSE_LOCK:
+                    _SESSION_RESPONSE_CACHE = copy.deepcopy(fallback)
+                    _SESSION_RESPONSE_CACHE_AT = 0.0
+    with _SESSION_RESPONSE_LOCK:
+        now = time.monotonic()
+        if _SESSION_RESPONSE_CACHE is not None and now - _SESSION_RESPONSE_CACHE_AT < ttl:
+            return _with_rollover_state(_SESSION_RESPONSE_CACHE)
         if not _SESSION_RESPONSE_REFRESHING:
             _SESSION_RESPONSE_REFRESHING = True
             start_refresh = True
             started_gen = _SESSION_RESPONSE_GEN
-        result = copy.deepcopy(_SESSION_RESPONSE_CACHE)
-        result["liveRefreshPending"] = True
+        if _SESSION_RESPONSE_CACHE is None:
+            result = {"dataStale": True, "liveRefreshPending": True}
+        else:
+            result = copy.deepcopy(_SESSION_RESPONSE_CACHE)
+            result["liveRefreshPending"] = True
 
     if start_refresh:
         try:

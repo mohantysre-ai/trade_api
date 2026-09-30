@@ -81,11 +81,18 @@ def test_intraday_keeps_when_swing_contract_fails(monkeypatch):
 def test_reconcile_swing_untouched_intraday_blocks_on_conflict(tmp_path, monkeypatch):
     day = "2026-08-28"
     intra_path = tmp_path / "intraday_session.json"
-    swing_path = tmp_path / "swing_session.json"
     # Swing owns RELIANCE (locked)
-    swing_path.write_text(
-        '{"locked":true,"sessionDate":"2026-08-28","long":[{"symbol":"RELIANCE","direction":"BUY","closed":false}],"short":[]}',
-        encoding="utf-8",
+    monkeypatch.setenv("SWING_STRATEGY_AUTHORITY", "V2")
+    monkeypatch.setenv("SWING_V2_ENABLED", "true")
+    monkeypatch.setenv("SWING_V2_MODE", "PAPER")
+    monkeypatch.setattr(
+        "app.services.swing_v2.authoritative.get_authoritative_session",
+        lambda live=False: {
+            "sessionDate": "2026-08-28",
+            "locked": True,
+            "long": [{"symbol": "RELIANCE", "direction": "BUY", "closed": False, "sessionDate": "2026-08-28"}],
+            "closedPositions": [],
+        },
     )
     # Intraday does not own it
     intra_path.write_text(
@@ -93,7 +100,6 @@ def test_reconcile_swing_untouched_intraday_blocks_on_conflict(tmp_path, monkeyp
         encoding="utf-8",
     )
     monkeypatch.setattr(xbook, "_INTRADAY_SESSION_PATH", str(intra_path))
-    monkeypatch.setattr(xbook, "_SWING_SESSION_PATH", str(swing_path))
 
     result = xbook.reconcile_cross_book(day, persist=True)
     # No promotion from intraday to swing
@@ -105,9 +111,6 @@ def test_reconcile_swing_untouched_intraday_blocks_on_conflict(tmp_path, monkeyp
     assert result["swingOwned"] == ["RELIANCE"]
     # Intraday blocks empty (no intraday symbols)
     assert result["intradayBlocksSwing"] == []
-    # Swing file unchanged
-    saved_swing = __import__("json").loads(swing_path.read_text(encoding="utf-8"))
-    assert any(r.get("symbol") == "RELIANCE" for r in saved_swing.get("long", []))
 
 
 def test_v2_swing_ownership_survives_same_day_exit(monkeypatch):

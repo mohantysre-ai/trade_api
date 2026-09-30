@@ -27,6 +27,16 @@ def _row(result,index,context):
     if not x["legs"] and result.extra.get("contract"): x["legs"]=[{**result.extra["contract"],"side":"BUY","qty":1,"expiry":result.expiry}]
     return x
 
+def _open_book_positions(session_date=None):
+    """Load today's durable open positions so admission limits see live exposure."""
+    try:
+        from .runtime import load_positions
+        import datetime as _dt
+        day=session_date or _dt.date.today().isoformat()
+        return [p for p in load_positions(day) if str(p.get("status") or "").upper()=="OPEN"]
+    except Exception:
+        return []
+
 def build_index_options_radar_v2(snapshot):
     payload=snapshot if isinstance(snapshot,dict) else {}; candidates=[]
     # V2 no longer preselects by V1 regime. Every enabled legal structure is built;
@@ -44,6 +54,7 @@ def build_index_options_radar_v2(snapshot):
         candidates,
         max_positions=MAX_CONCURRENT_TRADES,
         max_per_sleeve=MAX_CONCURRENT_PER_SLEEVE,
+        open_positions=_open_book_positions(),
     )
     keys={(x["strategy_id"],x["index"]) for x in quant["selected"]}; selected=[c for c in candidates if (str(c.get("strategyId")),str(c.get("key"))) in keys]
     for c in selected:c["quantAuthority"]="INDEX_OPTIONS_QUANT_V2"

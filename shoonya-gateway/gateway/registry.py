@@ -15,6 +15,8 @@ _TRADING_COLS = ("tradingsymbol", "trading_symbol", "tsym")
 _EXCH_COLS = ("exchange", "exch")
 _INSTR_COLS = ("instrument", "series")
 _SERIES_RANK = {"-EQ": 0, "-BE": 1, "-BZ": 2}
+# Derivatives + index instruments accepted from the NFO/BFO symbol masters.
+_DERIVATIVE_INSTRUMENTS = frozenset({"", "INDEX", "FUTIDX", "FUTSTK", "OPTIDX", "OPTSTK"})
 
 
 def _pick(header: list[str], names: Iterable[str]) -> int | None:
@@ -34,17 +36,18 @@ def _rank(trading_symbol: str) -> int:
 
 
 class InstrumentRegistry:
-    def __init__(self) -> None:
+    def __init__(self, exchange: str = "NSE", *, derivatives: bool = False) -> None:
         self._by_symbol: dict[str, str] = {}
         self._by_token: dict[str, str] = {}
         self.loaded_on: date | None = None
-        self.exchange = "NSE"
+        self.exchange = exchange
+        self.derivatives = derivatives
 
     def __len__(self) -> int:
         return len(self._by_symbol)
 
     def load_text(self, text: str, *, today: date | None = None) -> int:
-        text = text.lstrip("﻿")
+        text = text.lstrip("")
         first = text.splitlines()[0] if text else ""
         delimiter = "|" if first.count("|") > first.count(",") else ","
         reader = csv.reader(io.StringIO(text), delimiter=delimiter)
@@ -63,18 +66,28 @@ class InstrumentRegistry:
             token = row[i_tok].strip()
             if not trading or not token:
                 continue
-            if i_exch is not None and len(row) > i_exch and row[i_exch].strip().upper() not in ("", "NSE"):
+            if i_exch is not None and len(row) > i_exch and row[i_exch].strip().upper() not in ("", self.exchange):
                 continue
-            if i_instr is not None and len(row) > i_instr and row[i_instr].strip().upper() not in ("", "EQ", "BE", "BZ"):
-                continue
-            rank = _rank(trading)
-            if rank == 99:
-                continue
+            if i_instr is not None and len(row) > i_instr:
+                instrument = row[i_instr].strip().upper()
+                if self.derivatives:
+                    if instrument not in _DERIVATIVE_INSTRUMENTS:
+                        continue
+                elif instrument not in ("", "EQ", "BE", "BZ"):
+                    continue
+            if self.derivatives:
+                rank = 0
+            else:
+                rank = _rank(trading)
+                if rank == 99:
+                    continue
             symbol = norm_symbol(trading)
             if symbol not in best or rank < best[symbol][0]:
                 best[symbol] = (rank, token)
         if not best:
-            raise ValueError("symbol master contained no NSE equity rows")
+            raise ValueError(
+                f"symbol master contained no {'derivative' if self.derivatives else 'equity'} rows"
+            )
         self._by_symbol = {sym: tok for sym, (_r, tok) in best.items()}
         self._by_token = {tok: sym for sym, tok in self._by_symbol.items()}
         self.loaded_on = today or datetime.now(IST).date()
@@ -106,3 +119,29 @@ class InstrumentRegistry:
             sym for sym, tok in other.items()
             if self._by_symbol.get(norm_symbol(sym)) not in (None, str(tok))
         )
+
+
+class RegistrySet:
+    """Per-exchange instrument registries: NSE cash, NFO/BFO derivatives."""
+
+    def __init__(self) -> None:
+        self.nse = InstrumentRegistry("NSE")
+        self.nfo = InstrumentRegistry("NFO", derivatives=True)
+        self.bfo = InstrumentRegistry("BFO", derivatives=True)
+
+    def for_exchange(self, exch: str) -> InstrumentRegistry | None:
+        exch = str(exch).strip().upper()
+        if exch == "NSE":
+            return self.nse
+        if exch == "NFO":
+            return self.nfo
+        if exch == "BFO":
+            return self.bfo
+        return None
+
+    def token_for(self, exch: str, symbol: str) -> str | None:
+        registry = self.for_exchange(exch)
+        return registry.token_for(symbol) if registry else None
+
+    def is_stale(self, today: date | None = None, max_age_days: int = 1) -> bool:
+        return any(reg.is_stale(today, max_age_days) for reg in (self.nse, self.nfo, self.bfo))

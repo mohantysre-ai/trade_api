@@ -59,27 +59,18 @@ def intraday_locked_symbols(day: str) -> set[str]:
 
 
 def swing_locked_symbols(day: str) -> set[str]:
-    # Keep this default in lock-step with swing_v2.config.  Otherwise an
-    # unset environment would route the Swing API through V2 while this
-    # cross-book guard silently read the obsolete V1 JSON book.
-    if os.getenv("SWING_STRATEGY_AUTHORITY", "V2").strip().upper() == "V2":
-        try:
-            from .swing_v2.authoritative import get_authoritative_session
+    from .swing_v2.authoritative import get_authoritative_session
 
-            session = get_authoritative_session(live=False)
-            owned: set[str] = set()
-            for row in [*(session.get("long") or []), *(session.get("closedPositions") or [])]:
-                if not isinstance(row, dict) or not (row.get("symbol") or row.get("ticker")):
-                    continue
-                session_day = str(row.get("sessionDate") or "")[:10]
-                closed_at = str(row.get("lastEventAt") or row.get("exitTimestamp") or "")[:10]
-                if not row.get("terminal") or session_day == str(day)[:10] or closed_at == str(day)[:10]:
-                    owned.add(str(row.get("symbol") or row.get("ticker") or "").upper().strip())
-            return owned
-        except Exception as exc:
-            log.error("V2 cross-book symbol read failed closed: %s", exc)
-            return set()
-    return locked_symbols_for_date(_read_json(_SWING_SESSION_PATH), day=day)
+    session = get_authoritative_session(live=False)
+    owned: set[str] = set()
+    for row in [*(session.get("long") or []), *(session.get("closedPositions") or [])]:
+        if not isinstance(row, dict) or not (row.get("symbol") or row.get("ticker")):
+            continue
+        session_day = str(row.get("sessionDate") or "")[:10]
+        closed_at = str(row.get("lastEventAt") or row.get("exitTimestamp") or "")[:10]
+        if not row.get("terminal") or session_day == str(day)[:10] or closed_at == str(day)[:10]:
+            owned.add(str(row.get("symbol") or row.get("ticker") or "").upper().strip())
+    return owned
 
 
 def filter_rows_excluding(

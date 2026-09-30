@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import httpx
@@ -27,8 +28,11 @@ class GuardedHttp:
         assert_allowed(path)
         response = await self._client.post(
             self._base + path,
-            json=payload,
-            headers={"Authorization": f"Bearer {access_token}"},
+            content=("jData=" + json.dumps(payload, separators=(",", ":"))).encode(),
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
         )
         response.raise_for_status()
         return response.json()

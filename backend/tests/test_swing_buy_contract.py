@@ -11,7 +11,9 @@ from app.services import swing_session
 
 @pytest.fixture(autouse=True)
 def _legacy_swing_authority(monkeypatch):
-    monkeypatch.setenv("SWING_STRATEGY_AUTHORITY", "V1")
+    monkeypatch.setenv("SWING_STRATEGY_AUTHORITY", "V2")
+    monkeypatch.setenv("SWING_V2_ENABLED", "true")
+    monkeypatch.setenv("SWING_V2_MODE", "PAPER")
 
 def qualified_row(symbol: str = "VALID", **overrides) -> dict:
     intraday = {
@@ -307,32 +309,6 @@ def test_invalid_locked_rows_are_scrubbed_but_audit_and_execution_are_preserved(
     assert audit["RHIM"]["originalSelection"] == rhim
     assert audit["RHIM"]["preservedExecution"]["realizedPnl"] == -6124.4
     assert scrubbed["preservedExecutionHistory"][0]["symbol"] == "RHIM"
-
-
-def test_concurrent_gets_cannot_alter_persisted_portfolio(monkeypatch, tmp_path: Path):
-    path = tmp_path / "swing_session.json"
-    payload = {
-        "locked": True,
-        "sessionDate": "2026-08-12",
-        "long": [qualified_row()],
-        "short": [],
-        "counts": {"long": 1, "short": 0, "total": 1},
-    }
-    swing_session._atomic_write(str(path), payload)
-    before = path.read_bytes()
-    monkeypatch.setattr(swing_session, "_SWING_SESSION_PATH", str(path))
-
-    with ThreadPoolExecutor(max_workers=20) as pool:
-        results = list(pool.map(lambda _: swing_session.get_swing_session(live=False), range(40)))
-
-    assert path.read_bytes() == before
-    assert all(result["locked"] == payload["locked"] for result in results)
-    assert all(result["sessionDate"] == payload["sessionDate"] for result in results)
-    assert all(result["long"] == payload["long"] for result in results)
-    assert all(result["short"] == payload["short"] for result in results)
-    assert all(result["counts"] == payload["counts"] for result in results)
-    results[0]["long"][0]["symbol"] = "MUTATED"
-    assert results[1]["long"][0]["symbol"] == "VALID"
 
 
 def test_day_move_over_6pct_is_hard_rejected():

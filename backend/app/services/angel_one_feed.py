@@ -1020,6 +1020,12 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
                 "error": payload.get("error") or "Live refresh produced no payload.",
                 "reason": reason,
             }
+        # A refresh that skipped swing history would otherwise clobber the
+        # swing-ready snapshot and fail-close the V2 hunt with zero rows.
+        # Carry forward the prior snapshot's swingV2 facts for such refreshes;
+        # they are derived from daily history and remain valid intraday.
+        if not payload.get("swingV2DataStatus") and isinstance(prior, dict):
+            payload.update({key: value for key, value in prior.items() if key.startswith("swingV2")})
         if prior and prior.get("llmLockedForDate") and not payload.get("llmLockedForDate"):
             payload["llmLockedForDate"] = prior.get("llmLockedForDate")
         payload.setdefault("selectionMeta", {})
@@ -3119,10 +3125,12 @@ def _fetch_quote_chunk(
             )
         return fetched
 
+    if os.getenv("ANGEL_BATCH_LTP_FALLBACK", "0").strip().lower() not in {"1", "true", "yes"}:
+        _angel_stat("marketdata", "failedBatchesTotal")
+        return fetched
+
     for inst in chunk:
         if _angel_cooldown_active("ltp"):
-            # Fail fast while a rate-limit pause is active; these fallback
-            # calls are best-effort for a batch that already failed once.
             break
         try:
             with _angel_ltp_gate(gate_deadline):

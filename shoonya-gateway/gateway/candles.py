@@ -6,7 +6,7 @@ from typing import Any,Callable
 from .auth import AuthManager
 from .config import IST,Settings
 from .http import GuardedHttp
-from .registry import InstrumentRegistry
+from .registry import InstrumentRegistry,RegistrySet
 TPSERIES="/NorenWClientAPI/TPSeries"
 INTERVALS={"ONE_MINUTE":1,"FIVE_MINUTE":5,"FIFTEEN_MINUTE":15,"THIRTY_MINUTE":30,"ONE_HOUR":60}
 class TokenBucket:
@@ -44,18 +44,21 @@ class CandleBroker:
         now=self._clock()
         while self._calls and now-self._calls[0]>60:self._calls.popleft()
         return len(self._calls)<self._s.candle_max_per_min
-    async def fetch(self,symbol,interval,start_ts,end_ts):
+    async def fetch(self,symbol,interval,start_ts,end_ts,exch="NSE"):
         intrv=INTERVALS.get(interval)
         if intrv is None:return {"status":"UNSUPPORTED","rows":[]}
-        if not self._auth.authenticated or self._auth.session is None:return {"status":"AUTH_REQUIRED","rows":[]}
-        token=self._registry.token_for(symbol)
+        exch=str(exch).strip().upper()
+        registry=self._registry.for_exchange(exch) if isinstance(self._registry,RegistrySet) else (self._registry if exch=="NSE" else None)
+        if registry is None:return {"status":"UNSUPPORTED_EXCHANGE","rows":[]}
+        token=registry.token_for(symbol)
         if not token:return {"status":"UNKNOWN_SYMBOL","rows":[]}
+        if not self._auth.authenticated or self._auth.session is None:return {"status":"AUTH_REQUIRED","rows":[]}
         if self.circuit_open() or not self._minute_budget_ok():return {"status":"RATE_LIMITED","rows":[]}
         if not await self._bucket.acquire(3.):return {"status":"RATE_LIMITED","rows":[]}
         session=self._auth.session
         async with self._serial:
             self._calls.append(self._clock())
-            try:payload=await self._http.post_json(TPSERIES,{"uid":session.uid,"exch":"NSE","token":token,"st":str(int(start_ts)),"et":str(int(end_ts)),"intrv":str(intrv)},session.access_token)
+            try:payload=await self._http.post_json(TPSERIES,{"uid":session.uid,"exch":exch,"token":token,"st":str(int(start_ts)),"et":str(int(end_ts)),"intrv":str(intrv)},session.access_token)
             except Exception as exc:return {"status":"ERROR","rows":[],"error":type(exc).__name__}
         if isinstance(payload,dict):
             message=str(payload.get("emsg") or "")

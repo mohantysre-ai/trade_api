@@ -72,7 +72,20 @@ class StandbyFeedRunner:
             prim = primary.get(symbol) or {}
             prim_ltp = prim.get("ltp")
             prim_age = prim.get("dataAge")
-            if isinstance(ltp, (int, float)) and isinstance(prim_ltp, (int, float)) and prim_ltp and prim_age is not None and prim_age <= 120.0:
+            # Only measure cross-lane disagreement while the primary is still
+            # live. Against a primary that has already gone stale the two feeds
+            # legitimately disagree simply because the market moved, and
+            # counting that as divergence would disable the standby lane during
+            # exactly the outage it exists to cover.
+            primary_is_live = (
+                prim_age is not None and prim_age <= self.config.promote_after_s
+            )
+            if (
+                isinstance(ltp, (int, float))
+                and isinstance(prim_ltp, (int, float))
+                and prim_ltp
+                and primary_is_live
+            ):
                 deltas[symbol] = abs(ltp - prim_ltp) / prim_ltp * 100.0
             if self.config.promotable and not self.divergence.disabled:
                 outcome = state.apply_standby_tick(

@@ -303,6 +303,29 @@ def _fetch_candles_with_retry(
     return [], last_error
 
 
+def _fetch_shoonya_index_candles(
+    config: dict[str, Any],
+    start: datetime,
+    end: datetime,
+) -> tuple[list[list[Any]], str | None]:
+    """Hot-standby backup for index spot structure candles via the Shoonya gateway.
+
+    Resolves the index through the gateway's NFO index rows using the official
+    spot symbol (e.g. ``Nifty 50`` -> token 26000). Fails closed to empty.
+    """
+    try:
+        from .market_data_provider import fetch_shoonya_candles
+    except Exception:
+        return [], "shoonya_provider_unavailable"
+    try:
+        rows = fetch_shoonya_candles(
+            str(config["spotSymbol"]), "FIVE_MINUTE", start, end, exchange="NFO"
+        )
+    except Exception as exc:
+        return [], f"SHOONYA:{type(exc).__name__}"
+    return (rows, None) if rows else ([], "SHOONYA_EMPTY")
+
+
 def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     key = config["key"]
     try:
@@ -382,6 +405,13 @@ def _fetch_one_index(client: Any, rows: list[dict[str, Any]], config: dict[str, 
                 client, config["exchange"], config["spotToken"], history_start, now_ist, attempts=1,
             )
         structure_source = "INDEX_SPOT"
+        if not candles:
+            # Hot-standby backup: index spot candles via the Shoonya gateway
+            # (NorenTPSeries). Only used when Angel returned nothing.
+            shoonya_rows, shoonya_error = _fetch_shoonya_index_candles(config, history_start, now_ist)
+            if shoonya_rows:
+                candles, candle_error = shoonya_rows, None
+                structure_source = "INDEX_SPOT_SHOONYA"
         if not candles and future:
             candles, future_error = _fetch_candles_with_retry(
                 client, str(future.get("exch_seg") or config["segment"]), str(future.get("token") or ""), history_start, now_ist, attempts=1,

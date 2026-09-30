@@ -6,7 +6,7 @@ and EOD routes.
 """
 from __future__ import annotations
 import json, os, copy, threading, time as monotonic_time
-from collections import defaultdict
+from collections import defaultdict  # noqa: F401  (kept for reporting helpers)
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -19,7 +19,7 @@ from .ledger import SwingLedger, materialize_position
 from .reporting import ledger_eod_report
 from .schemas import EventType
 IST=ZoneInfo("Asia/Kolkata"); _LOCK=threading.RLock(); _DATA_REFRESH_LOCK=threading.Lock(); _SESSION_CACHE_LOCK=threading.Lock()
-_FINAL_REFRESH_MARGIN_SECONDS=int(os.getenv("SWING_FINAL_REFRESH_MARGIN_SECONDS","90")); _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0.0; _SESSION_READ_TTL=float(os.getenv("SWING_SESSION_READ_TTL","2")); _EOD_READ_CACHE={}; _SWING_SCAN_INTERVAL_SECONDS=float(os.getenv("SWING_SCAN_INTERVAL_SECONDS","300"))
+_FINAL_REFRESH_MARGIN_SECONDS=int(os.getenv("SWING_FINAL_REFRESH_MARGIN_SECONDS","90")); _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0.0; _SESSION_READ_TTL=float(os.getenv("SWING_SESSION_READ_TTL","2")); _EOD_READ_CACHE={}; _SWING_SCAN_INTERVAL_SECONDS=float(os.getenv("SWING_SCAN_INTERVAL_SECONDS","172800"))
 _RETRYABLE_FINAL_BLOCK_REASONS={"FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW","UNIVERSE_COVERAGE_BELOW_99PCT","UNIVERSE_COVERAGE_BELOW_90PCT","REGIME_UNRATED","SWING_V2_DATA_NOT_READY"}
 def is_v2_authoritative(config=None): return (config or load_config()).paper_authoritative
 def _state_path():
@@ -47,12 +47,17 @@ def _snapshot():
  from ..market_snapshot_store import readable_market_snapshot_path
  return _read_json(readable_market_snapshot_path())
 def _clock(value): h,m=(int(x) for x in value.split(":")); return time(h,m)
+_STATE_META_KEYS={"decisionId","positionId","sessionDate","symbol","lastEventType","lastEventAt","terminal"}
+def _state_event(state):
+  """Rebuild a single synthetic ledger event from a checkpointed position state.
+
+  materialize_position() applied to this event reproduces the checkpointed state
+  exactly, so every call site can keep consuming grouped events.
+  """
+  return {"decisionId":state.get("decisionId"),"positionId":state.get("positionId"),"symbol":state.get("symbol"),"sessionDate":state.get("sessionDate"),"eventType":state.get("lastEventType"),"eventTimestamp":state.get("lastEventAt"),"payload":{k:v for k,v in state.items() if k not in _STATE_META_KEYS}}
 def _position_groups(ledger):
- g=defaultdict(list)
- for e in ledger.events():
-  if e.get("positionId"): g[str(e["positionId"])].append(e)
- return g
-def _positions(ledger): return [materialize_position(e) for e in _position_groups(ledger).values()]
+  return {str(pid):[_state_event(s)] for pid,s in ledger.positions_state().items()}
+def _positions(ledger): return [dict(s) for s in ledger.positions_state().values()]
 def _position_row(position,mark=None):
  entry=float(position.get("entryPrice") or position.get("decisionPrice") or 0); qty=int(position.get("filledQty") or position.get("qty") or 0); remaining=int(position.get("remainingQty") if position.get("remainingQty") is not None else qty)
  try: age=session_age(date.fromisoformat(str(position.get("sessionDate"))[:10]),datetime.now(IST).date())
@@ -91,8 +96,24 @@ def _entry_hunt_diagnostics(scan,snapshot):
  regime=str(snapshot.get("swingV2Regime") or "")
  f={**f,"evaluated":f.get("evaluated",f.get("evaluated_count",feature_rows or f.get("universe"))),"qualified":f.get("qualified",f.get("qualified_out",(scan or {}).get("qualifiedCount",0))),"candleMetrics":f.get("candleMetrics",f.get("fresh_count",f.get("freshData",short_momentum_ready_rows))),"candleTimeframe":f.get("candleTimeframe","1H")}
  return {**f,"universeSize":universe_size or None,"featureRows":feature_rows,"historyReadyRows":history_ready_rows,"shortMomentumReadyRows":short_momentum_ready_rows,"historyReadyRatio":round(history_ready_ratio,4),"universeCoverage":round(universe_coverage,4),"regime":regime or None,"volumeScreened":feature_rows or universe_size or None,"evaluated":f.get("evaluated",feature_rows or f.get("universe")),"displayPool":len(stocks) if stocks else None,"swingUniverse":"Total Market 750","corePriorityUniverse":"Top 500 by liquidity","microcapPolicy":"SATELLITE · 20% priority · max 1 position","candleTimeframe":"1H"}
+def _has_backfill_entry(current):
+    backfill = current.get("backfill") if isinstance(current.get("backfill"), list) else []
+    return any(isinstance(entry, dict) and entry.get("symbol") for entry in backfill)
+
+
+def _session_scan_due(current, now):
+    last_scan = current.get("lastScanAt")
+    if not last_scan:
+        return True
+    try:
+        elapsed = (now - datetime.fromisoformat(str(last_scan).replace("Z", "+00:00")).astimezone(IST)).total_seconds()
+        return elapsed >= _SWING_SCAN_INTERVAL_SECONDS or _has_backfill_entry(current)
+    except Exception:
+        return True
+
+
 def _session(scan=None,*,now=None,market=None):
- cfg=load_config(); now=(now or datetime.now(timezone.utc)).astimezone(IST); day=now.date().isoformat(); market=market if isinstance(market,dict) else _market_day_status(now); trading_day=bool(market.get("isTradingDay")); ledger=SwingLedger(cfg.ledger_path); positions=_positions(ledger); snapshot=_snapshot(); marks=_marks(snapshot); active=[r for r in positions if r.get("positionId") and not r.get("terminal")]; closed=[]
+ cfg=load_config(); now=(now or datetime.now(timezone.utc)).astimezone(IST); day=now.date().isoformat(); market=market if isinstance(market,dict) else _market_day_status(now); trading_day=bool(market.get("isTradingDay")); ledger=SwingLedger(cfg.ledger_path); positions=_positions(ledger); snapshot=_snapshot(); marks=_marks(snapshot);   active=[r for r in positions if r.get("positionId") and not r.get("terminal") and str(r.get("sessionDate") or "")==day]; closed=[]
  for r in positions:
   if not r.get("terminal"): continue
   try: cd=datetime.fromisoformat(str(r.get("lastEventAt") or "").replace("Z","+00:00")).astimezone(IST).date().isoformat()
@@ -115,6 +136,8 @@ def _refresh_snapshot(reason,*,deadline=None):
  if not isinstance(result,dict) or result.get("success") is not True:
   snapshot=dict(snapshot); snapshot["swingV2RefreshError"]=result.get("error") if isinstance(result,dict) else "unknown_refresh_failure"
  return snapshot
+def _refresh_is_pending(snapshot):
+ return str(snapshot.get("swingV2RefreshError") or "").strip().lower() in {"market_refresh_already_running","live_refresh_already_running"}
 def _v2_readiness(snapshot,cfg):
  status=snapshot.get("swingV2DataStatus")
  status=status if isinstance(status,dict) else {}
@@ -177,19 +200,24 @@ def _quote_observations(symbols,now):
  stamp=datetime.now(timezone.utc).isoformat(); out={}
  for s,q in quotes.items():
   if not isinstance(q,dict):continue
-  try: ask=float(q.get("ltp") or q.get("open") or 0); depth=int(float(q.get("tradeVolume") or 0))
+  try: ask=float(q.get("ask") or q.get("ltp") or q.get("open") or 0); mark=float(q.get("ltp") or q.get("ask") or q.get("open") or 0); depth=int(float(q.get("askDepth") or q.get("tradeVolume") or q.get("volume") or 0))
   except:continue
-  if ask>0: out[str(s).upper()]={"timestamp":stamp,"ask":ask,"askDepth":depth,"open":float(q.get("open") or ask),"high":float(q.get("high") or ask),"low":float(q.get("low") or ask),"close":float(q.get("close") or ask),"source":str(q.get("quoteProvider") or "NEUTRAL_FEED")}
+  if ask>0: out[str(s).upper()]={"timestamp":stamp,"ask":ask,"askDepth":depth,"open":float(q.get("open") or mark),"high":float(q.get("high") or mark),"low":float(q.get("low") or mark),"close":float(q.get("close") or mark),"source":str(q.get("quoteProvider") or "NEUTRAL_FEED")}
  return out
  def _refresh_final_candidate_facts(snapshot,scan,now): return snapshot
 def _fill_locked_orders(ledger,now,cfg):
   locked=[]
   for _,events in _position_groups(ledger).items():
-   s=materialize_position(events)
-   if not s.get("terminal") and not s.get("entryTimestamp") and str(s.get("lastEventType") or "")=="POSITION_LOCKED": locked.append(s)
-  obs=_quote_observations([s["symbol"] for s in locked],now); expiry=datetime.combine(now.astimezone(IST).date(),_clock(cfg.order_expire_ist),tzinfo=IST)
+    s=materialize_position(events)
+    if not s.get("terminal") and not s.get("entryTimestamp") and str(s.get("lastEventType") or "")=="POSITION_LOCKED": locked.append(s)
+  if not locked:
+    return
+  obs=_quote_observations([s["symbol"] for s in locked],now)
+  expiry=datetime.combine(now.astimezone(IST).date(),_clock(cfg.order_expire_ist),tzinfo=IST)
   for c in locked:
-   o=obs.get(str(c.get("symbol") or "").upper()); execute_paper_order(ledger,c,[o] if o else [],expiry=expiry) if o or now.astimezone(IST)>=expiry else None
+    o=obs.get(str(c.get("symbol") or "").upper())
+    if o:
+      execute_paper_order(ledger,c,[o],expiry=expiry)
 def _manage_open_positions(ledger,now,cfg):
   opens=[]; terminalized=0; terminalized_symbols=[]
   for pid,events in _position_groups(ledger).items():
@@ -278,10 +306,7 @@ def run_authoritative_cycle(*,now=None,force=False):
    terminalized, terminalized_symbols = _manage_open_positions(ledger,now,cfg); current=_read_json(_state_path()); day=now.date().isoformat(); current=current if str(current.get("sessionDate") or "")==day else {"sessionDate":day,"selectionFinalized":False}; local=now.time().replace(tzinfo=None)
    from .market_data import intraday_occupied_symbols
    occupied=intraday_occupied_symbols(day); existing=[r for r in _positions(ledger) if not r.get("terminal")]; start,freeze,expiry=(_clock(cfg.decision_start_ist),_clock(cfg.decision_freeze_ist),_clock(cfg.order_expire_ist)); scan=current.get("scan") if isinstance(current.get("scan"),dict) else None
-   due=True
-   if current.get("lastScanAt"):
-    try: due=(now-datetime.fromisoformat(str(current["lastScanAt"]).replace("Z","+00:00")).astimezone(IST)).total_seconds()>=_SWING_SCAN_INTERVAL_SECONDS
-    except: pass
+   due=_session_scan_due(current, now)
    if terminalized>0:
     due=True
     replaced=_try_replace_stopped(ledger,cfg,now,terminalized_symbols,existing,occupied)
@@ -289,17 +314,22 @@ def run_authoritative_cycle(*,now=None,force=False):
   if start<=local<freeze and not current.get("selectionFinalized") and due:
    snapshot=_refresh_snapshot("swing_v2_decision_scan")
    if not _v2_snapshot_ready(snapshot,cfg):
-    scan=_scan_not_ready(snapshot,cfg)
+    if not (_refresh_is_pending(snapshot) and isinstance(scan,dict)):
+     scan=_scan_not_ready(snapshot,cfg)
    else:
     scan=build_from_market_snapshot(snapshot,final_lock=True,persist_events=True,occupied_symbols=occupied,existing_positions=existing,now=now)
    current.update(scan=scan,lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=snapshot.get("swingV2RefreshError"))
   elif freeze<=local and (not current.get("selectionFinalized") or (_retryable_final_block(scan) and due and local<=expiry)):
    snapshot=_refresh_snapshot("swing_v2_final_lock")
    if not _v2_snapshot_ready(snapshot,cfg):
-    scan=_scan_not_ready(snapshot,cfg)
+    refresh_pending=_refresh_is_pending(snapshot)
+    if not (refresh_pending and isinstance(scan,dict)):
+     scan=_scan_not_ready(snapshot,cfg)
    else:
+    refresh_pending=False
     scan=build_from_market_snapshot(snapshot,final_lock=True,persist_events=local<=expiry,occupied_symbols=occupied,existing_positions=existing,now=now)
-   current.update(scan=scan,selectionFinalized=True,finalizedAt=now.astimezone(timezone.utc).isoformat(),lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=snapshot.get("swingV2RefreshError"))
+   current.update(scan=scan,selectionFinalized=not refresh_pending,lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=snapshot.get("swingV2RefreshError"))
+   if not refresh_pending: current["finalizedAt"]=now.astimezone(timezone.utc).isoformat()
   # A qualified candidate is locked and paper-filled during the hunt window;
   # 15:10 is only the decision freeze, never a fill-start time. Entry price is
   # immutable in the ledger; subsequent cycles update marks/exits only.

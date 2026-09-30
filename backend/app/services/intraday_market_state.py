@@ -36,6 +36,12 @@ LIVE_WS_SOURCES = frozenset({SOURCE_WS, SOURCE_STANDBY_WS})
 FRESH_SECONDS = float(os.getenv("INTRADAY_WS_FRESH_SECONDS", "8"))
 STALE_SECONDS = float(os.getenv("INTRADAY_WS_STALE_SECONDS", "30"))
 RECOVERY_SECONDS = float(os.getenv("INTRADAY_WS_RECOVERY_SECONDS", "60"))
+# How long the last accepted price stays a usable reference for the tight
+# handoff consistency check. Past this the market has plainly moved while this
+# lane was blind, so the standby print is judged by the price band instead.
+HANDOFF_REFERENCE_SECONDS = float(
+    os.getenv("INTRADAY_STANDBY_HANDOFF_REFERENCE_SECONDS", "30")
+)
 # Angel's SmartWebSocketV2 silently drops tokens beyond its per-request limit
 # instead of erroring — a 250-token chunk (F4.1/F4.2) left up to 250 of the
 # 750-symbol universe unsubscribed with no observable failure. 50 matches the
@@ -183,6 +189,7 @@ def _new_symbol_row(universe_row: dict[str, Any] | None) -> dict[str, Any]:
         "tradeVolume": None,
         "tickCount": 0,
         "bar5m": None,
+        "primaryLastMono": 0.0,
     }
 
 
@@ -261,12 +268,25 @@ class IntradayMarketState:
 
     # ------------------------------------------------------------------- ticks
 
-    def apply_tick(self, token: str, exchange_type: int, message: Any) -> str:
+    def apply_tick(
+        self,
+        token: str,
+        exchange_type: int,
+        message: Any,
+        *,
+        promote_after_s: float = FRESH_SECONDS,
+    ) -> str:
         """Atomic latest-wins tick update.
 
-        Returns one of: ``new`` / ``duplicate`` / ``older`` / ``invalid``.
-        The full row is updated under one lock; readers never observe a
-        half-updated row.
+        Returns one of: ``new`` / ``duplicate`` / ``older`` / ``invalid`` /
+        ``interim``. The full row is updated under one lock; readers never
+        observe a half-updated row.
+
+        When the standby lane already owns the symbol this lane is only allowed
+        to take authority back if it is demonstrably keeping up: either the
+        standby has gone stale, or this lane's own observed tick gap is within
+        ``promote_after_s``. Without that test a merely slow primary oscillates
+        with the standby on every cycle.
         """
         token = str(token or "")
         if not isinstance(message, dict) or not token:
@@ -336,6 +356,27 @@ class IntradayMarketState:
             prev_close = _number(message.get("closed_price"), scale=100.0)
             if prev_close and prev_close > 0:
                 row["prevClose"] = prev_close
+
+            # Handoff hysteresis. ``primaryLastMono`` is written only here, so it
+            # keeps measuring this lane's real tick cadence even while the
+            # standby lane owns the row.
+            previous_primary = row.get("primaryLastMono") or 0.0
+            observed_gap = (mono - previous_primary) if previous_primary else None
+            row["primaryLastMono"] = mono
+            if row.get("source") == SOURCE_STANDBY_WS:
+                received = row.get("receivedMonotonic") or 0.0
+                standby_age = (mono - received) if received else None
+                standby_fresh = (
+                    standby_age is not None and standby_age <= promote_after_s
+                )
+                if (
+                    standby_fresh
+                    and observed_gap is not None
+                    and observed_gap > promote_after_s
+                ):
+                    _metric("ws_tick_interim_standby_holds")
+                    return "interim"
+
             row.update(
                 {
                     "ltp": ltp,
@@ -523,6 +564,7 @@ class IntradayMarketState:
         promote_after_s: float = FRESH_SECONDS,
         band_pct: float = 25.0,
         handoff_divergence_pct: float = 1.0,
+        handoff_reference_s: float = HANDOFF_REFERENCE_SECONDS,
     ) -> str:
         if not isinstance(quote, dict):
             _metric("standby_tick_invalid")
@@ -561,14 +603,38 @@ class IntradayMarketState:
                 _metric("standby_tick_rejected_primary_fresh")
                 return "rejected_primary_fresh"
             prev_close = row.get("prevClose")
-            if prev_close and prev_close > 0:
-                band = abs(ltp - float(prev_close)) / float(prev_close) * 100.0
-                if band > band_pct:
-                    _metric("standby_tick_rejected_band")
-                    return "rejected_band"
             prior_ltp = row.get("ltp")
-            if primary_age is not None and primary_age <= 120.0 and prior_ltp and float(prior_ltp) > 0:
-                divergence = abs(ltp - float(prior_ltp)) / float(prior_ltp) * 100.0
+            prior_ltp = float(prior_ltp) if prior_ltp and float(prior_ltp) > 0 else None
+            if prev_close and prev_close > 0:
+                outside_prev_close = (
+                    abs(ltp - float(prev_close)) / float(prev_close) * 100.0
+                    > band_pct
+                )
+                if outside_prev_close:
+                    # The band exists to catch corrupt data, not a real move. A
+                    # symbol that has legitimately traded far from the session
+                    # open is still fail-able-over, so the price is also judged
+                    # against the last price this book actually accepted.
+                    if prior_ltp is None or (
+                        abs(ltp - prior_ltp) / prior_ltp * 100.0 > band_pct
+                    ):
+                        _metric("standby_tick_rejected_band")
+                        return "rejected_band"
+            reference_age = primary_age
+            reference_window = max(float(handoff_reference_s), float(promote_after_s))
+            reference_is_live = (
+                reference_age is not None and reference_age <= reference_window
+            )
+            if prior_ltp is not None and reference_is_live:
+                # Consistency against the last accepted price, not against the
+                # primary's last print. Comparing to a primary that is already
+                # past the freshness SLA can only ever fire on a market that
+                # moved during the silence, and because a veto leaves the
+                # reference unchanged it can never recover: the standby lane
+                # would be frozen out for the rest of the session. Past
+                # ``handoff_reference_s`` the reference is no longer live and
+                # the price band above is the admissibility test instead.
+                divergence = abs(ltp - prior_ltp) / prior_ltp * 100.0
                 if divergence > handoff_divergence_pct:
                     _metric("standby_tick_quarantined_divergence")
                     return "quarantined_divergence"

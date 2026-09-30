@@ -33,6 +33,23 @@ def test_manage_open_positions_returns_empty_result_without_open_positions(monke
     assert result == (0, [])
 
 
+def test_quote_observation_uses_ltp_when_ohlc_is_missing(monkeypatch):
+    import app.services.swing_v2.market_data as market_data
+
+    monkeypatch.setattr(
+        market_data,
+        "latest_quotes",
+        lambda _symbols: {"AAA": {"ltp": 94.0, "ask": 96.0}},
+    )
+
+    quote = auth._quote_observations(
+        ["AAA"], datetime(2026, 9, 21, 6, 0, tzinfo=timezone.utc)
+    )["AAA"]
+
+    assert quote["ask"] == 96.0
+    assert quote["low"] == quote["close"] == 94.0
+
+
 def test_hunt_window_fills_locked_orders_before_1510(monkeypatch, tmp_path):
     calls = []
     cfg = type("Cfg", (), {

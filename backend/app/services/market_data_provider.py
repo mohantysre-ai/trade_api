@@ -235,8 +235,15 @@ def fetch_shoonya_candles(
     interval: str,
     fromdate: datetime,
     todate: datetime,
+    exchange: str = "NSE",
 ) -> list[list[Any]]:
-    """Fetch targeted Shoonya standby candles in the common candle-row shape."""
+    """Fetch targeted Shoonya standby candles in the common candle-row shape.
+
+    ``exchange`` selects the symbol master used by the gateway to resolve the
+    token: NSE for cash equity + index spot, NFO/BFO for option/future
+    contracts. Empty when the gateway is unconfigured or the symbol does not
+    resolve — never fabricate bars.
+    """
     if not shoonya_gateway_configured() or not symbol:
         return []
     try:
@@ -252,6 +259,7 @@ def fetch_shoonya_candles(
         str(interval).upper(),
         int(fromdate.timestamp()),
         int(todate.timestamp()),
+        exchange=str(exchange).upper(),
     )
     if not isinstance(result, dict) or result.get("status") != "OK":
         return []

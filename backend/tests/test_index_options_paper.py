@@ -2,6 +2,8 @@ import time
 import json
 from datetime import datetime, timedelta
 
+import app.services.index_options_paper as paper
+
 from app.services.angel_index_options import IST_ZONE
 from app.services.angel_index_stream import ANGEL_INDEX_STREAM
 from app.services.index_options_paper import (
@@ -17,6 +19,99 @@ from app.services.index_options_paper import (
 from app.services.index_options_engine import can_reenter_index_option, SELL_SLEEVE
 
 SESSION_DATE = datetime(2027, 6, 15, 11, 0, tzinfo=IST_ZONE)
+
+
+def test_locked_mark_falls_back_to_shoonya_before_option_chains(monkeypatch):
+    position = {
+        "index": "NIFTY",
+        "symbol": "NIFTY27JUN25000CE",
+        "token": "123",
+        "exchange": "NFO",
+        "expiry": "2027-06-24",
+        "strike": 25000,
+        "direction": "CALL",
+    }
+
+    class Client:
+        def fetch_batch_quotes(self, _instruments):
+            return {}
+
+    monkeypatch.setattr(paper, "_stream_marks", lambda instruments, max_age_seconds: ({}, {}, instruments))
+    monkeypatch.setattr(paper, "_shoonya_marks", lambda instruments: (
+        {instruments[0].tradingsymbol: 81.0},
+        {instruments[0].tradingsymbol: {"source": "SHOONYA_WEBSOCKET_LOCKED_CONTRACT"}},
+    ))
+    monkeypatch.setattr(paper, "_chain_marks", lambda *_args: (_ for _ in ()).throw(AssertionError("chain fallback must not run")))
+    marks, depth, _error, pipeline = paper._locked_marks(Client(), [position])
+    assert marks[position["symbol"]] == 81.0
+    assert depth[position["symbol"]]["source"] == "SHOONYA_WEBSOCKET_LOCKED_CONTRACT"
+    assert pipeline["shoonyaMarks"] == 1
+
+
+def test_shoonya_locked_mark_rejects_stale_quote(monkeypatch):
+    instrument = paper.Instrument("PAPER:NIFTY27JUN25000CE", "NFO", "NIFTY27JUN25000CE", "123", "NIFTY27JUN25000CE")
+
+    class Config:
+        promotable = True
+
+    class Gateway:
+        def __init__(self, _cfg): pass
+        def pin(self, *_args, **_kwargs): return True
+        def quotes(self, _symbols):
+            return {instrument.tradingsymbol: {"ltp": 79.0, "ageMs": (paper._mark_stale_seconds() + 1) * 1000}}
+
+    monkeypatch.setattr("app.services.standby_feed.config.StandbyConfig.from_env", lambda: Config())
+    monkeypatch.setattr("app.services.standby_feed.gateway_client.GatewayClient", Gateway)
+    marks, depth = paper._shoonya_marks([instrument])
+    assert marks == {}
+    assert depth == {}
+
+
+def test_executable_bid_crossing_stop_closes_even_when_ltp_is_above_stop(tmp_path, monkeypatch):
+    monkeypatch.setenv("INDEX_OPTIONS_PAPER_BOOK_FILE", str(tmp_path / "paper.json"))
+    now = datetime(2027, 6, 15, 11, 0, tzinfo=IST_ZONE)
+    reconcile_paper_book(_radar(100), now=now)
+    _inject_tick("12345", 82.0, bid=79.0, ask=82.5)
+    try:
+        book = reconcile_paper_book(_radar(82), now=now + timedelta(minutes=1))
+    finally:
+        _clear_tick("12345")
+    assert book["open"] == []
+    assert book["closed"][0]["exitReason"] == "INITIAL_STOP"
+    assert book["closed"][0]["exitPremium"] == 79.0
+
+
+def test_chain_fallback_uses_exact_strike_and_option_type(monkeypatch):
+    position = {
+        "index": "NIFTY",
+        "symbol": "NIFTY27JUN25000CE",
+        "token": "123",
+        "exchange": "NFO",
+        "expiry": "2027-06-24",
+        "strike": 25000,
+        "direction": "CALL",
+    }
+    monkeypatch.setattr(
+        "app.services.market_data_provider.fetch_nse_option_chain",
+        lambda *_args, **_kwargs: {
+            "source": "NSE",
+            "chain": [
+                {"strike": 25000, "optionType": "PUT", "ltp": 70.0},
+                {"strike": 25000, "optionType": "CALL", "ltp": 82.0},
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.dhan_scanx_options.fetch_scanx_option_chain",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Dhan must not run after an NSE match")),
+    )
+    monkeypatch.setattr(
+        "app.services.lemonn_options.fetch_lemonn_option_chain",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Lemonn must not run after an NSE match")),
+    )
+    marks, depth = paper._chain_marks([position], {position["symbol"]})
+    assert marks[position["symbol"]] == 82.0
+    assert depth[position["symbol"]]["source"] == "NSE"
 
 
 def test_seller_reentry_uses_seller_evidence_and_ignores_buy_exit():

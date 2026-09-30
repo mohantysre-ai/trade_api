@@ -3,22 +3,27 @@ import asyncio,logging,time
 from typing import Any
 from fastapi import Depends,FastAPI,Header,HTTPException,Query,WebSocket,WebSocketDisconnect
 from .auth import AuthManager
-from .candles import CandleBroker
-from .config import Settings
+from .candles import CandleBroker, parse_rows
+from .config import IST,Settings
+from .registry import RegistrySet
 from .http import GuardedHttp
 from .hub import Hub
 from .feed import FeedManager
 from .mapper import QuoteBook
 from .planner import SubscriptionPlanner
-from .registry import InstrumentRegistry
 log=logging.getLogger(__name__)
 class GatewayState:
     def __init__(self,settings):
-        self.settings=settings; self.registry=InstrumentRegistry(); self.auth=AuthManager(settings); self.http=GuardedHttp(settings)
-        self.planner=SubscriptionPlanner(settings.ws_max_tokens,settings.index_reserve,settings.unpin_grace_s); self.hub=Hub(); self.book=QuoteBook(settings,symbol_for_token=self._symbol_for_token); self.feed=FeedManager(settings,self.auth,self.registry,self.planner,self.book,self.hub); self.candles=CandleBroker(settings,self.http,self.auth,self.registry); self._tasks=[]; self.started_at=time.monotonic()
-    def _symbol_for_token(self,exch,token): return self.registry.symbol_for(exch,token)
+        self.settings=settings; self.registry=RegistrySet(); self.auth=AuthManager(settings); self.http=GuardedHttp(settings)
+        self.planner=SubscriptionPlanner(settings.ws_max_tokens,settings.index_reserve,settings.unpin_grace_s); self.hub=Hub(); self.book=QuoteBook(settings,symbol_for_token=self._symbol_for_token); self.feed=FeedManager(settings,self.auth,self.registry.nse,self.planner,self.book,self.hub); self.candles=CandleBroker(settings,self.http,self.auth,self.registry); self._tasks=[]; self.started_at=time.monotonic()
+    def _symbol_for_token(self,exch,token): return self.registry.for_exchange(exch).symbol_for(exch,token) if self.registry.for_exchange(exch) else None
     async def refresh_registry(self):
-        payload=await self.http.get_bytes("/NSE_symbols.txt.zip"); count=self.registry.load_zip(payload); self.planner.set_universe(index=self.settings.index_keys); return count
+        count=self.registry.nse.load_zip(await self.http.get_bytes("/NSE_symbols.txt.zip"))
+        try: count+=self.registry.nfo.load_zip(await self.http.get_bytes("/NFO_symbols.txt.zip"))
+        except Exception: log.warning("shoonya NFO registry refresh failed; keeping previous copy",exc_info=True)
+        try: count+=self.registry.bfo.load_zip(await self.http.get_bytes("/BFO_symbols.txt.zip"))
+        except Exception: log.warning("shoonya BFO registry refresh failed; keeping previous copy",exc_info=True)
+        self.planner.set_universe(index=self.settings.index_keys); return count
     async def start(self):
         self.auth.restore(); self.planner.set_universe(index=self.settings.index_keys); self._tasks.append(asyncio.create_task(self.feed.run())); self._tasks.append(asyncio.create_task(self._background()))
     async def _background(self):
@@ -36,7 +41,7 @@ class GatewayState:
     def health(self):
         feed_status=self.feed.status(); auth_status=self.auth.snapshot(); healthy=auth_status["state"]=="AUTHENTICATED" and feed_status["wsConnected"]; age_ms=feed_status.get("lastTickAgeMs")
         if healthy and age_ms is not None and age_ms>self.settings.quote_stale_s*1000*3: healthy=False
-        return {"healthy":healthy,"auth":auth_status,"feed":feed_status,"registry":{"count":len(self.registry),"loadedOn":self.registry.loaded_on.isoformat() if self.registry.loaded_on else None,"stale":self.registry.is_stale(max_age_days=self.settings.registry_max_age_days)},"uptimeSeconds":round(time.monotonic()-self.started_at,1)}
+        return {"healthy":healthy,"auth":auth_status,"feed":feed_status,"registry":{"count":len(self.registry.nse)+len(self.registry.nfo)+len(self.registry.bfo),"loadedOn":self.registry.nse.loaded_on.isoformat() if self.registry.nse.loaded_on else None,"stale":self.registry.is_stale(max_age_days=self.settings.registry_max_age_days)},"uptimeSeconds":round(time.monotonic()-self.started_at,1)}
 def create_app(settings:Settings|None=None)->FastAPI:
     settings=settings or Settings.from_env(); state=GatewayState(settings); app=FastAPI(title="shoonya-standby-gateway"); app.state.gw=state
     def _require_bearer(authorization:str|None=Header(default=None)):
@@ -68,12 +73,24 @@ def create_app(settings:Settings|None=None)->FastAPI:
         if not owner: raise HTTPException(status_code=422,detail="owner is required")
         state.planner.unpin(owner); return {"owner":owner,"released":True}
     @app.get("/v1/candles",dependencies=[Depends(_require_bearer)])
-    async def candles(symbol:str,interval:str,from_ts:int=Query(...,alias="from"),to_ts:int=Query(...,alias="to")):
-        return await state.candles.fetch(symbol.strip().upper(),interval.strip().upper(),from_ts,to_ts)
+    async def candles(symbol:str,interval:str,from_ts:int=Query(...,alias="from"),to_ts:int=Query(...,alias="to"),exchange:str="NSE"):
+        return await state.candles.fetch(symbol.strip().upper(),interval.strip().upper(),from_ts,to_ts,exchange.strip().upper())
     @app.post("/admin/oauth/code",dependencies=[Depends(_require_admin)])
-    def oauth_code(body:dict[str,Any]):
-        try: state.auth.set_session(uid=str(body["uid"]),account_id=str(body.get("accountId") or body["uid"]),access_token=str(body["accessToken"]))
+    async def oauth_code(body:dict[str,Any]):
+        try:
+            session=await state.auth.exchange_oauth_code(str(body["code"]))
+            state.auth.set_session(session.uid,session.account_id,session.access_token,session.websocket_token)
         except (KeyError,ValueError) as exc: raise HTTPException(status_code=422,detail=str(exc)) from exc
+        except Exception as exc: raise HTTPException(status_code=502,detail=f"OAuth exchange failed: {type(exc).__name__}") from exc
+        return {"state":state.auth.state.value}
+    @app.get("/admin/oauth/url",dependencies=[Depends(_require_admin)])
+    def oauth_url():
+        try: return {"url":state.auth.oauth_authorize_url()}
+        except Exception as exc: raise HTTPException(status_code=422,detail=str(exc)) from exc
+    @app.post("/admin/oauth/refresh",dependencies=[Depends(_require_admin)])
+    async def oauth_refresh():
+        try: await state.auth.refresh()
+        except Exception as exc: raise HTTPException(status_code=502,detail=f"OAuth refresh failed: {type(exc).__name__}") from exc
         return {"state":state.auth.state.value}
     @app.websocket("/v1/stream")
     async def stream(ws:WebSocket):
