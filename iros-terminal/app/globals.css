@@ -3458,7 +3458,7 @@ html[data-theme="light"] .category-dot {
   color: #899ba7;
   font-size: 8px;
   font-weight: 800;
-  cursor: default;
+  cursor: pointer;
 }
 .market-range-tabs button:last-child { border-right: 0; }
 .market-range-tabs button.is-active {
