@@ -1229,16 +1229,15 @@ function GlobalIndicesGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
   }
 
   return (
-    <div className="desk-snapshot-panel bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
-      <div className="desk-live-ribbon" aria-hidden />
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          {tilesLive && <div className="w-1.5 h-1.5 rounded-full desk-live-dot is-live" aria-hidden />}
+    <div className="desk-snapshot-panel market-overview-section bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+      <div className="market-overview-section-head">
+        <div>
           <span className="desk-panel-title">GLOBAL INDICES</span>
+          <p className="market-overview-section-subtitle">Key global equity benchmarks</p>
         </div>
-        {staleLabel && <span className="desk-panel-title">{staleLabel}</span>}
+        <span className="market-overview-range">1D</span>
       </div>
-      <div className="desk-metric-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+      <div className="desk-metric-grid market-overview-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
         {items.map((item) => {
           const isPositive = item.state === 'POSITIVE';
           return (
@@ -1425,16 +1424,15 @@ function CommoditiesFxGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
   }
 
   return (
-    <div className="desk-snapshot-panel bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
-      <div className="desk-live-ribbon" aria-hidden />
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full desk-live-dot is-live" aria-hidden />
+    <div className="desk-snapshot-panel market-overview-section bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+      <div className="market-overview-section-head">
+        <div>
           <span className="desk-panel-title">COMMODITIES & FX</span>
+          <p className="market-overview-section-subtitle">Commodities, currencies and digital assets</p>
         </div>
-        {staleLabel && <span className="desk-panel-title">{staleLabel}</span>}
+        <span className="market-overview-range">1D</span>
       </div>
-      <div className="desk-metric-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+      <div className="desk-metric-grid market-overview-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'BRENT CRUDE OIL') displayLabel = 'BRENT CRUDE';
@@ -1483,16 +1481,15 @@ function IndiaMarketsGrid({ items, staleLabel, tilesLive, tilesUpdating }: { ite
   }
 
   return (
-    <div className="desk-snapshot-panel bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
-      <div className="desk-live-ribbon" aria-hidden />
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          {tilesLive && <div className="w-1.5 h-1.5 rounded-full desk-live-dot is-live" aria-hidden />}
-          <span className="desk-panel-title">INDIA MARKETS — TOP MOVERS</span>
+    <div className="desk-snapshot-panel market-overview-section bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+      <div className="market-overview-section-head">
+        <div>
+          <span className="desk-panel-title">INDIA MARKETS</span>
+          <p className="market-overview-section-subtitle">Equity benchmarks, volatility and key sectors</p>
         </div>
-        {staleLabel && <span className="desk-panel-title">{staleLabel}</span>}
+        <span className="market-overview-range">1D</span>
       </div>
-      <div className="desk-metric-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+      <div className="desk-metric-grid market-overview-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'USD / INR Spot') displayLabel = 'USD / INR';
@@ -2741,16 +2738,29 @@ export default function IrosMasterAdvancedTerminal() {
 
         <main className="app-main min-w-0">
         {activeTab === 'marketSnapshot' && (
-          <div key="marketSnapshot" className="desk-panel-enter grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-3 items-stretch">
+          <div key="marketSnapshot" className="market-overview-v2 desk-panel-enter grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-3 items-stretch">
             <div className="space-y-3 min-w-0">
+              <section className="market-overview-toolbar" aria-label="Market overview data health">
+                <div className="market-overview-toolbar-copy">
+                  <span className="market-overview-kicker">MARKET OVERVIEW</span>
+                  <span className="market-overview-health">
+                    <span className={`market-overview-health-dot ${tilesLive ? 'is-live' : 'is-warn'}`} aria-hidden />
+                    {tilesLive ? 'LIVE MARKET DATA' : 'MARKET DATA DEGRADED'}
+                  </span>
+                </div>
+                <div className="market-overview-toolbar-meta">
+                  {staleMacroLabel ? <span className="market-overview-stale">{staleMacroLabel}</span> : <span className="market-overview-live">FRESH</span>}
+                  <span>{new Date(now).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} IST</span>
+                </div>
+              </section>
               <div className="grid grid-cols-1 gap-3 items-start">
-                <IndiaMarketsGrid items={enrichedMacros} staleLabel={staleMacroLabel} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
+                <IndiaMarketsGrid items={enrichedMacros} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
               </div>
               <div>
-                <GlobalIndicesGrid items={enrichedGlobalIndices} staleLabel={staleMacroLabel} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
+                <GlobalIndicesGrid items={enrichedGlobalIndices} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
               </div>
               <div>
-                <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
+                <CommoditiesFxGrid items={commodities} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
               </div>
               <div className="flex flex-col gap-4">
                 <GainersLosersHeatmap />
