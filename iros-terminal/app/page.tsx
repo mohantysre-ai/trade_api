@@ -1712,7 +1712,7 @@ function useIndexSparklines(items: MacroRow[], range: MarketRangeKey = '1D'): Re
       const updates: Record<string, number[]> = {};
       for (const result of results) {
         if (result.status === 'fulfilled' && result.value.sparkline.length >= 2) {
-          updates[result.value.label] = result.value.sparkline;
+          updates[`${result.value.label}::${range}`] = result.value.sparkline;
         }
       }
 
@@ -1724,7 +1724,14 @@ function useIndexSparklines(items: MacroRow[], range: MarketRangeKey = '1D'): Re
     void fetchSparklines();
   }, [items, range]);
 
-  return sparklines;
+  return useMemo(() => {
+    const current: Record<string, number[]> = {};
+    for (const item of items) {
+      const values = sparklines[`${item.label}::${range}`];
+      if (values) current[item.label] = values;
+    }
+    return current;
+  }, [items, range, sparklines]);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -2949,7 +2956,7 @@ export default function IrosMasterAdvancedTerminal() {
         ? ((item.sparkline && item.sparkline.length >= 2) ? item.sparkline : (mcSparklines[item.label] ?? item.sparkline))
         : (mcSparklines[item.label] ?? item.sparkline),
     })),
-    [currentMacros, mcSparklines]
+    [currentMacros, mcSparklines, marketRange]
   );
 
   const enrichedGlobalIndices = useMemo(
@@ -2959,7 +2966,7 @@ export default function IrosMasterAdvancedTerminal() {
         ? ((item.sparkline && item.sparkline.length >= 2) ? item.sparkline : (mcGlobalSparklines[item.label] ?? item.sparkline))
         : (mcGlobalSparklines[item.label] ?? item.sparkline),
     })),
-    [globalIndices, mcGlobalSparklines]
+    [globalIndices, mcGlobalSparklines, marketRange]
   );
 
   const enrichedCommodities = useMemo(
