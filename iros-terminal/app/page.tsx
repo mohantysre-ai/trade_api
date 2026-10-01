@@ -1215,11 +1215,277 @@ function SectorRotationHeatMap() {
   );
 }
 
+
+/* -------------------------------------------------------------------------- */
+/*  Market Overview V3 — mock-matched shell + live breadth / movers           */
+/* -------------------------------------------------------------------------- */
+
+const MARKET_RANGE_LABELS = ['1D', '1W', '1M', '3M', '1Y', '5Y'] as const;
+
+function MarketRangeTabs() {
+  return (
+    <div className="market-range-tabs" aria-label="Market chart range">
+      {MARKET_RANGE_LABELS.map((range) => (
+        <button
+          key={range}
+          type="button"
+          className={range === '1D' ? 'is-active' : ''}
+          aria-pressed={range === '1D'}
+          aria-disabled={range !== '1D'}
+          title={range === '1D' ? 'Live intraday series' : 'Historical range not wired to this snapshot feed'}
+        >
+          {range}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function MarketSectionIcon({ kind }: { kind: 'india' | 'global' | 'commodities' }) {
+  const glyph = kind === 'india' ? '🇮🇳' : kind === 'global' ? '🌐' : '▥';
+  return <span className={`market-section-icon market-section-icon--${kind}`} aria-hidden>{glyph}</span>;
+}
+
+function MarketOverviewHeader({
+  staleLabel,
+  live,
+  updatedAt,
+  sources,
+}: {
+  staleLabel?: string;
+  live: boolean;
+  updatedAt?: string;
+  sources?: string[];
+}) {
+  const [region, setRegion] = useState('Global');
+  const providerLabel = sources?.length ? sources.slice(0, 2).join(' + ') : 'Market feed';
+  return (
+    <section className="market-overview-header">
+      <div className="market-overview-header__brand">
+        <span className="market-overview-logo" aria-hidden>
+          <i /><i /><i />
+        </span>
+        <h2>Market Overview</h2>
+        <span className={`market-overview-live-chip ${live ? 'is-live' : 'is-warn'}`}>
+          <span aria-hidden /> {live ? 'LIVE' : 'DEGRADED'}
+        </span>
+      </div>
+      <div className="market-region-tabs" role="tablist" aria-label="Market region">
+        {['Global', 'India', 'US', 'Europe', 'Asia'].map((item) => (
+          <button
+            key={item}
+            type="button"
+            role="tab"
+            aria-selected={region === item}
+            className={region === item ? 'is-active' : ''}
+            onClick={() => setRegion(item)}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      <div className="market-overview-provider">
+        <div>
+          <span className="market-overview-meta-label">Data Provider</span>
+          <strong className={live ? 'is-live' : 'is-warn'}><span aria-hidden /> {providerLabel}</strong>
+        </div>
+        <div>
+          <span className="market-overview-meta-label">Last Updated</span>
+          <strong>{updatedAt ? new Date(updatedAt).toLocaleString('en-IN', { hour12: false }) : '—'}</strong>
+        </div>
+        {staleLabel && staleLabel !== 'LIVE' ? <span className="market-overview-stale-chip">{staleLabel}</span> : null}
+      </div>
+    </section>
+  );
+}
+
+function MarketKpiStrip({
+  items,
+  tilesLive,
+  tilesUpdating,
+}: {
+  items: MacroRow[];
+  tilesLive?: boolean;
+  tilesUpdating?: boolean;
+}) {
+  const wanted = ['NIFTY 50', 'NIFTY BANK', 'SENSEX', 'INDIA VIX', 'USD / INR'];
+  const rows = wanted
+    .map((label) => items.find((item) => {
+      const normalized = normalizeMarketLabel(item.label).replace(' SPOT', '');
+      return normalized === label;
+    }))
+    .filter((item): item is MacroRow => Boolean(item));
+
+  return (
+    <div className="market-kpi-strip">
+      {rows.map((item) => {
+        const positive = item.state === 'POSITIVE';
+        const label = item.label === 'USD / INR Spot' ? 'USD / INR' : item.label;
+        return (
+          <DeskLiveTile
+            key={item.label}
+            label={label}
+            value={item.val}
+            delta={item.delta}
+            positive={positive}
+            accent={positive ? 'var(--terminal-green)' : 'var(--terminal-red)'}
+            tilesLive={tilesLive}
+            tilesUpdating={tilesUpdating}
+            onActivate={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
+            sparkline={
+              <div className="desk-tile-spark">
+                {item.sparkline && item.sparkline.length >= 2
+                  ? <SparklineSVG positive={positive} data={item.sparkline} />
+                  : <div className="absolute inset-0"><MiniSparkline positive={positive} /></div>}
+              </div>
+            }
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function MarketOverviewSidebar({
+  indiaRows,
+  news,
+  now,
+}: {
+  indiaRows: MacroRow[];
+  news?: NewsItem[];
+  now: number;
+}) {
+  const [stocks, setStocks] = useState<NseEquityStock[]>([]);
+  const [gainers, setGainers] = useState<NseStock[]>([]);
+  const [showLosers, setShowLosers] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [breadthResponse, moversResponse] = await Promise.all([
+          fetchNseEquityStockIndices(),
+          fetchNseTopFiveStock(showLosers ? 'L' : 'G'),
+        ]);
+        if (cancelled) return;
+        setStocks(getNseHeatMapStocks(breadthResponse));
+        setGainers(getNseStocks(moversResponse, showLosers ? 'topLoosers' : 'topGainers').slice(0, 5));
+      } catch {
+        if (!cancelled) {
+          setStocks([]);
+          setGainers([]);
+        }
+      }
+    };
+    void load();
+    const id = window.setInterval(() => void load(), 300_000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [showLosers]);
+
+  const adv = stocks.filter((s) => typeof s.pChange === 'number' && s.pChange > 0).length;
+  const dec = stocks.filter((s) => typeof s.pChange === 'number' && s.pChange < 0).length;
+  const flat = Math.max(0, stocks.length - adv - dec);
+  const total = Math.max(1, stocks.length);
+  const advPct = (adv / total) * 100;
+  const decPct = (dec / total) * 100;
+
+  const vix = indiaRows.find((r) => normalizeMarketLabel(r.label) === 'INDIA VIX');
+  const vixDelta = parseDeltaPct(vix?.delta);
+  const risk =
+    advPct >= 58 && vixDelta <= 0 ? 'Low Risk'
+    : decPct >= 58 || vixDelta >= 3 ? 'High Risk'
+    : 'Neutral';
+
+  const sortedMovers = [...gainers].sort((a, b) => {
+    const av = typeof a.pchange === 'number' ? a.pchange : 0;
+    const bv = typeof b.pchange === 'number' ? b.pchange : 0;
+    return showLosers ? av - bv : bv - av;
+  });
+
+  const takeaways = useMemo(() => {
+    const rows = indiaRows
+      .map((r) => ({ label: r.label, pct: parseDeltaPct(r.delta) }))
+      .filter((r) => Number.isFinite(r.pct))
+      .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))
+      .slice(0, 3);
+    const notes = rows.map((r) => `${r.label} ${r.pct >= 0 ? 'up' : 'down'} ${Math.abs(r.pct).toFixed(2)}%`);
+    if (vix) notes.push(`India VIX ${vixDelta >= 0 ? 'up' : 'down'} ${Math.abs(vixDelta).toFixed(2)}%`);
+    return notes.slice(0, 4);
+  }, [indiaRows, vix, vixDelta]);
+
+  return (
+    <aside className="market-sidebar-stack">
+      <section className="market-side-card">
+        <div className="market-side-title">MARKET BREADTH <span>⌃</span></div>
+        <div className="market-side-tabs"><button className="is-active">India</button><button>US</button><button>Global</button></div>
+        <div className="market-breadth-bar" aria-label={`Advancing ${adv}, declining ${dec}, unchanged ${flat}`}>
+          <span className="is-adv" style={{ width: `${advPct}%` }} />
+          <span className="is-dec" style={{ width: `${decPct}%` }} />
+          <span className="is-flat" style={{ width: `${Math.max(0, 100 - advPct - decPct)}%` }} />
+        </div>
+        <div className="market-breadth-stats">
+          <div><span className="dot is-adv" />Advancing<strong>{adv || '—'}</strong></div>
+          <div><span className="dot is-dec" />Declining<strong>{dec || '—'}</strong></div>
+          <div><span className="dot is-flat" />Unchanged<strong>{stocks.length ? flat : '—'}</strong></div>
+        </div>
+      </section>
+
+      <section className="market-side-card">
+        <div className="market-side-title">TOP MOVERS <span>⌃</span></div>
+        <div className="market-side-tabs"><button className="is-active">Nifty 50</button><button>Nifty 500</button><button>Global</button></div>
+        <div className="market-side-tabs market-side-tabs--secondary">
+          <button className={!showLosers ? 'is-active' : ''} onClick={() => setShowLosers(false)}>Top Gainers</button>
+          <button className={showLosers ? 'is-active' : ''} onClick={() => setShowLosers(true)}>Top Losers</button>
+        </div>
+        <div className="market-mover-table">
+          <div className="market-mover-head"><span>SYMBOL</span><span>LTP</span><span>CHG %</span></div>
+          {sortedMovers.length ? sortedMovers.map((row) => {
+            const pct = typeof row.pchange === 'number' ? row.pchange : 0;
+            return (
+              <div className="market-mover-row" key={String(row.symbol)}>
+                <strong>{row.symbol ?? '—'}</strong>
+                <span>{formatNseNumber(row.lastPrice)}</span>
+                <span className={pct >= 0 ? 'is-up' : 'is-down'}>{pct >= 0 ? '+' : ''}{pct.toFixed(2)}%</span>
+              </div>
+            );
+          }) : <div className="market-side-empty">Live movers unavailable</div>}
+        </div>
+      </section>
+
+      <section className="market-side-card">
+        <div className="market-side-title">MARKET INSIGHTS <span>⌃</span></div>
+        <div className="market-risk-row">
+          <div>
+            <span className="market-risk-label">RISK REGIME</span>
+            <div className={`market-risk-gauge market-risk-gauge--${risk.toLowerCase().replace(/\s+/g, '-')}`}>
+              <span className="market-risk-needle" />
+            </div>
+            <strong>{risk}</strong>
+          </div>
+          <div className="market-risk-legend">
+            <span><i className="is-low" />Low Risk</span>
+            <span><i className="is-neutral" />Neutral</span>
+            <span><i className="is-high" />High Risk</span>
+          </div>
+        </div>
+        <div className="market-takeaways">
+          <span className="market-risk-label">KEY TAKEAWAYS</span>
+          <ul>{takeaways.map((item) => <li key={item}>{item}</li>)}</ul>
+        </div>
+      </section>
+
+      <div className="market-news-wrap">
+        <NewsFeedPanel items={news} now={now} sidebar={true} />
+      </div>
+    </aside>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /*  GlobalIndicesGrid                                                            */
 /* -------------------------------------------------------------------------- */
 
-function GlobalIndicesGrid({ items, staleLabel, tilesLive, tilesUpdating }: { items: MacroRow[]; staleLabel?: string; tilesLive?: boolean; tilesUpdating?: boolean }) {
+function GlobalIndicesGrid({ items, tilesLive, tilesUpdating }: { items: MacroRow[]; tilesLive?: boolean; tilesUpdating?: boolean }) {
   if (!items.length) {
     return (
       <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 shadow-sm">
@@ -1231,11 +1497,11 @@ function GlobalIndicesGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
   return (
     <div className="desk-snapshot-panel market-overview-section bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
       <div className="market-overview-section-head">
-        <div>
-          <span className="desk-panel-title">GLOBAL INDICES</span>
-          <p className="market-overview-section-subtitle">Key global equity benchmarks</p>
+        <div className="market-section-titleline">
+          <MarketSectionIcon kind="global" />
+          <div><span className="desk-panel-title">GLOBAL INDICES</span><p className="market-overview-section-subtitle">Key global equity benchmarks</p></div>
         </div>
-        <span className="market-overview-range">1D</span>
+        <MarketRangeTabs />
       </div>
       <div className="desk-metric-grid market-overview-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
         {items.map((item) => {
@@ -1414,7 +1680,7 @@ function useIndexSparklines(items: MacroRow[]): Record<string, number[]> {
 /*  CommoditiesFxGrid                                                            */
 /* -------------------------------------------------------------------------- */
 
-function CommoditiesFxGrid({ items, staleLabel, tilesLive, tilesUpdating }: { items: MacroRow[]; staleLabel?: string; tilesLive?: boolean; tilesUpdating?: boolean }) {
+function CommoditiesFxGrid({ items, tilesLive, tilesUpdating }: { items: MacroRow[]; tilesLive?: boolean; tilesUpdating?: boolean }) {
   if (!items.length) {
     return (
       <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 shadow-sm">
@@ -1426,11 +1692,11 @@ function CommoditiesFxGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
   return (
     <div className="desk-snapshot-panel market-overview-section bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
       <div className="market-overview-section-head">
-        <div>
-          <span className="desk-panel-title">COMMODITIES & FX</span>
-          <p className="market-overview-section-subtitle">Commodities, currencies and digital assets</p>
+        <div className="market-section-titleline">
+          <MarketSectionIcon kind="commodities" />
+          <div><span className="desk-panel-title">COMMODITIES & FX</span><p className="market-overview-section-subtitle">Commodities, currencies and digital assets</p></div>
         </div>
-        <span className="market-overview-range">1D</span>
+        <MarketRangeTabs />
       </div>
       <div className="desk-metric-grid market-overview-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
         {items.map((item) => {
@@ -1471,7 +1737,7 @@ function CommoditiesFxGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
 /*  IndiaMarketsGrid                                                             */
 /* -------------------------------------------------------------------------- */
 
-function IndiaMarketsGrid({ items, staleLabel, tilesLive, tilesUpdating }: { items: MacroRow[]; staleLabel?: string; tilesLive?: boolean; tilesUpdating?: boolean }) {
+function IndiaMarketsGrid({ items, tilesLive, tilesUpdating }: { items: MacroRow[]; tilesLive?: boolean; tilesUpdating?: boolean }) {
   if (!items.length) {
     return (
       <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 shadow-sm">
@@ -1483,11 +1749,11 @@ function IndiaMarketsGrid({ items, staleLabel, tilesLive, tilesUpdating }: { ite
   return (
     <div className="desk-snapshot-panel market-overview-section bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
       <div className="market-overview-section-head">
-        <div>
-          <span className="desk-panel-title">INDIA MARKETS</span>
-          <p className="market-overview-section-subtitle">Equity benchmarks, volatility and key sectors</p>
+        <div className="market-section-titleline">
+          <MarketSectionIcon kind="india" />
+          <div><span className="desk-panel-title">INDIA MARKETS</span><p className="market-overview-section-subtitle">Equity benchmarks and key sectors</p></div>
         </div>
-        <span className="market-overview-range">1D</span>
+        <MarketRangeTabs />
       </div>
       <div className="desk-metric-grid market-overview-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
         {items.map((item) => {
@@ -2738,36 +3004,21 @@ export default function IrosMasterAdvancedTerminal() {
 
         <main className="app-main min-w-0">
         {activeTab === 'marketSnapshot' && (
-          <div key="marketSnapshot" className="market-overview-v2 desk-panel-enter grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-3 items-stretch">
-            <div className="space-y-3 min-w-0">
-              <section className="market-overview-toolbar" aria-label="Market overview data health">
-                <div className="market-overview-toolbar-copy">
-                  <span className="market-overview-kicker">MARKET OVERVIEW</span>
-                  <span className="market-overview-health">
-                    <span className={`market-overview-health-dot ${tilesLive ? 'is-live' : 'is-warn'}`} aria-hidden />
-                    {tilesLive ? 'LIVE MARKET DATA' : 'MARKET DATA DEGRADED'}
-                  </span>
-                </div>
-                <div className="market-overview-toolbar-meta">
-                  {staleMacroLabel ? <span className="market-overview-stale">{staleMacroLabel}</span> : <span className="market-overview-live">FRESH</span>}
-                  <span>{new Date(now).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} IST</span>
-                </div>
-              </section>
-              <div className="grid grid-cols-1 gap-3 items-start">
+          <div key="marketSnapshot" className="market-overview-v3 desk-panel-enter">
+            <MarketOverviewHeader
+              staleLabel={staleMacroLabel}
+              live={tilesLive && staleMacroLabel === 'LIVE'}
+              updatedAt={liveMarket?.updatedAt}
+              sources={liveMarket?.rawSources}
+            />
+            <MarketKpiStrip items={enrichedMacros} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
+            <div className="market-overview-body">
+              <div className="market-overview-main">
                 <IndiaMarketsGrid items={enrichedMacros} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
-              </div>
-              <div>
                 <GlobalIndicesGrid items={enrichedGlobalIndices} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
-              </div>
-              <div>
                 <CommoditiesFxGrid items={commodities} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
               </div>
-              <div className="flex flex-col gap-4">
-                <GainersLosersHeatmap />
-              </div>
-            </div>
-            <div className="flex flex-col min-w-0">
-              <NewsFeedPanel items={liveMarket?.news} now={now} sidebar={true} />
+              <MarketOverviewSidebar indiaRows={enrichedMacros} news={liveMarket?.news} now={now} />
             </div>
           </div>
         )}
