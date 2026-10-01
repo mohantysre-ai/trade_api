@@ -91,7 +91,12 @@ function dedupedDrawerFetch<T>(key: string, url: string): Promise<T> {
 
 type TabKey = 'marketSnapshot' | 'stockHeatMap' | 'assetMatrix' | 'intradayMatrix' | 'indexOptions' | 'eod';
 
-const INDIA_MARKET_LABELS = new Set(['NIFTY 100', 'SENSEX', 'NIFTY BANK', 'NIFTY IT', 'NIFTY PHARMA', 'NIFTY MIDCAP', 'NIFTY SMALLCAP', 'GIFT NIFTY']);
+const INDIA_MARKET_LABELS = new Set([
+  'NIFTY 50', 'NIFTY 100', 'NIFTY 500', 'SENSEX', 'NIFTY BANK',
+  'NIFTY IT', 'NIFTY PHARMA', 'NIFTY AUTO', 'NIFTY FMCG', 'NIFTY METAL',
+  'NIFTY REALTY', 'NIFTY ENERGY', 'NIFTY PSU BANK', 'NIFTY MIDCAP',
+  'NIFTY SMALLCAP', 'INDIA VIX', 'USD / INR', 'USD / INR SPOT', 'GIFT NIFTY',
+]);
 const GLOBAL_ONLY_LABELS = new Set(['BRENT CRUDE', 'BRENT CRUDE OIL']);
 
 function normalizeMarketLabel(label: string) {
@@ -2981,9 +2986,15 @@ export default function IrosMasterAdvancedTerminal() {
 
   const regionalGlobalIndices = useMemo(() => {
     if (marketRegion === 'Global') return enrichedGlobalIndices;
-    if (marketRegion === 'US') return enrichedGlobalIndices.filter((row) => /DJI|DOW|S&P 500|NASDAQ/i.test(row.label));
-    if (marketRegion === 'Europe') return enrichedGlobalIndices.filter((row) => /DAX|CAC|FTSE|EURO STOXX/i.test(row.label));
-    if (marketRegion === 'Asia') return enrichedGlobalIndices.filter((row) => /NIKKEI|HANG SENG|SHANGHAI|KOSPI|ASX/i.test(row.label));
+    if (marketRegion === 'US') return enrichedGlobalIndices.filter((row) =>
+      /DJI|DOW|S&P 500|NASDAQ|RUSSELL|NYSE|CBOE VIX/i.test(row.label)
+    );
+    if (marketRegion === 'Europe') return enrichedGlobalIndices.filter((row) =>
+      /DAX|CAC|FTSE 100|EURO STOXX|STOXX EUROPE|IBEX|SMI|AEX|BEL 20|FTSE MIB/i.test(row.label)
+    );
+    if (marketRegion === 'Asia') return enrichedGlobalIndices.filter((row) =>
+      /NIKKEI|HANG SENG|SHANGHAI|KOSPI|TAIWAN|STRAITS TIMES|JAKARTA|MALAYSIA|ASX|NZX/i.test(row.label)
+    );
     return [];
   }, [enrichedGlobalIndices, marketRegion]);
 
