@@ -1356,17 +1356,89 @@ function MarketKpiStrip({
   );
 }
 
+
+function MarketFlowSignals() {
+  const [active, setActive] = useState<TrendlyneScreenKey>('risingDelivery');
+  const [itemsByScreen, setItemsByScreen] = useState<Partial<Record<TrendlyneScreenKey, TrendlyneStock[]>>>({});
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async (screen: TrendlyneScreenKey) => {
+    if (itemsByScreen[screen]?.length) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/trendlyne-screener?screen=${screen}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: TrendlyneScreenData = await res.json();
+      setItemsByScreen((prev) => ({ ...prev, [screen]: data.screenData?.slice(0, 5) ?? [] }));
+    } catch {
+      setItemsByScreen((prev) => ({ ...prev, [screen]: [] }));
+    } finally {
+      setLoading(false);
+    }
+  }, [itemsByScreen]);
+
+  useEffect(() => {
+    void load(active);
+  }, [active, load]);
+
+  const labelMap: Record<TrendlyneScreenKey, string> = {
+    risingDelivery: 'Delivery',
+    topLosersVolume: 'Vol Losers',
+    volumeShockers: 'Volume',
+    highVolumeGain: 'Vol Gainers',
+    highVolumeLoss: 'Vol Decliners',
+    outPerformanceWeek: 'Outperform',
+  };
+
+  const tabs: TrendlyneScreenKey[] = [
+    'risingDelivery',
+    'volumeShockers',
+    'highVolumeGain',
+    'highVolumeLoss',
+    'topLosersVolume',
+    'outPerformanceWeek',
+  ];
+  const rows = itemsByScreen[active] ?? [];
+
+  return (
+    <section className="market-side-card market-flow-card">
+      <div className="market-side-title">FLOW & DELIVERY <span>Trendlyne</span></div>
+      <div className="market-flow-tabs">
+        {tabs.map((key) => (
+          <button key={key} type="button" className={active === key ? 'is-active' : ''} onClick={() => setActive(key)}>
+            {labelMap[key]}
+          </button>
+        ))}
+      </div>
+      <div className="market-flow-list">
+        {loading && rows.length === 0 ? (
+          <div className="market-side-empty">Loading {labelMap[active]}…</div>
+        ) : rows.length === 0 ? (
+          <div className="market-side-empty">No {labelMap[active]} data</div>
+        ) : rows.map((item, index) => {
+          const currentPrice = item.tooltipParams.find((p) => p.key === 'currentPrice')?.value ?? '—';
+          return (
+            <a key={`${active}-${item.name}-${index}`} href={item.stockurl} target="_blank" rel="noopener noreferrer" className="market-flow-row">
+              <strong>{item.name}</strong>
+              <span>{formatLargeNumber(item.value)}</span>
+              <span className="market-flow-price">₹{currentPrice}</span>
+            </a>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function MarketOverviewSidebar({
   indiaRows,
   globalRows,
-  news,
   newsSummary,
   backendRegime,
   now,
 }: {
   indiaRows: MacroRow[];
   globalRows: MacroRow[];
-  news?: NewsItem[];
   newsSummary?: string;
   backendRegime?: string;
   now: number;
@@ -1504,6 +1576,8 @@ function MarketOverviewSidebar({
         </div>
       </section>
 
+      <MarketFlowSignals />
+
       <section className="market-side-card">
         <div className="market-side-title">MARKET INSIGHTS <span>⌃</span></div>
         <div className="market-risk-row">
@@ -1526,9 +1600,6 @@ function MarketOverviewSidebar({
         </div>
       </section>
 
-      <div className="market-news-wrap">
-        <NewsFeedPanel items={news} now={now} sidebar={true} />
-      </div>
     </aside>
   );
 }
@@ -3067,11 +3138,13 @@ export default function IrosMasterAdvancedTerminal() {
               <MarketOverviewSidebar
                 indiaRows={enrichedMacros}
                 globalRows={enrichedGlobalIndices}
-                news={liveMarket?.news}
                 newsSummary={liveMarket?.newsSummary}
                 backendRegime={liveMarket?.swingV2Regime}
                 now={now}
               />
+            </div>
+            <div className="market-news-wide">
+              <NewsFeedPanel items={liveMarket?.news} now={now} sidebar={true} />
             </div>
           </div>
         )}
