@@ -295,32 +295,38 @@ def _row_from_yahoo_quote(inst: YahooInstrument, quote: dict[str, Any]) -> dict[
 
 
 def _fetch_yahoo_api_batch(instruments: list[YahooInstrument]) -> dict[str, dict[str, Any]]:
+    """Fetch Yahoo quotes in bounded chunks so a larger regional universe cannot
+    make one oversized request fail the whole market overview."""
     if not instruments:
         return {}
 
-    symbol_to_key = {inst.symbol: inst.key for inst in instruments}
-    instruments_by_key = {inst.key: inst for inst in instruments}
-    symbols = ",".join(inst.symbol for inst in instruments)
+    rows: dict[str, dict[str, Any]] = {}
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    chunk_size = 20
 
-    try:
-        url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbols}"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        response = requests.get(url, timeout=10, headers=headers)
-        response.raise_for_status()
-        payload = response.json()
+    for offset in range(0, len(instruments), chunk_size):
+        chunk = instruments[offset : offset + chunk_size]
+        symbol_to_key = {inst.symbol: inst.key for inst in chunk}
+        instruments_by_key = {inst.key: inst for inst in chunk}
+        symbols = ",".join(inst.symbol for inst in chunk)
+        try:
+            url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbols}"
+            response = requests.get(url, timeout=10, headers=headers)
+            response.raise_for_status()
+            payload = response.json()
+            for quote in payload.get("quoteResponse", {}).get("result", []):
+                symbol = quote.get("symbol")
+                inst_key = symbol_to_key.get(str(symbol)) if isinstance(symbol, str) else None
+                if not inst_key:
+                    continue
+                row = _row_from_yahoo_quote(instruments_by_key[inst_key], quote)
+                if row:
+                    rows[inst_key] = row
+        except Exception:
+            # Keep successful chunks; per-instrument fallbacks fill missing rows.
+            continue
 
-        rows: dict[str, dict[str, Any]] = {}
-        for quote in payload.get("quoteResponse", {}).get("result", []):
-            symbol = quote.get("symbol")
-            inst_key = symbol_to_key.get(str(symbol)) if isinstance(symbol, str) else None
-            if not inst_key:
-                continue
-            row = _row_from_yahoo_quote(instruments_by_key[inst_key], quote)
-            if row:
-                rows[inst_key] = row
-        return rows
-    except Exception:
-        return {}
+    return rows
 
 
 def _fetch_yahoo_api_quote(inst: YahooInstrument) -> dict[str, Any] | None:
