@@ -19,6 +19,7 @@ const MC_SYMBOL_MAP: Record<string, string> = {
   "USD / INR": "in;usdinr",
   "USD/INR": "in;usdinr",
   "USD / INR SPOT": "in;usdinr",
+
 };
 
 const YAHOO_SYMBOL_MAP: Record<string, string> = {
@@ -48,6 +49,33 @@ const YAHOO_SYMBOL_MAP: Record<string, string> = {
   "PLATINUM": "PL=F",
   "PALLADIUM": "PA=F",
   "WHEAT": "ZW=F",
+  "NIFTY 500": "^CRSLDX",
+  "NIFTY AUTO": "^CNXAUTO",
+  "NIFTY FMCG": "^CNXFMCG",
+  "NIFTY METAL": "^CNXMETAL",
+  "NIFTY REALTY": "^CNXREALTY",
+  "NIFTY ENERGY": "^CNXENERGY",
+  "NIFTY PSU BANK": "^CNXPSUBANK",
+  "NIFTY MIDCAP": "NIFTY_MIDCAP_100.NS",
+  "NIFTY SMALLCAP": "^CNXSC",
+  "NASDAQ COMPOSITE": "^IXIC",
+  "RUSSELL 2000": "^RUT",
+  "NYSE COMPOSITE": "^NYA",
+  "DOW TRANSPORT": "^DJT",
+  "CBOE VIX": "^VIX",
+  "STOXX EUROPE 600": "^STOXX",
+  "IBEX 35": "^IBEX",
+  "SMI": "^SSMI",
+  "AEX": "^AEX",
+  "BEL 20": "^BFX",
+  "FTSE MIB": "FTSEMIB.MI",
+  "TAIWAN WEIGHTED": "^TWII",
+  "STRAITS TIMES": "^STI",
+  "JAKARTA COMPOSITE": "^JKSE",
+  "FTSE BURSA MALAYSIA": "^KLSE",
+  "S&P/NZX 50": "^NZ50",
+  "S&P/TSX COMPOSITE": "^GSPTSE",
+  "MEXICO IPC": "^MXX",
 };
 
 type RangeKey = "1D" | "1W" | "1M" | "3M" | "1Y" | "5Y";
