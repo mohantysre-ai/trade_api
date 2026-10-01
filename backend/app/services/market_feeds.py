@@ -81,8 +81,16 @@ DOMESTIC_INDEX_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("nifty50", "^NSEI", "NIFTY 50", "index", _fmt_index),
     YahooInstrument("sensex", "^BSESN", "SENSEX", "index", _fmt_index),
     YahooInstrument("niftybank", "^NSEBANK", "NIFTY BANK", "index", _fmt_index),
+    YahooInstrument("nifty100", "^CNX100", "NIFTY 100", "index", _fmt_index),
+    YahooInstrument("nifty500", "^CRSLDX", "NIFTY 500", "index", _fmt_index),
     YahooInstrument("niftyit", "^CNXIT", "NIFTY IT", "index", _fmt_index),
     YahooInstrument("niftypharma", "^CNXPHARMA", "NIFTY PHARMA", "index", _fmt_index),
+    YahooInstrument("niftyauto", "^CNXAUTO", "NIFTY AUTO", "index", _fmt_index),
+    YahooInstrument("niftyfmcg", "^CNXFMCG", "NIFTY FMCG", "index", _fmt_index),
+    YahooInstrument("niftymetal", "^CNXMETAL", "NIFTY METAL", "index", _fmt_index),
+    YahooInstrument("niftyrealty", "^CNXREALTY", "NIFTY REALTY", "index", _fmt_index),
+    YahooInstrument("niftyenergy", "^CNXENERGY", "NIFTY ENERGY", "index", _fmt_index),
+    YahooInstrument("niftypsubank", "^CNXPSUBANK", "NIFTY PSU BANK", "index", _fmt_index),
     # Yahoo's legacy ^CRSMID chart intermittently returns an empty/delisted
     # response. Its NSE instrument ticker carries the same Midcap 100 index.
     YahooInstrument("niftymidcap", "NIFTY_MIDCAP_100.NS", "NIFTY MIDCAP", "index", _fmt_index),
@@ -152,18 +160,44 @@ def fetch_gift_nifty() -> dict[str, Any] | None:
 
 # Global indices — expanded to 12 with ASX 200 and BOVESPA.
 GLOBAL_INDEX_INSTRUMENTS: list[YahooInstrument] = [
+    # United States
     YahooInstrument("dji", "^DJI", "DJI (US 30)", "index", _fmt_index),
     YahooInstrument("sp500", "^GSPC", "S&P 500", "index", _fmt_index),
     YahooInstrument("nasdaq100", "^NDX", "NASDAQ 100", "index", _fmt_index),
-    YahooInstrument("nikkei", "^N225", "NIKKEI 225", "index", _fmt_index),
-    YahooInstrument("hangseng", "^HSI", "HANG SENG", "index", _fmt_index),
-    YahooInstrument("shanghai", "000001.SS", "SHANGHAI COMP", "index", _fmt_index),
+    YahooInstrument("nasdaqcomp", "^IXIC", "NASDAQ COMPOSITE", "index", _fmt_index),
+    YahooInstrument("russell2000", "^RUT", "RUSSELL 2000", "index", _fmt_index),
+    YahooInstrument("nysecomp", "^NYA", "NYSE COMPOSITE", "index", _fmt_index),
+    YahooInstrument("dowtransport", "^DJT", "DOW TRANSPORT", "index", _fmt_index),
+    YahooInstrument("usvix", "^VIX", "CBOE VIX", "index", _fmt_index),
+
+    # Europe
     YahooInstrument("dax", "^GDAXI", "DAX", "index", _fmt_index),
     YahooInstrument("cac40", "^FCHI", "CAC 40", "index", _fmt_index),
     YahooInstrument("ftse", "^FTSE", "FTSE 100", "index", _fmt_index),
     YahooInstrument("eurostoxx50", "^STOXX50E", "EURO STOXX 50", "index", _fmt_index),
+    YahooInstrument("stoxx600", "^STOXX", "STOXX EUROPE 600", "index", _fmt_index),
+    YahooInstrument("ibex35", "^IBEX", "IBEX 35", "index", _fmt_index),
+    YahooInstrument("smi", "^SSMI", "SMI", "index", _fmt_index),
+    YahooInstrument("aex", "^AEX", "AEX", "index", _fmt_index),
+    YahooInstrument("bel20", "^BFX", "BEL 20", "index", _fmt_index),
+    YahooInstrument("ftsemib", "FTSEMIB.MI", "FTSE MIB", "index", _fmt_index),
+
+    # Asia-Pacific
+    YahooInstrument("nikkei", "^N225", "NIKKEI 225", "index", _fmt_index),
+    YahooInstrument("hangseng", "^HSI", "HANG SENG", "index", _fmt_index),
+    YahooInstrument("shanghai", "000001.SS", "SHANGHAI COMP", "index", _fmt_index),
+    YahooInstrument("kospi", "^KS11", "KOSPI", "index", _fmt_index),
+    YahooInstrument("taiwan", "^TWII", "TAIWAN WEIGHTED", "index", _fmt_index),
+    YahooInstrument("singapore", "^STI", "STRAITS TIMES", "index", _fmt_index),
+    YahooInstrument("jakarta", "^JKSE", "JAKARTA COMPOSITE", "index", _fmt_index),
+    YahooInstrument("klse", "^KLSE", "FTSE BURSA MALAYSIA", "index", _fmt_index),
     YahooInstrument("asx200", "^AXJO", "S&P/ASX 200", "index", _fmt_index),
+    YahooInstrument("nz50", "^NZ50", "S&P/NZX 50", "index", _fmt_index),
+
+    # Americas ex-US
     YahooInstrument("bovespa", "^BVSP", "BOVESPA", "index", _fmt_index),
+    YahooInstrument("tsx", "^GSPTSE", "S&P/TSX COMPOSITE", "index", _fmt_index),
+    YahooInstrument("mexicoipc", "^MXX", "MEXICO IPC", "index", _fmt_index),
 ]
 
 COMMODITY_INSTRUMENTS: list[YahooInstrument] = [
