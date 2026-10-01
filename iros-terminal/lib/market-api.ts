@@ -250,6 +250,9 @@ export type MarketDataResponse = {
   isSnapshotFallback?: boolean;
   selectionMeta?: SelectionMeta;
   dhanSwingPicks?: DhanSwingPicksPayload;
+  swingV2Regime?: string;
+  swingV2RegimeDetail?: Record<string, unknown>;
+  swingV2UniverseCoverage?: number;
 };
 
 export type FeedStatus = "idle" | "loading" | "live" | "offline";
