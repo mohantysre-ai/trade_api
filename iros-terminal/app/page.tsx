@@ -473,14 +473,15 @@ function NseTooltipContent({ data, ticker }: { data: Record<string, unknown>; ti
     return () => { cancelled = true; };
   }, [ticker, range]);
 
-  const statRows: Array<[string, unknown, string]> = [
+  const statRowsSource: Array<[string, unknown, string]> = [
     ['Prev Close', data.previousClose ?? data.prevClose, 'previousClose'],
     ['Open', data.open, 'open'],
     ['Day High', data.dayHigh ?? data.high, 'high'],
     ['Day Low', data.dayLow ?? data.low, 'low'],
     ['Volume', data.totalTradedVolume ?? data.volume, 'volume'],
     ['Last Updated', data.lastUpdateTime ?? data.lastUpdate ?? data.timestamp, 'timestamp'],
-  ].filter(([, value]) => value !== undefined && value !== null && value !== '');
+  ];
+  const statRows = statRowsSource.filter(([, value]) => value !== undefined && value !== null && value !== '');
 
   return (
     <div className="nse-tooltip-modern">
