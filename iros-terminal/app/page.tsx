@@ -422,43 +422,122 @@ function MiniSparkline({ positive }: { positive: boolean }) {
 /*  NseTooltipContent - shared tooltip content for NSE stocks                   */
 /* -------------------------------------------------------------------------- */
 
-function NseTooltipContent({ data }: { data: Record<string, unknown> }) {
-  const graphSrc = getNseGraphSrc(data);
-  const pchange = typeof data.pchange === 'number' ? data.pchange : (typeof data.pChange === 'number' ? data.pChange : null);
+function NseTooltipContent({ data, ticker }: { data: Record<string, unknown>; ticker: string }) {
+  const [range, setRange] = useState<'1D' | '1M' | '1Y'>('1D');
+  const [sparkline, setSparkline] = useState<number[]>([]);
+  const [chartLoading, setChartLoading] = useState(false);
+
+  const pchange = typeof data.pchange === 'number'
+    ? data.pchange
+    : (typeof data.pChange === 'number' ? data.pChange : null);
   const positive = pchange !== null && pchange >= 0;
 
+  const lastPrice = typeof data.lastPrice === 'number'
+    ? data.lastPrice
+    : typeof data.close === 'number'
+      ? data.close
+      : null;
+  const previousClose = typeof data.previousClose === 'number'
+    ? data.previousClose
+    : typeof data.prevClose === 'number'
+      ? data.prevClose
+      : null;
+  const changeAbs =
+    typeof data.change === 'number'
+      ? data.change
+      : (lastPrice != null && previousClose != null ? lastPrice - previousClose : null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setChartLoading(true);
+      try {
+        const res = await fetch(
+          `/api/stock-sparkline?ticker=${encodeURIComponent(ticker)}&flag=${encodeURIComponent(range)}`,
+          { cache: 'no-store' },
+        );
+        const payload = await res.json().catch(() => null);
+        if (!cancelled) {
+          const values = Array.isArray(payload?.sparkline)
+            ? payload.sparkline.filter((v: unknown): v is number => typeof v === 'number' && Number.isFinite(v))
+            : [];
+          setSparkline(values);
+        }
+      } catch {
+        if (!cancelled) setSparkline([]);
+      } finally {
+        if (!cancelled) setChartLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [ticker, range]);
+
+  const statRows: Array<[string, unknown, string]> = [
+    ['Prev Close', data.previousClose ?? data.prevClose, 'previousClose'],
+    ['Open', data.open, 'open'],
+    ['Day High', data.dayHigh ?? data.high, 'high'],
+    ['Day Low', data.dayLow ?? data.low, 'low'],
+    ['Volume', data.totalTradedVolume ?? data.volume, 'volume'],
+    ['Last Updated', data.lastUpdateTime ?? data.lastUpdate ?? data.timestamp, 'timestamp'],
+  ].filter(([, value]) => value !== undefined && value !== null && value !== '');
+
   return (
-    <div>
-      {/* Sparkline header */}
-      <div className="mb-2 rounded-t-lg p-1.5" style={{ background: positive ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)' }}>
-        <MiniSparkline positive={positive} />
+    <div className="nse-tooltip-modern">
+      <div className="nse-tooltip-price-row">
+        <div>
+          <div className="nse-tooltip-price">
+            {lastPrice != null ? `₹${lastPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+          </div>
+          {changeAbs != null && (
+            <div className={`nse-tooltip-abs ${positive ? 'is-up' : 'is-down'}`}>
+              {changeAbs >= 0 ? '+' : ''}{changeAbs.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+          )}
+        </div>
+        {pchange != null && (
+          <div className={`nse-tooltip-pct ${positive ? 'is-up' : 'is-down'}`}>
+            {positive ? '▲' : '▼'} {pchange > 0 ? '+' : ''}{pchange.toFixed(2)}%
+          </div>
+        )}
       </div>
 
-      {graphSrc && (
-        <div className="mb-2 rounded-lg border border-slate-200 bg-white shadow-sm p-1.5 transition-transform hover:scale-[1.01]">
-          <div className="mb-1 flex items-center justify-between text-[8px] uppercase tracking-wider text-slate-400 font-bold">
-            <span className="flex items-center gap-1">
-              <span className="w-1 h-1 rounded-full bg-teal-500 animate-pulse" />
-              Price Chart
-            </span>
-            <span className="text-teal-600">30D</span>
+      <div className="nse-tooltip-chart">
+        {sparkline.length >= 2 ? (
+          <SparklineSVG positive={positive} data={sparkline} />
+        ) : (
+          <div className="nse-tooltip-chart-empty">
+            {chartLoading ? 'Loading chart…' : 'Chart unavailable'}
           </div>
-          <img src={graphSrc} alt="NSE chart" className="h-16 w-full rounded object-contain bg-white" />
-        </div>
-      )}
+        )}
+      </div>
 
-      <div className="space-y-0.5">
-        {Object.entries(data).map(([key, value]) => {
-          const isPrice = key === 'lastPrice' || key === 'lastCorpAnnouncementPrice';
-          const isChange = key === 'pchange' || key === 'pChange';
-          const accentClass = isPrice ? 'text-slate-900 font-bold' : isChange ? (positive ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500';
-          return (
-            <div key={key} className="group flex items-center justify-between gap-3 px-2 py-1 rounded-md transition-all hover:bg-slate-50 hover:scale-[1.01]">
-              <div className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold truncate">{formatNseKey(key)}</div>
-              <div className={`text-[9px] font-mono text-right ${accentClass} transition-colors`}>{formatNseFieldValue(key, value)}</div>
-            </div>
-          );
-        })}
+      <div className="nse-tooltip-ranges" role="tablist" aria-label="Price history range">
+        {(['1D', '1M', '1Y'] as const).map((item) => (
+          <button
+            key={item}
+            type="button"
+            role="tab"
+            aria-selected={range === item}
+            className={range === item ? 'is-active' : ''}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setRange(item);
+            }}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+
+      <div className="nse-tooltip-stats">
+        {statRows.map(([label, value, key]) => (
+          <div className="nse-tooltip-stat" key={label}>
+            <span>{label}</span>
+            <strong>{formatNseFieldValue(key, value)}</strong>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -496,15 +575,16 @@ function AdaptiveTooltipPortal({
       style={{
         position: 'fixed',
         zIndex: 9999,
-        maxWidth: '240px',
-        maxHeight: '50vh',
+        width: '300px',
+        maxWidth: 'calc(100vw - 24px)',
+        maxHeight: '70vh',
         top: position.top,
         left: position.left,
-        borderRadius: '10px',
+        borderRadius: '14px',
         border: '1px solid var(--terminal-line)',
         background: 'var(--terminal-panel)',
         color: 'var(--foreground)',
-        padding: '10px',
+        padding: '12px',
         boxShadow: positive !== null
           ? (positive
               ? '0 8px 32px color-mix(in srgb, var(--terminal-green) 22%, transparent), 0 2px 8px rgba(0,0,0,0.12)'
@@ -527,7 +607,7 @@ function AdaptiveTooltipPortal({
           </span>
         )}
       </div>
-      <NseTooltipContent data={stock} />
+      <NseTooltipContent data={stock} ticker={ticker} />
     </div>,
     document.body
   );
