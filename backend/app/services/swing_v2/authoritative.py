@@ -219,7 +219,7 @@ def _fill_locked_orders(ledger,now,cfg):
     if o:
       execute_paper_order(ledger,c,[o],expiry=expiry)
 def _manage_open_positions(ledger,now,cfg):
-  opens=[]; terminalized=0; terminalized_symbols=[]
+  opens=[]; terminalized=[]
   for pid,events in _position_groups(ledger).items():
    s=materialize_position(events)
    if s.get("entryTimestamp") and not s.get("terminal"): opens.append((pid,s))
@@ -231,67 +231,138 @@ def _manage_open_positions(ledger,now,cfg):
    except:continue
    due=time_exit_due(now,age,max_overnights=cfg.max_overnights,exit_clock=cfg.mandatory_exit_ist)
    for i,bar in enumerate(bars):
-    s=process_position_bar(ledger,pid,bar,is_d2_exit=due and i==len(bars)-1,data_status="LIVE")
-    if s.get("terminal"):
-     terminalized+=1
-     if symbol:
-       terminalized_symbols.append(symbol)
+    updated=process_position_bar(ledger,pid,bar,is_d2_exit=due and i==len(bars)-1,data_status="LIVE")
+    if updated.get("terminal"):
+     terminalized.append({
+      "symbol":symbol,
+      "status":str(updated.get("status") or ""),
+      "exitReason":str(updated.get("exitReason") or ""),
+      "entrySessionDate":str(updated.get("sessionDate") or ""),
+      "holdingSessionAge":age,
+     })
      break
-  return terminalized, terminalized_symbols
-def _try_replace_stopped(ledger, cfg, now, stopped_symbols, existing_positions, occupied_symbols):
-    terminalized = 0
-    if not stopped_symbols:
-        return 0
+  return terminalized
+
+def _try_backfill_after_exit(ledger,cfg,now,terminalized,existing_positions,occupied_symbols):
+    """Refill a freed Swing slot only after genuine STOP/T2 exits.
+
+    CLOSED_TIME is the hard second-session exit and must not spawn a fresh
+    replacement at the end of the holding mandate. Backfill candidates are
+    rescanned from a freshly refreshed snapshot and must pass final-lock gates.
+    """
+    eligible=[
+      row for row in (terminalized or [])
+      if str(row.get("status") or "") in {"CLOSED_STOP","CLOSED_T2"}
+      and row.get("symbol")
+    ]
+    result={
+      "attempted":False,
+      "eligibleExits":[str(row.get("symbol") or "").upper() for row in eligible],
+      "locked":0,
+      "filled":0,
+      "reason":None,
+      "candidates":0,
+    }
+    if not eligible:
+      result["reason"]="NO_STOP_OR_T2_EXIT"
+      return result
+
+    local=now.astimezone(IST).time().replace(tzinfo=None)
+    start=_clock(cfg.decision_start_ist); cutoff=_clock(cfg.entry_cutoff_ist)
+    if local<start or local>cutoff:
+      result["reason"]="OUTSIDE_BACKFILL_ENTRY_WINDOW"
+      return result
+
+    result["attempted"]=True
     try:
-        snapshot = _snapshot()
-    except Exception:
-        return 0
-    if not _v2_snapshot_ready(snapshot, cfg):
-        return 0
-    regime = str(snapshot.get("swingV2Regime") or "")
-    capacity = 0 if regime == "HALT_NEW_LONGS" else cfg.max_positions
-    active_count = sum(1 for r in existing_positions if not r.get("terminal") and not r.get("closed"))
-    available = max(0, capacity - active_count)
-    if available <= 0:
-        return 0
-    occupied = set(occupied_symbols or [])
+      snapshot=_refresh_snapshot("swing_v2_backfill_after_exit")
+    except Exception as exc:
+      result["reason"]=f"BACKFILL_REFRESH_FAILED:{type(exc).__name__}"
+      return result
+
+    readiness=_v2_readiness(snapshot,cfg)
+    if not readiness.get("ready"):
+      result["reason"]="BACKFILL_DATA_NOT_READY"
+      result["readinessReasons"]=list(readiness.get("reasons") or [])
+      return result
+
+    regime=str(snapshot.get("swingV2Regime") or "")
+    capacity=0 if regime=="HALT_NEW_LONGS" else cfg.max_positions
+    active_count=sum(1 for r in existing_positions if not r.get("terminal") and not r.get("closed"))
+    available=max(0,capacity-active_count)
+    result["availableSlots"]=available
+    result["regime"]=regime
+    if available<=0:
+      result["reason"]="NO_AVAILABLE_SLOT"
+      return result
+
+    occupied=set(str(s).upper() for s in (occupied_symbols or set()) if s)
     occupied.update(str(r.get("symbol") or "").upper() for r in existing_positions if r.get("symbol"))
-    occupied.update(symbol.upper() for symbol in stopped_symbols)
-    scan = build_from_market_snapshot(snapshot, final_lock=False, persist_events=False, occupied_symbols=occupied, existing_positions=existing_positions, now=now)
-    if scan.get("blocked") or not scan.get("candidates"):
-        return 0
-    candidates = scan.get("candidates", [])
-    if not candidates:
-        return 0
-    selected = candidates[: min(available, len(candidates))]
-    filled = 0
-    session_date = now.astimezone(IST).date().isoformat()
-    committed_at = now.astimezone(timezone.utc).isoformat()
+    # Never recycle a symbol already owned by Swing during the same session,
+    # including the symbol that just stopped or hit T2.
+    today=now.astimezone(IST).date().isoformat()
+    for row in _positions(ledger):
+      if str(row.get("sessionDate") or "")[:10]==today and row.get("symbol"):
+        occupied.add(str(row.get("symbol")).upper())
+
+    scan=build_from_market_snapshot(
+      snapshot,
+      final_lock=True,
+      persist_events=False,
+      occupied_symbols=occupied,
+      existing_positions=existing_positions,
+      now=now,
+    )
+    result["scanBlockReason"]=scan.get("blockReason")
+    candidates=list(scan.get("candidates") or [])
+    result["candidates"]=len(candidates)
+    if scan.get("blocked") or not candidates:
+      result["reason"]="NO_QUALIFIED_BACKFILL"
+      return result
+
+    session_date=today
+    committed_at=now.astimezone(timezone.utc).isoformat()
+    locked=0
+    locked_symbols=[]
     for row in candidates[:available]:
-        decision_id = row.get("decisionId")
-        symbol = str(row.get("symbol") or "").upper()
-        if not decision_id or not symbol:
-            continue
-        try:
-            ledger.append(
-                idempotency_key=f"{decision_id}:{EventType.POSITION_LOCKED}",
-                decision_id=decision_id,
-                position_id=decision_id,
-                symbol=symbol,
-                session_date=session_date,
-                event_type=EventType.POSITION_LOCKED,
-                event_timestamp=committed_at,
-                payload=row,
-            )
-        except Exception:
-            continue
-        filled += 1
-        if filled >= available:
-            break
-    if filled > 0:
-        expiry = datetime.combine(now.astimezone(IST).date(), _clock(cfg.order_expire_ist), tzinfo=IST)
-        _fill_locked_orders(ledger, now, cfg)
-    return filled
+      decision_id=row.get("decisionId")
+      symbol=str(row.get("symbol") or "").upper()
+      if not decision_id or not symbol:
+        continue
+      try:
+        ledger.append(
+          idempotency_key=f"{decision_id}:{EventType.POSITION_LOCKED}",
+          decision_id=decision_id,
+          position_id=decision_id,
+          symbol=symbol,
+          session_date=session_date,
+          event_type=EventType.POSITION_LOCKED,
+          event_timestamp=committed_at,
+          payload=row,
+        )
+      except Exception:
+        continue
+      locked+=1
+      locked_symbols.append(symbol)
+
+    result["locked"]=locked
+    result["lockedSymbols"]=locked_symbols
+    if locked<=0:
+      result["reason"]="BACKFILL_LOCK_FAILED"
+      return result
+
+    _fill_locked_orders(ledger,now,cfg)
+    states=_positions(ledger)
+    result["filled"]=sum(
+      1 for row in states
+      if str(row.get("sessionDate") or "")[:10]==session_date
+      and str(row.get("symbol") or "").upper() in set(locked_symbols)
+      and row.get("entryTimestamp")
+      and not row.get("terminal")
+    )
+    result["reason"]="BACKFILL_LOCKED"
+    return result
+
 def run_authoritative_cycle(*,now=None,force=False):
   global _SESSION_READ_CACHE,_SESSION_READ_CACHE_AT,_EOD_READ_CACHE
   cfg=load_config()
@@ -303,14 +374,17 @@ def run_authoritative_cycle(*,now=None,force=False):
    from ..nse_trading_calendar import is_nse_trading_day
    market=_market_day_status(now)
    if not is_nse_trading_day(now.date()): return _session({"enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,"blockReason":"NSE_MARKET_HOLIDAY","candidates":[],"funnel":{"universe":0}},now=now,market=market)
-   terminalized, terminalized_symbols = _manage_open_positions(ledger,now,cfg); current=_read_json(_state_path()); day=now.date().isoformat(); current=current if str(current.get("sessionDate") or "")==day else {"sessionDate":day,"selectionFinalized":False}; local=now.time().replace(tzinfo=None)
+   terminalized=_manage_open_positions(ledger,now,cfg); current=_read_json(_state_path()); day=now.date().isoformat(); current=current if str(current.get("sessionDate") or "")==day else {"sessionDate":day,"selectionFinalized":False}; local=now.time().replace(tzinfo=None)
    from .market_data import intraday_occupied_symbols
    occupied=intraday_occupied_symbols(day); existing=[r for r in _positions(ledger) if not r.get("terminal")]; start,freeze,expiry=(_clock(cfg.decision_start_ist),_clock(cfg.decision_freeze_ist),_clock(cfg.order_expire_ist)); scan=current.get("scan") if isinstance(current.get("scan"),dict) else None
    due=_session_scan_due(current, now)
-   if terminalized>0:
-    due=True
-    replaced=_try_replace_stopped(ledger,cfg,now,terminalized_symbols,existing,occupied)
-    terminalized+=replaced
+   if terminalized:
+    eligible=[row for row in terminalized if str(row.get("status") or "") in {"CLOSED_STOP","CLOSED_T2"}]
+    if eligible:
+     due=True
+     current["backfillDiagnostics"]=_try_backfill_after_exit(ledger,cfg,now,terminalized,existing,occupied)
+    else:
+     current["backfillDiagnostics"]={"attempted":False,"eligibleExits":[],"locked":0,"filled":0,"reason":"NO_STOP_OR_T2_EXIT"}
   if start<=local<freeze and not current.get("selectionFinalized") and due:
    snapshot=_refresh_snapshot("swing_v2_decision_scan")
    if not _v2_snapshot_ready(snapshot,cfg):
