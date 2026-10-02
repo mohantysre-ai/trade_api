@@ -33,9 +33,18 @@ def session_age(entry_day: date, current_day: date, holidays: set[date] | None =
 
 
 def time_exit_due(now_ist: datetime, holding_session_age: int, *, max_overnights: int = 2, exit_clock: str = "15:15") -> bool:
+    """Return True only for a mandatory time exit after at least one overnight.
+
+    Swing positions may still close on the entry session via stop/T1/T2/thesis
+    rules, but a pure time-based exit must never turn Swing into an intraday
+    book.  This invariant also protects production from an accidental
+    SWING_MAX_OVERNIGHTS=1 override.
+    """
+    if holding_session_age <= 0:
+        return False
     local = now_ist.astimezone(IST)
     hour, minute = (int(part) for part in exit_clock.split(":"))
-    final_session_age = max(0, max_overnights - 1)
+    final_session_age = max(1, max_overnights - 1)
     return holding_session_age > final_session_age or (
         holding_session_age == final_session_age
         and local.time().replace(tzinfo=None) >= time(hour, minute)
