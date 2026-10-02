@@ -108,6 +108,52 @@ def test_swing_v2_is_paper_authoritative(v2_env):
     assert session["v1Enabled"] is False
 
 
+def test_session_carries_prior_day_open_positions_into_current_view(v2_env, monkeypatch):
+    auth = v2_env["auth"]
+    now = datetime(2026, 9, 24, 10, 30, tzinfo=IST)
+    monkeypatch.setattr(auth, "_snapshot", lambda: {
+        "swingV2Regime": "NORMAL",
+        "stockQuotes": {
+            "CARRY": {"ltpRaw": 106.0},
+            "TODAY": {"ltpRaw": 202.0},
+        },
+    })
+    monkeypatch.setattr(auth, "_positions", lambda _ledger: [
+        {
+            "positionId": "carry-1", "symbol": "CARRY", "sessionDate": "2026-09-23",
+            "entryTimestamp": "2026-09-23T05:00:00Z", "terminal": False,
+            "entryPrice": 100.0, "filledQty": 10, "remainingQty": 10,
+            "deployedCapital": 1000.0, "realizedPnl": 0.0,
+        },
+        {
+            "positionId": "today-1", "symbol": "TODAY", "sessionDate": "2026-09-24",
+            "entryTimestamp": "2026-09-24T05:00:00Z", "terminal": False,
+            "entryPrice": 200.0, "filledQty": 5, "remainingQty": 5,
+            "deployedCapital": 1000.0, "realizedPnl": 0.0,
+        },
+    ])
+    monkeypatch.setattr(auth, "_read_json", lambda *_args, **_kwargs: {
+        "sessionDate": "2026-09-24", "selectionFinalized": False,
+    })
+
+    session = auth._session(
+        {"regime": "NORMAL", "funnel": {}},
+        now=now,
+        market={"isTradingDay": True, "isHoliday": False, "isWeekend": False, "reason": "TRADING_DAY"},
+    )
+
+    assert {row["symbol"] for row in session["long"]} == {"CARRY", "TODAY"}
+    carry = next(row for row in session["long"] if row["symbol"] == "CARRY")
+    today = next(row for row in session["long"] if row["symbol"] == "TODAY")
+    assert carry["holdingSessionAge"] == 1
+    assert today["holdingSessionAge"] == 0
+    assert session["counts"]["carried"] == 1
+    assert session["counts"]["openedToday"] == 1
+    assert session["entryHuntDiagnostics"]["openPositions"] == 2
+    assert session["entryHuntDiagnostics"]["availableSlots"] == 3
+    assert session["cashHeld"] is False
+
+
 def test_session_reports_remaining_slots_and_scan_evidence(v2_env, monkeypatch):
     auth = v2_env["auth"]
     monkeypatch.setattr(auth, "_snapshot", lambda: {"swingV2Regime": "DEFENSIVE"})
