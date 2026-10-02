@@ -2277,30 +2277,40 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
     setSentimentFilter(null);
   };
 
-  // Sidebar mode: terminal-native live intelligence stream
+  // Sidebar mode: institutional event stream
   if (sidebar) {
     const bullishCount = baseItems.filter((item) => (item.sentiment ?? "Neutral") === "Bullish").length;
     const bearishCount = baseItems.filter((item) => (item.sentiment ?? "Neutral") === "Bearish").length;
     const neutralCount = baseItems.filter((item) => (item.sentiment ?? "Neutral") === "Neutral").length;
+    const newestPublishedAt = baseItems.reduce<number | null>((latest, item) => {
+      const stamp = new Date(item.publishedAt).getTime();
+      if (!Number.isFinite(stamp)) return latest;
+      return latest == null || stamp > latest ? stamp : latest;
+    }, null);
 
     return (
-      <section className="news-compact-panel">
-        <header className="news-compact-header">
+      <section className="news-compact-panel news-terminal-stream">
+        <header className="news-compact-header news-terminal-header">
           <div>
             <div className="news-compact-titleline">
               <span className="news-compact-live-dot" aria-hidden />
               <h3>MARKET NEWS</h3>
               <span className="news-compact-live">LIVE</span>
             </div>
-            <p>{filtered.length} stories · {sources.length} sources</p>
+            <p>{baseItems.length} stories · {sources.length} sources · institutional event stream</p>
           </div>
-          {hasFilters && (
-            <button type="button" onClick={resetFilters} className="news-compact-clear">Clear filters</button>
-          )}
+          <div className="news-terminal-header-actions">
+            {hasFilters && (
+              <button type="button" onClick={resetFilters} className="news-compact-clear">Clear filters</button>
+            )}
+            <span className="news-terminal-freshness">
+              {newestPublishedAt ? timeAgo(new Date(newestPublishedAt).toISOString()) : "—"}
+            </span>
+          </div>
         </header>
 
-        <div className="news-compact-toolbar">
-          <div className="news-compact-sentiment" role="group" aria-label="News sentiment filter">
+        <div className="news-compact-toolbar news-terminal-toolbar">
+          <div className="news-compact-sentiment news-terminal-filterstrip" role="group" aria-label="News sentiment filter">
             {([
               ["All", baseItems.length],
               ["Bullish", bullishCount],
@@ -2321,15 +2331,15 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
             })}
           </div>
 
-          <div className="news-compact-categories" aria-label="News category filter">
+          <div className="news-compact-categories news-terminal-categorystrip" aria-label="News category filter">
             <button
               type="button"
               className={!categoryFilter ? "is-active" : ""}
               onClick={() => setCategoryFilter(null)}
             >
-              All
+              All sectors
             </button>
-            {categories.slice(0, 6).map((category) => (
+            {categories.slice(0, 7).map((category) => (
               <button
                 key={category}
                 type="button"
@@ -2340,38 +2350,65 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
               </button>
             ))}
           </div>
+
+          <label className="news-terminal-source-filter">
+            <span>Source</span>
+            <select value={sourceFilter ?? ""} onChange={(event) => setSourceFilter(event.target.value || null)}>
+              <option value="">All</option>
+              {sources.map((source) => <option key={source} value={source}>{source}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <div className="news-terminal-columns" aria-hidden>
+          <span>Age</span>
+          <span>Source</span>
+          <span>Signal</span>
+          <span>Headline / market context</span>
+          <span />
         </div>
 
         <div
-          className="news-compact-list"
+          className="news-compact-list news-terminal-list"
           tabIndex={0}
           ref={railRef}
           onScroll={handleSidebarScroll}
-          aria-label="Live market news feed"
+          aria-label="Live market news intelligence stream"
         >
           {displayed.length === 0 ? (
             <div className="news-compact-empty">No stories match the selected filters.</div>
           ) : displayed.map((item, i) => {
             const sentiment = item.sentiment ?? "Neutral";
+            const category = item.category ?? "Market";
             const initials = item.source.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "N";
+            const publishedMs = new Date(item.publishedAt).getTime();
+            const ageMinutes = Number.isFinite(publishedMs) ? Math.max(0, Math.floor((now - publishedMs) / 60000)) : 9999;
+            const recencyClass = ageMinutes <= 15 ? "is-fresh" : ageMinutes <= 60 ? "is-recent" : "is-aged";
             return (
               <a
                 key={`${item.title}-${i}`}
                 href={item.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="news-compact-row"
+                className={`news-compact-row news-terminal-row ${recencyClass}`}
               >
-                <span className="news-compact-source" title={item.source}>{initials}</span>
-                <div className="news-compact-content">
-                  <div className="news-compact-meta">
-                    <span className="news-compact-source-name">{item.source}</span>
-                    <time dateTime={item.publishedAt}>{timeAgo(item.publishedAt)}</time>
-                    <span className={`news-compact-sentiment-tag is-${sentiment.toLowerCase()}`}>{sentiment}</span>
-                  </div>
+                <time className="news-terminal-age" dateTime={item.publishedAt}>{timeAgo(item.publishedAt)}</time>
+
+                <div className="news-terminal-source-cell">
+                  <span className="news-compact-source" title={item.source}>{initials}</span>
+                  <span className="news-compact-source-name">{item.source}</span>
+                </div>
+
+                <div className="news-terminal-signal-cell">
+                  <span className={`news-compact-sentiment-tag is-${sentiment.toLowerCase()}`}>{sentiment}</span>
+                  <span className="news-terminal-category">{category}</span>
+                </div>
+
+                <div className="news-compact-content news-terminal-content">
                   <h4>{item.title}</h4>
                   {item.summary ? <p>{item.summary}</p> : null}
                 </div>
+
                 <span className="news-compact-open" aria-hidden>↗</span>
               </a>
             );
@@ -2381,9 +2418,14 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
           {infiniteError && <div className="news-compact-error">Feed degraded: {infiniteError}</div>}
         </div>
 
-        <footer className="news-compact-footer">
-          <span>{infiniteHasMore ? "Scroll for more" : "Latest batch complete"}</span>
-          <span>RSS + backend feed</span>
+        <footer className="news-compact-footer news-terminal-footer">
+          <span>
+            {filtered.length} visible · {baseItems.length} loaded · {sources.length} sources
+          </span>
+          <span className="news-terminal-footer-status">
+            <i aria-hidden />
+            {infiniteHasMore ? "Live feed · scroll for more" : "Latest batch complete"}
+          </span>
         </footer>
       </section>
     );
