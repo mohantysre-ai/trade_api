@@ -4724,3 +4724,213 @@ html[data-theme="light"] .news-compact-toolbar {
     height: auto !important;
   }
 }
+
+
+/* ─── Sidebar readability polish: breadth / movers / flow / insights ─── */
+
+/* Keep the right rail compact, but readable at normal browser zoom. */
+.market-overview-v3 .market-side-card {
+  padding: 12px 13px !important;
+}
+
+.market-overview-v3 .market-side-title {
+  margin-bottom: 11px;
+  font-size: 12px !important;
+  line-height: 1.2;
+  letter-spacing: .025em !important;
+}
+
+.market-overview-v3 .market-side-title > span {
+  font-size: 9px !important;
+}
+
+.market-overview-v3 .market-side-tabs button {
+  min-height: 34px !important;
+  padding: 0 8px !important;
+  font-size: 9.5px !important;
+  line-height: 1.1;
+}
+
+.market-overview-v3 .market-breadth-bar {
+  height: 16px !important;
+  border-radius: 5px;
+}
+
+.market-overview-v3 .market-breadth-stats {
+  gap: 8px !important;
+  margin-top: 10px !important;
+}
+
+.market-overview-v3 .market-breadth-stats > div {
+  font-size: 9px !important;
+  line-height: 1.3;
+}
+
+.market-overview-v3 .market-breadth-stats strong {
+  margin-top: 4px !important;
+  font-size: 15px !important;
+  line-height: 1;
+}
+
+.market-overview-v3 .market-breadth-stats .dot {
+  width: 8px !important;
+  height: 8px !important;
+  margin-right: 5px !important;
+}
+
+.market-overview-v3 .market-mover-head,
+.market-overview-v3 .market-mover-row {
+  grid-template-columns: minmax(0, 1fr) 76px 62px !important;
+  gap: 7px !important;
+}
+
+.market-overview-v3 .market-mover-head {
+  padding: 4px 0 6px !important;
+  font-size: 8.5px !important;
+}
+
+.market-overview-v3 .market-mover-row {
+  min-height: 34px !important;
+  font-size: 10px !important;
+}
+
+.market-overview-v3 .market-mover-row strong {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+}
+
+.market-overview-v3 .market-mover-row span {
+  font-size: 10px !important;
+}
+
+.market-overview-v3 .market-flow-tabs {
+  gap: 5px !important;
+  padding-bottom: 6px !important;
+}
+
+.market-overview-v3 .market-flow-tabs button {
+  min-height: 30px !important;
+  padding: 0 9px !important;
+  font-size: 8.5px !important;
+  line-height: 1.1;
+}
+
+.market-overview-v3 .market-flow-row {
+  grid-template-columns: minmax(0,1fr) 70px 82px !important;
+  gap: 8px !important;
+  min-height: 34px !important;
+}
+
+.market-overview-v3 .market-flow-row strong {
+  font-size: 9.5px !important;
+  font-weight: 800 !important;
+}
+
+.market-overview-v3 .market-flow-row span {
+  font-size: 9.5px !important;
+}
+
+.market-overview-v3 .market-risk-label {
+  font-size: 9px !important;
+  line-height: 1.2;
+}
+
+.market-overview-v3 .market-risk-row {
+  grid-template-columns: minmax(0,1fr) 110px !important;
+  gap: 10px !important;
+}
+
+.market-overview-v3 .market-risk-row strong {
+  font-size: 11px !important;
+}
+
+.market-overview-v3 .market-risk-legend {
+  gap: 8px !important;
+  font-size: 9px !important;
+}
+
+.market-overview-v3 .market-risk-legend i {
+  width: 8px !important;
+  height: 8px !important;
+}
+
+.market-overview-v3 .market-takeaways li {
+  margin: 5px 0 !important;
+  font-size: 9.5px !important;
+  line-height: 1.45 !important;
+}
+
+.market-overview-v3 .market-side-empty {
+  font-size: 9.5px !important;
+}
+
+/* Light theme contrast was technically correct but still too faint in the
+   right rail. Make secondary numbers/labels visibly darker. */
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-breadth-stats > div,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-mover-head,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-flow-row span,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-risk-label,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-risk-legend,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-takeaways li {
+  color: #52616d !important;
+}
+
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-breadth-stats strong,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-mover-row span:not(.is-up):not(.is-down),
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-flow-price {
+  color: #334155 !important;
+}
+
+/* Narrow rail/mobile: retain the larger type and let controls wrap/scroll
+   instead of shrinking text back down. */
+@media (max-width: 640px) {
+  .market-overview-v3 .market-side-card {
+    padding: 12px !important;
+  }
+
+  .market-overview-v3 .market-side-title {
+    font-size: 13px !important;
+  }
+
+  .market-overview-v3 .market-side-tabs button {
+    min-height: 38px !important;
+    font-size: 10px !important;
+  }
+
+  .market-overview-v3 .market-breadth-stats > div {
+    font-size: 9.5px !important;
+  }
+
+  .market-overview-v3 .market-breadth-stats strong {
+    font-size: 16px !important;
+  }
+
+  .market-overview-v3 .market-mover-row {
+    min-height: 38px !important;
+  }
+
+  .market-overview-v3 .market-mover-row strong,
+  .market-overview-v3 .market-mover-row span {
+    font-size: 10.5px !important;
+  }
+
+  .market-overview-v3 .market-flow-tabs button {
+    min-height: 32px !important;
+    font-size: 9px !important;
+  }
+
+  .market-overview-v3 .market-flow-row {
+    min-height: 38px !important;
+  }
+
+  .market-overview-v3 .market-flow-row strong,
+  .market-overview-v3 .market-flow-row span {
+    font-size: 10px !important;
+  }
+
+  .market-overview-v3 .market-risk-label,
+  .market-overview-v3 .market-risk-legend,
+  .market-overview-v3 .market-takeaways li {
+    font-size: 10px !important;
+  }
+}
