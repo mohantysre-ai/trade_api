@@ -4642,3 +4642,85 @@ html[data-theme="light"] .news-compact-toolbar {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+
+
+/* ─── Drawer Trendlyne widget fit + light shell polish ───────────────── */
+
+/* Trendlyne injects its own iframe/widget width. Never let that width escape
+   the analysis drawer; if the provider emits a wider document, keep it usable
+   with contained horizontal scrolling rather than clipping the right edge. */
+.right-drawer .trendlyne-widgets,
+.right-drawer iframe[src*="trendlyne"],
+.right-drawer [data-get-url*="trendlyne"],
+.right-drawer div:has(> .trendlyne-widgets),
+.right-drawer div:has(> iframe[src*="trendlyne"]) {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.right-drawer iframe[src*="trendlyne"] {
+  display: block !important;
+  margin: 0 !important;
+  border: 0 !important;
+}
+
+.right-drawer div:has(> iframe[src*="trendlyne"]) {
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+/* The external Trendlyne widget is itself light themed. Its host should not
+   remain a black slab when the terminal is in LIGHT mode. */
+:root[data-theme="light"] .right-drawer div[class*="bg-slate-950"]:has(.trendlyne-widgets),
+:root[data-theme="light"] .right-drawer div[class*="bg-slate-950"]:has(iframe[src*="trendlyne"]),
+:root[data-theme="light"] .right-drawer [class*="bg-slate-950"]:has(> [data-get-url*="trendlyne"]) {
+  background: #ffffff !important;
+  border-color: rgba(51,65,85,.16) !important;
+}
+
+:root[data-theme="light"] .right-drawer .trendlyne-widgets,
+:root[data-theme="light"] .right-drawer iframe[src*="trendlyne"] {
+  background: #ffffff !important;
+  color-scheme: light !important;
+}
+
+/* Drawer tabs: preserve a visible left edge even after horizontal scrolling. */
+.right-drawer-tabs {
+  scroll-padding-inline: 12px !important;
+  overscroll-behavior-x: contain;
+}
+.right-drawer-tabs::before,
+.right-drawer-tabs::after {
+  content: "";
+  flex: 0 0 2px;
+}
+
+/* The provider widgets need a little more usable width. Reduce decorative
+   padding around them on drawer/mobile layouts instead of shrinking content. */
+@media (max-width: 900px) {
+  .right-drawer [class*="rounded-3xl"] > .relative.p-5 {
+    padding: 0.8rem !important;
+  }
+  .right-drawer iframe[src*="trendlyne"] {
+    min-width: 100% !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .right-drawer div:has(> iframe[src*="trendlyne"]) {
+    border-radius: 10px !important;
+  }
+  .right-drawer iframe[src*="trendlyne"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .right-drawer [class*="h-[min(70dvh,500px)]"],
+  .right-drawer [class*="min-h-[420px]"] {
+    min-height: 440px !important;
+    height: auto !important;
+  }
+}
