@@ -4,7 +4,15 @@
 FROM node:24.20.0-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+# Tailwind 4 loads Lightning CSS through a platform-native optional package.
+# npm can occasionally omit that optional binary from a Docker/Linux install
+# even when it is present in package-lock.json. Install optional deps explicitly
+# and repair the exact Linux x64 native package only when the binary is absent.
+RUN if [ -f package-lock.json ]; then npm ci --include=optional; else npm install --include=optional; fi \
+    && if [ ! -f node_modules/lightningcss-linux-x64-gnu/lightningcss.linux-x64-gnu.node ]; then \
+         npm install --no-save --include=optional lightningcss-linux-x64-gnu@1.32.0; \
+       fi \
+    && test -f node_modules/lightningcss-linux-x64-gnu/lightningcss.linux-x64-gnu.node
 
 FROM node:24.20.0-bookworm-slim AS builder
 WORKDIR /app
