@@ -4550,3 +4550,95 @@ html[data-theme="light"] .news-compact-toolbar {
     width: min(100vw, 42rem) !important;
   }
 }
+
+
+/* ─── Light-theme market overview hard override (screenshot fix) ─────── */
+/* Some V3 mock styles intentionally used hard-coded dark colors + !important.
+   Keep this block last so LIGHT always wins after runtime theme toggle. */
+:root[data-theme="light"] body .terminal-shell .market-overview-v3,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 * {
+  color-scheme: light;
+}
+
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 {
+  --mo-bg: #f4f7fa !important;
+  --mo-panel: #ffffff !important;
+  --mo-panel-2: #f7fafc !important;
+  --mo-line: rgba(51,65,85,.17) !important;
+  --mo-line-strong: rgba(37,99,235,.34) !important;
+  --mo-muted: #536673 !important;
+  --mo-subtle: #748491 !important;
+}
+
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-overview-header,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-overview-section,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-side-card,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .news-compact-panel,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-kpi-strip .desk-metric-tile,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-overview-grid .desk-metric-tile {
+  background: #ffffff !important;
+  background-image: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%) !important;
+  border-color: rgba(51,65,85,.16) !important;
+  box-shadow: 0 4px 14px rgba(15,23,42,.055), inset 0 1px 0 #ffffff !important;
+}
+
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-overview-header__brand h2,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .desk-panel-title,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .desk-metric-value,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-side-title,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .news-compact-titleline h3,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .news-compact-content h4,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-flow-row strong,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-mover-row strong {
+  color: #17212b !important;
+  text-shadow: none !important;
+}
+
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .desk-metric-label,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-overview-section-subtitle,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-overview-meta-label,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-overview-provider strong:not(.is-live):not(.is-warn),
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-breadth-stats > div,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .news-compact-meta,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .news-compact-content p {
+  color: #60717d !important;
+}
+
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-region-tabs button,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-range-tabs button,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-side-tabs button,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-flow-tabs button,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .news-compact-sentiment button,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .news-compact-categories button {
+  background: #f7fafc !important;
+  color: #52616d !important;
+  border-color: rgba(51,65,85,.14) !important;
+}
+
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-region-tabs button.is-active,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-range-tabs button.is-active,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-side-tabs button.is-active,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-flow-tabs button.is-active,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .news-compact-sentiment button.is-active,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .news-compact-categories button.is-active {
+  background: #eaf2ff !important;
+  color: #1d4ed8 !important;
+  border-color: rgba(37,99,235,.30) !important;
+}
+
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .news-compact-source {
+  background: #eef3f7 !important;
+  color: #334155 !important;
+  border-color: rgba(51,65,85,.14) !important;
+}
+
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-breadth-bar {
+  background: #e5eaf0 !important;
+}
+
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-overview-header,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-overview-section,
+:root[data-theme="light"] body .terminal-shell .market-overview-v3 .market-side-card {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
