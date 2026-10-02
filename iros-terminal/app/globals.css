@@ -4221,3 +4221,332 @@ html[data-theme="light"] .category-dot {
     font-size: 10.5px;
   }
 }
+
+
+/* ─── Minor responsive/theme polish: market + drawer + news ───────────── */
+
+/* Market Overview V3 must genuinely invert in light theme instead of keeping
+   the dark mock palette hard-coded inside cards. */
+html[data-theme="light"] .market-overview-v3 {
+  --mo-bg: #f5f8fb;
+  --mo-panel: #ffffff;
+  --mo-panel-2: #f8fafc;
+  --mo-line: rgba(51, 65, 85, 0.16);
+  --mo-line-strong: rgba(37, 99, 235, 0.30);
+  --mo-blue: #2563eb;
+  --mo-cyan: #0284c7;
+  --mo-green: #059669;
+  --mo-red: #dc2626;
+  --mo-amber: #b7791f;
+  --mo-muted: #526675;
+  --mo-subtle: #71808d;
+  color: #17212b;
+}
+
+html[data-theme="light"] .market-overview-header,
+html[data-theme="light"] .market-overview-v3 .market-overview-section,
+html[data-theme="light"] .market-side-card,
+html[data-theme="light"] .news-compact-panel {
+  background: linear-gradient(180deg, #ffffff, #f8fafc) !important;
+  border-color: var(--mo-line) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 4px 18px rgba(15,23,42,.06) !important;
+}
+
+html[data-theme="light"] .market-kpi-strip .desk-metric-tile,
+html[data-theme="light"] .market-overview-v3 .market-overview-grid .desk-metric-tile {
+  background: linear-gradient(145deg, #ffffff, #f7fafc) !important;
+  border-color: var(--mo-line) !important;
+  box-shadow: inset 0 1px 0 #ffffff, 0 3px 12px rgba(15,23,42,.045) !important;
+}
+
+html[data-theme="light"] .market-overview-header__brand h2,
+html[data-theme="light"] .market-overview-v3 .desk-panel-title,
+html[data-theme="light"] .market-side-title,
+html[data-theme="light"] .news-compact-titleline h3,
+html[data-theme="light"] .market-kpi-strip .desk-metric-value,
+html[data-theme="light"] .market-overview-v3 .market-overview-grid .desk-metric-value,
+html[data-theme="light"] .news-compact-content h4,
+html[data-theme="light"] .market-flow-row strong {
+  color: #17212b !important;
+}
+
+html[data-theme="light"] .market-overview-section-subtitle,
+html[data-theme="light"] .market-overview-header p,
+html[data-theme="light"] .news-compact-header p,
+html[data-theme="light"] .news-compact-meta,
+html[data-theme="light"] .news-compact-content p,
+html[data-theme="light"] .market-flow-row span,
+html[data-theme="light"] .market-breadth-stats > div {
+  color: #667784 !important;
+}
+
+html[data-theme="light"] .market-region-tabs button,
+html[data-theme="light"] .market-range-tabs button,
+html[data-theme="light"] .market-side-tabs button,
+html[data-theme="light"] .market-flow-tabs button,
+html[data-theme="light"] .news-compact-sentiment button,
+html[data-theme="light"] .news-compact-categories button {
+  background: #f8fafc;
+  border-color: rgba(51,65,85,.14);
+  color: #5d6b77;
+}
+
+html[data-theme="light"] .market-region-tabs button.is-active,
+html[data-theme="light"] .market-range-tabs button.is-active,
+html[data-theme="light"] .market-side-tabs button.is-active,
+html[data-theme="light"] .market-flow-tabs button.is-active,
+html[data-theme="light"] .news-compact-sentiment button.is-active,
+html[data-theme="light"] .news-compact-categories button.is-active {
+  background: rgba(37,99,235,.10);
+  border-color: rgba(37,99,235,.28);
+  color: #1d4ed8;
+}
+
+html[data-theme="light"] .news-compact-row,
+html[data-theme="light"] .market-flow-row,
+html[data-theme="light"] .market-mover-row {
+  border-color: rgba(51,65,85,.10);
+}
+
+html[data-theme="light"] .news-compact-row:hover,
+html[data-theme="light"] .market-flow-row:hover {
+  background: rgba(37,99,235,.045);
+}
+
+html[data-theme="light"] .news-compact-source {
+  background: #eef3f7;
+  border-color: rgba(51,65,85,.14);
+  color: #334155;
+}
+
+html[data-theme="light"] .news-compact-footer,
+html[data-theme="light"] .news-compact-toolbar {
+  border-color: rgba(51,65,85,.10);
+}
+
+/* Drawer: keep controls visible and prevent research/Trendlyne content from
+   exceeding the usable viewport. */
+.right-drawer {
+  background: var(--terminal-panel) !important;
+  color: var(--foreground);
+  width: min(100vw, clamp(28rem, 52vw, 46rem)) !important;
+  max-width: 100vw !important;
+}
+
+.right-drawer > *,
+.right-drawer section,
+.right-drawer article,
+.right-drawer [class*="grid"],
+.right-drawer [class*="flex"] {
+  min-width: 0;
+}
+
+.right-drawer img,
+.right-drawer svg:not(.right-drawer-close svg),
+.right-drawer canvas {
+  max-width: 100%;
+}
+
+.right-drawer table {
+  width: 100%;
+  max-width: 100%;
+}
+
+.right-drawer pre,
+.right-drawer code {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.right-drawer-close {
+  position: relative !important;
+  z-index: 200 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  border: 1px solid color-mix(in srgb, var(--fg-muted) 34%, var(--terminal-line)) !important;
+  background: var(--terminal-panel-2) !important;
+  color: var(--fg-strong) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  box-shadow: 0 3px 12px rgba(0,0,0,.16) !important;
+}
+.right-drawer-close svg {
+  display: block !important;
+  width: 17px !important;
+  height: 17px !important;
+  stroke: currentColor !important;
+  opacity: 1 !important;
+}
+.right-drawer-close:hover {
+  background: var(--terminal-panel-hover) !important;
+  color: var(--terminal-red) !important;
+}
+
+/* Research widgets inside the drawer: favour one fluid column until there is
+   enough width. This fixes Trendlyne cards/tables clipping in the side sheet. */
+.right-drawer .grid.md\:grid-cols-2,
+.right-drawer .grid.md\:grid-cols-3 {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+.right-drawer .md\:col-span-2 {
+  grid-column: auto !important;
+}
+.right-drawer [class*="rounded-xl"],
+.right-drawer [class*="rounded-lg"] {
+  max-width: 100%;
+}
+.right-drawer .desk-scroll-x {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Make Bloomberg-style news readable at normal zoom. */
+.market-news-wide .news-compact-content h4 {
+  font-size: 13px !important;
+  line-height: 1.38 !important;
+}
+.market-news-wide .news-compact-content p {
+  font-size: 10.5px !important;
+  line-height: 1.42 !important;
+}
+.market-news-wide .news-compact-meta,
+.market-news-wide .news-compact-source-name {
+  font-size: 9px !important;
+}
+.market-news-wide .news-compact-sentiment-tag {
+  font-size: 8px !important;
+}
+.market-news-wide .news-compact-row {
+  min-height: 108px;
+}
+
+/* Mobile: one news card per row, readable type, no squeezed metadata. */
+@media (max-width: 640px) {
+  .right-drawer {
+    width: 100dvw !important;
+    max-width: 100dvw !important;
+    border-left: 0 !important;
+  }
+  .right-drawer-head {
+    padding: 0.55rem 0.65rem !important;
+    padding-top: max(0.55rem, env(safe-area-inset-top)) !important;
+  }
+  .right-drawer-close {
+    position: sticky !important;
+    top: max(6px, env(safe-area-inset-top)) !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+  }
+  .right-drawer-tabs button {
+    font-size: 0.69rem !important;
+    min-height: 42px !important;
+  }
+  .right-drawer > div:last-of-type {
+    padding: 0.65rem !important;
+  }
+
+  .market-news-wide .news-compact-panel {
+    min-height: 0;
+    max-height: none;
+  }
+  .market-news-wide .news-compact-header {
+    padding: 10px 11px 8px;
+  }
+  .market-news-wide .news-compact-titleline h3 {
+    font-size: 12px !important;
+  }
+  .market-news-wide .news-compact-header p {
+    font-size: 9px !important;
+  }
+  .market-news-wide .news-compact-toolbar {
+    display: block;
+    padding: 8px;
+  }
+  .market-news-wide .news-compact-sentiment {
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 5px;
+  }
+  .market-news-wide .news-compact-sentiment button {
+    min-height: 34px;
+    font-size: 9px !important;
+  }
+  .market-news-wide .news-compact-categories {
+    justify-content: flex-start;
+    margin-top: 7px;
+  }
+  .market-news-wide .news-compact-categories button {
+    min-height: 30px;
+    font-size: 8.5px !important;
+  }
+  .market-news-wide .news-compact-list {
+    display: block;
+    max-height: none;
+    overflow-y: visible;
+  }
+  .market-news-wide .news-compact-row {
+    grid-template-columns: 34px minmax(0,1fr) 14px;
+    min-height: 0;
+    padding: 12px 10px;
+    border-right: 0 !important;
+  }
+  .market-news-wide .news-compact-source {
+    width: 34px;
+    height: 34px;
+    font-size: 9px;
+  }
+  .market-news-wide .news-compact-meta {
+    flex-wrap: wrap;
+    gap: 4px 7px;
+    font-size: 9px !important;
+  }
+  .market-news-wide .news-compact-source-name {
+    max-width: 48vw;
+    font-size: 9px !important;
+  }
+  .market-news-wide .news-compact-sentiment-tag {
+    margin-left: 0;
+    font-size: 8px !important;
+  }
+  .market-news-wide .news-compact-content h4 {
+    margin-top: 6px;
+    -webkit-line-clamp: 3;
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+  }
+  .market-news-wide .news-compact-content p {
+    -webkit-line-clamp: 2;
+    font-size: 11px !important;
+    line-height: 1.42 !important;
+  }
+  .market-news-wide .news-compact-footer {
+    font-size: 8px !important;
+  }
+
+  /* Snapshot cards should not squeeze into unreadable 2-up layouts on narrow phones. */
+  .market-overview-v3 .market-overview-grid,
+  .market-kpi-strip {
+    grid-template-columns: minmax(0,1fr) !important;
+  }
+  .market-overview-v3 .market-overview-grid .desk-metric-tile,
+  .market-kpi-strip .desk-metric-tile {
+    min-height: 78px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 900px) {
+  .market-news-wide .news-compact-list {
+    grid-template-columns: minmax(0,1fr) !important;
+  }
+  .right-drawer {
+    width: min(100vw, 42rem) !important;
+  }
+}
