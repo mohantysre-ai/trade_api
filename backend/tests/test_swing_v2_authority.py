@@ -454,6 +454,84 @@ def test_missing_history_causes_backfill_or_hold_not_ready():
     assert bars == []
 
 
+def test_backfill_runs_only_for_stop_or_t2_and_uses_fresh_final_lock(v2_env, monkeypatch):
+    auth = v2_env["auth"]
+    cfg = v2_env["cfg"].load_config()
+    now = datetime(2026, 9, 23, 11, 0, tzinfo=IST)
+
+    class DummyLedger:
+        def __init__(self):
+            self.rows = []
+        def append(self, **kwargs):
+            self.rows.append(kwargs)
+            return kwargs
+
+    ledger = DummyLedger()
+    snapshot = {
+        "swingV2UniverseCoverage": 1.0,
+        "swingV2Regime": "NORMAL",
+        "swingV2DataStatus": {
+            "featureRows": 100,
+            "historyReadyRows": 100,
+            "shortMomentumReadyRows": 100,
+            "universeCurrent": True,
+            "surveillanceCurrent": True,
+            "corporateEventsCurrent": True,
+        },
+    }
+    monkeypatch.setattr(auth, "_refresh_snapshot", lambda reason: snapshot)
+    monkeypatch.setattr(auth, "_positions", lambda _ledger: [])
+    monkeypatch.setattr(auth, "_fill_locked_orders", lambda *_args, **_kwargs: None)
+
+    captured = {}
+    def fake_build(snapshot_arg, **kwargs):
+        captured.update(kwargs)
+        return {
+            "blocked": False,
+            "candidates": [{
+                "decisionId": "replacement-1",
+                "symbol": "RELIANCE",
+                "sessionDate": now.date().isoformat(),
+            }],
+        }
+    monkeypatch.setattr(auth, "build_from_market_snapshot", fake_build)
+
+    result = auth._try_backfill_after_exit(
+        ledger,
+        cfg,
+        now,
+        [{"symbol": "DABUR", "status": "CLOSED_T2"}],
+        existing_positions=[],
+        occupied_symbols=set(),
+    )
+
+    assert result["attempted"] is True
+    assert result["locked"] == 1
+    assert result["eligibleExits"] == ["DABUR"]
+    assert captured["final_lock"] is True
+    assert captured["persist_events"] is False
+
+
+def test_closed_time_does_not_trigger_backfill(v2_env):
+    auth = v2_env["auth"]
+    cfg = v2_env["cfg"].load_config()
+    now = datetime(2026, 9, 23, 15, 16, tzinfo=IST)
+
+    class DummyLedger:
+        pass
+
+    result = auth._try_backfill_after_exit(
+        DummyLedger(),
+        cfg,
+        now,
+        [{"symbol": "DLF", "status": "CLOSED_TIME"}],
+        existing_positions=[],
+        occupied_symbols=set(),
+    )
+    assert result["attempted"] is False
+    assert result["reason"] == "NO_STOP_OR_T2_EXIT"
+
+
 def test_corporate_action_applies_r_formula_and_persists(tmp_path):
     from app.services.swing_v2.engine import process_corporate_action
     from app.services.swing_v2.ledger import SwingLedger
