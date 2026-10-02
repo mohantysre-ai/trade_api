@@ -196,6 +196,27 @@ def test_time_exit_due_on_d2():
     assert time_exit_due(now_d2_before, holding_session_age=2, max_overnights=2, exit_clock="15:15") is True
 
 
+def test_time_exit_never_closes_entry_session_even_if_env_requests_one_overnight():
+    entry_day_after_exit_clock = datetime(2026, 9, 11, 15, 16, tzinfo=IST)
+    next_session_after_exit_clock = datetime(2026, 9, 14, 15, 16, tzinfo=IST)
+
+    # Defensive invariant: CLOSED_TIME can never happen on D0.
+    assert time_exit_due(
+        entry_day_after_exit_clock,
+        holding_session_age=0,
+        max_overnights=1,
+        exit_clock="15:15",
+    ) is False
+
+    # Earliest pure time exit is after one overnight / on the next session.
+    assert time_exit_due(
+        next_session_after_exit_clock,
+        holding_session_age=1,
+        max_overnights=1,
+        exit_clock="15:15",
+    ) is True
+
+
 # 10. Cutoff at 14:45 IST
 def test_1445_ist_entry_cutoff():
     now_before = datetime(2026, 9, 11, 14, 30, tzinfo=IST)
