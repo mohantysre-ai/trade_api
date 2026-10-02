@@ -352,28 +352,40 @@ function useAdaptiveTooltip() {
       const rect = triggerRef.current.getBoundingClientRect();
       const viewportW = window.innerWidth;
       const viewportH = window.innerHeight;
-      const tooltipW = 240;
-      const tooltipH = 200;
+      const gap = 12;
+      const edge = 12;
+      const tooltipW = Math.min(320, Math.max(260, viewportW - edge * 2));
+      const tooltipH = Math.min(500, Math.max(280, viewportH * 0.7));
 
-      // Default: position below the trigger
-      let top = rect.bottom + 8;
-      let left = rect.left + rect.width / 2 - tooltipW / 2;
+      // Desktop preference: open beside the tile, not over the heatmap.
+      // Right first, then flip left if the trigger sits near the viewport edge.
+      let left = rect.right + gap;
+      let top = rect.top;
 
-      // If below would overflow, position above
-      if (top + tooltipH > viewportH) {
-        top = rect.top - tooltipH - 8;
+      const hasRoomRight = left + tooltipW <= viewportW - edge;
+      const leftCandidate = rect.left - tooltipW - gap;
+      const hasRoomLeft = leftCandidate >= edge;
+
+      if (!hasRoomRight && hasRoomLeft) {
+        left = leftCandidate;
+      } else if (!hasRoomRight) {
+        left = Math.max(edge, Math.min(
+          rect.left + rect.width / 2 - tooltipW / 2,
+          viewportW - tooltipW - edge,
+        ));
       }
 
-      // If left would overflow, align to left edge
-      if (left < 8) left = 8;
-      // If right would overflow, align to right edge
-      if (left + tooltipW > viewportW - 8) {
-        left = viewportW - tooltipW - 8;
+      // Keep the full card visible vertically. Align to trigger where possible,
+      // otherwise shift upward instead of letting the bottom clip off-screen.
+      if (top + tooltipH > viewportH - edge) {
+        top = viewportH - tooltipH - edge;
       }
+      if (top < edge) top = edge;
 
-      // If still out of viewport (very small screen), center horizontally
-      if (left < 8 && viewportW < tooltipW + 16) {
-        left = 8;
+      // Phones/tablets: use a viewport-contained sheet position.
+      if (viewportW <= 768) {
+        left = edge;
+        top = Math.max(edge, viewportH - tooltipH - edge);
       }
 
       setPosition({ top, left });
