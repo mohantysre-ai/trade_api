@@ -91,7 +91,12 @@ function dedupedDrawerFetch<T>(key: string, url: string): Promise<T> {
 
 type TabKey = 'marketSnapshot' | 'stockHeatMap' | 'assetMatrix' | 'intradayMatrix' | 'indexOptions' | 'eod';
 
-const INDIA_MARKET_LABELS = new Set(['NIFTY 100', 'SENSEX', 'NIFTY BANK', 'NIFTY IT', 'NIFTY PHARMA', 'NIFTY MIDCAP', 'NIFTY SMALLCAP', 'GIFT NIFTY']);
+const INDIA_MARKET_LABELS = new Set([
+  'NIFTY 50', 'NIFTY 100', 'NIFTY 500', 'SENSEX', 'NIFTY BANK',
+  'NIFTY IT', 'NIFTY PHARMA', 'NIFTY AUTO', 'NIFTY FMCG', 'NIFTY METAL',
+  'NIFTY REALTY', 'NIFTY ENERGY', 'NIFTY PSU BANK', 'NIFTY MIDCAP',
+  'NIFTY SMALLCAP', 'INDIA VIX', 'USD / INR', 'USD / INR SPOT', 'GIFT NIFTY',
+]);
 const GLOBAL_ONLY_LABELS = new Set(['BRENT CRUDE', 'BRENT CRUDE OIL']);
 
 function normalizeMarketLabel(label: string) {
@@ -285,10 +290,10 @@ function getNseStocks(response: NseTopFiveResponse, key: NseTopFiveCategoryKey) 
   return stocks.filter((stock): stock is NseStock => stock !== null && typeof stock === 'object');
 }
 
-async function fetchNseTopFiveStock(flag: NseTopFiveCategory['flag']) {
+async function fetchNseTopFiveStock(flag: NseTopFiveCategory['flag'], index = 'NIFTY 500') {
   const params = new URLSearchParams();
   params.set('flag', flag);
-  params.set('index', 'NIFTY 500');
+  params.set('index', index);
   const res = await fetch(`/api/nse-top-five-stock?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
@@ -347,28 +352,40 @@ function useAdaptiveTooltip() {
       const rect = triggerRef.current.getBoundingClientRect();
       const viewportW = window.innerWidth;
       const viewportH = window.innerHeight;
-      const tooltipW = 240;
-      const tooltipH = 200;
+      const gap = 12;
+      const edge = 12;
+      const tooltipW = Math.min(320, Math.max(260, viewportW - edge * 2));
+      const tooltipH = Math.min(500, Math.max(280, viewportH * 0.7));
 
-      // Default: position below the trigger
-      let top = rect.bottom + 8;
-      let left = rect.left + rect.width / 2 - tooltipW / 2;
+      // Desktop preference: open beside the tile, not over the heatmap.
+      // Right first, then flip left if the trigger sits near the viewport edge.
+      let left = rect.right + gap;
+      let top = rect.top;
 
-      // If below would overflow, position above
-      if (top + tooltipH > viewportH) {
-        top = rect.top - tooltipH - 8;
+      const hasRoomRight = left + tooltipW <= viewportW - edge;
+      const leftCandidate = rect.left - tooltipW - gap;
+      const hasRoomLeft = leftCandidate >= edge;
+
+      if (!hasRoomRight && hasRoomLeft) {
+        left = leftCandidate;
+      } else if (!hasRoomRight) {
+        left = Math.max(edge, Math.min(
+          rect.left + rect.width / 2 - tooltipW / 2,
+          viewportW - tooltipW - edge,
+        ));
       }
 
-      // If left would overflow, align to left edge
-      if (left < 8) left = 8;
-      // If right would overflow, align to right edge
-      if (left + tooltipW > viewportW - 8) {
-        left = viewportW - tooltipW - 8;
+      // Keep the full card visible vertically. Align to trigger where possible,
+      // otherwise shift upward instead of letting the bottom clip off-screen.
+      if (top + tooltipH > viewportH - edge) {
+        top = viewportH - tooltipH - edge;
       }
+      if (top < edge) top = edge;
 
-      // If still out of viewport (very small screen), center horizontally
-      if (left < 8 && viewportW < tooltipW + 16) {
-        left = 8;
+      // Phones/tablets: use a viewport-contained sheet position.
+      if (viewportW <= 768) {
+        left = edge;
+        top = Math.max(edge, viewportH - tooltipH - edge);
       }
 
       setPosition({ top, left });
@@ -417,43 +434,123 @@ function MiniSparkline({ positive }: { positive: boolean }) {
 /*  NseTooltipContent - shared tooltip content for NSE stocks                   */
 /* -------------------------------------------------------------------------- */
 
-function NseTooltipContent({ data }: { data: Record<string, unknown> }) {
-  const graphSrc = getNseGraphSrc(data);
-  const pchange = typeof data.pchange === 'number' ? data.pchange : (typeof data.pChange === 'number' ? data.pChange : null);
+function NseTooltipContent({ data, ticker }: { data: Record<string, unknown>; ticker: string }) {
+  const [range, setRange] = useState<'1D' | '1M' | '1Y'>('1D');
+  const [sparkline, setSparkline] = useState<number[]>([]);
+  const [chartLoading, setChartLoading] = useState(false);
+
+  const pchange = typeof data.pchange === 'number'
+    ? data.pchange
+    : (typeof data.pChange === 'number' ? data.pChange : null);
   const positive = pchange !== null && pchange >= 0;
 
+  const lastPrice = typeof data.lastPrice === 'number'
+    ? data.lastPrice
+    : typeof data.close === 'number'
+      ? data.close
+      : null;
+  const previousClose = typeof data.previousClose === 'number'
+    ? data.previousClose
+    : typeof data.prevClose === 'number'
+      ? data.prevClose
+      : null;
+  const changeAbs =
+    typeof data.change === 'number'
+      ? data.change
+      : (lastPrice != null && previousClose != null ? lastPrice - previousClose : null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setChartLoading(true);
+      try {
+        const res = await fetch(
+          `/api/stock-sparkline?ticker=${encodeURIComponent(ticker)}&flag=${encodeURIComponent(range)}`,
+          { cache: 'no-store' },
+        );
+        const payload = await res.json().catch(() => null);
+        if (!cancelled) {
+          const values = Array.isArray(payload?.sparkline)
+            ? payload.sparkline.filter((v: unknown): v is number => typeof v === 'number' && Number.isFinite(v))
+            : [];
+          setSparkline(values);
+        }
+      } catch {
+        if (!cancelled) setSparkline([]);
+      } finally {
+        if (!cancelled) setChartLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [ticker, range]);
+
+  const statRowsSource: Array<[string, unknown, string]> = [
+    ['Prev Close', data.previousClose ?? data.prevClose, 'previousClose'],
+    ['Open', data.open, 'open'],
+    ['Day High', data.dayHigh ?? data.high, 'high'],
+    ['Day Low', data.dayLow ?? data.low, 'low'],
+    ['Volume', data.totalTradedVolume ?? data.volume, 'volume'],
+    ['Last Updated', data.lastUpdateTime ?? data.lastUpdate ?? data.timestamp, 'timestamp'],
+  ];
+  const statRows = statRowsSource.filter(([, value]) => value !== undefined && value !== null && value !== '');
+
   return (
-    <div>
-      {/* Sparkline header */}
-      <div className="mb-2 rounded-t-lg p-1.5" style={{ background: positive ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)' }}>
-        <MiniSparkline positive={positive} />
+    <div className="nse-tooltip-modern">
+      <div className="nse-tooltip-price-row">
+        <div>
+          <div className="nse-tooltip-price">
+            {lastPrice != null ? `₹${lastPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+          </div>
+          {changeAbs != null && (
+            <div className={`nse-tooltip-abs ${positive ? 'is-up' : 'is-down'}`}>
+              {changeAbs >= 0 ? '+' : ''}{changeAbs.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+          )}
+        </div>
+        {pchange != null && (
+          <div className={`nse-tooltip-pct ${positive ? 'is-up' : 'is-down'}`}>
+            {positive ? '▲' : '▼'} {pchange > 0 ? '+' : ''}{pchange.toFixed(2)}%
+          </div>
+        )}
       </div>
 
-      {graphSrc && (
-        <div className="mb-2 rounded-lg border border-slate-200 bg-white shadow-sm p-1.5 transition-transform hover:scale-[1.01]">
-          <div className="mb-1 flex items-center justify-between text-[8px] uppercase tracking-wider text-slate-400 font-bold">
-            <span className="flex items-center gap-1">
-              <span className="w-1 h-1 rounded-full bg-teal-500 animate-pulse" />
-              Price Chart
-            </span>
-            <span className="text-teal-600">30D</span>
+      <div className="nse-tooltip-chart">
+        {sparkline.length >= 2 ? (
+          <SparklineSVG positive={positive} data={sparkline} />
+        ) : (
+          <div className="nse-tooltip-chart-empty">
+            {chartLoading ? 'Loading chart…' : 'Chart unavailable'}
           </div>
-          <img src={graphSrc} alt="NSE chart" className="h-16 w-full rounded object-contain bg-white" />
-        </div>
-      )}
+        )}
+      </div>
 
-      <div className="space-y-0.5">
-        {Object.entries(data).map(([key, value]) => {
-          const isPrice = key === 'lastPrice' || key === 'lastCorpAnnouncementPrice';
-          const isChange = key === 'pchange' || key === 'pChange';
-          const accentClass = isPrice ? 'text-slate-900 font-bold' : isChange ? (positive ? 'text-emerald-600' : 'text-red-500') : 'text-slate-500';
-          return (
-            <div key={key} className="group flex items-center justify-between gap-3 px-2 py-1 rounded-md transition-all hover:bg-slate-50 hover:scale-[1.01]">
-              <div className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold truncate">{formatNseKey(key)}</div>
-              <div className={`text-[9px] font-mono text-right ${accentClass} transition-colors`}>{formatNseFieldValue(key, value)}</div>
-            </div>
-          );
-        })}
+      <div className="nse-tooltip-ranges" role="tablist" aria-label="Price history range">
+        {(['1D', '1M', '1Y'] as const).map((item) => (
+          <button
+            key={item}
+            type="button"
+            role="tab"
+            aria-selected={range === item}
+            className={range === item ? 'is-active' : ''}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setRange(item);
+            }}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+
+      <div className="nse-tooltip-stats">
+        {statRows.map(([label, value, key]) => (
+          <div className="nse-tooltip-stat" key={label}>
+            <span>{label}</span>
+            <strong>{formatNseFieldValue(key, value)}</strong>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -491,15 +588,16 @@ function AdaptiveTooltipPortal({
       style={{
         position: 'fixed',
         zIndex: 9999,
-        maxWidth: '240px',
-        maxHeight: '50vh',
+        width: '300px',
+        maxWidth: 'calc(100vw - 24px)',
+        maxHeight: '70vh',
         top: position.top,
         left: position.left,
-        borderRadius: '10px',
+        borderRadius: '14px',
         border: '1px solid var(--terminal-line)',
         background: 'var(--terminal-panel)',
         color: 'var(--foreground)',
-        padding: '10px',
+        padding: '12px',
         boxShadow: positive !== null
           ? (positive
               ? '0 8px 32px color-mix(in srgb, var(--terminal-green) 22%, transparent), 0 2px 8px rgba(0,0,0,0.12)'
@@ -522,7 +620,7 @@ function AdaptiveTooltipPortal({
           </span>
         )}
       </div>
-      <NseTooltipContent data={stock} />
+      <NseTooltipContent data={stock} ticker={ticker} />
     </div>,
     document.body
   );
@@ -1215,11 +1313,395 @@ function SectorRotationHeatMap() {
   );
 }
 
+
+/* -------------------------------------------------------------------------- */
+/*  Market Overview V3 — mock-matched shell + live breadth / movers           */
+/* -------------------------------------------------------------------------- */
+
+const MARKET_RANGE_LABELS = ['1D', '1W', '1M', '3M', '1Y', '5Y'] as const;
+type MarketRangeKey = typeof MARKET_RANGE_LABELS[number];
+type MarketRegionKey = 'Global' | 'India' | 'US' | 'Europe' | 'Asia';
+
+function MarketRangeTabs({ value, onChange }: { value: MarketRangeKey; onChange: (range: MarketRangeKey) => void }) {
+  return (
+    <div className="market-range-tabs" aria-label="Market chart range">
+      {MARKET_RANGE_LABELS.map((range) => (
+        <button
+          key={range}
+          type="button"
+          className={range === value ? 'is-active' : ''}
+          aria-pressed={range === value}
+          onClick={() => onChange(range)}
+          title={`Show ${range} market history`}
+        >
+          {range}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function MarketSectionIcon({ kind }: { kind: 'india' | 'global' | 'commodities' }) {
+  const glyph = kind === 'india' ? '🇮🇳' : kind === 'global' ? '🌐' : '▥';
+  return <span className={`market-section-icon market-section-icon--${kind}`} aria-hidden>{glyph}</span>;
+}
+
+function MarketOverviewHeader({
+  staleLabel,
+  live,
+  updatedAt,
+  sources,
+  region,
+  onRegionChange,
+}: {
+  staleLabel?: string;
+  live: boolean;
+  updatedAt?: string;
+  sources?: string[];
+  region: MarketRegionKey;
+  onRegionChange: (region: MarketRegionKey) => void;
+}) {
+  const providerLabel = sources?.length ? sources.slice(0, 2).join(' + ') : 'Market feed';
+  return (
+    <section className="market-overview-header">
+      <div className="market-overview-header__brand">
+        <span className="market-overview-logo" aria-hidden>
+          <i /><i /><i />
+        </span>
+        <h2>Market Overview</h2>
+        <span className={`market-overview-live-chip ${live ? 'is-live' : 'is-warn'}`}>
+          <span aria-hidden /> {live ? 'LIVE' : 'DEGRADED'}
+        </span>
+      </div>
+      <div className="market-region-tabs" role="tablist" aria-label="Market region">
+        {(['Global', 'India', 'US', 'Europe', 'Asia'] as MarketRegionKey[]).map((item) => (
+          <button
+            key={item}
+            type="button"
+            role="tab"
+            aria-selected={region === item}
+            className={region === item ? 'is-active' : ''}
+            onClick={() => onRegionChange(item)}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      <div className="market-overview-provider">
+        <div>
+          <span className="market-overview-meta-label">Data Provider</span>
+          <strong className={live ? 'is-live' : 'is-warn'}><span aria-hidden /> {providerLabel}</strong>
+        </div>
+        <div>
+          <span className="market-overview-meta-label">Last Updated</span>
+          <strong>{updatedAt ? new Date(updatedAt).toLocaleString('en-IN', { hour12: false }) : '—'}</strong>
+        </div>
+        {staleLabel && staleLabel !== 'LIVE' ? <span className="market-overview-stale-chip">{staleLabel}</span> : null}
+      </div>
+    </section>
+  );
+}
+
+function MarketKpiStrip({
+  items,
+  tilesLive,
+  tilesUpdating,
+}: {
+  items: MacroRow[];
+  tilesLive?: boolean;
+  tilesUpdating?: boolean;
+}) {
+  const wanted = ['NIFTY 50', 'NIFTY BANK', 'SENSEX', 'INDIA VIX', 'USD / INR'];
+  const rows = wanted
+    .map((label) => items.find((item) => {
+      const normalized = normalizeMarketLabel(item.label).replace(' SPOT', '');
+      return normalized === label;
+    }))
+    .filter((item): item is MacroRow => Boolean(item));
+
+  return (
+    <div className="market-kpi-strip">
+      {rows.map((item) => {
+        const positive = item.state === 'POSITIVE';
+        const label = item.label === 'USD / INR Spot' ? 'USD / INR' : item.label;
+        return (
+          <DeskLiveTile
+            key={item.label}
+            label={label}
+            value={item.val}
+            delta={item.delta}
+            positive={positive}
+            accent={positive ? 'var(--terminal-green)' : 'var(--terminal-red)'}
+            tilesLive={tilesLive}
+            tilesUpdating={tilesUpdating}
+            onActivate={() => window.open(getIndexClickUrl(item.label), '_blank', 'noopener,noreferrer')}
+            sparkline={
+              <div className="desk-tile-spark">
+                {item.sparkline && item.sparkline.length >= 2
+                  ? <SparklineSVG positive={positive} data={item.sparkline} />
+                  : <div className="absolute inset-0"><MiniSparkline positive={positive} /></div>}
+              </div>
+            }
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+
+function MarketFlowSignals() {
+  const [active, setActive] = useState<TrendlyneScreenKey>('risingDelivery');
+  const [itemsByScreen, setItemsByScreen] = useState<Partial<Record<TrendlyneScreenKey, TrendlyneStock[]>>>({});
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async (screen: TrendlyneScreenKey) => {
+    if (itemsByScreen[screen]?.length) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/trendlyne-screener?screen=${screen}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: TrendlyneScreenData = await res.json();
+      setItemsByScreen((prev) => ({ ...prev, [screen]: data.screenData?.slice(0, 5) ?? [] }));
+    } catch {
+      setItemsByScreen((prev) => ({ ...prev, [screen]: [] }));
+    } finally {
+      setLoading(false);
+    }
+  }, [itemsByScreen]);
+
+  useEffect(() => {
+    void load(active);
+  }, [active, load]);
+
+  const labelMap: Record<TrendlyneScreenKey, string> = {
+    risingDelivery: 'Delivery',
+    topLosersVolume: 'Vol Losers',
+    volumeShockers: 'Volume',
+    highVolumeGain: 'Vol Gainers',
+    highVolumeLoss: 'Vol Decliners',
+    outPerformanceWeek: 'Outperform',
+  };
+
+  const tabs: TrendlyneScreenKey[] = [
+    'risingDelivery',
+    'volumeShockers',
+    'highVolumeGain',
+    'highVolumeLoss',
+    'topLosersVolume',
+    'outPerformanceWeek',
+  ];
+  const rows = itemsByScreen[active] ?? [];
+
+  return (
+    <section className="market-side-card market-flow-card">
+      <div className="market-side-title">FLOW & DELIVERY <span>Trendlyne</span></div>
+      <div className="market-flow-tabs">
+        {tabs.map((key) => (
+          <button key={key} type="button" className={active === key ? 'is-active' : ''} onClick={() => setActive(key)}>
+            {labelMap[key]}
+          </button>
+        ))}
+      </div>
+      <div className="market-flow-list">
+        {loading && rows.length === 0 ? (
+          <div className="market-side-empty">Loading {labelMap[active]}…</div>
+        ) : rows.length === 0 ? (
+          <div className="market-side-empty">No {labelMap[active]} data</div>
+        ) : rows.map((item, index) => {
+          const currentPrice = item.tooltipParams.find((p) => p.key === 'currentPrice')?.value ?? '—';
+          return (
+            <a key={`${active}-${item.name}-${index}`} href={item.stockurl} target="_blank" rel="noopener noreferrer" className="market-flow-row">
+              <strong>{item.name}</strong>
+              <span>{formatLargeNumber(item.value)}</span>
+              <span className="market-flow-price">₹{currentPrice}</span>
+            </a>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function MarketOverviewSidebar({
+  indiaRows,
+  globalRows,
+  newsSummary,
+  backendRegime,
+  now,
+}: {
+  indiaRows: MacroRow[];
+  globalRows: MacroRow[];
+  newsSummary?: string;
+  backendRegime?: string;
+  now: number;
+}) {
+  const [stocks, setStocks] = useState<NseEquityStock[]>([]);
+  const [gainers, setGainers] = useState<NseStock[]>([]);
+  const [showLosers, setShowLosers] = useState(false);
+  const [breadthScope, setBreadthScope] = useState<'India' | 'US' | 'Global'>('India');
+  const [moverUniverse, setMoverUniverse] = useState<'NIFTY 50' | 'NIFTY 500' | 'Global'>('NIFTY 50');
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [breadthResponse, moversResponse] = await Promise.all([
+          fetchNseEquityStockIndices(),
+          moverUniverse === 'Global'
+            ? Promise.resolve({ data: {} } as NseTopFiveResponse)
+            : fetchNseTopFiveStock(showLosers ? 'L' : 'G', moverUniverse),
+        ]);
+        if (cancelled) return;
+        setStocks(getNseHeatMapStocks(breadthResponse));
+        setGainers(moverUniverse === 'Global'
+          ? []
+          : getNseStocks(moversResponse, showLosers ? 'topLoosers' : 'topGainers').slice(0, 5));
+      } catch {
+        if (!cancelled) {
+          setStocks([]);
+          setGainers([]);
+        }
+      }
+    };
+    void load();
+    const id = window.setInterval(() => void load(), 300_000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [showLosers, moverUniverse]);
+
+  const benchmarkRows = breadthScope === 'US'
+    ? globalRows.filter((row) => /DJI|DOW|S&P 500|NASDAQ/i.test(row.label))
+    : globalRows;
+  const breadthFromBenchmarks = breadthScope !== 'India';
+  const adv = breadthFromBenchmarks
+    ? benchmarkRows.filter((row) => parseDeltaPct(row.delta) > 0).length
+    : stocks.filter((s) => typeof s.pChange === 'number' && s.pChange > 0).length;
+  const dec = breadthFromBenchmarks
+    ? benchmarkRows.filter((row) => parseDeltaPct(row.delta) < 0).length
+    : stocks.filter((s) => typeof s.pChange === 'number' && s.pChange < 0).length;
+  const sourceCount = breadthFromBenchmarks ? benchmarkRows.length : stocks.length;
+  const flat = Math.max(0, sourceCount - adv - dec);
+  const total = Math.max(1, sourceCount);
+  const advPct = (adv / total) * 100;
+  const decPct = (dec / total) * 100;
+
+  const vix = indiaRows.find((r) => normalizeMarketLabel(r.label) === 'INDIA VIX');
+  const vixDelta = parseDeltaPct(vix?.delta);
+  const normalizedRegime = String(backendRegime || '').toUpperCase();
+  const risk =
+    /RISK_OFF|BEAR|DEFENSIVE|HALT/.test(normalizedRegime) ? 'High Risk'
+    : /RISK_ON|BULL|AGGRESSIVE/.test(normalizedRegime) ? 'Low Risk'
+    : normalizedRegime && normalizedRegime !== 'REGIME_UNRATED' ? 'Neutral'
+    : advPct >= 58 && vixDelta <= 0 ? 'Low Risk'
+    : decPct >= 58 || vixDelta >= 3 ? 'High Risk'
+    : 'Neutral';
+
+  const globalMoverRows = globalRows
+    .map((row) => ({ symbol: row.label, lastPrice: Number(String(row.val).replace(/[^0-9.-]/g, '').replace(/,/g, '')), pchange: parseDeltaPct(row.delta) }))
+    .filter((row) => Number.isFinite(row.lastPrice) && Number.isFinite(row.pchange))
+    .sort((a, b) => showLosers ? a.pchange - b.pchange : b.pchange - a.pchange)
+    .slice(0, 5);
+
+  const sortedMovers = moverUniverse === 'Global'
+    ? globalMoverRows
+    : [...gainers].sort((a, b) => {
+        const av = typeof a.pchange === 'number' ? a.pchange : 0;
+        const bv = typeof b.pchange === 'number' ? b.pchange : 0;
+        return showLosers ? av - bv : bv - av;
+      });
+
+  const takeaways = useMemo(() => {
+    const rows = indiaRows
+      .map((r) => ({ label: r.label, pct: parseDeltaPct(r.delta) }))
+      .filter((r) => Number.isFinite(r.pct))
+      .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))
+      .slice(0, 3);
+    const notes = rows.map((r) => `${r.label} ${r.pct >= 0 ? 'up' : 'down'} ${Math.abs(r.pct).toFixed(2)}%`);
+    if (newsSummary?.trim()) notes.unshift(newsSummary.trim());
+    if (vix) notes.push(`India VIX ${vixDelta >= 0 ? 'up' : 'down'} ${Math.abs(vixDelta).toFixed(2)}%`);
+    return notes.slice(0, 4);
+  }, [indiaRows, newsSummary, vix, vixDelta]);
+
+  return (
+    <aside className="market-sidebar-stack">
+      <section className="market-side-card">
+        <div className="market-side-title">MARKET BREADTH <span>⌃</span></div>
+        <div className="market-side-tabs">
+          {(['India', 'US', 'Global'] as const).map((scope) => (
+            <button key={scope} className={breadthScope === scope ? 'is-active' : ''} onClick={() => setBreadthScope(scope)}>{scope}</button>
+          ))}
+        </div>
+        <div className="market-breadth-bar" aria-label={`Advancing ${adv}, declining ${dec}, unchanged ${flat}`}>
+          <span className="is-adv" style={{ width: `${advPct}%` }} />
+          <span className="is-dec" style={{ width: `${decPct}%` }} />
+          <span className="is-flat" style={{ width: `${Math.max(0, 100 - advPct - decPct)}%` }} />
+        </div>
+        <div className="market-breadth-stats">
+          <div><span className="dot is-adv" />Advancing<strong>{adv || '—'}</strong></div>
+          <div><span className="dot is-dec" />Declining<strong>{dec || '—'}</strong></div>
+          <div><span className="dot is-flat" />Unchanged<strong>{sourceCount ? flat : '—'}</strong></div>
+        </div>
+      </section>
+
+      <section className="market-side-card">
+        <div className="market-side-title">TOP MOVERS <span>⌃</span></div>
+        <div className="market-side-tabs">
+          <button className={moverUniverse === 'NIFTY 50' ? 'is-active' : ''} onClick={() => setMoverUniverse('NIFTY 50')}>Nifty 50</button>
+          <button className={moverUniverse === 'NIFTY 500' ? 'is-active' : ''} onClick={() => setMoverUniverse('NIFTY 500')}>Nifty 500</button>
+          <button className={moverUniverse === 'Global' ? 'is-active' : ''} onClick={() => setMoverUniverse('Global')}>Global</button>
+        </div>
+        <div className="market-side-tabs market-side-tabs--secondary">
+          <button className={!showLosers ? 'is-active' : ''} onClick={() => setShowLosers(false)}>Top Gainers</button>
+          <button className={showLosers ? 'is-active' : ''} onClick={() => setShowLosers(true)}>Top Losers</button>
+        </div>
+        <div className="market-mover-table">
+          <div className="market-mover-head"><span>SYMBOL</span><span>LTP</span><span>CHG %</span></div>
+          {sortedMovers.length ? sortedMovers.map((row) => {
+            const pct = typeof row.pchange === 'number' ? row.pchange : 0;
+            return (
+              <div className="market-mover-row" key={String(row.symbol)}>
+                <strong>{row.symbol ?? '—'}</strong>
+                <span>{formatNseNumber(row.lastPrice)}</span>
+                <span className={pct >= 0 ? 'is-up' : 'is-down'}>{pct >= 0 ? '+' : ''}{pct.toFixed(2)}%</span>
+              </div>
+            );
+          }) : <div className="market-side-empty">Live movers unavailable</div>}
+        </div>
+      </section>
+
+      <MarketFlowSignals />
+
+      <section className="market-side-card">
+        <div className="market-side-title">MARKET INSIGHTS <span>⌃</span></div>
+        <div className="market-risk-row">
+          <div>
+            <span className="market-risk-label">RISK REGIME</span>
+            <div className={`market-risk-gauge market-risk-gauge--${risk.toLowerCase().replace(/\s+/g, '-')}`}>
+              <span className="market-risk-needle" />
+            </div>
+            <strong>{risk}</strong>
+          </div>
+          <div className="market-risk-legend">
+            <span><i className="is-low" />Low Risk</span>
+            <span><i className="is-neutral" />Neutral</span>
+            <span><i className="is-high" />High Risk</span>
+          </div>
+        </div>
+        <div className="market-takeaways">
+          <span className="market-risk-label">KEY TAKEAWAYS</span>
+          <ul>{takeaways.map((item) => <li key={item}>{item}</li>)}</ul>
+        </div>
+      </section>
+
+    </aside>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /*  GlobalIndicesGrid                                                            */
 /* -------------------------------------------------------------------------- */
 
-function GlobalIndicesGrid({ items, staleLabel, tilesLive, tilesUpdating }: { items: MacroRow[]; staleLabel?: string; tilesLive?: boolean; tilesUpdating?: boolean }) {
+function GlobalIndicesGrid({ items, tilesLive, tilesUpdating, range, onRangeChange }: { items: MacroRow[]; tilesLive?: boolean; tilesUpdating?: boolean; range: MarketRangeKey; onRangeChange: (range: MarketRangeKey) => void }) {
   if (!items.length) {
     return (
       <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 shadow-sm">
@@ -1229,16 +1711,15 @@ function GlobalIndicesGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
   }
 
   return (
-    <div className="desk-snapshot-panel bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
-      <div className="desk-live-ribbon" aria-hidden />
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          {tilesLive && <div className="w-1.5 h-1.5 rounded-full desk-live-dot is-live" aria-hidden />}
-          <span className="desk-panel-title">GLOBAL INDICES</span>
+    <div className="desk-snapshot-panel market-overview-section bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+      <div className="market-overview-section-head">
+        <div className="market-section-titleline">
+          <MarketSectionIcon kind="global" />
+          <div><span className="desk-panel-title">GLOBAL INDICES</span><p className="market-overview-section-subtitle">Key global equity benchmarks</p></div>
         </div>
-        {staleLabel && <span className="desk-panel-title">{staleLabel}</span>}
+        <MarketRangeTabs value={range} onChange={onRangeChange} />
       </div>
-      <div className="desk-metric-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+      <div className="desk-metric-grid market-overview-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
         {items.map((item) => {
           const isPositive = item.state === 'POSITIVE';
           return (
@@ -1370,23 +1851,27 @@ function getIndexClickUrl(label: string): string {
 /* -------------------------------------------------------------------------- */
 /*  Hook: fetch sparkline data from Moneycontrol for indices missing sparklines */
 /* -------------------------------------------------------------------------- */
-function useIndexSparklines(items: MacroRow[]): Record<string, number[]> {
+function useIndexSparklines(items: MacroRow[], range: MarketRangeKey = '1D'): Record<string, number[]> {
   const [sparklines, setSparklines] = useState<Record<string, number[]>>({});
   const fetchedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const missingLabels = items
-      .filter((item) => (!item.sparkline || item.sparkline.length < 2) && !fetchedRef.current.has(item.label))
+      .filter((item) => {
+        const key = `${item.label}::${range}`;
+        const needsHistorical = range !== '1D';
+        return (needsHistorical || !item.sparkline || item.sparkline.length < 2) && !fetchedRef.current.has(key);
+      })
       .map((item) => item.label);
 
     if (missingLabels.length === 0) return;
 
-    missingLabels.forEach((label) => fetchedRef.current.add(label));
+    missingLabels.forEach((label) => fetchedRef.current.add(`${label}::${range}`));
 
     const fetchSparklines = async () => {
       const results = await Promise.allSettled(
         missingLabels.map(async (label) => {
-          const res = await fetch(`/api/index-sparkline?label=${encodeURIComponent(label)}`, { cache: 'no-store' });
+          const res = await fetch(`/api/index-sparkline?label=${encodeURIComponent(label)}&range=${encodeURIComponent(range)}`, { cache: 'no-store' });
           if (!res.ok) return { label, sparkline: [] as number[] };
           const data = await res.json();
           return { label, sparkline: (data.sparkline as number[]) ?? [] };
@@ -1396,7 +1881,7 @@ function useIndexSparklines(items: MacroRow[]): Record<string, number[]> {
       const updates: Record<string, number[]> = {};
       for (const result of results) {
         if (result.status === 'fulfilled' && result.value.sparkline.length >= 2) {
-          updates[result.value.label] = result.value.sparkline;
+          updates[`${result.value.label}::${range}`] = result.value.sparkline;
         }
       }
 
@@ -1406,16 +1891,23 @@ function useIndexSparklines(items: MacroRow[]): Record<string, number[]> {
     };
 
     void fetchSparklines();
-  }, [items]);
+  }, [items, range]);
 
-  return sparklines;
+  return useMemo(() => {
+    const current: Record<string, number[]> = {};
+    for (const item of items) {
+      const values = sparklines[`${item.label}::${range}`];
+      if (values) current[item.label] = values;
+    }
+    return current;
+  }, [items, range, sparklines]);
 }
 
 /* -------------------------------------------------------------------------- */
 /*  CommoditiesFxGrid                                                            */
 /* -------------------------------------------------------------------------- */
 
-function CommoditiesFxGrid({ items, staleLabel, tilesLive, tilesUpdating }: { items: MacroRow[]; staleLabel?: string; tilesLive?: boolean; tilesUpdating?: boolean }) {
+function CommoditiesFxGrid({ items, tilesLive, tilesUpdating, range, onRangeChange }: { items: MacroRow[]; tilesLive?: boolean; tilesUpdating?: boolean; range: MarketRangeKey; onRangeChange: (range: MarketRangeKey) => void }) {
   if (!items.length) {
     return (
       <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 shadow-sm">
@@ -1425,16 +1917,15 @@ function CommoditiesFxGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
   }
 
   return (
-    <div className="desk-snapshot-panel bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
-      <div className="desk-live-ribbon" aria-hidden />
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full desk-live-dot is-live" aria-hidden />
-          <span className="desk-panel-title">COMMODITIES & FX</span>
+    <div className="desk-snapshot-panel market-overview-section bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+      <div className="market-overview-section-head">
+        <div className="market-section-titleline">
+          <MarketSectionIcon kind="commodities" />
+          <div><span className="desk-panel-title">COMMODITIES & FX</span><p className="market-overview-section-subtitle">Commodities, currencies and digital assets</p></div>
         </div>
-        {staleLabel && <span className="desk-panel-title">{staleLabel}</span>}
+        <MarketRangeTabs value={range} onChange={onRangeChange} />
       </div>
-      <div className="desk-metric-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+      <div className="desk-metric-grid market-overview-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'BRENT CRUDE OIL') displayLabel = 'BRENT CRUDE';
@@ -1473,7 +1964,7 @@ function CommoditiesFxGrid({ items, staleLabel, tilesLive, tilesUpdating }: { it
 /*  IndiaMarketsGrid                                                             */
 /* -------------------------------------------------------------------------- */
 
-function IndiaMarketsGrid({ items, staleLabel, tilesLive, tilesUpdating }: { items: MacroRow[]; staleLabel?: string; tilesLive?: boolean; tilesUpdating?: boolean }) {
+function IndiaMarketsGrid({ items, tilesLive, tilesUpdating, range, onRangeChange }: { items: MacroRow[]; tilesLive?: boolean; tilesUpdating?: boolean; range: MarketRangeKey; onRangeChange: (range: MarketRangeKey) => void }) {
   if (!items.length) {
     return (
       <div className="bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 text-slate-400 shadow-sm">
@@ -1483,16 +1974,15 @@ function IndiaMarketsGrid({ items, staleLabel, tilesLive, tilesUpdating }: { ite
   }
 
   return (
-    <div className="desk-snapshot-panel bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
-      <div className="desk-live-ribbon" aria-hidden />
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          {tilesLive && <div className="w-1.5 h-1.5 rounded-full desk-live-dot is-live" aria-hidden />}
-          <span className="desk-panel-title">INDIA MARKETS — TOP MOVERS</span>
+    <div className="desk-snapshot-panel market-overview-section bg-white border border-slate-300 border-[0.5px] rounded-lg p-3 shadow-sm">
+      <div className="market-overview-section-head">
+        <div className="market-section-titleline">
+          <MarketSectionIcon kind="india" />
+          <div><span className="desk-panel-title">INDIA MARKETS</span><p className="market-overview-section-subtitle">Equity benchmarks and key sectors</p></div>
         </div>
-        {staleLabel && <span className="desk-panel-title">{staleLabel}</span>}
+        <MarketRangeTabs value={range} onChange={onRangeChange} />
       </div>
-      <div className="desk-metric-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+      <div className="desk-metric-grid market-overview-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
         {items.map((item) => {
           let displayLabel = item.label;
           if (displayLabel === 'USD / INR Spot') displayLabel = 'USD / INR';
@@ -1799,169 +2289,155 @@ function NewsFeedPanel({ items, now, sidebar }: { items?: NewsItem[]; now: numbe
     setSentimentFilter(null);
   };
 
-  // Sidebar mode: terminal-native live intelligence stream
+  // Sidebar mode: institutional event stream
   if (sidebar) {
     const bullishCount = baseItems.filter((item) => (item.sentiment ?? "Neutral") === "Bullish").length;
     const bearishCount = baseItems.filter((item) => (item.sentiment ?? "Neutral") === "Bearish").length;
     const neutralCount = baseItems.filter((item) => (item.sentiment ?? "Neutral") === "Neutral").length;
+    const newestPublishedAt = baseItems.reduce<number | null>((latest, item) => {
+      const stamp = new Date(item.publishedAt).getTime();
+      if (!Number.isFinite(stamp)) return latest;
+      return latest == null || stamp > latest ? stamp : latest;
+    }, null);
 
     return (
-      <section className="relative isolate flex h-auto max-h-[min(58dvh,560px)] min-h-[360px] flex-col overflow-hidden rounded-2xl border border-[var(--terminal-line)] bg-[color:var(--terminal-panel)] shadow-[var(--shadow-panel)] xl:h-[1270px] xl:max-h-none">
-        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -left-16 -top-20 h-48 w-48 rounded-full bg-[color:var(--terminal-cyan)] opacity-[0.07] blur-3xl motion-safe:animate-pulse" />
-          <div className="absolute -bottom-20 -right-16 h-56 w-56 rounded-full bg-[color:var(--terminal-violet)] opacity-[0.06] blur-3xl motion-safe:animate-pulse" />
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--terminal-cyan)] to-transparent opacity-70" />
-        </div>
-
-        <header className="relative z-10 border-b border-[var(--terminal-line)] bg-[color:var(--glass-1)] px-3 py-3 backdrop-blur-xl">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-3 w-3 shrink-0 items-center justify-center">
-                  <span className="absolute h-3 w-3 rounded-full bg-emerald-400/35 motion-safe:animate-ping" />
-                  <span className="relative h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.9)]" />
-                </span>
-                <h3 className="truncate text-[11px] font-black uppercase tracking-[0.16em] text-[var(--fg-strong)]">Live News Intelligence</h3>
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[8px] font-semibold uppercase tracking-wider text-[var(--fg-subtle)]">
-                <span>{filtered.length} stories</span>
-                <span className="opacity-40">•</span>
-                <span>{sources.length} sources</span>
-                <span className="opacity-40">•</span>
-                <span className="text-emerald-400">streaming</span>
-              </div>
+      <section className="news-compact-panel news-terminal-stream">
+        <header className="news-compact-header news-terminal-header">
+          <div>
+            <div className="news-compact-titleline">
+              <span className="news-compact-live-dot" aria-hidden />
+              <h3>MARKET NEWS</h3>
+              <span className="news-compact-live">LIVE</span>
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-emerald-300">Live</span>
-              {hasFilters && (
-                <button onClick={resetFilters} className="rounded-full border border-[var(--terminal-line)] bg-[color:var(--glass-flat)] px-2 py-1 text-[8px] font-bold uppercase tracking-wider text-[var(--fg-muted)] transition hover:border-rose-400/40 hover:text-rose-300">Clear</button>
-              )}
-            </div>
+            <p>{baseItems.length} stories · {sources.length} sources · institutional event stream</p>
           </div>
+          <div className="news-terminal-header-actions">
+            {hasFilters && (
+              <button type="button" onClick={resetFilters} className="news-compact-clear">Clear filters</button>
+            )}
+            <span className="news-terminal-freshness">
+              {newestPublishedAt ? timeAgo(new Date(newestPublishedAt).toISOString()) : "—"}
+            </span>
+          </div>
+        </header>
 
-          <div className="mt-3 grid grid-cols-3 gap-1.5">
+        <div className="news-compact-toolbar news-terminal-toolbar">
+          <div className="news-compact-sentiment news-terminal-filterstrip" role="group" aria-label="News sentiment filter">
             {([
-              ["Bullish", bullishCount, "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"],
-              ["Bearish", bearishCount, "border-rose-400/30 bg-rose-400/10 text-rose-300"],
-              ["Neutral", neutralCount, "border-slate-400/25 bg-slate-400/10 text-slate-300"],
-            ] as const).map(([label, count, tone]) => {
-              const active = sentimentFilter === label;
+              ["All", baseItems.length],
+              ["Bullish", bullishCount],
+              ["Bearish", bearishCount],
+              ["Neutral", neutralCount],
+            ] as const).map(([label, count]) => {
+              const active = label === "All" ? sentimentFilter == null : sentimentFilter === label;
               return (
                 <button
                   key={label}
-                  onClick={() => setSentimentFilter(active ? null : label)}
-                  className={`group rounded-xl border px-2 py-2 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${tone} ${active ? "ring-1 ring-current" : "opacity-85 hover:opacity-100"}`}
+                  type="button"
+                  className={active ? "is-active" : ""}
+                  onClick={() => setSentimentFilter(label === "All" ? null : (sentimentFilter === label ? null : label))}
                 >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="text-[8px] font-black uppercase tracking-wider">{label}</span>
-                    <span className="text-[13px] font-black tabular-nums">{count}</span>
-                  </div>
-                  <div className="mt-1 h-0.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/5">
-                    <div className="h-full rounded-full bg-current opacity-70 transition-all duration-500" style={{ width: `${Math.max(8, Math.min(100, (count / Math.max(1, baseItems.length)) * 100))}%` }} />
-                  </div>
+                  <span>{label}</span><strong>{count}</strong>
                 </button>
               );
             })}
           </div>
 
-          <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="news-compact-categories news-terminal-categorystrip" aria-label="News category filter">
             <button
+              type="button"
+              className={!categoryFilter ? "is-active" : ""}
               onClick={() => setCategoryFilter(null)}
-              className={`whitespace-nowrap rounded-full border px-2 py-1 text-[8px] font-bold uppercase tracking-wider transition ${!categoryFilter ? "border-[var(--terminal-cyan)] bg-[color:var(--terminal-cyan-dim)] text-[var(--terminal-mint-bright)]" : "border-[var(--terminal-line)] bg-[color:var(--glass-flat)] text-[var(--fg-muted)] hover:text-[var(--foreground)]"}`}
             >
               All sectors
             </button>
-            {categories.slice(0, 8).map((category) => (
+            {categories.slice(0, 7).map((category) => (
               <button
                 key={category}
+                type="button"
+                className={categoryFilter === category ? "is-active" : ""}
                 onClick={() => setCategoryFilter(categoryFilter === category ? null : category)}
-                className={`whitespace-nowrap rounded-full border px-2 py-1 text-[8px] font-bold uppercase tracking-wider transition ${categoryFilter === category ? "border-[var(--terminal-cyan)] bg-[color:var(--terminal-cyan-dim)] text-[var(--terminal-mint-bright)]" : "border-[var(--terminal-line)] bg-[color:var(--glass-flat)] text-[var(--fg-muted)] hover:text-[var(--foreground)]"}`}
               >
                 {category}
               </button>
             ))}
           </div>
-        </header>
+
+          <label className="news-terminal-source-filter">
+            <span>Source</span>
+            <select value={sourceFilter ?? ""} onChange={(event) => setSourceFilter(event.target.value || null)}>
+              <option value="">All</option>
+              {sources.map((source) => <option key={source} value={source}>{source}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <div className="news-terminal-columns" aria-hidden>
+          <span>Age</span>
+          <span>Source</span>
+          <span>Signal</span>
+          <span>Headline / market context</span>
+          <span />
+        </div>
 
         <div
-          className="relative z-10 flex-1 min-h-0 space-y-2 overflow-y-auto overflow-x-hidden p-2.5 pr-2"
+          className="news-compact-list news-terminal-list"
           tabIndex={0}
           ref={railRef}
           onScroll={handleSidebarScroll}
           aria-label="Live market news intelligence stream"
         >
           {displayed.length === 0 ? (
-            <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed border-[var(--terminal-line)] bg-[color:var(--glass-flat)] p-4 text-center text-[10px] text-[var(--fg-muted)]">No stories match the current intelligence filters.</div>
+            <div className="news-compact-empty">No stories match the selected filters.</div>
           ) : displayed.map((item, i) => {
-            const color = sourceColor(item.source);
             const sentiment = item.sentiment ?? "Neutral";
-            const sentimentTone = sentiment === "Bullish" ? "text-emerald-300 border-emerald-400/25 bg-emerald-400/10" : sentiment === "Bearish" ? "text-rose-300 border-rose-400/25 bg-rose-400/10" : "text-slate-300 border-slate-400/20 bg-slate-400/10";
-            const sourceInitials = item.source.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "N";
+            const category = item.category ?? "Market";
+            const initials = item.source.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "N";
+            const publishedMs = new Date(item.publishedAt).getTime();
+            const ageMinutes = Number.isFinite(publishedMs) ? Math.max(0, Math.floor((now - publishedMs) / 60000)) : 9999;
+            const recencyClass = ageMinutes <= 15 ? "is-fresh" : ageMinutes <= 60 ? "is-recent" : "is-aged";
             return (
-              <motion.a
+              <a
                 key={`${item.title}-${i}`}
                 href={item.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.28, delay: Math.min(i, 8) * 0.025 }}
-                whileHover={{ y: -2, scale: 1.005 }}
-                className="group relative block overflow-hidden rounded-xl border border-[var(--terminal-line)] bg-[color:var(--glass-flat)] p-3 shadow-sm transition-colors hover:border-[var(--terminal-line-strong)] hover:bg-[color:var(--glass-2)] focus:outline-none focus:ring-1 focus:ring-[var(--terminal-cyan)]"
+                className={`news-compact-row news-terminal-row ${recencyClass}`}
               >
-                <span aria-hidden className="absolute inset-y-0 left-0 w-[2px] opacity-90" style={{ background: color }} />
-                <span aria-hidden className="absolute inset-x-0 top-0 h-px origin-left scale-x-0 bg-gradient-to-r from-transparent via-[var(--terminal-cyan)] to-transparent opacity-70 transition-transform duration-500 group-hover:scale-x-100" />
+                <time className="news-terminal-age" dateTime={item.publishedAt}>{timeAgo(item.publishedAt)}</time>
 
-                <div className="flex items-start gap-2.5">
-                  <div
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-[8px] font-black shadow-sm"
-                    style={{
-                      background: `color-mix(in srgb, ${color} 22%, var(--terminal-panel-2))`,
-                      borderColor: `color-mix(in srgb, ${color} 55%, var(--terminal-line))`,
-                      color: "var(--fg-strong)",
-                    }}
-                    title={item.source}
-                  >{sourceInitials}</div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <span className="truncate text-[8px] font-black uppercase tracking-[0.12em] text-[var(--fg-muted)]">{item.source}</span>
-                      <span className="text-[7px] text-[var(--fg-subtle)]">•</span>
-                      <time className="shrink-0 text-[8px] font-mono text-[var(--fg-subtle)]" dateTime={item.publishedAt}>{timeAgo(item.publishedAt)}</time>
-                    </div>
-                    <h4 className="mt-1 line-clamp-3 text-[11px] font-bold leading-[1.35] text-[var(--foreground)] transition-colors group-hover:text-[var(--terminal-mint-bright)]">{item.title}</h4>
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <span className="rounded-full border border-[var(--terminal-line)] bg-[color:var(--terminal-panel-2)] px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-wider text-[var(--fg-muted)]">{item.category ?? "Market"}</span>
-                      <span className={`rounded-full border px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-wider ${sentimentTone}`}>{sentiment}</span>
-                    </div>
-                    {item.summary && (
-                      <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-300 group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus:grid-rows-[1fr] group-focus:opacity-100">
-                        <p className="mt-0 overflow-hidden text-[9px] leading-relaxed text-[var(--fg-muted)] group-hover:mt-2 group-focus:mt-2">{item.summary}</p>
-                      </div>
-                    )}
-                  </div>
-                  <span className="mt-0.5 shrink-0 text-[10px] text-[var(--fg-subtle)] transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-[var(--terminal-cyan)]">↗</span>
+                <div className="news-terminal-source-cell">
+                  <span className="news-compact-source" title={item.source}>{initials}</span>
+                  <span className="news-compact-source-name">{item.source}</span>
                 </div>
-              </motion.a>
+
+                <div className="news-terminal-signal-cell">
+                  <span className={`news-compact-sentiment-tag is-${sentiment.toLowerCase()}`}>{sentiment}</span>
+                  <span className="news-terminal-category">{category}</span>
+                </div>
+
+                <div className="news-compact-content news-terminal-content">
+                  <h4>{item.title}</h4>
+                  {item.summary ? <p>{item.summary}</p> : null}
+                </div>
+
+                <span className="news-compact-open" aria-hidden>↗</span>
+              </a>
             );
           })}
 
-          {infiniteLoading && (
-            <div className="relative overflow-hidden rounded-xl border border-[var(--terminal-line)] bg-[color:var(--glass-flat)] p-3">
-              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-[var(--terminal-cyan-dim)] to-transparent motion-safe:animate-pulse" />
-              <div className="relative flex items-center justify-center gap-2 text-[8px] font-bold uppercase tracking-wider text-[var(--fg-muted)]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--terminal-cyan)] motion-safe:animate-pulse" />
-                Receiving more market intelligence
-              </div>
-            </div>
-          )}
-          {infiniteError && (
-            <div className="rounded-lg border border-amber-400/25 bg-amber-400/10 px-2.5 py-2 text-[8px] text-amber-300">Feed degraded: {infiniteError}</div>
-          )}
+          {infiniteLoading && <div className="news-compact-loading">Loading more news…</div>}
+          {infiniteError && <div className="news-compact-error">Feed degraded: {infiniteError}</div>}
         </div>
 
-        <footer className="relative z-10 flex items-center justify-between gap-2 border-t border-[var(--terminal-line)] bg-[color:var(--glass-1)] px-3 py-2 text-[7px] font-semibold uppercase tracking-wider text-[var(--fg-subtle)] backdrop-blur-xl">
-          <span>{infiniteHasMore ? "Scroll for more" : "Latest batch complete"}</span>
-          <span className="flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-emerald-400 motion-safe:animate-pulse" /> RSS intelligence mesh</span>
+        <footer className="news-compact-footer news-terminal-footer">
+          <span>
+            {filtered.length} visible · {baseItems.length} loaded · {sources.length} sources
+          </span>
+          <span className="news-terminal-footer-status">
+            <i aria-hidden />
+            {infiniteHasMore ? "Live feed · scroll for more" : "Latest batch complete"}
+          </span>
         </footer>
       </section>
     );
@@ -2401,6 +2877,8 @@ export default function IrosMasterAdvancedTerminal() {
   }), []);
 
   const { data: baseLiveMarket, status: feedStatus, refreshOnDemand } = useMarketData(selectedPool);
+  const [marketRegion, setMarketRegion] = useState<MarketRegionKey>('Global');
+  const [marketRange, setMarketRange] = useState<MarketRangeKey>('1D');
   const liveMarket = useMemo(() => {
     if (!baseLiveMarket || Object.keys(liveDeskQuotes).length === 0) return baseLiveMarket;
     const overlay = (stock: LiveStock): LiveStock => {
@@ -2621,25 +3099,54 @@ export default function IrosMasterAdvancedTerminal() {
   }, [macroRefreshKey]);
 
   /* Fetch sparkline data from Moneycontrol for indices that are missing sparklines */
-  const mcSparklines = useIndexSparklines(currentMacros);
-  const mcGlobalSparklines = useIndexSparklines(globalIndices);
+  const mcSparklines = useIndexSparklines(currentMacros, marketRange);
+  const mcGlobalSparklines = useIndexSparklines(globalIndices, marketRange);
+  const mcCommoditySparklines = useIndexSparklines(commodities, marketRange);
 
   /* Merge sparkline data into macro rows */
   const enrichedMacros = useMemo(
     () => currentMacros.map((item) => ({
       ...item,
-      sparkline: (item.sparkline && item.sparkline.length >= 2) ? item.sparkline : (mcSparklines[item.label] ?? item.sparkline),
+      sparkline: marketRange === '1D'
+        ? ((item.sparkline && item.sparkline.length >= 2) ? item.sparkline : (mcSparklines[item.label] ?? item.sparkline))
+        : (mcSparklines[item.label] ?? item.sparkline),
     })),
-    [currentMacros, mcSparklines]
+    [currentMacros, mcSparklines, marketRange]
   );
 
   const enrichedGlobalIndices = useMemo(
     () => globalIndices.map((item) => ({
       ...item,
-      sparkline: (item.sparkline && item.sparkline.length >= 2) ? item.sparkline : (mcGlobalSparklines[item.label] ?? item.sparkline),
+      sparkline: marketRange === '1D'
+        ? ((item.sparkline && item.sparkline.length >= 2) ? item.sparkline : (mcGlobalSparklines[item.label] ?? item.sparkline))
+        : (mcGlobalSparklines[item.label] ?? item.sparkline),
     })),
-    [globalIndices, mcGlobalSparklines]
+    [globalIndices, mcGlobalSparklines, marketRange]
   );
+
+  const enrichedCommodities = useMemo(
+    () => commodities.map((item) => ({
+      ...item,
+      sparkline: marketRange === '1D'
+        ? item.sparkline
+        : (mcCommoditySparklines[item.label] ?? item.sparkline),
+    })),
+    [commodities, mcCommoditySparklines, marketRange]
+  );
+
+  const regionalGlobalIndices = useMemo(() => {
+    if (marketRegion === 'Global') return enrichedGlobalIndices;
+    if (marketRegion === 'US') return enrichedGlobalIndices.filter((row) =>
+      /DJI|DOW|S&P 500|NASDAQ|RUSSELL|NYSE|CBOE VIX/i.test(row.label)
+    );
+    if (marketRegion === 'Europe') return enrichedGlobalIndices.filter((row) =>
+      /DAX|CAC|FTSE 100|EURO STOXX|STOXX EUROPE|IBEX|SMI|AEX|BEL 20|FTSE MIB/i.test(row.label)
+    );
+    if (marketRegion === 'Asia') return enrichedGlobalIndices.filter((row) =>
+      /NIKKEI|HANG SENG|SHANGHAI|KOSPI|TAIWAN|STRAITS TIMES|JAKARTA|MALAYSIA|ASX|NZX/i.test(row.label)
+    );
+    return [];
+  }, [enrichedGlobalIndices, marketRegion]);
 
   const sourcesTape = useMemo(() => {
     const base =
@@ -2741,22 +3248,37 @@ export default function IrosMasterAdvancedTerminal() {
 
         <main className="app-main min-w-0">
         {activeTab === 'marketSnapshot' && (
-          <div key="marketSnapshot" className="desk-panel-enter grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-3 items-stretch">
-            <div className="space-y-3 min-w-0">
-              <div className="grid grid-cols-1 gap-3 items-start">
-                <IndiaMarketsGrid items={enrichedMacros} staleLabel={staleMacroLabel} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
+          <div key="marketSnapshot" className="market-overview-v3 desk-panel-enter">
+            <MarketOverviewHeader
+              staleLabel={staleMacroLabel}
+              live={tilesLive && staleMacroLabel === 'LIVE'}
+              updatedAt={liveMarket?.updatedAt}
+              sources={liveMarket?.rawSources}
+              region={marketRegion}
+              onRegionChange={setMarketRegion}
+            />
+            <MarketKpiStrip items={enrichedMacros} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
+            <div className="market-overview-body">
+              <div className="market-overview-main">
+                {(marketRegion === 'Global' || marketRegion === 'India') && (
+                  <IndiaMarketsGrid items={enrichedMacros} tilesLive={tilesLive} tilesUpdating={tilesUpdating} range={marketRange} onRangeChange={setMarketRange} />
+                )}
+                {marketRegion !== 'India' && regionalGlobalIndices.length > 0 && (
+                  <GlobalIndicesGrid items={regionalGlobalIndices} tilesLive={tilesLive} tilesUpdating={tilesUpdating} range={marketRange} onRangeChange={setMarketRange} />
+                )}
+                {(marketRegion === 'Global' || marketRegion === 'India') && (
+                  <CommoditiesFxGrid items={enrichedCommodities} tilesLive={tilesLive} tilesUpdating={tilesUpdating} range={marketRange} onRangeChange={setMarketRange} />
+                )}
               </div>
-              <div>
-                <GlobalIndicesGrid items={enrichedGlobalIndices} staleLabel={staleMacroLabel} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
-              </div>
-              <div>
-                <CommoditiesFxGrid items={commodities} staleLabel={staleMacroLabel} tilesLive={tilesLive} tilesUpdating={tilesUpdating} />
-              </div>
-              <div className="flex flex-col gap-4">
-                <GainersLosersHeatmap />
-              </div>
+              <MarketOverviewSidebar
+                indiaRows={enrichedMacros}
+                globalRows={enrichedGlobalIndices}
+                newsSummary={liveMarket?.newsSummary}
+                backendRegime={liveMarket?.swingV2Regime}
+                now={now}
+              />
             </div>
-            <div className="flex flex-col min-w-0">
+            <div className="market-news-wide">
               <NewsFeedPanel items={liveMarket?.news} now={now} sidebar={true} />
             </div>
           </div>
@@ -2798,7 +3320,7 @@ export default function IrosMasterAdvancedTerminal() {
 
         {activeTab === 'eod' && (
           <div key="eod" className="desk-panel-enter space-y-3 min-w-0">
-            <EodDeskPanel refreshToken={deskRefreshKey} />
+            <EodDeskPanel refreshToken={deskRefreshKey} onSymbolSelect={handleSelect} />
           </div>
         )}
         </main>

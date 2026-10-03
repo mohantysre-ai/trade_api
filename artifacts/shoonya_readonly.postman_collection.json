@@ -1,0 +1,126 @@
+{
+  "info": {
+    "name": "Shoonya Read-Only Authentication and RELIANCE Quote",
+    "_postman_id": "b434de44-1b2a-45d4-b885-49cf5b3424e3",
+    "description": "Read-only Shoonya validation. Run requests in order: QuickAuth, Search RELIANCE, Get RELIANCE Quote.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://api.shoonya.com/NorenWClientTP" },
+    { "key": "uid", "value": "" },
+    { "key": "password", "value": "" },
+    { "key": "totp_secret", "value": "" },
+    { "key": "vendor_code", "value": "FA76267_U" },
+    { "key": "api_secret", "value": "" },
+    { "key": "session_token", "value": "" },
+    { "key": "reliance_token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1 - QuickAuth",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const uid = pm.collectionVariables.get('uid');",
+              "const password = pm.collectionVariables.get('password');",
+              "const secret = pm.collectionVariables.get('api_secret');",
+              "const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';",
+              "const normalized = pm.collectionVariables.get('totp_secret').replace(/\\s/g, '').replace(/=+$/, '').toUpperCase();",
+              "let bits = '';",
+              "for (const char of normalized) { const value = alphabet.indexOf(char); if (value < 0) throw new Error('Invalid Base32 TOTP secret'); bits += value.toString(2).padStart(5, '0'); }",
+              "let hex = '';",
+              "for (let i = 0; i + 4 <= bits.length; i += 4) hex += parseInt(bits.slice(i, i + 4), 2).toString(16);",
+              "const counterHex = Math.floor(Date.now() / 30000).toString(16).padStart(16, '0');",
+              "const hmac = CryptoJS.HmacSHA1(CryptoJS.enc.Hex.parse(counterHex), CryptoJS.enc.Hex.parse(hex)).toString();",
+              "const offset = parseInt(hmac.slice(-1), 16);",
+              "const binary = parseInt(hmac.slice(offset * 2, offset * 2 + 8), 16) & 0x7fffffff;",
+              "const otp = String(binary % 1000000).padStart(6, '0');",
+              "const payload = {apkversion:'1.0.0',source:'API',uid:uid,pwd:CryptoJS.SHA256(password).toString(),factor2:otp,vc:pm.collectionVariables.get('vendor_code'),appkey:CryptoJS.SHA256(uid+'|'+secret).toString(),imei:'abc1234'};",
+              "pm.variables.set('login_jdata', JSON.stringify(payload));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Shoonya returned JSON', function () { pm.response.to.be.json; });",
+              "const result = pm.response.json();",
+              "pm.test('Authentication succeeded', function () { pm.expect(result.stat).to.eql('Ok'); });",
+              "if (result.stat === 'Ok' && result.susertoken) pm.collectionVariables.set('session_token', result.susertoken);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+        "body": { "mode": "raw", "raw": "jData={{login_jdata}}" },
+        "url": "{{base_url}}/QuickAuth"
+      }
+    },
+    {
+      "name": "2 - Search RELIANCE",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const payload = {uid:pm.collectionVariables.get('uid'),stext:'RELIANCE',exch:'NSE'};",
+              "pm.variables.set('search_jdata', JSON.stringify(payload));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const result = pm.response.json();",
+              "pm.test('RELIANCE search succeeded', function () { pm.expect(result.stat).to.eql('Ok'); });",
+              "const match = (result.values || []).find(x => String(x.tsym || '').toUpperCase() === 'RELIANCE-EQ') || (result.values || [])[0];",
+              "if (match && match.token) pm.collectionVariables.set('reliance_token', String(match.token));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+        "body": { "mode": "raw", "raw": "jData={{search_jdata}}&jKey={{session_token}}" },
+        "url": "{{base_url}}/SearchScrip"
+      }
+    },
+    {
+      "name": "3 - Get RELIANCE Quote",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const payload = {uid:pm.collectionVariables.get('uid'),exch:'NSE',token:pm.collectionVariables.get('reliance_token')};",
+              "pm.variables.set('quote_jdata', JSON.stringify(payload));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const result = pm.response.json();",
+              "pm.test('RELIANCE quote succeeded', function () { pm.expect(result.stat).to.eql('Ok'); });",
+              "pm.test('Quote contains last price', function () { pm.expect(result.lp).to.exist; });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+        "body": { "mode": "raw", "raw": "jData={{quote_jdata}}&jKey={{session_token}}" },
+        "url": "{{base_url}}/GetQuotes"
+      }
+    }
+  ]
+}

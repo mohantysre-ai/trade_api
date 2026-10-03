@@ -51,6 +51,11 @@ NSE_OPTION_CHAIN_URL = os.getenv(
 )
 NSE_CANDLE_MIN_INTERVAL_SECONDS = float(os.getenv("NSE_CANDLE_MIN_INTERVAL_SECONDS", "0.15"))
 NSE_CANDLE_CIRCUIT_SECONDS = float(os.getenv("NSE_CANDLE_CIRCUIT_SECONDS", "60"))
+NSE_CANDLE_CONNECTION_RETRIES = max(0, int(os.getenv("NSE_CANDLE_CONNECTION_RETRIES", "1")))
+NSE_CANDLE_RETRY_BACKOFF_SECONDS = max(
+    0.0, float(os.getenv("NSE_CANDLE_RETRY_BACKOFF_SECONDS", "0.35"))
+)
+NSE_QUOTE_CIRCUIT_SECONDS = float(os.getenv("NSE_QUOTE_CIRCUIT_SECONDS", "60"))
 MARKET_DATA_MIN_COVERAGE_PCT = float(os.getenv("MARKET_DATA_MIN_COVERAGE_PCT", "99"))
 _IST_ZONE = ZoneInfo("Asia/Kolkata")
 
@@ -63,6 +68,8 @@ _NSE_CHART_LOCK = threading.Lock()
 _NSE_CHART_SESSION: requests.Session | None = None
 _NSE_CHART_LAST_CALL = 0.0
 _NSE_CANDLE_CIRCUIT_UNTIL = 0.0
+_NSE_QUOTE_CIRCUIT_UNTIL = 0.0
+_NSE_QUOTE_CIRCUIT_LOCK = threading.Lock()
 _NSE_CHART_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Referer": f"{NSE_CHARTING_BASE_URL.rstrip('/')}/",
@@ -214,6 +221,94 @@ def _as_ist(value: datetime) -> datetime:
     return value.astimezone(_IST_ZONE)
 
 
+def create_angel_fetch_callback(
+    instruments_by_key: dict[str, Any] | None = None,
+) -> Callable[[list[str]], dict[str, dict[str, Any]]]:
+    """Return an Angel-first fetch callback for ``fetch_quotes_with_failover``.
+
+    The callback accepts symbol keys and returns ``{key: quote}``.  When
+    ``instruments_by_key`` is provided, missing symbols are resolved through
+    that mapping; otherwise a bare ``Instrument`` is constructed per key.
+    """
+    def angel_fetch(symbols: list[str]) -> dict[str, dict[str, Any]]:
+        if not symbols:
+            return {}
+        try:
+            from ..angel_one_feed import AngelOneClient, Instrument
+
+            client = AngelOneClient()
+            if instruments_by_key:
+                eligible = [
+                    instruments_by_key[s]
+                    for s in symbols
+                    if s in instruments_by_key
+                ]
+            else:
+                eligible = [
+                    Instrument(key=str(s).upper(), token="", exchange="NSE", tradingsymbol=str(s).upper())
+                    for s in symbols
+                ]
+            raw = client.fetch_batch_quotes(eligible) if eligible else {}
+            out: dict[str, dict[str, Any]] = {}
+            for key, quote in (raw or {}).items():
+                if isinstance(quote, dict):
+                    row = dict(quote)
+                    row.setdefault("quoteProvider", "angel")
+                    out[str(key).upper()] = row
+            return out
+        except Exception as exc:
+            log.debug("angel fetch callback failed: %s", exc)
+            return {}
+
+    return angel_fetch
+
+
+def shoonya_gateway_configured() -> bool:
+    """True when the standby gateway and candle fallback are enabled by config."""
+    return (
+        os.getenv("SHOONYA_STANDBY_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
+        and os.getenv("SHOONYA_CANDLES_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
+        and bool(os.getenv("SHOONYA_GATEWAY_URL"))
+    )
+
+
+def fetch_shoonya_candles(
+    symbol: str,
+    interval: str,
+    fromdate: datetime,
+    todate: datetime,
+    exchange: str = "NSE",
+) -> list[list[Any]]:
+    """Fetch targeted Shoonya standby candles in the common candle-row shape.
+
+    ``exchange`` selects the symbol master used by the gateway to resolve the
+    token: NSE for cash equity + index spot, NFO/BFO for option/future
+    contracts. Empty when the gateway is unconfigured or the symbol does not
+    resolve — never fabricate bars.
+    """
+    if not shoonya_gateway_configured() or not symbol:
+        return []
+    try:
+        from .standby_feed.config import StandbyConfig
+        from .standby_feed.gateway_client import GatewayClient
+    except Exception:
+        return []
+    client = GatewayClient(StandbyConfig.from_env())
+    fromdate = _as_ist(fromdate)
+    todate = _as_ist(todate)
+    result = client.candles(
+        str(symbol).upper(),
+        str(interval).upper(),
+        int(fromdate.timestamp()),
+        int(todate.timestamp()),
+        exchange=str(exchange).upper(),
+    )
+    if not isinstance(result, dict) or result.get("status") != "OK":
+        return []
+    rows = result.get("rows")
+    return rows if isinstance(rows, list) else []
+
+
 def _nse_candle_calls_allowed() -> bool:
     return time.monotonic() >= _NSE_CANDLE_CIRCUIT_UNTIL
 
@@ -224,6 +319,18 @@ def _trip_nse_candle_circuit(seconds: float | None = None) -> None:
     _NSE_CANDLE_CIRCUIT_UNTIL = max(_NSE_CANDLE_CIRCUIT_UNTIL, time.monotonic() + max(1.0, hold))
     _NSE_CHART_SESSION = None
     log.warning("NSE charting circuit open for %.0fs", hold)
+
+
+def _reset_nse_chart_session() -> None:
+    global _NSE_CHART_SESSION
+    with _NSE_CHART_LOCK:
+        session = _NSE_CHART_SESSION
+        _NSE_CHART_SESSION = None
+    if session is not None:
+        try:
+            session.close()
+        except Exception:
+            pass
 
 
 def _nse_history_slot() -> None:
@@ -255,14 +362,30 @@ def _nse_bar_dt(ms: Any) -> datetime:
 def _nse_chart_get(params: dict[str, Any]) -> dict[str, Any] | None:
     if not _nse_candle_calls_allowed():
         return None
-    _nse_history_slot()
-    try:
-        response = _nse_chart_session().get(
-            NSE_CHARTING_HISTORY_URL, params=params, timeout=(8, 20)
-        )
-    except requests.RequestException as exc:
-        _trip_nse_candle_circuit()
-        log.warning("NSE charting connection failed; provider circuit opened: %s", exc)
+    response = None
+    for attempt in range(NSE_CANDLE_CONNECTION_RETRIES + 1):
+        _nse_history_slot()
+        try:
+            response = _nse_chart_session().get(
+                NSE_CHARTING_HISTORY_URL, params=params, timeout=(8, 20)
+            )
+            break
+        except requests.ConnectionError as exc:
+            _reset_nse_chart_session()
+            if attempt < NSE_CANDLE_CONNECTION_RETRIES:
+                if NSE_CANDLE_RETRY_BACKOFF_SECONDS > 0:
+                    time.sleep(NSE_CANDLE_RETRY_BACKOFF_SECONDS)
+                log.warning("NSE charting connection failed; retrying with a fresh session: %s", exc)
+                continue
+            _trip_nse_candle_circuit()
+            log.warning("NSE charting connection failed; provider circuit opened: %s", exc)
+            return None
+        except requests.RequestException as exc:
+            _reset_nse_chart_session()
+            _trip_nse_candle_circuit()
+            log.warning("NSE charting request failed; provider circuit opened: %s", exc)
+            return None
+    if response is None:
         return None
     if response.status_code in {401, 403, 429, 503}:
         _trip_nse_candle_circuit()
@@ -370,8 +493,22 @@ def _dhan_quote_to_canonical(raw: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _nse_quote_calls_allowed() -> bool:
+    return time.monotonic() >= _NSE_QUOTE_CIRCUIT_UNTIL
+
+
+def _trip_nse_quote_circuit(seconds: float | None = None) -> None:
+    global _NSE_QUOTE_CIRCUIT_UNTIL
+    hold = NSE_QUOTE_CIRCUIT_SECONDS if seconds is None else float(seconds)
+    with _NSE_QUOTE_CIRCUIT_LOCK:
+        _NSE_QUOTE_CIRCUIT_UNTIL = max(_NSE_QUOTE_CIRCUIT_UNTIL, time.monotonic() + max(1.0, hold))
+    log.warning("NSE equity quote circuit open for %.0fs; using fallback providers", hold)
+
+
 def fetch_nse500_quotes(symbols: Iterable[str]) -> dict[str, dict[str, Any]]:
     """Fetch the official NSE Nifty 500 snapshot used by the heat map."""
+    if not _nse_quote_calls_allowed():
+        raise RuntimeError("NSE_QUOTE_CIRCUIT_OPEN")
     wanted = {_norm(symbol) for symbol in symbols if _norm(symbol)}
     headers = {
         "Accept": "application/json, text/plain, */*",
@@ -382,12 +519,19 @@ def fetch_nse500_quotes(symbols: Iterable[str]) -> dict[str, dict[str, Any]]:
         ),
     }
     session = requests.Session()
-    session.get("https://www.nseindia.com/", headers=headers, timeout=(5, 15))
-    response = session.get(
-        NSE_EQUITY_STOCK_INDICES_URL, headers=headers, timeout=(10, 30)
-    )
-    response.raise_for_status()
-    payload = response.json()
+    try:
+        session.get("https://www.nseindia.com/", headers=headers, timeout=(4, 10))
+        response = session.get(NSE_EQUITY_STOCK_INDICES_URL, headers=headers, timeout=(4, 10))
+        if response.status_code in {401, 403, 429, 503}:
+            _trip_nse_quote_circuit()
+            raise RuntimeError(f"NSE_QUOTE_HTTP_{response.status_code}")
+        response.raise_for_status()
+        payload = response.json()
+    except requests.RequestException:
+        _trip_nse_quote_circuit()
+        raise
+    finally:
+        session.close()
     rows = payload.get("data", []) if isinstance(payload, dict) else []
     out: dict[str, dict[str, Any]] = {}
     for raw in rows if isinstance(rows, list) else []:
@@ -471,19 +615,69 @@ class QuoteCoverage:
         }
 
 
+def fetch_shoonya_quotes(symbols: list[str]) -> dict[str, dict[str, Any]]:
+    """Fetch quotes from the Shoonya standby gateway."""
+    if not symbols:
+        return {}
+    try:
+        from .standby_feed.config import StandbyConfig
+        from .standby_feed.gateway_client import GatewayClient
+    except Exception:
+        return {}
+    try:
+        client = GatewayClient(StandbyConfig.from_env())
+        return {str(k).upper(): dict(v) for k, v in client.quotes([str(s).upper() for s in symbols]).items() if isinstance(v, dict)}
+    except Exception as exc:
+        log.debug("shoonya quote fetch failed: %s", exc)
+        return {}
+
+
 def fetch_quotes_with_failover(
     symbols: Iterable[str],
     angel_fetch: Callable[[list[str]], dict[str, dict[str, Any]]],
+    *,
+    shoonya_fetch: Callable[[list[str]], dict[str, dict[str, Any]]] | None = None,
+    angel_first: bool = False,
 ) -> tuple[dict[str, dict[str, Any]], QuoteCoverage]:
-    """NSE primary, Dhan missing-symbol fallback, then Angel final fallback."""
+    """Bulk quote coverage with Angel-first optional mode and Shoonya failover.
+
+    Default path: NSE -> Dhan -> Angel -> Shoonya.
+    With ``angel_first=True``: Angel -> NSE fill -> Dhan fill -> Shoonya.
+    Rate-limit errors from Angel open a circuit via ``ProviderRouter`` and
+    immediately route remaining symbols to Shoonya for this call.
+    """
+    from .provider_router import Provider, ProviderRouter, Capability
+
     ordered = list(dict.fromkeys(_norm(s) for s in symbols if _norm(s)))
     quotes: dict[str, dict[str, Any]] = {}
-    providers = {"nse": 0, "dhan": 0, "angel": 0}
-    try:
-        quotes.update(fetch_nse500_quotes(ordered))
-        providers["nse"] = len(quotes)
-    except Exception as exc:
-        log.warning("NSE Nifty 500 quote fetch failed; using Dhan fallback: %s", exc)
+    providers = {"nse": 0, "dhan": 0, "angel": 0, "shoonya": 0}
+
+    if angel_first:
+        try:
+            angel = angel_fetch(ordered)
+            for symbol, quote in angel.items():
+                if symbol in ordered and isinstance(quote, dict):
+                    row = dict(quote)
+                    row.setdefault("quoteProvider", "angel")
+                    quotes[symbol] = row
+                    providers["angel"] += 1
+        except Exception as exc:
+            log.warning("Angel-first quote fetch failed; filling from NSE/Dhan/Shoonya: %s", exc)
+            try:
+                ProviderRouter.mark_rate_limited(Provider.ANGEL, hold_seconds=60.0)
+            except Exception:
+                pass
+
+    missing = [symbol for symbol in ordered if symbol not in quotes]
+    if missing:
+        try:
+            nse = fetch_nse500_quotes(missing)
+            for symbol, quote in nse.items():
+                if symbol not in quotes and isinstance(quote, dict):
+                    quotes[symbol] = quote
+                    providers["nse"] += 1
+        except Exception as exc:
+            log.warning("NSE Nifty 500 quote fetch failed; using Dhan fallback: %s", exc)
 
     missing = [symbol for symbol in ordered if symbol not in quotes]
     if missing:
@@ -494,20 +688,44 @@ def fetch_quotes_with_failover(
                     quotes[symbol] = quote
                     providers["dhan"] += 1
         except Exception as exc:
-            log.warning("Dhan bulk quote fallback failed; using Angel: %s", exc)
+            log.warning("Dhan bulk quote fallback failed; using Angel/Shoonya: %s", exc)
 
     missing = [symbol for symbol in ordered if symbol not in quotes]
     if missing:
+        router_available = True
         try:
-            angel = angel_fetch(missing)
-            for symbol, quote in angel.items():
+            router = ProviderRouter()
+            router_available = router.is_available(Provider.ANGEL, Capability.EQUITY_REST_QUOTES)
+        except Exception:
+            pass
+        if router_available:
+            try:
+                angel = angel_fetch(missing)
+                for symbol, quote in angel.items():
+                    if symbol not in quotes and isinstance(quote, dict):
+                        quote = dict(quote)
+                        quote.setdefault("quoteProvider", "angel")
+                        quotes[symbol] = quote
+                        providers["angel"] += 1
+            except Exception as exc:
+                log.warning("Angel quote fallback failed; routing to Shoonya: %s", exc)
+                try:
+                    ProviderRouter.mark_rate_limited(Provider.ANGEL, hold_seconds=60.0)
+                except Exception:
+                    pass
+
+    missing = [symbol for symbol in ordered if symbol not in quotes]
+    if missing and shoonya_fetch is not None:
+        try:
+            shoonya = shoonya_fetch(missing)
+            for symbol, quote in shoonya.items():
                 if symbol not in quotes and isinstance(quote, dict):
                     quote = dict(quote)
-                    quote.setdefault("quoteProvider", "angel")
+                    quote.setdefault("quoteProvider", "shoonya")
                     quotes[symbol] = quote
-                    providers["angel"] += 1
+                    providers["shoonya"] += 1
         except Exception as exc:
-            log.warning("Angel quote fallback failed: %s", exc)
+            log.warning("Shoonya quote fallback failed: %s", exc)
 
     missing = [symbol for symbol in ordered if symbol not in quotes]
     expected = len(ordered)

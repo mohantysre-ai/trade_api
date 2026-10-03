@@ -89,3 +89,32 @@ def test_desk_ic_timeout_returns_deterministic_fallback_without_thread_pileup(mo
         return acquired
 
     assert _wait_until(lock_is_released)
+
+
+def test_stale_market_refresh_owner_never_blocks_a_second_caller(monkeypatch):
+    lock = threading.Lock()
+    lock.acquire()
+    monkeypatch.setattr(angel_one_feed, "_SCHEDULED_REFRESH_LOCK", lock)
+    monkeypatch.setattr(
+        angel_one_feed,
+        "_SCHEDULED_REFRESH_STATE",
+        {
+            "running": True,
+            "reason": "slow_candle_scan",
+            "startedAt": "2000-01-01T00:00:00+00:00",
+            "lastProgressAt": "2000-01-01T00:00:00+00:00",
+        },
+    )
+
+    try:
+        before = time.monotonic()
+        result = angel_one_feed.run_scheduled_live_refresh(reason="intraday_session_read")
+        elapsed = time.monotonic() - before
+    finally:
+        lock.release()
+
+    assert elapsed < 0.2
+    assert result["success"] is False
+    assert result["error"] == "market_refresh_stale_running"
+    assert result["activeRefresh"]["running"] is True
+    assert result["activeRefresh"]["reason"] == "slow_candle_scan"

@@ -33,6 +33,9 @@ from .market_snapshot_store import market_snapshot_path
 _PAPER_LOCK = threading.Lock()
 PAPER_SQUARE_OFF_TIME = dt_time(15, 29)
 SELLER_SQUARE_OFF_TIME = dt_time(15, 20)
+EXITED_LIVE_AT_EOD = "EXITED_LIVE_AT_EOD"
+RECOVERED_AFTER_EOD = "RECOVERED_AFTER_EOD"
+EOD_PRICE_UNAVAILABLE = "EOD_PRICE_UNAVAILABLE"
 DEFAULT_SELLER_MAX_SINGLE_RISK_INR = 5_000.0
 DEFAULT_SELLER_MAX_PORTFOLIO_RISK_INR = 10_000.0
 LONG_PREMIUM_MARK_INTERVAL_SECONDS = 60
@@ -139,8 +142,18 @@ def _hydrate_locked_instruments(positions: list[dict[str, Any]], candidates: lis
         try:
             for raw in load_angel_scrip_master():
                 symbol = str(raw.get("symbol") or "")
-                if symbol and symbol not in by_symbol:
-                    by_symbol[symbol] = {"token": raw.get("token"), "exchange": raw.get("exch_seg")}
+                if not symbol:
+                    continue
+                master_entry = {"token": raw.get("token"), "exchange": raw.get("exch_seg")}
+                if symbol in by_symbol:
+                    existing = by_symbol[symbol]
+                    if not existing.get("token") or not existing.get("exchange"):
+                        if raw.get("token"):
+                            existing["token"] = raw.get("token")
+                        if raw.get("exch_seg"):
+                            existing["exchange"] = raw.get("exch_seg")
+                else:
+                    by_symbol[symbol] = master_entry
         except Exception:
             pass
     resolved = 0
@@ -165,6 +178,8 @@ def _position_instruments(position: dict[str, Any]) -> list[dict[str, Any]]:
     """Every contract that backs one position (all legs for a seller spread)."""
     if sleeve_of(position) == SELL_SLEEVE:
         return [leg for leg in (position.get("legs") or []) if isinstance(leg, dict)]
+    if str(position.get("strategyMode") or "").upper() == "INTRADAY_PYRAMID":
+        return [position, *(leg for leg in (position.get("legs") or []) if isinstance(leg, dict))]
     return [position]
 
 
@@ -225,6 +240,110 @@ def _rest_marks(client: Any, instruments: list[Instrument]) -> tuple[dict[str, f
     return marks, None
 
 
+def _shoonya_marks(instruments: list[Instrument]) -> tuple[dict[str, float], dict[str, dict[str, Any]]]:
+    if not instruments:
+        return {}, {}
+    try:
+        from .standby_feed.config import StandbyConfig
+        from .standby_feed.gateway_client import GatewayClient
+
+        cfg = StandbyConfig.from_env()
+        if not cfg.promotable:
+            return {}, {}
+        client = GatewayClient(cfg)
+        keys = [f"{instrument.exchange}|{instrument.token}" for instrument in instruments]
+        client.pin("index-options-paper", keys, ttl_seconds=120.0)
+        quotes = client.quotes([instrument.tradingsymbol for instrument in instruments])
+    except Exception:
+        return {}, {}
+    marks: dict[str, float] = {}
+    depth: dict[str, dict[str, Any]] = {}
+    for instrument in instruments:
+        row = quotes.get(instrument.tradingsymbol) or {}
+        mark = _float(row.get("ltp"))
+        age_ms = _float(row.get("ageMs"))
+        if mark is None or mark <= 0 or age_ms is None or age_ms < 0 or age_ms / 1000.0 > _mark_stale_seconds() or row.get("status") == "NOT_SUBSCRIBED":
+            continue
+        marks[instrument.tradingsymbol] = mark
+        depth[instrument.tradingsymbol] = {
+            "mark": mark,
+            "bid": _float(row.get("bestBid") or row.get("bid")),
+            "ask": _float(row.get("bestAsk") or row.get("ask")),
+            "source": "SHOONYA_WEBSOCKET_LOCKED_CONTRACT",
+            "ageSeconds": age_ms / 1000.0,
+            "stale": False,
+        }
+    return marks, depth
+
+
+def _chain_marks(positions: list[dict[str, Any]], symbols: set[str]) -> tuple[dict[str, float], dict[str, dict[str, Any]]]:
+    if not symbols:
+        return {}, {}
+    marks: dict[str, float] = {}
+    depth: dict[str, dict[str, Any]] = {}
+    requests: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for position in positions:
+        index_key = str(position.get("index") or position.get("key") or "").upper()
+        for leg in _position_instruments(position):
+            symbol = str(leg.get("symbol") or "")
+            expiry = str(leg.get("expiry") or position.get("expiry") or "")[:10]
+            if symbol in symbols and index_key and expiry:
+                requests.setdefault((index_key, expiry), []).append({
+                    **leg,
+                    "_positionDirection": position.get("direction"),
+                })
+    for (index_key, expiry_text), legs in requests.items():
+        try:
+            expiry = datetime.fromisoformat(expiry_text).date()
+        except ValueError:
+            continue
+        from .dhan_scanx_options import fetch_scanx_option_chain
+        from .lemonn_options import fetch_lemonn_option_chain
+        from .market_data_provider import fetch_nse_option_chain
+
+        fetchers = (
+            lambda: fetch_nse_option_chain(index_key, expiry, timeout=(3, 5)),
+            lambda: fetch_scanx_option_chain(index_key, expiry, timeout=5.0),
+            lambda: fetch_lemonn_option_chain(index_key, expiry, timeout=5.0),
+        )
+        unresolved = list(legs)
+        for fetcher in fetchers:
+            if not unresolved:
+                break
+            try:
+                payload = fetcher()
+            except Exception:
+                continue
+            next_unresolved: list[dict[str, Any]] = []
+            for leg in unresolved:
+                symbol = str(leg.get("symbol") or "")
+                strike = _float(leg.get("strike"))
+                option_type = str(leg.get("optionType") or leg.get("direction") or leg.get("_positionDirection") or "").upper()
+                option_type = "CALL" if option_type in {"CE", "CALL"} else "PUT" if option_type in {"PE", "PUT"} else option_type
+                source = str(payload.get("source") or "OPTION_CHAIN_FALLBACK")
+                match = next((row for row in payload.get("chain") or [] if isinstance(row, dict) and (
+                    str(row.get("symbol") or "").upper() == symbol.upper() or (
+                        strike is not None and _float(row.get("strike")) == strike
+                        and str(row.get("optionType") or "").upper() in {option_type, option_type[:1] + "E"}
+                    )
+                )), None)
+                mark = _float((match or {}).get("ltp"))
+                if mark is None or mark <= 0:
+                    next_unresolved.append(leg)
+                    continue
+                marks[symbol] = mark
+                depth[symbol] = {
+                    "mark": mark,
+                    "bid": _float(match.get("bestBid")),
+                    "ask": _float(match.get("bestAsk")),
+                    "source": source,
+                    "ageSeconds": None,
+                    "stale": False,
+                }
+            unresolved = next_unresolved
+    return marks, depth
+
+
 def _locked_marks(
     client: Any, positions: list[dict[str, Any]],
 ) -> tuple[dict[str, float], dict[str, dict[str, Any]], str | None, dict[str, Any]]:
@@ -251,13 +370,21 @@ def _locked_marks(
             "mark": mark, "bid": None, "ask": None,
             "source": "ANGEL_DIRECT_LOCKED_CONTRACT", "ageSeconds": None, "stale": True,
         }
+    missing = [instrument for instrument in pending if instrument.tradingsymbol not in rest_marks]
+    shoonya_marks, shoonya_depth = _shoonya_marks(missing)
+    depth.update(shoonya_depth)
+    missing_symbols = {instrument.tradingsymbol for instrument in missing if instrument.tradingsymbol not in shoonya_marks}
+    chain_marks, chain_depth = _chain_marks(positions, missing_symbols) if missing_symbols else ({}, {})
+    depth.update(chain_depth)
     pipeline.update({
         "streamMarks": len(stream_marks),
         "restMarks": len(rest_marks),
+        "shoonyaMarks": len(shoonya_marks),
+        "chainMarks": len(chain_marks),
         "staleContracts": len(pending),
         "restRequested": len(pending) if client is not None else 0,
     })
-    return {**rest_marks, **stream_marks}, depth, rest_error, pipeline
+    return {**chain_marks, **shoonya_marks, **rest_marks, **stream_marks}, depth, rest_error, pipeline
 
 
 def _direct_locked_marks(client: Any, positions: list[dict[str, Any]]) -> tuple[dict[str, float], str | None]:
@@ -426,12 +553,12 @@ def _spot_for(position: dict[str, Any], candidates: list[dict[str, Any]]) -> flo
     return None
 
 
-def _close_credit(position: dict[str, Any], debit: float, reason: str, now: datetime) -> dict[str, Any]:
+def _close_credit(position: dict[str, Any], debit: float, reason: str, now: datetime, *, exit_state: str | None = None) -> dict[str, Any]:
     credit, qty = float(position["entryCredit"]), int(position["quantity"])
     costs = float(position.get("estimatedRoundTripCosts") or 0)
     pnl = round((credit - debit) * qty - costs, 2)
     max_loss = max(float(position.get("maxLossPerLot") or 0), 0.01)
-    return {
+    closed = {
         **position,
         "status": "CLOSED",
         "exitDebit": round(debit, 2),
@@ -442,11 +569,14 @@ def _close_credit(position: dict[str, Any], debit: float, reason: str, now: date
         "pnlPct": round(pnl / max_loss * 100.0, 2),
         "unrealizedPnl": 0.0,
     }
+    if exit_state:
+        closed["eodExitState"] = exit_state
+    return closed
 
 
 def _update_credit_open(
     position: dict[str, Any], debit: float, marked_legs: list[dict[str, Any]], spot: float | None, now: datetime,
-    *, mark_source: str = "RADAR_EXECUTABLE_DEPTH", stale_legs: list[str] | None = None,
+    *, mark_source: str = "RADAR_EXECUTABLE_DEPTH", stale_legs: list[str] | None = None, exit_state: str | None = None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     credit, qty = float(position["entryCredit"]), int(position["quantity"])
     costs = float(position.get("estimatedRoundTripCosts") or 0)
@@ -473,13 +603,13 @@ def _update_credit_open(
     upper = _float(position.get("shortCallStrike"))
     breached = bool(spot is not None and ((lower is not None and spot <= lower) or (upper is not None and spot >= upper)))
     if breached:
-        return None, _close_credit(updated, debit, "UNDERLYING_SHORT_STRIKE_BREACH", now)
+        return None, _close_credit(updated, debit, "UNDERLYING_SHORT_STRIKE_BREACH", now, exit_state=exit_state)
     if debit <= profit_debit:
-        return None, _close_credit(updated, debit, "PROFIT_TARGET_50PCT_CREDIT", now)
+        return None, _close_credit(updated, debit, "PROFIT_TARGET_50PCT_CREDIT", now, exit_state=exit_state)
     if debit >= stop_debit:
-        return None, _close_credit(updated, debit, "DEFINED_RISK_STOP", now)
+        return None, _close_credit(updated, debit, "DEFINED_RISK_STOP", now, exit_state=exit_state)
     if now.astimezone(IST_ZONE).time().replace(tzinfo=None) >= SELLER_SQUARE_OFF_TIME:
-        return None, _close_credit(updated, debit, "EOD_GAMMA_SQUAREOFF", now)
+        return None, _close_credit(updated, debit, "EOD_GAMMA_SQUAREOFF", now, exit_state=exit_state or EXITED_LIVE_AT_EOD)
     return updated, None
 
 
@@ -502,6 +632,7 @@ def _new_position(
             return None
         lot = next(iter(lots))
         primary = next((leg for leg in legs if leg.get("action") == "SELL"), legs[0])
+        intended_eod = datetime.combine(now.date(), SELLER_SQUARE_OFF_TIME).replace(tzinfo=now.tzinfo).isoformat()
         return {
             "id": f"{now.astimezone(IST_ZONE).date().isoformat()}-{sequence:02d}-{row['key']}-SELL",
             "index": row["key"], "bucket": row["bucket"], "direction": row.get("direction"),
@@ -518,6 +649,7 @@ def _new_position(
             "unrealizedPnl": 0.0, "source": row.get("dataSource"), "execution": "DEFINED_RISK_PAPER_ONLY",
             "entryBasis": "SELL_BID_BUY_ASK", "nakedRisk": False,
             "markQuality": "FRESH", "spreadMarkQuality": "FRESH", "spreadStaleLegs": [],
+            "intendedEodSquareOffAt": intended_eod,
         }
 
     contract = row.get("contract") if isinstance(row.get("contract"), dict) else {}
@@ -532,10 +664,12 @@ def _new_position(
         premium, pricing = ask, "ANGEL_WEBSOCKET_ASK"
     else:
         premium, pricing = _float(contract.get("ltp")), "LOCKED_CONTRACT_LTP"
-    if not premium or premium <= LONG_PREMIUM_STOP_POINTS or not lot or lot < 1:
+    if not premium or premium <= 0 or not lot or lot < 1:
         return None
-    stop = premium - LONG_PREMIUM_STOP_POINTS
-    target = premium + LONG_PREMIUM_TARGET_POINTS
+    distance = min(LONG_PREMIUM_STOP_POINTS, max(0.5, premium * 0.50))
+    target_distance = distance * LONG_PREMIUM_RISK_REWARD
+    stop = premium - distance
+    target = premium + target_distance
     return {
         "id": f"{now.astimezone(IST_ZONE).date().isoformat()}-{sequence:02d}-{row['key']}",
         "index": row["key"], "bucket": row["bucket"], "direction": row["direction"],
@@ -549,8 +683,8 @@ def _new_position(
         "status": "OPEN", "enteredAt": now.isoformat(), "updatedAt": now.isoformat(), "markedAt": now.isoformat(),
         "nextMarkDueAt": datetime.fromtimestamp(now.timestamp() + LONG_PREMIUM_MARK_INTERVAL_SECONDS, tz=now.tzinfo).isoformat(),
         "unrealizedPnl": 0.0, "source": row.get("dataSource"), "execution": "PAPER_ONLY",
-        "riskModel": "FIXED_OPTION_PREMIUM_POINTS_1_TO_2", "markIntervalSeconds": LONG_PREMIUM_MARK_INTERVAL_SECONDS,
-        "stopDistancePoints": LONG_PREMIUM_STOP_POINTS, "targetDistancePoints": LONG_PREMIUM_TARGET_POINTS,
+        "riskModel": ("FIXED_OPTION_PREMIUM_POINTS_1_TO_2" if distance >= LONG_PREMIUM_STOP_POINTS else "ADAPTIVE_OPTION_PREMIUM_POINTS_1_TO_2"), "markIntervalSeconds": LONG_PREMIUM_MARK_INTERVAL_SECONDS,
+        "stopDistancePoints": round(distance, 2), "targetDistancePoints": round(target_distance, 2),
         "riskRewardRatio": LONG_PREMIUM_RISK_REWARD,
         "entryPricingSource": pricing,
         "entryBid": round(bid, 2) if bid is not None else None,
@@ -560,13 +694,17 @@ def _new_position(
     }
 
 
-def _governor(book: dict[str, Any]) -> IndexOptionReEntryGovernor:
+def _governor(book: dict[str, Any], sleeve: str | None = None) -> IndexOptionReEntryGovernor:
     governor = IndexOptionReEntryGovernor()
     for row in [*(book.get("open") or []), *(book.get("closed") or [])]:
+        if sleeve is not None and sleeve_of(row) != sleeve:
+            continue
         key = str(row.get("index") or "")
         if key:
             governor.trade_counts[key] = governor.trade_counts.get(key, 0) + 1
     for row in book.get("closed") or []:
+        if sleeve is not None and sleeve_of(row) != sleeve:
+            continue
         key = str(row.get("index") or "")
         reason = str(row.get("exitReason") or "")
         pnl = float(row.get("pnl") or 0)
@@ -602,6 +740,14 @@ def _cross_book_owner(row: dict[str, Any], session_date: str) -> str | None:
 
 def _reentry_confirmations(row: dict[str, Any]) -> dict[str, bool]:
     gates = row.get("gates") if isinstance(row.get("gates"), dict) else {}
+    if sleeve_of(row) == SELL_SLEEVE:
+        structure = gates.get("fresh") is True and gates.get("structure") is True
+        return {
+            "fresh_breakout_confirmed": structure,
+            "oi_aligned": gates.get("futuresRegime") is True and gates.get("optionChain") is True,
+            "breadth_aligned": gates.get("breadth") is True,
+            "opposite_confirmation": structure,
+        }
     breakout = all(gates.get(name) is True for name in ("fresh", "structure", "breakout"))
     oi = gates.get("futuresOi") is True
     breadth = gates.get("breadth") is True
@@ -701,7 +847,7 @@ def _select_sleeve_entries(
     entries: list[tuple[dict[str, Any], dict[str, Any]]] = []
     used_indexes: set[str] = set()
     used_buckets: set[str] = set()
-    governor = _governor(book)
+    governor = _governor(book, sleeve_of(ranked[0])) if ranked else IndexOptionReEntryGovernor()
     for row in ranked:
         sleeve = sleeve_of(row)
         index, bucket = str(row.get("key") or ""), str(row.get("bucket") or "")
@@ -734,7 +880,18 @@ def _select_sleeve_entries(
             continue
         position = _new_position(row, clock, 1, depth=depth)
         if position is None:
-            row["entryBlockedBy"] = "POSITION_CONSTRUCTION_FAILED"
+            if sleeve == BUY_SLEEVE:
+                contract = row.get("contract") if isinstance(row.get("contract"), dict) else {}
+                premium = _float(contract.get("ltp"))
+                lot = _float(contract.get("lotSize"))
+                if premium is None or premium <= 0:
+                    row["entryBlockedBy"] = "BUY_PREMIUM_INVALID_PRICE"
+                elif lot is None or lot < 1:
+                    row["entryBlockedBy"] = "BUY_PREMIUM_INVALID_LOT"
+                else:
+                    row["entryBlockedBy"] = "POSITION_CONSTRUCTION_FAILED"
+            else:
+                row["entryBlockedBy"] = "SELLER_CONSTRUCTION_OR_RISK_INVALID"
             continue
         entries.append((row, position))
         used_indexes.add(index)
@@ -850,12 +1007,13 @@ def hydrate_open_position_subscriptions(
 
 
 def reconcile_paper_book(
-    radar: dict[str, Any], *, client: Any = None, now: datetime | None = None, persist: bool = True,
+    radar: dict[str, Any], *, client: Any = None, now: datetime | None = None, persist: bool = True, eod_exit_state: str | None = None,
 ) -> dict[str, Any]:
     clock = (now or datetime.now(IST_ZONE)).astimezone(IST_ZONE)
     session = clock.date().isoformat()
     with _PAPER_LOCK:
         book = _load_book(session)
+        book.setdefault("entryAudit", [])
         buy_candidates = radar.get("candidates") if isinstance(radar.get("candidates"), list) else []
         seller_candidates = radar.get("sellerCandidates") if isinstance(radar.get("sellerCandidates"), list) else []
         candidates = [*buy_candidates, *seller_candidates]
@@ -887,7 +1045,7 @@ def reconcile_paper_book(
                 )
                 active, closed = _update_credit_open(
                     position, debit, marked_legs, _spot_for(position, candidates), clock,
-                    mark_source=spread_source, stale_legs=stale_legs,
+                    mark_source=spread_source, stale_legs=stale_legs, exit_state=eod_exit_state,
                 )
                 if active:
                     next_open.append(active)
@@ -902,25 +1060,94 @@ def reconcile_paper_book(
             symbol = str(position.get("symbol") or "")
             meta = mark_depth.get(symbol) or {}
             mark = locked_marks.get(symbol)
+            executable_bid = _float(meta.get("bid"))
+            stop_premium = _float(position.get("initialStopPremium"))
+            if executable_bid is not None and executable_bid > 0 and stop_premium is not None and executable_bid <= stop_premium:
+                mark = executable_bid
             if mark is None:
                 mark = _mark_for(position, candidates)
                 mark_source = "RADAR_CHAIN_FALLBACK"
-            elif meta.get("source") == "ANGEL_WEBSOCKET":
-                mark_source = "ANGEL_WEBSOCKET_LOCKED_CONTRACT"
             else:
-                mark_source = "ANGEL_DIRECT_LOCKED_CONTRACT"
+                mark_source = str(meta.get("source") or "LOCKED_CONTRACT_FALLBACK")
+                if mark_source == "ANGEL_WEBSOCKET":
+                    mark_source = "ANGEL_WEBSOCKET_LOCKED_CONTRACT"
             if mark is None:
                 position["markStatus"] = "UNAVAILABLE"
                 position["markError"] = mark_error
                 position["lastMarkAttemptAt"] = clock.isoformat()
                 next_open.append(position)
                 continue
-            position["markError"] = mark_error if mark_source != "ANGEL_DIRECT_LOCKED_CONTRACT" else None
+            position["markError"] = mark_error if mark_source == "RADAR_CHAIN_FALLBACK" else None
             quality = (
                 "FRESH_WEBSOCKET" if mark_source == "ANGEL_WEBSOCKET_LOCKED_CONTRACT"
-                else "REST_FALLBACK" if mark_source == "ANGEL_DIRECT_LOCKED_CONTRACT"
+                else "FRESH_WEBSOCKET" if mark_source == "SHOONYA_WEBSOCKET_LOCKED_CONTRACT"
+                else "REST_FALLBACK" if mark_source != "RADAR_CHAIN_FALLBACK"
                 else "RADAR_FALLBACK"
             )
+            from .index_options_intraday_strategy import evaluate_position as _evaluate_intraday, position_from_dict as _intraday_from_dict
+            intraday_mode = str(position.get("strategyMode") or "").upper() == "INTRADAY_PYRAMID"
+            if intraday_mode:
+                pos = _intraday_from_dict(position, sequence=0)
+                if pos is not None:
+                    marks_map = {}
+                    for leg in pos.legs:
+                        leg_mark = mark if leg.symbol == symbol else locked_marks.get(leg.symbol)
+                        if leg_mark is None:
+                            leg_mark = _float(_candidate_contract(leg.symbol, candidates).get("ltp"))
+                        if leg_mark is not None and leg_mark > 0:
+                            marks_map[leg.symbol] = leg_mark
+                    updated_pos = _evaluate_intraday(pos, marks_map, clock)
+                    updated_dict = {
+                        **position,
+                        **{
+                            "status": updated_pos.status,
+                            "exitReason": updated_pos.exit_reason,
+                            "pnl": round(updated_pos.total_realized_pnl, 2),
+                            "realizedPnl": round(updated_pos.total_realized_pnl, 2),
+                            "remainingQty": updated_pos.remaining_qty,
+                            "pyramidedLots": updated_pos.pyramided_lots,
+                            "legs": [
+                                {
+                                    **next((existing for existing in (position.get("legs") or [])
+                                            if isinstance(existing, dict) and existing.get("symbol") == leg.symbol), {}),
+                                    "symbol": leg.symbol,
+                                    "direction": leg.direction,
+                                    "entryPrice": leg.entry_price,
+                                    "averageEntryPrice": leg.average_entry_price or leg.entry_price,
+                                    "qty": leg.current_qty,
+                                    "initialQty": leg.initial_qty,
+                                    "pyramidedQty": leg.pyramided_qty,
+                                    "partialBookedQty": leg.partial_booked_qty,
+                                    "stopPrice": leg.stop_price,
+                                    "targetPrice": leg.target_price,
+                                    "peakPrice": leg.peak_price,
+                                    "mfePoints": round(leg.mfe_points, 2),
+                                    "targetHit": leg.target_hit,
+                                    "trailActive": leg.trail_active,
+                                    "closed": leg.closed,
+                                    "exitReason": leg.exit_reason,
+                                    "exitPrice": leg.exit_price,
+                                    "realizedPnl": round(leg.realized_pnl, 2),
+                                    "minuteMarks": leg.minute_marks,
+                                }
+                                for leg in updated_pos.legs
+                            ],
+                            "unrealizedPnl": round(sum(
+                                ((1 if leg.direction == "LONG" else -1) *
+                                 (marks_map.get(leg.symbol, leg.average_entry_price or leg.entry_price) -
+                                  (leg.average_entry_price or leg.entry_price)) * leg.current_qty)
+                                for leg in updated_pos.legs if not leg.closed
+                            ), 2),
+                        },
+                    }
+                    if updated_pos.all_legs_closed():
+                        closed_now.append(updated_dict)
+                    else:
+                        next_open.append(updated_dict)
+                else:
+                    next_open.append(position)
+                continue
+
             active, closed = _update_open(
                 position, mark, clock, mark_source=mark_source, quality=quality,
                 data_age_seconds=meta.get("ageSeconds"),
@@ -953,6 +1180,14 @@ def reconcile_paper_book(
                     book, sleeve_locks[sleeve],
                     session=session, clock=clock, depth=entry_depth,
                 )
+            for row in radar_rows:
+                reason = row.get("entryBlockedBy") or row.get("ownershipBlockedBy")
+                if reason:
+                    book["entryAudit"].append({
+                        "at": clock.isoformat(), "index": row.get("key"), "bucket": row.get("bucket"),
+                        "strategyMode": sleeve_of(row), "score": row.get("score"),
+                        "outcome": "REJECTED", "reason": str(reason),
+                    })
             # 2. Only now are the portfolio limits applied, round-robin across
             #    sleeves so one sleeve's second pick cannot starve the other
             #    sleeve's first pick.
@@ -977,7 +1212,13 @@ def reconcile_paper_book(
                 book["entryCount"] += 1
                 sleeve_locks[sleeve]["indexes"].add(str(row.get("key")))
                 sleeve_locks[sleeve]["buckets"].add(str(row.get("bucket")))
+                book["entryAudit"].append({
+                    "at": clock.isoformat(), "index": row.get("key"), "bucket": row.get("bucket"),
+                    "strategyMode": sleeve, "score": row.get("score"),
+                    "outcome": "LOCKED", "reason": "LOCKED", "positionId": position.get("id"),
+                })
 
+        book["entryAudit"] = book["entryAudit"][-200:]
         subscriptions = _sync_position_subscriptions(client, book["open"], closed_now)
 
         open_pnl = round(sum(float(row.get("unrealizedPnl") or 0) for row in book["open"]), 2)
@@ -1002,7 +1243,10 @@ def reconcile_paper_book(
                 "markIntervalSeconds": LONG_PREMIUM_MARK_INTERVAL_SECONDS,
                 "stopPoints": LONG_PREMIUM_STOP_POINTS,
                 "targetPoints": LONG_PREMIUM_TARGET_POINTS,
+                "stopPointsMax": LONG_PREMIUM_STOP_POINTS,
+                "targetPointsMax": LONG_PREMIUM_TARGET_POINTS,
                 "riskReward": LONG_PREMIUM_RISK_REWARD,
+                "lowPremiumAdaptive": True,
             },
             "sellerRiskCaps": {"singleTrade": _seller_single_risk_cap(), "portfolio": _seller_portfolio_risk_cap()},
         })

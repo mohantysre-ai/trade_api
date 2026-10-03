@@ -72,6 +72,21 @@ def test_directional_breakout_builds_bull_put_credit_spread_not_naked_short():
     assert setup["risk"]["maxLossPerLot"] > 0
 
 
+def test_hedge_wing_with_executable_ask_does_not_require_delta_or_iv():
+    chain = _chain()
+    wing = next(row for row in chain if row["optionType"] == "CALL" and row["strike"] == 110)
+    wing.pop("delta")
+    wing.pop("iv")
+    wing["bestAsk"] = 0.62
+    setup = _seller(chain=chain, structure={
+        "status": "CONFIRMED", "direction": "PUT", "last": 96,
+        "orbLow": 97, "orbHigh": 103, "atr5m": 2, "barCount": 27,
+    })
+    assert setup["strategyType"] == "BEAR_CALL_CREDIT_SPREAD"
+    assert [leg["action"] for leg in setup["legs"]] == ["SELL", "BUY"]
+    assert setup["gates"]["contractEconomics"] is True
+
+
 def test_seller_rejects_missing_hedge_and_unpriced_volatility_edge():
     no_wings = [row for row in _chain() if row["strike"] in {95, 100, 105}]
     unavailable = _seller(chain=no_wings)

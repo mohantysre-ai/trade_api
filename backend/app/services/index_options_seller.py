@@ -23,9 +23,11 @@ SELLER_ENTRY_START = dt_time(9, 45)
 SELLER_ENTRY_CUTOFF = dt_time(14, 30)
 SELLER_EXPIRY_DAY_CUTOFF = dt_time(13, 30)
 MIN_CREDIT_TO_RISK = 0.20
+MIN_CREDIT_TO_RISK_CHEAP_VOL = 0.15
 MIN_IV_EDGE_POINTS = 0.75
 MIN_IV_EDGE_RATIO = 1.05
 MAX_LEG_SPREAD_PCT = 2.0
+MAX_HEDGE_SPREAD_PCT = 4.0
 MIN_SHORT_DELTA = 0.15
 MAX_SHORT_DELTA = 0.40
 ESTIMATED_COST_PER_ORDER_INR = 20.0
@@ -95,6 +97,19 @@ def _usable(row: dict[str, Any]) -> bool:
     )
 
 
+def _usable_wing(row: dict[str, Any]) -> bool:
+    spread = _leg_spread(row)
+    return bool(
+        row.get("symbol")
+        and (_float(row.get("volume")) or 0) > 0
+        and (_float(row.get("lotSize")) or 0) >= 1
+        and _float(row.get("theta")) is not None
+        and _float(row.get("gamma")) is not None
+        and spread is not None
+        and spread <= MAX_HEDGE_SPREAD_PCT
+    )
+
+
 def _pick_short(rows: list[dict[str, Any]], spot: float, option_type: str) -> dict[str, Any] | None:
     wanted = []
     for row in rows:
@@ -118,7 +133,11 @@ def _pick_wing(rows: list[dict[str, Any]], short: dict[str, Any], option_type: s
     wings = []
     for row in rows:
         strike = _float(row.get("strike"))
-        if row.get("optionType") != option_type or strike is None or not _usable(row):
+        if row.get("optionType") != option_type or strike is None or not _usable_wing(row):
+            continue
+        if (row.get("expiry") or row.get("expiryValue")) != (short.get("expiry") or short.get("expiryValue")):
+            continue
+        if row.get("exchange") != short.get("exchange") or row.get("lotSize") != short.get("lotSize"):
             continue
         farther = strike > short_strike if option_type == "CALL" else strike < short_strike
         if farther:
@@ -321,13 +340,78 @@ def _setup_from_legs(
     short_iv = median(short_ivs) if short_ivs else None
     iv_edge = short_iv - vix if short_iv is not None and vix is not None else None
     iv_ratio = short_iv / vix if short_iv is not None and vix and vix > 0 else None
-    volatility_edge = bool(iv_edge is not None and iv_ratio is not None and iv_edge >= MIN_IV_EDGE_POINTS and iv_ratio >= MIN_IV_EDGE_RATIO)
+    adaptive_min_credit_risk = MIN_CREDIT_TO_RISK
+    adaptive_min_iv_edge = MIN_IV_EDGE_POINTS
+    adaptive_min_iv_ratio = MIN_IV_EDGE_RATIO
+    cheap_volatility_regime = vix is not None and vix < 15.0 and iv_edge is not None and iv_edge < 0
+    low_vix_positive_edge = vix is not None and vix < 15.0 and iv_edge is not None and iv_edge >= 0
+    if cheap_volatility_regime:
+        adaptive_min_credit_risk = MIN_CREDIT_TO_RISK * 1.50
+        adaptive_min_iv_edge = MIN_IV_EDGE_POINTS * 2.0
+        adaptive_min_iv_ratio = max(1.15, MIN_IV_EDGE_RATIO * 1.15)
+    if cheap_volatility_regime and credit_to_risk < MIN_CREDIT_TO_RISK_CHEAP_VOL:
+        volatility_edge = False
+        gate_evidence_vol = {
+            "aligned": False, "shortIv": round(short_iv, 3) if short_iv is not None else None,
+            "indiaVix": vix, "ivEdgePoints": round(iv_edge, 3) if iv_edge is not None else None,
+            "ivToVix": round(iv_ratio, 3) if iv_ratio is not None else None, "vixRegime": vix_regime,
+            "regime": "CHEAP_VOLATILITY_DISABLED", "reason": "INSUFFICIENT_EXPECTED_COMPENSATION",
+            "minimumEdgePoints": adaptive_min_iv_edge, "minimumIvToVix": adaptive_min_iv_ratio,
+            "minimumCreditToRisk": adaptive_min_credit_risk,
+        }
+    elif cheap_volatility_regime:
+        volatility_edge = bool(
+            iv_edge is not None and iv_ratio is not None
+            and iv_edge >= adaptive_min_iv_edge
+            and iv_ratio >= adaptive_min_iv_ratio
+        )
+        gate_evidence_vol = {
+            "aligned": volatility_edge, "shortIv": round(short_iv, 3) if short_iv is not None else None,
+            "indiaVix": vix, "ivEdgePoints": round(iv_edge, 3) if iv_edge is not None else None,
+            "ivToVix": round(iv_ratio, 3) if iv_ratio is not None else None, "vixRegime": vix_regime,
+            "regime": "CHEAP_VOLATILITY_STRONGER_GATE",
+            "minimumEdgePoints": adaptive_min_iv_edge, "minimumIvToVix": adaptive_min_iv_ratio,
+            "minimumCreditToRisk": adaptive_min_credit_risk,
+        }
+    elif low_vix_positive_edge:
+        volatility_edge = bool(
+            iv_edge is not None and iv_ratio is not None
+            and iv_edge >= adaptive_min_iv_edge
+            and iv_ratio >= adaptive_min_iv_ratio
+        )
+        gate_evidence_vol = {
+            "aligned": volatility_edge, "shortIv": round(short_iv, 3) if short_iv is not None else None,
+            "indiaVix": vix, "ivEdgePoints": round(iv_edge, 3) if iv_edge is not None else None,
+            "ivToVix": round(iv_ratio, 3) if iv_ratio is not None else None, "vixRegime": vix_regime,
+            "regime": "LOW_VIX_POSITIVE_EDGE_NO_RELAXATION",
+            "minimumEdgePoints": adaptive_min_iv_edge, "minimumIvToVix": adaptive_min_iv_ratio,
+            "minimumCreditToRisk": adaptive_min_credit_risk,
+        }
+    else:
+        volatility_edge = bool(
+            iv_edge is not None and iv_ratio is not None
+            and iv_edge >= adaptive_min_iv_edge
+            and iv_ratio >= adaptive_min_iv_ratio
+        )
+        gate_evidence_vol = {
+            "aligned": volatility_edge, "shortIv": round(short_iv, 3) if short_iv is not None else None,
+            "indiaVix": vix, "ivEdgePoints": round(iv_edge, 3) if iv_edge is not None else None,
+            "ivToVix": round(iv_ratio, 3) if iv_ratio is not None else None, "vixRegime": vix_regime,
+            "regime": "NORMAL", "minimumEdgePoints": adaptive_min_iv_edge,
+            "minimumIvToVix": adaptive_min_iv_ratio, "minimumCreditToRisk": adaptive_min_credit_risk,
+        }
     carry_theta = sum(-(_float(leg.get("theta")) or 0) for leg in sell_legs) + sum((_float(leg.get("theta")) or 0) for leg in buy_legs)
     net_gamma = sum(-(_float(leg.get("gamma")) or 0) for leg in sell_legs) + sum((_float(leg.get("gamma")) or 0) for leg in buy_legs)
     gamma_cap = max(0.001, 75.0 / spot)
     leg_spreads = [_float(leg.get("spreadPct")) for leg in legs]
     max_spread = max((value for value in leg_spreads if value is not None), default=math.inf)
-    contract_ok = bool(credit > 0 and len(lots) == 1 and next(iter(lots), 0) > 0 and max_spread <= MAX_LEG_SPREAD_PCT)
+    contract_ok = bool(
+        credit > 0 and len(lots) == 1 and next(iter(lots), 0) > 0
+        and all(
+            spread is not None and spread <= (MAX_LEG_SPREAD_PCT if leg["action"] == "SELL" else MAX_HEDGE_SPREAD_PCT)
+            for leg, spread in zip(legs, leg_spreads)
+        )
+    )
 
     raw_breadth = _float(breadth.get("score"))
     coverage = _float(breadth.get("coveragePct"))
@@ -345,7 +429,7 @@ def _setup_from_legs(
     wall_ok = None if any(value is None for value in wall_checks) else all(value is True for value in wall_checks)
     structure_ok = _structure_ready(structure, neutral=neutral)
     time_ok, time_evidence = _time_gate(expiry_value, now)
-    defined_risk = width > 0 and max_loss > 0 and credit_to_risk >= MIN_CREDIT_TO_RISK
+    defined_risk = width > 0 and max_loss > 0 and credit_to_risk >= adaptive_min_credit_risk
     theta_ok = carry_theta > 0 and abs(net_gamma) <= gamma_cap
 
     atr = _float(structure.get("atr5m"))
@@ -416,12 +500,10 @@ def _setup_from_legs(
             "optionChain": {"aligned": wall_ok, "reason": "TWO_SIDED_OI_UP_PREMIUM_DOWN_WRITING" if neutral else "DIRECTIONAL_OI_UP_PREMIUM_DOWN_WRITING",
                             "shortLegWalls": wall_checks},
             "breadth": {**breadth, "aligned": breadth_ok, "sellerMode": "NEUTRAL" if neutral else "DIRECTIONAL"},
-            "volatilityEdge": {"aligned": volatility_edge if iv_edge is not None else None, "shortIv": round(short_iv, 3) if short_iv is not None else None,
-                               "indiaVix": vix, "ivEdgePoints": round(iv_edge, 3) if iv_edge is not None else None,
-                               "ivToVix": round(iv_ratio, 3) if iv_ratio is not None else None, "vixRegime": vix_regime},
+            "volatilityEdge": gate_evidence_vol,
             "contractEconomics": {"aligned": contract_ok, "maxLegSpreadPct": round(max_spread, 3) if math.isfinite(max_spread) else None,
                                   "entryBasis": "SELL_BID_BUY_ASK"},
-            "definedRisk": {"aligned": defined_risk, "creditToRisk": round(credit_to_risk, 3), "minimum": MIN_CREDIT_TO_RISK,
+            "definedRisk": {"aligned": defined_risk, "creditToRisk": round(credit_to_risk, 3), "minimum": adaptive_min_credit_risk,
                             "maxLossPerLot": round(max_loss_lot, 2), "netMaxProfitPerLot": round(net_profit_lot, 2),
                             "estimatedRoundTripCosts": round(estimated_cost, 2)},
             "thetaCarry": {"aligned": theta_ok, "netTheta": round(carry_theta, 4), "netGamma": round(net_gamma, 6), "gammaCap": round(gamma_cap, 6)},
@@ -442,6 +524,43 @@ def _setup_from_legs(
             "rejectionReasons": [name for name, value in gates.items() if value is False],
         },
     }
+
+
+def _pick_short_with_wing(rows, spot, option_type):
+    """Pick a short option that has at least one valid hedge wing.
+
+    Spread-aware: prefers tighter short-leg spreads first, then delta
+    proximity to 0.25 as tiebreaker. Falls back through candidates so the
+    builder never fails merely because the mathematically-ideal short happens
+    to sit on the chain boundary with no room for a hedge.
+    """
+    candidates = []
+    for row in rows:
+        if row.get("optionType") != option_type or not _usable(row):
+            continue
+        strike, delta = _float(row.get("strike")), abs(_float(row.get("delta")) or 0)
+        if strike is None or not (MIN_SHORT_DELTA <= delta <= MAX_SHORT_DELTA):
+            continue
+        if option_type == "CALL" and strike <= spot:
+            continue
+        if option_type == "PUT" and strike >= spot:
+            continue
+        candidates.append(row)
+    if not candidates:
+        return None, None
+
+    def _short_sort_key(row):
+        spread = _leg_spread(row)
+        spread_component = spread if spread is not None else float("inf")
+        delta_proximity = abs(abs(_float(row.get("delta")) or 0) - 0.25)
+        return (spread_component, delta_proximity)
+
+    candidates.sort(key=_short_sort_key)
+    for candidate in candidates:
+        wing = _pick_wing(rows, candidate, option_type)
+        if wing:
+            return candidate, wing
+    return candidates[0], None
 
 
 def build_defined_risk_seller_setup(
@@ -467,8 +586,7 @@ def build_defined_risk_seller_setup(
     clock = (now or datetime.now(IST_ZONE)).astimezone(IST_ZONE)
     direction = structure.get("direction")
     if direction == "CALL":
-        short = _pick_short(chain, spot, "PUT")
-        wing = _pick_wing(chain, short, "PUT") if short else None
+        short, wing = _pick_short_with_wing(chain, spot, "PUT")
         if short and wing:
             fut = {**futures_oi, "aligned": directional_oi_aligned}
             return _setup_from_legs(
@@ -484,8 +602,7 @@ def build_defined_risk_seller_setup(
             details={"requiredShortDelta": "0.15-0.40", "requiredHedge": "LOWER_STRIKE_PUT"},
         )
     elif direction == "PUT":
-        short = _pick_short(chain, spot, "CALL")
-        wing = _pick_wing(chain, short, "CALL") if short else None
+        short, wing = _pick_short_with_wing(chain, spot, "CALL")
         if short and wing:
             fut = {**futures_oi, "aligned": directional_oi_aligned}
             return _setup_from_legs(

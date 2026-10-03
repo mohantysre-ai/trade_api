@@ -1,0 +1,57 @@
+{
+  "date": "2026-09-25",
+  "generated_at": "2026-09-26T08:30:00Z",
+  "shoonya_auth": {
+    "attempted": true,
+    "authenticated": false,
+    "account": null,
+    "session_valid": false,
+    "login_time": null,
+    "blocker": "Missing Shoonya credentials in runtime environment: SHOONYA_UID, SHOONYA_ACCOUNT_ID, SHOONYA_PASSWORD, SHOONYA_TOTP_SECRET",
+    "error": null,
+    "safe_output": {
+      "authenticated": false,
+      "account": null,
+      "session_valid": false,
+      "login_time": null
+    }
+  },
+  "symbol_master": {
+    "required": 0,
+    "token_resolved": 0,
+    "missing": [],
+    "note": "Symbol master resolution blocked by missing authentication"
+  },
+  "candles": {
+    "requested_symbols": [],
+    "resolved_tokens": 0,
+    "coverage": {
+      "5m": 0,
+      "1h": 0,
+      "daily": 0
+    },
+    "note": "Candle fetch blocked by missing authentication"
+  },
+  "quotes": {
+    "tested": [],
+    "received": 0,
+    "note": "Quote fetch blocked by missing authentication"
+  },
+  "websocket": {
+    "attempted": false,
+    "connected": false,
+    "auth_ack": false,
+    "subscriptions": 0,
+    "note": "WebSocket connection blocked by missing authentication"
+  },
+  "angel_vs_shoonya_comparison": {
+    "comparisons": [],
+    "note": "Comparison blocked by missing Shoonya data"
+  },
+  "status": "BLOCKED",
+  "next_steps": [
+    "Configure SHOONYA_UID, SHOONYA_ACCOUNT_ID, SHOONYA_PASSWORD, SHOONYA_TOTP_SECRET in backend/.env or shoonya-gateway/.env",
+    "Start shoonya-gateway service",
+    "Re-run backend/scripts/shoonya_real_validation.py"
+  ]
+}

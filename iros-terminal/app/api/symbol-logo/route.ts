@@ -64,6 +64,18 @@ function logoResponse(request: Request, cached: CachedLogo) {
   });
 }
 
+async function fetchSvg(logoId: string): Promise<string | null> {
+  const logoAsset = await providerFetch(`${LOGO_ENDPOINT}/${logoId}.svg`);
+  if (!logoAsset.ok) return null;
+  const svg = await logoAsset.text();
+  if (
+    svg.length > 200_000 ||
+    !/<svg[\s>]/i.test(svg) ||
+    /<script[\s>]|<foreignObject[\s>]|\son\w+\s*=/i.test(svg)
+  ) return null;
+  return svg;
+}
+
 async function resolveLogo(rawSymbol: string, kind: LogoKind): Promise<CachedLogo | null> {
   const cacheKey = `${kind}:${rawSymbol.toUpperCase()}`;
   const hit = memoryCache.get(cacheKey);
@@ -75,28 +87,33 @@ async function resolveLogo(rawSymbol: string, kind: LogoKind): Promise<CachedLog
 
   const lookup = (async () => {
     const plan = buildLookupPlan(rawSymbol, kind, process.env.SYMBOL_LOGO_DEFAULT_EXCHANGE || "NSE");
-    const searchUrl = new URL(SEARCH_ENDPOINT);
-    searchUrl.searchParams.set("text", plan.query);
-    searchUrl.searchParams.set("hl", "1");
-    searchUrl.searchParams.set("lang", "en");
-    searchUrl.searchParams.set("search_type", plan.searchType);
-    searchUrl.searchParams.set("domain", "production");
-    if (plan.exchange) searchUrl.searchParams.set("exchange", plan.exchange);
+    let logoId = plan.logoId;
+    let svg: string | null = null;
 
-    const searchResponse = await providerFetch(searchUrl.toString());
-    if (!searchResponse.ok) return null;
-    const payload = (await searchResponse.json()) as { symbols?: SearchResult[] };
-    const logoId = selectExactLogo(Array.isArray(payload.symbols) ? payload.symbols : [], plan);
-    if (!logoId) return null;
+    if (logoId) {
+      svg = await fetchSvg(logoId);
+    }
 
-    const logoAsset = await providerFetch(`${LOGO_ENDPOINT}/${logoId}.svg`);
-    if (!logoAsset.ok) return null;
-    const svg = await logoAsset.text();
-    if (
-      svg.length > 200_000 ||
-      !/<svg[\s>]/i.test(svg) ||
-      /<script[\s>]|<foreignObject[\s>]|\son\w+\s*=/i.test(svg)
-    ) return null;
+    if (!svg) {
+      const searchUrl = new URL(SEARCH_ENDPOINT);
+      searchUrl.searchParams.set("text", plan.query);
+      searchUrl.searchParams.set("hl", "1");
+      searchUrl.searchParams.set("lang", "en");
+      if (plan.searchType) searchUrl.searchParams.set("search_type", plan.searchType);
+      searchUrl.searchParams.set("domain", "production");
+      if (plan.exchange) searchUrl.searchParams.set("exchange", plan.exchange);
+
+      const searchResponse = await providerFetch(searchUrl.toString());
+      if (!searchResponse.ok) return null;
+      const payload = (await searchResponse.json()) as { symbols?: SearchResult[] };
+      const selected = selectExactLogo(Array.isArray(payload.symbols) ? payload.symbols : [], plan);
+      if (!selected) return null;
+      logoId = selected;
+      svg = await fetchSvg(logoId);
+      if (!svg) return null;
+    }
+
+    if (!logoId || !svg) return null;
 
     const cached = {
       svg,

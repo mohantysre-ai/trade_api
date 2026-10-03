@@ -99,6 +99,33 @@ if errorlevel 1 (
 echo.
 
 pushd "%PROJECT_ROOT%"
+echo [*] Packing newest native and Docker durable state...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%pack-desk-state.ps1"
+if errorlevel 1 (
+    echo [FAIL] Durable-state pack failed. Docker was not started.
+    popd
+    if not "%IROS_NO_PAUSE%"=="1" pause
+    exit /b 1
+)
+
+if %DO_PULL% equ 0 (
+    docker compose %COMPOSE_PROFILES% stop market-api ai-news >nul 2>&1
+    docker compose %COMPOSE_PROFILES% create market-api
+    if errorlevel 1 (
+        echo [FAIL] Could not create market-api for durable-state restore.
+        popd
+        if not "%IROS_NO_PAUSE%"=="1" pause
+        exit /b 1
+    )
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%apply-packed-desk-state.ps1"
+    if errorlevel 1 (
+        echo [FAIL] Durable-state restore failed. Docker was not started.
+        popd
+        if not "%IROS_NO_PAUSE%"=="1" pause
+        exit /b 1
+    )
+)
+
 if %DO_PULL% equ 1 (
     echo [*] docker compose %COMPOSE_PROFILES% pull ...
     docker compose %COMPOSE_PROFILES% pull
@@ -116,10 +143,29 @@ if %DO_PULL% equ 1 (
         if not "%IROS_NO_PAUSE%"=="1" pause
         exit /b 1
     )
-    echo [*] Seeding desk JSON ^(sessions + market snapshot + eod^) from Hub into volumes ...
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%seed-desk-state-from-hub.ps1"
+    if "%IROS_RUNTIME_RESTORED%"=="1" (
+        echo [*] Latest runtime-private volumes already restored - skipping second desk-state overlay.
+    ) else (
+        echo [*] Seeding desk JSON ^(sessions + market snapshot + eod^) from Hub into volumes ...
+        powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%seed-desk-state-from-hub.ps1"
+        if errorlevel 1 (
+            echo [FAIL] desk-state seed failed — docker login, or run push-docker-hub.bat on the live desk.
+            popd
+            if not "%IROS_NO_PAUSE%"=="1" pause
+            exit /b 1
+        )
+    )
+    echo [*] Reconciling Hub seed with newer state already present on this machine...
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%pack-desk-state.ps1"
     if errorlevel 1 (
-        echo [FAIL] desk-state seed failed — docker login, or run push-docker-hub.bat on the live desk.
+        echo [FAIL] Hub/local durable-state merge failed. Docker was not started.
+        popd
+        if not "%IROS_NO_PAUSE%"=="1" pause
+        exit /b 1
+    )
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%apply-packed-desk-state.ps1"
+    if errorlevel 1 (
+        echo [FAIL] Reconciled durable-state restore failed. Docker was not started.
         popd
         if not "%IROS_NO_PAUSE%"=="1" pause
         exit /b 1

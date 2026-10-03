@@ -19,6 +19,7 @@ class MarketStateStore:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._quotes: dict[str, Quote] = {}
+        self._dirty_quotes: dict[str, Quote] = {}
         self._bars: dict[str, dict[str, list[dict[str, Any]]]] = {}
         self._feed_status: FeedStatus = FeedStatus.UNAVAILABLE
         self._last_tick_age: float = 0.0
@@ -28,6 +29,7 @@ class MarketStateStore:
     def update_quote(self, quote: Quote) -> None:
         with self._lock:
             self._quotes[quote.symbol] = quote
+            self._dirty_quotes[quote.symbol] = quote
             self._last_tick_age = 0.0
             self._tick_count += 1
 
@@ -35,6 +37,7 @@ class MarketStateStore:
         with self._lock:
             for quote in quotes:
                 self._quotes[quote.symbol] = quote
+                self._dirty_quotes[quote.symbol] = quote
             self._last_tick_age = 0.0
             self._tick_count += len(quotes)
 
@@ -49,6 +52,12 @@ class MarketStateStore:
     def get_all_quotes(self) -> dict[str, Quote]:
         with self._lock:
             return dict(self._quotes)
+
+    def drain_dirty_quotes(self) -> list[Quote]:
+        with self._lock:
+            quotes = list(self._dirty_quotes.values())
+            self._dirty_quotes.clear()
+            return quotes
 
     def upsert_bar(self, symbol: str, interval: str, bar: dict[str, Any]) -> None:
         with self._lock:

@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { LiveTickNumber } from '@/lib/desk-motion';
 import { subscribeLiveDesk, type LiveDeskSnapshot } from '@/lib/live-desk';
 import { isExplicitNonFill, isLiveSessionFill, canOverlayIntradayBook } from '@/lib/eod-execution';
+import { sortEodRows, type EodSort, type EodSortKey } from '@/app/lib/eod-sort';
 
 /* -------------------------------------------------------------------------- */
 /*  Types for EOD report responses from the backend                          */
@@ -650,7 +651,50 @@ function rootCauseTone(root: string | null | undefined): string {
   }
 }
 
-function OutcomeRow({ trade }: { trade: IntradayTrade }) {
+function SymbolLink({ symbol, onSelect }: { symbol: string; onSelect?: (symbol: string) => void }) {
+  if (!onSelect) return <span>{symbol}</span>;
+  return (
+    <button
+      type="button"
+      onClick={(event) => { event.stopPropagation(); onSelect(symbol); }}
+      className="min-h-6 rounded px-1 -mx-1 font-inherit font-bold text-cyan-700 underline decoration-dotted underline-offset-2 hover:text-cyan-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+      title={`Open ${symbol} analysis`}
+    >
+      {symbol}
+    </button>
+  );
+}
+
+function numericValue(value: unknown): number | null {
+  const parsed = typeof value === 'string'
+    ? Number(value.replace(/[₹,]/g, '').trim())
+    : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function fmtPrice(v: unknown): string {
+  const n = numericValue(v);
+  return n == null ? '—' : n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function SortableTh({ id, label, sort, onSort, className = '' }: {
+  id: EodSortKey;
+  label: string;
+  sort: EodSort | null;
+  onSort: (key: EodSortKey) => void;
+  className?: string;
+}) {
+  const active = sort?.key === id;
+  return (
+    <th className={className} aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button type="button" className={`desk-sort-th ${active ? 'is-on' : ''}`} onClick={() => onSort(id)} title={`Sort by ${label}`}>
+        {label}<span aria-hidden>{active ? (sort.dir === 'asc' ? '↑' : '↓') : '↕'}</span>
+      </button>
+    </th>
+  );
+}
+
+function OutcomeRow({ trade, onSymbolSelect }: { trade: IntradayTrade; onSymbolSelect?: (symbol: string) => void }) {
   const d: MissDiagnostic = trade.missDiagnostic || {
     isMiss: trade.outcomeBucket === 'LOSS',
     isHit: trade.outcomeBucket === 'WIN',
@@ -694,7 +738,7 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
     <>
       <tr className="border-t border-slate-100 hover:bg-slate-50/80">
         <td className="px-2 py-1.5 font-bold text-slate-900">
-          {trade.symbol}
+          <SymbolLink symbol={trade.symbol} onSelect={onSymbolSelect} />
           {ic && (
             <span
               className={`ml-1 desk-pill ${
@@ -793,29 +837,35 @@ function OutcomeRow({ trade }: { trade: IntradayTrade }) {
   );
 }
 
-function OutcomeTable({ rows }: { rows: IntradayTrade[] }) {
+function OutcomeTable({ rows, sort, onSort, onSymbolSelect, bookLabel }: {
+  rows: IntradayTrade[];
+  sort: EodSort | null;
+  onSort: (key: EodSortKey) => void;
+  onSymbolSelect?: (symbol: string) => void;
+  bookLabel: string;
+}) {
   return (
     <div className="overflow-x-auto desk-scroll-x">
       <table className="w-full text-[10px]">
         <thead className="sticky top-0 bg-slate-50 text-slate-500 uppercase tracking-wider">
           <tr>
-            <th className="px-2 py-2 text-left font-bold">Ticker</th>
-            <th className="px-2 py-2 text-left font-bold">Side</th>
-            <th className="px-2 py-2 text-right font-bold">Qty</th>
-            <th className="px-2 py-2 text-left font-bold">Exit type / price</th>
-            <th className="px-2 py-2 text-right font-bold">R</th>
-            <th className="px-2 py-2 text-right font-bold">Move%</th>
-            <th className="hidden sm:table-cell px-2 py-2 text-right font-bold">MAE (R)</th>
-            <th className="hidden sm:table-cell px-2 py-2 text-right font-bold">MFE (R)</th>
-            <th className="hidden sm:table-cell px-2 py-2 text-left font-bold">Why (root)</th>
-            <th className="px-2 py-2 text-right font-bold">P&L</th>
-            <th className="hidden sm:table-cell px-2 py-2 text-left font-bold">Flags</th>
-            <th className="hidden sm:table-cell px-2 py-2 text-left font-bold">Src</th>
+            <SortableTh id="symbol" label="Ticker" sort={sort} onSort={onSort} className="px-2 py-2 text-left font-bold" />
+            <SortableTh id="side" label="Side" sort={sort} onSort={onSort} className="px-2 py-2 text-left font-bold" />
+            <SortableTh id="qty" label="Qty" sort={sort} onSort={onSort} className="px-2 py-2 text-right font-bold" />
+            <SortableTh id="exitType" label="Exit type / price" sort={sort} onSort={onSort} className="px-2 py-2 text-left font-bold" />
+            <SortableTh id="economicR" label="R" sort={sort} onSort={onSort} className="px-2 py-2 text-right font-bold" />
+            <SortableTh id="movePct" label="Move%" sort={sort} onSort={onSort} className="px-2 py-2 text-right font-bold" />
+            <SortableTh id="maeR" label="MAE (R)" sort={sort} onSort={onSort} className="hidden sm:table-cell px-2 py-2 text-right font-bold" />
+            <SortableTh id="mfeR" label="MFE (R)" sort={sort} onSort={onSort} className="hidden sm:table-cell px-2 py-2 text-right font-bold" />
+            <SortableTh id="rootCause" label="Why (root)" sort={sort} onSort={onSort} className="hidden sm:table-cell px-2 py-2 text-left font-bold" />
+            <SortableTh id="pnl" label="P&L" sort={sort} onSort={onSort} className="px-2 py-2 text-right font-bold" />
+            <SortableTh id="flags" label="Flags" sort={sort} onSort={onSort} className="hidden sm:table-cell px-2 py-2 text-left font-bold" />
+            <SortableTh id="srcRank" label="Src" sort={sort} onSort={onSort} className="hidden sm:table-cell px-2 py-2 text-left font-bold" />
           </tr>
         </thead>
         <tbody>
-          {rows.map((trade) => (
-            <OutcomeRow key={`${trade.symbol}-${trade.exitReason}`} trade={trade} />
+          {rows.map((trade, index) => (
+            <OutcomeRow key={`${bookLabel}-${trade.symbol}-${trade.direction}-${trade.exitReason}-${index}`} trade={trade} onSymbolSelect={onSymbolSelect} />
           ))}
         </tbody>
       </table>
@@ -824,26 +874,44 @@ function OutcomeTable({ rows }: { rows: IntradayTrade[] }) {
 }
 
 /** Replaces old Miss Analysis / target-hit prose cards with dense outcome tables. */
-function OutcomeDesk({ trades, coverage, isMock, symbolSource, bookLabel = 'Intraday' }: {
+function OutcomeDesk({ trades, coverage, isMock, symbolSource, bookLabel = 'Intraday', sort, onSort, onSymbolSelect }: {
   trades: IntradayTrade[];
   coverage?: number;
   isMock?: boolean;
   symbolSource?: string;
   bookLabel?: string;
+  sort: EodSort | null;
+  onSort: (key: EodSortKey) => void;
+  onSymbolSelect?: (symbol: string) => void;
 }) {
   // Book outcomeBucket is authoritative — not path isHit/isMiss
   const misses = trades
     .filter((t) => t.outcomeBucket === 'LOSS' || t.outcomeBucket === 'FLAT')
     .slice()
-    .sort((a, b) => (a.economicR ?? a.rMultiple ?? 0) - (b.economicR ?? b.rMultiple ?? 0));
+    ;
   const hits = trades
     .filter((t) => t.outcomeBucket === 'WIN')
     .slice()
-    .sort((a, b) => (b.economicR ?? b.rMultiple ?? 0) - (a.economicR ?? a.rMultiple ?? 0));
+    ;
   const skips = trades
     .filter((t) => t.outcomeBucket === 'SKIPPED' || Boolean(t.missDiagnostic?.isSkip) || ['NOT_TRIGGERED', 'NO_MARK'].includes(t.exitReason))
     .slice()
-    .sort((a, b) => a.symbol.localeCompare(b.symbol));
+    ;
+  const accessor = (row: IntradayTrade, key: EodSortKey) => {
+    const d = row.missDiagnostic;
+    const values: Partial<Record<EodSortKey, string | number | null | undefined>> = {
+      symbol: row.symbol, side: row.direction, qty: row.qty, entry: row.entryPrice, mark: row.exitPrice,
+      exit: row.exitPrice, exitType: row.deskExitLabel || row.exitReason, status: row.outcomeBucket,
+      economicR: economicRFromRow(row), pathR: row.pathR ?? d?.pathR, movePct: row.pnlPct ?? d?.movePct,
+      maeR: row.maeR ?? d?.maeR ?? d?.maePct, mfeR: row.mfeR ?? d?.mfeR ?? d?.mfePct,
+      rootCause: d?.rootCause, pnl: row.pnl, pnlPct: row.pnlPct,
+      flags: d?.factors?.join(' '), srcRank: `${d?.source || ''}-${row.lineage?.lockRank ?? ''}`,
+    };
+    return values[key];
+  };
+  const sortedMisses = sortEodRows(misses, sort ?? { key: 'economicR', dir: 'asc' }, accessor, (row) => row.symbol);
+  const sortedHits = sortEodRows(hits, sort ?? { key: 'economicR', dir: 'desc' }, accessor, (row) => row.symbol);
+  const sortedSkips = sortEodRows(skips, sort ?? { key: 'symbol', dir: 'asc' }, accessor, (row) => row.symbol);
 
   if (!misses.length && !hits.length && !skips.length) return null;
 
@@ -877,7 +945,7 @@ function OutcomeDesk({ trades, coverage, isMock, symbolSource, bookLabel = 'Intr
           <div className="border-b border-slate-100 bg-red-50/40 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-red-700">
             Book LOSS / FLAT
           </div>
-          <OutcomeTable rows={misses} />
+          <OutcomeTable rows={sortedMisses} sort={sort} onSort={onSort} onSymbolSelect={onSymbolSelect} bookLabel={bookLabel} />
         </div>
       )}
 
@@ -886,7 +954,7 @@ function OutcomeDesk({ trades, coverage, isMock, symbolSource, bookLabel = 'Intr
           <div className="border-b border-slate-100 bg-emerald-50/40 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-emerald-700">
             Book WIN
           </div>
-          <OutcomeTable rows={hits} />
+          <OutcomeTable rows={sortedHits} sort={sort} onSort={onSort} onSymbolSelect={onSymbolSelect} bookLabel={bookLabel} />
         </div>
       )}
 
@@ -895,7 +963,7 @@ function OutcomeDesk({ trades, coverage, isMock, symbolSource, bookLabel = 'Intr
           <div className="border-b border-slate-100 bg-slate-100/80 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-slate-600">
             Skipped · not triggered (excluded from P&L)
           </div>
-          <OutcomeTable rows={skips} />
+          <OutcomeTable rows={sortedSkips} sort={sort} onSort={onSort} onSymbolSelect={onSymbolSelect} bookLabel={bookLabel} />
         </div>
       )}
     </div>
@@ -946,13 +1014,23 @@ function PortfolioDist({
   title,
   rows,
   totalDeployed,
+  onSymbolSelect,
+  sort,
+  onSort,
 }: {
   title: string;
   rows: { symbol: string; deployed: number; qty: number; pnl: number | null; pnlPct: number | null }[];
   totalDeployed: number;
+  onSymbolSelect?: (symbol: string) => void;
+  sort: EodSort | null;
+  onSort: (key: EodSortKey) => void;
 }) {
   if (!rows.length) return null;
   const total = totalDeployed > 0 ? totalDeployed : rows.reduce((s, r) => s + (r.deployed || 0), 0);
+  const sortedRows = sortEodRows(rows, sort, (row, key) => ({
+    symbol: row.symbol, qty: row.qty, deployed: row.deployed,
+    weight: total > 0 ? row.deployed / total : null, pnl: row.pnl, pnlPct: row.pnlPct,
+  })[key as 'symbol' | 'qty' | 'deployed' | 'weight' | 'pnl' | 'pnlPct'], (row) => row.symbol);
   return (
     <div className="border-t border-slate-100 px-3 py-2">
       <div className="mb-1.5 flex flex-wrap items-center gap-2">
@@ -966,19 +1044,19 @@ function PortfolioDist({
         <table className="w-full text-[10px]">
           <thead>
             <tr className="text-slate-500 uppercase tracking-wider border-b border-slate-100">
-              <th className="text-left px-1 py-1 font-bold">Symbol</th>
-              <th className="text-right px-1 py-1 font-bold">Qty</th>
-              <th className="text-right px-1 py-1 font-bold">Deployed</th>
-              <th className="text-right px-1 py-1 font-bold">Weight</th>
-              <th className="text-right px-1 py-1 font-bold">P&L</th>
+              <SortableTh id="symbol" label="Symbol" sort={sort} onSort={onSort} className="text-left px-1 py-1 font-bold" />
+              <SortableTh id="qty" label="Qty" sort={sort} onSort={onSort} className="text-right px-1 py-1 font-bold" />
+              <SortableTh id="deployed" label="Deployed" sort={sort} onSort={onSort} className="text-right px-1 py-1 font-bold" />
+              <SortableTh id="weight" label="Weight" sort={sort} onSort={onSort} className="text-right px-1 py-1 font-bold" />
+              <SortableTh id="pnl" label="P&L" sort={sort} onSort={onSort} className="text-right px-1 py-1 font-bold" />
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => {
+            {sortedRows.map((r) => {
               const w = total > 0 && r.deployed > 0 ? (r.deployed / total) * 100 : null;
               return (
                 <tr key={r.symbol} className="border-b border-slate-50">
-                  <td className="px-1 py-1 font-bold text-slate-800">{r.symbol}</td>
+                  <td className="px-1 py-1 font-bold text-slate-800"><SymbolLink symbol={r.symbol} onSelect={onSymbolSelect} /></td>
                   <td className="px-1 py-1 text-right tabular-nums text-slate-700">{r.qty || '—'}</td>
                   <td className="px-1 py-1 text-right tabular-nums text-slate-700">
                     {r.deployed > 0 ? `₹${r.deployed.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '—'}
@@ -1008,6 +1086,7 @@ export type EodAnalysisPanelProps = {
   refreshToken?: number;
   /** When true, rebuild book reports (bypass cache). Default refresh uses cache. */
   forceBookRebuild?: boolean;
+  onSymbolSelect?: (symbol: string) => void;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -1021,6 +1100,7 @@ export default function EodAnalysisPanel({
   onSwingDateChange,
   refreshToken = 0,
   forceBookRebuild = false,
+  onSymbolSelect,
 }: EodAnalysisPanelProps = {}) {
   const [intraday, setIntraday] = useState<IntradayReport | null>(null);
   const [swing, setSwing] = useState<SwingReport | null>(null);
@@ -1030,7 +1110,16 @@ export default function EodAnalysisPanel({
   const [localDate, setLocalDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [localSwingDate, setLocalSwingDate] = useState('');
   const [liveMarks, setLiveMarks] = useState<LiveMarksState | null>(null);
+  const [sort, setSort] = useState<EodSort | null>(null);
   const liveBusy = useRef(false);
+
+  const toggleSort = useCallback((key: EodSortKey) => {
+    setSort((current) => current?.key !== key
+      ? { key, dir: 'desc' }
+      : current.dir === 'desc'
+        ? { key, dir: 'asc' }
+        : null);
+  }, []);
 
   const dateStr = controlledDate ?? localDate;
   const swingDateStr = controlledSwingDate ?? localSwingDate;
@@ -1091,11 +1180,8 @@ export default function EodAnalysisPanel({
         loadOne<IndexOptionsReport>(`/api/reports/eod-index-options${buildQs(dateStr)}`, 'Index Options'),
       ]);
       if (intraData) setIntraday(intraData);
-      else setIntraday(null);
       if (swingData) setSwing(swingData);
-      else setSwing(null);
       if (optionsData) setIndexOptions(optionsData);
-      else setIndexOptions(null);
       if (!intraData && !swingData && !optionsData) {
         setError((prev) => prev || 'Book P&L failed to load');
       }
@@ -1662,6 +1748,15 @@ export default function EodAnalysisPanel({
         </div>
       )}
 
+      <div className="flex min-h-8 flex-wrap items-center gap-1.5 px-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+        <span>Shared sort</span>
+        {sort ? (
+          <button type="button" className="desk-pill desk-pill--info" onClick={() => setSort(null)}>
+            {sort.key} {sort.dir === 'asc' ? '↑' : '↓'} · clear
+          </button>
+        ) : <span className="desk-pill desk-pill--muted">Section defaults</span>}
+      </div>
+
       {loading && !showBody && (
         <div className="bg-white border border-slate-300 border-[0.5px] rounded-xl p-6 text-center text-[11px] text-slate-400 shadow-sm">
           Loading EOD reports…
@@ -1696,14 +1791,22 @@ export default function EodAnalysisPanel({
               {(indexOptions.positions || []).length > 0 && (
                 <div className="mt-2 overflow-x-auto">
                   <table className="w-full min-w-[560px] text-[10px]">
-                    <thead><tr className="border-b border-slate-200 text-left uppercase text-slate-500"><th>Contract</th><th>Index</th><th>Kind</th><th className="text-right">P&amp;L</th></tr></thead>
-                    <tbody>{(indexOptions.positions || []).map((p, i) => (
+                    <thead><tr className="border-b border-slate-200 text-left uppercase text-slate-500">
+                      <SortableTh id="contract" label="Contract" sort={sort} onSort={toggleSort} />
+                      <SortableTh id="index" label="Index" sort={sort} onSort={toggleSort} />
+                      <SortableTh id="kind" label="Kind" sort={sort} onSort={toggleSort} />
+                      <SortableTh id="pnl" label="P&L" sort={sort} onSort={toggleSort} className="text-right" />
+                    </tr></thead>
+                    <tbody>{sortEodRows(indexOptions.positions || [], sort, (p, key) => ({
+                      contract: p.symbol || p.legs?.map((leg) => leg.symbol).filter(Boolean).join(' '),
+                      index: p.index, kind: p.pnlKind, pnl: p.pnl,
+                    })[key as 'contract' | 'index' | 'kind' | 'pnl'], (p) => p.symbol || p.index || '').map((p, i) => (
                       <tr key={p.id || p.strategyPositionId || `${p.symbol || p.index || 'option'}-${i}`} className="border-b border-slate-100">
                         <td className="py-1 font-bold">
-                          {p.symbol || 'Defined-risk structure'}
+                          {p.symbol ? <SymbolLink symbol={p.symbol} onSelect={onSymbolSelect} /> : 'Defined-risk structure'}
                           {p.legs?.map((leg, legIndex) => (
                             <div key={`${leg.symbol}-${legIndex}`} className="mt-1 font-normal text-slate-500">
-                              {leg.side} {(leg.qty || 1) * (leg.lotSize || 1)} qty · {leg.symbol || 'Contract unavailable'} · Entry {fmtInr(leg.entryFill ?? leg.entryPrice, 2)} · {p.pnlKind === 'realised' ? 'Exit' : 'Mark'} {fmtInr(leg.exitFill ?? leg.currentPrice, 2)}
+                              {leg.side} {(leg.qty || 1) * (leg.lotSize || 1)} qty · {leg.symbol ? <SymbolLink symbol={leg.symbol} onSelect={onSymbolSelect} /> : 'Contract unavailable'} · Entry {fmtInr(leg.entryFill ?? leg.entryPrice, 2)} · {p.pnlKind === 'realised' ? 'Exit' : 'Mark'} {fmtInr(leg.exitFill ?? leg.currentPrice, 2)}
                             </div>
                           ))}
                         </td><td>{p.index || '—'}</td><td>{p.pnlKind || '—'}</td>
@@ -1749,6 +1852,9 @@ export default function EodAnalysisPanel({
               isMock={displayIntraday.isMock}
               symbolSource={displayIntraday.symbolSource}
               bookLabel="Intraday"
+              sort={sort}
+              onSort={toggleSort}
+              onSymbolSelect={onSymbolSelect}
             />
           )}
 
@@ -1810,6 +1916,9 @@ export default function EodAnalysisPanel({
               isMock={displaySwing.isMock}
               symbolSource={displaySwing.symbolSource}
               bookLabel="Swing"
+              sort={sort}
+              onSort={toggleSort}
+              onSymbolSelect={onSymbolSelect}
             />
           )}
 
@@ -1884,6 +1993,9 @@ export default function EodAnalysisPanel({
                 <PortfolioDist
                   title="Intraday portfolio balance"
                   totalDeployed={displayIntraday.totalDeployed || 0}
+                  onSymbolSelect={onSymbolSelect}
+                  sort={sort}
+                  onSort={toggleSort}
                   rows={(displayIntraday.trades || []).filter((t) => t.outcomeBucket !== 'SKIPPED' && !t.skipped).map((t) => ({
                     symbol: String(t.symbol || ''),
                     qty: t.qty || 0,
@@ -1909,23 +2021,27 @@ export default function EodAnalysisPanel({
                   <table className="w-full text-[10px]">
                     <thead>
                       <tr className="text-slate-500 uppercase tracking-wider border-b border-slate-100">
-                        <th className="text-left px-2 py-1.5 font-bold">Symbol</th>
-                        <th className="text-right px-2 py-1.5 font-bold">Qty</th>
-                        <th className="text-right px-2 py-1.5 font-bold">Entry</th>
-                        <th className="text-right px-2 py-1.5 font-bold">Mark / Exit</th>
-                        <th className="hidden sm:table-cell text-left px-2 py-1.5 font-bold">Scale / Trail</th>
-                        <th className="text-center px-2 py-1.5 font-bold">Result</th>
-                        <th className="text-right px-2 py-1.5 font-bold">P&L</th>
+                        <SortableTh id="symbol" label="Symbol" sort={sort} onSort={toggleSort} className="text-left px-2 py-1.5 font-bold" />
+                        <SortableTh id="qty" label="Qty" sort={sort} onSort={toggleSort} className="text-right px-2 py-1.5 font-bold" />
+                        <SortableTh id="entry" label="Entry" sort={sort} onSort={toggleSort} className="text-right px-2 py-1.5 font-bold" />
+                        <SortableTh id="mark" label="Mark / Exit" sort={sort} onSort={toggleSort} className="text-right px-2 py-1.5 font-bold" />
+                        <SortableTh id="scaleTrail" label="Scale / Trail" sort={sort} onSort={toggleSort} className="hidden sm:table-cell text-left px-2 py-1.5 font-bold" />
+                        <SortableTh id="status" label="Result" sort={sort} onSort={toggleSort} className="text-center px-2 py-1.5 font-bold" />
+                        <SortableTh id="pnl" label="P&L" sort={sort} onSort={toggleSort} className="text-right px-2 py-1.5 font-bold" />
                       </tr>
                     </thead>
                     <tbody>
-                      {displayIntraday.trades.map((trade, i) => {
+                      {sortEodRows(displayIntraday.trades, sort, (trade, key) => ({
+                        symbol: trade.symbol, qty: trade.qty, entry: trade.entryPrice, mark: trade.exitPrice,
+                        exit: trade.exitPrice, scaleTrail: trade.deskProgress || trade.scaleProgress,
+                        status: trade.exitReason, pnl: trade.pnl,
+                      })[key as 'symbol' | 'qty' | 'entry' | 'mark' | 'exit' | 'scaleTrail' | 'status' | 'pnl'], (trade) => trade.symbol).map((trade, i) => {
                         const badge = exitReasonBadge(trade.exitReason);
                         return (
                           <tr key={`${trade.symbol}-${trade.direction}-${i}`} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                             <td className="px-2 py-1.5">
                               <span className={`font-bold ${trade.direction === 'LONG' ? 'text-emerald-700' : 'text-red-700'}`}>
-                                {trade.symbol}
+                                <SymbolLink symbol={trade.symbol} onSelect={onSymbolSelect} />
                               </span>
                               {' '}
                               <span className="text-[8px] text-slate-400 ml-1">{trade.direction}</span>
@@ -2050,6 +2166,9 @@ export default function EodAnalysisPanel({
                 <PortfolioDist
                   title="Swing portfolio balance"
                   totalDeployed={displaySwing.totalDeployed || 0}
+                  onSymbolSelect={onSymbolSelect}
+                  sort={sort}
+                  onSort={toggleSort}
                   rows={(displaySwing.picks || []).filter((p) => p.outcomeBucket !== 'SKIPPED' && !p.skipped).map((p) => ({
                     symbol: p.symbol,
                     qty: p.qty || 0,
@@ -2076,22 +2195,27 @@ export default function EodAnalysisPanel({
                   <table className="w-full text-[10px]">
                     <thead>
                       <tr className="text-slate-500 uppercase tracking-wider border-b border-slate-100">
-                        <th className="text-left px-2 py-1.5 font-bold">Symbol</th>
-                        <th className="hidden sm:table-cell text-left px-2 py-1.5 font-bold">Src / Rank</th>
-                        <th className="text-center px-2 py-1.5 font-bold">Status</th>
-                        <th className="text-right px-2 py-1.5 font-bold">Qty</th>
-                        <th className="text-right px-2 py-1.5 font-bold">Entry</th>
-                        <th className="text-right px-2 py-1.5 font-bold">Mark</th>
-                        <th className="text-right px-2 py-1.5 font-bold">Exit</th>
-                        <th className="hidden sm:table-cell text-right px-2 py-1.5 font-bold">Econ R</th>
-                        <th className="hidden sm:table-cell text-left px-2 py-1.5 font-bold">Scale / Trail</th>
-                        <th className="hidden sm:table-cell text-right px-2 py-1.5 font-bold">Deployed</th>
-                        <th className="text-right px-2 py-1.5 font-bold">P&L</th>
-                        <th className="hidden sm:table-cell text-right px-2 py-1.5 font-bold">%</th>
+                        <SortableTh id="symbol" label="Symbol" sort={sort} onSort={toggleSort} className="text-left px-2 py-1.5 font-bold" />
+                        <SortableTh id="srcRank" label="Src / Rank" sort={sort} onSort={toggleSort} className="hidden sm:table-cell text-left px-2 py-1.5 font-bold" />
+                        <SortableTh id="status" label="Status" sort={sort} onSort={toggleSort} className="text-center px-2 py-1.5 font-bold" />
+                        <SortableTh id="qty" label="Qty" sort={sort} onSort={toggleSort} className="text-right px-2 py-1.5 font-bold" />
+                        <SortableTh id="entry" label="Entry" sort={sort} onSort={toggleSort} className="text-right px-2 py-1.5 font-bold" />
+                        <SortableTh id="mark" label="Mark" sort={sort} onSort={toggleSort} className="text-right px-2 py-1.5 font-bold" />
+                        <SortableTh id="exit" label="Exit" sort={sort} onSort={toggleSort} className="text-right px-2 py-1.5 font-bold" />
+                        <SortableTh id="economicR" label="Econ R" sort={sort} onSort={toggleSort} className="hidden sm:table-cell text-right px-2 py-1.5 font-bold" />
+                        <SortableTh id="scaleTrail" label="Scale / Trail" sort={sort} onSort={toggleSort} className="hidden sm:table-cell text-left px-2 py-1.5 font-bold" />
+                        <SortableTh id="deployed" label="Deployed" sort={sort} onSort={toggleSort} className="hidden sm:table-cell text-right px-2 py-1.5 font-bold" />
+                        <SortableTh id="pnl" label="P&L" sort={sort} onSort={toggleSort} className="text-right px-2 py-1.5 font-bold" />
+                        <SortableTh id="pnlPct" label="%" sort={sort} onSort={toggleSort} className="hidden sm:table-cell text-right px-2 py-1.5 font-bold" />
                       </tr>
                     </thead>
                     <tbody>
-                      {displaySwing.picks.map((pick, i) => {
+                      {sortEodRows(displaySwing.picks, sort, (pick, key) => ({
+                        symbol: pick.symbol, srcRank: pick.lineage?.lockRank ?? pick.score, status: pick.status,
+                        qty: pick.qty, entry: pick.entryPrice, mark: numericValue(pick.currentPrice), exit: pick.exitPrice,
+                        economicR: economicRFromRow(pick), scaleTrail: pick.deskProgress || pick.scaleProgress,
+                        deployed: pick.deployedCapital, pnl: pick.pnl, pnlPct: pick.pnlPct,
+                      })[key as 'symbol' | 'srcRank' | 'status' | 'qty' | 'entry' | 'mark' | 'exit' | 'economicR' | 'scaleTrail' | 'deployed' | 'pnl' | 'pnlPct'], (pick) => pick.symbol).map((pick, i) => {
                         const badge = statusBadge(pick.status);
                         const econ = pick.economicR ?? pick.rMultiple;
                         const path = pick.pathR;
@@ -2101,7 +2225,7 @@ export default function EodAnalysisPanel({
                           <tr key={`${pick.symbol}-${i}`} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                             <td className="px-2 py-1.5">
                               <span className={`font-bold ${pick.direction === 'LONG' ? 'text-emerald-700' : 'text-red-700'}`}>
-                                {pick.symbol}
+                                <SymbolLink symbol={pick.symbol} onSelect={onSymbolSelect} />
                               </span>
                               {' '}
                               <span className="text-[8px] text-slate-400 ml-1">{pick.direction}</span>
@@ -2132,16 +2256,16 @@ export default function EodAnalysisPanel({
                                 ? `${pick.exitState.remainingQty}/${pick.qty || '—'}`
                                 : (pick.qty || '—')}
                             </td>
-                            <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">{pick.entryPrice}</td>
+                            <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">{fmtPrice(pick.entryPrice)}</td>
                             <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">
-                              {pick.markLive && pick.currentPrice != null ? (
-                                <LiveTickNumber value={Number(pick.currentPrice).toFixed(2)} />
+                              {pick.markLive && numericValue(pick.currentPrice) != null ? (
+                                <LiveTickNumber value={numericValue(pick.currentPrice)!.toFixed(2)} />
                               ) : (
-                                pick.currentPrice != null ? Number(pick.currentPrice).toFixed(2) : '—'
+                                fmtPrice(pick.currentPrice)
                               )}
                             </td>
                             <td className="text-right px-2 py-1.5 text-slate-700 tabular-nums">
-                              {pick.skipped || pick.outcomeBucket === 'SKIPPED' ? '—' : (pick.exitPrice ?? '—')}
+                              {pick.skipped || pick.outcomeBucket === 'SKIPPED' ? '—' : fmtPrice(pick.exitPrice)}
                             </td>
                             <td className={`hidden sm:table-cell text-right px-2 py-1.5 tabular-nums font-bold ${(econ ?? 0) < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
                               <div>{fmtMissSigned(econ, 2, 'R')}</div>
@@ -2201,7 +2325,7 @@ export default function EodAnalysisPanel({
                   </div>
                   <div className="flex items-end justify-between mt-1">
                     <div>
-                      <span className="text-[16px] font-black text-slate-900">{displaySwing.bestPerformer.symbol}</span>
+                      <span className="text-[16px] font-black text-slate-900"><SymbolLink symbol={displaySwing.bestPerformer.symbol} onSelect={onSymbolSelect} /></span>
                       {' '}
                       <span className="text-[10px] text-slate-500 ml-1">{displaySwing.bestPerformer.direction}</span>
                       <div className="text-[9px] text-slate-500 tabular-nums">
@@ -2232,7 +2356,7 @@ export default function EodAnalysisPanel({
                   </div>
                   <div className="flex items-end justify-between mt-1">
                     <div>
-                      <span className="text-[16px] font-black text-slate-900">{displaySwing.worstPerformer.symbol}</span>
+                      <span className="text-[16px] font-black text-slate-900"><SymbolLink symbol={displaySwing.worstPerformer.symbol} onSelect={onSymbolSelect} /></span>
                       {' '}
                       <span className="text-[10px] text-slate-500 ml-1">{displaySwing.worstPerformer.direction}</span>
                       <div className="text-[9px] text-slate-500 tabular-nums">

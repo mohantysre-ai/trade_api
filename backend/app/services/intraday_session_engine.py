@@ -55,6 +55,9 @@ _CLOSE_FREEZE_LOCK = threading.Lock()
 # stale disk state and race a lost-update onto intraday_session.json.
 _SESSION_PERSIST_LOCK = threading.RLock()
 _SESSION_RESPONSE_LOCK = threading.Lock()
+# Cold builds run under this lock instead of the response lock so cache
+# publication/invalidation never waits behind a full session rebuild.
+_SESSION_COLD_COMPUTE_LOCK = threading.Lock()
 _SESSION_RESPONSE_CACHE: dict[str, Any] | None = None
 _SESSION_RESPONSE_CACHE_AT = 0.0
 _SESSION_RESPONSE_REFRESHING = False
@@ -354,6 +357,18 @@ def _safe_float(v: Any, default: float | None = None) -> float | None:
 
 def _clamp(x: float, lo: float = 0.0, hi: float = 100.0) -> float:
     return max(lo, min(hi, x))
+
+
+def _market_data_stale(snap: dict[str, Any]) -> bool:
+    updated_at = snap.get("updatedAt")
+    if not updated_at:
+        return True
+    try:
+        snap_dt = datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
+        age = max(0.0, (datetime.now(tz=timezone.utc) - snap_dt.astimezone(timezone.utc)).total_seconds())
+        return age > 300
+    except Exception:
+        return True
 
 
 def _atomic_write(path: Path, payload: dict[str, Any]) -> None:
@@ -2529,7 +2544,7 @@ def _overlay_market_state(snap: dict[str, Any]) -> dict[str, Any]:
         if freshness in ("LIVE", "DEGRADED"):
             row["ltp"] = quote.get("ltp")
             row["ltpRaw"] = quote.get("ltp")
-            row["ltpSource"] = "ANGEL_WS"
+            row["ltpSource"] = quote.get("source") or "ANGEL_WS"
             row["receivedAt"] = quote.get("receivedAt")
             row["dataAge"] = quote.get("dataAge")
             row["dataStale"] = False
@@ -2939,6 +2954,8 @@ def _maybe_refresh_live_snapshot(*, reason: str) -> dict[str, Any]:
     """
     global _SNAP_REFRESH_LAST
     from .angel_one_feed import _snapshot_needs_live_refresh
+    from .angel_one_feed import _SCHEDULED_REFRESH_STATE_LOCK
+    from .angel_one_feed import _SCHEDULED_REFRESH_STATE
     from .angel_one_feed import run_scheduled_live_refresh
     from .trade_outcome import _is_market_open
 
@@ -2950,6 +2967,10 @@ def _maybe_refresh_live_snapshot(*, reason: str) -> dict[str, Any]:
     now = time.monotonic()
     if (now - _SNAP_REFRESH_LAST) < _SNAP_REFRESH_MIN_GAP_SEC:
         return snap
+    with _SCHEDULED_REFRESH_STATE_LOCK:
+        refresh_state = dict(_SCHEDULED_REFRESH_STATE)
+    if refresh_state.get("running"):
+        return snap
     try:
         result = run_scheduled_live_refresh(reason=reason)
     except Exception:
@@ -2957,9 +2978,10 @@ def _maybe_refresh_live_snapshot(*, reason: str) -> dict[str, Any]:
         return load_market_snapshot()
     if not isinstance(result, dict) or result.get("success") is not True:
         log.warning(
-            "intraday live snapshot refresh unsuccessful (%s): %s",
+            "intraday live snapshot refresh unsuccessful (%s): %s active=%s",
             reason,
             result.get("error") if isinstance(result, dict) else result,
+            result.get("activeRefresh") if isinstance(result, dict) else None,
         )
         return load_market_snapshot()
     _SNAP_REFRESH_LAST = time.monotonic()
@@ -4017,17 +4039,19 @@ def propose_replacements(
     long_rows = list(session.get("long") or [])
     short_rows = list(session.get("short") or [])
     all_rows = long_rows + short_rows
+    free = compute_free_slots(long_rows, short_rows)
+    if free["total"] <= 0:
+        return []
     risk = _portfolio_risk_flags(long_rows, short_rows)
     allowed, _block = replacement_window_open(
         daily_loss_hit=bool(risk["dailyLossHit"]),
         max_names_hit=bool(risk["maxNamesHit"]),
     )
     if not allowed:
-        return []
-
-    free = compute_free_slots(long_rows, short_rows)
-    if free["total"] <= 0:
-        return []
+        if free["total"] > 0 and _block == "midday_pause":
+            pass
+        else:
+            return []
 
     replacement_capacity = min(
         max(0, MAX_DAILY_REPLACEMENTS - _replacement_count(all_rows)),
@@ -4262,7 +4286,7 @@ def apply_replacements(
             daily_loss_hit=bool(risk["dailyLossHit"]),
             max_names_hit=bool(risk["maxNamesHit"]),
         )
-        if not allowed:
+        if not allowed and _block != "midday_pause":
             return []
 
     free = compute_free_slots(long_rows, short_rows)
@@ -4952,19 +4976,29 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
         now = time.monotonic()
         if _SESSION_SNAPSHOT_CACHE is not None and now - _SESSION_SNAPSHOT_CACHE_AT < _SESSION_SNAPSHOT_TTL:
             return copy.deepcopy(_SESSION_SNAPSHOT_CACHE)
-        with _SESSION_RESPONSE_LOCK:
-            now = time.monotonic()
-            if _SESSION_SNAPSHOT_CACHE is None:
-                _SESSION_SNAPSHOT_CACHE = copy.deepcopy(_compute_session(include_live=False))
-                _SESSION_SNAPSHOT_CACHE_AT = now
-            elif now - _SESSION_SNAPSHOT_CACHE_AT >= _SESSION_SNAPSHOT_TTL and not _SESSION_SNAPSHOT_REFRESHING:
-                _SESSION_SNAPSHOT_REFRESHING = True
-                threading.Thread(
-                    target=_refresh_session_snapshot_cache,
-                    name="intraday-session-snapshot-refresh",
-                    daemon=True,
-                ).start()
-            return copy.deepcopy(_SESSION_SNAPSHOT_CACHE)
+        with _SESSION_COLD_COMPUTE_LOCK:
+            with _SESSION_RESPONSE_LOCK:
+                now = time.monotonic()
+                if _SESSION_SNAPSHOT_CACHE is not None and now - _SESSION_SNAPSHOT_CACHE_AT < _SESSION_SNAPSHOT_TTL:
+                    return copy.deepcopy(_SESSION_SNAPSHOT_CACHE)
+            computed = copy.deepcopy(_compute_session(include_live=False))
+            with _SESSION_RESPONSE_LOCK:
+                if _SESSION_SNAPSHOT_CACHE is None:
+                    _SESSION_SNAPSHOT_CACHE = computed
+                    _SESSION_SNAPSHOT_CACHE_AT = time.monotonic()
+                now = time.monotonic()
+                if _SESSION_SNAPSHOT_CACHE is not None and now - _SESSION_SNAPSHOT_CACHE_AT < _SESSION_SNAPSHOT_TTL:
+                    return copy.deepcopy(_SESSION_SNAPSHOT_CACHE)
+            with _SESSION_RESPONSE_LOCK:
+                now = time.monotonic()
+                if _SESSION_SNAPSHOT_CACHE is not None and now - _SESSION_SNAPSHOT_CACHE_AT >= _SESSION_SNAPSHOT_TTL and not _SESSION_SNAPSHOT_REFRESHING:
+                    _SESSION_SNAPSHOT_REFRESHING = True
+                    threading.Thread(
+                        target=_refresh_session_snapshot_cache,
+                        name="intraday-session-snapshot-refresh",
+                        daemon=True,
+                    ).start()
+                return copy.deepcopy(_SESSION_SNAPSHOT_CACHE)
     disk_session = load_session()
     rollover_pending = _schedule_stale_session_rotation(disk_session)
 
@@ -4989,18 +5023,35 @@ def get_session(include_live: bool = True) -> dict[str, Any]:
         now = time.monotonic()
         if _SESSION_RESPONSE_CACHE is not None and now - _SESSION_RESPONSE_CACHE_AT < ttl:
             return _with_rollover_state(_SESSION_RESPONSE_CACHE)
-        if _SESSION_RESPONSE_CACHE is None:
-            fallback = _compute_session(include_live=False, persist=False)
-            fallback["dataStale"] = True
-            fallback["liveRefreshPending"] = True
-            _SESSION_RESPONSE_CACHE = copy.deepcopy(fallback)
-            _SESSION_RESPONSE_CACHE_AT = 0.0
+    if _SESSION_RESPONSE_CACHE is None:
+        # Cold first read: rebuild outside the response lock. One worker
+        # computes while concurrent GETs wait here, never on the response
+        # lock, so cache publication/invalidation stays responsive.
+        with _SESSION_COLD_COMPUTE_LOCK:
+            with _SESSION_RESPONSE_LOCK:
+                now = time.monotonic()
+                if _SESSION_RESPONSE_CACHE is not None and now - _SESSION_RESPONSE_CACHE_AT < ttl:
+                    return _with_rollover_state(_SESSION_RESPONSE_CACHE)
+            if _SESSION_RESPONSE_CACHE is None:
+                fallback = _compute_session(include_live=False, persist=False)
+                fallback["dataStale"] = True
+                fallback["liveRefreshPending"] = True
+                with _SESSION_RESPONSE_LOCK:
+                    _SESSION_RESPONSE_CACHE = copy.deepcopy(fallback)
+                    _SESSION_RESPONSE_CACHE_AT = 0.0
+    with _SESSION_RESPONSE_LOCK:
+        now = time.monotonic()
+        if _SESSION_RESPONSE_CACHE is not None and now - _SESSION_RESPONSE_CACHE_AT < ttl:
+            return _with_rollover_state(_SESSION_RESPONSE_CACHE)
         if not _SESSION_RESPONSE_REFRESHING:
             _SESSION_RESPONSE_REFRESHING = True
             start_refresh = True
             started_gen = _SESSION_RESPONSE_GEN
-        result = copy.deepcopy(_SESSION_RESPONSE_CACHE)
-        result["liveRefreshPending"] = True
+        if _SESSION_RESPONSE_CACHE is None:
+            result = {"dataStale": True, "liveRefreshPending": True}
+        else:
+            result = copy.deepcopy(_SESSION_RESPONSE_CACHE)
+            result["liveRefreshPending"] = True
 
     if start_refresh:
         try:
@@ -5111,6 +5162,9 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
                 "marketOpen": live.get("marketOpen"),
                 "sessionClosed": live.get("sessionClosed"),
                 "dataStale": live.get("dataStale"),
+                "liveMarksStale": live.get("dataStale"),
+                "liveRefreshPending": live.get("liveRefreshPending"),
+                "liveMarksStatus": live.get("liveMarksStatus"),
                 "ltpSourceMix": live.get("ltpSourceMix"),
                 "priceSourcesNote": live.get("priceSourcesNote"),
                 "newAlerts": live.get("newAlerts") or [],
@@ -5296,7 +5350,10 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
             max_names_hit=bool(risk_flags["maxNamesHit"]),
         )
         if not allowed:
-            replacement_blocked_reason = win_reason or rot_code
+            if free_slots["total"] > 0 and win_reason == "midday_pause":
+                pass
+            else:
+                replacement_blocked_reason = win_reason or rot_code
         elif free_slots["total"] <= 0:
             replacement_blocked_reason = "no_free_slots"
         elif daily_positions_remaining <= 0:
@@ -5551,6 +5608,10 @@ def _compute_session(include_live: bool = True, *, persist: bool = False) -> dic
         "sessionClosed": session_closed,
         "closeMarksFrozenAt": session.get("closeMarksFrozenAt"),
         "dataStale": live_meta.get("dataStale") if "dataStale" in live_meta else session.get("dataStale"),
+        "marketDataStale": live_meta.get("marketDataStale") if "marketDataStale" in live_meta else _market_data_stale(snap),
+        "liveMarksStale": live_meta.get("liveMarksStale"),
+        "liveRefreshPending": live_meta.get("liveRefreshPending"),
+        "liveMarksStatus": live_meta.get("liveMarksStatus"),
         "ltpSourceMix": live_meta.get("ltpSourceMix"),
         "priceSourcesNote": live_meta.get("priceSourcesNote"),
         "feedStatus": feed_status,

@@ -27,4 +27,5 @@ def test_swing_entry_hunt_is_not_a_1015_hard_stop():
     assert swing_entry_hunt_allowed(datetime(2026, 8, 13, 10, 5, tzinfo=ist)) == (True, "entry_hunt")
     assert swing_entry_hunt_allowed(datetime(2026, 8, 13, 10, 16, tzinfo=ist)) == (True, "entry_hunt")
     assert swing_entry_hunt_allowed(datetime(2026, 8, 13, 14, 44, tzinfo=ist)) == (True, "entry_hunt")
-    assert swing_entry_hunt_allowed(datetime(2026, 8, 13, 14, 45, tzinfo=ist)) == (False, "after_hunt")
+    assert swing_entry_hunt_allowed(datetime(2026, 8, 13, 15, 9, tzinfo=ist)) == (True, "entry_hunt")
+    assert swing_entry_hunt_allowed(datetime(2026, 8, 13, 15, 10, tzinfo=ist)) == (False, "after_hunt")

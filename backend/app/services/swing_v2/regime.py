@@ -15,5 +15,5 @@ def classify_regime(inputs: dict[str, Any]) -> dict[str, Any]:
         "VIX_STRESS": float(inputs["vixPercentile"]) >= 85 or float(inputs["vixChange1dPct"]) >= 15,
     }
     points = sum(checks.values())
-    state, scale, cap = ("NORMAL", 1.0, 5) if points <= 1 else (("DEFENSIVE", .5, 2) if points == 2 else ("HALT_NEW_LONGS", 0.0, 0))
+    state, scale, cap = ("NORMAL", 1.0, 5) if points <= 1 else (("DEFENSIVE", .5, 5) if points == 2 else ("HALT_NEW_LONGS", 0.0, 0))
     return {"state": state, "riskScale": scale, "positionCap": cap, "stressPoints": points, "reasonCodes": [key for key, active in checks.items() if active]}

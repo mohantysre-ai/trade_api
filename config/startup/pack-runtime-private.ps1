@@ -21,23 +21,18 @@ Copy-Item "config\cloudflare\credentials.json" (Join-Path $Secrets "cloudflare-c
 Write-Host "  packed secrets/backend.env"
 Write-Host "  packed secrets/cloudflare-credentials.json"
 
-$Stopped = $false
-try {
-    $running = docker compose ps --status running --services
-    if ($running -match "market-api|ai-news") {
-        docker compose stop market-api ai-news | Out-Null
-        $Stopped = $true
-    }
-    foreach ($volume in @("iros-desk-state", "iros-backend-data", "iros-eod-archive")) {
-        docker volume inspect "sigq_${volume}" | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "Missing Docker volume sigq_${volume}" }
-        docker run --rm -v "sigq_${volume}:/source:ro" -v "${Volumes}:/backup" alpine:3.21 sh -c "tar czf /backup/${volume}.tar.gz -C /source ."
-        if ($LASTEXITCODE -ne 0) { throw "Failed to pack volume $volume" }
-        $kb = [Math]::Round((Get-Item (Join-Path $Volumes "$volume.tar.gz")).Length / 1024.0, 1)
-        Write-Host "  packed volumes/$volume.tar.gz ($kb KB)"
-    }
-} finally {
-    if ($Stopped) { docker compose start market-api ai-news | Out-Null }
+foreach ($entry in @(
+    @{ Volume = "iros-desk-state"; Folder = "state" },
+    @{ Volume = "iros-backend-data"; Folder = "data" },
+    @{ Volume = "iros-eod-archive"; Folder = "archive" }
+)) {
+    $source = Join-Path $Root "config\docker\desk-state\seed\$($entry.Folder)"
+    if (-not (Test-Path -LiteralPath $source)) { throw "Missing staged $source - pack-desk-state.ps1 must succeed first." }
+    $archive = Join-Path $Volumes "$($entry.Volume).tar.gz"
+    tar -czf $archive -C $source .
+    if ($LASTEXITCODE -ne 0) { throw "Failed to pack staged $($entry.Volume)" }
+    $kb = [Math]::Round((Get-Item -LiteralPath $archive).Length / 1024.0, 1)
+    Write-Host "  packed volumes/$($entry.Volume).tar.gz ($kb KB)"
 }
 
 @(

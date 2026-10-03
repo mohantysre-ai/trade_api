@@ -26,10 +26,10 @@ Set the variables from `performance/friday-market.env.example`. For write tests,
 $QaState = Join-Path $env:TEMP "alphix-friday-qa"
 New-Item -ItemType Directory -Path $QaState -Force | Out-Null
 Copy-Item intraday_session.json (Join-Path $QaState "intraday_session.json") -Force
-Copy-Item swing_session.json (Join-Path $QaState "swing_session.json") -Force
+Copy-Item swing_v2_session.json (Join-Path $QaState "swing_v2_session.json") -Force
 Copy-Item fixed_trade_plan.json (Join-Path $QaState "fixed_trade_plan.json") -Force
 $env:INTRADAY_SESSION_FILE = Join-Path $QaState "intraday_session.json"
-$env:SWING_SESSION_FILE = Join-Path $QaState "swing_session.json"
+$env:SWING_V2_SESSION_FILE = Join-Path $QaState "swing_v2_session.json"
 $env:FIXED_PLAN_FILE = Join-Path $QaState "fixed_trade_plan.json"
 $env:SWING_V2_LEDGER_PATH = Join-Path $QaState "swing_v2_ledger.sqlite3"
 $env:INDEX_OPTIONS_RADAR_FILE = Join-Path $QaState "index_options_radar.json"

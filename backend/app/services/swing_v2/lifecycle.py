@@ -170,7 +170,19 @@ def evaluate_position(position: dict[str, Any], bar: dict[str, Any], *, is_d2_ex
             out.update({"status": "EXIT_EXECUTION_FAILED", "exitReason": "EXIT_EXECUTION_FAILED"})
             return out
         realized += _fill_pnl(out, remaining, close)
-        out.update({"closed": True, "terminal": True, "status": "CLOSED_TIME", "remainingQty": 0, "exitReason": "TIME_EXIT_FILLED", "exitPrice": close, "realizedPnl": round(realized, 2), "unrealizedPnl": 0.0, "totalPnl": round(realized, 2)})
+        out.update({
+            "closed": True,
+            "terminal": True,
+            "status": "CLOSED_TIME",
+            "remainingQty": 0,
+            "exitReason": "TIME_EXIT_FILLED",
+            "exitPolicy": "T2_HARD_MANDATORY",
+            "holdingSession": 2,
+            "exitPrice": close,
+            "realizedPnl": round(realized, 2),
+            "unrealizedPnl": 0.0,
+            "totalPnl": round(realized, 2),
+        })
     elif close > 0:
         unrealized = _fill_pnl(out, remaining, close)
         out.update({"unrealizedPnl": round(unrealized, 2), "totalPnl": round(realized + unrealized, 2)})

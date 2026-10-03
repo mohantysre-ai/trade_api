@@ -21,7 +21,7 @@ export async function GET(request: Request) {
 
     const res = await fetch(backendUrl.toString(), {
       cache: "no-store",
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(45_000),
     });
 
     if (!res.ok) {
@@ -82,32 +82,8 @@ export async function GET(request: Request) {
       };
     });
 
-    const targetTotal = Math.max(100, parsedOffset + parsedLimit);
-    const baseLength = normalized.length;
-    const padded = baseLength >= targetTotal
-      ? normalized
-      : [
-          ...normalized,
-          ...Array.from({ length: targetTotal - baseLength }, (_, i) => {
-            const src = normalized[i % Math.max(1, baseLength)] ?? {
-              source: 'Live Feed',
-              title: 'Market update',
-              link: '#',
-              summary: '',
-              publishedAt: new Date().toISOString(),
-              sentiment: 'Neutral',
-              category: 'Market',
-            };
-            return {
-              ...src,
-              title: `${src.title} • ${Math.floor(i / Math.max(1, baseLength)) + 2}`,
-              link: src.link === '#' ? '#' : `${src.link}${src.link.includes('?') ? '&' : '?'}dup=${i + 1}`,
-            };
-          }),
-        ];
-
-    const payload = padded.slice(parsedOffset, parsedOffset + parsedLimit);
-    const hasMore = parsedOffset + parsedLimit < padded.length;
+    const payload = normalized.slice(parsedOffset, parsedOffset + parsedLimit);
+    const hasMore = parsedOffset + payload.length < normalized.length;
 
     return NextResponse.json({
       success: true,

@@ -28,6 +28,8 @@ def execute_paper_order(
         observations,
         expiry=expiry,
     )
+    if result["executionStatus"] == "PENDING_UNFILLED":
+        return {**candidate, **result}
     if result["executionStatus"] == "EXPIRED_UNFILLED":
         return ledger.append(
             idempotency_key=f"{decision_id}:ORDER_EXPIRED",

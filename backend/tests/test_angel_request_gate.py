@@ -241,6 +241,31 @@ def test_timeout_exception_does_not_trip_circuit(monkeypatch):
     assert not feed._ANGEL_COOLDOWN_BY_CLASS, "network timeout must not open the AB1021 cooldown"
 
 
+def test_failed_batch_does_not_fan_out_to_ltp_calls(monkeypatch):
+    _reset_gates()
+    monkeypatch.delenv("ANGEL_BATCH_LTP_FALLBACK", raising=False)
+
+    class FailedSmart:
+        def __init__(self):
+            self.ltp_calls = 0
+
+        def getMarketData(self, *_a, **_k):
+            return {"status": False, "message": "temporary upstream failure"}
+
+        def ltpData(self, *_a, **_k):
+            self.ltp_calls += 1
+            return {"status": True, "data": {"ltp": 10}}
+
+    from app.utils.symbols import Instrument
+
+    smart = FailedSmart()
+    insts = [Instrument(f"S{i}", "NSE", f"S{i}-EQ", str(1000 + i), f"S{i}") for i in range(25)]
+    fetched = feed._fetch_quote_chunk(smart, insts, {i.token: i.key for i in insts}, None)
+    assert fetched == {}
+    assert smart.ltp_calls == 0
+    assert feed._ANGEL_GATE_STATS["marketdata"]["failedBatchesTotal"] == 1
+
+
 def test_partial_batch_is_counted_not_zero_filled(monkeypatch):
     _reset_gates()
 

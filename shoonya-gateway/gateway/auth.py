@@ -1,0 +1,102 @@
+"""Daily-session auth state machine."""
+from __future__ import annotations
+import asyncio,enum,hashlib,json,logging,os,time
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Awaitable,Callable
+import httpx
+import pyotp
+from .config import IST,Settings
+from .auth_types import OAuthBrowserUnavailable
+log=logging.getLogger(__name__)
+class AuthState(str,enum.Enum):
+    AUTH_REQUIRED="AUTH_REQUIRED"; LOGGING_IN="LOGGING_IN"; AUTHENTICATED="AUTHENTICATED"; EXPIRED="EXPIRED"
+class LoginUnavailable(RuntimeError): pass
+@dataclass
+class Session:
+    uid:str; account_id:str; access_token:str; obtained_at:str; websocket_token:str=""
+    def redacted(self): return {"uid":self.uid,"accountId":self.account_id,"obtainedAt":self.obtained_at}
+LoginFn=Callable[[],Awaitable[Session]]
+def _hhmm(text): h,m=text.split(":"); return int(h),int(m)
+class AuthManager:
+    def __init__(self,settings:Settings,login_fn:LoginFn|None=None,clock:Callable[[],datetime]=lambda:datetime.now(IST),mono:Callable[[],float]=time.monotonic)->None:
+        self._s=settings; self._login_fn=login_fn or self._login; self._clock=clock; self._mono=mono; self.state=AuthState.AUTH_REQUIRED; self.session=None; self.last_error=""; self._attempts=[]; self._next_attempt_at=0.; self._backoff=30.
+    async def _login(self):
+        if self._s.auth_mode=="oauth_auto":
+            from .oauth_browser import fetch_authorization_code
+            try: auth_code=await asyncio.to_thread(fetch_authorization_code,self._s)
+            except OAuthBrowserUnavailable as exc: raise LoginUnavailable(str(exc)) from exc
+            return await self.exchange_oauth_code(auth_code)
+        if self._s.auth_mode=="oauth":
+            return await self.exchange_oauth_code(self._s.oauth_auth_code)
+        required=(self._s.uid,self._s.password,self._s.totp_secret,self._s.vendor_code,self._s.api_secret)
+        if not all(required): raise LoginUnavailable("automatic login credentials are incomplete")
+        payload={"apkversion":"1.0.0","source":self._s.source,"uid":self._s.uid,"pwd":hashlib.sha256(self._s.password.encode()).hexdigest(),"factor2":pyotp.TOTP(self._s.totp_secret).now(),"vc":self._s.vendor_code,"appkey":hashlib.sha256(f"{self._s.uid}|{self._s.api_secret}".encode()).hexdigest(),"imei":"shoonya-gateway"}
+        async with httpx.AsyncClient(timeout=20.0,verify=self._s.tls_verify) as client:
+            response=await client.post(f"{self._s.api_base}/NorenWClientAPI/QuickAuth",content=("jData="+json.dumps(payload,separators=(",",":"))).encode(),headers={"Content-Type":"application/x-www-form-urlencoded"})
+            response.raise_for_status(); result=response.json()
+        if result.get("stat")!="Ok" or not result.get("susertoken"): raise LoginUnavailable(str(result.get("emsg") or "Shoonya login rejected"))
+        token=str(result["susertoken"])
+        return Session(self._s.uid,str(result.get("actid") or self._s.account_id or self._s.uid),token,self._clock().isoformat(),token)
+    def oauth_authorize_url(self):
+        if not self._s.vendor_code: raise LoginUnavailable("SHOONYA_CLIENT_ID is required")
+        return f"{self._s.oauth_url}?client_id={self._s.vendor_code}"
+    async def exchange_oauth_code(self,auth_code):
+        if not all((auth_code,self._s.uid,self._s.vendor_code,self._s.api_secret)):
+            raise LoginUnavailable("OAuth code, UID, client ID, and secret code are required")
+        checksum=hashlib.sha256(f"{self._s.vendor_code}{self._s.api_secret}{auth_code}".encode()).hexdigest()
+        payload={"code":auth_code,"checksum":checksum,"uid":self._s.uid}
+        async with httpx.AsyncClient(timeout=20.0,verify=self._s.tls_verify) as client:
+            response=await client.post(f"{self._s.api_base}/NorenWClientAPI/GenAcsTok",content=("jData="+json.dumps(payload,separators=(",",":"))).encode(),headers={"Content-Type":"application/x-www-form-urlencoded"})
+            response.raise_for_status(); result=response.json()
+        access_token=str(result.get("access_token") or "")
+        websocket_token=str(result.get("susertoken") or access_token)
+        uid=str(result.get("USERID") or self._s.uid)
+        if not access_token: raise LoginUnavailable(str(result.get("emsg") or result.get("message") or "Shoonya OAuth exchange rejected"))
+        return Session(uid,str(result.get("actid") or self._s.account_id or uid),access_token,self._clock().isoformat(),websocket_token)
+    def set_session(self,uid,account_id,access_token,websocket_token=""):
+        if not access_token or not uid: raise ValueError("uid and access_token are required")
+        self.session=Session(uid,account_id or uid,access_token,self._clock().isoformat(),websocket_token or access_token); self.state=AuthState.AUTHENTICATED; self.last_error=""; self._save()
+    def mark_expired(self,reason):
+        if self.state==AuthState.AUTHENTICATED: log.warning("shoonya session marked expired: %s",reason)
+        self.state=AuthState.EXPIRED; self.last_error=reason; self.session=None; self._clear_saved()
+    @property
+    def authenticated(self): return self.state==AuthState.AUTHENTICATED and self.session is not None
+    def _save(self):
+        if not self._s.session_file or self.session is None:return
+        try:
+            os.makedirs(os.path.dirname(self._s.session_file) or ".",exist_ok=True)
+            payload={"uid":self.session.uid,"accountId":self.session.account_id,"accessToken":self.session.access_token,"websocketToken":self.session.websocket_token,"obtainedAt":self.session.obtained_at}
+            tmp=self._s.session_file+".tmp"; fd=os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
+            with os.fdopen(fd,"w",encoding="utf-8") as fh: json.dump(payload,fh)
+            os.replace(tmp,self._s.session_file)
+        except OSError as exc: log.warning("could not persist shoonya session: %s",type(exc).__name__)
+    def _clear_saved(self):
+        try:
+            if self._s.session_file and os.path.exists(self._s.session_file): os.remove(self._s.session_file)
+        except OSError: pass
+    def restore(self):
+        try:
+            with open(self._s.session_file,"r",encoding="utf-8") as fh:data=json.load(fh)
+            if str(data.get("obtainedAt",""))[:10]!=self._clock().date().isoformat():return False
+            self.session=Session(str(data["uid"]),str(data.get("accountId") or data["uid"]),str(data["accessToken"]),str(data["obtainedAt"]),str(data.get("websocketToken") or data["accessToken"])); self.state=AuthState.AUTHENTICATED; return True
+        except (OSError,ValueError,KeyError): return False
+    def in_login_window(self): now=self._clock(); h,m=_hhmm(self._s.login_hhmm); return (now.hour,now.minute)>=(h,m)
+    def deadline_breached(self): now=self._clock(); h,m=_hhmm(self._s.login_deadline_hhmm); return (now.hour,now.minute)>=(h,m) and not self.authenticated
+    def _attempts_left(self):
+        cutoff=self._mono()-self._s.login_attempt_window_s; self._attempts=[t for t in self._attempts if t>=cutoff]; return len(self._attempts)<self._s.login_max_attempts
+    async def maybe_login(self):
+        if self.authenticated or self._s.auth_mode not in {"auto","oauth_auto"} or self._login_fn is None or not self.in_login_window(): return False
+        if self._mono()<self._next_attempt_at or not self._attempts_left(): return False
+        self._attempts.append(self._mono()); self.state=AuthState.LOGGING_IN
+        try: session=await self._login_fn()
+        except LoginUnavailable as exc:
+            self.state=AuthState.AUTH_REQUIRED; self.last_error=f"login unavailable: {exc}"; self._next_attempt_at=self._mono()+self._s.login_attempt_window_s; return False
+        except Exception as exc:
+            self.state=AuthState.AUTH_REQUIRED; self.last_error=f"login failed: {type(exc).__name__}"; self._next_attempt_at=self._mono()+self._backoff; self._backoff=min(self._backoff*2,self._s.login_attempt_window_s); return False
+        self._backoff=30.; self.set_session(session.uid,session.account_id,session.access_token,session.websocket_token); return True
+    async def refresh(self):
+        session=await self._login()
+        self.set_session(session.uid,session.account_id,session.access_token,session.websocket_token)
+        return True
+    def snapshot(self): return {"state":self.state.value,"mode":self._s.auth_mode,"session":self.session.redacted() if self.session else None,"lastError":self.last_error,"deadlineBreached":self.deadline_breached()}

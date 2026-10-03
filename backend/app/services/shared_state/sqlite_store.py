@@ -134,7 +134,15 @@ class SQLiteStore:
             ),
         )
 
-    def persist_view_snapshot(self, namespace: str, version: ViewVersion) -> None:
+    def persist_view_snapshot(self, namespace: str, version: ViewVersion | dict[str, Any]) -> None:
+        if isinstance(version, dict):
+            version_number = int(version.get("version") or 0)
+            payload = dict(version.get("payload") or {})
+            updated_at = float(version.get("updatedAt") or time.time())
+        else:
+            version_number = version.version
+            payload = version.payload
+            updated_at = version.updated_at
         self.enqueue(
             """
             INSERT INTO view_snapshot (namespace, version, payload, updated_at)
@@ -145,9 +153,9 @@ class SQLiteStore:
             """,
             (
                 namespace,
-                version.version,
-                json.dumps(version.payload),
-                int(version.updated_at),
+                version_number,
+                json.dumps(payload),
+                int(updated_at),
             ),
         )
 

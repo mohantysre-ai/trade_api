@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { jsonCompressed } from "@/lib/json-compressed";
 import { cachedBackendJson, liveCacheHeaders } from "@/lib/server-live-cache";
 
 export const runtime = "nodejs";
@@ -11,7 +12,7 @@ export const runtime = "nodejs";
  * see response.ltpSourceMix / priceSourcesNote / dataStale. Do not assume
  * "no external API calls" or tick-live freshness.
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const backendUrl =
       process.env.MARKET_API_URL ??
@@ -19,7 +20,7 @@ export async function GET() {
       "http://127.0.0.1:8000";
 
     const { data, cacheStatus } = await cachedBackendJson("live-prices", `${backendUrl}/api/live-prices`, 4_000);
-    return NextResponse.json(data, { headers: liveCacheHeaders(cacheStatus) });
+    return jsonCompressed(data, { headers: liveCacheHeaders(cacheStatus), request });
   } catch (err) {
     return NextResponse.json({
       long: [],

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backendBase } from "../../eod/_proxy";
+import { cachedBackendJson, liveCacheHeaders } from "../../../../lib/server-live-cache";
 
 export const runtime = "nodejs";
 
@@ -16,10 +17,23 @@ export async function GET(request: NextRequest) {
     if (date) params.set("date", date);
     if (force) params.set("force", force);
     const qs = params.toString() ? `?${params.toString()}` : "";
+    const url = `${backendBase()}/api/reports/eod-intraday${qs}`;
 
-    const res = await fetch(`${backendBase()}/api/reports/eod-intraday${qs}`, {
+    if (!force) {
+      const { data, cacheStatus } = await cachedBackendJson(
+        `eod-intraday-${date || "latest"}`,
+        url,
+        2_000,
+        60_000,
+        45_000,
+      );
+      return NextResponse.json(data, { headers: liveCacheHeaders(cacheStatus) });
+    }
+
+    const res = await fetch(url, {
       cache: "no-store",
       headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(60_000),
     });
 
     if (!res.ok) {
@@ -30,7 +44,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(await res.json());
+    return NextResponse.json(await res.json(), { headers: liveCacheHeaders("MISS") });
   } catch (err) {
     return NextResponse.json(
       {

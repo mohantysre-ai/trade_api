@@ -70,7 +70,7 @@ def test_quote_failover_fetches_only_symbols_missing_from_nse(monkeypatch):
     assert set(quotes) == {"AAA", "BBB"}
     assert quotes["BBB"]["quoteProvider"] == "dhan"
     assert coverage.selection_allowed is True
-    assert coverage.providers == {"nse": 1, "dhan": 1, "angel": 0}
+    assert coverage.providers == {"nse": 1, "dhan": 1, "angel": 0, "shoonya": 0}
 
 
 def test_angel_receives_only_symbols_missing_from_nse_and_dhan(monkeypatch):
@@ -95,7 +95,7 @@ def test_angel_receives_only_symbols_missing_from_nse_and_dhan(monkeypatch):
     )
     assert requested == ["CCC"]
     assert set(quotes) == {"AAA", "BBB", "CCC"}
-    assert coverage.providers == {"nse": 1, "dhan": 1, "angel": 1}
+    assert coverage.providers == {"nse": 1, "dhan": 1, "angel": 1, "shoonya": 0}
 
 
 def test_quote_coverage_fails_closed(monkeypatch):
@@ -210,6 +210,7 @@ def test_nse_intraday_drops_bars_outside_requested_window(monkeypatch):
 
 def test_nse_chart_disconnect_opens_circuit_and_suppresses_repeat_request(monkeypatch):
     provider._NSE_CANDLE_CIRCUIT_UNTIL = 0.0
+    monkeypatch.setattr(provider, "NSE_CANDLE_RETRY_BACKOFF_SECONDS", 0.0)
     calls = []
 
     def fail_session():
@@ -221,4 +222,50 @@ def test_nse_chart_disconnect_opens_circuit_and_suppresses_repeat_request(monkey
     assert provider._nse_chart_get(params) is None
     assert provider._NSE_CANDLE_CIRCUIT_UNTIL > 0
     assert provider._nse_chart_get(params) is None
-    assert len(calls) == 1
+    assert len(calls) == 2
+
+
+def test_nse_chart_disconnect_retries_with_fresh_session_before_opening_circuit(monkeypatch):
+    provider._NSE_CANDLE_CIRCUIT_UNTIL = 0.0
+    monkeypatch.setattr(provider, "NSE_CANDLE_RETRY_BACKOFF_SECONDS", 0.0)
+    calls = []
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"status": True, "data": []}
+
+    class Session:
+        @staticmethod
+        def get(*_args, **_kwargs):
+            calls.append(1)
+            if len(calls) == 1:
+                raise provider.requests.ConnectionError("remote closed")
+            return Response()
+
+        @staticmethod
+        def close():
+            return None
+
+    monkeypatch.setattr(provider, "_nse_chart_session", lambda: Session())
+    assert provider._nse_chart_get({"symbol": "RELIANCE", "token": "2885"}) == {
+        "status": True,
+        "data": [],
+    }
+    assert provider._NSE_CANDLE_CIRCUIT_UNTIL == 0.0
+    assert len(calls) == 2
+
+
+def test_nse_quote_circuit_opens_and_failover_still_serves_quotes(monkeypatch):
+    provider._NSE_QUOTE_CIRCUIT_UNTIL = 0.0
+    def limited(_symbols):
+        provider._trip_nse_quote_circuit(60)
+        raise RuntimeError("NSE_QUOTE_HTTP_429")
+    monkeypatch.setattr(provider, "fetch_nse500_quotes", limited)
+    monkeypatch.setattr(provider, "fetch_dhan_bulk_quotes", lambda symbols: {s: {"ltp": 100, "quoteProvider": "dhan_scanx"} for s in symbols})
+    quotes, coverage = provider.fetch_quotes_with_failover(["AAA", "BBB"], lambda _symbols: {})
+    assert set(quotes) == {"AAA", "BBB"}
+    assert coverage.providers["dhan"] == 2
+    assert provider._NSE_QUOTE_CIRCUIT_UNTIL > 0

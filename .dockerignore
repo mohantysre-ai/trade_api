@@ -19,8 +19,13 @@
 iros-terminal/.next
 iros-terminal/node_modules
 backend/.venv
-*.md
+backend/app/services/client_secret.json
+backend/app/services/gemini_oauth_token.json
+**/*.md
 !backend/README.md
+!README.md
+**/tests
+**/test_*.py
 docs
 tmp
 .tmp
@@ -39,3 +44,9 @@ backend/.env
 !backend/.env.example
 **/.DS_Store
 **/Thumbs.db
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm

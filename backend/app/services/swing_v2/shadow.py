@@ -11,11 +11,11 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from .config import SwingV2Config, load_config
-from .data_quality import evaluate_freshness
+from .data_quality import evaluate_data_freshness
 from .ledger import SwingLedger
 from .portfolio import construct_portfolio
 from .ranking import assign_segment_percentiles, rank_score
-from .schemas import EventType, ValidationState
+from .schemas import EventType, QualificationMode, ValidationState
 from .setups import evaluate_setups
 from .tradability import evaluate_tradability
 
@@ -29,8 +29,12 @@ def _snapshot_hash(rows: list[dict[str, Any]]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _is_micro(row: dict[str, Any]) -> bool:
+    return "MICRO" in str(row.get("universeSegment") or "").upper()
+
+
 def _regime_scale(regime: str) -> tuple[float, int]:
-    return {"NORMAL": (1.0, 5), "DEFENSIVE": (.5, 2), "HALT_NEW_LONGS": (0.0, 0)}.get(regime, (0.0, 0))
+    return {"NORMAL": (1.0, 5), "DEFENSIVE": (.5, 5), "HALT_NEW_LONGS": (0.0, 0)}.get(regime, (0.0, 0))
 
 
 def _raw_coverage_tier(coverage: float, cfg: SwingV2Config) -> tuple[str, float]:
@@ -50,6 +54,8 @@ def _coverage_tier(coverage: float, cfg: SwingV2Config, *, session_date: str, ap
     with _COVERAGE_LOCK:
         if _COVERAGE_STATE["sessionDate"] != session_date:
             _COVERAGE_STATE.update(sessionDate=session_date, tier=raw_tier, pendingTier=None, pendingCycles=0)
+        elif _COVERAGE_STATE["tier"] == "BLOCK" and raw_tier != "BLOCK":
+            _COVERAGE_STATE.update(tier=raw_tier, pendingTier=None, pendingCycles=0)
         elif _COVERAGE_STATE["tier"] != raw_tier:
             if _COVERAGE_STATE["pendingTier"] == raw_tier:
                 _COVERAGE_STATE["pendingCycles"] += 1
@@ -70,7 +76,7 @@ def _decision_id(snapshot_id: str, session_date: str, symbol: str) -> str:
 
 
 def _quality_and_safety(row: dict[str, Any], *, final_lock: bool, now: datetime) -> tuple[bool, list[str]]:
-    fresh, freshness_reasons = evaluate_freshness(row, final_lock=final_lock, now=now)
+    fresh, freshness_reasons = evaluate_data_freshness(row, final_lock=final_lock, now=now)
     tradable, trade_reasons = evaluate_tradability(row)
     governance_reasons = []
     for flag, reason in (("insolvencyOrDefault", "INSOLVENCY_OR_DEFAULT"), ("unresolvedAuditQualification", "UNRESOLVED_AUDIT_QUALIFICATION"), ("materialPromoterPledgeAlert", "MATERIAL_PROMOTER_PLEDGE_ALERT")):
@@ -86,17 +92,38 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
 
     tradable_rows = [r for r in rows if cfg.microcap_mode == "SHADOW" or "MICRO" not in str(r.get("universeSegment") or "").upper()]
     shadow_rows = [r for r in rows if cfg.microcap_mode != "SHADOW" and "MICRO" in str(r.get("universeSegment") or "").upper()]
-    freshness = [(r, evaluate_freshness(r, final_lock=final_lock, now=now)) for r in tradable_rows]
-    fresh_rows = [r for r, result in freshness if result[0]]
-    stale_rows = [r for r, result in freshness if not result[0]]
-    stale_reason_counts = Counter(reason for _, result in freshness if not result[0] for reason in result[1])
+    data_freshness = [(r, evaluate_data_freshness(r, final_lock=final_lock, now=now)) for r in tradable_rows]
+    data_fresh_rows = [r for r, result in data_freshness if result[0]]
+    data_stale_rows = [r for r, result in data_freshness if not result[0]]
+    data_stale_reason_counts = Counter(reason for _, result in data_freshness if not result[0] for reason in result[1])
+    candidate_fresh_rows = []
+    candidate_stale_rows = []
+    candidate_stale_reason_counts = Counter()
+    for r in data_fresh_rows:
+        gov_reasons = []
+        for flag, reason in (
+            ("corporateEventsCurrent", "CORPORATE_EVENTS_FEED_STALE"),
+            ("surveillanceCurrent", "SURVEILLANCE_FEED_STALE"),
+            ("universeCurrent", "UNIVERSE_FEED_STALE"),
+        ):
+            if r.get(flag) is not True:
+                gov_reasons.append(reason)
+        if gov_reasons:
+            candidate_stale_rows.append(r)
+            candidate_stale_reason_counts.update(gov_reasons)
+        else:
+            candidate_fresh_rows.append(r)
     candle_metrics = sum(
         bool((row.get("sourceTimestamps") or {}).get("bars1h") or (row.get("sourceTimestamps") or {}).get("bars5m"))
         for row in tradable_rows
     )
-    shadow_covered = sum(1 for r in shadow_rows if evaluate_freshness(r, final_lock=final_lock, now=now)[0])
-    denominator = len(tradable_rows)
-    tradable_coverage = len(fresh_rows) / denominator if denominator else universe_coverage
+    shadow_covered = sum(1 for r in shadow_rows if evaluate_data_freshness(r, final_lock=final_lock, now=now)[0])
+    total_universe = len(rows)
+    tradable_universe = len(tradable_rows)
+    data_coverage = len(data_fresh_rows) / total_universe if total_universe else universe_coverage
+    tradable_coverage = len(candidate_fresh_rows) / tradable_universe if tradable_universe else universe_coverage
+    paper_hunt_covered = sum(1 for r in candidate_fresh_rows if evaluate_tradability(r)[0])
+    paper_hunt_coverage = paper_hunt_covered / total_universe if total_universe else universe_coverage
     shadow_coverage = shadow_covered / max(1, len(shadow_rows)) if shadow_rows else 1.0
     session_date = now.astimezone(ZoneInfo("Asia/Kolkata")).date().isoformat()
     proposed_tier, proposed_multiplier, hysteresis = _coverage_tier(tradable_coverage, cfg, session_date=session_date, apply_hysteresis=apply_coverage_hysteresis)
@@ -106,13 +133,12 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
     else:
         tier = "NORMAL" if tradable_coverage >= cfg.coverage_normal_threshold else "BLOCK"
         coverage_risk_multiplier = 1.0 if tier == "NORMAL" else 0.0
-    _LOG.info("Swing V2 coverage session=%s final_lock=%s tiers_active=%s fresh=%d stale=%d denominator=%d coverage=%.4f denominator_source=ACTIVE_PAPER_HUNT_ROWS effective_tier=%s proposed_tier=%s stale_reasons=%s", session_date, final_lock, tiers_active, len(fresh_rows), len(stale_rows), denominator, tradable_coverage, tier, proposed_tier, dict(stale_reason_counts))
+    _LOG.info("Swing V2 coverage session=%s final_lock=%s tiers_active=%s data_fresh=%d data_stale=%d candidate_fresh=%d candidate_stale=%d total_universe=%d tradable_universe=%d data_coverage=%.4f tradable_coverage=%.4f paper_hunt_coverage=%.4f effective_tier=%s proposed_tier=%s data_stale_reasons=%s candidate_stale_reasons=%s", session_date, final_lock, tiers_active, len(data_fresh_rows), len(data_stale_rows), len(candidate_fresh_rows), len(candidate_stale_rows), total_universe, tradable_universe, data_coverage, tradable_coverage, paper_hunt_coverage, tier, proposed_tier, dict(data_stale_reason_counts), dict(candidate_stale_reason_counts))
 
-    funnel = {"universe_size": len(rows), "evaluated_count": len(tradable_rows), "fresh_count": len(fresh_rows), "stale_excluded_count": len(stale_rows), "stale_reason_counts": dict(stale_reason_counts), "candleMetrics": candle_metrics, "candleTimeframe": "1H", "coverage_pct": round(tradable_coverage * 100.0, 4), "coverage_denominator": denominator, "coverage_numerator": len(fresh_rows), "coverage_denominator_source": "ACTIVE_PAPER_HUNT_ROWS", "gate_tier": tier, "proposed_gate_tier": proposed_tier, "coverage_risk_multiplier": coverage_risk_multiplier, "candidates_in": len(fresh_rows), "qualified_out": 0, "qualified": 0, "locked_out": 0, "block_reason": None, "hysteresis": hysteresis, "universe": len(rows), "freshData": len(fresh_rows), "tradable": 0, "safetyPass": 0, "setupPass": 0, "expectancyPass": 0, "portfolioPass": 0, "locked": 0, "filled": 0, "blocked": False}
+    funnel = {"universe_size": total_universe, "evaluated_count": tradable_universe, "fresh_count": len(candidate_fresh_rows), "stale_excluded_count": len(candidate_stale_rows), "stale_reason_counts": dict(candidate_stale_reason_counts), "candleMetrics": candle_metrics, "candleTimeframe": "1H", "coverage_pct": round(tradable_coverage * 100.0, 4), "coverage_denominator": tradable_universe, "coverage_numerator": len(candidate_fresh_rows), "coverage_denominator_source": "ACTIVE_PAPER_HUNT_ROWS", "gate_tier": tier, "proposed_gate_tier": proposed_tier, "coverage_risk_multiplier": coverage_risk_multiplier, "dataCoverage": data_coverage, "tradableCoverage": tradable_coverage, "paperHuntCoverage": paper_hunt_coverage, "dataCoveragePct": round(data_coverage * 100.0, 4), "tradableCoveragePct": round(tradable_coverage * 100.0, 4), "paperHuntCoveragePct": round(paper_hunt_coverage * 100.0, 4), "totalUniverse": total_universe, "tradableUniverse": tradable_universe, "dataFreshCount": len(data_fresh_rows), "tradableFreshCount": len(candidate_fresh_rows), "paperHuntFreshCount": paper_hunt_covered, "candidates_in": len(candidate_fresh_rows), "qualified_out": 0, "qualified": 0, "locked_out": 0, "block_reason": None, "hysteresis": hysteresis, "universe": total_universe, "freshData": len(candidate_fresh_rows), "tradable": 0, "safetyPass": 0, "setupPass": 0, "expectancyPass": 0, "portfolioPass": 0, "locked": 0, "filled": 0, "blocked": False}
     if tier == "BLOCK":
         block_reason = "UNIVERSE_COVERAGE_BELOW_90PCT" if tiers_active and proposed_tier == "BLOCK" else "UNIVERSE_COVERAGE_BELOW_99PCT"
-        funnel.update(blocked=True, block_reason=block_reason, candidates_in=0)
-        return {**base, "blocked": True, "retryable": True, "blockReason": block_reason, "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "coverageTier": tier, "proposedCoverageTier": proposed_tier, "coverageTiersAuthoritative": tiers_active, "coverageRiskMultiplier": 0.0, "coverageDenominatorSource": "ACTIVE_PAPER_HUNT_ROWS", "freshRows": len(fresh_rows), "missingFreshRows": len(stale_rows), "staleExcludedRows": len(stale_rows), "staleReasonCounts": dict(stale_reason_counts), "shadowCoverage": shadow_coverage, "candidates": [], "candidateCount": len(fresh_rows), "qualifiedCount": 0, "selectedCount": 0, "funnel": funnel}
+        funnel.update(blocked=True, block_reason=block_reason)
 
     regime_risk_scale, regime_cap = _regime_scale(regime)
     if regime == "REGIME_UNRATED":
@@ -121,39 +147,145 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
     if regime_risk_scale == 0:
         funnel.update(blocked=True, block_reason="HALT_NEW_LONGS", candidates_in=0)
         return {**base, "blocked": True, "blockReason": "HALT_NEW_LONGS", "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "coverageTier": tier, "coverageRiskMultiplier": coverage_risk_multiplier, "shadowCoverage": shadow_coverage, "regime": regime, "candidates": [], "funnel": funnel}
-
-    snapshot_id, decision_timestamp = _snapshot_hash(rows), now.isoformat()
     qualified, rejected = [], []
-    stale_symbols = {str(r.get("symbol") or r.get("ticker") or "").upper() for r in stale_rows}
+    snapshot_id, decision_timestamp = _snapshot_hash(rows), now.isoformat()
+    stale_symbols = {str(r.get("symbol") or r.get("ticker") or "").upper() for r in candidate_stale_rows}
     for raw in rows:
         row = dict(raw); symbol = str(row.get("symbol") or row.get("ticker") or "").upper()
         segment = str(row.get("universeSegment") or "").replace("_", "").upper(); active_segments = {value.replace("_", "").upper() for value in cfg.active_segments}
         segment_active = segment in active_segments or segment == "NIFTY500FALLBACK" or (segment == "NIFTYMICROCAP250" and cfg.microcap_mode == "SHADOW")
-        fresh_ok, fresh_reasons = evaluate_freshness(row, final_lock=final_lock, now=now); trade_ok, trade_reasons = evaluate_tradability(row); gate_ok, gate_reasons = _quality_and_safety(row, final_lock=final_lock, now=now)
+        fresh_ok, fresh_reasons = evaluate_data_freshness(row, final_lock=final_lock, now=now); trade_ok, trade_reasons = evaluate_tradability(row); gate_ok, gate_reasons = _quality_and_safety(row, final_lock=final_lock, now=now)
         funnel["tradable"] += int(trade_ok); funnel["safetyPass"] += int(gate_ok)
         if symbol in stale_symbols or not fresh_ok:
             rejected.append({"symbol": symbol, "reasonCodes": sorted(set(fresh_reasons or ["STALE_EXCLUDED_BY_COVERAGE_TIER"])), "qualificationStage": "FRESHNESS"}); continue
-        setup = evaluate_setups(row) if gate_ok else {"eligible": False, "passedSetupIds": [], "rejections": {}}; rank = rank_score(row)
-        score_lock_eligible = rank["status"] == "RATED" and float(rank.get("score") or 0) > 70; setup_ok = bool(setup["eligible"] or score_lock_eligible); funnel["setupPass"] += int(setup_ok)
-        capacity_ok = float(row.get("upsideCapacityR") or 0) >= cfg.min_upside_capacity_r; planned_ok = float(row.get("plannedMaxBlendedR") or 1.5) >= cfg.min_planned_blended_r
-        gross_r = float(row.get("upsideCapacityR") or row.get("plannedMaxBlendedR") or 1.5); cost_r = float(row.get("costPenaltyR") or 0) + float(row.get("spreadPenaltyR") or 0) + float(row.get("slippagePenaltyR") or 0)
+        setup = evaluate_setups(row) if gate_ok else {"eligible": False, "passedSetupIds": [], "rejections": {}}
+        rank = rank_score(row)
+        score_lock_eligible = rank["status"] == "RATED" and float(rank.get("score") or 0) >= cfg.setup_score_override
+        capacity_ok = float(row.get("upsideCapacityR") or 0) >= cfg.min_upside_capacity_r
+        planned_ok = float(row.get("plannedMaxBlendedR") or 1.5) >= cfg.min_planned_blended_r
+        gross_r = float(row.get("upsideCapacityR") or row.get("plannedMaxBlendedR") or 1.5)
+        cost_r = float(row.get("costPenaltyR") or 0) + float(row.get("spreadPenaltyR") or 0) + float(row.get("slippagePenaltyR") or 0)
         if cost_r == 0 and row.get("modeledRoundTripCostPct"):
-            risk_dist = float(row.get("riskPerShare") or 5.0); price = float(row.get("decisionPrice") or row.get("entryPrice") or 100.0)
-            if risk_dist > 0: cost_r = (float(row.get("modeledRoundTripCostPct")) / 100.0 * price) / risk_dist
-        net_reward_r = gross_r - cost_r; row["expectedNetR"] = round(net_reward_r, 4) if row.get("expectedNetR") is None else row["expectedNetR"]; net_reward_ok = net_reward_r >= cfg.min_expected_net_r
-        expected = row.get("expectedNetR"); calibrated = expected is not None and str(row.get("expectedNetRStatus") or "").upper() == "CALIBRATED"; expectancy_ok = calibrated and float(expected) >= cfg.min_expected_net_r; funnel["expectancyPass"] += int(expectancy_ok)
+            price = float(row.get("decisionPrice") or row.get("entryPrice") or 0)
+            explicit_risk = float(row.get("riskPerShare") or 0)
+            structure_stop = float(row.get("structureStop") or 0)
+            atr_risk = float(row.get("atr14") or 0)
+            risk_dist = (
+                explicit_risk
+                if explicit_risk > 0
+                else (price - structure_stop)
+                if price > 0 and structure_stop > 0 and structure_stop < price
+                else atr_risk
+                if atr_risk > 0
+                else 0.0
+            )
+            if risk_dist > 0 and price > 0:
+                cost_r = (float(row.get("modeledRoundTripCostPct")) / 100.0 * price) / risk_dist
+        net_reward_r = gross_r - cost_r
+        row["expectedNetR"] = round(net_reward_r, 4) if row.get("expectedNetR") is None else row["expectedNetR"]
+        net_reward_ok = net_reward_r >= cfg.min_expected_net_r
+        expected = row.get("expectedNetR")
+        expected_status = str(row.get("expectedNetRStatus") or "").upper()
+        calibrated_negative = expected is not None and expected_status == "CALIBRATED" and float(expected) < 0
+        if calibrated_negative:
+            rejected.append({
+                "symbol": symbol,
+                "reasonCodes": sorted(set(fresh_reasons + trade_reasons + gate_reasons + ["CALIBRATED_NEGATIVE_EXPECTANCY"])),
+                "setupRejections": setup.get("rejections"),
+                "qualificationStage": "CANDIDATE_QUALIFICATION",
+                "expectancyStatus": "CALIBRATED_NEGATIVE",
+                "capacityStatus": "PASS" if capacity_ok else "LOW",
+            })
+            continue
+        expectancy_ok = expected is not None and expected_status == "CALIBRATED" and float(expected) >= cfg.min_expected_net_r
+        funnel["expectancyPass"] += int(expectancy_ok)
         reasons = fresh_reasons + trade_reasons + gate_reasons
-        if not net_reward_ok: reasons.append("NET_REWARD_BELOW_MINIMUM")
-        if not segment_active: reasons.append("SEGMENT_NOT_ACTIVE")
-        if not segment_active or not gate_ok or not setup_ok or not capacity_ok or not planned_ok or not net_reward_ok or rank["status"] != "RATED":
-            rejected.append({"symbol": symbol, "reasonCodes": sorted(set(reasons)), "setupRejections": setup.get("rejections"), "qualificationStage": "CANDIDATE_QUALIFICATION", "expectancyStatus": "PASS" if expectancy_ok else ("UNRATED" if expected is None else "LOW_OR_UNCALIBRATED"), "capacityStatus": "PASS" if capacity_ok else "LOW"}); continue
-        gross_utility = float(expected) if expectancy_ok else float(rank["score"]) / 1000.0; utility = gross_utility - float(row.get("costPenaltyR") or 0) - float(row.get("gapRiskPenaltyR") or 0)
-        qualified.append({**row, **rank, "symbol": symbol, "setupIds": setup["passedSetupIds"], "scoreLockEligible": score_lock_eligible, "expectedUtilityR": utility, "expectedNetRStatus": row.get("expectedNetRStatus") or "UNRATED", "promotionEligible": expectancy_ok, "decisionId": _decision_id(snapshot_id, session_date, symbol), "sourceSnapshotId": snapshot_id})
+        if rank["status"] != "RATED":
+            reasons.append("RANK_UNRATED")
+            reasons.extend(str(code) for code in (rank.get("reasonCodes") or []))
+        if not net_reward_ok:
+            reasons.append("NET_REWARD_BELOW_MINIMUM")
+        if not segment_active:
+            reasons.append("SEGMENT_NOT_ACTIVE")
+        tier_a_formal = setup["eligible"]
+        tier_a_score = score_lock_eligible
+        tier_a = (tier_a_formal or tier_a_score) and capacity_ok and planned_ok and net_reward_ok and gate_ok
+        tier_b_score_ok = rank["status"] == "RATED" and float(rank.get("score") or 0) >= cfg.tier_b_min_score
+        tier_b_capacity_ok = float(row.get("upsideCapacityR") or 0) >= cfg.tier_b_min_upside_capacity_r
+        tier_b_planned_ok = float(row.get("plannedMaxBlendedR") or 1.5) >= cfg.tier_b_min_planned_blended_r
+        tier_b_net_ok = net_reward_r >= cfg.tier_b_min_expected_net_r
+        tier_b = (
+            not tier_a
+            and tier_b_score_ok
+            and tier_b_capacity_ok
+            and tier_b_planned_ok
+            and tier_b_net_ok
+            and gate_ok
+        )
+        if tier_b and cfg.prohibit_tier_b_microcaps and _is_micro(row):
+            tier_b = False
+            reasons.append("TIER_B_MICROCAP_PROHIBITED")
+        setup_ok = tier_a or tier_b
+        funnel["setupPass"] += int(setup_ok)
+        if rank["status"] == "RATED" and not tier_a_score and not tier_b_score_ok and not setup["eligible"]:
+            reasons.append("SCORE_BELOW_TIER_B_MINIMUM")
+        qualification_mode = (
+            "PRIMARY_SETUP" if setup["eligible"]
+            else "SCORE_SOFT_PASS" if tier_a_score
+            else "DIVERSIFIED_SOFT_PASS" if tier_b
+            else "NONE"
+        )
+        if not segment_active or not gate_ok or not setup_ok or rank["status"] != "RATED":
+            if not tier_b:
+                if not capacity_ok:
+                    reasons.append("UPSIDE_CAPACITY_BELOW_MINIMUM")
+                if not planned_ok:
+                    reasons.append("PLANNED_BLENDED_R_BELOW_MINIMUM")
+                if not net_reward_ok:
+                    reasons.append("NET_REWARD_BELOW_MINIMUM")
+            rejected.append({
+                "symbol": symbol,
+                "reasonCodes": sorted(set(reasons)),
+                "setupRejections": setup.get("rejections"),
+                "qualificationStage": "CANDIDATE_QUALIFICATION",
+                "expectancyStatus": "PASS" if expectancy_ok else ("UNRATED" if expected is None else "LOW_OR_UNCALIBRATED"),
+                "capacityStatus": "PASS" if capacity_ok else "LOW",
+            })
+            continue
+        gross_utility = float(expected) if expectancy_ok else float(rank["score"]) / 1000.0
+        utility = gross_utility - float(row.get("costPenaltyR") or 0) - float(row.get("gapRiskPenaltyR") or 0)
+        risk_multiplier = 1.0 if tier_a else (cfg.tier_b_risk_multiplier if tier_b else 1.0)
+        qualified.append({
+            **row,
+            **rank,
+            "symbol": symbol,
+            "setupIds": setup["passedSetupIds"],
+            "scoreLockEligible": score_lock_eligible,
+            "qualificationMode": qualification_mode,
+            "opportunityThresholds": {
+                "setupScoreOverride": cfg.setup_score_override,
+                "minUpsideCapacityR": cfg.min_upside_capacity_r,
+                "minPlannedBlendedR": cfg.min_planned_blended_r,
+                "minExpectedNetR": cfg.min_expected_net_r,
+            },
+            "expectedUtilityR": utility,
+            "expectedNetRStatus": row.get("expectedNetRStatus") or "UNRATED",
+            "promotionEligible": expectancy_ok,
+            "decisionId": _decision_id(snapshot_id, session_date, symbol),
+            "sourceSnapshotId": snapshot_id,
+            "riskMultiplier": risk_multiplier,
+            "tier": "A" if tier_a else "B" if tier_b else "NONE",
+        })
 
     qualified = assign_segment_percentiles(qualified); funnel["qualified_out"] = len(qualified)
     effective_risk_scale = regime_risk_scale * coverage_risk_multiplier
     scaled_cfg = SwingV2Config(**{**cfg.__dict__, "max_positions": min(cfg.max_positions, regime_cap), "core_risk_bps": max(1, int(round(cfg.core_risk_bps * effective_risk_scale))), "microcap_risk_bps": max(1, int(round(cfg.microcap_risk_bps * effective_risk_scale)))})
     portfolio = construct_portfolio(qualified, scaled_cfg, correlations=correlations, occupied_symbols=occupied_symbols, existing_positions=existing_positions); selected = portfolio["selected"]
+    if tier == "BLOCK" and final_lock:
+        selected = []
+        portfolio["selected"] = []
+        funnel["blocked"] = True
+        funnel["block_reason"] = "UNIVERSE_COVERAGE_BELOW_90PCT" if tiers_active and proposed_tier == "BLOCK" else "UNIVERSE_COVERAGE_BELOW_99PCT"
     ist_now = now.astimezone(ZoneInfo("Asia/Kolkata")); cutoff_parts = [int(p) for p in cfg.entry_cutoff_ist.split(":")]; cutoff_time = time(cutoff_parts[0], cutoff_parts[1])
     if ist_now.time().replace(tzinfo=None) >= cutoff_time:
         for item in portfolio["selected"]: portfolio["rejected"].append({"symbol": item.get("symbol"), "portfolioRejectReason": f"ENTRY_CUTOFF_AFTER_{cfg.entry_cutoff_ist.replace(':','')}_IST"})
@@ -166,9 +298,31 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
     funnel["qualified"] = funnel["qualified_out"]
     if persist_events:
         ledger = SwingLedger(cfg.ledger_path); selected_ids = {row["decisionId"] for row in selected}; selected_by_id = {row["decisionId"]: row for row in selected}
+        already_locked_symbols = {
+            str(event.get("symbol") or "").upper()
+            for event in ledger.events(session_date=session_date)
+            if str(event.get("eventType") or "") == str(EventType.POSITION_LOCKED)
+        }
+        active_non_terminal = sum(1 for p in ledger.positions_state().values() if not p.get("terminal"))
+        lock_budget = max(0, scaled_cfg.max_positions - active_non_terminal)
+        if lock_budget <= 0:
+            for row in qualified:
+                if row["decisionId"] in selected_ids:
+                    portfolio["rejected"].append({"symbol": row.get("symbol"), "portfolioRejectReason": "MAX_POSITIONS_LEDGER_CAP"})
+            selected = []
+            selected_ids = set()
         for row in qualified:
-            event_type = EventType.POSITION_LOCKED if row["decisionId"] in selected_ids else EventType.CANDIDATE_QUALIFIED; event_payload = selected_by_id.get(row["decisionId"], row)
+            wants_lock = row["decisionId"] in selected_ids
+            if wants_lock and row["symbol"].upper() in already_locked_symbols:
+                continue
+            if wants_lock and lock_budget <= 0:
+                portfolio["rejected"].append({"symbol": row.get("symbol"), "portfolioRejectReason": "MAX_POSITIONS_LEDGER_CAP"})
+                continue
+            event_type = EventType.POSITION_LOCKED if wants_lock else EventType.CANDIDATE_QUALIFIED; event_payload = selected_by_id.get(row["decisionId"], row)
             ledger.append(idempotency_key=f"{row['decisionId']}:{event_type}", decision_id=row["decisionId"], position_id=row["decisionId"] if event_type == EventType.POSITION_LOCKED else None, symbol=row["symbol"], session_date=session_date, event_type=event_type, event_timestamp=now.isoformat(), payload=event_payload)
+            if event_type == EventType.POSITION_LOCKED:
+                already_locked_symbols.add(row["symbol"].upper())
+                lock_budget -= 1
         for index, row in enumerate(rejected):
             symbol = row.get("symbol") or f"UNKNOWN_{index}"; decision_id = _decision_id(snapshot_id, session_date, symbol)
             ledger.append(idempotency_key=f"{decision_id}:{EventType.CANDIDATE_REJECTED}", decision_id=decision_id, symbol=symbol, session_date=session_date, event_type=EventType.CANDIDATE_REJECTED, event_timestamp=now.isoformat(), payload=row)
@@ -177,4 +331,4 @@ def build_shadow_v2(rows: list[dict[str, Any]], *, universe_coverage: float = 0.
         for reason in row.get("reasonCodes") or [row.get("portfolioRejectReason")]:
             if reason: reason_counts[str(reason)] = reason_counts.get(str(reason), 0) + 1
     funnel["topRejectionReasons"] = sorted(({"reason": key, "count": value} for key, value in reason_counts.items()), key=lambda item: item["count"], reverse=True)[:10]
-    return {**base, "generatedAt": now.isoformat(), "regime": regime, "regimeRiskScale": regime_risk_scale, "coverageTier": tier, "proposedCoverageTier": proposed_tier, "coverageTiersAuthoritative": tiers_active, "coverageRiskMultiplier": coverage_risk_multiplier, "effectiveRiskScale": effective_risk_scale, "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "coverageDenominatorSource": "ACTIVE_PAPER_HUNT_ROWS", "staleReasonCounts": dict(stale_reason_counts), "shadowCoverage": shadow_coverage, "sourceSnapshotId": snapshot_id, "candidateCount": len(fresh_rows), "qualifiedCount": len(qualified), "selectedCount": len(selected), "candidates": selected, "rejected": rejected + portfolio["rejected"], "funnel": funnel, "portfolioInitialRisk": portfolio["portfolioInitialRisk"], "gapStressLoss": portfolio["gapStressLoss"], "cash": portfolio["cash"]}
+    return {**base, "generatedAt": now.isoformat(), "regime": regime, "regimeRiskScale": regime_risk_scale, "coverageTier": tier, "proposedCoverageTier": proposed_tier, "coverageTiersAuthoritative": tiers_active, "coverageRiskMultiplier": coverage_risk_multiplier, "effectiveRiskScale": effective_risk_scale, "coverage": tradable_coverage, "tradableCoverage": tradable_coverage, "dataCoverage": data_coverage, "paperHuntCoverage": paper_hunt_coverage, "coverageDenominatorSource": "ACTIVE_PAPER_HUNT_ROWS", "staleReasonCounts": dict(candidate_stale_reason_counts), "dataStaleReasonCounts": dict(data_stale_reason_counts), "shadowCoverage": shadow_coverage, "sourceSnapshotId": snapshot_id, "candidateCount": len(candidate_fresh_rows), "qualifiedCount": len(qualified), "selectedCount": len(selected), "candidates": selected, "rejected": rejected + portfolio["rejected"], "funnel": funnel, "portfolioInitialRisk": portfolio["portfolioInitialRisk"], "gapStressLoss": portfolio["gapStressLoss"], "cash": portfolio["cash"], "correlationEvidencePairs": portfolio["correlationEvidencePairs"], "correlationPolicy": portfolio["correlationPolicy"], "blocked": funnel.get("blocked", False), "blockReason": funnel.get("block_reason")}

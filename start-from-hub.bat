@@ -23,18 +23,19 @@ if errorlevel 1 (
   )
 )
 if not exist "%~dp0backend\.env" (
-  echo [*] backend\.env not found - restoring from private Hub image...
+  echo [*] backend\.env not found - restoring secrets + latest volumes from private Hub image...
   powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0config\startup\restore-runtime-private.ps1"
-  if errorlevel 1 (
-    echo [FAIL] Runtime restore from sigq-runtime-private failed. Run: docker login
-    echo        Nothing will be started.
-    pause
-    exit /b 1
-  )
-  echo [OK] Runtime restored.
 ) else (
-  echo [*] backend\.env already present - skipping runtime-private restore.
-  echo     Run restore-runtime-private.bat directly to force a resync from Hub.
+  echo [*] backend\.env already present - preserving local secrets but restoring latest Hub volumes...
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0config\startup\restore-runtime-private.ps1" -PreserveSecrets
 )
+if errorlevel 1 (
+  echo [FAIL] Runtime restore from sigq-runtime-private failed. Run: docker login
+  echo        Nothing will be started.
+  pause
+  exit /b 1
+)
+echo [OK] Latest runtime volumes restored from Hub.
+set "IROS_RUNTIME_RESTORED=1"
 call "%~dp0config\startup\start_docker.bat" --pull %*
 exit /b %ERRORLEVEL%

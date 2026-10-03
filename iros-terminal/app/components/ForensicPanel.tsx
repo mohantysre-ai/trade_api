@@ -648,6 +648,18 @@ export default function ForensicPanel({
     decisionWindow?: { start?: string; freeze?: string; entryCutoff?: string; orderExpiry?: string; timezone?: string };
     selectionFinalized?: boolean;
     huntWindow?: { huntStart?: string; huntEnd?: string };
+    isTradingDay?: boolean;
+    isHoliday?: boolean;
+    isWeekend?: boolean;
+    marketDayReason?: string;
+    marketDay?: {
+      date?: string;
+      weekday?: string;
+      isTradingDay?: boolean;
+      isWeekend?: boolean;
+      isHoliday?: boolean;
+      reason?: string;
+    };
     entryHuntDiagnostics?: {
       evaluated?: number;
       qualified?: number;
@@ -655,6 +667,12 @@ export default function ForensicPanel({
       eodQualified?: number;
       diagnosticPhase?: string;
       universeSize?: number | null;
+      featureRows?: number;
+      historyReadyRows?: number;
+      shortMomentumReadyRows?: number;
+      historyReadyRatio?: number;
+      universeCoverage?: number;
+      regime?: string | null;
       volumeScreened?: number;
       candleMetrics?: number;
       candleTimeframe?: string;
@@ -1150,6 +1168,17 @@ export default function ForensicPanel({
       swingBookPositions.length === 0 &&
       !lockedSwingMode,
   );
+  const swingNonTradingDay = Boolean(
+    swingSession?.isTradingDay === false ||
+      swingSession?.marketDay?.isTradingDay === false,
+  );
+  const swingMarketDayLabel = useMemo(() => {
+    const status = swingSession?.marketDay;
+    const reason = String(swingSession?.marketDayReason || status?.reason || '');
+    if (reason === 'WEEKEND') return `Market closed — weekend${status?.weekday ? ` (${status.weekday})` : ''}`;
+    if (reason === 'MARKET_HOLIDAY') return 'Market closed — NSE holiday';
+    return 'Market closed — non-trading day';
+  }, [swingSession?.marketDay, swingSession?.marketDayReason]);
   const huntingSwing = Boolean(
     todaySwingEmpty &&
       (swingSession?.hunting || swingSession?.cashReason === 'WAITING_FOR_QUALIFIED_BUY_ENTRY'),
@@ -1364,6 +1393,15 @@ export default function ForensicPanel({
                 {' · '}
                 {swingSession?.cashReason || 'NO_ACTIVE_VALID_SWING_SELECTIONS'}
                 {' · '}entry hunt closed — no qualified BUY locked
+              </>
+            ) : swingNonTradingDay ? (
+              <>
+                <span className="inline-flex items-center rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                  MARKET CLOSED · {swingSession?.sessionDate}
+                </span>
+                {' · '}
+                {swingMarketDayLabel}
+                {' · '}last trading session book — no rollover expected until the next trading day
               </>
             ) : staleSwingLock ? (
               <>
@@ -1700,12 +1738,25 @@ export default function ForensicPanel({
         })}
         {!portfolioDisplayRows.length && (huntingSwing || waitingSwingDecision || cashHeldSwing) && (
           <div className="col-span-full space-y-3 py-2">
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2">
               {[
-                ['Universe', swingSession?.entryHuntDiagnostics?.universeSize ?? '—'],
-                ['Target universe', swingSession?.entryHuntDiagnostics?.swingUniverse ?? 'Nifty 500'],
-                ['Candles', swingSession?.entryHuntDiagnostics?.candleMetrics ?? '—'],
-                ['Evaluated', swingSession?.entryHuntDiagnostics?.evaluated ?? '—'],
+                ['Swing Universe', swingSession?.entryHuntDiagnostics?.universeSize ?? '—'],
+                ['Feature Rows', swingSession?.entryHuntDiagnostics?.featureRows ?? '—'],
+                ['History Ready Rows', swingSession?.entryHuntDiagnostics?.historyReadyRows ?? '—'],
+                ['Short-Momentum Ready Rows', swingSession?.entryHuntDiagnostics?.shortMomentumReadyRows ?? '—'],
+                [
+                  'History Ready Ratio',
+                  typeof swingSession?.entryHuntDiagnostics?.historyReadyRatio === 'number'
+                    ? `${(swingSession.entryHuntDiagnostics.historyReadyRatio * 100).toFixed(1)}%`
+                    : '—',
+                ],
+                [
+                  'Universe Coverage',
+                  typeof swingSession?.entryHuntDiagnostics?.universeCoverage === 'number'
+                    ? `${(swingSession.entryHuntDiagnostics.universeCoverage * 100).toFixed(1)}%`
+                    : '—',
+                ],
+                ['Regime', swingSession?.entryHuntDiagnostics?.regime || '—'],
                 [swingSession?.entryHuntDiagnostics?.diagnosticPhase === 'POST_HUNT_EOD' ? 'Locked in window' : 'Qualified BUY', swingSession?.entryHuntDiagnostics?.qualified ?? 0],
               ].map(([label, value]) => (
                 <div key={String(label)} className="rounded-lg border border-slate-200 bg-white/80 px-3 py-2">
@@ -1752,14 +1803,18 @@ export default function ForensicPanel({
         {!portfolioDisplayRows.length && !huntingSwing && !cashHeldSwing && (
           <div className="col-span-full py-8 text-center">
             <p className="text-slate-700 text-[13px] font-semibold">
-              {institutionalMode
+              {swingNonTradingDay
+                ? swingMarketDayLabel
+                : institutionalMode
                 ? institutionalOffHours
                   ? 'No off-hours institutional BUY setups pass quant + SIGQ Research gates'
                   : 'No institutional-grade BUY setups pass all gates'
                 : 'No high-probability BUY setups right now'}
             </p>
             <p className="text-slate-500 text-[11px] mt-1">
-              {institutionalMode
+              {swingNonTradingDay
+                ? `No scan is expected today${swingSession?.sessionDate ? ` — book state is from the last trading session (${swingSession.sessionDate})` : ''}. Gates are evaluated on trading days only; this is a market-hours status, not a screening failure.`
+                : institutionalMode
                 ? institutionalOffHours
                   ? `Off-hours / snapshot mode: intraday volume gates are rank-penalized (0/${assetRows.filter((r) => !r.isMetaRow).length} hard-filter passers in pool). Still requires quant score ≥ ${SCORE_STRONG}, SIGQ Research confirm, LOW/MODERATE risk, and scanner R:R ≥2 or ATR-based estimate. No filler names — refresh after market open for live volume confirms.`
                   : `₹1cr+ book requires quant score ≥ ${SCORE_STRONG}, hard+quality filters, SIGQ Research confirm (checklist ≥70% preferred), LOW/MODERATE risk, and scanner R:R ≥2 when in the scanner LONG set. No filler names — refresh after market open.`

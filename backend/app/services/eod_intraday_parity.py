@@ -29,6 +29,13 @@ def install() -> None:
     def parity_generate(for_date, *args, **kwargs):
         report = original(for_date, *args, **kwargs)
         try:
+            force = bool(kwargs.get("force", False))
+            # A normal EOD read is immutable. If the generator returned a
+            # versioned snapshot, do not recompute the session or rewrite the
+            # same file on every dashboard poll.
+            if not force and report.get("fromCache"):
+                return report
+
             from .desk_clock import cash_session_phase
             from .eod_book_cache import save_book_cache
             from .intraday_session_engine import _compute_session
@@ -37,7 +44,6 @@ def install() -> None:
             if str(session.get("sessionDate") or "")[:10] != for_date.isoformat():
                 return report
 
-            force = bool(kwargs.get("force", False))
             capital = kwargs.get("capital")
             if capital is None and args:
                 capital = args[0]

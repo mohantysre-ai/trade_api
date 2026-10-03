@@ -108,6 +108,70 @@ def test_swing_v2_is_paper_authoritative(v2_env):
     assert session["v1Enabled"] is False
 
 
+def test_session_carries_prior_day_open_positions_into_current_view(v2_env, monkeypatch):
+    auth = v2_env["auth"]
+    now = datetime(2026, 9, 24, 10, 30, tzinfo=IST)
+    monkeypatch.setattr(auth, "_snapshot", lambda: {
+        "swingV2Regime": "NORMAL",
+        "stockQuotes": {
+            "CARRY": {"ltpRaw": 106.0},
+            "TODAY": {"ltpRaw": 202.0},
+        },
+    })
+    monkeypatch.setattr(auth, "_positions", lambda _ledger: [
+        {
+            "positionId": "carry-1", "symbol": "CARRY", "sessionDate": "2026-09-23",
+            "entryTimestamp": "2026-09-23T05:00:00Z", "terminal": False,
+            "entryPrice": 100.0, "filledQty": 10, "remainingQty": 10,
+            "deployedCapital": 1000.0, "realizedPnl": 0.0,
+        },
+        {
+            "positionId": "today-1", "symbol": "TODAY", "sessionDate": "2026-09-24",
+            "entryTimestamp": "2026-09-24T05:00:00Z", "terminal": False,
+            "entryPrice": 200.0, "filledQty": 5, "remainingQty": 5,
+            "deployedCapital": 1000.0, "realizedPnl": 0.0,
+        },
+    ])
+    monkeypatch.setattr(auth, "_read_json", lambda *_args, **_kwargs: {
+        "sessionDate": "2026-09-24", "selectionFinalized": False,
+    })
+
+    session = auth._session(
+        {"regime": "NORMAL", "funnel": {}},
+        now=now,
+        market={"isTradingDay": True, "isHoliday": False, "isWeekend": False, "reason": "TRADING_DAY"},
+    )
+
+    assert {row["symbol"] for row in session["long"]} == {"CARRY", "TODAY"}
+    carry = next(row for row in session["long"] if row["symbol"] == "CARRY")
+    today = next(row for row in session["long"] if row["symbol"] == "TODAY")
+    assert carry["holdingSessionAge"] == 1
+    assert today["holdingSessionAge"] == 0
+    assert session["counts"]["carried"] == 1
+    assert session["counts"]["openedToday"] == 1
+    assert session["entryHuntDiagnostics"]["openPositions"] == 2
+    assert session["entryHuntDiagnostics"]["availableSlots"] == 3
+    assert session["cashHeld"] is False
+
+
+def test_session_reports_remaining_slots_and_scan_evidence(v2_env, monkeypatch):
+    auth = v2_env["auth"]
+    monkeypatch.setattr(auth, "_snapshot", lambda: {"swingV2Regime": "DEFENSIVE"})
+    monkeypatch.setattr(auth, "_positions", lambda _ledger: [{
+        "positionId": "one", "symbol": "AAA", "sessionDate": "2026-09-23", "terminal": False,
+    }])
+    scan = {"regime": "DEFENSIVE", "qualifiedCount": 4, "selectedCount": 1,
+            "correlationEvidencePairs": 0, "funnel": {"topRejectionReasons": [
+                {"reason": "MAX_TWO_NAMES_PER_SECTOR", "count": 2},
+            ]}}
+    session = auth._session(scan, now=datetime(2026, 9, 23, 11, 0, tzinfo=IST))
+    diagnostics = session["entryHuntDiagnostics"]
+    assert diagnostics["regimePositionCap"] == 5
+    assert diagnostics["availableSlots"] == 4
+    assert diagnostics["qualifiedCount"] == 4
+    assert diagnostics["correlationEvidencePairs"] == 0
+
+
 def test_swing_session_routes_through_v2(v2_env):
     sess = v2_env["sess"]
     loaded = sess.load_swing_session()
@@ -122,6 +186,124 @@ def test_swing_eod_uses_v2_state(v2_env):
     report = v2_env["eod"].generate_swing_eod_report(date(2026, 9, 13))
     assert report.get("source") == "swing_v2_ledger"
     assert report.get("authoritative") is True
+
+
+def test_swing_eod_preserves_filled_trade_lifecycle_fields(v2_env, monkeypatch):
+    from datetime import date
+    from app.services import eod_book_cache
+    from app.services.swing_v2.ledger import SwingLedger
+    from app.services.swing_v2.schemas import EventType
+
+    monkeypatch.setattr(eod_book_cache, "load_book_cache", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(eod_book_cache, "save_book_cache", lambda _day, _kind, payload: payload)
+    ledger = SwingLedger(v2_env["cfg"].load_config().ledger_path)
+    base = {
+        "status": "OPEN", "executionStatus": "FILLED", "filledQty": 20,
+        "remainingQty": 20, "entryPrice": 100.0, "entryTimestamp": "2026-09-13T04:30:00Z",
+        "deployedCapital": 2000.0, "initialStop": 95.0, "effectiveStop": 95.0,
+        "t1": 105.0, "t2": 110.0, "realizedPnl": 0.0, "unrealizedPnl": 0.0,
+        "totalPnl": 0.0,
+    }
+    ledger.append(
+        idempotency_key="poly-fill", decision_id="poly", position_id="poly",
+        symbol="POLYCAB", session_date="2026-09-13", event_type=EventType.FILL_COMPLETE,
+        event_timestamp="2026-09-13T04:30:00Z", payload=base,
+    )
+    ledger.append(
+        idempotency_key="poly-exit", decision_id="poly", position_id="poly",
+        symbol="POLYCAB", session_date="2026-09-13", event_type=EventType.TIME_EXIT_FILLED,
+        event_timestamp="2026-09-13T10:00:00Z",
+        payload={**base, "status": "CLOSED_TIME", "remainingQty": 0, "terminal": True,
+                 "exitReason": "TIME_EXIT_FILLED", "exitPrice": 108.0,
+                 "realizedPnl": 160.0, "totalPnl": 160.0},
+    )
+    report = v2_env["eod"].generate_swing_eod_report(date(2026, 9, 13), force=True)
+    row = report["picks"][0]
+    assert row["qty"] == 20
+    assert row["entryPrice"] == 100.0
+    assert row["currentPrice"] == 108.0
+    assert row["exitPrice"] == 108.0
+    assert row["exitReason"] == "TIME_EXIT_FILLED"
+    assert row["status"] == "CLOSED_TIME"
+    assert row["outcomeBucket"] == "WIN"
+    assert report["attribution"]["triggered"] == 1
+
+
+def test_current_swing_eod_rebuilds_authoritative_cached_book(v2_env, monkeypatch):
+    from datetime import date
+    from app.services import eod_book_cache
+    from app.services.swing_v2.ledger import SwingLedger
+    from app.services.swing_v2.schemas import EventType
+
+    day = date(2026, 9, 23)
+    monkeypatch.setattr(v2_env["eod"], "_today_ist", lambda: day.isoformat())
+    monkeypatch.setattr(
+        eod_book_cache,
+        "load_book_cache",
+        lambda *_args, **_kwargs: {"picks": [{"symbol": "STALE"}]},
+    )
+    monkeypatch.setattr(eod_book_cache, "save_book_cache", lambda _day, _kind, payload: payload)
+    ledger = SwingLedger(v2_env["cfg"].load_config().ledger_path)
+    ledger.append(
+        idempotency_key="fresh-current-entry", decision_id="fresh-current-entry",
+        position_id="fresh-current-entry", symbol="FRESH", session_date=day.isoformat(),
+        event_type=EventType.FILL_COMPLETE, event_timestamp="2026-09-23T04:30:00Z",
+        payload={
+            "status": "OPEN", "executionStatus": "FILLED", "filledQty": 1,
+            "remainingQty": 1, "entryPrice": 100.0, "initialStop": 95.0,
+            "effectiveStop": 95.0, "deployedCapital": 100.0,
+            "realizedPnl": 0.0, "unrealizedPnl": 0.0, "totalPnl": 0.0,
+        },
+    )
+
+    report = v2_env["eod"].generate_swing_eod_report(day)
+
+    assert [row["symbol"] for row in report["picks"]] == ["FRESH"]
+
+
+def test_swing_ledger_initializes_each_path_once(monkeypatch, tmp_path):
+    from app.services.swing_v2.ledger import SwingLedger
+
+    calls = []
+    monkeypatch.setattr(SwingLedger, "_initialize", lambda self: calls.append(self.path))
+    path = str(tmp_path / "once.sqlite3")
+    SwingLedger(path)
+    SwingLedger(path)
+    assert calls == [path]
+
+
+def test_unfilled_expired_swing_lock_is_skipped_not_closed(v2_env, monkeypatch):
+    from datetime import date
+    from app.services import eod_book_cache
+    from app.services.swing_v2.ledger import SwingLedger
+    from app.services.swing_v2.schemas import EventType
+
+    monkeypatch.setattr(eod_book_cache, "load_book_cache", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(eod_book_cache, "save_book_cache", lambda _day, _kind, payload: payload)
+    ledger = SwingLedger(v2_env["cfg"].load_config().ledger_path)
+    ledger.append(
+        idempotency_key="polycab-expired", decision_id="polycab", position_id="polycab",
+        symbol="POLYCAB", session_date="2026-09-23", event_type=EventType.ORDER_EXPIRED,
+        event_timestamp="2026-09-23T10:05:00Z",
+        payload={
+            "status": "ORDER_EXPIRED", "executionStatus": "EXPIRED_UNFILLED",
+            "filledQty": 0, "remainingQty": 20, "deployedCapital": 101082.0,
+            "realizedPnl": 0.0, "unrealizedPnl": 0.0, "totalPnl": 0.0,
+        },
+    )
+    report = v2_env["eod"].generate_swing_eod_report(date(2026, 9, 23), force=True)
+    row = report["picks"][0]
+    assert row["status"] == "NOT_TRIGGERED"
+    assert row["executionStatus"] == "EXPIRED_UNFILLED"
+    assert row["skipped"] is True
+    assert row["qty"] is None
+    assert row["filledQty"] == 0
+    assert row["entryPrice"] is None
+    assert row["deployedCapital"] == 0.0
+    assert row["pnl"] == 0.0
+    assert report["totalDeployed"] == 0.0
+    assert report["attribution"]["triggered"] == 0
+    assert report["attribution"]["skipped"] == 1
 
 
 def test_desk_book_symbols_reads_v2_ownership(v2_env):
@@ -318,6 +500,84 @@ def test_missing_history_causes_backfill_or_hold_not_ready():
     assert bars == []
 
 
+def test_backfill_runs_only_for_stop_or_t2_and_uses_fresh_final_lock(v2_env, monkeypatch):
+    auth = v2_env["auth"]
+    cfg = v2_env["cfg"].load_config()
+    now = datetime(2026, 9, 23, 11, 0, tzinfo=IST)
+
+    class DummyLedger:
+        def __init__(self):
+            self.rows = []
+        def append(self, **kwargs):
+            self.rows.append(kwargs)
+            return kwargs
+
+    ledger = DummyLedger()
+    snapshot = {
+        "swingV2UniverseCoverage": 1.0,
+        "swingV2Regime": "NORMAL",
+        "swingV2DataStatus": {
+            "featureRows": 100,
+            "historyReadyRows": 100,
+            "shortMomentumReadyRows": 100,
+            "universeCurrent": True,
+            "surveillanceCurrent": True,
+            "corporateEventsCurrent": True,
+        },
+    }
+    monkeypatch.setattr(auth, "_refresh_snapshot", lambda reason: snapshot)
+    monkeypatch.setattr(auth, "_positions", lambda _ledger: [])
+    monkeypatch.setattr(auth, "_fill_locked_orders", lambda *_args, **_kwargs: None)
+
+    captured = {}
+    def fake_build(snapshot_arg, **kwargs):
+        captured.update(kwargs)
+        return {
+            "blocked": False,
+            "candidates": [{
+                "decisionId": "replacement-1",
+                "symbol": "RELIANCE",
+                "sessionDate": now.date().isoformat(),
+            }],
+        }
+    monkeypatch.setattr(auth, "build_from_market_snapshot", fake_build)
+
+    result = auth._try_backfill_after_exit(
+        ledger,
+        cfg,
+        now,
+        [{"symbol": "DABUR", "status": "CLOSED_T2"}],
+        existing_positions=[],
+        occupied_symbols=set(),
+    )
+
+    assert result["attempted"] is True
+    assert result["locked"] == 1
+    assert result["eligibleExits"] == ["DABUR"]
+    assert captured["final_lock"] is True
+    assert captured["persist_events"] is False
+
+
+def test_closed_time_does_not_trigger_backfill(v2_env):
+    auth = v2_env["auth"]
+    cfg = v2_env["cfg"].load_config()
+    now = datetime(2026, 9, 23, 15, 16, tzinfo=IST)
+
+    class DummyLedger:
+        pass
+
+    result = auth._try_backfill_after_exit(
+        DummyLedger(),
+        cfg,
+        now,
+        [{"symbol": "DLF", "status": "CLOSED_TIME"}],
+        existing_positions=[],
+        occupied_symbols=set(),
+    )
+    assert result["attempted"] is False
+    assert result["reason"] == "NO_STOP_OR_T2_EXIT"
+
+
 def test_corporate_action_applies_r_formula_and_persists(tmp_path):
     from app.services.swing_v2.engine import process_corporate_action
     from app.services.swing_v2.ledger import SwingLedger
@@ -404,8 +664,16 @@ def test_no_cross_book_scrubbing_or_deletion():
         assert "_scrub_cross_book_swing_rows" not in text
 
 
-def test_slow_swing_consumer_cannot_block_market_data_publishing():
+def test_slow_swing_consumer_cannot_block_market_data_publishing(monkeypatch):
     from app.services.swing_v2.authoritative import _refresh_snapshot
 
+    monkeypatch.setattr(
+        "app.services.swing_v2.authoritative._snapshot",
+        lambda: {"swingV2DataStatus": {"featureRows": 1, "historyReadyRows": 1, "universeCurrent": True, "surveillanceCurrent": True, "corporateEventsCurrent": True}, "swingV2UniverseCoverage": 1.0, "swingV2Regime": "NORMAL"},
+    )
+    monkeypatch.setattr(
+        "app.services.market_refresh_facade.refresh_market_snapshot",
+        lambda *a, **kw: {"success": True},
+    )
     snap = _refresh_snapshot("test_call")
     assert isinstance(snap, dict)

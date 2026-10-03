@@ -39,6 +39,7 @@ import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from SmartApi import SmartConnect
 
@@ -47,6 +48,7 @@ from ..utils.log_redaction import install_secret_redaction
 # SmartAPI logs complete request headers on failures. Install this before the
 # first client request so credentials never reach container logs.
 install_secret_redaction()
+log = logging.getLogger(__name__)
 
 from .bulk_deals import load_bulk_deals
 from .stock_quality import (
@@ -76,7 +78,9 @@ from .market_data_provider import (
     fetch_dhan_candles,
     fetch_nse_candles,
     fetch_quotes_with_failover,
+    fetch_shoonya_candles,
     load_dhan_security_ids,
+    shoonya_gateway_configured,
 )
 from ..utils.symbols import MACRO_INSTRUMENTS, MOCK_TICKERS, NIFTY_50_KEYS, WATCHLIST, Instrument
 from .llm_client import (
@@ -132,10 +136,7 @@ INTRADAY_750_CONSTITUENT_URLS = (
     "https://www.niftyindices.com/IndexConstituent/ind_niftymicrocap250_list.csv",
 )
 SCRIP_MASTER_URL = "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json"
-# Funnel: full Nifty 500 quotes → top N by volume for Asset Matrix (env: VOLUME_PRESELECT_LIMIT).
-# Swing hunt candles default to the full 500 (env: SWING_CANDIDATE_LIMIT).
 VOLUME_PRESELECT_LIMIT = int(os.getenv("VOLUME_PRESELECT_LIMIT", "200"))
-SWING_CANDIDATE_LIMIT = int(os.getenv("SWING_CANDIDATE_LIMIT", "500"))
 _NSE_EQ_TOKEN_MAP: dict[str, tuple[str, str]] | None = None
 _NSE_EQ_TOKEN_MAP_LOADED_AT = 0.0
 _NSE_EQ_TOKEN_MAP_TTL_SECONDS = int(os.getenv("NSE_EQ_TOKEN_MAP_TTL_SECONDS", "86400"))
@@ -593,18 +594,38 @@ def _persist_snapshot_ticker_facts(sym: str, merged: dict[str, Any]) -> None:
     atomic_update_json(_snapshot_path(), _mutator)
 
 
-def _snapshot_intraday_cache(snapshot: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
-    """Reuse intraday candle metrics from last_market_snapshot when still within TTL."""
+def _snapshot_intraday_cache(
+    snapshot: dict[str, Any] | None,
+    *,
+    allow_previous_swing_session: bool = False,
+    now: datetime | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Reuse candle metrics while they are valid for their strategy timeframe."""
     age = _snapshot_age_seconds(snapshot)
-    if age is None or age > INTRADAY_METRICS_TTL_SECONDS:
+    fresh_intraday = age is not None and age <= INTRADAY_METRICS_TTL_SECONDS
+    if not fresh_intraday and not allow_previous_swing_session:
         return {}
     cache: dict[str, dict[str, Any]] = {}
     for ticker, row in (snapshot.get("stockQuotes") or {}).items():
         if not isinstance(row, dict):
             continue
         intraday = row.get("intraday")
-        if _intraday_metrics_usable(intraday):
+        if fresh_intraday and _intraday_metrics_usable(intraday):
             cache[str(ticker)] = intraday
+            continue
+        if not allow_previous_swing_session or not _swing_candle_metrics_usable(intraday, "1h"):
+            continue
+        raw = intraday.get("swingV2Raw") if isinstance(intraday, dict) else None
+        if not isinstance(raw, dict) or raw.get("dailyBarsThroughPreviousClose") is not True:
+            continue
+        try:
+            from .swing_v2.data_quality import _bars1h_session_fresh
+
+            stamp = raw.get("last1hTimestamp") or raw.get("last60mTimestamp") or raw.get("last5mTimestamp")
+            if _bars1h_session_fresh(stamp, now):
+                cache[str(ticker)] = intraday
+        except Exception:
+            continue
     return cache
 
 
@@ -907,7 +928,7 @@ def _is_refresh_stale() -> bool:
         state = dict(_SCHEDULED_REFRESH_STATE)
     if not state.get("running"):
         return False
-    started = state.get("startedAt")
+    started = state.get("lastProgressAt") or state.get("startedAt")
     if not started:
         return True
     try:
@@ -919,48 +940,57 @@ def _is_refresh_stale() -> bool:
 
 
 def _clear_stale_refresh_lock() -> bool:
-    """Force-clear a stuck scheduled refresh lock so scans can proceed."""
+    """Record stale ownership without pretending a held mutex was released."""
     with _SCHEDULED_REFRESH_STATE_LOCK:
         if not _SCHEDULED_REFRESH_STATE.get("running"):
             return False
         prior = dict(_SCHEDULED_REFRESH_STATE)
         _SCHEDULED_REFRESH_STATE.update(
-            running=False,
-            reason=None,
-            startedAt=None,
-            clearedAt=datetime.now(timezone.utc).isoformat(),
-            clearedReason="stale_refresh_timeout",
+            staleDetectedAt=datetime.now(timezone.utc).isoformat(),
+            staleReason="refresh_progress_timeout",
         )
     logging.getLogger(__name__).warning(
-        "Cleared stuck scheduled refresh lock: prior=%s", prior
+        "Detected stale scheduled refresh owner; mutex remains owned: prior=%s", prior
     )
-    return True
+    return False
 
 
 def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dict[str, Any]:
     """Live quote/candle refresh with LLM day-lock reuse (no force LLM)."""
     log = logging.getLogger(__name__)
     if not _SCHEDULED_REFRESH_LOCK.acquire(blocking=False):
-        if _is_refresh_stale():
+        stale = _is_refresh_stale()
+        if stale:
             _clear_stale_refresh_lock()
-            _SCHEDULED_REFRESH_LOCK.acquire(blocking=True)
-        else:
-            with _SCHEDULED_REFRESH_STATE_LOCK:
-                active = dict(_SCHEDULED_REFRESH_STATE)
-            return {
-                "success": False,
-                "error": "market_refresh_already_running",
-                "reason": reason,
-                "activeRefresh": active,
-            }
+        with _SCHEDULED_REFRESH_STATE_LOCK:
+            active = dict(_SCHEDULED_REFRESH_STATE)
+        return {
+            "success": False,
+            "error": "market_refresh_stale_running" if stale else "market_refresh_already_running",
+            "reason": reason,
+            "activeRefresh": active,
+        }
+    started_mono = time.monotonic()
+    started_at = datetime.now(timezone.utc).isoformat()
     with _SCHEDULED_REFRESH_STATE_LOCK:
         _SCHEDULED_REFRESH_STATE.update(
             {
                 "running": True,
                 "reason": reason,
-                "startedAt": datetime.now(timezone.utc).isoformat(),
+                "startedAt": started_at,
+                "lastProgressAt": started_at,
+                "progress": "starting",
+                "staleDetectedAt": None,
+                "staleReason": None,
             }
         )
+
+    def refresh_progress(message: str) -> None:
+        with _SCHEDULED_REFRESH_STATE_LOCK:
+            _SCHEDULED_REFRESH_STATE.update(
+                lastProgressAt=datetime.now(timezone.utc).isoformat(),
+                progress=str(message),
+            )
     swing_hunt = reason == "swing_entry_hunt" or reason.startswith("swing_v2")
     intraday_hunt = reason.startswith("intraday_")
     pool = (
@@ -980,6 +1010,7 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
             prefer_cache=False,
             allow_fallback=True,
             force_llm_refresh=False,
+            on_progress=refresh_progress,
             angel_first_quotes=swing_hunt,
             swing_v2_history=reason.startswith("swing_v2"),
         )
@@ -989,6 +1020,12 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
                 "error": payload.get("error") or "Live refresh produced no payload.",
                 "reason": reason,
             }
+        # A refresh that skipped swing history would otherwise clobber the
+        # swing-ready snapshot and fail-close the V2 hunt with zero rows.
+        # Carry forward the prior snapshot's swingV2 facts for such refreshes;
+        # they are derived from daily history and remain valid intraday.
+        if not payload.get("swingV2DataStatus") and isinstance(prior, dict):
+            payload.update({key: value for key, value in prior.items() if key.startswith("swingV2")})
         if prior and prior.get("llmLockedForDate") and not payload.get("llmLockedForDate"):
             payload["llmLockedForDate"] = prior.get("llmLockedForDate")
         payload.setdefault("selectionMeta", {})
@@ -1015,9 +1052,19 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
         log.exception("Scheduled live refresh failed: %s", exc)
         return {"success": False, "error": str(exc), "reason": reason}
     finally:
+        finished_at = datetime.now(timezone.utc).isoformat()
         with _SCHEDULED_REFRESH_STATE_LOCK:
             _SCHEDULED_REFRESH_STATE.update(
-                {"running": False, "reason": None, "startedAt": None}
+                {
+                    "running": False,
+                    "reason": None,
+                    "startedAt": None,
+                    "lastProgressAt": None,
+                    "progress": None,
+                    "lastReason": reason,
+                    "finishedAt": finished_at,
+                    "durationSeconds": round(time.monotonic() - started_mono, 3),
+                }
             )
         _SCHEDULED_REFRESH_LOCK.release()
 
@@ -1110,7 +1157,7 @@ def _next_quote_circuit_hold() -> float:
     _ANGEL_TRIP_COUNT += 1
     _ANGEL_LAST_TRIP_AT_MONO = now
     base = ANGEL_QUOTE_CIRCUIT_SECONDS * (ANGEL_CIRCUIT_BACKOFF_MULTIPLIER ** min(_ANGEL_TRIP_COUNT - 1, 4))
-    hold = min(base, ANGEL_CIRCUIT_BACKOFF_CAP_SECONDS) * (1.0 + random.uniform(-ANGEL_CIRCUIT_JITTER, ANGEL_CIRCUIT_JITTER))
+    hold = min(base * (1.0 + random.uniform(0.0, ANGEL_CIRCUIT_JITTER)), ANGEL_CIRCUIT_BACKOFF_CAP_SECONDS)
     return max(1.0, hold)
 
 
@@ -3078,10 +3125,12 @@ def _fetch_quote_chunk(
             )
         return fetched
 
+    if os.getenv("ANGEL_BATCH_LTP_FALLBACK", "0").strip().lower() not in {"1", "true", "yes"}:
+        _angel_stat("marketdata", "failedBatchesTotal")
+        return fetched
+
     for inst in chunk:
         if _angel_cooldown_active("ltp"):
-            # Fail fast while a rate-limit pause is active; these fallback
-            # calls are best-effort for a batch that already failed once.
             break
         try:
             with _angel_ltp_gate(gate_deadline):
@@ -3156,7 +3205,7 @@ def _fetch_stock_quotes_with_coverage(
     client: AngelOneClient,
     instruments: list[Instrument],
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
-    """NSE primary, then Dhan bulk and Angel for only missing symbols."""
+    """NSE primary, then Dhan bulk, Angel for missing, and Shoonya final fallback."""
     by_key = {inst.key: inst for inst in instruments}
 
     def angel_missing(symbols: list[str]) -> dict[str, dict[str, Any]]:
@@ -3167,7 +3216,20 @@ def _fetch_stock_quotes_with_coverage(
         ]
         return client.fetch_batch_quotes(eligible) if eligible else {}
 
-    quotes, coverage = fetch_quotes_with_failover(by_key, angel_missing)
+    def shoonya_missing(symbols: list[str]) -> dict[str, dict[str, Any]]:
+        if not symbols:
+            return {}
+        try:
+            from .market_data_provider import fetch_shoonya_quotes
+            return fetch_shoonya_quotes(symbols)
+        except Exception:
+            return {}
+
+    quotes, coverage = fetch_quotes_with_failover(
+        by_key,
+        angel_missing,
+        shoonya_fetch=shoonya_missing,
+    )
     return quotes, coverage.as_dict()
 
 
@@ -3204,6 +3266,7 @@ def _build_stock_row(
         "bestBid": best_bid,
         "bestAsk": best_ask,
         "availableAskDepth": ask_depth,
+        "quoteReceivedAt": datetime.now(timezone.utc).isoformat(),
         "intraday": intraday or {},
         **(
             {"fresh": False, "staleReason": "zero_or_missing_ltp"}
@@ -3596,7 +3659,7 @@ def _swing_v2_raw_metrics(
     ltp: float,
     now: datetime,
 ) -> dict[str, Any]:
-    min_observations = int(os.getenv("SWING_MIN_DAILY_OBSERVATIONS", "90"))
+    min_observations = int(os.getenv("SWING_MIN_DAILY_OBSERVATIONS", "30"))
     previous = []
     today = now.astimezone(IST_ZONE).date().isoformat()
     for candle in daily_candles:
@@ -3612,11 +3675,28 @@ def _swing_v2_raw_metrics(
             return 0.0
         return statistics.pstdev(values) * math.sqrt(252)
 
-    def momentum(lookback: int, vol_window: int) -> float | None:
-        if len(closes) < lookback + 5:
+    def momentum(lookback: int, vol_window: int, *, skip_recent: int = 0) -> float | None:
+        """Volatility-adjusted close-to-close momentum.
+
+        Swing V2 holds for at most two sessions, so the production ranker uses
+        10d/20d momentum. Long-horizon fields remain diagnostic only and are
+        populated only when their full history exists.
+        """
+        required = lookback + skip_recent + 1
+        if len(closes) < required:
             return None
-        denominator = annualized_vol(vol_window)
-        return None if denominator <= 0 else (closes[-5] / closes[-lookback - 5] - 1) / denominator
+        end_index = len(closes) - 1 - skip_recent
+        start_index = end_index - lookback
+        if start_index < 0 or closes[start_index] <= 0:
+            return None
+        values = returns[-max(20, vol_window):]
+        if len(values) < min(20, vol_window):
+            return None
+        daily_vol = statistics.pstdev(values)
+        horizon_vol = daily_vol * math.sqrt(max(1, lookback))
+        if horizon_vol <= 0:
+            return None
+        return (closes[end_index] / closes[start_index] - 1) / horizon_vol
 
     ema20_values = _ema(closes, period=20)
     atr_pct = _atr_percent(previous)
@@ -3631,8 +3711,10 @@ def _swing_v2_raw_metrics(
         "dailyObservationCount": len(previous),
         "dailyBarsThroughPreviousClose": bool(previous),
         "historyReady": len(previous) >= min_observations,
+        "mom10dRaw": momentum(10, 20),
+        "mom20dRaw": momentum(20, 20),
         "mom6mRaw": momentum(126, 126),
-        "mom12mRaw": momentum(126, 126),
+        "mom12mRaw": momentum(252, 252),
         "return5dRaw": (closes[-1] / closes[-6] - 1) if len(closes) >= 6 and closes[-6] > 0 else None,
         "ema20Daily": ema20_values[-1] if ema20_values else None,
         "atr14": atr if atr > 0 else None,
@@ -3642,8 +3724,22 @@ def _swing_v2_raw_metrics(
         "intradayLow": min(intraday_lows) if intraday_lows else None,
         "last5mTimestamp": last_ts,
         "last1hTimestamp": last_ts,
-        "previous52wHigh": max((float(row.get("high") or 0) for row in previous[-max(min_observations, 90):]), default=0.0) or None,
+        "recent30dHigh": max((float(row.get("high") or 0) for row in previous[-30:]), default=0.0) or None,
+        "previous52wHigh": max((float(row.get("high") or 0) for row in previous[-252:]), default=0.0) if len(previous) >= 126 else None,
     }
+
+
+def _one_hour_candle_rows_fresh(rows: list[list[Any]], now: datetime) -> bool:
+    if not rows:
+        return False
+    parsed = _parse_candle_rows(rows)
+    timestamp = parsed[-1].get("ts") if parsed else None
+    try:
+        from .swing_v2.data_quality import _bars1h_session_fresh
+
+        return _bars1h_session_fresh(timestamp, now)
+    except Exception:
+        return False
 
 
 def _intraday_metrics(
@@ -3678,6 +3774,10 @@ def _intraday_metrics(
         else:
             daily_raw = []
             intraday_raw = []
+        if interval == "ONE_HOUR" and not _one_hour_candle_rows_fresh(intraday_raw, now):
+            intraday_raw = []
+        if not intraday_raw and shoonya_gateway_configured():
+            intraday_raw = fetch_shoonya_candles(inst.key, interval, intraday_from, now)
         # Public NSE charting fills daily (and T-1 5m) without Angel. Today's
         # 5m is usually empty while the session is open.
         if not daily_raw:
@@ -3686,6 +3786,8 @@ def _intraday_metrics(
             intraday_raw = fetch_nse_candles(
                 inst.key, inst.token, interval, intraday_from, now
             )
+        if interval == "ONE_HOUR" and not _one_hour_candle_rows_fresh(intraday_raw, now):
+            intraday_raw = []
         # Batch hunt skips Angel when a Dhan id exists (AB1021). Drawer single-name
         # fetches may force Angel so ATR/turnover are not left blank.
         allow_angel = force_angel_fallback or not tried_dhan
@@ -4542,20 +4644,49 @@ def _build_payload_from_live_data(
     now = _ist_now()
     resolved_pool_name = pool_name or NIFTY_500_LABEL
     snapshot = prior_snapshot if prior_snapshot is not None else _load_last_snapshot()
-    intraday_cache = _snapshot_intraday_cache(snapshot)
+    intraday_cache = _snapshot_intraday_cache(
+        snapshot,
+        allow_previous_swing_session=swing_v2_history,
+        now=now,
+    )
 
     progress("Fetching live quotes...")
     stock_universe, active_pool_label = _quote_universe(resolved_pool_name, client)
 
     if angel_first_quotes:
         # Swing contract: request every resolved Nifty 500 quote from Angel One
-        # first. Only missing Angel symbols use the existing provider failover.
-        angel_rows = client.fetch_batch_quotes(stock_universe)
+        # first. On rate-limit, immediately failover to Shoonya for the full
+        # universe; only symbols still missing fall through to NSE/Dhan.
+        angel_rows: dict[str, dict[str, Any]] = {}
+        try:
+            angel_rows = client.fetch_batch_quotes(stock_universe)
+        except Exception as exc:
+            if _is_angel_rate_limited(exc):
+                _trip_angel_quote_circuit()
+                log.warning("Angel quote rate-limited during swing hunt; failing over to Shoonya: %s", exc)
+            else:
+                log.warning("Angel quote fetch failed during swing hunt; trying Shoonya: %s", exc)
+
         stock_quotes_raw = {
             str(symbol).upper(): {**dict(row), "quoteProvider": "angel"}
             for symbol, row in angel_rows.items()
             if isinstance(row, dict)
         }
+
+        missing_instruments = [inst for inst in stock_universe if inst.key not in stock_quotes_raw]
+        shoonya_rows: dict[str, dict[str, Any]] = {}
+        if missing_instruments and not angel_rows:
+            try:
+                from .market_data_provider import fetch_shoonya_quotes
+                shoonya_symbols = [str(inst.key).upper() for inst in missing_instruments]
+                shoonya_raw = fetch_shoonya_quotes(shoonya_symbols)
+                for symbol, row in shoonya_raw.items():
+                    if isinstance(row, dict):
+                        stock_quotes_raw[symbol] = {**dict(row), "quoteProvider": "shoonya"}
+                        shoonya_rows[symbol] = row
+            except Exception as exc:
+                log.warning("Shoonya quote fallback failed during swing hunt: %s", exc)
+
         missing_instruments = [inst for inst in stock_universe if inst.key not in stock_quotes_raw]
         fallback_rows: dict[str, dict[str, Any]] = {}
         fallback_meta: dict[str, Any] = {}
@@ -4566,7 +4697,12 @@ def _build_payload_from_live_data(
         expected = len(stock_universe)
         received = len(stock_quotes_raw)
         coverage_pct = round((received / expected * 100.0) if expected else 0.0, 2)
-        providers = {"angel": len(angel_rows), "nse": 0, "dhan": 0}
+        providers = {
+            "angel": len(angel_rows),
+            "shoonya": len(shoonya_rows),
+            "nse": 0,
+            "dhan": 0,
+        }
         for provider, count in (fallback_meta.get("providers") or {}).items():
             providers[provider] = providers.get(provider, 0) + int(count or 0)
         quote_coverage = {
@@ -4602,8 +4738,7 @@ def _build_payload_from_live_data(
 
     candle_limit = int(os.getenv("INTRADAY_CANDIDATE_LIMIT", str(VOLUME_PRESELECT_LIMIT)))
     volume_limit = int(os.getenv("VOLUME_PRESELECT_LIMIT", str(VOLUME_PRESELECT_LIMIT)))
-    swing_limit = int(os.getenv("SWING_CANDIDATE_LIMIT", str(SWING_CANDIDATE_LIMIT)))
-    candle_limit = len(stock_universe) if angel_first_quotes else max(candle_limit, volume_limit, swing_limit)
+    candle_limit = len(stock_universe) if angel_first_quotes else max(candle_limit, volume_limit)
     top_by_volume = _select_top_volume_stocks(all_stocks, candle_limit)
     candidate_rows = top_by_volume[:candle_limit]
     candidate_keys = {row["ticker"] for row in candidate_rows}
@@ -4642,7 +4777,7 @@ def _build_payload_from_live_data(
         if swing_v2_history and metrics_ready:
             raw = cached_intraday.get("swingV2Raw") if isinstance(cached_intraday, dict) else None
             try:
-                metrics_ready = bool(isinstance(raw, dict) and int(raw.get("dailyObservationCount") or 0) >= int(os.getenv("SWING_MIN_DAILY_OBSERVATIONS", "90")))
+                metrics_ready = bool(isinstance(raw, dict) and int(raw.get("dailyObservationCount") or 0) >= int(os.getenv("SWING_MIN_DAILY_OBSERVATIONS", "30")))
             except (TypeError, ValueError):
                 metrics_ready = False
         if metrics_ready:
@@ -4662,7 +4797,7 @@ def _build_payload_from_live_data(
             force_angel_fallback=angel_first_quotes,
             interval="ONE_HOUR" if angel_first_quotes else "FIVE_MINUTE",
             timeframe="1h" if angel_first_quotes else "5m",
-            daily_lookback_days=int(os.getenv("SWING_HISTORY_LOOKBACK_DAYS", "180")) if swing_v2_history else 45,
+            daily_lookback_days=int(os.getenv("SWING_HISTORY_LOOKBACK_DAYS", "60")) if swing_v2_history else 45,
         )
         for ticker, metrics in fetched_metrics.items():
             original = row_by_ticker.get(ticker)
@@ -5172,6 +5307,13 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Market payloads are large JSON (last_market_snapshot is ~1.8 MB) and the
+    # same bytes cross the Cloudflare tunnel on every poll. Gzip cuts them ~5-8x.
+    # Level 5 is the deliberate trade: most of the win, a fraction of level-9 CPU,
+    # which matters because market hours are CPU-bound already. Registered after
+    # CORS so it wraps outermost and compresses the CORS response too.
+    app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
+
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
@@ -5617,12 +5759,30 @@ def create_app() -> FastAPI:
 
     @app.post("/api/swing-session/lock")
     def swing_session_lock(force: bool = False) -> dict[str, Any]:
-        """Lock Asset Matrix BUY set into swing_session.json for EOD."""
+        """Lock the swing book.
+
+        ``force=true`` requests an immediate V2 cycle inside the normal
+        trading window. Holidays and off-hours remain fail-closed.
+        """
         try:
             from .swing_session import lock_swing_session
             result = lock_swing_session(force=force)
             if not result.get("success") and result.get("error"):
                 raise HTTPException(status_code=409, detail=result.get("error"))
+            if force:
+                session = result.get("session")
+                session = session if isinstance(session, dict) else {}
+                result = {
+                    **result,
+                    "forceApplied": bool(result.get("forced")),
+                    "forceBypassed": result.get("forceBypassed"),
+                    "forceBlockedReason": (
+                        None
+                        if result.get("forced")
+                        else str(result.get("forceBlockedReason") or session.get("cashReason") or session.get("marketDayReason") or "")
+                        or None
+                    ),
+                }
             return result
         except HTTPException:
             raise
@@ -5696,19 +5856,18 @@ def create_app() -> FastAPI:
         Serves ``data/eod/{date}/book_intraday.json`` when present unless force=true.
         """
         try:
-            from datetime import date as _date
+            from datetime import date as _date, datetime as _dt
             from .eod_intraday_report import generate_intraday_eod_report
-            from datetime import datetime as _dt
             for_date = (
                 _date.fromisoformat(date)
                 if date
                 else _dt.now(tz=IST_ZONE).date()
             )
-            if for_date == _dt.now(tz=IST_ZONE).date():
-                # Session-economics projection (never a candle-rewrite of the
-                # locked session): generate reads the authoritative Intraday
-                # session directly for today's date.
-                return generate_intraday_eod_report(for_date, force=force)
+            if not force:
+                from .eod_book_cache import load_book_cache
+                cached = load_book_cache(for_date, "intraday")
+                if cached is not None:
+                    return cached
             return generate_intraday_eod_report(for_date, force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -5720,21 +5879,27 @@ def create_app() -> FastAPI:
     ) -> dict[str, Any]:
         """Day-bucketed swing P&L. Cached under book_swing.json unless force=true."""
         try:
-            from datetime import date as _date
+            from datetime import date as _date, datetime as _dt
             from .eod_swing_report import generate_swing_eod_report
+            from .eod_book_cache import load_book_cache
             for_date = _date.fromisoformat(date) if date else None
+            if not force:
+                effective_date = for_date or _dt.now(tz=IST_ZONE).date()
+                cached = load_book_cache(effective_date, "swing")
+                if cached is not None:
+                    return cached
             return generate_swing_eod_report(for_date, force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.get("/api/reports/eod-index-options")
-    def eod_index_options_report(date: str | None = None) -> dict[str, Any]:
+    def eod_index_options_report(date: str | None = None, force: bool = False) -> dict[str, Any]:
         """Date-locked Index Options paper P&L archived with the EOD books."""
         try:
             from datetime import date as _date, datetime as _dt
             from .eod_index_options_report import generate_index_options_eod_report
             for_date = _date.fromisoformat(date) if date else _dt.now(tz=IST_ZONE).date()
-            return generate_index_options_eod_report(for_date)
+            return generate_index_options_eod_report(for_date, force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 

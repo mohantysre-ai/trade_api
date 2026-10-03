@@ -50,7 +50,11 @@ def test_angel_option_chain_diagnostic_falls_back_on_error() -> None:
 
 
 def test_index_options_force_refresh_bypasses_cache() -> None:
-    with patch("app.services.index_options_live.compose_live_index_options_radar") as mock_compose:
+    with (
+        patch("app.services.index_options_live.compose_live_index_options_radar") as mock_compose,
+        patch("app.services.angel_one_feed.ensure_fresh_market_snapshot", return_value={}),
+        patch("app.services.angel_one_feed.AngelOneClient", return_value=object()),
+    ):
         mock_compose.return_value = {"success": True, "cacheStatus": "FORCED"}
         resp = client.get("/api/index-options?force=1")
     assert resp.status_code == 200

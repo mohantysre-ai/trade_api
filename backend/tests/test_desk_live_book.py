@@ -77,3 +77,65 @@ def test_dummy_quote_stub_is_not_reused_as_candle_cache():
     cache = _snapshot_intraday_cache(snap)
     assert "REAL" in cache
     assert "DUMMY" not in cache
+
+
+def test_previous_session_swing_history_is_reused_without_reusing_stale_intraday():
+    from datetime import datetime, timezone
+
+    from app.services.angel_one_feed import _snapshot_intraday_cache
+
+    metrics = {
+        "data_source": "candles",
+        "timeframe": "1h",
+        "vwap": 100.0,
+        "ema9": 99.0,
+        "orb_high": 101.0,
+        "orb_low": 98.0,
+        "swingV2Raw": {
+            "dailyBarsThroughPreviousClose": True,
+            "dailyObservationCount": 60,
+            "last1hTimestamp": "2026-09-22T09:30:00+05:30",
+        },
+    }
+    snap = {
+        "updatedAt": "2026-09-22T10:00:00+00:00",
+        "stockQuotes": {"REUSABLE": {"intraday": metrics}},
+    }
+    now = datetime(2026, 9, 23, 5, 30, tzinfo=timezone.utc)
+
+    assert _snapshot_intraday_cache(snap, now=now) == {}
+    assert _snapshot_intraday_cache(
+        snap,
+        allow_previous_swing_session=True,
+        now=now,
+    ) == {"REUSABLE": metrics}
+
+
+def test_older_than_previous_session_swing_history_is_not_reused():
+    from datetime import datetime, timezone
+
+    from app.services.angel_one_feed import _snapshot_intraday_cache
+
+    metrics = {
+        "data_source": "candles",
+        "timeframe": "1h",
+        "vwap": 100.0,
+        "ema9": 99.0,
+        "orb_high": 101.0,
+        "orb_low": 98.0,
+        "swingV2Raw": {
+            "dailyBarsThroughPreviousClose": True,
+            "dailyObservationCount": 60,
+            "last1hTimestamp": "2026-09-21T09:30:00+05:30",
+        },
+    }
+    snap = {
+        "updatedAt": "2026-09-21T10:00:00+00:00",
+        "stockQuotes": {"STALE": {"intraday": metrics}},
+    }
+
+    assert _snapshot_intraday_cache(
+        snap,
+        allow_previous_swing_session=True,
+        now=datetime(2026, 9, 23, 5, 30, tzinfo=timezone.utc),
+    ) == {}

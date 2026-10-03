@@ -281,6 +281,31 @@ def test_quant_portfolio_returns_auditable_ranked_decisions():
     assert "ranked" in r and "portfolioRisk" in r
 
 
+def test_quant_portfolio_reserves_independent_buy_and_sell_sleeves(monkeypatch):
+    import app.services.index_options.quant_v2 as quant
+
+    rows = [
+        {**candidate("BUY_A", index="NIFTY"), "strategyMode": "BUY_PREMIUM", "testUtility": 30},
+        {**candidate("BUY_B", index="BANKNIFTY"), "strategyMode": "BUY_PREMIUM", "testUtility": 20},
+        {**candidate("SELL_A", index="SENSEX"), "strategyMode": "SELL_PREMIUM", "testUtility": 10},
+    ]
+
+    def fake_score(row, **_kwargs):
+        utility = float(row["testUtility"])
+        return quant.QuantDecision(
+            str(row["strategyId"]), str(row["key"]), utility, utility,
+            1, 0, 0, 0, 0, "ADMIT", (), 1,
+        )
+
+    def fake_governor(*_args, **_kwargs):
+        return {"pass": True, "reasons": [], "greeks": {}, "stressLoss": 0, "limits": {}}
+
+    monkeypatch.setattr(quant, "score_candidate", fake_score)
+    monkeypatch.setattr(quant, "risk_governor", fake_governor)
+    result = quant.select_quant_portfolio(rows, max_positions=2, max_per_sleeve=2)
+    assert [row["strategy_id"] for row in result["selected"]] == ["BUY_A", "SELL_A"]
+
+
 def test_entry_premium_and_greeks_from_identical_bs_inputs():
     c = _make_nifty_strangle()
     call_leg = c["legs"][0]

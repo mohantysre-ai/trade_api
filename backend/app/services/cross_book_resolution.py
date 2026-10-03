@@ -15,7 +15,6 @@ from typing import Any
 
 from .desk_book_symbols import (
     _INTRADAY_SESSION_PATH,
-    _SWING_SESSION_PATH,
     _read_json,
     filter_rows_excluding,
     locked_symbols_for_date,
@@ -159,18 +158,27 @@ def intraday_blocks_swing_symbol(
 
 def swing_locked_symbols_for_day(day: str) -> set[str]:
     """Swing LONG symbols that are locked for the given day."""
-    session = _read_json(_SWING_SESSION_PATH)
+    try:
+        from .swing_v2.authoritative import get_authoritative_session
+
+        session = get_authoritative_session(live=False)
+    except Exception as exc:
+        log.error("V2 cross-book symbol read failed closed: %s", exc)
+        return set()
     if str(session.get("sessionDate") or "")[:10] != str(day or "")[:10]:
         return set()
     if not session.get("locked"):
         return set()
     out: set[str] = set()
-    for row in session.get("long") or []:
-        if not isinstance(row, dict) or row.get("closed"):
+    for row in [*(session.get("long") or []), *(session.get("closedPositions") or [])]:
+        if not isinstance(row, dict) or not (row.get("symbol") or row.get("ticker")):
             continue
-        sym = str(row.get("symbol") or row.get("ticker") or "").upper().strip()
-        if sym:
-            out.add(sym)
+        session_day = str(row.get("sessionDate") or "")[:10]
+        closed_at = str(row.get("lastEventAt") or row.get("exitTimestamp") or "")[:10]
+        if not row.get("terminal") or session_day == str(day)[:10] or closed_at == str(day)[:10]:
+            sym = str(row.get("symbol") or row.get("ticker") or "").upper().strip()
+            if sym:
+                out.add(sym)
     return out
 
 
@@ -192,7 +200,6 @@ def reconcile_cross_book(day: str, *, persist: bool = True) -> dict[str, Any]:
     """Report cross-book state: Swing owns symbols; Intraday must block on conflicts."""
     snap = _load_matrix_snapshot()
     intra_session = _read_json(_INTRADAY_SESSION_PATH)
-    swing_session = _read_json(_SWING_SESSION_PATH)
 
     # Swing-first promotion DISABLED: Intraday never promotes to Swing.
     # Swing positions remain untouched (no scrubbing).

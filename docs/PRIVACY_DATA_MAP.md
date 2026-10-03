@@ -65,7 +65,7 @@ Default Docker mounts:
 
 Named state paths configured in `docker-compose.yml`:
 
-- `/app/state/swing_session.json`
+- `/app/state/swing_v2_session.json`
 - `/app/state/trade_api_snapshot.json`
 - `/app/state/last_market_snapshot.json`
 - `/app/state/fixed_trade_plan.json`

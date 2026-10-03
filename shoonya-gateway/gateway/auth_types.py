@@ -1,0 +1,2 @@
+class OAuthBrowserUnavailable(RuntimeError):
+    pass

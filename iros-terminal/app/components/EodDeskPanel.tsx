@@ -184,9 +184,11 @@ function PmMemoStrip({
 
 export default function EodDeskPanel({
   refreshToken = 0,
+  onSymbolSelect,
 }: {
   /** Bumped by top desk Refresh — reloads Book / LLM status without force. */
   refreshToken?: number;
+  onSymbolSelect?: (symbol: string) => void;
 }) {
   const [mode, setMode] = useState<EodMode>('book');
   const [dates, setDates] = useState<string[]>([]);
@@ -671,6 +673,7 @@ export default function EodDeskPanel({
                 onSwingDateChange={setSwingDateStr}
                 refreshToken={refreshKey}
                 forceBookRebuild={forceBookRebuild}
+                onSymbolSelect={onSymbolSelect}
               />
             </EodPaneErrorBoundary>
           </section>

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from app.services import intraday_session_engine as eng
-from app.services import swing_session
 from app.services import sector_rotation
 
 
@@ -100,50 +99,6 @@ def test_capital_and_risk_never_exceed_configuration():
     assert sum(r["deployedCapital"] for r in selected) <= 10_000
     assert sum(r["maxLoss"] for r in selected) <= 10_000 * eng.MAX_PORTFOLIO_RISK
     assert all(r["approxQty"] * r["entryPrice"] == r["deployedCapital"] for r in selected)
-
-
-def test_swing_gate_rejects_expected_r_below_minimum(monkeypatch):
-    monkeypatch.setattr(swing_session, "is_swing_desk_eligible", lambda *_: True)
-    raw = _qualified_swing_raw(symbol="LOWR", target1=104, target2=106)
-    assert swing_session._normalize_swing_row(raw, "2026-08-12") is None
-
-
-def test_swing_grade_and_expected_r(monkeypatch):
-    monkeypatch.setattr(swing_session, "is_swing_desk_eligible", lambda *_: True)
-    raw = _qualified_swing_raw()
-    row = swing_session._normalize_swing_row(raw, "2026-08-12")
-    assert row is not None
-    assert row["expectedR"] == 2.0
-    assert row["entryQuality"] == "ENTRY_A"
-    assert row["originalSide"] == "BUY"
-    assert row["riskAuditVerdict"] == "APPROVE"
-    assert row["selectionEvidence"]["accepted"] is True
-
-
-def test_persisted_swing_book_is_migrated_to_five_with_capital_recomputed():
-    rows = [
-        {
-            "symbol": f"S{i}",
-            "deployedCapital": 100_000.0,
-            "maxLoss": 2_000.0,
-        }
-        for i in range(8)
-    ]
-    migrated, dropped = swing_session._enforce_swing_position_cap(
-        {"locked": True, "long": rows, "short": [], "capital": {"swingCapital": 1_000_000}}
-    )
-    assert [r["symbol"] for r in migrated["long"]] == ["S0", "S1", "S2", "S3", "S4"]
-    assert dropped == ["S5", "S6", "S7"]
-    assert migrated["counts"] == {"long": 5, "short": 0, "total": 5}
-    assert migrated["capital"]["deployedCapital"] == 500_000.0
-    assert migrated["capital"]["remainingCapital"] == 500_000.0
-
-
-def test_swing_cap_migration_is_idempotent():
-    session = {"locked": True, "long": [{"symbol": f"S{i}"} for i in range(5)], "short": []}
-    migrated, dropped = swing_session._enforce_swing_position_cap(session)
-    assert migrated is session
-    assert dropped == []
 
 
 def test_nse_sector_payload_normalization_accepts_nested_shapes():

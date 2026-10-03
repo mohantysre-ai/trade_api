@@ -33,13 +33,11 @@ echo     Public URL:   %PUBLIC_URL%
 echo.
 
 REM =========================================================
-REM CLEAR STALE BACKEND CACHES
+REM CLEAR REGENERABLE BYTECODE CACHES
 REM =========================================================
-echo [CACHE-CLEAN] Clearing stale swing V2 caches...
-if exist "%BACKEND_DIR%\app\data\swing_v2_session.json" (
-    del /f /q "%BACKEND_DIR%\app\data\swing_v2_session.json" >nul 2>&1
-    echo [CACHE-CLEAN] Removed swing_v2_session.json
-)
+REM swing_v2_session.json is durable strategy state, not a cache. Deleting it
+REM on startup can make localhost and the tunnel report different lock state.
+echo [CACHE-CLEAN] Preserving durable swing V2 session state...
 if exist "%BACKEND_DIR%\app\services\swing_v2\__pycache__" (
     del /f /q "%BACKEND_DIR%\app\services\swing_v2\__pycache__\*.pyc" >nul 2>&1
     echo [CACHE-CLEAN] Cleared swing_v2 bytecode cache
@@ -101,6 +99,15 @@ if %PORT_BUSY% equ 1 (
     echo [OK] Ports freed. Proceeding...
 )
 echo [PASS] All ports are free. Proceeding...
+echo.
+
+echo [*] Reconciling newest durable state from native and Docker stores...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%sync-state-before-native.ps1"
+if errorlevel 1 (
+    echo [FAIL] Durable-state reconciliation failed. App was not started.
+    if not "%IROS_NO_PAUSE%"=="1" pause
+    exit /b 1
+)
 echo.
 
 REM Stop previous cloudflared for clean reconnect

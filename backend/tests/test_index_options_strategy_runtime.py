@@ -130,6 +130,31 @@ def test_alternative_is_shadow_only(tmp_path, monkeypatch):
     assert shadows[0]["strategyId"] == "LONG_STRADDLE"
 
 
+def test_two_open_buy_positions_do_not_block_sell_sleeve(tmp_path, monkeypatch):
+    monkeypatch.setenv("INDEX_OPTIONS_STRATEGY_DB", str(tmp_path / "shared.db"))
+    straddle = _candidate("LONG_STRADDLE")
+    straddle["strategyMode"] = "BUY_PREMIUM"
+    strangle = _candidate("LONG_STRANGLE")
+    strangle["strategyMode"] = "BUY_PREMIUM"
+    buys = [straddle, strangle]
+    process_strategy_cycle(
+        {"modularCandidates": buys, "modularSelected": buys},
+        _snapshot(),
+        datetime(2026, 9, 15, 10, 0, tzinfo=IST_ZONE),
+    )
+
+    seller = _candidate("IRON_CONDOR")
+    seller["strategyMode"] = "SELL_PREMIUM"
+    result = process_strategy_cycle(
+        {"modularCandidates": [seller], "modularSelected": [seller]},
+        _snapshot(),
+        datetime(2026, 9, 15, 10, 1, tzinfo=IST_ZONE),
+    )
+
+    assert len(result["open"]) == 3
+    assert seller["paperEntryState"] == "FILLED"
+
+
 @pytest.mark.parametrize("strategy,family", [
     ("BULL_CALL_DEBIT_SPREAD", "DIRECTIONAL"),
     ("BEAR_PUT_DEBIT_SPREAD", "DIRECTIONAL"),

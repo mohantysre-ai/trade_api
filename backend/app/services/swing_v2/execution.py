@@ -26,6 +26,12 @@ def simulate_paper_fill(order: dict[str, Any], observations: list[dict[str, Any]
         if remaining == 0:
             break
     if filled == 0:
+        latest_observation = max(
+            (datetime.fromisoformat(str(item["timestamp"]).replace("Z", "+00:00")) for item in observations if item.get("timestamp")),
+            default=None,
+        )
+        if latest_observation is not None and latest_observation < expiry:
+            return {"executionStatus": "PENDING_UNFILLED", "filledQty": 0, "remainingQty": requested, "realizedPnl": 0.0, "fills": []}
         return {"executionStatus": "EXPIRED_UNFILLED", "filledQty": 0, "remainingQty": requested, "realizedPnl": 0.0, "fills": []}
     return {"executionStatus": "FILLED" if remaining == 0 else "PARTIAL_FILL", "filledQty": filled, "remainingQty": remaining, "fillPrice": round(notional / filled, 4), "fills": fills}
 

@@ -3,6 +3,19 @@ from datetime import datetime
 from app.services import angel_one_feed as feed
 
 
+def test_refresh_fixed_plan_close_marks_uses_module_logger(monkeypatch, tmp_path):
+    snapshot_path = tmp_path / "last_market_snapshot.json"
+    monkeypatch.setattr(feed, "_snapshot_path", lambda: snapshot_path)
+    monkeypatch.setattr(feed, "_load_last_snapshot", lambda: {"stockQuotes": {"AAA": {"ltpRaw": 100.0}}})
+    monkeypatch.setattr(feed, "_enrich_snapshot_with_fixed_plan", lambda payload: payload)
+
+    result = feed.refresh_fixed_plan_close_marks(force=True)
+
+    assert result["ok"] is True
+    assert result["quoteCount"] == 1
+    assert snapshot_path.exists()
+
+
 def _reset_circuit() -> None:
     feed._ANGEL_CANDLE_CIRCUIT_UNTIL = 0.0
     feed._CANDLE_COOLDOWN_UNTIL_MONO = 0.0
@@ -95,3 +108,86 @@ def test_nse_daily_skips_angel_one_day(monkeypatch):
     )
     assert nse_intervals == ["ONE_DAY", "FIVE_MINUTE"]
     assert angel_intervals == ["FIVE_MINUTE"]
+
+
+def test_stale_dhan_one_hour_bars_fall_through_to_nse(monkeypatch):
+    _reset_circuit()
+    nse_intervals: list[str] = []
+    angel_intervals: list[str] = []
+
+    class DummyClient:
+        def fetch_candles(self, _exchange, _token, interval, *_args, **_kwargs):
+            angel_intervals.append(interval)
+            return []
+
+    def fake_dhan(_security_id, interval, *_args, **_kwargs):
+        if interval == "ONE_DAY":
+            return [["2026-08-14 00:00:00", 10, 11, 9, 10.5, 1000]]
+        return [["2026-08-13 15:15:00", 10, 11, 9, 10.5, 1000]]
+
+    def fake_nse(_symbol, _token, interval, *_args, **_kwargs):
+        nse_intervals.append(interval)
+        if interval == "ONE_HOUR":
+            return [["2026-08-17 10:15:00", 10, 11, 9, 10.5, 1000]]
+        return []
+
+    monkeypatch.setattr(feed, "dhan_configured", lambda: True)
+    monkeypatch.setattr(feed, "load_dhan_security_ids", lambda: {"RELIANCE": "2885"})
+    monkeypatch.setattr(feed, "fetch_dhan_candles", fake_dhan)
+    monkeypatch.setattr(feed, "fetch_nse_candles", fake_nse)
+
+    from app.utils.symbols import Instrument
+
+    inst = Instrument("RELIANCE", "NSE", "RELIANCE-EQ", "2885", "RELIANCE")
+    metrics = feed._intraday_metrics(
+        DummyClient(),
+        inst,
+        1400.0,
+        datetime(2026, 8, 17, 11, 9, tzinfo=feed.IST_ZONE),
+        interval="ONE_HOUR",
+        timeframe="1h",
+    )
+
+    assert nse_intervals == ["ONE_HOUR"]
+    assert angel_intervals == []
+    assert metrics["swingV2Raw"]["last1hTimestamp"] == "2026-08-17 10:15:00"
+
+
+def test_stale_dhan_and_nse_one_hour_bars_fall_through_to_angel(monkeypatch):
+    _reset_circuit()
+    angel_intervals: list[str] = []
+
+    class DummyClient:
+        def fetch_candles(self, _exchange, _token, interval, *_args, **_kwargs):
+            angel_intervals.append(interval)
+            return [["2026-08-17 10:15:00", 10, 11, 9, 10.5, 1000]]
+
+    def fake_dhan(_security_id, interval, *_args, **_kwargs):
+        if interval == "ONE_DAY":
+            return [["2026-08-14 00:00:00", 10, 11, 9, 10.5, 1000]]
+        return [["2026-08-13 15:15:00", 10, 11, 9, 10.5, 1000]]
+
+    monkeypatch.setattr(feed, "dhan_configured", lambda: True)
+    monkeypatch.setattr(feed, "load_dhan_security_ids", lambda: {"RELIANCE": "2885"})
+    monkeypatch.setattr(feed, "fetch_dhan_candles", fake_dhan)
+    monkeypatch.setattr(
+        feed,
+        "fetch_nse_candles",
+        lambda *_args, **_kwargs: [["2026-08-13 15:15:00", 10, 11, 9, 10.5, 1000]],
+    )
+
+    from app.utils.symbols import Instrument
+
+    inst = Instrument("RELIANCE", "NSE", "RELIANCE-EQ", "2885", "RELIANCE")
+    metrics = feed._intraday_metrics(
+        DummyClient(),
+        inst,
+        1400.0,
+        datetime(2026, 8, 17, 11, 9, tzinfo=feed.IST_ZONE),
+        force_angel_fallback=True,
+        interval="ONE_HOUR",
+        timeframe="1h",
+    )
+
+    assert angel_intervals == ["ONE_HOUR"]
+    assert metrics["swingV2Raw"]["last1hTimestamp"] == "2026-08-17 10:15:00"

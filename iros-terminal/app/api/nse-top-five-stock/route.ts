@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const NSE_INDEX = "NIFTY 500";
+const DEFAULT_NSE_INDEX = "NIFTY 500";
+const NSE_INDEXES = new Set(["NIFTY 50", "NIFTY 100", "NIFTY 200", "NIFTY 500"]);
 const NSE_FLAGS = new Set(["G", "L", "MAVA", "MAVO"]);
 
 function getFlag(requestUrl: URL) {
@@ -13,6 +14,8 @@ function getFlag(requestUrl: URL) {
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const flag = getFlag(requestUrl);
+  const requestedIndex = (requestUrl.searchParams.get("index") || DEFAULT_NSE_INDEX).toUpperCase();
+  const index = NSE_INDEXES.has(requestedIndex) ? requestedIndex : DEFAULT_NSE_INDEX;
 
   if (!flag) {
     return NextResponse.json(
@@ -27,10 +30,11 @@ export async function GET(request: Request) {
     );
     nseUrl.searchParams.set("functionName", "getTopFiveStock");
     nseUrl.searchParams.set("flag", flag);
-    nseUrl.searchParams.set("index", NSE_INDEX);
+    nseUrl.searchParams.set("index", index);
 
     const res = await fetch(nseUrl.toString(), {
       cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
       headers: {
         Accept: "application/json, text/plain, */*",
         Referer: "https://www.nseindia.com/",
@@ -51,6 +55,10 @@ export async function GET(request: Request) {
     return NextResponse.json(data);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const timedOut = /timeout|aborted|AbortError/i.test(message);
+    return NextResponse.json(
+      { error: timedOut ? "NSE request timed out — retry shortly" : message },
+      { status: timedOut ? 504 : 500 }
+    );
   }
 }

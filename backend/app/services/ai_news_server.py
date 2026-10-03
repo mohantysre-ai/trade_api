@@ -67,6 +67,7 @@ logger = logging.getLogger("ai_news_server")
 try:
     from fastapi import FastAPI, Query
     from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.middleware.gzip import GZipMiddleware
 except ImportError:
     logger.error("FastAPI not installed. Run: pip install fastapi uvicorn")
     sys.exit(1)
@@ -125,6 +126,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# News summaries are large JSON text blobs - highly compressible. Level 5 keeps
+# the win without competing for CPU with the market-feed work on the same host.
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
 
 
 @app.get("/health")

@@ -6,7 +6,11 @@ from typing import Any
 
 
 def check_portfolio_limits(position: dict[str, Any], open_positions: list[dict[str, Any]]) -> tuple[bool, str]:
-    if len(open_positions) >= 2:
+    # Keep this compatibility helper aligned with the active engine limit.
+    # The authoritative Quant V2 governor still owns Greeks/stress/CVaR.
+    from ..index_options_engine import MAX_CONCURRENT_TRADES
+
+    if len(open_positions) >= MAX_CONCURRENT_TRADES:
         return False, "MAX_CONCURRENT_TRADES_REACHED"
     return True, "OK"
 

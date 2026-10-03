@@ -4,7 +4,8 @@ from app.services.angel_index_options import IST_ZONE
 from app.services.angel_index_stream import ANGEL_INDEX_STREAM
 from app.services.index_options_paper import reconcile_paper_book
 from app.services.index_options_paper_supervisor import (
-    _next_minute_boundary,
+    SUPERVISOR_INTERVAL_SECONDS,
+    _next_cycle,
     _session_active,
     run_paper_supervisor_cycle,
 )
@@ -134,6 +135,13 @@ def test_supervisor_session_window_includes_eod_squareoff_minute():
     assert _session_active(datetime(2026, 9, 1, 15, 31, tzinfo=IST_ZONE)) is False
 
 
-def test_next_cycle_aligns_to_wall_clock_minute():
+def test_next_cycle_advances_by_configured_interval_and_preserves_timezone():
     now = datetime(2026, 9, 1, 11, 7, 43, 250000, tzinfo=IST_ZONE)
-    assert _next_minute_boundary(now) == datetime(2026, 9, 1, 11, 8, tzinfo=IST_ZONE)
+    nxt = _next_cycle(now)
+    assert nxt == now + timedelta(seconds=SUPERVISOR_INTERVAL_SECONDS)
+    assert nxt.tzinfo == IST_ZONE
+
+def test_next_cycle_rolls_over_hour_boundary():
+    now = datetime(2026, 9, 1, 11, 59, 58, tzinfo=IST_ZONE)
+    nxt = _next_cycle(now)
+    assert nxt == datetime(2026, 9, 1, 12, 0, 3, tzinfo=IST_ZONE)

@@ -60,6 +60,17 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("tunnel: $tunnelName")
 [void]$sb.AppendLine("credentials-file: /etc/cloudflared/credentials.json")
 [void]$sb.AppendLine("")
+# Cloudflare's edge proxy read timeout is ~100s. These origin settings keep the
+# connector patient enough that a slow-but-alive backend is not cut off early,
+# while the app-side timeouts stay far below the edge limit.
+[void]$sb.AppendLine("originRequest:")
+[void]$sb.AppendLine("  connectTimeout: 15s")
+[void]$sb.AppendLine("  tcpKeepAlive: 30s")
+[void]$sb.AppendLine("  keepAliveTimeout: 90s")
+[void]$sb.AppendLine("  keepAliveConnections: 100")
+[void]$sb.AppendLine("  httpHostHeader: sigq.in")
+[void]$sb.AppendLine("  disableChunkedEncoding: false")
+[void]$sb.AppendLine("")
 [void]$sb.AppendLine("ingress:")
 foreach ($pair in $ingressPairs) {
   [void]$sb.AppendLine("  - hostname: $($pair.Hostname)")

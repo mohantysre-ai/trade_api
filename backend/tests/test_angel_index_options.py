@@ -18,6 +18,20 @@ from app.services.angel_index_options import (
 )
 from datetime import date, datetime, timedelta
 
+import os
+
+# Unit tests here are offline by construction: the Shoonya hot-standby
+# candle backup must never leak a live network call into these assertions,
+# and the shared persisted candle/baseline caches must stay untouched.
+os.environ["SHOONYA_STANDBY_ENABLED"] = "0"
+os.environ["SHOONYA_CANDLES_ENABLED"] = "0"
+os.environ.pop("SHOONYA_GATEWAY_URL", None)
+import tempfile as _tempfile
+_INDEX_OPTIONS_TEST_CACHE = os.path.join(_tempfile.gettempdir(), "index_options_candles_test.json")
+_INDEX_OPTIONS_TEST_BASELINE = os.path.join(_tempfile.gettempdir(), "index_options_oi_baseline_test.json")
+os.environ["INDEX_OPTIONS_CANDLE_CACHE_FILE"] = _INDEX_OPTIONS_TEST_CACHE
+os.environ["INDEX_OPTIONS_OI_BASELINE_FILE"] = _INDEX_OPTIONS_TEST_BASELINE
+
 
 def _master(name="NIFTY", segment="NFO"):
     return [

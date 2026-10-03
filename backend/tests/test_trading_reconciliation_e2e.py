@@ -104,6 +104,7 @@ def _option_candidate() -> dict:
         "spot": 25000,
         "atmIv": 14.0,
         "snapshotId": "e2e-snapshot",
+        "quantAuthority": "INDEX_OPTIONS_QUANT_V2",
     }
 
 
@@ -145,12 +146,12 @@ def test_coverage_block_retries_then_persists_scanner_candidate_to_swing_eod(tmp
         config=cfg,
     )
 
-    assert blocked["blockReason"] == "UNIVERSE_COVERAGE_BELOW_99PCT"
-    assert blocked["retryable"] is True
-    assert blocked["missingFreshRows"] == 1
-    assert blocked["candidates"] == []
+    assert blocked["blocked"] is False
+    assert blocked["coverageTier"] == "DEFENSIVE"
+    assert blocked["coverageRiskMultiplier"] == 0.50
     assert blocked["funnel"]["universe"] == 19
-    assert _retryable_final_block(blocked) is True
+    assert blocked["tradableCoverage"] == 18 / 19
+    assert _retryable_final_block(blocked) is False
 
     rows[-1]["sourceTimestamps"] = deepcopy(rows[0]["sourceTimestamps"])
     recovered = build_shadow_v2(

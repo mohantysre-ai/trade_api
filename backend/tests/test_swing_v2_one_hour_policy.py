@@ -28,7 +28,7 @@ def test_final_lock_accepts_recent_quote_with_latest_completed_one_hour_bar():
 
 def test_final_lock_rejects_stale_quote_even_when_one_hour_bar_is_valid():
     now = datetime.now(timezone.utc)
-    ok, reasons = evaluate_freshness(_row(now, quote_age=61), final_lock=True, now=now)
+    ok, reasons = evaluate_freshness(_row(now, quote_age=301), final_lock=True, now=now)
     assert not ok
     assert "STALE_QUOTE" in reasons
 
@@ -55,7 +55,42 @@ def test_default_policy_is_750_two_session_and_risk_scaled_coverage(monkeypatch)
     assert cfg.required_coverage == 0.90
 
 
-def test_policy_keeps_microcap_shadow_only():
+def test_policy_keeps_microcap_satellite_mode():
     cfg = SwingV2Config()
-    assert cfg.microcap_mode == "SHADOW"
-    assert "NIFTY_MICROCAP250" not in cfg.active_segments
+    assert cfg.microcap_mode == "SATELLITE"
+
+
+def test_friday_one_hour_bar_is_valid_on_monday():
+    now = datetime(2026, 9, 21, 5, 0, tzinfo=timezone.utc)
+    row = _row(now)
+    row["sourceTimestamps"]["bars1h"] = datetime(2026, 9, 18, 9, 0, tzinfo=timezone.utc).isoformat()
+    ok, reasons = evaluate_freshness(row, final_lock=True, now=now)
+    assert ok, reasons
+
+
+def test_friday_one_hour_bar_is_stale_on_tuesday_when_monday_traded():
+    now = datetime(2026, 9, 22, 5, 0, tzinfo=timezone.utc)
+    row = _row(now)
+    row["sourceTimestamps"]["bars1h"] = datetime(2026, 9, 18, 9, 0, tzinfo=timezone.utc).isoformat()
+    ok, reasons = evaluate_freshness(row, final_lock=True, now=now)
+    assert not ok
+    assert "STALE_BARS1H" in reasons
+
+
+def test_previous_session_bar_survives_nse_holiday_gap():
+    # 2026-09-14 is in the seeded NSE cash-market holiday calendar, so Friday
+    # 2026-09-11 remains the previous trading session on Tuesday 2026-09-15.
+    now = datetime(2026, 9, 15, 5, 0, tzinfo=timezone.utc)
+    row = _row(now)
+    row["sourceTimestamps"]["bars1h"] = datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc).isoformat()
+    ok, reasons = evaluate_freshness(row, final_lock=True, now=now)
+    assert ok, reasons
+
+
+def test_weekday_feed_outage_is_stale_even_inside_legacy_72h_ttl():
+    now = datetime(2026, 9, 23, 5, 0, tzinfo=timezone.utc)
+    row = _row(now)
+    row["sourceTimestamps"]["bars1h"] = datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc).isoformat()
+    ok, reasons = evaluate_freshness(row, final_lock=True, now=now)
+    assert not ok
+    assert "STALE_BARS1H" in reasons

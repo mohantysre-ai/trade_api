@@ -81,8 +81,16 @@ DOMESTIC_INDEX_INSTRUMENTS: list[YahooInstrument] = [
     YahooInstrument("nifty50", "^NSEI", "NIFTY 50", "index", _fmt_index),
     YahooInstrument("sensex", "^BSESN", "SENSEX", "index", _fmt_index),
     YahooInstrument("niftybank", "^NSEBANK", "NIFTY BANK", "index", _fmt_index),
+    YahooInstrument("nifty100", "^CNX100", "NIFTY 100", "index", _fmt_index),
+    YahooInstrument("nifty500", "^CRSLDX", "NIFTY 500", "index", _fmt_index),
     YahooInstrument("niftyit", "^CNXIT", "NIFTY IT", "index", _fmt_index),
     YahooInstrument("niftypharma", "^CNXPHARMA", "NIFTY PHARMA", "index", _fmt_index),
+    YahooInstrument("niftyauto", "^CNXAUTO", "NIFTY AUTO", "index", _fmt_index),
+    YahooInstrument("niftyfmcg", "^CNXFMCG", "NIFTY FMCG", "index", _fmt_index),
+    YahooInstrument("niftymetal", "^CNXMETAL", "NIFTY METAL", "index", _fmt_index),
+    YahooInstrument("niftyrealty", "^CNXREALTY", "NIFTY REALTY", "index", _fmt_index),
+    YahooInstrument("niftyenergy", "^CNXENERGY", "NIFTY ENERGY", "index", _fmt_index),
+    YahooInstrument("niftypsubank", "^CNXPSUBANK", "NIFTY PSU BANK", "index", _fmt_index),
     # Yahoo's legacy ^CRSMID chart intermittently returns an empty/delisted
     # response. Its NSE instrument ticker carries the same Midcap 100 index.
     YahooInstrument("niftymidcap", "NIFTY_MIDCAP_100.NS", "NIFTY MIDCAP", "index", _fmt_index),
@@ -152,18 +160,44 @@ def fetch_gift_nifty() -> dict[str, Any] | None:
 
 # Global indices — expanded to 12 with ASX 200 and BOVESPA.
 GLOBAL_INDEX_INSTRUMENTS: list[YahooInstrument] = [
+    # United States
     YahooInstrument("dji", "^DJI", "DJI (US 30)", "index", _fmt_index),
     YahooInstrument("sp500", "^GSPC", "S&P 500", "index", _fmt_index),
     YahooInstrument("nasdaq100", "^NDX", "NASDAQ 100", "index", _fmt_index),
-    YahooInstrument("nikkei", "^N225", "NIKKEI 225", "index", _fmt_index),
-    YahooInstrument("hangseng", "^HSI", "HANG SENG", "index", _fmt_index),
-    YahooInstrument("shanghai", "000001.SS", "SHANGHAI COMP", "index", _fmt_index),
+    YahooInstrument("nasdaqcomp", "^IXIC", "NASDAQ COMPOSITE", "index", _fmt_index),
+    YahooInstrument("russell2000", "^RUT", "RUSSELL 2000", "index", _fmt_index),
+    YahooInstrument("nysecomp", "^NYA", "NYSE COMPOSITE", "index", _fmt_index),
+    YahooInstrument("dowtransport", "^DJT", "DOW TRANSPORT", "index", _fmt_index),
+    YahooInstrument("usvix", "^VIX", "CBOE VIX", "index", _fmt_index),
+
+    # Europe
     YahooInstrument("dax", "^GDAXI", "DAX", "index", _fmt_index),
     YahooInstrument("cac40", "^FCHI", "CAC 40", "index", _fmt_index),
     YahooInstrument("ftse", "^FTSE", "FTSE 100", "index", _fmt_index),
     YahooInstrument("eurostoxx50", "^STOXX50E", "EURO STOXX 50", "index", _fmt_index),
+    YahooInstrument("stoxx600", "^STOXX", "STOXX EUROPE 600", "index", _fmt_index),
+    YahooInstrument("ibex35", "^IBEX", "IBEX 35", "index", _fmt_index),
+    YahooInstrument("smi", "^SSMI", "SMI", "index", _fmt_index),
+    YahooInstrument("aex", "^AEX", "AEX", "index", _fmt_index),
+    YahooInstrument("bel20", "^BFX", "BEL 20", "index", _fmt_index),
+    YahooInstrument("ftsemib", "FTSEMIB.MI", "FTSE MIB", "index", _fmt_index),
+
+    # Asia-Pacific
+    YahooInstrument("nikkei", "^N225", "NIKKEI 225", "index", _fmt_index),
+    YahooInstrument("hangseng", "^HSI", "HANG SENG", "index", _fmt_index),
+    YahooInstrument("shanghai", "000001.SS", "SHANGHAI COMP", "index", _fmt_index),
+    YahooInstrument("kospi", "^KS11", "KOSPI", "index", _fmt_index),
+    YahooInstrument("taiwan", "^TWII", "TAIWAN WEIGHTED", "index", _fmt_index),
+    YahooInstrument("singapore", "^STI", "STRAITS TIMES", "index", _fmt_index),
+    YahooInstrument("jakarta", "^JKSE", "JAKARTA COMPOSITE", "index", _fmt_index),
+    YahooInstrument("klse", "^KLSE", "FTSE BURSA MALAYSIA", "index", _fmt_index),
     YahooInstrument("asx200", "^AXJO", "S&P/ASX 200", "index", _fmt_index),
+    YahooInstrument("nz50", "^NZ50", "S&P/NZX 50", "index", _fmt_index),
+
+    # Americas ex-US
     YahooInstrument("bovespa", "^BVSP", "BOVESPA", "index", _fmt_index),
+    YahooInstrument("tsx", "^GSPTSE", "S&P/TSX COMPOSITE", "index", _fmt_index),
+    YahooInstrument("mexicoipc", "^MXX", "MEXICO IPC", "index", _fmt_index),
 ]
 
 COMMODITY_INSTRUMENTS: list[YahooInstrument] = [
@@ -261,32 +295,38 @@ def _row_from_yahoo_quote(inst: YahooInstrument, quote: dict[str, Any]) -> dict[
 
 
 def _fetch_yahoo_api_batch(instruments: list[YahooInstrument]) -> dict[str, dict[str, Any]]:
+    """Fetch Yahoo quotes in bounded chunks so a larger regional universe cannot
+    make one oversized request fail the whole market overview."""
     if not instruments:
         return {}
 
-    symbol_to_key = {inst.symbol: inst.key for inst in instruments}
-    instruments_by_key = {inst.key: inst for inst in instruments}
-    symbols = ",".join(inst.symbol for inst in instruments)
+    rows: dict[str, dict[str, Any]] = {}
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    chunk_size = 20
 
-    try:
-        url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbols}"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        response = requests.get(url, timeout=10, headers=headers)
-        response.raise_for_status()
-        payload = response.json()
+    for offset in range(0, len(instruments), chunk_size):
+        chunk = instruments[offset : offset + chunk_size]
+        symbol_to_key = {inst.symbol: inst.key for inst in chunk}
+        instruments_by_key = {inst.key: inst for inst in chunk}
+        symbols = ",".join(inst.symbol for inst in chunk)
+        try:
+            url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbols}"
+            response = requests.get(url, timeout=10, headers=headers)
+            response.raise_for_status()
+            payload = response.json()
+            for quote in payload.get("quoteResponse", {}).get("result", []):
+                symbol = quote.get("symbol")
+                inst_key = symbol_to_key.get(str(symbol)) if isinstance(symbol, str) else None
+                if not inst_key:
+                    continue
+                row = _row_from_yahoo_quote(instruments_by_key[inst_key], quote)
+                if row:
+                    rows[inst_key] = row
+        except Exception:
+            # Keep successful chunks; per-instrument fallbacks fill missing rows.
+            continue
 
-        rows: dict[str, dict[str, Any]] = {}
-        for quote in payload.get("quoteResponse", {}).get("result", []):
-            symbol = quote.get("symbol")
-            inst_key = symbol_to_key.get(str(symbol)) if isinstance(symbol, str) else None
-            if not inst_key:
-                continue
-            row = _row_from_yahoo_quote(instruments_by_key[inst_key], quote)
-            if row:
-                rows[inst_key] = row
-        return rows
-    except Exception:
-        return {}
+    return rows
 
 
 def _fetch_yahoo_api_quote(inst: YahooInstrument) -> dict[str, Any] | None:

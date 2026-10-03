@@ -9,6 +9,7 @@ from typing import Any
 from .schemas import Event, EventType
 from .sqlite_store import get_sqlite_store
 from .view_store import get_view_store
+from .market_state import get_market_state
 from .event_bus import get_event_bus
 
 
@@ -31,6 +32,7 @@ class PersistenceWorker:
     def _run(self) -> None:
         sqlite = get_sqlite_store()
         view_store = get_view_store()
+        market_state = get_market_state()
         event_bus = get_event_bus()
         while not self._stop.is_set():
             try:
@@ -43,6 +45,17 @@ class PersistenceWorker:
                         )
                     except Exception:
                         pass
+                for quote in market_state.drain_dirty_quotes():
+                    sqlite.persist_quote({
+                        "symbol": quote.symbol,
+                        "ltp": quote.ltp,
+                        "bid": quote.bid,
+                        "ask": quote.ask,
+                        "volume": quote.volume,
+                        "oi": quote.oi,
+                        "source": quote.source,
+                        "updated_at": quote.timestamp,
+                    })
                 snap = view_store.snapshot()
                 for namespace, view in snap.items():
                     sqlite.persist_view_snapshot(namespace, view)

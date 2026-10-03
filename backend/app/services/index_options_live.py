@@ -66,11 +66,12 @@ def _apply_live_spot_risk_guard(strategy_inputs: dict[str, Any]) -> dict[str, An
         invalidated=bool(stop is not None and ((direction=="CALL" and spot<=stop) or (direction=="PUT" and spot>=stop)))
         if invalidated:
             gates["structure"]=gates["breakout"]=gates["riskReward"]=False; row["expectedR"]=0.0
+            gate_evidence["riskReward"]={"expectedR":0.0,"aligned":False,"minimumR":1.5,"basis":"LIVE_SPOT_STRUCTURAL_INVALIDATION","entryUnderlying":round(spot,4),"stop":round(stop,4) if stop is not None else None,"target":round(target,4) if target is not None else None,"liveInvalidated":True}
             if "LIVE_SPOT_CROSSED_STRUCTURAL_STOP" not in limitations: limitations.append("LIVE_SPOT_CROSSED_STRUCTURAL_STOP")
             continue
         if stop is None or target is None or not atr or not premium or delta<=0 or not opening_range: continue
         structural_risk=abs(spot-stop); atr_floor=atr*.20; spread_cost=premium*spread_pct/100; spread_underlying=spread_cost/delta if spread_cost>0 else 0; risk_move=max(structural_risk,atr_floor,spread_underlying); reward_move=abs(target-spot); option_loss=max(delta*risk_move-.5*gamma*risk_move*risk_move+spread_cost,spread_cost,.05); option_gain=max(delta*reward_move+.5*gamma*reward_move*reward_move-spread_cost,0); expected_r=round(option_gain/option_loss,3) if option_loss>0 else 0
-        row["expectedR"]=expected_r; gates["riskReward"]=expected_r>=1.5; gate_evidence["riskReward"]={"expectedR":expected_r,"aligned":expected_r>=1.5,"minimumR":1.5,"basis":"LIVE_SPOT_ORB_INVALIDATION_WITH_ATR_SPREAD_RISK_FLOOR","entryUnderlying":round(spot,4),"stop":round(stop,4),"target":round(target,4)}; _refresh_live_breadth_confirmation(row,expected_r)
+        row["expectedR"]=expected_r; gates["riskReward"]=expected_r>=1.5; gate_evidence["riskReward"]={"expectedR":expected_r,"aligned":expected_r>=1.5,"minimumR":1.5,"basis":"LIVE_SPOT_ORB_INVALIDATION_WITH_ATR_SPREAD_RISK_FLOOR","entryUnderlying":round(spot,4),"stop":round(stop,4),"target":round(target,4),"structuralRiskPoints":round(structural_risk,4),"atrRiskFloorPoints":round(atr_floor,4),"spreadRiskFloorPoints":round(spread_underlying,4),"riskPoints":round(risk_move,4),"projectedOptionLoss":round(option_loss,4),"projectedOptionGain":round(option_gain,4),"liveInvalidated":False}; _refresh_live_breadth_confirmation(row,expected_r)
     return strategy_inputs
 
 
@@ -151,7 +152,15 @@ def compose_live_index_options_radar(snapshot: dict[str,Any],*,live:bool=True,cl
     book=ensure_fresh_market_snapshot(snapshot,reason="index_options_breadth"); option_data=None
     if live:
         try: option_data=snapshot_fn(client)
-        except Exception as exc: option_data=unavailable_provider_snapshot(exc)
+        except Exception as exc:
+            option_data=unavailable_provider_snapshot(exc)
+            try:
+                from .market_data_provider import fetch_shoonya_quotes
+                shoonya_raw = fetch_shoonya_quotes([])
+                if shoonya_raw:
+                    option_data.setdefault("providerEvidence", {})["shoonyaQuotes"] = {"status": "AVAILABLE", "count": len(shoonya_raw)}
+            except Exception:
+                pass
         expiries={}
         try: expiries.update(expiries_fn())
         except Exception as exc: option_data["fallbackSource"]="SCANX"; option_data["expiryMasterError"]=str(exc)
@@ -174,7 +183,7 @@ def compose_live_index_options_radar(snapshot: dict[str,Any],*,live:bool=True,cl
     clock = (now or datetime.now(IST_ZONE)).astimezone(IST_ZONE)
     result["sessionDate"] = clock.date().isoformat()
     result["strategyBook"] = process_strategy_cycle(result, book, clock) if persist else strategy_book(result["sessionDate"])
-    market_open=index_options_market_open(now); paper=reconcile_paper_book(result,client=client,persist=persist,now=now); result["paperBook"]=_merge_strategy_projection(paper,result.get("strategyBook")); result["sessionStatus"]="OPEN" if market_open else "CLOSED"; result["huntActive"]=market_open; result["limits"]["huntMode"]="CONTINUOUS_MARKET_SESSION" if market_open else "SESSION_CLOSED"; result["limits"]["selectionAuthority"]="INDEX_OPTIONS_QUANT_V2"; result["provider"]="ANGEL_ONE_WITH_SCANX_AND_LEMONN_FALLBACK"; result["providerEvidence"]=book.get("indexOptionProvider"); result["streamStatus"]=ANGEL_INDEX_STREAM.status()
+    market_open=index_options_market_open(now); paper=reconcile_paper_book(result,client=client,persist=persist,now=now); result["paperBook"]=_merge_strategy_projection(paper,result.get("strategyBook")); result["sessionStatus"]="OPEN" if market_open else "CLOSED"; result["huntActive"]=market_open; result["limits"]["huntMode"]="CONTINUOUS_MARKET_SESSION" if market_open else "SESSION_CLOSED"; result["limits"]["selectionAuthority"]="INDEX_OPTIONS_QUANT_V2"; result["provider"]="ANGEL_ONE_WITH_SHOONYA_AND_SCANX_AND_LEMONN_FALLBACK"; result["providerEvidence"]=book.get("indexOptionProvider"); result["streamStatus"]=ANGEL_INDEX_STREAM.status()
     if persist: persist_radar(result)
     return result
 
@@ -195,6 +204,7 @@ def hydrate_durable_index_options_radar(radar: dict[str, Any], *, now: datetime 
 
 def finalize_closed_index_options_radar(radar:dict[str,Any],*,client:Any,persist:bool=True,now:datetime|None=None)->dict[str,Any]:
     result = hydrate_durable_index_options_radar(radar, now=now)
+    result["sessionStatus"] = "CLOSED"
     result["huntActive"] = False
     result["limits"] = {**(result.get("limits") or {}), "huntMode": "SESSION_CLOSED", "selectionAuthority": "INDEX_OPTIONS_QUANT_V2"}
     result["cacheStatus"] = "SESSION_FROZEN"

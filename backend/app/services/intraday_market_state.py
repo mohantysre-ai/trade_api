@@ -24,15 +24,24 @@ from zoneinfo import ZoneInfo
 
 IST_ZONE = ZoneInfo("Asia/Kolkata")
 LOGGER = logging.getLogger(__name__)
+RECOVERY_LOGGER = logging.getLogger("uvicorn.error").getChild("intraday_recovery")
 
 EXCHANGE_TYPES = {"NSE": 1, "NFO": 2, "BSE": 3, "BFO": 4}
 SOURCE_WS = "ANGEL_WS"
 SOURCE_REST_BOOTSTRAP = "ANGEL_REST_BOOTSTRAP"
 SOURCE_REST_RECOVERY = "ANGEL_REST_RECOVERY"
+SOURCE_STANDBY_WS = "SHOONYA_WS"
+LIVE_WS_SOURCES = frozenset({SOURCE_WS, SOURCE_STANDBY_WS})
 
 FRESH_SECONDS = float(os.getenv("INTRADAY_WS_FRESH_SECONDS", "8"))
 STALE_SECONDS = float(os.getenv("INTRADAY_WS_STALE_SECONDS", "30"))
 RECOVERY_SECONDS = float(os.getenv("INTRADAY_WS_RECOVERY_SECONDS", "60"))
+# How long the last accepted price stays a usable reference for the tight
+# handoff consistency check. Past this the market has plainly moved while this
+# lane was blind, so the standby print is judged by the price band instead.
+HANDOFF_REFERENCE_SECONDS = float(
+    os.getenv("INTRADAY_STANDBY_HANDOFF_REFERENCE_SECONDS", "30")
+)
 # Angel's SmartWebSocketV2 silently drops tokens beyond its per-request limit
 # instead of erroring — a 250-token chunk (F4.1/F4.2) left up to 250 of the
 # 750-symbol universe unsubscribed with no observable failure. 50 matches the
@@ -180,6 +189,7 @@ def _new_symbol_row(universe_row: dict[str, Any] | None) -> dict[str, Any]:
         "tradeVolume": None,
         "tickCount": 0,
         "bar5m": None,
+        "primaryLastMono": 0.0,
     }
 
 
@@ -217,6 +227,7 @@ class IntradayMarketState:
         self._generation = 0
         self._last_tick_at: datetime | None = None
         self._connected = False
+        self._standby_health: dict[str, Any] | None = None
 
     # ------------------------------------------------------------------ universe
 
@@ -257,12 +268,25 @@ class IntradayMarketState:
 
     # ------------------------------------------------------------------- ticks
 
-    def apply_tick(self, token: str, exchange_type: int, message: Any) -> str:
+    def apply_tick(
+        self,
+        token: str,
+        exchange_type: int,
+        message: Any,
+        *,
+        promote_after_s: float = FRESH_SECONDS,
+    ) -> str:
         """Atomic latest-wins tick update.
 
-        Returns one of: ``new`` / ``duplicate`` / ``older`` / ``invalid``.
-        The full row is updated under one lock; readers never observe a
-        half-updated row.
+        Returns one of: ``new`` / ``duplicate`` / ``older`` / ``invalid`` /
+        ``interim``. The full row is updated under one lock; readers never
+        observe a half-updated row.
+
+        When the standby lane already owns the symbol this lane is only allowed
+        to take authority back if it is demonstrably keeping up: either the
+        standby has gone stale, or this lane's own observed tick gap is within
+        ``promote_after_s``. Without that test a merely slow primary oscillates
+        with the standby on every cycle.
         """
         token = str(token or "")
         if not isinstance(message, dict) or not token:
@@ -332,6 +356,27 @@ class IntradayMarketState:
             prev_close = _number(message.get("closed_price"), scale=100.0)
             if prev_close and prev_close > 0:
                 row["prevClose"] = prev_close
+
+            # Handoff hysteresis. ``primaryLastMono`` is written only here, so it
+            # keeps measuring this lane's real tick cadence even while the
+            # standby lane owns the row.
+            previous_primary = row.get("primaryLastMono") or 0.0
+            observed_gap = (mono - previous_primary) if previous_primary else None
+            row["primaryLastMono"] = mono
+            if row.get("source") == SOURCE_STANDBY_WS:
+                received = row.get("receivedMonotonic") or 0.0
+                standby_age = (mono - received) if received else None
+                standby_fresh = (
+                    standby_age is not None and standby_age <= promote_after_s
+                )
+                if (
+                    standby_fresh
+                    and observed_gap is not None
+                    and observed_gap > promote_after_s
+                ):
+                    _metric("ws_tick_interim_standby_holds")
+                    return "interim"
+
             row.update(
                 {
                     "ltp": ltp,
@@ -509,6 +554,128 @@ class IntradayMarketState:
             pass
         return True
 
+    # ------------------------------------------------------------ standby lane
+
+    def apply_standby_tick(
+        self,
+        symbol: str,
+        quote: dict[str, Any] | None,
+        *,
+        promote_after_s: float = FRESH_SECONDS,
+        band_pct: float = 25.0,
+        handoff_divergence_pct: float = 1.0,
+        handoff_reference_s: float = HANDOFF_REFERENCE_SECONDS,
+    ) -> str:
+        if not isinstance(quote, dict):
+            _metric("standby_tick_invalid")
+            return "rejected_invalid"
+        ltp = _number(quote.get("ltp"))
+        if ltp is None or ltp <= 0:
+            _metric("standby_tick_invalid")
+            return "rejected_invalid"
+        exchange_ts_ms = quote.get("exchangeTsMs")
+        if isinstance(exchange_ts_ms, (int, float)) and exchange_ts_ms > 0:
+            try:
+                tick_date = datetime.fromtimestamp(float(exchange_ts_ms) / 1000.0, tz=IST_ZONE).date()
+            except (OverflowError, OSError, ValueError):
+                tick_date = None
+            if tick_date is not None and tick_date != _now_utc().astimezone(IST_ZONE).date():
+                _metric("standby_tick_stale_date")
+                return "rejected_date"
+        symbol = str(symbol or "").upper()
+        if not symbol:
+            _metric("standby_tick_invalid")
+            return "rejected_invalid"
+        now = _now_utc()
+        mono = time.monotonic()
+        with self._lock:
+            row = self._state.get(symbol)
+            if row is None:
+                row = next((s for s in self._state.values() if s.get("symbol") == symbol), None)
+            if row is None:
+                row = _new_symbol_row(None)
+                row["symbol"] = symbol
+                self._state[symbol] = row
+            received = row.get("receivedMonotonic") or 0.0
+            primary_age = (mono - received) if received else None
+            primary_source_is_ws = row.get("source") == SOURCE_WS
+            if primary_age is not None and primary_age <= promote_after_s and primary_source_is_ws:
+                _metric("standby_tick_rejected_primary_fresh")
+                return "rejected_primary_fresh"
+            prev_close = row.get("prevClose")
+            prior_ltp = row.get("ltp")
+            prior_ltp = float(prior_ltp) if prior_ltp and float(prior_ltp) > 0 else None
+            if prev_close and prev_close > 0:
+                outside_prev_close = (
+                    abs(ltp - float(prev_close)) / float(prev_close) * 100.0
+                    > band_pct
+                )
+                if outside_prev_close:
+                    # The band exists to catch corrupt data, not a real move. A
+                    # symbol that has legitimately traded far from the session
+                    # open is still fail-able-over, so the price is also judged
+                    # against the last price this book actually accepted.
+                    if prior_ltp is None or (
+                        abs(ltp - prior_ltp) / prior_ltp * 100.0 > band_pct
+                    ):
+                        _metric("standby_tick_rejected_band")
+                        return "rejected_band"
+            reference_age = primary_age
+            reference_window = max(float(handoff_reference_s), float(promote_after_s))
+            reference_is_live = (
+                reference_age is not None and reference_age <= reference_window
+            )
+            if prior_ltp is not None and reference_is_live:
+                # Consistency against the last accepted price, not against the
+                # primary's last print. Comparing to a primary that is already
+                # past the freshness SLA can only ever fire on a market that
+                # moved during the silence, and because a veto leaves the
+                # reference unchanged it can never recover: the standby lane
+                # would be frozen out for the rest of the session. Past
+                # ``handoff_reference_s`` the reference is no longer live and
+                # the price band above is the admissibility test instead.
+                divergence = abs(ltp - prior_ltp) / prior_ltp * 100.0
+                if divergence > handoff_divergence_pct:
+                    _metric("standby_tick_quarantined_divergence")
+                    return "quarantined_divergence"
+            row.update({
+                "ltp": ltp,
+                "receivedAt": _iso(now),
+                "receivedMonotonic": mono,
+                "source": SOURCE_STANDBY_WS,
+                "connected": True,
+                "failover": True,
+            })
+            standby_prev_close = quote.get("prevClose")
+            if isinstance(standby_prev_close, (int, float)) and standby_prev_close > 0:
+                row["prevClose"] = float(standby_prev_close)
+            volume = _number(quote.get("volume"))
+            if volume is not None:
+                row["tradeVolume"] = volume
+            row["stale"] = False
+            self._generation += 1
+            self._last_tick_at = now
+        _metric("standby_tick_applied")
+        try:
+            from app.services.shared_state.market_state import get_market_state
+            from app.services.shared_state.schemas import FeedStatus, Quote
+            get_market_state().update_quote(
+                Quote(
+                    symbol=symbol,
+                    ltp=ltp,
+                    volume=volume if volume is not None else None,
+                    source=SOURCE_STANDBY_WS,
+                    feed_status=FeedStatus.DEGRADED,
+                )
+            )
+        except Exception:
+            pass
+        return "applied"
+
+    def set_standby_health(self, health: dict[str, Any] | None) -> None:
+        with self._lock:
+            self._standby_health = dict(health) if isinstance(health, dict) else None
+
     # -------------------------------------------------- snapshot / status
 
     def capture_snapshot(self, symbols: list[str] | None = None) -> dict[str, Any]:
@@ -559,6 +726,7 @@ class IntradayMarketState:
             rows = list(self._state.values())
             connected = self._connected
             last_tick_at = self._last_tick_at
+            standby_health = dict(self._standby_health) if self._standby_health else None
         now_mono = time.monotonic()
         live = stale = unavailable = 0
         oldest_live: float | None = None
@@ -594,6 +762,7 @@ class IntradayMarketState:
             "lastTickAt": _iso(last_tick_at),
             "oldestLiveTickAgeSeconds": oldest_live,
             "feedStatus": health,
+            "standby": standby_health,
         }
 
     def stale_symbols(
@@ -922,7 +1091,7 @@ class _RecoveryCircuit:
         if self.failures >= self.threshold and self.opened_at == 0.0:
             self.opened_at = time.monotonic()
             _metric("rest_circuit_open")
-            LOGGER.warning("REST_CIRCUIT_OPEN reason=recovery_failures=%d", self.failures)
+            RECOVERY_LOGGER.warning("REST_CIRCUIT_OPEN reason=recovery_failures=%d", self.failures)
 
     def record_success(self) -> None:
         self.failures = 0
@@ -937,6 +1106,89 @@ class _RecoveryCircuit:
             self.failures = self.threshold - 1
             return True
         return False
+
+
+class _RecoverySweep:
+    def __init__(self) -> None:
+        self.pending: list[str] = []
+        self.total = 0
+        self.attempted = 0
+        self.repaired = 0
+
+    def next_batch(
+        self,
+        stale: list[dict[str, Any]],
+        batch_size: int,
+    ) -> list[str]:
+        stale_symbols = list(
+            dict.fromkeys(
+                str(row.get("symbol") or "").upper()
+                for row in stale
+                if row.get("symbol")
+            )
+        )
+        if not self.pending:
+            self.pending = stale_symbols
+            self.total = len(self.pending)
+            self.attempted = 0
+            self.repaired = 0
+        else:
+            stale_set = set(stale_symbols)
+            self.pending = [symbol for symbol in self.pending if symbol in stale_set]
+        size = max(1, batch_size)
+        batch = self.pending[:size]
+        del self.pending[:size]
+        self.attempted += len(batch)
+        return batch
+
+    def record(self, repaired: int) -> bool:
+        self.repaired += repaired
+        return self.total > 0 and not self.pending
+
+
+def _recover_via_standby(
+    market_state: "IntradayMarketState",
+    sweep: _RecoverySweep | None = None,
+) -> int:
+    from .standby_feed.config import StandbyConfig
+    from .standby_feed.gateway_client import GatewayClient
+
+    cfg = StandbyConfig.from_env()
+    if not cfg.promotable:
+        return 0
+    client = GatewayClient(cfg)
+    health = client.health()
+    if not health or not health.get("healthy"):
+        return 0
+    batch_size = int(os.getenv("INTRADAY_RECOVERY_BATCH", "25"))
+    sweep = sweep or _RecoverySweep()
+    symbols = sweep.next_batch(market_state.stale_symbols(), batch_size)
+    if not symbols:
+        return 0
+    quotes = client.quotes(symbols)
+    repaired = 0
+    for sym in symbols:
+        wire = quotes.get(sym)
+        if not isinstance(wire, dict) or wire.get("status") == "NOT_SUBSCRIBED":
+            continue
+        outcome = market_state.apply_standby_tick(
+            sym,
+            wire,
+            promote_after_s=cfg.promote_after_s,
+            band_pct=cfg.band_pct,
+            handoff_divergence_pct=cfg.handoff_divergence_pct,
+        )
+        if outcome == "applied":
+            repaired += 1
+    if repaired:
+        RECOVERY_LOGGER.info("STANDBY_RECOVERY repaired=%d/%d", repaired, len(symbols))
+    if sweep.record(repaired):
+        RECOVERY_LOGGER.info(
+            "STANDBY_RECOVERY sweep_repaired=%d/%d",
+            sweep.repaired,
+            sweep.total,
+        )
+    return repaired
 
 
 def start_intraday_recovery_worker(client: Any) -> threading.Thread | None:
@@ -956,23 +1208,24 @@ def start_intraday_recovery_worker(client: Any) -> threading.Thread | None:
     interval = float(os.getenv("INTRADAY_RECOVERY_INTERVAL_SEC", "60"))
     batch_size = int(os.getenv("INTRADAY_RECOVERY_BATCH", "25"))
     circuit = _RecoveryCircuit()
+    rest_sweep = _RecoverySweep()
+    standby_sweep = _RecoverySweep()
     stream = get_intraday_stream()
     market_state = stream.market_state
 
     def _recover_once() -> int:
         if market_state.stream_status().get("wsConnected") is not True:
-            return 0  # WS restoration is primary; REST recovery waits.
+            try:
+                return _recover_via_standby(market_state, standby_sweep)
+            except Exception:
+                RECOVERY_LOGGER.debug("standby recovery attempt failed", exc_info=True)
+                return 0
         if not circuit.allow():
             return 0
-        stale = market_state.stale_symbols()
-        symbols = [
-            str(row.get("symbol") or "").upper()
-            for row in stale
-            if row.get("symbol")
-        ][:batch_size]
+        symbols = rest_sweep.next_batch(market_state.stale_symbols(), batch_size)
         if not symbols:
             return 0
-        LOGGER.info("REST_RECOVERY symbols=%d", len(symbols))
+        RECOVERY_LOGGER.info("REST_RECOVERY symbols=%d", len(symbols))
         try:
             from .trade_outcome import _fetch_angel_plan_prices
 
@@ -980,7 +1233,7 @@ def start_intraday_recovery_worker(client: Any) -> threading.Thread | None:
         except Exception as exc:
             circuit.record_failure()
             _metric("rest_recovery_failures")
-            LOGGER.warning("REST_RECOVERY failed: %s", exc)
+            RECOVERY_LOGGER.warning("REST_RECOVERY failed: %s", exc)
             return 0
         repaired = 0
         for sym in symbols:
@@ -989,9 +1242,21 @@ def start_intraday_recovery_worker(client: Any) -> threading.Thread | None:
                 repaired += 1
         if repaired:
             circuit.record_success()
-            LOGGER.info("REST_RECOVERY repaired=%d/%d", repaired, len(symbols))
+            RECOVERY_LOGGER.info(
+                "REST_RECOVERY repaired=%d/%d progress=%d/%d",
+                repaired,
+                len(symbols),
+                rest_sweep.repaired + repaired,
+                rest_sweep.total,
+            )
         else:
             circuit.record_failure()
+        if rest_sweep.record(repaired):
+            RECOVERY_LOGGER.info(
+                "REST_RECOVERY sweep_repaired=%d/%d",
+                rest_sweep.repaired,
+                rest_sweep.total,
+            )
         return repaired
 
     def _run() -> None:
@@ -1000,7 +1265,7 @@ def start_intraday_recovery_worker(client: Any) -> threading.Thread | None:
             try:
                 _recover_once()
             except Exception:
-                LOGGER.exception("intraday recovery cycle failed")
+                RECOVERY_LOGGER.exception("intraday recovery cycle failed")
 
     if not WS_ENABLED:
         return None
@@ -1046,6 +1311,9 @@ __all__ = [
     "AngelIntradayStream",
     "IntradayMarketState",
     "IntradayUniverse",
+    "LIVE_WS_SOURCES",
+    "SOURCE_STANDBY_WS",
+    "SOURCE_WS",
     "get_intraday_market_state",
     "get_intraday_stream",
     "metrics_snapshot",

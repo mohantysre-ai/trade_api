@@ -190,7 +190,7 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
     """Union locked Swing + Intraday baskets for EOD (target ~10 + 10 + 10 = 30).
 
     Sources (facts only, no invented symbols):
-      - swing_session.json (Asset Matrix BUY lock) -> book=SWING when sessionDate matches
+      - swing_v2_session.json / authoritative V2 session -> book=SWING when sessionDate matches
       - intradAy_session.json long/short -> book=INTRADAY when sessionDate matches
       - fixed_trade_plan.json only if intradAy session empty (legacy mirror)
       - eod_archive fills gaps for missing keys only

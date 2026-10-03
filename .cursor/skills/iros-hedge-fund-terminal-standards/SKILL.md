@@ -60,7 +60,7 @@ Never invent prices, scores, win rates, Kelly, verdicts, news, or risk flags. If
 | File | Path | Role |
 |---|---|---|
 | Live Intraday | Docker volume `/app/state/intraday_session.json` (native: repo root) | Today’s Intraday book — **includes closed names + realized P&L** |
-| Live Swing | Docker volume `/app/state/swing_session.json` (native: repo root) | Today’s Swing book — closed rows stay on `long`/`short` |
+| Live Swing | Docker volume `/app/state/swing_v2_session.json` (native: repo root) | Today’s Swing book — closed rows stay on `long`/`short` |
 | Live market | Docker volume `/app/state/last_market_snapshot.json` | Quotes + Matrix; `GET /api/market-data` with `prefer_cache` |
 | EOD Book | Docker volume `/app/backend/app/data/eod/{IST date}/` (native: `backend/app/data/eod/`) | **Dated archive of that same IST day’s books** |
 | Bulk deals | `backend/app/data/bulk_deals_cache.json` | NSE bulk/block deal cache |
@@ -77,7 +77,7 @@ EOD Intraday and Swing sections must stay aligned with each other and with the l
 
 | IST date D | Intraday tab | Swing / Asset Matrix tab | EOD Book Intraday | EOD Book Swing |
 |---|---|---|---|---|
-| D = today | `intraday_session.json` | `swing_session.json` | Generate from that live session (closed names + realized stay) | Generate from that live swing session |
+| D = today | `intraday_session.json` | `swing_v2_session.json` | Generate from that live session (closed names + realized stay) | Generate from that live swing session |
 | D = prior session | Do not display as today’s working book | Do not overlay as today’s lock | `data/eod/D/book_intraday.json` only | `data/eod/D/book_swing.json` only |
 
 Rules:

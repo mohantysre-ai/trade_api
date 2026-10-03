@@ -1,5 +1,8 @@
 import time
+import json
 from datetime import datetime, timedelta
+
+import app.services.index_options_paper as paper
 
 from app.services.angel_index_options import IST_ZONE
 from app.services.angel_index_stream import ANGEL_INDEX_STREAM
@@ -10,9 +13,143 @@ from app.services.index_options_paper import (
     LONG_PREMIUM_TARGET_POINTS,
     hydrate_open_position_subscriptions,
     reconcile_paper_book,
+    _governor,
+    _reentry_confirmations,
 )
+from app.services.index_options_engine import can_reenter_index_option, SELL_SLEEVE
 
 SESSION_DATE = datetime(2027, 6, 15, 11, 0, tzinfo=IST_ZONE)
+
+
+def test_locked_mark_falls_back_to_shoonya_before_option_chains(monkeypatch):
+    position = {
+        "index": "NIFTY",
+        "symbol": "NIFTY27JUN25000CE",
+        "token": "123",
+        "exchange": "NFO",
+        "expiry": "2027-06-24",
+        "strike": 25000,
+        "direction": "CALL",
+    }
+
+    class Client:
+        def fetch_batch_quotes(self, _instruments):
+            return {}
+
+    monkeypatch.setattr(paper, "_stream_marks", lambda instruments, max_age_seconds: ({}, {}, instruments))
+    monkeypatch.setattr(paper, "_shoonya_marks", lambda instruments: (
+        {instruments[0].tradingsymbol: 81.0},
+        {instruments[0].tradingsymbol: {"source": "SHOONYA_WEBSOCKET_LOCKED_CONTRACT"}},
+    ))
+    monkeypatch.setattr(paper, "_chain_marks", lambda *_args: (_ for _ in ()).throw(AssertionError("chain fallback must not run")))
+    marks, depth, _error, pipeline = paper._locked_marks(Client(), [position])
+    assert marks[position["symbol"]] == 81.0
+    assert depth[position["symbol"]]["source"] == "SHOONYA_WEBSOCKET_LOCKED_CONTRACT"
+    assert pipeline["shoonyaMarks"] == 1
+
+
+def test_shoonya_locked_mark_rejects_stale_quote(monkeypatch):
+    instrument = paper.Instrument("PAPER:NIFTY27JUN25000CE", "NFO", "NIFTY27JUN25000CE", "123", "NIFTY27JUN25000CE")
+
+    class Config:
+        promotable = True
+
+    class Gateway:
+        def __init__(self, _cfg): pass
+        def pin(self, *_args, **_kwargs): return True
+        def quotes(self, _symbols):
+            return {instrument.tradingsymbol: {"ltp": 79.0, "ageMs": (paper._mark_stale_seconds() + 1) * 1000}}
+
+    monkeypatch.setattr("app.services.standby_feed.config.StandbyConfig.from_env", lambda: Config())
+    monkeypatch.setattr("app.services.standby_feed.gateway_client.GatewayClient", Gateway)
+    marks, depth = paper._shoonya_marks([instrument])
+    assert marks == {}
+    assert depth == {}
+
+
+def test_executable_bid_crossing_stop_closes_even_when_ltp_is_above_stop(tmp_path, monkeypatch):
+    monkeypatch.setenv("INDEX_OPTIONS_PAPER_BOOK_FILE", str(tmp_path / "paper.json"))
+    now = datetime(2027, 6, 15, 11, 0, tzinfo=IST_ZONE)
+    reconcile_paper_book(_radar(100), now=now)
+    _inject_tick("12345", 82.0, bid=79.0, ask=82.5)
+    try:
+        book = reconcile_paper_book(_radar(82), now=now + timedelta(minutes=1))
+    finally:
+        _clear_tick("12345")
+    assert book["open"] == []
+    assert book["closed"][0]["exitReason"] == "INITIAL_STOP"
+    assert book["closed"][0]["exitPremium"] == 79.0
+
+
+def test_chain_fallback_uses_exact_strike_and_option_type(monkeypatch):
+    position = {
+        "index": "NIFTY",
+        "symbol": "NIFTY27JUN25000CE",
+        "token": "123",
+        "exchange": "NFO",
+        "expiry": "2027-06-24",
+        "strike": 25000,
+        "direction": "CALL",
+    }
+    monkeypatch.setattr(
+        "app.services.market_data_provider.fetch_nse_option_chain",
+        lambda *_args, **_kwargs: {
+            "source": "NSE",
+            "chain": [
+                {"strike": 25000, "optionType": "PUT", "ltp": 70.0},
+                {"strike": 25000, "optionType": "CALL", "ltp": 82.0},
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.dhan_scanx_options.fetch_scanx_option_chain",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Dhan must not run after an NSE match")),
+    )
+    monkeypatch.setattr(
+        "app.services.lemonn_options.fetch_lemonn_option_chain",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Lemonn must not run after an NSE match")),
+    )
+    marks, depth = paper._chain_marks([position], {position["symbol"]})
+    assert marks[position["symbol"]] == 82.0
+    assert depth[position["symbol"]]["source"] == "NSE"
+
+
+def test_seller_reentry_uses_seller_evidence_and_ignores_buy_exit():
+    prior = SESSION_DATE - timedelta(minutes=21)
+    book = {"open": [], "closed": [
+        {"index": "NIFTY", "strategyMode": "BUY_PREMIUM", "exitReason": "INITIAL_STOP",
+         "exitedAt": SESSION_DATE.isoformat(), "direction": "CALL", "pnl": -100},
+        {"index": "NIFTY", "strategyMode": SELL_SLEEVE, "exitReason": "PROFIT_TARGET_50PCT_CREDIT",
+         "exitedAt": prior.isoformat(), "direction": "BULLISH", "pnl": 100},
+    ]}
+    row = {"strategyMode": SELL_SLEEVE, "gates": {
+        "fresh": True, "structure": True, "futuresRegime": True,
+        "optionChain": True, "breadth": True,
+    }}
+    decision = can_reenter_index_option(
+        "NIFTY", "BULLISH", SESSION_DATE, _governor(book, SELL_SLEEVE),
+        **_reentry_confirmations(row),
+    )
+    assert decision["allowed"] is True
+
+
+def test_intraday_pyramid_marks_each_leg_from_its_own_contract(tmp_path, monkeypatch):
+    path = tmp_path / "paper.json"
+    monkeypatch.setenv("INDEX_OPTIONS_PAPER_BOOK_FILE", str(path))
+    now = SESSION_DATE
+    legs = [
+        {"symbol": symbol, "entryPrice": 100.0, "qty": 50, "initialQty": 50}
+        for symbol in ("NIFTY_LEG1", "NIFTY_LEG2")
+    ]
+    path.write_text(json.dumps({"sessionDate": now.date().isoformat(), "open": [{
+        "id": "PYRAMID-1", "index": "NIFTY", "bucket": "BROAD", "symbol": "NIFTY_LEG1",
+        "strategyMode": "INTRADAY_PYRAMID", "direction": "LONG", "legs": legs,
+        "enteredAt": (now - timedelta(minutes=1)).isoformat(), "markedAt": (now - timedelta(minutes=1)).isoformat(),
+    }], "closed": [], "entryCount": 1}), encoding="utf-8")
+    chain = [{"symbol": "NIFTY_LEG1", "ltp": 141.0}, {"symbol": "NIFTY_LEG2", "ltp": 95.0}]
+    book = reconcile_paper_book({"candidates": [{"chain": chain}], "selected": []}, now=now)
+    assert book["open"][0]["legs"][0]["targetHit"] is True
+    assert book["open"][0]["legs"][1]["targetHit"] is False
 
 
 def _candidate(mark=100.0, *, key="BANKNIFTY", bucket="FINANCIAL", lot=30):
@@ -52,12 +189,14 @@ def test_eligible_contract_auto_locks_one_lot_with_fixed_20_40_risk(tmp_path, mo
     assert position["riskModel"] == "FIXED_OPTION_PREMIUM_POINTS_1_TO_2"
     assert position["markIntervalSeconds"] == 60
     assert position["minuteMarks"] == [{"at": now.isoformat(), "premium": 100.0, "pnl": 0.0, "source": "ENTRY_LOCK"}]
-    assert entered["longPremiumRiskPolicy"] == {
-        "markIntervalSeconds": 60,
-        "stopPoints": 20.0,
-        "targetPoints": 40.0,
-        "riskReward": 2.0,
-    }
+    policy = entered["longPremiumRiskPolicy"]
+    assert policy["markIntervalSeconds"] == 60
+    assert policy["stopPoints"] == 20.0
+    assert policy["targetPoints"] == 40.0
+    assert policy["riskReward"] == 2.0
+    assert policy["stopPointsMax"] == 20.0
+    assert policy["targetPointsMax"] == 40.0
+    assert policy["lowPremiumAdaptive"] is True
 
 
 def test_price_does_not_reprice_before_one_minute_then_persists_minute_mark(tmp_path, monkeypatch):
@@ -139,13 +278,17 @@ def test_cross_book_owner_blocks_new_paper_entry(tmp_path, monkeypatch):
     assert radar["selected"][0]["ownershipBlockedBy"] == "SWING"
 
 
-def test_premium_too_low_for_true_20_point_stop_is_not_locked(tmp_path, monkeypatch):
+def test_low_premium_uses_positive_adaptive_one_to_two_stop(tmp_path, monkeypatch):
     monkeypatch.setenv("INDEX_OPTIONS_PAPER_BOOK_FILE", str(tmp_path / "paper.json"))
     row = _candidate(mark=20.0)
     book = reconcile_paper_book({"candidates": [row], "selected": [row]},
                                 now=datetime(2026, 8, 24, 11, 0, tzinfo=IST_ZONE))
-    assert book["open"] == []
-    assert book["entryCount"] == 0
+    assert book["entryCount"] == 1
+    position = book["open"][0]
+    assert position["initialStopPremium"] == 10.0
+    assert position["stopDistancePoints"] == 10.0
+    assert position["targetDistancePoints"] == 20.0
+    assert position["riskRewardRatio"] == 2.0
 
 
 def test_missing_exchange_lot_never_fabricates_quantity(tmp_path, monkeypatch):
@@ -250,16 +393,21 @@ def test_portfolio_concurrency_is_applied_after_both_sleeves_select(tmp_path, mo
 
     extra_buy = _candidate(100.0, key="BANKNIFTY", bucket="FINANCIAL")
     extra_sell = _seller_row(key="BANKNIFTY", bucket="FINANCIAL")
-    blocked = reconcile_paper_book(
+    expanded = reconcile_paper_book(
         {
             "candidates": [extra_buy], "sellerCandidates": [extra_sell],
             "selected": [extra_buy, extra_sell], "modularSelected": [extra_buy, extra_sell],
         },
         now=SESSION_DATE + timedelta(minutes=1),
     )
-    assert blocked["entryCount"] == 2
-    assert extra_buy["entryBlockedBy"] == "MAX_CONCURRENT_TRADES_REACHED"
-    assert extra_sell["entryBlockedBy"] == "MAX_CONCURRENT_TRADES_REACHED"
+    # The portfolio-wide cap is 8; the independent BROAD/FINANCIAL sleeve
+    # buckets currently bound this fixture to four simultaneous positions.
+    assert expanded["entryCount"] == 4
+    assert extra_buy.get("entryBlockedBy") is None
+    assert extra_sell.get("entryBlockedBy") is None
+    assert sorted(row["index"] for row in expanded["open"]) == [
+        "BANKNIFTY", "BANKNIFTY", "NIFTY", "NIFTY"
+    ]
 
 
 def test_duplicate_strategy_is_never_locked_twice(tmp_path, monkeypatch):

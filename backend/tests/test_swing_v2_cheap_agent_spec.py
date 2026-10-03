@@ -186,12 +186,35 @@ def test_friction_cost_rejection():
 # 9. Hard 1–2 Session Expiry
 def test_time_exit_due_on_d2():
     now_d0 = datetime(2026, 9, 11, 10, 0, tzinfo=IST)
-    now_d2_before = datetime(2026, 9, 15, 14, 0, tzinfo=IST)
-    now_d2_after = datetime(2026, 9, 15, 15, 16, tzinfo=IST)
+    now_d1_before = datetime(2026, 9, 14, 15, 14, tzinfo=IST)
+    now_d1_after = datetime(2026, 9, 14, 15, 16, tzinfo=IST)
+    now_d2_before = datetime(2026, 9, 15, 9, 15, tzinfo=IST)
 
     assert time_exit_due(now_d0, holding_session_age=0, max_overnights=2, exit_clock="15:15") is False
-    assert time_exit_due(now_d2_before, holding_session_age=2, max_overnights=2, exit_clock="15:15") is False
-    assert time_exit_due(now_d2_after, holding_session_age=2, max_overnights=2, exit_clock="15:15") is True
+    assert time_exit_due(now_d1_before, holding_session_age=1, max_overnights=2, exit_clock="15:15") is False
+    assert time_exit_due(now_d1_after, holding_session_age=1, max_overnights=2, exit_clock="15:15") is True
+    assert time_exit_due(now_d2_before, holding_session_age=2, max_overnights=2, exit_clock="15:15") is True
+
+
+def test_time_exit_never_closes_entry_session_even_if_env_requests_one_overnight():
+    entry_day_after_exit_clock = datetime(2026, 9, 11, 15, 16, tzinfo=IST)
+    next_session_after_exit_clock = datetime(2026, 9, 14, 15, 16, tzinfo=IST)
+
+    # Defensive invariant: CLOSED_TIME can never happen on D0.
+    assert time_exit_due(
+        entry_day_after_exit_clock,
+        holding_session_age=0,
+        max_overnights=1,
+        exit_clock="15:15",
+    ) is False
+
+    # Earliest pure time exit is after one overnight / on the next session.
+    assert time_exit_due(
+        next_session_after_exit_clock,
+        holding_session_age=1,
+        max_overnights=1,
+        exit_clock="15:15",
+    ) is True
 
 
 # 10. Cutoff at 14:45 IST
@@ -252,7 +275,7 @@ def test_1445_ist_entry_cutoff():
     assert len(scan_after.get("candidates") or []) == 0
 
 
-def test_score_above_70_overrides_setup_gate_but_not_safety_gate():
+def test_score_soft_pass_overrides_setup_gate_but_not_safety_gate():
     now = datetime(2026, 9, 11, 10, 0, tzinfo=IST)
     row = {
         "symbol": "HIGH_SCORE",
@@ -294,8 +317,9 @@ def test_score_above_70_overrides_setup_gate_but_not_safety_gate():
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr("app.services.swing_v2.shadow.evaluate_setups", lambda _: {"eligible": False, "passedSetupIds": [], "rejections": {"test": "forced"}})
         result = build_shadow_v2([row], universe_coverage=1.0, regime="NORMAL", final_lock=True, now=now, config=cfg)
-    assert result["candidates"][0]["score"] > 70
+    assert result["candidates"][0]["score"] >= cfg.setup_score_override
     assert result["candidates"][0]["scoreLockEligible"] is True
+    assert result["candidates"][0]["qualificationMode"] == "SCORE_SOFT_PASS"
 
 
 def test_score_above_70_still_fails_stale_data():

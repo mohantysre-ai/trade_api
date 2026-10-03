@@ -57,7 +57,7 @@ function Invoke-Docker {
 
 function Copy-FromApi {
     param([string]$Cid, [string]$From, [string]$To, [switch]$Optional)
-    $code = Invoke-Docker cp "${Cid}:${From}/." $To
+    $code = Invoke-Docker -DockerArgs @('cp', "${Cid}:${From}/.", $To)
     if ($code -ne 0) {
         if ($Optional) {
             Write-Host "  skip $From (missing in container)"
@@ -70,93 +70,151 @@ function Copy-FromApi {
 function Copy-FromVolume {
     param([string]$Volume, [string]$Sub, [string]$To)
     $inner = if ($Sub) { "/vol/$Sub" } else { "/vol" }
-    $code = Invoke-Docker run --rm -v "${Volume}:/vol" -v "${To}:/out" alpine:3.21 sh -c "if [ -d $inner ]; then cp -a $inner/. /out/; fi"
+    $code = Invoke-Docker -DockerArgs @('run', '--rm', '-v', "${Volume}:/vol", '-v', "${To}:/out", 'alpine:3.21', 'sh', '-c', "if [ -d $inner ]; then cp -a $inner/. /out/; fi")
     if ($code -ne 0) { throw "volume pack of $Volume failed." }
 }
 
 try {
-    $cid = (docker ps -aq -f "name=iros-market-api").Trim()
+    $cid = [string](docker ps -aq -f "name=iros-market-api" | Select-Object -First 1)
+    $cid = "$cid".Trim()
     if ($cid) {
         Copy-FromApi $cid "/app/state" $tmpState
         Copy-FromApi $cid "/app/backend/app/data" $tmpData
         Copy-FromApi $cid "/app/backend/app/services/eod_archive" $tmpArchive -Optional
     } else {
         Write-Host "  iros-market-api missing - packing compose project volumes"
-        $stateVol = (docker volume ls -q | Select-String -Pattern "iros-desk-state$").Line
-        $dataVol = (docker volume ls -q | Select-String -Pattern "iros-backend-data$").Line
-        $archVol = (docker volume ls -q | Select-String -Pattern "iros-eod-archive$").Line
-        if (-not $stateVol) { throw "named volume iros-desk-state not found." }
-        Copy-FromVolume $stateVol "" $tmpState
-        if ($dataVol) { Copy-FromVolume $dataVol "" $tmpData }
-        if ($archVol) { Copy-FromVolume $archVol "" $tmpArchive }
+        $stateVol = [string](docker volume ls -q | Select-String -Pattern "iros-desk-state$" | Select-Object -First 1)
+        $dataVol = [string](docker volume ls -q | Select-String -Pattern "iros-backend-data$" | Select-Object -First 1)
+        $archVol = [string](docker volume ls -q | Select-String -Pattern "iros-eod-archive$" | Select-Object -First 1)
+        if ($stateVol) {
+            Copy-FromVolume $stateVol.Trim() "" $tmpState
+            if ($dataVol) { Copy-FromVolume $dataVol.Trim() "" $tmpData }
+            if ($archVol) { Copy-FromVolume $archVol.Trim() "" $tmpArchive }
+        } else {
+            Write-Host "  no IROS volumes found - packing direct-app state only"
+        }
     }
 } catch {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
     throw
 }
 
-function Copy-Tree {
-    param([string]$From, [string]$To)
-    if (-not (Test-Path -LiteralPath $From)) { return 0 }
-    $items = Get-ChildItem -LiteralPath $From -Force -ErrorAction SilentlyContinue
-    if (-not $items) { return 0 }
-    Copy-Item -Path (Join-Path $From "*") -Destination $To -Recurse -Force -ErrorAction SilentlyContinue
-    return @($items).Count
+function Copy-SqliteSnapshot {
+    param([string]$Source, [string]$Target)
+    $python = Join-Path $Root '.venv\Scripts\python.exe'
+    if (-not (Test-Path -LiteralPath $python)) { $python = Join-Path $Root '.test-venv\Scripts\python.exe' }
+    if (-not (Test-Path -LiteralPath $python)) {
+        Write-Host "  [WARN] no Python venv - skipping live database $Source (will not be packed)"
+        return $false
+    }
+    New-Item -ItemType Directory -Force -Path (Split-Path $Target -Parent) | Out-Null
+    $backup = "$Target.pack"
+    if (Test-Path -LiteralPath $backup) { Remove-Item -LiteralPath $backup -Force }
+    & $python (Join-Path $PSScriptRoot 'sqlite-backup.py') $Source $backup
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $backup)) {
+        Write-Host "  [WARN] SQLite snapshot failed for $Source - preserving existing seed copy"
+        return $false
+    }
+    Move-Item -LiteralPath $backup -Destination $Target -Force
+    (Get-Item -LiteralPath $Target).LastWriteTimeUtc = (Get-Item -LiteralPath $Source).LastWriteTimeUtc
+    # A WAL database must never travel with stale sidecars: an orphaned -wal from
+    # the source host is what makes the restored image report "database malformed".
+    foreach ($suffix in @('-wal', '-shm')) {
+        $sidecar = "$Target$suffix"
+        if (Test-Path -LiteralPath $sidecar) { Remove-Item -LiteralPath $sidecar -Force }
+    }
+    return $true
 }
 
-Copy-Tree $tmpState $seedState | Out-Null
+function Copy-Tree {
+    param([string]$From, [string]$To, [switch]$State)
+    if (-not (Test-Path -LiteralPath $From)) { return 0 }
+    $items = if ($State) {
+        Get-ChildItem -LiteralPath $From -File -Filter '*.json' -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notmatch '(\.bak|\.tmp|\.lock)\.json$' }
+    } else {
+        Get-ChildItem -LiteralPath $From -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notmatch '\.(wal|shm)$' }
+    }
+    if (-not $items) { return 0 }
+    $copied = 0
+    foreach ($item in $items) {
+        if (-not $item.PSIsContainer -and $item.Extension -in @('.sqlite3', '.db')) {
+            # Snapshot through SQLite itself: a byte copy of an open WAL database
+            # ships torn pages and produces "database disk image is malformed".
+            $dest = Join-Path $To $item.Name
+            if (Copy-SqliteSnapshot $item.FullName $dest) {
+                Write-Host "  snapshotted database $($item.Name)"
+                $copied++
+            }
+            continue
+        }
+        Copy-Item -LiteralPath $item.FullName -Destination $To -Recurse -Force
+        $copied++
+    }
+    return $copied
+}
+
+Copy-Tree $tmpState $seedState -State | Out-Null
 Copy-Tree $tmpData $seedData | Out-Null
 Copy-Tree $tmpArchive $seedArchive | Out-Null
 
-$localData = Join-Path $Root "backend\app\data"
-$localArchive = Join-Path $Root "backend\app\services\eod_archive"
-if (Test-Path -LiteralPath $localData) {
-    Copy-Tree $localData $seedData | Out-Null
-}
-if (Test-Path -LiteralPath $localArchive) {
-    Copy-Tree $localArchive $seedArchive | Out-Null
-}
-
-$localStateRoot = Join-Path $Root "backend\app\services"
-$localStateBackend = Join-Path $Root "backend"
-$localStateRepo = $Root
-$stateFileMap = @(
-    @{ From = Join-Path $localStateRepo "swing_session.json"; To = Join-Path $seedState "swing_session.json" }
-    @{ From = Join-Path $localStateRepo "swing_session.json.bak"; To = Join-Path $seedState "swing_session.json.bak" }
-    @{ From = Join-Path $localStateRepo "intraday_session.json"; To = Join-Path $seedState "intraday_session.json" }
-    @{ From = Join-Path $localStateRepo "intraday_session.json.bak"; To = Join-Path $seedState "intraday_session.json.bak" }
-    @{ From = Join-Path $localStateRepo "intraday_session.json.lock"; To = Join-Path $seedState "intraday_session.json.lock" }
-    @{ From = Join-Path $localStateBackend "intraday_session.json"; To = Join-Path $seedState "intraday_session.json" }
-    @{ From = Join-Path $localStateRepo "last_market_snapshot.json"; To = Join-Path $seedState "last_market_snapshot.json" }
-    @{ From = Join-Path $localStateRepo "last_market_snapshot.json.bak"; To = Join-Path $seedState "last_market_snapshot.json.bak" }
-    @{ From = Join-Path $localStateRoot "last_market_snapshot.json"; To = Join-Path $seedState "last_market_snapshot.json" }
-    @{ From = Join-Path $localStateRoot "last_market_snapshot.json.bak"; To = Join-Path $seedState "last_market_snapshot.json.bak" }
-    @{ From = Join-Path $localStateRepo "fixed_trade_plan.json"; To = Join-Path $seedState "fixed_trade_plan.json" }
-    @{ From = Join-Path $localStateRepo "fixed_trade_plan.json.bak"; To = Join-Path $seedState "fixed_trade_plan.json.bak" }
-    @{ From = Join-Path $localStateRepo "trade_api_snapshot.json"; To = Join-Path $seedState "trade_api_snapshot.json" }
-    @{ From = Join-Path $localStateRepo "trade_api_snapshot.json.bak"; To = Join-Path $seedState "trade_api_snapshot.json.bak" }
-    @{ From = Join-Path $localStateRepo "alert_history.json"; To = Join-Path $seedState "alert_history.json" }
-    @{ From = Join-Path $localStateRepo "alert_history.json.lock"; To = Join-Path $seedState "alert_history.json.lock" }
-    @{ From = Join-Path $localStateRoot "index_options_radar.json"; To = Join-Path $seedState "index_options_radar.json" }
-    @{ From = Join-Path $localStateRoot "index_options_radar.json.bak"; To = Join-Path $seedState "index_options_radar.json.bak" }
-    @{ From = Join-Path $localStateRoot "index_options_oi_baseline.json"; To = Join-Path $seedState "index_options_oi_baseline.json" }
-    @{ From = Join-Path $localStateRoot "index_options_oi_baseline.json.bak"; To = Join-Path $seedState "index_options_oi_baseline.json.bak" }
-    @{ From = Join-Path $localStateRoot "index_options_candles.json"; To = Join-Path $seedState "index_options_candles.json" }
-    @{ From = Join-Path $localStateRoot "index_options_candles.json.bak"; To = Join-Path $seedState "index_options_candles.json.bak" }
-    @{ From = Join-Path $localStateRoot "index_options_paper_book.json"; To = Join-Path $seedState "index_options_paper_book.json" }
-    @{ From = Join-Path $localStateRoot "index_options_paper_book.json.bak"; To = Join-Path $seedState "index_options_paper_book.json.bak" }
-    @{ From = Join-Path $localStateRoot "index_options_paper_supervisor.json"; To = Join-Path $seedState "index_options_paper_supervisor.json" }
-    @{ From = Join-Path $localStateRoot "index_options_paper_supervisor.json.bak"; To = Join-Path $seedState "index_options_paper_supervisor.json.bak" }
-    @{ From = Join-Path $localStateRoot "index_options_paper_supervisor.lock"; To = Join-Path $seedState "index_options_paper_supervisor.lock" }
-    @{ From = Join-Path $localStateRoot "index_options_hunt_supervisor.json"; To = Join-Path $seedState "index_options_hunt_supervisor.json" }
-    @{ From = Join-Path $localStateRoot "index_options_hunt_supervisor.json.bak"; To = Join-Path $seedState "index_options_hunt_supervisor.json.bak" }
-    @{ From = Join-Path $localStateRoot "index_options_hunt_supervisor.lock"; To = Join-Path $seedState "index_options_hunt_supervisor.lock" }
-)
-foreach ($entry in $stateFileMap) {
-    if (Test-Path -LiteralPath $entry.From) {
-        Copy-Item -LiteralPath $entry.From -Destination $entry.To -Force -ErrorAction SilentlyContinue
+function Merge-NewerFiles {
+    param([string]$From, [string]$To, [switch]$TopLevelOnly)
+    if (-not (Test-Path -LiteralPath $From)) { return }
+    $items = if ($TopLevelOnly) {
+        Get-ChildItem -LiteralPath $From -File -Force
+    } else {
+        Get-ChildItem -LiteralPath $From -Recurse -File -Force
+    }
+    foreach ($item in $items) {
+        if ($item.Extension -notin @('.json', '.sqlite3', '.db')) { continue }
+        if ($item.Name -match '(\.bak|\.tmp|\.lock)$') { continue }
+        if ($item.Name -in @('client_secret.json', 'gemini_oauth_token.json')) { continue }
+        $relative = $item.FullName.Substring($From.Length).TrimStart('\', '/')
+        $target = Join-Path $To $relative
+        if (Test-Path -LiteralPath $target) {
+            if ($item.Name -eq 'swing_v2_ledger.sqlite3') {
+                $python = Join-Path $Root '.venv\Scripts\python.exe'
+                if (-not (Test-Path -LiteralPath $python)) { $python = Join-Path $Root '.test-venv\Scripts\python.exe' }
+                $sequenceScript = Join-Path $PSScriptRoot 'sqlite-sequence.py'
+                $sourceSequence = [long](& $python $sequenceScript $item.FullName)
+                $targetSequence = [long](& $python $sequenceScript $target)
+                if ($sourceSequence -le $targetSequence) { continue }
+                Write-Host "  newer direct-app ledger sequence: $sourceSequence > $targetSequence"
+            } elseif ($item.LastWriteTimeUtc -le (Get-Item -LiteralPath $target).LastWriteTimeUtc) {
+                continue
+            }
+        }
+        New-Item -ItemType Directory -Force -Path (Split-Path $target -Parent) | Out-Null
+        if ($item.Extension -in @('.sqlite3', '.db')) {
+            if (-not (Copy-SqliteSnapshot $item.FullName $target)) {
+                Write-Host "  [WARN] live database not packed: $relative"
+                continue
+            }
+        } else {
+            Copy-Item -LiteralPath $item.FullName -Destination $target -Force
+            try { $null = Get-Content -LiteralPath $target -Raw -Encoding utf8 | ConvertFrom-Json } catch { throw "Invalid JSON in $($item.FullName)" }
+        }
+        (Get-Item -LiteralPath $target).LastWriteTimeUtc = $item.LastWriteTimeUtc
+        Write-Host "  newer direct-app state: $relative"
     }
 }
+
+Merge-NewerFiles (Join-Path $Root 'backend\app\services') $seedState -TopLevelOnly
+$nativeRootState = Join-Path $tmp 'native-root-state'
+New-Item -ItemType Directory -Force -Path $nativeRootState | Out-Null
+foreach ($name in @('intraday_session.json')) {
+    $source = Join-Path $Root $name
+    if (Test-Path -LiteralPath $source) {
+        Copy-Item -LiteralPath $source -Destination (Join-Path $nativeRootState $name) -Force
+        (Get-Item -LiteralPath (Join-Path $nativeRootState $name)).LastWriteTimeUtc = (Get-Item -LiteralPath $source).LastWriteTimeUtc
+    }
+}
+Merge-NewerFiles $nativeRootState $seedState -TopLevelOnly
+Merge-NewerFiles (Join-Path $Root 'backend\app\data') $seedData
+Merge-NewerFiles (Join-Path $Root 'backend\app\services\eod_archive') $seedArchive
+
 
 function Get-TreeFiles {
     param([string]$Dir)
@@ -182,7 +240,7 @@ Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 $manifest = [ordered]@{
     packedAtUtc = [DateTime]::UtcNow.ToString("o")
     host        = $env:COMPUTERNAME
-    source      = "docker-volume"
+    source      = "newest-per-file:docker-volume+direct-app"
     layout      = "state+data+archive"
     files = @(
         $allFiles | ForEach-Object {
@@ -198,7 +256,7 @@ Write-Host "  wrote manifest.json ($($allFiles.Count) files)"
 
 $snap = Join-Path $seedState "last_market_snapshot.json"
 $session = Join-Path $seedState "intraday_session.json"
-$swing = Join-Path $seedState "swing_session.json"
+$swing = Join-Path $seedData "swing_v2_session.json"
 if (-not (Test-Path -LiteralPath $snap)) {
     Write-Host "[WARN] last_market_snapshot.json missing on volume - other machines will not get live Matrix quotes."
 }
