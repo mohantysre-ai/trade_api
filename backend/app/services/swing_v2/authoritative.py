@@ -19,7 +19,7 @@ from .ledger import SwingLedger, materialize_position
 from .reporting import ledger_eod_report
 from .schemas import EventType
 IST=ZoneInfo("Asia/Kolkata"); _LOCK=threading.RLock(); _DATA_REFRESH_LOCK=threading.Lock(); _SESSION_CACHE_LOCK=threading.Lock()
-_FINAL_REFRESH_MARGIN_SECONDS=int(os.getenv("SWING_FINAL_REFRESH_MARGIN_SECONDS","90")); _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0.0; _SESSION_READ_TTL=float(os.getenv("SWING_SESSION_READ_TTL","2")); _EOD_READ_CACHE={}; _SWING_SCAN_INTERVAL_SECONDS=float(os.getenv("SWING_SCAN_INTERVAL_SECONDS","172800"))
+_FINAL_REFRESH_MARGIN_SECONDS=int(os.getenv("SWING_FINAL_REFRESH_MARGIN_SECONDS","90")); _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0.0; _SESSION_READ_TTL=float(os.getenv("SWING_SESSION_READ_TTL","2")); _EOD_READ_CACHE={}; _SWING_SCAN_INTERVAL_SECONDS=float(os.getenv("SWING_SCAN_INTERVAL_SECONDS","1800"))
 _RETRYABLE_FINAL_BLOCK_REASONS={"FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW","UNIVERSE_COVERAGE_BELOW_99PCT","UNIVERSE_COVERAGE_BELOW_90PCT","REGIME_UNRATED","SWING_V2_DATA_NOT_READY"}
 def is_v2_authoritative(config=None): return (config or load_config()).paper_authoritative
 def _state_path():
@@ -187,7 +187,7 @@ def _scan_not_ready(snapshot,cfg):
  reasons=readiness["reasons"] or [f"SWING_V2_DATA_NOT_READY_MIN_{cfg.min_daily_observations}_OBS"]
  return {
   "enabled":True,"authoritative":True,"mode":"PAPER","blocked":True,
-  "blockReason":"SWING_V2_DATA_NOT_READY","candidates":[],
+  "blockReason":"SWING_V2_DATA_NOT_READY","regime":"DATA_NOT_READY","candidates":[],
   "funnel":{
    "universe":snapshot.get("swingV2UniverseSize") or 0,
    "evaluated":feature_rows,
