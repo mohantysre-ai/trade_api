@@ -757,6 +757,99 @@ def _ai_payload_reusable(snapshot: dict[str, Any] | None) -> bool:
     return bool(existing_ti) and not existing_ti.get("llmError") and bool(existing_summary)
 
 
+def _recover_swing_v2_from_prior_snapshot(
+    payload: dict[str, Any],
+    prior_snapshot: dict[str, Any] | None,
+    *,
+    now: datetime,
+) -> dict[str, Any]:
+    """Recover Swing V2 history facts from the prior durable snapshot.
+
+    A live quote refresh can succeed while the bulk historical-candle stage
+    transiently returns no Swing rows. Do not let that zero-row result erase
+    a still-valid previous-session 1h history set. Reattach only the prior
+    Swing history inputs, keep today's live quote fields, then rerun governed
+    enrichment so decisionPrice and all price-derived fields are recomputed.
+    """
+    if not isinstance(prior_snapshot, dict):
+        return payload
+    status = payload.get("swingV2DataStatus")
+    status = status if isinstance(status, dict) else {}
+    try:
+        feature_rows = int(status.get("featureRows") or 0)
+    except (TypeError, ValueError):
+        feature_rows = 0
+    if feature_rows > 0:
+        return payload
+
+    prior_status = prior_snapshot.get("swingV2DataStatus")
+    prior_status = prior_status if isinstance(prior_status, dict) else {}
+    try:
+        prior_feature_rows = int(prior_status.get("featureRows") or 0)
+    except (TypeError, ValueError):
+        prior_feature_rows = 0
+    if prior_feature_rows <= 0:
+        return payload
+
+    current_quotes = payload.get("stockQuotes")
+    prior_quotes = prior_snapshot.get("stockQuotes")
+    if not isinstance(current_quotes, dict) or not isinstance(prior_quotes, dict):
+        return payload
+
+    try:
+        from .swing_v2.data_quality import _bars1h_session_fresh
+        from .swing_v2.ingestion import enrich_v2_market_snapshot
+    except Exception:
+        return payload
+
+    recovered = 0
+    for symbol, current_row in current_quotes.items():
+        if not isinstance(current_row, dict):
+            continue
+        prior_row = prior_quotes.get(symbol)
+        if not isinstance(prior_row, dict):
+            continue
+        prior_intra = prior_row.get("intraday")
+        if not isinstance(prior_intra, dict):
+            continue
+        raw = prior_intra.get("swingV2Raw")
+        if not isinstance(raw, dict) or raw.get("dailyBarsThroughPreviousClose") is not True:
+            continue
+        stamp = raw.get("last1hTimestamp") or raw.get("last60mTimestamp") or raw.get("last5mTimestamp")
+        if not _bars1h_session_fresh(stamp, now):
+            continue
+
+        intra = current_row.get("intraday")
+        intra = dict(intra) if isinstance(intra, dict) else {}
+        if not isinstance(intra.get("swingV2Raw"), dict):
+            intra["swingV2Raw"] = dict(raw)
+        for key in ("vwap", "ema9", "volume_multiplier", "data_source", "timeframe"):
+            if not intra.get(key) and prior_intra.get(key) is not None:
+                intra[key] = prior_intra.get(key)
+        current_row["intraday"] = intra
+        recovered += 1
+
+    if recovered <= 0:
+        return payload
+
+    try:
+        rows = [row for row in current_quotes.values() if isinstance(row, dict)]
+        rebuilt = enrich_v2_market_snapshot(dict(payload), rows, now=now)
+        rebuilt.setdefault("swingV2Recovery", {})
+        if isinstance(rebuilt["swingV2Recovery"], dict):
+            rebuilt["swingV2Recovery"].update({
+                "usedPriorHistory": True,
+                "recoveredSymbols": recovered,
+                "source": "prior_durable_snapshot",
+            })
+        return rebuilt
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "Swing V2 prior-history recovery failed: %s", exc
+        )
+        return payload
+
+
 def _ai_cache_fresh(snapshot: dict[str, Any] | None, top_tickers: list[str]) -> bool:
     """True when snapshot terminal intelligence + news summary can be reused.
 
@@ -5074,6 +5167,12 @@ def build_market_payload(
             angel_first_quotes=angel_first_quotes,
             swing_v2_history=swing_v2_history,
         )
+        if swing_v2_history:
+            payload = _recover_swing_v2_from_prior_snapshot(
+                payload,
+                snapshot,
+                now=_ist_now(),
+            )
         _save_last_snapshot(payload)
         return payload
     except Exception as exc:
