@@ -673,6 +673,32 @@ export default function ForensicPanel({
       historyReadyRatio?: number;
       universeCoverage?: number;
       regime?: string | null;
+      regimeReasonCodes?: string[];
+      regimeStressPoints?: number | null;
+      regimeDetail?: {
+        reasonCodes?: string[];
+        stressPoints?: number | null;
+        riskScale?: number | null;
+        positionCap?: number | null;
+      };
+      haltShadow?: {
+        mode?: string;
+        authoritative?: boolean;
+        regimeOverride?: string;
+        qualifiedCount?: number;
+        selectedCount?: number;
+        candidates?: Array<{
+          symbol?: string;
+          score?: number | null;
+          tier?: string | null;
+          qualificationMode?: string | null;
+          expectedNetR?: number | null;
+          upsideCapacityR?: number | null;
+          setupIds?: string[];
+        }>;
+        topRejectionReasons?: Array<{ reason?: string; count?: number }>;
+        error?: string;
+      };
       volumeScreened?: number;
       candleMetrics?: number;
       candleTimeframe?: string;
@@ -1779,6 +1805,95 @@ export default function ForensicPanel({
               <p className="text-[11px] text-slate-500">
                 EOD snapshot found {swingSession.entryHuntDiagnostics.eodQualified ?? 0} qualified setup(s) after the 14:45 entry cutoff; these are analysis results, not locked trades.
               </p>
+            )}
+            {swingSession?.entryHuntDiagnostics?.regime === 'HALT_NEW_LONGS' && (
+              <div className="rounded-xl border border-red-200 bg-red-50/80 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-[11px] font-black uppercase tracking-wider text-red-800">
+                      Regime Gate · HALT_NEW_LONGS
+                    </div>
+                    <p className="mt-0.5 text-[10px] leading-relaxed text-red-700">
+                      Long entries are blocked by the market-regime governor. Shadow qualification below is diagnostic only and cannot create a trade.
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-red-200 bg-white px-2 py-1 text-[10px] font-bold text-red-800 tabular-nums">
+                    Stress {swingSession.entryHuntDiagnostics.regimeStressPoints ?? '—'} / 4
+                  </div>
+                </div>
+
+                {(swingSession.entryHuntDiagnostics.regimeReasonCodes?.length ?? 0) > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {(swingSession.entryHuntDiagnostics.regimeReasonCodes ?? []).map((reason) => (
+                      <span
+                        key={reason}
+                        className="rounded border border-red-200 bg-white px-2 py-1 text-[9px] font-bold text-red-700"
+                      >
+                        {reason.replaceAll('_', ' ')}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-3 border-t border-red-200 pt-2">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-700">
+                    <span>
+                      Would qualify without regime gate:{' '}
+                      <strong className="text-slate-900">
+                        {swingSession.entryHuntDiagnostics.haltShadow?.qualifiedCount ?? 0}
+                      </strong>
+                    </span>
+                    <span>
+                      Would enter portfolio:{' '}
+                      <strong className="text-slate-900">
+                        {swingSession.entryHuntDiagnostics.haltShadow?.selectedCount ?? 0}
+                      </strong>
+                    </span>
+                    <span className="font-bold uppercase tracking-wide text-amber-700">Diagnostic only</span>
+                  </div>
+
+                  {(swingSession.entryHuntDiagnostics.haltShadow?.candidates?.length ?? 0) > 0 ? (
+                    <div className="mt-2 overflow-x-auto">
+                      <table className="min-w-full text-left text-[10px]">
+                        <thead>
+                          <tr className="border-b border-red-100 text-[8px] uppercase tracking-wider text-slate-500">
+                            <th className="px-2 py-1.5">Symbol</th>
+                            <th className="px-2 py-1.5">Score</th>
+                            <th className="px-2 py-1.5">Tier</th>
+                            <th className="px-2 py-1.5">Qualification</th>
+                            <th className="px-2 py-1.5">Expected R</th>
+                            <th className="px-2 py-1.5">Upside R</th>
+                            <th className="px-2 py-1.5">Setups</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(swingSession.entryHuntDiagnostics.haltShadow?.candidates ?? []).map((row) => (
+                            <tr key={row.symbol} className="border-b border-red-100/70 last:border-b-0">
+                              <td className="px-2 py-1.5 font-black text-slate-900">{row.symbol || '—'}</td>
+                              <td className="px-2 py-1.5 font-semibold tabular-nums">{typeof row.score === 'number' ? row.score.toFixed(1) : '—'}</td>
+                              <td className="px-2 py-1.5">{row.tier || '—'}</td>
+                              <td className="px-2 py-1.5">{row.qualificationMode || '—'}</td>
+                              <td className="px-2 py-1.5 tabular-nums">{typeof row.expectedNetR === 'number' ? row.expectedNetR.toFixed(2) + 'R' : '—'}</td>
+                              <td className="px-2 py-1.5 tabular-nums">{typeof row.upsideCapacityR === 'number' ? row.upsideCapacityR.toFixed(2) + 'R' : '—'}</td>
+                              <td className="px-2 py-1.5">{row.setupIds?.join(', ') || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-[10px] text-slate-600">
+                      No candidate would pass the full Swing V2 qualification stack even if the regime gate were NORMAL.
+                    </p>
+                  )}
+
+                  {swingSession.entryHuntDiagnostics.haltShadow?.error && (
+                    <p className="mt-2 text-[9px] text-red-700">
+                      Shadow diagnostic unavailable: {swingSession.entryHuntDiagnostics.haltShadow.error}
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
             {(swingSession?.entryHuntDiagnostics?.topRejectionReasons?.length ?? 0) > 0 && (
               <div className="flex flex-wrap gap-1.5">
