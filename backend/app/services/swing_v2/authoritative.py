@@ -96,7 +96,11 @@ def _entry_hunt_diagnostics(scan,snapshot):
  history_ready_ratio=(history_ready_rows/feature_rows) if feature_rows>0 else 0.0
  regime=str(snapshot.get("swingV2Regime") or "")
  f={**f,"evaluated":f.get("evaluated",f.get("evaluated_count",feature_rows or f.get("universe"))),"qualified":f.get("qualified",f.get("qualified_out",(scan or {}).get("qualifiedCount",0))),"candleMetrics":f.get("candleMetrics",f.get("fresh_count",f.get("freshData",short_momentum_ready_rows))),"candleTimeframe":f.get("candleTimeframe","1H")}
- return {**f,"universeSize":universe_size or None,"featureRows":feature_rows,"historyReadyRows":history_ready_rows,"shortMomentumReadyRows":short_momentum_ready_rows,"historyReadyRatio":round(history_ready_ratio,4),"universeCoverage":round(universe_coverage,4),"regime":regime or None,"volumeScreened":feature_rows or universe_size or None,"evaluated":f.get("evaluated",feature_rows or f.get("universe")),"displayPool":len(stocks) if stocks else None,"swingUniverse":"Total Market 750","corePriorityUniverse":"Top 500 by liquidity","microcapPolicy":"SATELLITE · 20% priority · max 1 position","candleTimeframe":"1H"}
+ detail=(scan or {}).get("regimeDetail")
+ detail=detail if isinstance(detail,dict) else (snapshot.get("swingV2RegimeDetail") if isinstance(snapshot.get("swingV2RegimeDetail"),dict) else {})
+ halt_shadow=(scan or {}).get("haltShadow")
+ halt_shadow=halt_shadow if isinstance(halt_shadow,dict) else None
+ return {**f,"universeSize":universe_size or None,"featureRows":feature_rows,"historyReadyRows":history_ready_rows,"shortMomentumReadyRows":short_momentum_ready_rows,"historyReadyRatio":round(history_ready_ratio,4),"universeCoverage":round(universe_coverage,4),"regime":regime or None,"regimeDetail":detail,"regimeReasonCodes":list((scan or {}).get("regimeReasonCodes") or detail.get("reasonCodes") or []),"regimeStressPoints":(scan or {}).get("regimeStressPoints",detail.get("stressPoints")),"haltShadow":halt_shadow,"volumeScreened":feature_rows or universe_size or None,"evaluated":f.get("evaluated",feature_rows or f.get("universe")),"displayPool":len(stocks) if stocks else None,"swingUniverse":"Total Market 750","corePriorityUniverse":"Top 500 by liquidity","microcapPolicy":"SATELLITE · 20% priority · max 1 position","candleTimeframe":"1H"}
 def _has_backfill_entry(current):
     backfill = current.get("backfill") if isinstance(current.get("backfill"), list) else []
     return any(isinstance(entry, dict) and entry.get("symbol") for entry in backfill)
@@ -199,6 +203,67 @@ def _scan_not_ready(snapshot,cfg):
   "readiness":readiness,
   "dataStatus":status,
  }
+def _attach_regime_diagnostics(scan,snapshot,*,occupied_symbols,existing_positions,now):
+    """Expose why the regime blocked longs and what would pass without that gate.
+
+    The actual authoritative scan remains untouched and HALT_NEW_LONGS still
+    locks zero positions. A second non-persisting NORMAL-regime pass is used
+    only for operator visibility.
+    """
+    if not isinstance(scan,dict):
+        return scan
+    detail=snapshot.get("swingV2RegimeDetail")
+    detail=detail if isinstance(detail,dict) else {}
+    out=dict(scan)
+    out["regimeDetail"]=detail
+    out["regimeReasonCodes"]=list(detail.get("reasonCodes") or [])
+    out["regimeStressPoints"]=detail.get("stressPoints")
+    if str(snapshot.get("swingV2Regime") or "")!="HALT_NEW_LONGS":
+        return out
+    try:
+        shadow_snapshot=dict(snapshot)
+        shadow_snapshot["swingV2Regime"]="NORMAL"
+        shadow=build_from_market_snapshot(
+            shadow_snapshot,
+            final_lock=True,
+            persist_events=False,
+            occupied_symbols=occupied_symbols,
+            existing_positions=existing_positions,
+            now=now,
+        )
+        candidates=[]
+        for row in list(shadow.get("candidates") or [])[:10]:
+            if not isinstance(row,dict):
+                continue
+            candidates.append({
+                "symbol":str(row.get("symbol") or row.get("ticker") or "").upper(),
+                "score":row.get("score"),
+                "tier":row.get("tier"),
+                "qualificationMode":row.get("qualificationMode"),
+                "expectedNetR":row.get("expectedNetR"),
+                "upsideCapacityR":row.get("upsideCapacityR"),
+                "setupIds":list(row.get("setupIds") or []),
+            })
+        out["haltShadow"]={
+            "mode":"DIAGNOSTIC_ONLY",
+            "authoritative":False,
+            "regimeOverride":"NORMAL",
+            "qualifiedCount":int(shadow.get("qualifiedCount") or 0),
+            "selectedCount":int(shadow.get("selectedCount") or 0),
+            "candidates":candidates,
+            "topRejectionReasons":list((shadow.get("funnel") or {}).get("topRejectionReasons") or [])[:8],
+        }
+    except Exception as exc:
+        out["haltShadow"]={
+            "mode":"DIAGNOSTIC_ONLY",
+            "authoritative":False,
+            "error":f"{type(exc).__name__}:{exc}",
+            "qualifiedCount":0,
+            "selectedCount":0,
+            "candidates":[],
+        }
+    return out
+
 def _quote_observations(symbols,now):
  if not symbols:return {}
  try:
@@ -400,6 +465,7 @@ def run_authoritative_cycle(*,now=None,force=False):
      scan=_scan_not_ready(snapshot,cfg)
    else:
     scan=build_from_market_snapshot(snapshot,final_lock=True,persist_events=True,occupied_symbols=occupied,existing_positions=existing,now=now)
+    scan=_attach_regime_diagnostics(scan,snapshot,occupied_symbols=occupied,existing_positions=existing,now=now)
    current.update(scan=scan,lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=snapshot.get("swingV2RefreshError"))
   elif freeze<=local and (not current.get("selectionFinalized") or (_retryable_final_block(scan) and due and local<=expiry)):
    snapshot=_refresh_snapshot("swing_v2_final_lock")
@@ -410,6 +476,7 @@ def run_authoritative_cycle(*,now=None,force=False):
    else:
     refresh_pending=False
     scan=build_from_market_snapshot(snapshot,final_lock=True,persist_events=local<=expiry,occupied_symbols=occupied,existing_positions=existing,now=now)
+    scan=_attach_regime_diagnostics(scan,snapshot,occupied_symbols=occupied,existing_positions=existing,now=now)
    current.update(scan=scan,selectionFinalized=not refresh_pending,lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=snapshot.get("swingV2RefreshError"))
    if not refresh_pending: current["finalizedAt"]=now.astimezone(timezone.utc).isoformat()
   # A qualified candidate is locked and paper-filled during the hunt window;
