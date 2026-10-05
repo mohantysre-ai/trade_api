@@ -5,12 +5,35 @@ FROM node:24.20.0-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
 # Tailwind 4 loads Lightning CSS through a platform-native optional package.
-# npm can occasionally omit that optional binary from a Docker/Linux install
-# even when it is present in package-lock.json. Install optional deps explicitly
-# and repair the exact Linux x64 native package only when the binary is absent.
-RUN if [ -f package-lock.json ]; then npm ci --include=optional; else npm install --include=optional; fi \
+# Docker builds occasionally see transient npm ECONNRESET errors, so make the
+# dependency stage retry-safe and avoid audit/fund traffic. npm ci remains the
+# authoritative install; the native Lightning CSS package is repaired only if
+# npm omitted the optional Linux binary.
+RUN npm config set fetch-retries 5 \
+    && npm config set fetch-retry-mintimeout 20000 \
+    && npm config set fetch-retry-maxtimeout 120000 \
+    && npm config set fetch-timeout 300000 \
+    && install_deps() { \
+         if [ -f package-lock.json ]; then \
+           npm ci --include=optional --prefer-offline --no-audit --no-fund; \
+         else \
+           npm install --include=optional --prefer-offline --no-audit --no-fund; \
+         fi; \
+       }; \
+       n=0; until install_deps; do \
+         n=$((n+1)); \
+         if [ "$n" -ge 3 ]; then exit 1; fi; \
+         echo "npm install failed; retrying attempt $((n+1))/3..."; \
+         rm -rf node_modules; \
+         sleep $((n*5)); \
+       done \
     && if [ ! -f node_modules/lightningcss-linux-x64-gnu/lightningcss.linux-x64-gnu.node ]; then \
-         npm install --no-save --include=optional lightningcss-linux-x64-gnu@1.32.0; \
+         n=0; until npm install --no-save --include=optional --prefer-offline --no-audit --no-fund lightningcss-linux-x64-gnu@1.32.0; do \
+           n=$((n+1)); \
+           if [ "$n" -ge 3 ]; then exit 1; fi; \
+           echo "lightningcss native install failed; retrying attempt $((n+1))/3..."; \
+           sleep $((n*5)); \
+         done; \
        fi \
     && test -f node_modules/lightningcss-linux-x64-gnu/lightningcss.linux-x64-gnu.node
 
