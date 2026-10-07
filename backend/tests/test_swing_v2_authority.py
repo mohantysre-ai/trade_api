@@ -677,3 +677,61 @@ def test_slow_swing_consumer_cannot_block_market_data_publishing(monkeypatch):
     )
     snap = _refresh_snapshot("test_call")
     assert isinstance(snap, dict)
+
+
+def test_halt_shadow_exposes_stage_counts_and_rejected_candidates(monkeypatch):
+    snapshot = {
+        "swingV2Regime": "HALT_NEW_LONGS",
+        "swingV2RegimeDetail": {"stressPoints": 3, "reasonCodes": ["INDEX_BELOW_EMA20"]},
+    }
+
+    def fake_build(snapshot_arg, **kwargs):
+        assert snapshot_arg["swingV2Regime"] == "NORMAL"
+        return {
+            "qualifiedCount": 0,
+            "selectedCount": 0,
+            "candidateCount": 16,
+            "candidates": [],
+            "rejected": [
+                {
+                    "symbol": "AAA",
+                    "qualificationStage": "CANDIDATE_QUALIFICATION",
+                    "reasonCodes": ["NET_REWARD_BELOW_MINIMUM", "SCORE_BELOW_TIER_B_MINIMUM"],
+                },
+                {
+                    "symbol": "BBB",
+                    "portfolioRejectReason": "MAX_TWO_NAMES_PER_SECTOR",
+                },
+            ],
+            "funnel": {
+                "evaluated_count": 16,
+                "fresh_count": 16,
+                "tradable": 15,
+                "safetyPass": 14,
+                "setupPass": 3,
+                "expectancyPass": 2,
+                "qualified_out": 0,
+                "portfolioPass": 0,
+                "topRejectionReasons": [
+                    {"reason": "NET_REWARD_BELOW_MINIMUM", "count": 8},
+                    {"reason": "SCORE_BELOW_TIER_B_MINIMUM", "count": 5},
+                ],
+            },
+        }
+
+    monkeypatch.setattr(auth, "build_from_market_snapshot", fake_build)
+    out = auth._attach_regime_diagnostics(
+        {"regime": "HALT_NEW_LONGS", "blocked": True, "blockReason": "HALT_NEW_LONGS"},
+        snapshot,
+        occupied_symbols=set(),
+        existing_positions=[],
+        now=datetime(2026, 10, 7, 14, 30, tzinfo=IST),
+    )
+    shadow = out["haltShadow"]
+    assert shadow["authoritative"] is False
+    assert shadow["regimeOverride"] == "NORMAL"
+    assert shadow["stageCounts"]["evaluated"] == 16
+    assert shadow["stageCounts"]["setupPass"] == 3
+    assert shadow["topRejectionReasons"][0]["reason"] == "NET_REWARD_BELOW_MINIMUM"
+    assert shadow["rejectedCandidates"][0]["symbol"] == "AAA"
+    assert shadow["rejectedCandidates"][1]["reasonCodes"] == ["MAX_TWO_NAMES_PER_SECTOR"]
