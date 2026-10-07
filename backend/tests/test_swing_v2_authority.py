@@ -680,6 +680,8 @@ def test_slow_swing_consumer_cannot_block_market_data_publishing(monkeypatch):
 
 
 def test_halt_shadow_exposes_stage_counts_and_rejected_candidates(monkeypatch):
+    import app.services.swing_v2.authoritative as auth
+
     snapshot = {
         "swingV2Regime": "HALT_NEW_LONGS",
         "swingV2RegimeDetail": {"stressPoints": 3, "reasonCodes": ["INDEX_BELOW_EMA20"]},
