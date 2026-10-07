@@ -697,6 +697,23 @@ export default function ForensicPanel({
           setupIds?: string[];
         }>;
         topRejectionReasons?: Array<{ reason?: string; count?: number }>;
+        stageCounts?: {
+          evaluated?: number;
+          freshData?: number;
+          tradable?: number;
+          safetyPass?: number;
+          setupPass?: number;
+          expectancyPass?: number;
+          qualified?: number;
+          portfolioPass?: number;
+        };
+        rejectedCandidates?: Array<{
+          symbol?: string;
+          qualificationStage?: string | null;
+          reasonCodes?: string[];
+          expectancyStatus?: string | null;
+          capacityStatus?: string | null;
+        }>;
         error?: string;
       };
       volumeScreened?: number;
@@ -1851,6 +1868,59 @@ export default function ForensicPanel({
                     </span>
                     <span className="font-bold uppercase tracking-wide text-amber-700">Diagnostic only</span>
                   </div>
+
+                  {swingSession.entryHuntDiagnostics.haltShadow?.stageCounts && (
+                    <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-8">
+                      {[
+                        ['Evaluated', swingSession.entryHuntDiagnostics.haltShadow.stageCounts.evaluated],
+                        ['Fresh', swingSession.entryHuntDiagnostics.haltShadow.stageCounts.freshData],
+                        ['Tradable', swingSession.entryHuntDiagnostics.haltShadow.stageCounts.tradable],
+                        ['Safety', swingSession.entryHuntDiagnostics.haltShadow.stageCounts.safetyPass],
+                        ['Setup', swingSession.entryHuntDiagnostics.haltShadow.stageCounts.setupPass],
+                        ['Expectancy', swingSession.entryHuntDiagnostics.haltShadow.stageCounts.expectancyPass],
+                        ['Qualified', swingSession.entryHuntDiagnostics.haltShadow.stageCounts.qualified],
+                        ['Portfolio', swingSession.entryHuntDiagnostics.haltShadow.stageCounts.portfolioPass],
+                      ].map(([label, value]) => (
+                        <div key={String(label)} className="rounded border border-red-100 bg-white px-2 py-1.5">
+                          <div className="text-[8px] font-bold uppercase tracking-wider text-slate-500">{label}</div>
+                          <div className="text-[11px] font-black tabular-nums text-slate-900">{value ?? 0}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {(swingSession.entryHuntDiagnostics.haltShadow?.topRejectionReasons?.length ?? 0) > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {(swingSession.entryHuntDiagnostics.haltShadow?.topRejectionReasons ?? []).slice(0, 10).map((item) => (
+                        <span key={`halt-${item.reason}-${item.count}`} className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-900">
+                          {(item.reason || '—').replaceAll('_', ' ')} {item.count ?? 0}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {(swingSession.entryHuntDiagnostics.haltShadow?.rejectedCandidates?.length ?? 0) > 0 && (
+                    <div className="mt-2 overflow-x-auto">
+                      <table className="min-w-full text-left text-[9px]">
+                        <thead>
+                          <tr className="border-b border-red-100 text-[8px] uppercase tracking-wider text-slate-500">
+                            <th className="px-2 py-1.5">Rejected</th>
+                            <th className="px-2 py-1.5">Stage</th>
+                            <th className="px-2 py-1.5">Why</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(swingSession.entryHuntDiagnostics.haltShadow?.rejectedCandidates ?? []).map((row, idx) => (
+                            <tr key={`${row.symbol || 'unknown'}-${idx}`} className="border-b border-red-100/70 last:border-b-0">
+                              <td className="px-2 py-1.5 font-black text-slate-900">{row.symbol || '—'}</td>
+                              <td className="px-2 py-1.5 text-slate-600">{row.qualificationStage || '—'}</td>
+                              <td className="px-2 py-1.5 text-slate-700">{row.reasonCodes?.join(' · ').replaceAll('_', ' ') || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
 
                   {(swingSession.entryHuntDiagnostics.haltShadow?.candidates?.length ?? 0) > 0 ? (
                     <div className="mt-2 overflow-x-auto">
