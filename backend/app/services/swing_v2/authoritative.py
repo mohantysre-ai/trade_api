@@ -244,6 +244,18 @@ def _attach_regime_diagnostics(scan,snapshot,*,occupied_symbols,existing_positio
                 "upsideCapacityR":row.get("upsideCapacityR"),
                 "setupIds":list(row.get("setupIds") or []),
             })
+        shadow_funnel=shadow.get("funnel") if isinstance(shadow.get("funnel"),dict) else {}
+        rejected_candidates=[]
+        for row in list(shadow.get("rejected") or [])[:12]:
+            if not isinstance(row,dict):
+                continue
+            rejected_candidates.append({
+                "symbol":str(row.get("symbol") or row.get("ticker") or "").upper(),
+                "qualificationStage":row.get("qualificationStage") or ("PORTFOLIO" if row.get("portfolioRejectReason") else "CANDIDATE_QUALIFICATION"),
+                "reasonCodes":list(row.get("reasonCodes") or ([row.get("portfolioRejectReason")] if row.get("portfolioRejectReason") else []))[:8],
+                "expectancyStatus":row.get("expectancyStatus"),
+                "capacityStatus":row.get("capacityStatus"),
+            })
         out["haltShadow"]={
             "mode":"DIAGNOSTIC_ONLY",
             "authoritative":False,
@@ -251,7 +263,18 @@ def _attach_regime_diagnostics(scan,snapshot,*,occupied_symbols,existing_positio
             "qualifiedCount":int(shadow.get("qualifiedCount") or 0),
             "selectedCount":int(shadow.get("selectedCount") or 0),
             "candidates":candidates,
-            "topRejectionReasons":list((shadow.get("funnel") or {}).get("topRejectionReasons") or [])[:8],
+            "stageCounts":{
+                "evaluated":int(shadow_funnel.get("evaluated_count") or shadow_funnel.get("universe") or shadow.get("candidateCount") or 0),
+                "freshData":int(shadow_funnel.get("fresh_count") or shadow_funnel.get("freshData") or 0),
+                "tradable":int(shadow_funnel.get("tradable") or 0),
+                "safetyPass":int(shadow_funnel.get("safetyPass") or 0),
+                "setupPass":int(shadow_funnel.get("setupPass") or 0),
+                "expectancyPass":int(shadow_funnel.get("expectancyPass") or 0),
+                "qualified":int(shadow.get("qualifiedCount") or shadow_funnel.get("qualified_out") or 0),
+                "portfolioPass":int(shadow_funnel.get("portfolioPass") or shadow.get("selectedCount") or 0),
+            },
+            "rejectedCandidates":rejected_candidates,
+            "topRejectionReasons":list(shadow_funnel.get("topRejectionReasons") or [])[:10],
         }
     except Exception as exc:
         out["haltShadow"]={
