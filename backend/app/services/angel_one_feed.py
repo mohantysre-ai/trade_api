@@ -5978,15 +5978,13 @@ def create_app() -> FastAPI:
     ) -> dict[str, Any]:
         """Day-bucketed swing P&L. Cached under book_swing.json unless force=true."""
         try:
-            from datetime import date as _date, datetime as _dt
+            from datetime import date as _date
             from .eod_swing_report import generate_swing_eod_report
-            from .eod_book_cache import load_book_cache
             for_date = _date.fromisoformat(date) if date else None
-            if not force:
-                effective_date = for_date or _dt.now(tz=IST_ZONE).date()
-                cached = load_book_cache(effective_date, "swing")
-                if cached is not None:
-                    return cached
+            # Cache policy belongs inside generate_swing_eod_report.  In V2
+            # authoritative mode today's book must be rebuilt from the ledger
+            # so newly locked/closed positions and live marks cannot be hidden
+            # behind an earlier book_swing.json.
             return generate_swing_eod_report(for_date, force=force)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
