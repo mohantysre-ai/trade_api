@@ -737,3 +737,49 @@ def test_halt_shadow_exposes_stage_counts_and_rejected_candidates(monkeypatch):
     assert shadow["topRejectionReasons"][0]["reason"] == "NET_REWARD_BELOW_MINIMUM"
     assert shadow["rejectedCandidates"][0]["symbol"] == "AAA"
     assert shadow["rejectedCandidates"][1]["reasonCodes"] == ["MAX_TWO_NAMES_PER_SECTOR"]
+
+
+def test_current_authoritative_eod_marks_open_position_from_snapshot(v2_env, monkeypatch):
+    from app.services.swing_v2.ledger import SwingLedger
+    from app.services.swing_v2.schemas import EventType
+
+    auth = v2_env["auth"]
+    day = datetime.now(IST).date()
+    ledger = SwingLedger(v2_env["cfg"].load_config().ledger_path)
+    ledger.append(
+        idempotency_key="live-mark-entry",
+        decision_id="live-mark-entry",
+        position_id="live-mark-entry",
+        symbol="AXISBANK",
+        session_date=day.isoformat(),
+        event_type=EventType.FILL_COMPLETE,
+        event_timestamp=datetime.now(timezone.utc).isoformat(),
+        payload={
+            "status": "OPEN",
+            "executionStatus": "FILLED",
+            "filledQty": 10,
+            "remainingQty": 10,
+            "entryPrice": 100.0,
+            "entryTimestamp": datetime.now(timezone.utc).isoformat(),
+            "deployedCapital": 1000.0,
+            "realizedPnl": 0.0,
+            "unrealizedPnl": 0.0,
+            "totalPnl": 0.0,
+            "initialStop": 95.0,
+            "effectiveStop": 95.0,
+        },
+    )
+    monkeypatch.setattr(auth, "_snapshot", lambda: {
+        "stockQuotes": {"AXISBANK": {"ltpRaw": 110.0}}
+    })
+
+    report = auth.authoritative_eod_report(day)
+    row = report["positions"][0]
+
+    assert row["currentPrice"] == 110.0
+    assert row["ltp"] == 110.0
+    assert row["unrealizedPnl"] == 100.0
+    assert row["totalPnl"] == 100.0
+    assert report["unrealizedPnl"] == 100.0
+    assert report["totalPnl"] == 100.0
+    assert report["markSource"] == "LIVE_SNAPSHOT_FOR_OPEN_POSITIONS"
