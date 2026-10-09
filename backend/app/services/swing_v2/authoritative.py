@@ -540,5 +540,24 @@ def lock_authoritative_session(*,force=False):
    s=get_authoritative_session(live=True); return {"success":True,"alreadyLocked":bool(s.get("locked")),"forced":False,"forceBlockedReason":"DECISION_WINDOW_CLOSED","session":s}
   s=run_authoritative_cycle(); return {"success":True,"alreadyLocked":bool(s.get("locked")),"forced":True,"forceBypassed":None,"session":s}
  s=run_authoritative_cycle(); return {"success":True,"alreadyLocked":bool(s.get("locked")),"session":s}
-def authoritative_eod_report(for_date): return ledger_eod_report(SwingLedger(load_config().ledger_path),for_date.isoformat())
+def authoritative_eod_report(for_date):
+ report=ledger_eod_report(SwingLedger(load_config().ledger_path),for_date.isoformat())
+ today=datetime.now(IST).date()
+ if for_date!=today:
+  return report
+ marks=_marks(_snapshot())
+ positions=[]
+ for raw in report.get("positions") or []:
+  if not isinstance(raw,dict):
+   continue
+  symbol=str(raw.get("symbol") or "").upper()
+  mark=marks.get(symbol)
+  if raw.get("terminal") or not mark:
+   positions.append(raw)
+  else:
+   positions.append(_position_row(raw,mark,as_of=datetime.now(IST)))
+ realized=sum(float(row.get("realizedPnl") or 0) for row in positions)
+ unrealized=sum(float(row.get("unrealizedPnl") or 0) for row in positions)
+ report={**report,"positions":positions,"realizedPnl":round(realized,2),"unrealizedPnl":round(unrealized,2),"totalPnl":round(realized+unrealized,2),"markSource":"LIVE_SNAPSHOT_FOR_OPEN_POSITIONS"}
+ return report
 __all__=["authoritative_eod_report","get_authoritative_session","is_v2_authoritative","lock_authoritative_session","run_authoritative_cycle"]
