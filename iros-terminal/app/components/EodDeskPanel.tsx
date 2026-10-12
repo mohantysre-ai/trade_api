@@ -498,8 +498,7 @@ export default function EodDeskPanel({
                   onChange={(e) => {
                     const next = e.target.value;
                     setDateStr(next);
-                    setSwingDateStr(next);
-                  }}
+                                      }}
                   className="min-h-11 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-300"
                 >
                   {[dateStr, ...dates.filter((d) => d !== dateStr)]
@@ -517,8 +516,7 @@ export default function EodDeskPanel({
                   onChange={(e) => {
                     const next = e.target.value;
                     setDateStr(next);
-                    setSwingDateStr(next);
-                  }}
+                                      }}
                   className="min-h-11 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-300"
                 />
               )}
@@ -532,8 +530,7 @@ export default function EodDeskPanel({
                   onChange={(e) => {
                     const next = e.target.value;
                     setDateStr(next);
-                    setSwingDateStr(next);
-                  }}
+                                      }}
                   className="min-h-11 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-300"
                 />
               </label>
