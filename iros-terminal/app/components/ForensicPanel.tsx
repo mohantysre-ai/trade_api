@@ -760,7 +760,16 @@ export default function ForensicPanel({
       closed?: boolean;
       outcome?: { label?: string | null } | null;
     }>;
-    portfolio?: { realizedPnl?: number; unrealizedPnl?: number; totalPnl?: number; lockedCount?: number };
+    counts?: { long?: number; short?: number; total?: number; carried?: number; openedToday?: number; closedToday?: number; displayTotal?: number };
+    portfolio?: {
+      realizedPnl?: number;
+      unrealizedPnl?: number;
+      totalPnl?: number;
+      lockedCount?: number;
+      openCount?: number;
+      closedTodayCount?: number;
+      displayCount?: number;
+    };
   } | null>(null);
   const [locking, setLocking] = useState(false);
   const [lockError, setLockError] = useState<string | null>(null);
@@ -1397,7 +1406,9 @@ export default function ForensicPanel({
                   LOCKED · {swingSession?.sessionDate}
                 </span>
                 {' · '}live Book P&amp;L · auto SL/trail · {swingSession?.source || 'asset_matrix_buy'} ·{' '}
-                {portfolioDisplayRows.length} names
+                {swingSession?.portfolio?.openCount ?? swingSession?.counts?.long ?? 0} open
+                {' · '}
+                {swingSession?.portfolio?.closedTodayCount ?? swingSession?.counts?.closedToday ?? 0} closed today
                 {typeof swingPortfolioPnl === 'number' && (
                   <>
                     {' · '}P&amp;L{' '}
