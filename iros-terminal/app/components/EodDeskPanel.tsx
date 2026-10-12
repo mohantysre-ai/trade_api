@@ -193,7 +193,10 @@ export default function EodDeskPanel({
   const [mode, setMode] = useState<EodMode>('book');
   const [dates, setDates] = useState<string[]>([]);
   const [dateStr, setDateStr] = useState(() => getIstMarketState().today);
-  const [swingDateStr, setSwingDateStr] = useState(() => getIstMarketState().today);
+  // EOD is one accounting date across Intraday / Swing / Index Options.
+  // Keep Swing on the same canonical date; a stale independent Swing date can
+  // otherwise query an empty archive while the live Swing book is populated.
+  const swingDateStr = dateStr;
   const [runBusy, setRunBusy] = useState(false);
   const [llmBusy, setLlmBusy] = useState(false);
   const [runMsg, setRunMsg] = useState<string | null>(null);
@@ -275,7 +278,6 @@ export default function EodDeskPanel({
         const sStale = Boolean(swing?.locked && sDate && sDate !== today);
         if (iStale && sStale && iDate === sDate) {
           setDateStr(iDate);
-          setSwingDateStr(iDate);
         }
       } catch {
         /* keep IST today */
@@ -668,9 +670,9 @@ export default function EodDeskPanel({
               <EodAnalysisPanel
                 embedded
                 date={dateStr}
-                swingDate={swingDateStr}
+                swingDate={dateStr}
                 onDateChange={setDateStr}
-                onSwingDateChange={setSwingDateStr}
+                onSwingDateChange={setDateStr}
                 refreshToken={refreshKey}
                 forceBookRebuild={forceBookRebuild}
                 onSymbolSelect={onSymbolSelect}
