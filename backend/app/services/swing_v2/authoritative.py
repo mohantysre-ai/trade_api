@@ -512,6 +512,25 @@ def run_authoritative_cycle(*,now=None,force=False):
   return session
 def get_authoritative_session(*,live=False):
  global _SESSION_READ_CACHE,_SESSION_READ_CACHE_AT
+ # A live Swing read is also the market-hours liveness path.  Do not depend
+ # exclusively on the background scheduler to start today's V2 hunt: if the
+ # persisted scan is due (including first read after a restart), run exactly
+ # one governed authoritative cycle.  _session_scan_due enforces the configured
+ # 30-minute cadence, so normal UI polling does not create repeated scans.
+ if live:
+  try:
+   wall=datetime.now(timezone.utc).astimezone(IST)
+   cfg=load_config()
+   from ..nse_trading_calendar import is_nse_trading_day
+   local=wall.time().replace(tzinfo=None)
+   start=_clock(cfg.decision_start_ist); expiry=_clock(cfg.order_expire_ist)
+   if is_nse_trading_day(wall.date()) and start<=local<=expiry:
+    state=_read_json(_state_path())
+    if str(state.get("sessionDate") or "")!=wall.date().isoformat() or _session_scan_due(state,wall):
+     return run_authoritative_cycle(now=wall)
+  except Exception as exc:
+   _LOG.warning("Swing V2 live read cycle failed; serving cached session: %s",exc)
+
  now=monotonic_time.monotonic()
  ttl=0.75 if live else _SESSION_READ_TTL
  with _SESSION_CACHE_LOCK:
