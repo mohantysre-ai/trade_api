@@ -637,9 +637,13 @@ export default function ForensicPanel({
   refreshToken?: number;
 }) {
   const [swingSession, setSwingSession] = useState<{
+    success?: boolean;
+    error?: string;
     locked?: boolean;
     sessionDate?: string;
     source?: string;
+    authority?: string;
+    strategyId?: string;
     cashHeld?: boolean;
     cashReason?: string;
     hunting?: boolean;
@@ -662,6 +666,7 @@ export default function ForensicPanel({
     };
     entryHuntDiagnostics?: {
       evaluated?: number;
+      maxPositions?: number;
       qualified?: number;
       qualifiedDuringHunt?: number;
       eodQualified?: number;
@@ -1190,8 +1195,39 @@ export default function ForensicPanel({
 
   useEffect(() => {
     let cancelled = false;
+
+    const applyAuthoritativeSwing = (value: unknown) => {
+      if (cancelled || !value || typeof value !== 'object') return;
+      const candidate = value as NonNullable<typeof swingSession>;
+      // Never replace a known-good authoritative session with an empty
+      // allSettled fallback object from the shared desk poll.
+      if (candidate.success === false) return;
+      if (!candidate.sessionDate && !candidate.strategyId && !candidate.authority) return;
+      setSwingSession(candidate);
+    };
+
+    const loadAuthoritativeSwing = async () => {
+      try {
+        const res = await fetch('/api/swing-session?live=1', { cache: 'no-store' });
+        const body = await res.json().catch(() => null);
+        if (!cancelled && res.ok && body?.success !== false) {
+          applyAuthoritativeSwing(body);
+        } else if (!cancelled && body?.success === false) {
+          setSwingSession((prev) => prev ?? body);
+        }
+      } catch {
+        // Shared live-desk polling may still recover; do not replace a good
+        // session with a transport-error placeholder.
+      }
+    };
+
+    // The Swing panel is an authoritative V2 book view. Fetch its session
+    // directly on mount/date rollover instead of waiting for another desk
+    // subscriber to populate the shared snapshot.
+    void loadAuthoritativeSwing();
+
     const unsubscribe = subscribeLiveDesk((snapshot) => {
-      if (!cancelled) setSwingSession(snapshot['swing-session'] as typeof swingSession);
+      applyAuthoritativeSwing(snapshot['swing-session']);
     });
     return () => {
       cancelled = true;
@@ -1203,6 +1239,20 @@ export default function ForensicPanel({
     if (refreshToken > 0) void fetchLiveDeskSnapshot(true);
   }, [refreshToken]);
 
+  const swingSessionDate = String(swingSession?.sessionDate || '').slice(0, 10);
+  const swingSessionCurrent = Boolean(
+    swingSession?.success !== false &&
+      swingSessionDate &&
+      swingSessionDate === istToday &&
+      (swingSession?.authority === 'V2' || swingSession?.source === 'swing_v2_ledger' || swingSession?.strategyId),
+  );
+  const swingSessionUnavailable = Boolean(
+    !swingSession ||
+      swingSession?.success === false ||
+      !swingSessionDate ||
+      (swingSessionDate !== istToday && !swingSession?.locked),
+  );
+
   const swingBookPositions = useMemo(
     () => uniqueSwingLongPositions([
       ...(swingSession?.long ?? []),
@@ -1211,12 +1261,12 @@ export default function ForensicPanel({
     [swingSession?.closedPositions, swingSession?.long],
   );
   const lockedSwingMode = Boolean(
-    swingSession?.locked &&
-      String(swingSession?.sessionDate || '').slice(0, 10) === istToday &&
+    swingSessionCurrent &&
+      swingSession?.locked &&
       swingBookPositions.length > 0,
   );
   const todaySwingEmpty = Boolean(
-    String(swingSession?.sessionDate || '').slice(0, 10) === istToday &&
+    swingSessionCurrent &&
       swingBookPositions.length === 0 &&
       !lockedSwingMode,
   );
@@ -1282,8 +1332,9 @@ export default function ForensicPanel({
   };
 
   const portfolioDisplayRows: MatrixCardRow[] = useMemo(() => {
-    if (huntingSwing || cashHeldSwing) return [];
-    if (!lockedSwingMode || !swingBookPositions.length) return displayRows;
+    if (swingSessionUnavailable || !swingSessionCurrent) return [];
+    if (huntingSwing || waitingSwingDecision || cashHeldSwing) return [];
+    if (!lockedSwingMode || !swingBookPositions.length) return [];
     const byTicker = new Map(displayRows.map((item) => [item.row.ticker.toUpperCase(), item]));
     return swingBookPositions
       .map((pos) => {
@@ -1354,7 +1405,7 @@ export default function ForensicPanel({
         } satisfies MatrixCardRow;
       })
       .filter((x): x is MatrixCardRow => x != null);
-  }, [cashHeldSwing, displayRows, huntingSwing, lockedSwingMode, swingBookPositions, swingSession, tickerIntelMap, tickerNewsMap, trendlyneSummaries]);
+  }, [cashHeldSwing, displayRows, huntingSwing, waitingSwingDecision, lockedSwingMode, swingBookPositions, swingSession, swingSessionCurrent, swingSessionUnavailable, tickerIntelMap, tickerNewsMap, trendlyneSummaries]);
 
   const tickerList = useMemo(
     () => portfolioDisplayRows.map((item) => item.row.ticker),
@@ -1400,7 +1451,14 @@ export default function ForensicPanel({
             <h3 className="desk-panel-title text-emerald-700">SWING PORTFOLIO</h3>
           </div>
           <p className="text-slate-500 text-[12px] mt-0.5">
-            {lockedSwingMode ? (
+            {swingSessionUnavailable ? (
+              <>
+                <span className="inline-flex items-center rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-red-800">
+                  SESSION UNAVAILABLE
+                </span>
+                {' · '}authoritative Swing V2 session not loaded — scanner/matrix fallback is disabled
+              </>
+            ) : lockedSwingMode ? (
               <>
                 <span className="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-800">
                   LOCKED · {swingSession?.sessionDate}
@@ -1469,16 +1527,16 @@ export default function ForensicPanel({
                 ? `Institutional ₹1cr+ book — off-hours snapshot: score ≥ ${SCORE_STRONG}, SIGQ Research confirm, LOW/MODERATE risk (volume gates rank-penalized)`
                 : `Institutional ₹1cr+ book — score ≥ ${SCORE_STRONG}, SIGQ Research confirm, scanner R:R ≥2 when live`
               : live?.poolDescription || `Top ${MATRIX_BUY_MIN_DISPLAY}+ high-probability BUY setups — score ≥ ${MATRIX_BUY_MIN_SCORE}, CORE preferred`}
-            {!lockedSwingMode && !staleSwingLock && typeof live?.universeSize === 'number' && live.universeSize > 0 && (
+            {!swingSessionUnavailable && !lockedSwingMode && !staleSwingLock && typeof live?.universeSize === 'number' && live.universeSize > 0 && (
               <> · Universe {live.universeSize}</>
             )}
-            {!lockedSwingMode && !staleSwingLock && typeof live?.volumeScreenedCount === 'number' && live.volumeScreenedCount > 0 && (
+            {!swingSessionUnavailable && !lockedSwingMode && !staleSwingLock && typeof live?.volumeScreenedCount === 'number' && live.volumeScreenedCount > 0 && (
               <> · Top {live.volumeScreenedCount} by volume screened</>
             )}
-            {!lockedSwingMode && !staleSwingLock && dhanPickMap.size > 0 && (
+            {!swingSessionUnavailable && !lockedSwingMode && !staleSwingLock && dhanPickMap.size > 0 && (
               <> · Scanner LONG {dhanPickMap.size}</>
             )}
-            {!lockedSwingMode && !staleSwingLock && !huntingSwing && !cashHeldSwing && (
+            {!swingSessionUnavailable && !lockedSwingMode && !staleSwingLock && !huntingSwing && !cashHeldSwing && (
               <>
                 {' · '}BUY Picks {displayRows.length}
                 {institutionalMode && <> · max {INSTITUTIONAL_MATRIX_TOP_N}</>}
@@ -1520,7 +1578,7 @@ export default function ForensicPanel({
               </select>
             </label>
           )}
-          {!lockedSwingMode && !cashHeldSwing && (
+          {!swingSessionUnavailable && !lockedSwingMode && !cashHeldSwing && (
             <button
               type="button"
               disabled={locking}
@@ -1996,7 +2054,23 @@ export default function ForensicPanel({
             )}
           </div>
         )}
-        {!portfolioDisplayRows.length && !huntingSwing && !cashHeldSwing && (
+        {swingSessionUnavailable && (
+          <div className="col-span-full rounded-xl border border-red-200 bg-red-50/70 p-4">
+            <div className="text-[11px] font-black uppercase tracking-wider text-red-800">
+              Swing V2 authoritative session unavailable
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-red-700">
+              The panel did not receive a valid current-day Swing session. The generic Asset Matrix placeholder is intentionally hidden so it cannot be mistaken for the paper-trading book.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-600">
+              <span>Expected date: <strong>{istToday}</strong></span>
+              <span>Received date: <strong>{swingSessionDate || '—'}</strong></span>
+              <span>Source: <strong>{swingSession?.source || '—'}</strong></span>
+              {swingSession?.error && <span>Error: <strong>{swingSession.error}</strong></span>}
+            </div>
+          </div>
+        )}
+        {!swingSessionUnavailable && !portfolioDisplayRows.length && !huntingSwing && !cashHeldSwing && (
           <div className="col-span-full py-8 text-center">
             <p className="text-slate-700 text-[13px] font-semibold">
               {swingNonTradingDay
@@ -2005,16 +2079,12 @@ export default function ForensicPanel({
                 ? institutionalOffHours
                   ? 'No off-hours institutional BUY setups pass quant + SIGQ Research gates'
                   : 'No institutional-grade BUY setups pass all gates'
-                : 'No high-probability BUY setups right now'}
+                : 'No authoritative Swing V2 position locked right now'}
             </p>
             <p className="text-slate-500 text-[11px] mt-1">
               {swingNonTradingDay
                 ? `No scan is expected today${swingSession?.sessionDate ? ` — book state is from the last trading session (${swingSession.sessionDate})` : ''}. Gates are evaluated on trading days only; this is a market-hours status, not a screening failure.`
-                : institutionalMode
-                ? institutionalOffHours
-                  ? `Off-hours / snapshot mode: intraday volume gates are rank-penalized (0/${assetRows.filter((r) => !r.isMetaRow).length} hard-filter passers in pool). Still requires quant score ≥ ${SCORE_STRONG}, SIGQ Research confirm, LOW/MODERATE risk, and scanner R:R ≥2 or ATR-based estimate. No filler names — refresh after market open for live volume confirms.`
-                  : `₹1cr+ book requires quant score ≥ ${SCORE_STRONG}, hard+quality filters, SIGQ Research confirm (checklist ≥70% preferred), LOW/MODERATE risk, and scanner R:R ≥2 when in the scanner LONG set. No filler names — refresh after market open.`
-                : `Up to ${MATRIX_BUY_TOP_N} picks from the ranked pool. At least ${MATRIX_BUY_MIN_DISPLAY} shown when enough CORE setups exist; otherwise best hard-filter passers (score ≥ ${SCORE_MODERATE}) fill the floor. Refresh after market open for live confirms.`}
+                : `Swing V2 maximum is ${swingSession?.entryHuntDiagnostics?.maxPositions ?? 5} concurrent positions with no minimum trade count. Scanner LONG and Asset Matrix display rows are diagnostics only; only the authoritative V2 qualified/selected/locked funnel can create a paper position.`}
             </p>
           </div>
         )}
