@@ -13,8 +13,8 @@ logs/
 .env.*
 **/.env
 **/.env.*
-!.env.example
-!**/.env.example
+.env.example
+**/.env.example
 config/cloudflare/credentials.json
 config/docker/desk-state/seed/*.json
 config/docker/desk-state/seed/state/
@@ -44,4 +44,5 @@ strix_runs/
 *.sqlite3-shm
 __pycache__/
 *.pyc
+backend/.env.example
 backend/.env.example
