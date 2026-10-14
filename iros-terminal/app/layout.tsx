@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { DeskPrefsProvider } from "./components/DeskPrefsProvider";
 import ServiceWorkerRegister from "./components/ServiceWorkerRegister";
+import AccessMenu from "./components/AccessMenu";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -80,6 +81,7 @@ export default function RootLayout({
         <DeskPrefsProvider>
           <ServiceWorkerRegister />
           {children}
+          <AccessMenu />
         </DeskPrefsProvider>
       </body>
     </html>
