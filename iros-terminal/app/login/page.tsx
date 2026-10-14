@@ -1,13 +1,12 @@
 'use client';
 
 import { FormEvent, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 type Mode = "login" | "register";
 
 export default function LoginPage() {
   const router = useRouter();
-  const params = useSearchParams();
   const [mode, setMode] = useState<Mode>("login");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -36,7 +35,10 @@ export default function LoginPage() {
         setPassword("");
         return;
       }
-      const next = params.get("next");
+      const next =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("next")
+          : null;
       router.replace(next && next.startsWith("/") ? next : "/");
       router.refresh();
     } catch (err) {
