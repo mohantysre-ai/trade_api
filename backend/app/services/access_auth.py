@@ -113,37 +113,43 @@ def _hash_token(token: str) -> str:
 
 
 def _ensure_admin() -> None:
-    identifier = (os.getenv("SIGQ_ADMIN_IDENTIFIER") or "").strip()
     password = os.getenv("SIGQ_ADMIN_PASSWORD") or ""
-    if not identifier or not password:
+    raw_many = (os.getenv("SIGQ_ADMIN_IDENTIFIERS") or "").strip()
+    raw_one = (os.getenv("SIGQ_ADMIN_IDENTIFIER") or "").strip()
+    raw_values = [part.strip() for part in raw_many.split(",") if part.strip()]
+    if raw_one and raw_one not in raw_values:
+        raw_values.append(raw_one)
+    if not raw_values or not password:
         return
-    normalized, kind = _normalize_identifier(identifier)
-    pw_hash, salt = _hash_password(password)
+
     with _LOCK, _connect() as conn:
-        row = conn.execute(
-            "SELECT id FROM access_users WHERE identifier = ?",
-            (normalized,),
-        ).fetchone()
-        if row:
-            conn.execute(
-                """
-                UPDATE access_users
-                   SET password_hash = ?, password_salt = ?, status = 'APPROVED',
-                       is_admin = 1, approved_at = COALESCE(approved_at, ?)
-                 WHERE id = ?
-                """,
-                (pw_hash, salt, _now(), int(row["id"])),
-            )
-        else:
-            conn.execute(
-                """
-                INSERT INTO access_users
-                  (identifier, identifier_type, password_hash, password_salt,
-                   status, is_admin, created_at, approved_at)
-                VALUES (?, ?, ?, ?, 'APPROVED', 1, ?, ?)
-                """,
-                (normalized, kind, pw_hash, salt, _now(), _now()),
-            )
+        for identifier in raw_values:
+            normalized, kind = _normalize_identifier(identifier)
+            pw_hash, salt = _hash_password(password)
+            row = conn.execute(
+                "SELECT id FROM access_users WHERE identifier = ?",
+                (normalized,),
+            ).fetchone()
+            if row:
+                conn.execute(
+                    """
+                    UPDATE access_users
+                       SET password_hash = ?, password_salt = ?, status = 'APPROVED',
+                           is_admin = 1, approved_at = COALESCE(approved_at, ?)
+                     WHERE id = ?
+                    """,
+                    (pw_hash, salt, _now(), int(row["id"])),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO access_users
+                      (identifier, identifier_type, password_hash, password_salt,
+                       status, is_admin, created_at, approved_at)
+                    VALUES (?, ?, ?, ?, 'APPROVED', 1, ?, ?)
+                    """,
+                    (normalized, kind, pw_hash, salt, _now(), _now()),
+                )
         conn.commit()
 
 
