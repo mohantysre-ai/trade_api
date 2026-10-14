@@ -17,7 +17,13 @@ def generate_index_options_eod_report(for_date: date, *, force: bool = False) ->
     """Archive only the paper book whose IST session date matches ``for_date``."""
     from .eod_book_cache import load_book_cache, save_book_cache
 
-    if not force:
+    day = for_date.isoformat()
+    today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
+
+    # Historical books are immutable and may be served from archive. Today's
+    # EOD must be reconciled from the current durable/live option books on every
+    # read; otherwise an early zero-trade cache can mask positions entered later.
+    if not force and for_date != today:
         cached = load_book_cache(for_date, "index_options")
         if cached is not None:
             return cached
@@ -27,7 +33,6 @@ def generate_index_options_eod_report(for_date: date, *, force: bool = False) ->
     except (FileNotFoundError, ValueError, TypeError):
         live = {}
 
-    day = for_date.isoformat()
     from .index_options.runtime import strategy_eod
     from .index_options.accounting import eod_positions, merge_paper_books
 
@@ -78,6 +83,15 @@ def generate_index_options_eod_report(for_date: date, *, force: bool = False) ->
         "strategyRealizedPnl": strategy_realized,
         "strategyUnrealizedPnl": strategy_unrealized,
         "updatedAt": live.get("updatedAt"),
+        "reconciliation": {
+            "requestedDate": day,
+            "isToday": for_date == today,
+            "paperBookMatchedDate": matching_live,
+            "paperOpenCount": len(live.get("open") or []) if isinstance(live, dict) else 0,
+            "paperClosedCount": len(live.get("closed") or []) if isinstance(live, dict) else 0,
+            "durableStrategyCount": len(strategy_rows),
+            "source": "LIVE_PLUS_DURABLE_FOR_TODAY" if for_date == today else "ARCHIVE_REBUILD",
+        },
     }
     report["strategyAttribution"] = strategy
     return save_book_cache(for_date, "index_options", report)
