@@ -44,3 +44,4 @@ strix_runs/
 *.sqlite3-shm
 __pycache__/
 *.pyc
+backend/.env.example
