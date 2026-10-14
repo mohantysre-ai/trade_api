@@ -181,6 +181,9 @@ async def sse_stream(request: Request) -> StreamingResponse:
 
 app.include_router(_SNAPSHOT_ROUTER)
 
+from app.services.access_auth import create_access_router
+app.include_router(create_access_router())
+
 start_paper_supervisor(AngelOneClient)
 start_index_options_hunt_supervisor(AngelOneClient)
 
