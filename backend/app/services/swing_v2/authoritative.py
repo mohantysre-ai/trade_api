@@ -565,19 +565,65 @@ def authoritative_eod_report(for_date):
  today=datetime.now(IST).date()
  if for_date!=today:
   return report
+
+ # Today's EOD must never appear empty while the authoritative Swing session
+ # visibly has open or same-day closed positions.  The live session and EOD use
+ # the same ledger, but a partially-written/rotated event timeline can make the
+ # date-bucketed materializer temporarily return zero rows.  Reconcile missing
+ # rows from the current authoritative session instead of showing a blank book.
+ session=_session(now=datetime.now(IST))
+ session_rows=[]
+ if str(session.get("sessionDate") or "")[:10]==for_date.isoformat():
+  session_rows=[
+   row for row in [
+    *(session.get("long") or []),
+    *(session.get("closedPositions") or []),
+   ] if isinstance(row,dict)
+  ]
+
+ positions=[row for row in (report.get("positions") or []) if isinstance(row,dict)]
+ def _row_key(row):
+  pid=str(row.get("positionId") or "").strip()
+  if pid:
+   return ("positionId",pid)
+  return (
+   "fallback",
+   str(row.get("symbol") or "").upper(),
+   str(row.get("entryTimestamp") or row.get("sessionDate") or ""),
+   str(row.get("status") or ""),
+  )
+ by_key={_row_key(row):row for row in positions}
+ recovered=0
+ for row in session_rows:
+  key=_row_key(row)
+  if key not in by_key:
+   by_key[key]=row
+   recovered+=1
+ positions=list(by_key.values())
+
  marks=_marks(_snapshot())
- positions=[]
- for raw in report.get("positions") or []:
-  if not isinstance(raw,dict):
-   continue
+ marked=[]
+ now=datetime.now(IST)
+ for raw in positions:
   symbol=str(raw.get("symbol") or "").upper()
   mark=marks.get(symbol)
-  if raw.get("terminal") or not mark:
-   positions.append(raw)
+  if raw.get("terminal") or raw.get("closed") or not mark:
+   marked.append(raw)
   else:
-   positions.append(_position_row(raw,mark,as_of=datetime.now(IST)))
- realized=sum(float(row.get("realizedPnl") or 0) for row in positions)
- unrealized=sum(float(row.get("unrealizedPnl") or 0) for row in positions)
- report={**report,"positions":positions,"realizedPnl":round(realized,2),"unrealizedPnl":round(unrealized,2),"totalPnl":round(realized+unrealized,2),"markSource":"LIVE_SNAPSHOT_FOR_OPEN_POSITIONS"}
+   marked.append(_position_row(raw,mark,as_of=now))
+
+ realized=sum(float(row.get("realizedPnl") or 0) for row in marked)
+ unrealized=sum(float(row.get("unrealizedPnl") or 0) for row in marked)
+ report={
+  **report,
+  "positions":marked,
+  "realizedPnl":round(realized,2),
+  "unrealizedPnl":round(unrealized,2),
+  "totalPnl":round(realized+unrealized,2),
+  "markSource":"LIVE_SNAPSHOT_FOR_OPEN_POSITIONS",
+  "liveSessionReconciled":bool(session_rows),
+  "liveSessionRowCount":len(session_rows),
+  "recoveredFromLiveSession":recovered,
+ }
  return report
 __all__=["authoritative_eod_report","get_authoritative_session","is_v2_authoritative","lock_authoritative_session","run_authoritative_cycle"]
