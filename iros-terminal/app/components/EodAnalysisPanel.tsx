@@ -1123,7 +1123,9 @@ export default function EodAnalysisPanel({
 
   const dateStr = controlledDate ?? localDate;
   const swingDateStr = controlledSwingDate ?? localSwingDate;
+  const resolvedSwingDate = swingDateStr || dateStr;
   const isTodayBook = dateStr === istCalendarToday();
+  const isTodaySwingBook = resolvedSwingDate === istCalendarToday();
 
   const setDateStr = (v: string) => {
     onDateChange?.(v);
@@ -1146,7 +1148,7 @@ export default function EodAnalysisPanel({
       const s = p.toString();
       return s ? `?${s}` : '';
     };
-    const swingDate = swingDateStr || dateStr;
+    const swingDate = resolvedSwingDate;
     const timeoutMs = force ? 60_000 : 45_000;
 
     const loadOne = async <T,>(url: string, label: string): Promise<T | null> => {
@@ -1188,7 +1190,7 @@ export default function EodAnalysisPanel({
     } finally {
       setLoading(false);
     }
-  }, [dateStr, swingDateStr]);
+  }, [dateStr, resolvedSwingDate]);
 
   // forceBookRebuild is read only when refreshToken/date triggers — parent may clear it without a second fetch
   useEffect(() => {
@@ -1199,8 +1201,7 @@ export default function EodAnalysisPanel({
 
   // Market-hours live marks — overlay LTP / MTM without rewriting book cache
   useEffect(() => {
-    if (!isTodayBook) {
-       
+    if (!isTodayBook && !isTodaySwingBook) {
       setLiveMarks(null);
       return;
     }
@@ -1277,8 +1278,11 @@ export default function EodAnalysisPanel({
             };
           }
         };
-        if (String(sw?.sessionDate || '').slice(0, 10) === dateStr) {
-          ingestSession([...(sw?.long || []), ...(sw?.short || [])] as LivePriceRow[], 'LONG');
+        if (String(sw?.sessionDate || '').slice(0, 10) === resolvedSwingDate) {
+          ingestSession(
+            [...(sw?.long || []), ...(sw?.short || []), ...(sw?.closedPositions || [])] as LivePriceRow[],
+            'LONG',
+          );
         }
         if (String(intra?.sessionDate || intra?.locked?.sessionDate || '').slice(0, 10) === dateStr) {
           ingestSession(
@@ -1308,13 +1312,15 @@ export default function EodAnalysisPanel({
       cancelled = true;
       unsubscribe();
     };
-  }, [isTodayBook, dateStr]);
+  }, [isTodayBook, isTodaySwingBook, dateStr, resolvedSwingDate]);
 
-  const liveActive = Boolean(isTodayBook && liveMarks && (liveMarks.marketOpen || Object.keys(liveMarks.bySymbol).length > 0));
+  const hasLiveMarks = Boolean(liveMarks && (liveMarks.marketOpen || Object.keys(liveMarks.bySymbol).length > 0));
+  const liveActiveIntraday = Boolean(isTodayBook && hasLiveMarks);
+  const liveActiveSwing = Boolean(isTodaySwingBook && hasLiveMarks);
 
   const displayIntraday = useMemo(() => {
     if (!intraday) return null;
-    if (!liveActive || !liveMarks || !canOverlayIntradayBook(intraday.marketPhase, liveMarks.marketOpen)) {
+    if (!liveActiveIntraday || !liveMarks || !canOverlayIntradayBook(intraday.marketPhase, liveMarks.marketOpen)) {
       return deriveIntradayHeadlines(intraday, intraday.trades || []);
     }
 
@@ -1506,11 +1512,11 @@ export default function EodAnalysisPanel({
       liveUnrealisedPnl: number;
       liveOverlay: boolean;
     };
-  }, [intraday, liveActive, liveMarks]);
+  }, [intraday, liveActiveIntraday, liveMarks]);
 
   const displaySwing = useMemo(() => {
     if (!swing) return null;
-    if (!liveActive || !liveMarks) {
+    if (!liveActiveSwing || !liveMarks) {
       return deriveSwingHeadlines(swing, swing.picks || []);
     }
 
@@ -1643,7 +1649,7 @@ export default function EodAnalysisPanel({
       liveUnrealisedPnl: number;
       liveOverlay: boolean;
     };
-  }, [swing, liveActive, liveMarks]);
+  }, [swing, liveActiveSwing, liveMarks]);
 
   const noIntraday = displayIntraday && (!displayIntraday.trades || displayIntraday.trades.length === 0);
   const noSwing = displaySwing && (!displaySwing.picks || displaySwing.picks.length === 0);
