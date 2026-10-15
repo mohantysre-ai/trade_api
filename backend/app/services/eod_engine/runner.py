@@ -232,12 +232,27 @@ def _run_eod_analysis_locked(
             {"date": for_date.isoformat(), "proposals": []},
             payload.pm_commentary,
         )
+
+        # "No analytical picks" does not mean "no executed book".  Warm the
+        # canonical Intraday/Swing/Options books before returning so the master
+        # payload is reconciled from actual execution state rather than being
+        # permanently frozen as an empty EOD.
+        _ensure_book_reports_cached(for_date, force=True)
+        payload_json = payload.model_dump(mode="json")
+        try:
+            with open(master_path, "r", encoding="utf-8-sig") as fh:
+                reconciled = json.load(fh)
+            if isinstance(reconciled, dict):
+                payload_json = reconciled
+        except Exception:
+            pass
+
         result = {
             "success": True,
             "skipped": False,
             "date": for_date.isoformat(),
-            "status": "NO_PICKS",
-            "payload": payload.model_dump(mode="json"),
+            "status": payload_json.get("status") or "NO_PICKS",
+            "payload": payload_json,
             "llm_used": False,
         }
         try:
@@ -341,13 +356,22 @@ def _run_eod_analysis_locked(
 
     _ensure_book_reports_cached(for_date, force=True)
 
+    payload_json = payload.model_dump(mode="json")
+    try:
+        with open(master_path, "r", encoding="utf-8-sig") as fh:
+            reconciled = json.load(fh)
+        if isinstance(reconciled, dict):
+            payload_json = reconciled
+    except Exception:
+        pass
+
     result = {
         "success": True,
         "skipped": False,
         "date": for_date.isoformat(),
-        "status": status,
+        "status": payload_json.get("status") or status,
         "scorecard_count": len(scorecards),
-        "payload": payload.model_dump(mode="json"),
+        "payload": payload_json,
         "llm_used": bool(allow_llm and commentary.source == "LLM"),
     }
     try:
