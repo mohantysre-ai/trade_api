@@ -804,7 +804,57 @@ def generate_swing_eod_report(
 
     if v2_authoritative or live_v2_today:
         report = authoritative_eod_report(as_of)
-        positions = report.get("positions") or []
+        positions = [
+            row for row in (report.get("positions") or [])
+            if isinstance(row, dict)
+        ]
+
+        # Hard same-day invariant: if the live authoritative Swing session has
+        # positions, EOD must contain those same positions.  Do not depend on a
+        # second materialization path to rediscover them.  This closes the class
+        # of failures where the live panel is populated but EOD is blank.
+        if as_of == today and live_v2_today:
+            live_rows = [
+                row for row in [
+                    *(live_v2_session.get("long") or []),
+                    *(live_v2_session.get("closedPositions") or []),
+                ]
+                if isinstance(row, dict)
+            ]
+
+            def _eod_row_key(row: dict[str, Any]) -> tuple[str, ...]:
+                position_id = str(row.get("positionId") or "").strip()
+                if position_id:
+                    return ("positionId", position_id)
+                return (
+                    "fallback",
+                    str(row.get("symbol") or "").upper(),
+                    str(row.get("entryTimestamp") or row.get("sessionDate") or ""),
+                )
+
+            merged = {_eod_row_key(row): row for row in positions}
+            for row in live_rows:
+                merged[_eod_row_key(row)] = {
+                    **merged.get(_eod_row_key(row), {}),
+                    **row,
+                }
+            positions = list(merged.values())
+
+            # The report totals must follow the reconciled rows, not the
+            # pre-reconciliation ledger projection.
+            realized = sum(float(row.get("realizedPnl") or 0) for row in positions)
+            unrealized = sum(float(row.get("unrealizedPnl") or 0) for row in positions)
+            report = {
+                **report,
+                "positions": positions,
+                "realizedPnl": round(realized, 2),
+                "unrealizedPnl": round(unrealized, 2),
+                "totalPnl": round(realized + unrealized, 2),
+                "liveSessionReconciled": True,
+                "liveSessionRowCount": len(live_rows),
+                "eodInvariant": "LIVE_SWING_SESSION_SUBSET_OF_EOD",
+            }
+
         picks = []
         for p in positions:
             entry = _number(p.get("entryPrice")) or _number(p.get("fillPrice"))
