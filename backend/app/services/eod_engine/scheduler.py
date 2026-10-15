@@ -32,6 +32,7 @@ log = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
 
 _STARTED = False
+_SWING_SUPERVISOR_STARTED = False
 _LOCK = threading.Lock()
 _STOP = threading.Event()
 _CLOSE_MARKS_DONE_FOR: str | None = None
@@ -106,14 +107,26 @@ _PM_LLM_MINUTE = int(os.getenv("DESK_PM_LLM_MINUTE", "0"))
 
 
 def start_eod_scheduler() -> None:
-    """Start background daemon once (idempotent)."""
-    global _STARTED
+    """Start background daemons once (idempotent).
+
+    Swing owns a dedicated liveness thread.  It must not share the EOD/desk
+    scheduler thread because long-running EOD or refresh work can otherwise
+    prevent Swing fills, exits and decision scans from running on time.
+    """
+    global _STARTED, _SWING_SUPERVISOR_STARTED
     with _LOCK:
         if _STARTED:
             return
         _STARTED = True
+        _SWING_SUPERVISOR_STARTED = True
     t = threading.Thread(target=_scheduler_loop, name="desk-scheduler", daemon=True)
     t.start()
+    swing_t = threading.Thread(
+        target=_swing_supervisor_loop,
+        name="swing-v2-supervisor",
+        daemon=True,
+    )
+    swing_t.start()
     lw = lock_window_config()
     msg = (
         f"Desk automation started "
@@ -141,6 +154,7 @@ def desk_automation_status() -> dict[str, Any]:
         "enabled": _DESK_AUTO,
         "date": day,
         "schedulerStarted": _STARTED,
+        "swingSupervisorStarted": _SWING_SUPERVISOR_STARTED,
         "config": {
             "preworkHour": _PREWORK_HOUR,
             "preworkMinute": _PREWORK_MINUTE,
@@ -160,6 +174,27 @@ def desk_automation_status() -> dict[str, Any]:
     }
 
 
+def _swing_supervisor_loop() -> None:
+    """Independent Swing V2 writer/liveness loop.
+
+    Runs even while the general desk scheduler is busy with EOD, midday refresh
+    or LLM work.  run_authoritative_cycle is internally serialized and only
+    performs a decision scan when its persisted cadence says one is due; the
+    frequent loop is primarily for fills, exits, recovery and session rollover.
+    """
+    interval = max(5.0, float(os.getenv("SWING_SUPERVISOR_INTERVAL_SECONDS", "30")))
+    while not _STOP.is_set():
+        try:
+            now = datetime.now(tz=IST)
+            if now.weekday() < 5 and _DESK_AUTO:
+                from ..swing_session import refresh_swing_session_state
+
+                refresh_swing_session_state()
+        except Exception as exc:
+            log.warning("Swing V2 supervisor tick failed: %s", exc)
+        _STOP.wait(interval)
+
+
 def _scheduler_loop() -> None:
     while not _STOP.is_set():
         try:
@@ -173,12 +208,6 @@ def _scheduler_loop() -> None:
                     refresh_session_state()
                 except Exception as exc:
                     log.debug("Live session state refresh skipped: %s", exc)
-                try:
-                    from ..swing_session import refresh_swing_session_state
-
-                    refresh_swing_session_state()
-                except Exception as exc:
-                    log.debug("Swing session state refresh skipped: %s", exc)
                 _maybe_run_morning_prework(now)
                 _maybe_auto_commit(now)
                 _maybe_auto_swing_lock(now)
