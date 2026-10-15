@@ -263,16 +263,21 @@ def _load_stamp() -> dict[str, Any]:
     try:
         raw = json.loads(_STAMP_PATH.read_text(encoding="utf-8"))
         return raw if isinstance(raw, dict) else {}
-    except Exception:
+    except FileNotFoundError:
+        return {}
+    except Exception as exc:
+        log.warning("Desk automation stamp read failed: %s", exc)
         return {}
 
 
 def _save_stamp(stamp: dict[str, Any]) -> None:
     try:
         _STAMP_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _STAMP_PATH.write_text(json.dumps(stamp, indent=2), encoding="utf-8")
-    except Exception:
-        pass
+        tmp = _STAMP_PATH.with_suffix(_STAMP_PATH.suffix + ".tmp")
+        tmp.write_text(json.dumps(stamp, indent=2), encoding="utf-8")
+        os.replace(tmp, _STAMP_PATH)
+    except Exception as exc:
+        log.warning("Desk automation stamp write failed: %s", exc)
 
 
 def _today_stamp(now: datetime) -> dict[str, Any]:
@@ -655,29 +660,36 @@ def _maybe_refresh_close_marks(now: datetime) -> None:
 def _maybe_run_today() -> None:
     today = datetime.now(tz=IST).date()
     now = datetime.now(tz=IST)
+    day_key = today.isoformat()
     master = os.path.join(eod_day_dir(today), "master_eod_payload.json")
     if os.path.isfile(master):
         log.info("EOD artifacts already present for %s — skip scheduled run", today)
         _mark_stage(now, "eod", status="skipped", reason="artifacts_present")
         return
-    log.info("Scheduled EOD run starting for %s", today)
-    try:
-        result = run_eod_analysis(today, force=False)
-        _mark_stage(
-            now,
-            "eod",
-            status="done" if result.get("success", True) else "error",
-            skipped=result.get("skipped"),
-        )
-        log.info(
-            "Scheduled EOD run done: date=%s status=%s skipped=%s",
-            result.get("date"),
-            result.get("status"),
-            result.get("skipped"),
-        )
-    except Exception as exc:
-        log.exception("Scheduled EOD run failed: %s", exc)
-        _mark_stage(now, "eod", status="error", error=str(exc))
+
+    def _job() -> None:
+        job_now = datetime.now(tz=IST)
+        log.info("Scheduled EOD run starting for %s", today)
+        try:
+            result = run_eod_analysis(today, force=False)
+            _mark_stage(
+                job_now,
+                "eod",
+                status="done" if result.get("success", True) else "error",
+                skipped=result.get("skipped"),
+            )
+            log.info(
+                "Scheduled EOD run done: date=%s status=%s skipped=%s",
+                result.get("date"),
+                result.get("status"),
+                result.get("skipped"),
+            )
+        except Exception as exc:
+            log.exception("Scheduled EOD run failed: %s", exc)
+            _mark_stage(job_now, "eod", status="error", error=str(exc))
+
+    if _spawn_once(f"eod:{day_key}", _job):
+        _mark_stage(now, "eod", status="running")
 
 
 def _maybe_pm_llm(now: datetime) -> None:
