@@ -560,6 +560,7 @@ type LivePricesDesk = {
 type SessionDesk = {
   long?: LivePriceRow[];
   short?: LivePriceRow[];
+  closedPositions?: LivePriceRow[];
   sessionDate?: string;
   locked?: {
     long?: LivePriceRow[];
