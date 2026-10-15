@@ -770,19 +770,39 @@ def generate_swing_eod_report(
     force: bool = False,
 ) -> dict[str, Any]:
     """Build swing Book P&L from locked swing portfolio (not intradAy mirror)."""
-    from .swing_v2.authoritative import authoritative_eod_report, is_v2_authoritative
+    from .swing_v2.authoritative import (
+        authoritative_eod_report,
+        get_authoritative_session,
+        is_v2_authoritative,
+    )
     from .eod_book_cache import load_book_cache, save_book_cache
 
     today = date.fromisoformat(_today_ist())
     as_of = for_date or today
     v2_authoritative = is_v2_authoritative()
+    live_v2_session = {}
+    if as_of == today:
+        try:
+            live_v2_session = get_authoritative_session(live=False) or {}
+        except Exception:
+            live_v2_session = {}
+    live_v2_today = bool(
+        str(live_v2_session.get("sessionDate") or "")[:10] == as_of.isoformat()
+        and (
+            live_v2_session.get("authoritative") is True
+            or str(live_v2_session.get("authority") or "").upper() == "V2"
+            or str(live_v2_session.get("source") or "") == "swing_v2_ledger"
+        )
+    )
 
-    if not force and (not v2_authoritative or as_of != today):
+    # Never let a same-day cached NO_BOOK/empty Swing artifact hide a live
+    # authoritative Swing V2 book. Historical dates remain cache-first.
+    if not force and as_of != today:
         cached = load_book_cache(as_of, "swing")
         if cached is not None:
             return cached
 
-    if v2_authoritative:
+    if v2_authoritative or live_v2_today:
         report = authoritative_eod_report(as_of)
         positions = report.get("positions") or []
         picks = []
@@ -898,7 +918,15 @@ def generate_swing_eod_report(
             # report was built from so EOD consumers can assert V2 authority.
             "symbolSource": "swing_v2_ledger",
             "source": report.get("source") or "swing_v2_ledger",
-            "authoritative": bool(report.get("authoritative")),
+            "authoritative": bool(report.get("authoritative") or live_v2_today),
+            "reconciliation": {
+                "requestedDate": as_of.isoformat(),
+                "liveSessionMatchedDate": live_v2_today,
+                "liveOpenCount": len(live_v2_session.get("long") or []),
+                "liveClosedTodayCount": len(live_v2_session.get("closedPositions") or []),
+                "reportPositionCount": len(positions),
+                "source": "SWING_V2_LEDGER_PLUS_LIVE_SESSION",
+            },
             "isMock": False,
             "attribution": {
                 "locked": len(picks),
