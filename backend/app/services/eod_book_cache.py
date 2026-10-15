@@ -83,6 +83,21 @@ def _is_triggered_swing(row: dict[str, Any]) -> bool:
     return str(row.get("status") or "").upper() != "NOT_TRIGGERED"
 
 
+def _row_pnl_value(row: dict[str, Any]) -> float:
+    """Canonical row P&L across Intraday, Swing and Index Options schemas."""
+    for key in ("totalPnl", "pnl"):
+        raw = row.get(key)
+        if raw is not None:
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                pass
+    try:
+        return float(row.get("realizedPnl") or 0.0) + float(row.get("unrealizedPnl") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _reconcile_master_from_books(for_date) -> None:
     """Make the headline EOD artifact agree with canonical Book caches."""
     day_dir = _day_dir(for_date)
@@ -114,10 +129,7 @@ def _reconcile_master_from_books(for_date) -> None:
     pnls: list[float] = []
     deployed = 0.0
     for row in active_rows:
-        try:
-            pnl = float(row.get("pnl") or 0.0)
-        except (TypeError, ValueError):
-            pnl = 0.0
+        pnl = _row_pnl_value(row)
         pnls.append(pnl)
         try:
             deployed += float(row.get("deployedCapital") or 0.0)
@@ -361,9 +373,21 @@ def freeze_dated_books_from_live(for_date: date | str) -> dict[str, Any]:
     intra = load_book_cache(day, "intraday")
     swing = load_book_cache(day, "swing")
     options = load_book_cache(day, "index_options")
-    have_intra = bool(intra and intra.get("trades"))
-    have_swing = bool(swing and (swing.get("picks") or swing.get("totalPicks")))
-    have_options = bool(options and (options.get("positions") or options.get("totalPnl") is not None))
+    have_intra = bool(intra and intra.get("trades") and str(intra.get("archiveStatus") or "") != "NO_BOOK")
+    have_swing = bool(
+        swing
+        and (swing.get("picks") or int(swing.get("totalPicks") or 0) > 0)
+        and str(swing.get("archiveStatus") or "") != "NO_BOOK"
+    )
+    have_options = bool(
+        options
+        and (
+            options.get("positions")
+            or int(options.get("entryCount") or 0) > 0
+            or int(options.get("closedCount") or 0) > 0
+        )
+        and str(options.get("archiveStatus") or "") != "NO_BOOK"
+    )
     if have_intra and have_swing and have_options:
         return {"skipped": True, "reason": "already_archived", "date": day.isoformat()}
     from .eod_intraday_report import generate_intraday_eod_report
