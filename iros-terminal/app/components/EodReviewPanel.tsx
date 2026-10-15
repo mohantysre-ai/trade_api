@@ -22,6 +22,17 @@ import {
 
 const DASH = '—';
 
+function istCalendarToday(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${map.year}-${map.month}-${map.day}`;
+}
+
 function fmtNum(v: number | null | undefined, digits = 2, suffix = ''): string {
   if (v == null || Number.isNaN(Number(v))) return DASH;
   return `${Number(v).toFixed(digits)}${suffix}`;
@@ -352,12 +363,12 @@ export default function EodReviewPanel({
       const sorted = [...list].sort((a, b) => b.localeCompare(a));
       setDates(sorted);
       if (controlledDate === undefined) {
-        setLocalDate((prev) => prev || sorted[0] || new Date().toISOString().slice(0, 10));
+        setLocalDate((prev) => prev || sorted[0] || istCalendarToday());
       }
     } catch {
       setDates([]);
       if (controlledDate === undefined) {
-        setLocalDate((prev) => prev || new Date().toISOString().slice(0, 10));
+        setLocalDate((prev) => prev || istCalendarToday());
       }
     }
   }, [controlledDate]);
