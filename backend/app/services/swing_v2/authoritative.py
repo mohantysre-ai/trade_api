@@ -536,17 +536,16 @@ def get_authoritative_session(*,live=False):
  with _SESSION_CACHE_LOCK:
   if _SESSION_READ_CACHE is not None and now-_SESSION_READ_CACHE_AT<ttl:
    return copy.deepcopy(_SESSION_READ_CACHE)
-  cached = copy.deepcopy(_SESSION_READ_CACHE)
- if cached is not None:
-  return cached
+
+ # Cache expiry is a hard freshness boundary.  The previous implementation
+ # copied an expired cache and returned it forever until some writer happened
+ # to replace it.  That could freeze Swing status across a new session, hide
+ # newly locked positions and make EOD disagree with the live ledger.
  fresh = _session()
  with _SESSION_CACHE_LOCK:
-  if _SESSION_READ_CACHE is None or now-_SESSION_READ_CACHE_AT>=ttl:
-   _SESSION_READ_CACHE = fresh
-   _SESSION_READ_CACHE_AT = monotonic_time.monotonic()
-  else:
-   fresh = copy.deepcopy(_SESSION_READ_CACHE)
- return fresh
+  _SESSION_READ_CACHE = fresh
+  _SESSION_READ_CACHE_AT = monotonic_time.monotonic()
+ return copy.deepcopy(fresh)
 def lock_authoritative_session(*,force=False):
  """Operator lock that remains fail-closed outside a live trading window."""
  if force:
