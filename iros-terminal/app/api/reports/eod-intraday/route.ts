@@ -19,7 +19,10 @@ export async function GET(request: NextRequest) {
     const qs = params.toString() ? `?${params.toString()}` : "";
     const url = `${backendBase()}/api/reports/eod-intraday${qs}`;
 
-    if (!force) {
+    const istToday = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
+    const isToday = !date || date === istToday;
+
+    if (!force && !isToday) {
       const { data, cacheStatus } = await cachedBackendJson(
         `eod-intraday-${date || "latest"}`,
         url,
