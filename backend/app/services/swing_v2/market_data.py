@@ -17,7 +17,7 @@ import logging
 import os
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -127,7 +127,16 @@ def historical_bars(symbol: str, interval: str, limit: int) -> list[dict[str, An
         from ..market_data_provider import load_dhan_security_ids
 
         now = datetime.now(timezone.utc)
-        start = now
+        interval_upper = str(interval or "").upper()
+        if interval_upper == "ONE_DAY":
+            lookback = timedelta(days=max(45, int(limit * 2.2)))
+        elif interval_upper in {"ONE_HOUR", "SIXTY_MINUTE"}:
+            lookback = timedelta(days=max(10, int(limit / 5) + 5))
+        elif interval_upper in {"FIFTEEN_MINUTE", "THIRTY_MINUTE"}:
+            lookback = timedelta(days=max(5, int(limit / 20) + 3))
+        else:
+            lookback = timedelta(days=max(3, int(limit / 60) + 2))
+        start = now - lookback
         token = ""
         ids = load_dhan_security_ids()
         token = ids.get(str(symbol).upper(), "")
