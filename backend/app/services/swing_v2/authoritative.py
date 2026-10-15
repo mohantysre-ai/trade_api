@@ -70,13 +70,25 @@ def _position_row(position,mark=None,*,as_of=None):
   if entry>0 and remaining>0 and not position.get("terminal"):
    u=remaining*(mark-entry); row["unrealizedPnl"]=round(u,2); row["unrealizedPnlPct"]=round((mark/entry-1)*100,4); row["totalPnl"]=round(float(position.get("realizedPnl") or 0)+u,2)
  return row
-def _marks(snapshot):
+def _marks(snapshot, symbols=None):
+ """Best-available Swing marks: fresh shared/provider quotes first, snapshot fallback."""
  out={}; quotes=snapshot.get("stockQuotes") if isinstance(snapshot.get("stockQuotes"),dict) else {}
  for s,r in quotes.items():
   if not isinstance(r,dict): continue
   try: p=float(r.get("ltpRaw") or r.get("ltp") or r.get("close") or 0)
   except (TypeError,ValueError): p=0
   if p>0: out[str(s).upper()]=p
+ wanted=[str(s).upper() for s in (symbols or []) if s]
+ if wanted:
+  try:
+   from .market_data import latest_quotes
+   for s,r in latest_quotes(wanted).items():
+    if not isinstance(r,dict): continue
+    try: p=float(r.get("ltp") or r.get("lastPrice") or r.get("close") or 0)
+    except (TypeError,ValueError): p=0
+    if p>0: out[str(s).upper()]=p
+  except Exception as exc:
+   _LOG.debug("Swing live-mark overlay failed; using snapshot fallback: %s",exc)
  return out
 def _entry_hunt_diagnostics(scan,snapshot):
  f=(scan or {}).get("funnel")
@@ -119,10 +131,11 @@ def _session_scan_due(current, now):
 
 
 def _session(scan=None,*,now=None,market=None):
- cfg=load_config(); now=(now or datetime.now(timezone.utc)).astimezone(IST); day=now.date().isoformat(); market=market if isinstance(market,dict) else _market_day_status(now); trading_day=bool(market.get("isTradingDay")); ledger=SwingLedger(cfg.ledger_path); positions=_positions(ledger); snapshot=_snapshot(); marks=_marks(snapshot)
+ cfg=load_config(); now=(now or datetime.now(timezone.utc)).astimezone(IST); day=now.date().isoformat(); market=market if isinstance(market,dict) else _market_day_status(now); trading_day=bool(market.get("isTradingDay")); ledger=SwingLedger(cfg.ledger_path); positions=_positions(ledger); snapshot=_snapshot()
  # Open Swing positions survive the session boundary. Their original
  # sessionDate is the entry date and must never be used to hide them on D2.
  active=[r for r in positions if r.get("positionId") and r.get("entryTimestamp") and not r.get("terminal")]
+ marks=_marks(snapshot,[r.get("symbol") for r in active])
  closed=[]
  for r in positions:
   if not r.get("terminal"): continue
@@ -612,7 +625,7 @@ def authoritative_eod_report(for_date):
    recovered+=1
  positions=list(by_key.values())
 
- marks=_marks(_snapshot())
+ marks=_marks(_snapshot(),[r.get("symbol") for r in positions])
  marked=[]
  now=datetime.now(IST)
  for raw in positions:
