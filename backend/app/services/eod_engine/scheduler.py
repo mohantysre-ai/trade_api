@@ -42,6 +42,7 @@ _MIDDAY_DONE: set[str] = set()
 _PM_LLM_ATTEMPTED_FOR: str | None = None
 _BG_RUNNING: set[str] = set()
 _BG_LOCK = threading.Lock()
+_STAMP_LOCK = threading.Lock()
 
 
 def _spawn_once(job_key: str, target) -> bool:
@@ -290,14 +291,17 @@ def _today_stamp(now: datetime) -> dict[str, Any]:
 
 
 def _mark_stage(now: datetime, stage: str, **extra: Any) -> None:
-    stamp = _today_stamp(now)
-    entry = {
-        "status": extra.pop("status", "done"),
-        "at": datetime.now(tz=IST).isoformat(),
-        **extra,
-    }
-    stamp["stages"][stage] = entry
-    _save_stamp(stamp)
+    # Background jobs can finish concurrently; serialize read-modify-write so
+    # one stage update cannot erase another stage written a few milliseconds earlier.
+    with _STAMP_LOCK:
+        stamp = _today_stamp(now)
+        entry = {
+            "status": extra.pop("status", "done"),
+            "at": datetime.now(tz=IST).isoformat(),
+            **extra,
+        }
+        stamp["stages"][stage] = entry
+        _save_stamp(stamp)
 
 
 def _stage_done(now: datetime, stage: str) -> bool:
