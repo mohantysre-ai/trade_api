@@ -49,9 +49,9 @@ except ImportError:
     from app.services.ai_ticker_news import generate_ticker_news_report, PulseNewsCollector
 
 try:
-    from .angel_one_feed import fetch_live_news
+    from .public_news_feed import fetch_live_news
 except ImportError:
-    from app.services.angel_one_feed import fetch_live_news
+    from app.services.public_news_feed import fetch_live_news
 
 try:
     from ..utils.symbols import WATCHLIST
