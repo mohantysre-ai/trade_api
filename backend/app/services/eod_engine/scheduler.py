@@ -187,7 +187,11 @@ def _swing_supervisor_loop() -> None:
     while not _STOP.is_set():
         try:
             now = datetime.now(tz=IST)
-            if now.weekday() < 5 and _DESK_AUTO:
+            mins_now = now.hour * 60 + now.minute
+            # Swing lifecycle is market-session work.  After 15:30 the durable
+            # ledger + final snapshot are read-only until the next session;
+            # repeatedly re-running the cycle only burns provider/API capacity.
+            if now.weekday() < 5 and _DESK_AUTO and (9 * 60 + 15) <= mins_now <= (15 * 60 + 30):
                 from ..swing_session import refresh_swing_session_state
 
                 refresh_swing_session_state()
