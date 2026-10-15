@@ -90,6 +90,13 @@ def run_eod_analysis(
             with open(master_path, "r", encoding="utf-8-sig") as fh:
                 existing = json.load(fh)
             _ensure_book_reports_cached(resolved_date)
+            try:
+                with open(master_path, "r", encoding="utf-8-sig") as fh:
+                    refreshed = json.load(fh)
+                if isinstance(refreshed, dict):
+                    existing = refreshed
+            except Exception:
+                pass
             result = {
                 "success": True,
                 "skipped": True,
@@ -187,6 +194,13 @@ def _run_eod_analysis_locked(
             with open(master_path, "r", encoding="utf-8-sig") as fh:
                 existing = json.load(fh)
             _ensure_book_reports_cached(for_date)
+            try:
+                with open(master_path, "r", encoding="utf-8-sig") as fh:
+                    refreshed = json.load(fh)
+                if isinstance(refreshed, dict):
+                    existing = refreshed
+            except Exception:
+                pass
             result = {
                 "success": True,
                 "skipped": True,
