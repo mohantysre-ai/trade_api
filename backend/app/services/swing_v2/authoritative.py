@@ -5,7 +5,7 @@ V2 ledger into the compatibility session consumed by the existing dashboard
 and EOD routes.
 """
 from __future__ import annotations
-import json, os, copy, threading, time as monotonic_time
+import json, os, copy, logging, threading, time as monotonic_time
 from collections import defaultdict  # noqa: F401  (kept for reporting helpers)
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
@@ -19,6 +19,7 @@ from .ledger import SwingLedger, materialize_position
 from .reporting import ledger_eod_report
 from .schemas import EventType
 IST=ZoneInfo("Asia/Kolkata"); _LOCK=threading.RLock(); _DATA_REFRESH_LOCK=threading.Lock(); _SESSION_CACHE_LOCK=threading.Lock()
+_LOG=logging.getLogger(__name__)
 _FINAL_REFRESH_MARGIN_SECONDS=int(os.getenv("SWING_FINAL_REFRESH_MARGIN_SECONDS","90")); _SESSION_READ_CACHE=None; _SESSION_READ_CACHE_AT=0.0; _SESSION_READ_TTL=float(os.getenv("SWING_SESSION_READ_TTL","2")); _EOD_READ_CACHE={}; _SWING_SCAN_INTERVAL_SECONDS=float(os.getenv("SWING_SCAN_INTERVAL_SECONDS","1800"))
 _RETRYABLE_FINAL_BLOCK_REASONS={"FINAL_DATA_REFRESH_MISSED_ORDER_WINDOW","UNIVERSE_COVERAGE_BELOW_99PCT","UNIVERSE_COVERAGE_BELOW_90PCT","REGIME_UNRATED","SWING_V2_DATA_NOT_READY"}
 def is_v2_authoritative(config=None): return (config or load_config()).paper_authoritative
@@ -529,7 +530,18 @@ def get_authoritative_session(*,live=False):
     if str(state.get("sessionDate") or "")!=wall.date().isoformat() or _session_scan_due(state,wall):
      return run_authoritative_cycle(now=wall)
   except Exception as exc:
-   _LOG.warning("Swing V2 live read cycle failed; serving cached session: %s",exc)
+   _LOG.exception("Swing V2 live read cycle failed; rebuilding session from durable ledger: %s",exc)
+   # A transient refresh/scan failure must never make the read endpoint itself
+   # unavailable.  The durable ledger is sufficient to reconstruct today's
+   # authoritative book, including carried/open positions and current marks.
+   try:
+    fresh=_session(now=wall)
+    with _SESSION_CACHE_LOCK:
+     _SESSION_READ_CACHE=fresh
+     _SESSION_READ_CACHE_AT=monotonic_time.monotonic()
+    return copy.deepcopy(fresh)
+   except Exception as fallback_exc:
+    _LOG.exception("Swing V2 durable-ledger fallback failed: %s",fallback_exc)
 
  now=monotonic_time.monotonic()
  ttl=0.75 if live else _SESSION_READ_TTL
