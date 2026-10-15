@@ -50,3 +50,9 @@ backend/.env
 *.sqlite3
 *.sqlite3-wal
 *.sqlite3-shm
+
+# Runtime desk state belongs in named volumes / iros-desk-state, never in the
+# market-api image. Excluding it prevents EOD/session history from being copied
+# into the image and then duplicated again as seed data.
+backend/app/data/**
+backend/app/services/eod_archive/**
