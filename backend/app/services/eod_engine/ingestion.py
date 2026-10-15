@@ -238,6 +238,7 @@ def load_day_picks(for_date: date) -> dict[str, Any]:
     if swing_ok:
         _ingest(list(swing.get("long") or []), "swing_session", book="SWING")
         _ingest(list(swing.get("short") or []), "swing_session", book="SWING")
+        _ingest(list(swing.get("closedPositions") or []), "swing_session_closed", book="SWING")
     elif swing.get("locked") and swing_date and swing_date != day_key:
         log.info(
             "Rejecting stale swing_session for Book (%s != %s) — date parity",
