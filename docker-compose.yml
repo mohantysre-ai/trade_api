@@ -1,6 +1,6 @@
 # Alphix / IROS Terminal — production compose stack
 name: sigq
-# Hub images (same on every machine): smohanty010620/iros-market-api, iros-frontend, cloudflared, iros-desk-state
+# Hub images (same on every machine): smohanty010620/iros-market-api, iros-ai-news, iros-frontend, cloudflared, iros-desk-state
 # iros-desk-state is a JSON snapshot image (Hub has no volumes). Packed by push-docker-hub.bat.
 #
 # This PC (after code changes):  rebuild-docker.bat   then  push-docker-hub.bat
@@ -123,11 +123,11 @@ services:
         condition: service_healthy
 
   ai-news:
-    image: smohanty010620/iros-market-api:latest
+    image: smohanty010620/iros-ai-news:latest
     container_name: iros-ai-news
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: backend/Dockerfile.ai-news
     restart: unless-stopped
     init: true
     env_file:
@@ -155,8 +155,6 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - iros-backend-data:/app/backend/app/data
-      - iros-eod-archive:/app/backend/app/services/eod_archive
       - iros-desk-state:/app/state
       - ./backend/app/services/client_secret.json:/app/backend/app/services/client_secret.json:ro
       - ./backend/app/services/gemini_oauth_token.json:/app/backend/app/services/gemini_oauth_token.json:ro
