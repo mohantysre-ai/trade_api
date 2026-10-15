@@ -4,6 +4,7 @@ REM IROS — Build and push Hub images (all machines pull these)
 REM ============================================================
 REM Images:
 REM   smohanty010620/iros-market-api
+REM   smohanty010620/iros-ai-news
 REM   smohanty010620/iros-frontend
 REM   smohanty010620/cloudflared   (tunnel run baked in; no secrets)
 REM   smohanty010620/iros-desk-state  (desk JSON snapshot — Hub has no volumes)
@@ -75,6 +76,10 @@ if errorlevel 1 (
 echo.
 echo [*] Pushing %HUB%/iros-market-api:latest ...
 docker push %HUB%/iros-market-api:latest
+if errorlevel 1 goto :pushfail
+
+echo [*] Pushing %HUB%/iros-ai-news:latest ...
+docker push %HUB%/iros-ai-news:latest
 if errorlevel 1 goto :pushfail
 
 echo [*] Pushing %HUB%/iros-frontend:latest ...
