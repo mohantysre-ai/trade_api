@@ -57,7 +57,7 @@ _LIVE_BOOK_CACHE_LOCK = threading.Lock()
 _LIVE_BOOK_CACHE_REFRESHING = False
 _LIVE_BOOK_CACHE_GEN = 0
 _LIVE_BOOK_CACHE_OPEN_TTL = float(os.environ.get("LIVE_BOOK_CACHE_OPEN_TTL", "4"))
-_LIVE_BOOK_CACHE_CLOSED_TTL = float(os.environ.get("LIVE_BOOK_CACHE_CLOSED_TTL", "20"))
+_LIVE_BOOK_CACHE_CLOSED_TTL = float(os.environ.get("LIVE_BOOK_CACHE_CLOSED_TTL", "120"))
 
 # NSE equity cash trading session (IST)
 _MARKET_OPEN_HOUR = 9
@@ -171,10 +171,15 @@ def _plan_row_is_open(pos: dict[str, Any]) -> bool:
 
 
 def _should_refresh_plan_ltps(market_open: bool, after_close: bool) -> bool:
-    """Refresh open plan tickers on trading days — session open and post-close."""
+    """Refresh plan tickers only during the live NSE cash session.
+
+    After 15:30 IST the final persisted snapshot/session marks are immutable
+    for the desk. Re-hitting Angel/Yahoo for every instrument after close only
+    adds latency, API pressure and cross-book drift.
+    """
     if not _is_trading_day():
         return False
-    return bool(market_open or after_close)
+    return bool(market_open)
 
 
 def _is_trading_day(now: datetime | None = None) -> bool:
