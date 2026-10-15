@@ -8,12 +8,15 @@ export type LiveDeskSnapshot = { sequence: number; receivedAt: string; 'live-pri
 const LIVE_KEYS: LiveDeskKey[] = ['live-prices', 'intraday-session', 'swing-session'];
 const urls: Record<LiveDeskKey, string> = { 'live-prices': '/api/live-prices', 'intraday-session': '/api/intraday-session', 'swing-session': '/api/swing-session?live=1' };
 const OPEN_POLL_MS = 5_000;
-const LOCKED_SWING_POLL_MS = 1_000;
+const LOCKED_SWING_POLL_MS = 3_000;
 const CLOSED_POLL_MS = 30_000;
 const OPEN_CACHE_MS = 4_500;
-const LOCKED_SWING_CACHE_MS = 850;
+const LOCKED_SWING_CACHE_MS = 2_500;
 const CLOSED_CACHE_MS = 29_500;
 const lastGood = new Map<LiveDeskKey, Record<string, unknown>>();
+const lastGoodAt = new Map<LiveDeskKey, number>();
+const FETCH_TIMEOUT_MS = 8_000;
+const MAX_CLIENT_STALE_MS = 30_000;
 const listeners = new Set<(snapshot: LiveDeskSnapshot) => void>();
 let lastSnapshot: LiveDeskSnapshot | null = null, lastSnapshotAt = 0, pendingSnapshot: Promise<LiveDeskSnapshot> | null = null, pollTimer: number | null = null, sequence = 0;
 
@@ -29,8 +32,25 @@ function pollingPeriod(): number { return marketIsOpen() ? (hasLockedSwing() ? L
 function cachePeriod(): number { return marketIsOpen() ? (hasLockedSwing() ? LOCKED_SWING_CACHE_MS : OPEN_CACHE_MS) : CLOSED_CACHE_MS; }
 function notifySnapshot(snapshot: LiveDeskSnapshot): void { for (const listener of listeners) { try { listener(snapshot); } catch {} } }
 async function fetchDeskKey(key: LiveDeskKey): Promise<Record<string, unknown>> {
-  try { const response = await fetch(urls[key], { cache: 'no-store' }); if (!response.ok) throw new Error(`${key} HTTP ${response.status}`); const data = await response.json() as Record<string, unknown>; lastGood.set(key, data); return data; }
-  catch (error) { const fallback = lastGood.get(key); if (fallback) return fallback; throw error; }
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(urls[key], { cache: 'no-store', signal: ctrl.signal });
+    if (!response.ok) throw new Error(`${key} HTTP ${response.status}`);
+    const data = await response.json() as Record<string, unknown>;
+    lastGood.set(key, data);
+    lastGoodAt.set(key, Date.now());
+    return data;
+  } catch (error) {
+    const fallback = lastGood.get(key);
+    const storedAt = lastGoodAt.get(key) ?? 0;
+    if (fallback && Date.now() - storedAt <= MAX_CLIENT_STALE_MS) {
+      return { ...fallback, __stale: true, __staleReason: error instanceof Error ? error.message : String(error) };
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 export async function fetchLiveDeskSnapshot(force = false): Promise<LiveDeskSnapshot> {
   const maxAge = cachePeriod();
