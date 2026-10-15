@@ -773,13 +773,14 @@ def generate_swing_eod_report(
     from .swing_v2.authoritative import (
         authoritative_eod_report,
         get_authoritative_session,
-        is_v2_authoritative,
     )
     from .eod_book_cache import load_book_cache, save_book_cache
 
     today = date.fromisoformat(_today_ist())
     as_of = for_date or today
-    v2_authoritative = is_v2_authoritative()
+    # Swing V1 has been removed.  The live desk already routes unconditionally
+    # through Swing V2, so EOD must use the same authority regardless of legacy
+    # SWING_V2_ENABLED / SWING_STRATEGY_AUTHORITY environment flags.
     live_v2_session = {}
     if as_of == today:
         try:
@@ -802,7 +803,10 @@ def generate_swing_eod_report(
         if cached is not None:
             return cached
 
-    if v2_authoritative or live_v2_today:
+    # Permanent authority rule: Swing EOD is always the Swing V2 ledger.
+    # A config/env mismatch must never send EOD down the removed legacy path
+    # while the live portfolio is visibly populated from V2.
+    if True:
         report = authoritative_eod_report(as_of)
         positions = [
             row for row in (report.get("positions") or [])
@@ -986,6 +990,34 @@ def generate_swing_eod_report(
                 "losses": sum(1 for p in picks if float(p.get("totalPnl") or 0) < 0),
                 "deployed": sum(float(p.get("deployedCapital") or 0) for p in picks),
             },
+            "deskCounts": {
+                "swing": len(picks),
+                "intradayLong": 0,
+                "intradayShort": 0,
+                "total": len(picks),
+            },
+            "winCount": sum(1 for p in picks if float(p.get("totalPnl") or 0) > 0),
+            "lossCount": sum(1 for p in picks if float(p.get("totalPnl") or 0) < 0),
+            "hitRatePct": (
+                round(
+                    sum(1 for p in picks if float(p.get("totalPnl") or 0) > 0)
+                    / max(1, sum(1 for p in picks if not p.get("skipped")))
+                    * 100.0,
+                    2,
+                )
+                if any(not p.get("skipped") for p in picks)
+                else 0.0
+            ),
+            "totalPnlPct": (
+                round(
+                    float(report.get("totalPnl") or 0.0)
+                    / sum(float(p.get("deployedCapital") or 0) for p in picks)
+                    * 100.0,
+                    4,
+                )
+                if sum(float(p.get("deployedCapital") or 0) for p in picks) > 0
+                else None
+            ),
         }
         return save_book_cache(as_of, "swing", cache_report)
 
