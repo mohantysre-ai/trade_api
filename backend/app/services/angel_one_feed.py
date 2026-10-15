@@ -157,6 +157,8 @@ _ONDEMAND_ACTIVE_BY_KEY: dict[str, str] = {}
 _REFRESH_TASK_LOCK = threading.Lock()
 _SCHEDULED_REFRESH_LOCK = threading.Lock()
 _SCHEDULED_REFRESH_STATE_LOCK = threading.Lock()
+_QUOTE_CHUNK_CURSOR_LOCK = threading.Lock()
+_QUOTE_CHUNK_CURSOR = 0
 _SCHEDULED_REFRESH_STATE: dict[str, Any] = {
     "running": False,
     "reason": None,
@@ -1033,42 +1035,58 @@ def _is_refresh_stale() -> bool:
 
 
 def _clear_stale_refresh_lock() -> bool:
-    """Record stale ownership without pretending a held mutex was released."""
+    """Quarantine a stale refresh owner and install a fresh mutex generation.
+
+    Python primitive locks cannot cancel their owner. Replacing the global lock
+    lets new refreshes proceed while the stale thread retains and eventually
+    releases only its original local lock. Refresh IDs prevent that stale thread
+    from clearing the state of a newer refresh when it finally exits.
+    """
+    global _SCHEDULED_REFRESH_LOCK
     with _SCHEDULED_REFRESH_STATE_LOCK:
         if not _SCHEDULED_REFRESH_STATE.get("running"):
             return False
         prior = dict(_SCHEDULED_REFRESH_STATE)
         _SCHEDULED_REFRESH_STATE.update(
+            running=False,
             staleDetectedAt=datetime.now(timezone.utc).isoformat(),
             staleReason="refresh_progress_timeout",
         )
+        _SCHEDULED_REFRESH_LOCK = threading.Lock()
     logging.getLogger(__name__).warning(
-        "Detected stale scheduled refresh owner; mutex remains owned: prior=%s", prior
+        "Recovered stale scheduled refresh owner by rotating mutex: prior=%s", prior
     )
-    return False
+    return True
 
 
 def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dict[str, Any]:
     """Live quote/candle refresh with LLM day-lock reuse (no force LLM)."""
     log = logging.getLogger(__name__)
-    if not _SCHEDULED_REFRESH_LOCK.acquire(blocking=False):
+    refresh_lock = _SCHEDULED_REFRESH_LOCK
+    if not refresh_lock.acquire(blocking=False):
         stale = _is_refresh_stale()
-        if stale:
-            _clear_stale_refresh_lock()
-        with _SCHEDULED_REFRESH_STATE_LOCK:
-            active = dict(_SCHEDULED_REFRESH_STATE)
-        return {
-            "success": False,
-            "error": "market_refresh_stale_running" if stale else "market_refresh_already_running",
-            "reason": reason,
-            "activeRefresh": active,
-        }
+        recovered = _clear_stale_refresh_lock() if stale else False
+        if recovered:
+            refresh_lock = _SCHEDULED_REFRESH_LOCK
+            if not refresh_lock.acquire(blocking=False):
+                recovered = False
+        if not recovered:
+            with _SCHEDULED_REFRESH_STATE_LOCK:
+                active = dict(_SCHEDULED_REFRESH_STATE)
+            return {
+                "success": False,
+                "error": "market_refresh_stale_running" if stale else "market_refresh_already_running",
+                "reason": reason,
+                "activeRefresh": active,
+            }
+    refresh_id = uuid.uuid4().hex
     started_mono = time.monotonic()
     started_at = datetime.now(timezone.utc).isoformat()
     with _SCHEDULED_REFRESH_STATE_LOCK:
         _SCHEDULED_REFRESH_STATE.update(
             {
                 "running": True,
+                "refreshId": refresh_id,
                 "reason": reason,
                 "startedAt": started_at,
                 "lastProgressAt": started_at,
@@ -1147,19 +1165,24 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
     finally:
         finished_at = datetime.now(timezone.utc).isoformat()
         with _SCHEDULED_REFRESH_STATE_LOCK:
-            _SCHEDULED_REFRESH_STATE.update(
-                {
-                    "running": False,
-                    "reason": None,
-                    "startedAt": None,
-                    "lastProgressAt": None,
-                    "progress": None,
-                    "lastReason": reason,
-                    "finishedAt": finished_at,
-                    "durationSeconds": round(time.monotonic() - started_mono, 3),
-                }
-            )
-        _SCHEDULED_REFRESH_LOCK.release()
+            if _SCHEDULED_REFRESH_STATE.get("refreshId") == refresh_id:
+                _SCHEDULED_REFRESH_STATE.update(
+                    {
+                        "running": False,
+                        "refreshId": None,
+                        "reason": None,
+                        "startedAt": None,
+                        "lastProgressAt": None,
+                        "progress": None,
+                        "lastReason": reason,
+                        "finishedAt": finished_at,
+                        "durationSeconds": round(time.monotonic() - started_mono, 3),
+                    }
+                )
+        try:
+            refresh_lock.release()
+        except RuntimeError:
+            pass
 
 
 _thread_local_angel_client = threading.local()
@@ -3264,22 +3287,31 @@ def _fetch_batch_quotes_chunked(
     instruments: list[Instrument],
 ) -> dict[str, dict[str, Any]]:
     def _fetch():
+        global _QUOTE_CHUNK_CURSOR
         smart = self.connect()
         token_to_key = {inst.token: inst.key for inst in instruments}
         chunks = [instruments[i : i + QUOTE_CHUNK_SIZE] for i in range(0, len(instruments), QUOTE_CHUNK_SIZE)]
+        if not chunks:
+            return {}
+        with _QUOTE_CHUNK_CURSOR_LOCK:
+            start_idx = _QUOTE_CHUNK_CURSOR % len(chunks)
+        ordered = chunks[start_idx:] + chunks[:start_idx]
         all_fetched: dict[str, dict[str, Any]] = {}
+        processed = 0
 
-        for chunk in chunks:
+        for chunk in ordered:
             if _angel_cooldown_active("marketdata"):
-                # Don't re-pressure Angel mid-batch after a trip; the remaining
-                # chunk(s) are picked up by the next refresh cycle.
                 logging.getLogger(__name__).warning(
-                    "Angel marketdata cooldown active; skipping %d remaining quote chunk(s)",
-                    len(chunks) - chunks.index(chunk),
+                    "Angel marketdata cooldown active; %d quote chunk(s) deferred",
+                    len(ordered) - processed,
                 )
                 break
             all_fetched.update(_fetch_quote_chunk(smart, chunk, token_to_key, self))
+            processed += 1
 
+        if processed:
+            with _QUOTE_CHUNK_CURSOR_LOCK:
+                _QUOTE_CHUNK_CURSOR = (start_idx + processed) % len(chunks)
         return all_fetched
 
     try:
