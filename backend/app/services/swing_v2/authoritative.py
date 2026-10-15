@@ -135,7 +135,14 @@ def _session(scan=None,*,now=None,market=None):
  # Open Swing positions survive the session boundary. Their original
  # sessionDate is the entry date and must never be used to hide them on D2.
  active=[r for r in positions if r.get("positionId") and r.get("entryTimestamp") and not r.get("terminal")]
- marks=_marks(snapshot,[r.get("symbol") for r in active])
+ local_clock=now.time().replace(tzinfo=None)
+ cash_open=_clock("09:15")
+ cash_close=_clock("15:30")
+ market_hours=cash_open<=local_clock<=cash_close and trading_day
+ # During market hours overlay fresh shared/provider quotes.  After close the
+ # final persisted market snapshot/ledger is immutable for the session and is
+ # the fast read source; do not re-hit quote providers on every UI poll.
+ marks=_marks(snapshot,[r.get("symbol") for r in active] if market_hours else None)
  closed=[]
  for r in positions:
   if not r.get("terminal"): continue
@@ -557,7 +564,13 @@ def get_authoritative_session(*,live=False):
     _LOG.exception("Swing V2 durable-ledger fallback failed: %s",fallback_exc)
 
  now=monotonic_time.monotonic()
- ttl=0.75 if live else _SESSION_READ_TTL
+ try:
+  wall_for_ttl=datetime.now(timezone.utc).astimezone(IST)
+  local_for_ttl=wall_for_ttl.time().replace(tzinfo=None)
+  after_hours=local_for_ttl<_clock("09:15") or local_for_ttl>_clock("15:30")
+ except Exception:
+  after_hours=False
+ ttl=30.0 if after_hours else (0.75 if live else _SESSION_READ_TTL)
  with _SESSION_CACHE_LOCK:
   if _SESSION_READ_CACHE is not None and now-_SESSION_READ_CACHE_AT<ttl:
    return copy.deepcopy(_SESSION_READ_CACHE)
@@ -625,9 +638,15 @@ def authoritative_eod_report(for_date):
    recovered+=1
  positions=list(by_key.values())
 
- marks=_marks(_snapshot(),[r.get("symbol") for r in positions])
+ eod_now=datetime.now(IST)
+ eod_local=eod_now.time().replace(tzinfo=None)
+ eod_market_hours=_clock("09:15")<=eod_local<=_clock("15:30")
+ marks=_marks(
+  _snapshot(),
+  [r.get("symbol") for r in positions] if eod_market_hours else None,
+ )
  marked=[]
- now=datetime.now(IST)
+ now=eod_now
  for raw in positions:
   symbol=str(raw.get("symbol") or "").upper()
   mark=marks.get(symbol)
