@@ -1107,7 +1107,7 @@ export default function EodAnalysisPanel({
   const [indexOptions, setIndexOptions] = useState<IndexOptionsReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [localDate, setLocalDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [localDate, setLocalDate] = useState(() => istCalendarToday());
   const [localSwingDate, setLocalSwingDate] = useState('');
   const [liveMarks, setLiveMarks] = useState<LiveMarksState | null>(null);
   const [sort, setSort] = useState<EodSort | null>(null);
