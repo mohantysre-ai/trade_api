@@ -1,0 +1,55 @@
+# syntax=docker/dockerfile:1.7
+# Standalone AI/news service. Deliberately excludes broker, yfinance, pandas,
+# lxml and trading-engine dependencies used by market-api.
+
+FROM python:3.11-slim-bookworm AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /build
+RUN python -m venv /opt/venv
+COPY backend/requirements-ai-news.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-compile -r requirements-ai-news.txt \
+    && find /opt/venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \
+    && find /opt/venv -type f -name "*.pyc" -delete \
+    && find /opt/venv -type f -name "*.pyo" -delete \
+    && find /opt/venv -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true \
+    && find /opt/venv -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
+
+FROM python:3.11-slim-bookworm AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH" \
+    TZ=Asia/Kolkata
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/venv /opt/venv
+
+WORKDIR /app
+COPY backend /app/backend
+RUN find /app/backend -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \
+    && find /app/backend -type f -name "*.pyc" -delete \
+    && mkdir -p /app/state
+
+WORKDIR /app/backend
+
+EXPOSE 8001
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=4)"]
+
+CMD ["uvicorn", "app.services.ai_news_server:app", "--host", "0.0.0.0", "--port", "8001"]
