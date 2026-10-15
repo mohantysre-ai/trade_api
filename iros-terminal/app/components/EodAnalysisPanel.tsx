@@ -1693,13 +1693,13 @@ export default function EodAnalysisPanel({
             />
           </div>
           {fromCache && <span className="desk-pill desk-pill--ok">BOOK · CACHED</span>}
-          {liveActive && liveMarks?.marketOpen && (
+          {(liveActiveIntraday || liveActiveSwing) && liveMarks?.marketOpen && (
             <span className="desk-pill desk-pill--ok inline-flex items-center gap-1.5">
               <span className="desk-breathe-dot" aria-hidden />
               LIVE MARKS
             </span>
           )}
-          {liveActive && liveMarks && !liveMarks.marketOpen && (
+          {(liveActiveIntraday || liveActiveSwing) && liveMarks && !liveMarks.marketOpen && (
             <span className="desk-pill desk-pill--warn">SESSION MARKS</span>
           )}
           <button
@@ -1724,7 +1724,7 @@ export default function EodAnalysisPanel({
       {embedded && (
         <div className="flex flex-wrap items-center gap-2 px-0.5">
           {fromCache && <span className="desk-pill desk-pill--ok">BOOK · CACHED</span>}
-          {liveActive && liveMarks?.marketOpen && (
+          {(liveActiveIntraday || liveActiveSwing) && liveMarks?.marketOpen && (
             <span className="desk-pill desk-pill--ok inline-flex items-center gap-1.5">
               <span className="desk-breathe-dot" aria-hidden />
               LIVE MARKS · 2s
@@ -1937,7 +1937,7 @@ export default function EodAnalysisPanel({
                 {displayIntraday?.date ?? dateStr}
                 {displayIntraday?.symbolSource ? ` · ${displayIntraday.symbolSource}` : ''}
                 {displayIntraday?.isMock ? ' · MOCK' : ''}
-                {liveActive && liveMarks?.marketOpen ? ' · LIVE MTM' : ''}
+                {liveActiveIntraday && liveMarks?.marketOpen ? ' · LIVE MTM' : ''}
               </p>
               {displayIntraday?.executionBasis === 'MODELED_PAPER' && (
                 <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-amber-700">
@@ -2115,7 +2115,7 @@ export default function EodAnalysisPanel({
                 {displaySwing?.symbolSource ? ` · ${displaySwing.symbolSource}` : ''}
                 {displaySwing?.isMock ? ' · MOCK' : ''}
                 {' · Asset Matrix swing lock (not intraday)'}
-                {liveActive && liveMarks?.marketOpen ? ' · LIVE MTM' : ''}
+                {liveActiveSwing && liveMarks?.marketOpen ? ' · LIVE MTM' : ''}
               </p>
               {displaySwing?.executionBasis === 'MODELED_PAPER' && (
                 <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-amber-700">
