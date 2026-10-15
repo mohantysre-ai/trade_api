@@ -1062,6 +1062,25 @@ def _clear_stale_refresh_lock() -> bool:
 def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dict[str, Any]:
     """Live quote/candle refresh with LLM day-lock reuse (no force LLM)."""
     log = logging.getLogger(__name__)
+
+    # Full-universe stock refreshes are market-session work. After cash close,
+    # serve the final durable snapshot immediately instead of re-fetching
+    # Nifty 100/500/Intraday 750/Live Universe instruments. Dedicated macro/news
+    # services may still refresh independently.
+    now_ist = _ist_now()
+    minutes_ist = now_ist.hour * 60 + now_ist.minute
+    if minutes_ist > (15 * 60 + 30) or minutes_ist < (9 * 60 + 15):
+        snapshot = _load_last_snapshot()
+        if isinstance(snapshot, dict) and snapshot:
+            return {
+                "success": True,
+                "reason": reason,
+                "afterHoursSnapshot": True,
+                "pool": snapshot.get("activePool"),
+                "universeSize": snapshot.get("universeSize"),
+                "updatedAt": snapshot.get("updatedAt"),
+                "source": "LAST_MARKET_SNAPSHOT",
+            }
     refresh_lock = _SCHEDULED_REFRESH_LOCK
     if not refresh_lock.acquire(blocking=False):
         stale = _is_refresh_stale()
