@@ -677,6 +677,10 @@ export default function ForensicPanel({
       shortMomentumReadyRows?: number;
       historyReadyRatio?: number;
       universeCoverage?: number;
+      priceCoverage?: number;
+      freshTradableCoverage?: number;
+      coverageGateTier?: string | null;
+      coverageGateReason?: string | null;
       regime?: string | null;
       regimeReasonCodes?: string[];
       regimeStressPoints?: number | null;
@@ -1863,9 +1867,15 @@ export default function ForensicPanel({
                     : '—',
                 ],
                 [
-                  'Universe Coverage',
-                  typeof swingSession?.entryHuntDiagnostics?.universeCoverage === 'number'
-                    ? `${(swingSession.entryHuntDiagnostics.universeCoverage * 100).toFixed(1)}%`
+                  'Price Coverage',
+                  typeof (swingSession?.entryHuntDiagnostics?.priceCoverage ?? swingSession?.entryHuntDiagnostics?.universeCoverage) === 'number'
+                    ? `${((swingSession?.entryHuntDiagnostics?.priceCoverage ?? swingSession?.entryHuntDiagnostics?.universeCoverage ?? 0) * 100).toFixed(1)}%`
+                    : '—',
+                ],
+                [
+                  'Fresh Gate Coverage',
+                  typeof swingSession?.entryHuntDiagnostics?.freshTradableCoverage === 'number'
+                    ? `${(swingSession.entryHuntDiagnostics.freshTradableCoverage * 100).toFixed(1)}%`
                     : '—',
                 ],
                 ['Regime', swingSession?.entryHuntDiagnostics?.regime || '—'],
