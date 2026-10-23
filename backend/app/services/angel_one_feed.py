@@ -1138,11 +1138,15 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
             pool_name=pool,
             force_refresh=True,
             prefer_cache=False,
-            allow_fallback=True,
+            # A generic cached market snapshot is useful for the terminal, but it
+            # is NOT a valid Swing decision snapshot.  Silent fallback here was
+            # how a 200-row generic screen became Feature Rows=0 / Coverage=0
+            # and then got persisted as today's authoritative Swing decision.
+            allow_fallback=not swing_hunt,
             force_llm_refresh=False,
             on_progress=refresh_progress,
             angel_first_quotes=swing_hunt,
-            swing_v2_history=reason.startswith("swing_v2"),
+            swing_v2_history=swing_hunt,
         )
         if not payload.get("success", False):
             return {
@@ -1150,6 +1154,22 @@ def run_scheduled_live_refresh(*, reason: str = "scheduled_live_refresh") -> dic
                 "error": payload.get("error") or "Live refresh produced no payload.",
                 "reason": reason,
             }
+        if swing_hunt:
+            swing_status = payload.get("swingV2DataStatus")
+            swing_status = swing_status if isinstance(swing_status, dict) else {}
+            feature_rows = int(swing_status.get("featureRows") or 0)
+            if payload.get("isSnapshotFallback") or feature_rows <= 0:
+                errors = swing_status.get("errors") or []
+                return {
+                    "success": False,
+                    "error": (
+                        "SWING_V2_REFRESH_INVALID: "
+                        + ("; ".join(str(x) for x in errors[:3]) if errors else "no governed Swing feature rows")
+                    ),
+                    "reason": reason,
+                    "featureRows": feature_rows,
+                    "snapshotFallback": bool(payload.get("isSnapshotFallback")),
+                }
         # A refresh that skipped swing history would otherwise clobber the
         # swing-ready snapshot and fail-close the V2 hunt with zero rows.
         # Carry forward the prior snapshot's swingV2 facts for such refreshes;
