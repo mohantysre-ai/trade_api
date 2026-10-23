@@ -517,24 +517,32 @@ def run_authoritative_cycle(*,now=None,force=False):
      current["backfillDiagnostics"]={"attempted":False,"eligibleExits":[],"locked":0,"filled":0,"reason":"NO_STOP_OR_T2_EXIT"}
   if start<=local<freeze and not current.get("selectionFinalized") and due:
    snapshot=_refresh_snapshot("swing_v2_decision_scan")
+   refresh_error=str(snapshot.get("swingV2RefreshError") or "")
    if not _v2_snapshot_ready(snapshot,cfg):
-    if not (_refresh_is_pending(snapshot) and isinstance(scan,dict)):
+    # Failed/invalid data refresh is transient during the open hunt.  Preserve
+    # the last meaningful scan and keep hunting; never convert it into a
+    # finalized HALT/CASH result merely because today's generic snapshot has
+    # zero Swing feature rows.
+    if refresh_error and isinstance(scan,dict):
+     current["refreshError"]=refresh_error
+    elif not (_refresh_is_pending(snapshot) and isinstance(scan,dict)):
      scan=_scan_not_ready(snapshot,cfg)
    else:
     scan=build_from_market_snapshot(snapshot,final_lock=True,persist_events=True,occupied_symbols=occupied,existing_positions=existing,now=now)
     scan=_attach_regime_diagnostics(scan,snapshot,occupied_symbols=occupied,existing_positions=existing,now=now)
-   current.update(scan=scan,lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=snapshot.get("swingV2RefreshError"))
+   current.update(scan=scan,lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=refresh_error or None)
   elif freeze<=local and (not current.get("selectionFinalized") or (_retryable_final_block(scan) and due and local<=expiry)):
    snapshot=_refresh_snapshot("swing_v2_final_lock")
+   refresh_error=str(snapshot.get("swingV2RefreshError") or "")
    if not _v2_snapshot_ready(snapshot,cfg):
-    refresh_pending=_refresh_is_pending(snapshot)
+    refresh_pending=bool(refresh_error) or _refresh_is_pending(snapshot)
     if not (refresh_pending and isinstance(scan,dict)):
      scan=_scan_not_ready(snapshot,cfg)
    else:
     refresh_pending=False
     scan=build_from_market_snapshot(snapshot,final_lock=True,persist_events=local<=expiry,occupied_symbols=occupied,existing_positions=existing,now=now)
     scan=_attach_regime_diagnostics(scan,snapshot,occupied_symbols=occupied,existing_positions=existing,now=now)
-   current.update(scan=scan,selectionFinalized=not refresh_pending,lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=snapshot.get("swingV2RefreshError"))
+   current.update(scan=scan,selectionFinalized=not refresh_pending,lastScanAt=now.astimezone(timezone.utc).isoformat(),refreshError=refresh_error or None)
    if not refresh_pending: current["finalizedAt"]=now.astimezone(timezone.utc).isoformat()
   # A qualified candidate is locked and paper-filled during the hunt window;
   # 15:10 is only the decision freeze, never a fill-start time. Entry price is
