@@ -10,6 +10,8 @@ import json
 import math
 import os
 import statistics
+import threading
+import time as monotonic_time
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -34,6 +36,9 @@ _HEADERS = {
 }
 
 FALLBACK_SEGMENT = "NIFTY500_FALLBACK"
+_REGIME_MARKET_CACHE_LOCK = threading.Lock()
+_REGIME_MARKET_CACHE: dict[str, Any] = {"at": 0.0, "values": None}
+_REGIME_MARKET_CACHE_TTL = 300.0
 
 
 def _apply_factor_percentiles(prepared: list[dict[str, Any]]) -> None:
@@ -201,21 +206,31 @@ def _regime_from_market(prepared: list[dict[str, Any]]) -> dict[str, Any]:
     usable = [row for row in prepared if _number(row.get("ema20Daily")) and _number(row.get("decisionPrice")) and _number(row.get("return5dRaw")) is not None]
     breadth = 100.0 * sum(float(row["decisionPrice"]) > float(row["ema20Daily"]) for row in usable) / len(usable) if usable else None
     market_5d = statistics.median(float(row["return5dRaw"]) for row in usable) * 100 if usable else None
-    try:
-        import yfinance as yf
+    now_mono = monotonic_time.monotonic()
+    with _REGIME_MARKET_CACHE_LOCK:
+        cached = _REGIME_MARKET_CACHE.get("values")
+        cached_at = float(_REGIME_MARKET_CACHE.get("at") or 0.0)
+    if isinstance(cached, tuple) and now_mono - cached_at < _REGIME_MARKET_CACHE_TTL:
+        index_close, ema, vix_percentile, vix_change = cached
+    else:
+        try:
+            import yfinance as yf
 
-        index = yf.Ticker("^CRSLDX").history(period="3mo", interval="1d")["Close"].dropna().tolist()
-        vix = yf.Ticker("^INDIAVIX").history(period="18mo", interval="1d")["Close"].dropna().tolist()
-        index_close = float(index[-1]) if len(index) >= 20 else None
-        alpha = 2 / 21
-        ema = float(index[0]) if index else 0.0
-        for value in index:
-            ema = float(value) * alpha + ema * (1 - alpha)
-        vix_current = float(vix[-1]) if vix else None
-        vix_percentile = 100.0 * sum(float(value) <= vix_current for value in vix[-252:]) / len(vix[-252:]) if vix_current and vix else None
-        vix_change = (vix[-1] / vix[-2] - 1) * 100 if len(vix) >= 2 else None
-    except Exception:
-        index_close = ema = vix_percentile = vix_change = None
+            index = yf.Ticker("^CRSLDX").history(period="3mo", interval="1d")["Close"].dropna().tolist()
+            vix = yf.Ticker("^INDIAVIX").history(period="18mo", interval="1d")["Close"].dropna().tolist()
+            index_close = float(index[-1]) if len(index) >= 20 else None
+            alpha = 2 / 21
+            ema = float(index[0]) if index else 0.0
+            for value in index:
+                ema = float(value) * alpha + ema * (1 - alpha)
+            vix_current = float(vix[-1]) if vix else None
+            vix_percentile = 100.0 * sum(float(value) <= vix_current for value in vix[-252:]) / len(vix[-252:]) if vix_current and vix else None
+            vix_change = (vix[-1] / vix[-2] - 1) * 100 if len(vix) >= 2 else None
+        except Exception:
+            index_close = ema = vix_percentile = vix_change = None
+        with _REGIME_MARKET_CACHE_LOCK:
+            _REGIME_MARKET_CACHE["at"] = now_mono
+            _REGIME_MARKET_CACHE["values"] = (index_close, ema, vix_percentile, vix_change)
     return classify_regime({"nifty500Close": index_close, "nifty500Ema20": ema or None, "breadthAboveEma20Pct": breadth, "nifty500Return5dPct": market_5d, "vixPercentile": vix_percentile, "vixChange1dPct": vix_change})
 
 
