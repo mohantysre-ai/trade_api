@@ -167,7 +167,85 @@ def _session(scan=None,*,now=None,market=None):
  return {"success":True,"book":"SWING","strategyId":cfg.strategy_id,"policyVersion":cfg.policy_version,"featureVersion":cfg.feature_version,"validationState":"RESEARCH_HYPOTHESIS","authority":"V2","authoritative":True,"executionMode":"PAPER","manualBrokerOrderPlaced":False,"v1Enabled":False,"sessionDate":day,"marketDay":market,"isTradingDay":trading_day,"isHoliday":bool(market.get("isHoliday")),"isWeekend":bool(market.get("isWeekend")),"marketDayReason":str(market.get("reason") or ""),"locked":bool(active) or locked_today or cash,"hunting":in_window and not finalized and (not blocked or retryable_data_block) and len(active)<capacity,"waitingForDecisionWindow":before_decision and not finalized,"decisionPhase":diagnostics["diagnosticPhase"],"decisionWindow":{"start":cfg.decision_start_ist,"freeze":cfg.decision_freeze_ist,"entryCutoff":cfg.entry_cutoff_ist,"orderExpiry":cfg.order_expire_ist,"timezone":"Asia/Kolkata"},"selectionFinalized":finalized,"cashHeld":cash,"cashReason":cash_reason,"source":"swing_v2_ledger","selectionContract":cfg.strategy_id,"long":rows,"short":[],"closedPositions":closed_rows,"counts":{"long":len(rows),"short":0,"total":len(rows),"carried":len(carried),"openedToday":len(opened_today),"closedToday":len(closed_rows),"displayTotal":len(rows)+len(closed_rows)},"capital":{"swingCapital":cfg.nav,"slots":len(rows),"deployedCapital":round(sum(float(r.get("deployedCapital") or 0) for r in rows),2),"remainingCapital":round(max(0,cfg.nav-sum(float(r.get("deployedCapital") or 0) for r in rows)),2),"portfolioRisk":round(sum(float(r.get("initialRiskRupees") or 0) for r in rows),2)},"portfolio":{"swingCapital":cfg.nav,"realizedPnl":round(realized,2),"unrealizedPnl":round(unreal,2),"totalPnl":round(realized+unreal,2),"lockedCount":len(rows),"openCount":len(rows),"closedTodayCount":len(closed_rows),"displayCount":len(rows)+len(closed_rows),"carriedCount":len(carried),"openedTodayCount":len(opened_today)},"v2":effective or {"enabled":True,"authoritative":True,"candidates":[]},"entryHuntDiagnostics":diagnostics,"updatedAt":datetime.now(timezone.utc).isoformat()}
 def _time_until_expiry(now,expiry): return datetime.combine(now.astimezone(IST).date(),expiry,tzinfo=IST)-now.astimezone(IST)
 def _retryable_final_block(scan): return str((scan or {}).get("blockReason") or "") in _RETRYABLE_FINAL_BLOCK_REASONS
+def _overlay_fresh_swing_quotes(snapshot,now):
+ """Refresh only quote facts while preserving expensive Swing history/candles.
+
+ Used when a full 750-name refresh is busy/fails but the persisted snapshot
+ already has valid 1h/daily history.  Fresh quotes are enough to recover the
+ quote-freshness gate without downloading 741 histories again.
+ """
+ if not isinstance(snapshot,dict):
+  return snapshot
+ quotes=snapshot.get("stockQuotes")
+ if not isinstance(quotes,dict) or not quotes:
+  return snapshot
+ symbols=[str(s).upper() for s,row in quotes.items() if isinstance(row,dict)]
+ try:
+  from .market_data import latest_quotes
+  live=latest_quotes(symbols)
+ except Exception as exc:
+  _LOG.warning("Swing lightweight quote overlay failed: %s",exc)
+  return snapshot
+ if not live:
+  return snapshot
+ stamp=datetime.now(timezone.utc).isoformat()
+ patched=dict(snapshot)
+ patched_quotes={k:dict(v) if isinstance(v,dict) else v for k,v in quotes.items()}
+ refreshed=0
+ for symbol,q in live.items():
+  symbol=str(symbol).upper()
+  existing=patched_quotes.get(symbol)
+  if not isinstance(existing,dict) or not isinstance(q,dict):
+   continue
+  try:
+   ltp=float(q.get("ltp") or q.get("lastPrice") or 0)
+  except (TypeError,ValueError):
+   ltp=0.0
+  if ltp<=0:
+   continue
+  row=dict(existing)
+  row["ltpRaw"]=ltp
+  row["ltp"]=ltp
+  for source_key,target_key in (
+   ("open","open"),("high","high"),("low","low"),("close","close"),
+   ("bid","bestBid"),("ask","bestAsk"),("volume","volume"),("tradeVolume","volume"),
+  ):
+   if q.get(source_key) is not None:
+    row[target_key]=q.get(source_key)
+  row["quoteReceivedAt"]=stamp
+  row["fresh"]=True
+  row.pop("staleReason",None)
+  patched_quotes[symbol]=row
+  refreshed+=1
+ if refreshed<=0:
+  return snapshot
+ patched["stockQuotes"]=patched_quotes
+ stocks=[]
+ for row in list(patched.get("stocks") or []):
+  if not isinstance(row,dict):
+   stocks.append(row); continue
+  symbol=str(row.get("ticker") or "").upper()
+  current=patched_quotes.get(symbol)
+  stocks.append({**row,**current} if isinstance(current,dict) else row)
+ patched["stocks"]=stocks
+ try:
+  from .ingestion import enrich_v2_market_snapshot
+  all_rows=[row for row in patched_quotes.values() if isinstance(row,dict)]
+  patched=enrich_v2_market_snapshot(patched,all_rows,now=now)
+  patched.setdefault("swingV2Recovery",{})
+  if isinstance(patched["swingV2Recovery"],dict):
+   patched["swingV2Recovery"].update({
+    "quoteOverlay":True,
+    "refreshedQuoteCount":refreshed,
+    "quoteOverlayAt":stamp,
+   })
+ except Exception as exc:
+  _LOG.warning("Swing quote-overlay enrichment failed: %s",exc)
+ return patched
+
+
 def _refresh_snapshot(reason,*,deadline=None):
+ now=datetime.now(timezone.utc).astimezone(IST)
  try:
   from ..market_refresh_facade import refresh_market_snapshot
   with _DATA_REFRESH_LOCK:
@@ -176,7 +254,13 @@ def _refresh_snapshot(reason,*,deadline=None):
   result={"success":False,"error":str(exc),"reason":reason}
  snapshot=_snapshot()
  if not isinstance(result,dict) or result.get("success") is not True:
-  snapshot=dict(snapshot); snapshot["swingV2RefreshError"]=result.get("error") if isinstance(result,dict) else "unknown_refresh_failure"
+  snapshot=dict(snapshot)
+  snapshot["swingV2RefreshError"]=result.get("error") if isinstance(result,dict) else "unknown_refresh_failure"
+  # If history is already usable, recover freshness cheaply instead of
+  # repeatedly attempting a full quote+candle universe rebuild.
+  status=snapshot.get("swingV2DataStatus") if isinstance(snapshot.get("swingV2DataStatus"),dict) else {}
+  if int(status.get("historyReadyRows") or 0)>0:
+   snapshot=_overlay_fresh_swing_quotes(snapshot,now)
  return snapshot
 def _refresh_is_pending(snapshot):
  return str(snapshot.get("swingV2RefreshError") or "").strip().lower() in {"market_refresh_already_running","live_refresh_already_running"}
