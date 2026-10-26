@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import Any, Callable
 import json
 import re
+import threading
+import time
 
 import requests
 import yfinance as yf
@@ -239,6 +241,9 @@ def _missing_macro_row(inst: YahooInstrument, source: str = "unavailable") -> di
 # ---------------------------------------------------------------------------
 _SPARKLINE_CACHE: dict[str, tuple[float, list[float]]] = {}
 _SPARKLINE_TTL = 300.0  # seconds
+_YAHOO_FALLBACK_CACHE: dict[str, tuple[float, dict[str, Any] | None]] = {}
+_YAHOO_FALLBACK_LOCK = threading.Lock()
+_YAHOO_FALLBACK_TTL = 60.0
 
 
 def _fetch_sparkline(symbol: str) -> list[float]:
@@ -394,6 +399,13 @@ def _fetch_yfinance_quote(inst: YahooInstrument) -> dict[str, Any] | None:
 
 
 def _fetch_yahoo_quote(inst: YahooInstrument) -> dict[str, Any] | None:
+    now = time.time()
+    with _YAHOO_FALLBACK_LOCK:
+        cached = _YAHOO_FALLBACK_CACHE.get(inst.symbol)
+        if cached and now - cached[0] < _YAHOO_FALLBACK_TTL:
+            return dict(cached[1]) if isinstance(cached[1], dict) else None
+
+    row: dict[str, Any] | None = None
     try:
         from yfinance import Ticker
         t = Ticker(inst.symbol)
@@ -404,7 +416,7 @@ def _fetch_yahoo_quote(inst: YahooInstrument) -> dict[str, Any] | None:
             ltp = float(live_price)
             close_val = float(prev_close) if prev_close else ltp
             delta, state = _pct_change(ltp, close_val)
-            return {
+            row = {
                 "label": inst.label,
                 "val": inst.format_val(ltp),
                 "delta": delta,
@@ -416,36 +428,39 @@ def _fetch_yahoo_quote(inst: YahooInstrument) -> dict[str, Any] | None:
     except Exception:
         pass
 
-    try:
-        ticker = yf.Ticker(inst.symbol)
-        hist = ticker.history(period="5d", interval="1d")
-        if not hist.empty:
-            hist = hist.dropna(subset=["Close"])
+    if row is None:
+        try:
+            ticker = yf.Ticker(inst.symbol)
+            hist = ticker.history(period="5d", interval="1d")
             if not hist.empty:
-                last = hist.iloc[-1]
-                ltp = float(last["Close"])
-                close = float(hist.iloc[-2]["Close"]) if len(hist) >= 2 else ltp
-                delta, state = _pct_change(ltp, close)
-                return {
-                    "label": inst.label,
-                    "val": inst.format_val(ltp),
-                    "delta": delta,
-                    "state": state,
-                    "group": inst.group,
-                    "source": "yahoo_finance",
-                    "sparkline": _fetch_sparkline(inst.symbol),
-                }
-    except Exception:
-        pass
+                hist = hist.dropna(subset=["Close"])
+                if not hist.empty:
+                    last = hist.iloc[-1]
+                    ltp = float(last["Close"])
+                    close = float(hist.iloc[-2]["Close"]) if len(hist) >= 2 else ltp
+                    delta, state = _pct_change(ltp, close)
+                    row = {
+                        "label": inst.label,
+                        "val": inst.format_val(ltp),
+                        "delta": delta,
+                        "state": state,
+                        "group": inst.group,
+                        "source": "yahoo_finance",
+                        "sparkline": _fetch_sparkline(inst.symbol),
+                    }
+        except Exception:
+            pass
 
-    row = _fetch_yfinance_quote(inst)
-    if row is not None:
-        return row
-    row = _fetch_yahoo_api_quote(inst)
+    if row is None:
+        row = _fetch_yfinance_quote(inst)
+    if row is None:
+        row = _fetch_yahoo_api_quote(inst)
     if row is None:
         row = _fetch_yahoo_html_quote(inst)
-    return row
 
+    with _YAHOO_FALLBACK_LOCK:
+        _YAHOO_FALLBACK_CACHE[inst.symbol] = (now, dict(row) if isinstance(row, dict) else None)
+    return row
 
 def _fetch_investing_com_quote(symbol: str, label: str) -> dict[str, Any] | None:
     """Fetch GIFT NIFTY and other data from investing.com."""
